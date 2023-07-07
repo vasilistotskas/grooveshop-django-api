@@ -2,6 +2,12 @@
 
 <!--next-version-placeholder-->
 
+## v0.1.1 (2023-07-07)
+
+### Fix
+
+* **build:** Pyproject.toml, setup.cfg and setup.py ([`a7f6638`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a7f6638ba3ac685984daa0fa0d040c448d5e1899))
+
 ## v0.1.0 (2023-07-07)
 
 ### Feature

@@ -2,6 +2,12 @@
 
 <!--next-version-placeholder-->
 
+## v0.2.0 (2023-07-07)
+
+### Feature
+
+* **docker:** Added docker file and more minor fixes ([`f6706d8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f6706d852aa993a3dcf7d684e01439011382b7ad))
+
 ## v0.1.1 (2023-07-07)
 
 ### Fix

@@ -1,0 +1,63 @@
+{% extends "account/base.html" %}
+
+{% load i18n %}
+{% load form_filters %}
+{% block head_title %}{% trans "Signup" %}{% endblock %}
+
+{% block content %}
+    <h1 class="grid p-10 items-center justify-items-center text-xl font-black">{{ site.name }} - {% trans "Sign Up" %}</h1>
+
+    <div class="grid items-center justify-items-center w-full h-full g-6 text-gray-800">
+        <div class="w-full rounded-lg shadow border md:mt-0 sm:max-w-md xl:p-0 bg-zinc-800 border-gray-700">
+            <div class="p-12 sm:p-8">
+                <h2 class="text-xl font-bold leading-tight tracking-tight md:text-2xl text-white">
+                    {% trans "Create an account" %}
+                </h2>
+                <form class="signup" id="signup_form" method="post" action="{% url 'account_signup' %}">
+                    {% csrf_token %}
+                    <div>
+                        <label for="email" class="block mb-2 text-sm font-medium text-white">{% trans "Your email" %}</label>
+                        {{ form.email | add_class:"border sm:text-sm rounded-lg block w-full p-2.5 bg-gray-700 border-gray-600 :placeholder-gray-400 text-white focus:ring-blue-500 focus:border-blue-500" }}
+                        <div class="form-errors">
+                            {{ form.email.errors | safe }}
+                        </div>
+                    </div>
+                    <div>
+                        <label for="password1" class="block mb-2 text-sm font-medium text-white">{% trans "Password" %}</label>
+                        {{ form.password1 | add_class:"border sm:text-sm rounded-lg block w-full p-2.5 bg-gray-700 border-gray-600 :placeholder-gray-400 text-white focus:ring-blue-500 focus:border-blue-500" }}
+                        <div class="form-errors">
+                            {{ form.password1.errors | safe }}
+                        </div>
+                    </div>
+                    <div>
+                        <label for="password2" class="block mb-2 text-sm font-medium text-white">{% trans "Confirm password" %}</label>
+                        {{ form.password2 | add_class:"border sm:text-sm rounded-lg block w-full p-2.5 bg-gray-700 border-gray-600 :placeholder-gray-400 text-white focus:ring-blue-500 focus:border-blue-500" }}
+                        <div class="form-errors">
+                            {{ form.password2.errors | safe }}
+                        </div>
+                    </div>
+                    {% if form.non_field_errors %}
+                        <div class="form-errors">
+                          {{ form.non_field_errors | safe }}
+                        </div>
+                    {% endif %}
+                    <div class="flex items-start mb-5">
+                        <div class="flex items-center h-5">
+                          <input id="terms" aria-describedby="terms" type="checkbox" class="w-4 h-4 border rounded focus:ring-3 bg-gray-700 border-gray-600 focus:ring-primary-600 ring-offset-gray-800" required>
+                        </div>
+                        <div class="ml-3 text-sm">
+                          <label for="terms" class="font-light text-gray-300">{% blocktrans %}I accept the <a class="font-medium hover:underline" href="#">Terms and Conditions{% endblocktrans %}</a></label>
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full text-white ring-2 ring-primary outline-none font-medium rounded-lg text-sm px-5 py-2.5 text-center bg-primary-600 hover:bg-primary-700 ring-primary-800 mb-5">{% trans "Sign Up" %} &raquo;</button>
+                    <p class="grid items-center justify-items-center font-light text-gray-300">
+                      {% blocktrans %}Already have an account? <a href="{{ login_url }}" class="font-medium hover:underline text-primary-500">Login here{% endblocktrans %}</a>
+                    </p>
+                    {% if redirect_field_value %}
+                      <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}" />
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}

@@ -98,7 +98,7 @@ jobs:
         if: matrix.db == 'postgres'
         run: coveralls --service=github
         env:
-          GITHUB_TOKEN: ${{ secrets.DJANGO_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Store Pull Request comment to be posted
         uses: actions/upload-artifact@v3

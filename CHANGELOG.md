@@ -2,6 +2,12 @@
 
 <!--next-version-placeholder-->
 
+## v0.2.1 (2023-07-07)
+
+### Fix
+
+* **docker.yml:** Image fix ([`b8058de`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b8058dee7d98f0ec3fd8a670330e259642a62fe2))
+
 ## v0.2.0 (2023-07-07)
 
 ### Feature

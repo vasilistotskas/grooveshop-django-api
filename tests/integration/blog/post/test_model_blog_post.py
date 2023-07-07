@@ -53,7 +53,7 @@ class BlogPostTestCase(TestCase):
         post = BlogPost.objects.get(title="title")
         image: str = ""
         if post.image and hasattr(post.image, "url"):
-            image = settings.BACKEND_BASE_URL + post.image.url
+            image = settings.APP_BASE_URL + post.image.url
         self.assertEqual(post.main_image_absolute_url, image)
 
     def test_number_of_likes(self):

@@ -18,7 +18,7 @@ class SlideViewSetTestCase(APITestCase):
     def setUp(self):
         self.slider = Slider.objects.create(
             name="test",
-            url="http://localhost:8010/",
+            url="http://localhost:8000/",
             title="test",
             description="test",
         )
@@ -46,7 +46,7 @@ class SlideViewSetTestCase(APITestCase):
     def test_create_valid(self):
         slider = Slider.objects.create(
             name="test_new",
-            url="http://localhost:8010/",
+            url="http://localhost:8000/",
             title="test_new",
             description="test_new",
         )

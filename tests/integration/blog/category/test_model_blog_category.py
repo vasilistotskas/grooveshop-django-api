@@ -27,7 +27,7 @@ class BlogCategoryTestCase(TestCase):
         category = BlogCategory.objects.get(name="name")
         image: str = ""
         if category.image and hasattr(category.image, "url"):
-            image = settings.BACKEND_BASE_URL + category.image.url
+            image = settings.APP_BASE_URL + category.image.url
         self.assertEqual(category.main_image_absolute_url, image)
 
     def test_get_main_image_filename(self):

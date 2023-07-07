@@ -65,7 +65,7 @@ class ProductCategory(MPTTModel, UUIDModel, TimeStampMixinModel, SeoModel):
     def category_menu_image_one_absolute_url(self) -> str:
         image: str = ""
         if self.menu_image_one:
-            return settings.BACKEND_BASE_URL + self.menu_image_one.url
+            return settings.APP_BASE_URL + self.menu_image_one.url
         return image
 
     @property
@@ -79,7 +79,7 @@ class ProductCategory(MPTTModel, UUIDModel, TimeStampMixinModel, SeoModel):
     def category_menu_image_two_absolute_url(self) -> str:
         image: str = ""
         if self.menu_image_two:
-            image = settings.BACKEND_BASE_URL + self.menu_image_two.url
+            image = settings.APP_BASE_URL + self.menu_image_two.url
         return image
 
     @property
@@ -93,7 +93,7 @@ class ProductCategory(MPTTModel, UUIDModel, TimeStampMixinModel, SeoModel):
     def category_menu_main_banner_absolute_url(self) -> str:
         image: str = ""
         if self.menu_main_banner:
-            return settings.BACKEND_BASE_URL + self.menu_main_banner.url
+            return settings.APP_BASE_URL + self.menu_main_banner.url
         return image
 
     @property

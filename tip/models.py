@@ -41,7 +41,7 @@ class Tip(TimeStampMixinModel, SortableModel, UUIDModel):
     def main_image_absolute_url(self) -> str:
         icon: str = ""
         if self.icon and hasattr(self.icon, "url"):
-            return settings.BACKEND_BASE_URL + self.icon.url
+            return settings.APP_BASE_URL + self.icon.url
         return icon
 
     @property

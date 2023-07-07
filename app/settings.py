@@ -9,8 +9,7 @@ env = environ.Env(
     SECRET_KEY=(str, "django-insecure-1#t2p3u4^=5)6@7(8)9-0"),
     DEBUG=(bool, True),
     SYSTEM_ENV=(str, "dev"),
-    BACKEND_BASE_URL=(str, "http://localhost:8000"),
-    APP_BASE_URL=(str, "http://localhost:8010"),
+    APP_BASE_URL=(str, "http://localhost:8000"),
     NUXT_BASE_URL=(str, "http://localhost:3000"),
     APP_MAIN_HOST_NAME=(str, "localhost"),
     MEDIA_STREAM_URL=(str, "http://localhost:3003/media_stream-image"),
@@ -59,12 +58,11 @@ SYSTEM_ENV = env("SYSTEM_ENV")
 if "celery" in sys.argv[0]:
     DEBUG = False
 
-BACKEND_BASE_URL = str(env("BACKEND_BASE_URL"))
 APP_BASE_URL = str(env("APP_BASE_URL"))
 NUXT_BASE_URL = str(env("NUXT_BASE_URL"))
 APP_MAIN_HOST_NAME = str(env("APP_MAIN_HOST_NAME"))
 MEDIA_STREAM_URL = str(env("MEDIA_STREAM_URL"))
-BASE_URL = BACKEND_BASE_URL
+BASE_URL = APP_BASE_URL
 
 ALLOWED_HOSTS = [APP_MAIN_HOST_NAME, "127.0.0.1", "http://localhost:3003", "backend"]
 ALLOWED_HOSTS.extend(
@@ -78,19 +76,16 @@ CORS_ORIGIN_ALLOW_ALL = bool(env("CORS_ORIGIN_ALLOW_ALL"))
 CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_WHITELIST = [
     APP_BASE_URL,
-    BACKEND_BASE_URL,
     NUXT_BASE_URL,
     "http://localhost:3003",
 ]
 CSRF_TRUSTED_ORIGINS = [
     APP_BASE_URL,
-    BACKEND_BASE_URL,
     NUXT_BASE_URL,
     "http://localhost:3003",
 ]
 CORS_ALLOWED_ORIGINS = [
     APP_BASE_URL,
-    BACKEND_BASE_URL,
     NUXT_BASE_URL,
     "http://localhost:3003",
 ]

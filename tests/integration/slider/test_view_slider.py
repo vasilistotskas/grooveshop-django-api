@@ -15,7 +15,7 @@ class SliderViewSetTestCase(APITestCase):
     def setUp(self):
         self.slider = Slider.objects.create(
             name="test",
-            url="http://localhost:8010/",
+            url="http://localhost:8000/",
             title="test",
             description="test",
         )
@@ -30,7 +30,7 @@ class SliderViewSetTestCase(APITestCase):
     def test_create_valid(self):
         payload = {
             "name": "test_one",
-            "url": "http://localhost:8010/",
+            "url": "http://localhost:8000/",
             "title": "test_one",
             "description": "test_one",
         }
@@ -43,7 +43,7 @@ class SliderViewSetTestCase(APITestCase):
     def test_create_invalid(self):
         payload = {
             "name": "test",
-            "url": "http://localhost:8010/",
+            "url": "http://localhost:8000/",
         }
         response = self.client.post(
             "/api/v1/slider/", json.dumps(payload), content_type="application/json"
@@ -65,7 +65,7 @@ class SliderViewSetTestCase(APITestCase):
     def test_update_valid(self):
         payload = {
             "name": "test_two",
-            "url": "http://localhost:8010/",
+            "url": "http://localhost:8000/",
             "title": "test_two",
             "description": "test_two",
         }
@@ -82,7 +82,7 @@ class SliderViewSetTestCase(APITestCase):
             "title": "INVALID INVALID INVALID INVALID INVALID INVALID INVALID INVALID "
             "INVALID INVALID INVALID INVALID INVALID INVALID "
             "INVALID INVALID INVALID INVALID",
-            "url": "http://localhost:8010/",
+            "url": "http://localhost:8000/",
             "image": "test",
         }
         response = self.client.put(
@@ -95,7 +95,7 @@ class SliderViewSetTestCase(APITestCase):
     def test_partial_update_valid(self):
         payload = {
             "name": "test_three",
-            "url": "http://localhost:8010/",
+            "url": "http://localhost:8000/",
             "title": "test_three",
             "description": "test_three",
         }
@@ -112,7 +112,7 @@ class SliderViewSetTestCase(APITestCase):
             "title": "INVALID INVALID INVALID INVALID INVALID INVALID INVALID INVALID "
             "INVALID INVALID INVALID INVALID INVALID INVALID "
             "INVALID INVALID INVALID INVALID",
-            "url": "http://localhost:8010/",
+            "url": "http://localhost:8000/",
             "image": "test",
         }
         response = self.client.patch(

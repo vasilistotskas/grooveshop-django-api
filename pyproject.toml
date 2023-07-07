@@ -11,7 +11,7 @@ version_variable = [
     "setup.py:__version__",
     "pyproject.toml:version"
 ]
-branch = "master"
+branch = "main"
 upload_to_pypi = false
 upload_to_release = true
 build_command = "pip install poetry && poetry build"

@@ -3,7 +3,7 @@ from setuptools import setup
 __version__ = "0.1.0"
 
 setup(
-    name="src",
+    name="grooveshop-django-api",
     version=__version__,
     description="GrooveShop Setup",
     author="Vasilis Totskas",

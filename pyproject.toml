@@ -1,9 +1,12 @@
 [tool.poetry]
-name = "src"
+name = "grooveshop-django-api"
 version = "0.1.0"
 description = "GrooveShop Backend"
 authors = [
     "Vasilis Totskas"
+]
+packages = [
+    { include = "*", from = "." },
 ]
 
 [tool.semantic_release]
@@ -64,9 +67,9 @@ pudb = "*"
 black = "23.3.0"
 
 [tool.setuptools.packages.find]
-where = ["src"]  # list of folders that contain the packages (["."] by default)
+where = ["."]  # list of folders that contain the packages (["."] by default)
 include = ["*"]  # package names should match these glob patterns (["*"] by default)
-exclude = ["files*", "logs*"]  # exclude packages matching these glob patterns
+exclude = ["static*", "logs*", "media*", "htmlcov*", "venv*"]  # package names should not match these glob patterns ([] by default)
 namespaces = false  # to disable scanning PEP 420 namespaces (true by default)
 
 [build-system]

@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from typing import Literal
 
+from django.http import HttpRequest
+
 from cart.models import Cart
 from cart.models import CartItem
 from core import caches
 from product.models.product import Product
-from django.http import HttpRequest
 
 
 class CartService:

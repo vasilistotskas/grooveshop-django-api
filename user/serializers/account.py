@@ -1,7 +1,8 @@
-from user.models import UserAccount
 from django.http import HttpRequest
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
+
+from user.models import UserAccount
 
 
 class UserAccountSerializer(serializers.ModelSerializer):

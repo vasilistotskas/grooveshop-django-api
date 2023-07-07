@@ -1,5 +1,6 @@
-from vat.models import Vat
 from django.contrib import admin
+
+from vat.models import Vat
 
 
 @admin.register(Vat)

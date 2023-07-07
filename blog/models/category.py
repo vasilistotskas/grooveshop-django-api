@@ -1,10 +1,11 @@
 import os
 
+from django.conf import settings
+from django.db import models
+
 from core.models import SortableModel
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
-from django.conf import settings
-from django.db import models
 
 
 class BlogCategory(TimeStampMixinModel, SortableModel, UUIDModel):

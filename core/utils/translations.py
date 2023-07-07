@@ -4,9 +4,10 @@ from typing import Any
 from typing import Dict
 from typing import Tuple
 
-from core.enum.core_enum import LangCodesEnum
 from django.db import models
 from django.utils.translation import get_language
+
+from core.enum.core_enum import LangCodesEnum
 
 
 class TranslationWrapper:

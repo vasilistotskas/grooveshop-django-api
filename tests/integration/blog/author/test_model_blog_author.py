@@ -1,6 +1,7 @@
-from blog.models.author import BlogAuthor
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+
+from blog.models.author import BlogAuthor
 
 User = get_user_model()
 

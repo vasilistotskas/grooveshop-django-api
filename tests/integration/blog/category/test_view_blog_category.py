@@ -3,12 +3,13 @@ from __future__ import annotations
 import json
 import os
 
-from app.settings import BASE_DIR
-from blog.models.category import BlogCategory
-from blog.serializers.category import BlogCategorySerializer
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import status
 from rest_framework.test import APITestCase
+
+from app.settings import BASE_DIR
+from blog.models.category import BlogCategory
+from blog.serializers.category import BlogCategorySerializer
 
 
 class BlogCategoryViewSetTestCase(APITestCase):

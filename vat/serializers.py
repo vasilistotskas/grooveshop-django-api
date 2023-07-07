@@ -1,5 +1,6 @@
-from vat.models import Vat
 from rest_framework import serializers
+
+from vat.models import Vat
 
 
 class VatSerializer(serializers.ModelSerializer):

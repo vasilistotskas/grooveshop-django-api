@@ -1,5 +1,6 @@
-from blog.models.tag import BlogTag
 from django.test import TestCase
+
+from blog.models.tag import BlogTag
 
 
 class BlogTagTestCase(TestCase):

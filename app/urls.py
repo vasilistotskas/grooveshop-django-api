@@ -1,4 +1,3 @@
-from session.views import ActiveUserViewSet
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
@@ -12,6 +11,8 @@ from drf_spectacular.views import SpectacularRedocView
 from drf_spectacular.views import SpectacularSwaggerView
 from rest_framework import routers
 from rest_framework.authtoken import views
+
+from session.views import ActiveUserViewSet
 
 app_name = "app"
 

@@ -1,6 +1,9 @@
 from typing import Dict
 from typing import Type
 
+from rest_framework import serializers
+from rest_framework.relations import PrimaryKeyRelatedField
+
 from core.api.serializers import BaseExpandSerializer
 from product.models.category import ProductCategory
 from product.models.product import Product
@@ -8,8 +11,6 @@ from product.models.product import ProductImages
 from product.serializers.category import ProductCategorySerializer
 from vat.models import Vat
 from vat.serializers import VatSerializer
-from rest_framework import serializers
-from rest_framework.relations import PrimaryKeyRelatedField
 
 
 class ProductSerializer(BaseExpandSerializer):

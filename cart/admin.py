@@ -1,6 +1,7 @@
+from django.contrib import admin
+
 from cart.models import Cart
 from cart.models import CartItem
-from django.contrib import admin
 
 
 class CartItemInline(admin.TabularInline):

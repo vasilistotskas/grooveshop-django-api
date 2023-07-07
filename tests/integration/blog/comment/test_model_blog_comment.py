@@ -1,9 +1,10 @@
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+
 from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
 from blog.models.comment import BlogComment
 from blog.models.post import BlogPost
-from django.contrib.auth import get_user_model
-from django.test import TestCase
 
 User = get_user_model()
 

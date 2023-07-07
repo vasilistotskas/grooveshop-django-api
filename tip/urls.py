@@ -1,6 +1,7 @@
-from tip.views import TipViewSet
 from django.urls import path
 from rest_framework.urlpatterns import format_suffix_patterns
+
+from tip.views import TipViewSet
 
 urlpatterns = [
     path(

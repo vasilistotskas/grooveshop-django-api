@@ -1,14 +1,15 @@
 import os
 
-from core.models import TimeStampMixinModel
-from core.models import UUIDModel
-from product.models.product import Product
-from seo.models import SeoModel
 from django.conf import settings
 from django.db import models
 from mptt.fields import TreeForeignKey
 from mptt.models import MPTTModel
 from tinymce.models import HTMLField
+
+from core.models import TimeStampMixinModel
+from core.models import UUIDModel
+from product.models.product import Product
+from seo.models import SeoModel
 
 
 class ProductCategory(MPTTModel, UUIDModel, TimeStampMixinModel, SeoModel):

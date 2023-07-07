@@ -1,10 +1,5 @@
 from __future__ import annotations
 
-from blog.models.post import BlogPost
-from blog.paginators.post import BlogPostPagination
-from blog.serializers.post import BlogPostSerializer
-from core.api.views import BaseExpandView
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action
@@ -13,6 +8,12 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
+
+from blog.models.post import BlogPost
+from blog.paginators.post import BlogPostPagination
+from blog.serializers.post import BlogPostSerializer
+from core.api.views import BaseExpandView
+from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 
 
 class BlogPostViewSet(BaseExpandView, ModelViewSet):

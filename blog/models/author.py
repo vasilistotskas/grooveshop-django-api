@@ -1,6 +1,7 @@
+from django.db import models
+
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
-from django.db import models
 
 
 class BlogAuthor(TimeStampMixinModel, UUIDModel):

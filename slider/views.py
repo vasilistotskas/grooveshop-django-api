@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import status
+from rest_framework.filters import SearchFilter
+from rest_framework.generics import get_object_or_404
+from rest_framework.response import Response
+from rest_framework.viewsets import ModelViewSet
+
 from core.api.views import BaseExpandView
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from slider.models import Slide
@@ -8,12 +15,6 @@ from slider.paginators import SlidePagination
 from slider.paginators import SliderPagination
 from slider.serializers import SliderSerializer
 from slider.serializers import SlideSerializer
-from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import status
-from rest_framework.filters import SearchFilter
-from rest_framework.generics import get_object_or_404
-from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet
 
 
 class SliderViewSet(ModelViewSet):

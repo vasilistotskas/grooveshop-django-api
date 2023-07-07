@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import json
 
+from rest_framework import status
+from rest_framework.test import APITestCase
+
 from product.models.category import ProductCategory
 from product.models.product import Product
 from product.serializers.product import ProductSerializer
 from vat.models import Vat
-from rest_framework import status
-from rest_framework.test import APITestCase
 
 
 class ProductViewSetTestCase(APITestCase):

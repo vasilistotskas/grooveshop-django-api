@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import json
 
-from user.models import UserAccount
-from user.serializers.account import UserAccountSerializer
 from rest_framework import status
 from rest_framework.test import APITestCase
+
+from user.models import UserAccount
+from user.serializers.account import UserAccountSerializer
 
 
 class UserAccountViewSetTestCase(APITestCase):

@@ -1,6 +1,7 @@
+from django.contrib import admin
+
 from country.models import Country
 from region.admin import RegionInline
-from django.contrib import admin
 
 
 @admin.register(Country)

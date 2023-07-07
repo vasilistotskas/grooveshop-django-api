@@ -1,6 +1,9 @@
 from typing import Dict
 from typing import Type
 
+from rest_framework import serializers
+from rest_framework.relations import PrimaryKeyRelatedField
+
 from core.api.serializers import BaseExpandSerializer
 from country.models import Country
 from country.serializers import CountrySerializer
@@ -9,8 +12,6 @@ from region.serializers import RegionSerializer
 from user.models import UserAccount
 from user.models import UserAddress
 from user.serializers.account import UserAccountSerializer
-from rest_framework import serializers
-from rest_framework.relations import PrimaryKeyRelatedField
 
 
 class UserAddressSerializer(BaseExpandSerializer):

@@ -1,5 +1,6 @@
-from tip.models import Tip
 from rest_framework import serializers
+
+from tip.models import Tip
 
 
 class TipSerializer(serializers.ModelSerializer):

@@ -1,10 +1,11 @@
-from cart.service import CartService
-from core import caches
 from django.contrib.auth.signals import user_logged_in
 from django.contrib.auth.signals import user_logged_out
 from django.core.serializers import serialize
 from django.dispatch import receiver
 from django.utils.timezone import now
+
+from cart.service import CartService
+from core import caches
 
 
 @receiver(user_logged_in)

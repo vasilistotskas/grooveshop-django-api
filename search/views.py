@@ -1,8 +1,9 @@
+from django.db.models import Q
+from rest_framework import generics
+
 from product.models.product import Product
 from product.serializers.product import ProductSerializer
 from search.paginators import SearchPagination
-from django.db.models import Q
-from rest_framework import generics
 
 
 class SearchProduct(generics.ListAPIView):

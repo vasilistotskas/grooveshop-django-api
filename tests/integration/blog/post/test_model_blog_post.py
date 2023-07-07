@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import os
 
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase
+
 from app.settings import BASE_DIR
 from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
 from blog.models.post import BlogPost
 from blog.models.tag import BlogTag
-from django.conf import settings
-from django.contrib.auth import get_user_model
-from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
 
 User = get_user_model()
 

@@ -1,5 +1,6 @@
-from pay_way.models import PayWay
 from rest_framework import serializers
+
+from pay_way.models import PayWay
 
 
 class PayWaySerializer(serializers.ModelSerializer):

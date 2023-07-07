@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import json
 
-from slider.models import Slide
-from slider.models import Slider
-from slider.serializers import SlideSerializer
 from django.utils.timezone import now
 from rest_framework import status
 from rest_framework.test import APITestCase
+
+from slider.models import Slide
+from slider.models import Slider
+from slider.serializers import SlideSerializer
 
 
 class SlideViewSetTestCase(APITestCase):

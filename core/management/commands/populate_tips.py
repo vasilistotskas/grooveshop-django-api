@@ -1,14 +1,15 @@
 import os
 import random
 
-from app.settings import BASE_DIR
-from tip.models import Tip
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import BaseCommand
 from django.utils.timezone import now
 from faker import Faker
+
+from app.settings import BASE_DIR
+from tip.models import Tip
 
 
 class Command(BaseCommand):

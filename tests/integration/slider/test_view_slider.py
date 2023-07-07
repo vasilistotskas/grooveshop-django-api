@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import json
 
-from slider.models import Slider
-from slider.serializers import SliderSerializer
 from rest_framework import status
 from rest_framework.test import APITestCase
+
+from slider.models import Slider
+from slider.serializers import SliderSerializer
 
 
 class SliderViewSetTestCase(APITestCase):

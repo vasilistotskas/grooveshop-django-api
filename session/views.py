@@ -3,9 +3,6 @@ from __future__ import annotations
 import json
 from datetime import timedelta
 
-from core import caches
-from user.models import UserAccount
-from user.serializers.account import UserAccountSerializer
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.http import JsonResponse
@@ -18,6 +15,10 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
+
+from core import caches
+from user.models import UserAccount
+from user.serializers.account import UserAccountSerializer
 
 User = get_user_model()
 

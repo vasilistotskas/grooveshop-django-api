@@ -1,12 +1,13 @@
 import os
 
+from django.conf import settings
+from django.db import models
+from django.utils.safestring import mark_safe
+
 from core.models import SortableModel
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
 from helpers.image_resize import make_thumbnail
-from django.conf import settings
-from django.db import models
-from django.utils.safestring import mark_safe
 
 
 class Slider(TimeStampMixinModel, UUIDModel):

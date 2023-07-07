@@ -1,12 +1,13 @@
 from random import randrange
 
+from django.core.management import BaseCommand
+from django.utils.timezone import now
+from faker import Faker
+
 from country.models import Country
 from order.models import Order
 from order.models import OrderItem
 from pay_way.models import PayWay
-from django.core.management import BaseCommand
-from django.utils.timezone import now
-from faker import Faker
 
 
 class Command(BaseCommand):

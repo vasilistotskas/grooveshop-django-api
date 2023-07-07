@@ -1,6 +1,7 @@
-from country.views import CountryViewSet
 from django.urls import path
 from rest_framework.urlpatterns import format_suffix_patterns
+
+from country.views import CountryViewSet
 
 urlpatterns = [
     path(

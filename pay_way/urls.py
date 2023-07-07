@@ -1,5 +1,6 @@
-from pay_way.views import PayWayViewSet
 from django.urls import path
+
+from pay_way.views import PayWayViewSet
 
 urlpatterns = [
     path(

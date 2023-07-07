@@ -1,13 +1,14 @@
 import os
 
+from django.conf import settings
+from django.db import models
+from django.utils.safestring import mark_safe
+
 from core.models import SortableModel
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
 from tip.enum.tip_enum import TipKindEnum
 from tip.validators import validate_file_extension
-from django.conf import settings
-from django.db import models
-from django.utils.safestring import mark_safe
 
 
 class Tip(TimeStampMixinModel, SortableModel, UUIDModel):

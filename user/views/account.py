@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
-from user.paginators.account import UserAccountPagination
-from user.serializers.account import UserAccountSerializer
 from django.contrib.auth import get_user_model
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
@@ -12,6 +9,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
+
+from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+from user.paginators.account import UserAccountPagination
+from user.serializers.account import UserAccountSerializer
 
 User = get_user_model()
 

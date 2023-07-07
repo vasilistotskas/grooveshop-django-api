@@ -4,11 +4,6 @@ import os
 from typing import Any
 from typing import List
 
-from core import caches
-from core.models import TimeStampMixinModel
-from core.models import UUIDModel
-from user.enum.address import FloorChoicesEnum
-from user.enum.address import LocationChoicesEnum
 from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser
 from django.contrib.auth.models import BaseUserManager
@@ -18,6 +13,12 @@ from django.core.cache import cache
 from django.db import models
 from django.http import HttpRequest
 from django.utils.safestring import mark_safe
+
+from core import caches
+from core.models import TimeStampMixinModel
+from core.models import UUIDModel
+from user.enum.address import FloorChoicesEnum
+from user.enum.address import LocationChoicesEnum
 
 User = settings.AUTH_USER_MODEL
 
@@ -128,9 +129,7 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
             return mark_safe('<img src="{}" height="50"/>'.format(self.image.url))
         else:
             return mark_safe(
-                '<img src="{}" height="50"/>'.format(
-                    "/files/images/default.png"
-                )
+                '<img src="{}" height="50"/>'.format("/files/images/default.png")
             )
 
 

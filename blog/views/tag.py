@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-from blog.models.tag import BlogTag
-from blog.paginators.tag import BlogTagPagination
-from blog.serializers.tag import BlogTagSerializer
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.filters import SearchFilter
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
+
+from blog.models.tag import BlogTag
+from blog.paginators.tag import BlogTagPagination
+from blog.serializers.tag import BlogTagSerializer
+from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 
 
 class BlogTagViewSet(ModelViewSet):

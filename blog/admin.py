@@ -1,9 +1,10 @@
+from django.contrib import admin
+
 from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
 from blog.models.comment import BlogComment
 from blog.models.post import BlogPost
 from blog.models.tag import BlogTag
-from django.contrib import admin
 
 
 @admin.register(BlogAuthor)

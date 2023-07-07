@@ -1,14 +1,15 @@
 import os
 
-from app.settings import BASE_DIR
-from slider.models import Slide
-from slider.models import Slider
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import BaseCommand
 from django.utils.timezone import now
 from faker import Faker
+
+from app.settings import BASE_DIR
+from slider.models import Slide
+from slider.models import Slider
 
 
 class Command(BaseCommand):

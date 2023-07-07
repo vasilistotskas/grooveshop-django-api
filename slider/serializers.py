@@ -1,11 +1,12 @@
 from typing import Dict
 from typing import Type
 
+from rest_framework import serializers
+from rest_framework.relations import PrimaryKeyRelatedField
+
 from core.api.serializers import BaseExpandSerializer
 from slider.models import Slide
 from slider.models import Slider
-from rest_framework import serializers
-from rest_framework.relations import PrimaryKeyRelatedField
 
 
 class SliderSerializer(serializers.ModelSerializer):

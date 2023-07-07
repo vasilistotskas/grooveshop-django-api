@@ -1,10 +1,11 @@
 import json
 
-from blog.models.author import BlogAuthor
-from blog.serializers.author import BlogAuthorSerializer
 from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.test import APITestCase
+
+from blog.models.author import BlogAuthor
+from blog.serializers.author import BlogAuthorSerializer
 
 User = get_user_model()
 

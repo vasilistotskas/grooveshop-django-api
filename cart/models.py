@@ -1,7 +1,8 @@
-from core.models import TimeStampMixinModel
-from core.models import UUIDModel
 from django.db import models
 from django.utils.timezone import now
+
+from core.models import TimeStampMixinModel
+from core.models import UUIDModel
 
 
 class Cart(TimeStampMixinModel, UUIDModel):

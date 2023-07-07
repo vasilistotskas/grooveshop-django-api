@@ -1,10 +1,11 @@
+from django.urls import path
+from rest_framework.urlpatterns import format_suffix_patterns
+
 from blog.views.author import BlogAuthorViewSet
 from blog.views.category import BlogCategoryViewSet
 from blog.views.comment import BlogCommentViewSet
 from blog.views.post import BlogPostViewSet
 from blog.views.tag import BlogTagViewSet
-from django.urls import path
-from rest_framework.urlpatterns import format_suffix_patterns
 
 urlpatterns = [
     path("blog/post/", BlogPostViewSet.as_view({"get": "list", "post": "create"})),

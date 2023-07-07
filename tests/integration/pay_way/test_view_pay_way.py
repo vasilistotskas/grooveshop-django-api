@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import json
 
-from pay_way.models import PayWay
-from pay_way.serializers import PayWaySerializer
 from rest_framework import status
 from rest_framework.test import APITestCase
+
+from pay_way.models import PayWay
+from pay_way.serializers import PayWaySerializer
 
 
 class PayWayViewSetTestCase(APITestCase):

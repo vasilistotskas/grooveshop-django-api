@@ -1,7 +1,8 @@
-from slider.views import SliderViewSet
-from slider.views import SlideViewSet
 from django.urls import path
 from rest_framework.urlpatterns import format_suffix_patterns
+
+from slider.views import SliderViewSet
+from slider.views import SlideViewSet
 
 urlpatterns = [
     path(

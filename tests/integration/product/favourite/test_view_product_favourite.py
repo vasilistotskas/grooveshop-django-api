@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import json
 
+from rest_framework import status
+from rest_framework.test import APITestCase
+
 from product.models.favourite import ProductFavourite
 from product.models.product import Product
 from product.serializers.favourite import ProductFavouriteSerializer
 from user.models import UserAccount
-from rest_framework import status
-from rest_framework.test import APITestCase
 
 
 class ProductFavouriteViewSetTestCase(APITestCase):

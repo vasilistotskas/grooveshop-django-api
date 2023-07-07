@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import json
 
+from django.contrib.auth import get_user_model
+from rest_framework import status
+from rest_framework.test import APITestCase
+
 from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
 from blog.models.comment import BlogComment
 from blog.models.post import BlogPost
 from blog.serializers.comment import BlogCommentSerializer
-from django.contrib.auth import get_user_model
-from rest_framework import status
-from rest_framework.test import APITestCase
 
 User = get_user_model()
 

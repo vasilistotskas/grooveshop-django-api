@@ -1,10 +1,5 @@
 from __future__ import annotations
 
-from core.api.views import BaseExpandView
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
-from region.models import Region
-from region.paginators import RegionPagination
-from region.serializers import RegionSerializer
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action
@@ -12,6 +7,12 @@ from rest_framework.filters import SearchFilter
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
+
+from core.api.views import BaseExpandView
+from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+from region.models import Region
+from region.paginators import RegionPagination
+from region.serializers import RegionSerializer
 
 
 class RegionViewSet(BaseExpandView, ModelViewSet):

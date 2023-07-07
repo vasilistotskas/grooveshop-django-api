@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import os
 
-from app.settings import BASE_DIR
-from blog.models.category import BlogCategory
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
+
+from app.settings import BASE_DIR
+from blog.models.category import BlogCategory
 
 
 class BlogCategoryTestCase(TestCase):

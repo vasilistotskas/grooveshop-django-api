@@ -1,9 +1,10 @@
 from random import randrange
 
-from product.models.review import ProductReview
 from django.core.management import BaseCommand
 from django.utils.timezone import now
 from faker import Faker
+
+from product.models.review import ProductReview
 
 
 class Command(BaseCommand):

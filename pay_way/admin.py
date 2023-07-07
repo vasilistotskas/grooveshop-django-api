@@ -1,5 +1,6 @@
-from pay_way.models import PayWay
 from django.contrib import admin
+
+from pay_way.models import PayWay
 
 
 @admin.register(PayWay)

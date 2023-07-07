@@ -1,13 +1,14 @@
 from decimal import Decimal
 
+from django.db import models
+from django.db.models import QuerySet
+
 from core.models import SortableModel
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
 from order.enum.status_enum import StatusEnum
 from user.enum.address import FloorChoicesEnum
 from user.enum.address import LocationChoicesEnum
-from django.db import models
-from django.db.models import QuerySet
 
 
 class Order(TimeStampMixinModel, UUIDModel):

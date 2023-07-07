@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import json
 
-from country.models import Country
-from country.serializers import CountrySerializer
 from rest_framework import status
 from rest_framework.test import APITestCase
+
+from country.models import Country
+from country.serializers import CountrySerializer
 
 
 class CountryViewSetTestCase(APITestCase):

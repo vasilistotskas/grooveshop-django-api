@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import json
 
-from product.models.category import ProductCategory
-from product.serializers.category import ProductCategorySerializer
 from rest_framework import status
 from rest_framework.test import APITestCase
+
+from product.models.category import ProductCategory
+from product.serializers.category import ProductCategorySerializer
 
 
 class ProductCategoryViewSetTestCase(APITestCase):

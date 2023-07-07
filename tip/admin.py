@@ -1,5 +1,6 @@
-from tip.models import Tip
 from django.contrib import admin
+
+from tip.models import Tip
 
 
 @admin.register(Tip)

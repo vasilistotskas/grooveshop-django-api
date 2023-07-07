@@ -1,5 +1,6 @@
-from region.models import Region
 from django.contrib import admin
+
+from region.models import Region
 
 
 class RegionInline(admin.TabularInline):

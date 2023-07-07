@@ -1,5 +1,6 @@
-from vat.models import Vat
 from django.test import TestCase
+
+from vat.models import Vat
 
 
 class VatTestCase(TestCase):

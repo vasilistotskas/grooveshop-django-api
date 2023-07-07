@@ -1,18 +1,19 @@
 import os
 from random import randrange
 
-from app.settings import BASE_DIR
-from product.models.category import ProductCategory
-from product.models.favourite import ProductFavourite
-from product.models.product import Product
-from product.models.product import ProductImages
-from vat.models import Vat
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import BaseCommand
 from django.utils.text import slugify
 from django.utils.timezone import now
 from faker import Faker
+
+from app.settings import BASE_DIR
+from product.models.category import ProductCategory
+from product.models.favourite import ProductFavourite
+from product.models.product import Product
+from product.models.product import ProductImages
+from vat.models import Vat
 
 
 class Command(BaseCommand):

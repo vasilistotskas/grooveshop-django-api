@@ -1,12 +1,13 @@
 import os
 
+from django.conf import settings
+from django.db import models
+from tinymce.models import HTMLField
+
 from blog.enum.blog_post_enum import PostStatusEnum
 from core.models import PublishableModel
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
-from django.conf import settings
-from django.db import models
-from tinymce.models import HTMLField
 
 
 class BlogPost(TimeStampMixinModel, PublishableModel, UUIDModel):

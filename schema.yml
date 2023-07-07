@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
-  title: DeepWeb API
+  title: Django Spectacular
   version: 1.0.0
-  description: DeepWeb API description
+  description: Django Spectacular Description
 paths:
   /api/v1/active_users/active_users_count/:
     get:
@@ -9539,8 +9539,6 @@ components:
           type: boolean
         viewCount:
           type: integer
-          maximum: 2147483647
-          minimum: -2147483648
         createdAt:
           type: string
           format: date-time
@@ -9690,8 +9688,6 @@ components:
           readOnly: true
         quantity:
           type: integer
-          maximum: 2147483647
-          minimum: 0
         totalPrice:
           type: number
           format: double
@@ -9725,13 +9721,9 @@ components:
           maxLength: 3
         isoCc:
           type: integer
-          maximum: 32767
-          minimum: 0
           nullable: true
         phoneCode:
           type: integer
-          maximum: 32767
-          minimum: 0
           nullable: true
         createdAt:
           type: string
@@ -9956,8 +9948,6 @@ components:
           $ref: '#/components/schemas/Product'
         quantity:
           type: integer
-          maximum: 2147483647
-          minimum: -2147483648
         createdAt:
           type: string
           format: date-time
@@ -10552,8 +10542,6 @@ components:
           type: boolean
         viewCount:
           type: integer
-          maximum: 2147483647
-          minimum: -2147483648
         createdAt:
           type: string
           format: date-time
@@ -10662,8 +10650,6 @@ components:
           readOnly: true
         quantity:
           type: integer
-          maximum: 2147483647
-          minimum: 0
         totalPrice:
           type: number
           format: double
@@ -10690,13 +10676,9 @@ components:
           maxLength: 3
         isoCc:
           type: integer
-          maximum: 32767
-          minimum: 0
           nullable: true
         phoneCode:
           type: integer
-          maximum: 32767
-          minimum: 0
           nullable: true
         createdAt:
           type: string
@@ -10915,15 +10897,11 @@ components:
           readOnly: true
         hits:
           type: integer
-          maximum: 2147483647
-          minimum: 0
         likesCounter:
           type: integer
           readOnly: true
         stock:
           type: integer
-          maximum: 2147483647
-          minimum: 0
         active:
           type: boolean
         weight:
@@ -11141,10 +11119,7 @@ components:
           type: string
           maxLength: 250
         rate:
-          allOf:
-          - $ref: '#/components/schemas/RateEnum'
-          minimum: 0
-          maximum: 32767
+          $ref: '#/components/schemas/RateEnum'
         status:
           $ref: '#/components/schemas/ProductReviewStatusEnum'
         createdAt:
@@ -11235,8 +11210,6 @@ components:
           format: date-time
         orderPosition:
           type: integer
-          maximum: 2147483647
-          minimum: -2147483648
         mainImageAbsoluteUrl:
           type: string
           readOnly: true
@@ -11615,15 +11588,11 @@ components:
           readOnly: true
         hits:
           type: integer
-          maximum: 2147483647
-          minimum: 0
         likesCounter:
           type: integer
           readOnly: true
         stock:
           type: integer
-          maximum: 2147483647
-          minimum: 0
         active:
           type: boolean
         weight:
@@ -11893,10 +11862,7 @@ components:
           type: string
           maxLength: 250
         rate:
-          allOf:
-          - $ref: '#/components/schemas/RateEnum'
-          minimum: 0
-          maximum: 32767
+          $ref: '#/components/schemas/RateEnum'
         status:
           $ref: '#/components/schemas/ProductReviewStatusEnum'
         createdAt:
@@ -12035,8 +12001,6 @@ components:
           format: date-time
         orderPosition:
           type: integer
-          maximum: 2147483647
-          minimum: -2147483648
         mainImageAbsoluteUrl:
           type: string
           readOnly: true

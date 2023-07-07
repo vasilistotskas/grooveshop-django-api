@@ -66,12 +66,7 @@ APP_MAIN_HOST_NAME = str(env("APP_MAIN_HOST_NAME"))
 MEDIA_STREAM_URL = str(env("MEDIA_STREAM_URL"))
 BASE_URL = BACKEND_BASE_URL
 
-ALLOWED_HOSTS = [
-    APP_MAIN_HOST_NAME,
-    "127.0.0.1",
-    "http://localhost:3003",
-    "backend"
-]
+ALLOWED_HOSTS = [APP_MAIN_HOST_NAME, "127.0.0.1", "http://localhost:3003", "backend"]
 ALLOWED_HOSTS.extend(
     filter(
         None,

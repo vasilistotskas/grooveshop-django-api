@@ -1,11 +1,12 @@
 import os
 
-from app.settings import BASE_DIR
-from country.models import Country
-from region.models import Region
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import BaseCommand
+
+from app.settings import BASE_DIR
+from country.models import Country
+from region.models import Region
 
 
 class Command(BaseCommand):

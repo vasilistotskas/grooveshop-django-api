@@ -5,15 +5,6 @@ import random
 import string
 from decimal import Decimal
 
-from core.models import SortableModel
-from core.models import TimeStampMixinModel
-from core.models import UUIDModel
-from core.utils.translations import TranslationProxy
-from helpers.image_resize import make_thumbnail
-from product.models.favourite import ProductFavourite
-from product.models.review import ProductReview
-from seo.models import SeoModel
-from seo.models import SeoModelTranslation
 from django.conf import settings
 from django.db import models
 from django.db.models import Avg
@@ -24,6 +15,16 @@ from django.utils.safestring import mark_safe
 from django.utils.safestring import SafeString
 from mptt.fields import TreeForeignKey
 from tinymce.models import HTMLField
+
+from core.models import SortableModel
+from core.models import TimeStampMixinModel
+from core.models import UUIDModel
+from core.utils.translations import TranslationProxy
+from helpers.image_resize import make_thumbnail
+from product.models.favourite import ProductFavourite
+from product.models.review import ProductReview
+from seo.models import SeoModel
+from seo.models import SeoModelTranslation
 
 
 def generate_unique_code():

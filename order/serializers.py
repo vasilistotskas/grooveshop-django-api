@@ -1,11 +1,12 @@
+from drf_spectacular.utils import extend_schema_field
+from rest_framework import serializers
+
 from country.serializers import CountrySerializer
 from order.models import Order
 from order.models import OrderItem
 from pay_way.serializers import PayWaySerializer
 from product.serializers.product import ProductSerializer
 from region.serializers import RegionSerializer
-from drf_spectacular.utils import extend_schema_field
-from rest_framework import serializers
 
 
 class OrderItemSerializer(serializers.ModelSerializer):

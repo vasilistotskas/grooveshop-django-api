@@ -1,12 +1,13 @@
 from typing import Dict
 from typing import Type
 
+from rest_framework import serializers
+from rest_framework.relations import PrimaryKeyRelatedField
+
 from blog.models.author import BlogAuthor
 from core.api.serializers import BaseExpandSerializer
 from user.models import UserAccount
 from user.serializers.account import UserAccountSerializer
-from rest_framework import serializers
-from rest_framework.relations import PrimaryKeyRelatedField
 
 
 class BlogAuthorSerializer(BaseExpandSerializer):

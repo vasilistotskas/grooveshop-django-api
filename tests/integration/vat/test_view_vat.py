@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import json
 
-from vat.models import Vat
-from vat.serializers import VatSerializer
 from rest_framework import status
 from rest_framework.test import APITestCase
+
+from vat.models import Vat
+from vat.serializers import VatSerializer
 
 
 class VatViewSetTestCase(APITestCase):

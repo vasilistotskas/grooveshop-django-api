@@ -1,9 +1,10 @@
+from django.db import models
+
 from core.models import PublishableModel
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
 from product.enum.review import RateChoicesEnum
 from product.enum.review import StatusEnum
-from django.db import models
 
 
 class ProductReview(TimeStampMixinModel, PublishableModel, UUIDModel):

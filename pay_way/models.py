@@ -1,12 +1,13 @@
 import os
 
+from django.conf import settings
+from django.db import models
+from django.db.models.query import QuerySet
+
 from core.models import SortableModel
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
 from order.enum.pay_way_enum import PayWayEnum
-from django.conf import settings
-from django.db import models
-from django.db.models.query import QuerySet
 
 
 class PayWay(TimeStampMixinModel, SortableModel, UUIDModel):

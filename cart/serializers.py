@@ -1,8 +1,9 @@
+from drf_spectacular.utils import extend_schema_field
+from rest_framework import serializers
+
 from cart.models import Cart
 from cart.models import CartItem
 from product.serializers.product import ProductSerializer
-from drf_spectacular.utils import extend_schema_field
-from rest_framework import serializers
 
 
 class CartItemSerializer(serializers.ModelSerializer):

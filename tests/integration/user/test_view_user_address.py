@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import json
 
+from rest_framework import status
+from rest_framework.test import APITestCase
+
 from country.models import Country
 from region.models import Region
 from user.models import UserAccount
 from user.models import UserAddress
 from user.serializers.address import UserAddressSerializer
-from rest_framework import status
-from rest_framework.test import APITestCase
 
 
 class UserAddressViewSetTestCase(APITestCase):

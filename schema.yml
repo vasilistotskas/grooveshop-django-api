@@ -11720,9 +11720,11 @@ components:
           nullable: true
         firstName:
           type: string
+          nullable: true
           maxLength: 255
         lastName:
           type: string
+          nullable: true
           maxLength: 255
         phone:
           type: string
@@ -12700,9 +12702,11 @@ components:
           nullable: true
         firstName:
           type: string
+          nullable: true
           maxLength: 255
         lastName:
           type: string
+          nullable: true
           maxLength: 255
         phone:
           type: string
@@ -12770,10 +12774,8 @@ components:
           readOnly: true
       required:
       - email
-      - firstName
       - id
       - lastLogin
-      - lastName
       - mainImageAbsoluteUrl
       - mainImageFilename
       - updatedAt

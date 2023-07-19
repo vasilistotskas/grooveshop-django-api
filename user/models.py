@@ -60,7 +60,9 @@ class UserAccountManager(BaseUserManager):
 class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinModel):
     id = models.BigAutoField(primary_key=True)
     email = models.EmailField(_("Email Address"), max_length=254, unique=True)
-    first_name = models.CharField(_("First Name"), max_length=255, blank=True, null=True)
+    first_name = models.CharField(
+        _("First Name"), max_length=255, blank=True, null=True
+    )
     last_name = models.CharField(_("Last Name"), max_length=255, blank=True, null=True)
     phone = models.CharField(_("Phone"), max_length=255, blank=True, null=True)
     city = models.CharField(_("City"), max_length=255, blank=True, null=True)

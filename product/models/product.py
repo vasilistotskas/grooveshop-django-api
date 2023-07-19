@@ -100,10 +100,10 @@ class Product(TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel):
         ordering = ["-created_at"]
 
     def __unicode__(self):
-        return self.safe_translation_getter("name", any_language=True) or u""
+        return self.safe_translation_getter("name", any_language=True) or ""
 
     def __str__(self):
-        return self.safe_translation_getter("name", any_language=True) or u""
+        return self.safe_translation_getter("name", any_language=True) or ""
 
     def save(self, *args, **kwargs):
         vat_value = 0.0

@@ -55,12 +55,15 @@ class Command(BaseCommand):
                     product = Product.objects.create(
                         category_id=category.id,
                         slug=slug,
-                        description=faker.text(50),
                         price=product_price,
                         active="True",
                         stock=100,
+                        discount_percent=faker.random_int(1, 99),
+                        weight=faker.random_int(1, 10),
                         created_at=now(),
                         vat_id=1,
+                        name=name,
+                        description=faker.text(50),
                     )
                     i = i + 1
 

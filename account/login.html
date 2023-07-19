@@ -1,0 +1,99 @@
+{% extends "account/base.html" %}
+
+{% load i18n %}
+{% load form_filters %}
+{% load account socialaccount %}
+
+{% block head_title %}{% trans "Sign In" %}{% endblock %}
+
+{% block content %}
+    <h1 class="grid p-10 items-center justify-items-center text-xl font-black">{{ site.name }} - {% trans "Sign In" %}</h1>
+
+    {% get_providers as socialaccount_providers %}
+
+    <div class="h-auto">
+        <div class="grid sm:grid-cols-1 lg:grid-cols-3fr-2fr sm:gap-6 lg:gap-24  h-full g-6 text-gray-800">
+          <div class="w-full grid items-center justify-items-center">
+            <img
+              src="/static/favicon/android-icon-420x420.png"
+              class="w-auto"
+              alt="Login"
+              width="420px"
+              height="420px"
+            />
+          </div>
+          <div class="w-full grid p-12 rounded-lg shadow border md:mt-0 sm:max-w-md bg-zinc-800 border-gray-700">
+            <form class="login" method="POST" action="{% url 'account_login' %}">
+              {% csrf_token %}
+              <div class="mb-6">
+                {{ form.login | add_class:"border sm:text-sm rounded-lg block w-full p-2.5 bg-gray-700 border-gray-600 :placeholder-gray-400 text-white focus:ring-blue-500 focus:border-blue-500" }}
+                {{ form.login.errors | safe }}
+              </div>
+              <div class="mb-6">
+                {{ form.password | add_class:"border sm:text-sm rounded-lg block w-full p-2.5 bg-gray-700 border-gray-600 :placeholder-gray-400 text-white focus:ring-blue-500 focus:border-blue-500" }}
+                {{ form.password.errors | safe }}
+              </div>
+                {% if form.non_field_errors %}
+                    <div class="form-errors">
+                      {{ form.non_field_errors | safe }}
+                    </div>
+                {% endif %}
+              <div class="flex justify-between items-center mb-6">
+                <div class="form-group form-check">
+                  <input
+                    type="checkbox"
+                    name="remember"
+                    aria-describedby="remember"
+                    class="w-4 h-4 border border-gray-300 rounded bg-gray-50 focus:ring-3 focus:ring-primary-300 dark:bg-gray-700 dark:border-gray-600 dark:focus:ring-primary-600 dark:ring-offset-gray-800"
+                    id="id_remember"
+                  />
+                  <label class="form-check-label inline-block text-gray-100" for="id_remember"
+                    >{% trans "Remember me" %}</label
+                  >
+                </div>
+                <a
+                  href="{% url 'account_reset_password' %}"
+                  class="text-gray-100 hover:text-gray-200 focus:text-gray-200 active:text-gray-300 duration-200 transition ease-in-out"
+                >
+                  {% trans "Forgot Password?" %}
+                </a>
+              </div>
+
+              {% if redirect_field_value %}
+                <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}" />
+              {% endif %}
+
+              <button
+                type="submit"
+                class="w-full text-white ring-2 ring-primary outline-none font-medium rounded-lg text-sm px-5 py-2.5 text-center bg-primary-600 hover:bg-primary-700 ring-primary-800"
+                data-mdb-ripple="true"
+                data-mdb-ripple-color="light"
+              >
+                {% trans "Sign In" %}
+              </button>
+
+              <div
+                class="flex items-center my-4 before:flex-1 before:border-t before:border-gray-300 before:mt-0.5 after:flex-1 after:border-t after:border-gray-300 after:mt-0.5"
+              >
+                <p class="grid items-center justify-items-center font-light text-gray-300">{% trans 'OR' %}</p>
+              </div>
+
+              {% if socialaccount_providers %}
+                <div class="socialaccount_ballot">
+                  <ul class="socialaccount_providers">
+                    {% include "socialaccount/snippets/provider_list.html" with process="login" %}
+                  </ul>
+                </div>
+
+                {% include "socialaccount/snippets/login_extra.html" %}
+
+                {% else %}
+                  <p class="grid items-center justify-items-center font-light text-gray-300">{% blocktrans %}If you have not created an account yet, then please
+                  <a class="font-medium text-gray-300 hover:underline text-primary-500" href="{{ signup_url }}">sign up</a> first.{% endblocktrans %}</p>
+              {% endif %}
+
+            </form>
+          </div>
+        </div>
+    </div>
+{% endblock %}

@@ -1,0 +1,20 @@
+{% extends "socialaccount/base.html" %}
+
+{% load i18n %}
+
+{% block head_title %}{% trans "Login Cancelled" %}{% endblock %}
+
+{% block content %}
+
+    <h1 class="grid p-10 items-center justify-items-center text-xl font-black">{% trans "Login Cancelled" %}</h1>
+
+    <div class="grid items-center justify-items-center w-full h-full g-6 text-gray-800">
+        <div class="w-full rounded-lg shadow border md:mt-0 sm:max-w-md xl:p-0 bg-zinc-800 border-gray-700">
+            <div class="p-12 sm:p-8">
+                {% url 'account_login' as login_url %}
+                <p class="grid items-center justify-items-center font-light text-gray-300">{% blocktrans %}You decided to cancel logging in to our site using one of your existing accounts. If this was a mistake, please proceed to <a class="font-medium text-gray-300 hover:underline text-primary-500" href="{{login_url}}">sign in</a>.{% endblocktrans %}</p>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}

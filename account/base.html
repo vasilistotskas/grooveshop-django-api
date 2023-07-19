@@ -1,0 +1,247 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<meta content="IE=edge" http-equiv="X-UA-Compatible" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1, shrink-to-fit=no"
+		/>
+		<meta content="width=device-width,initial-scale=1.0" name="viewport" />
+		<meta name="theme-color" content="#ffffff" />
+
+    <link
+			href="{% static 'favicon/apple-icon-57x57.png' %}"
+			rel="apple-touch-icon"
+			sizes="57x57"
+		/>
+		<link
+			href="{% static 'favicon/apple-icon-60x60.png' %}"
+			rel="apple-touch-icon"
+			sizes="60x60"
+		/>
+		<link
+			href="{% static 'favicon/apple-icon-72x72.png' %}"
+			rel="apple-touch-icon"
+			sizes="72x72"
+		/>
+		<link
+			href="{% static 'favicon/apple-icon-76x76.png' %}"
+			rel="apple-touch-icon"
+			sizes="76x76"
+		/>
+		<link
+			href="{% static 'favicon/apple-icon-114x114.png' %}"
+			rel="apple-touch-icon"
+			sizes="114x114"
+		/>
+		<link
+			href="{% static 'favicon/apple-icon-120x120.png' %}"
+			rel="apple-touch-icon"
+			sizes="120x120"
+		/>
+		<link
+			href="{% static 'favicon/apple-icon-144x144.png' %}"
+			rel="apple-touch-icon"
+			sizes="144x144"
+		/>
+		<link
+			href="{% static 'favicon/apple-icon-152x152.png' %}"
+			rel="apple-touch-icon"
+			sizes="152x152"
+		/>
+		<link
+			href="{% static 'favicon/apple-icon-180x180.png' %}"
+			rel="apple-touch-icon"
+			sizes="180x180"
+		/>
+		<link
+			href="{% static 'favicon/android-icon-192x192.png' %}"
+			rel="icon"
+			sizes="192x192"
+			type="image/png"
+		/>
+    <link
+			href="{% static 'favicon/favicon-16x16.png' %}"
+			rel="icon"
+			sizes="16x16"
+			type="image/png"
+		/>
+		<link
+			href="{% static 'favicon/favicon-32x32.png' %}"
+			rel="icon"
+			sizes="32x32"
+			type="image/png"
+		/>
+		<link
+			href="{% static 'favicon/favicon-96x96.png' %}"
+			rel="icon"
+			sizes="96x96"
+			type="image/png"
+		/>
+		<link
+			crossorigin="use-credentials"
+			href="{% static 'favicon/manifest.json' %}"
+			rel="manifest"
+		/>
+
+    <meta name="description" content="grooveShop Auth" />
+    <meta name="keywords" content="auth" />
+    <meta name="author" content="vasilistotskas" />
+
+    <title>{% block head_title %}{% endblock %}</title>
+    {% block extra_head %}
+    {% endblock %}
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            gridTemplateColumns: {
+              'auto-1fr': 'auto 1fr',
+              '1fr-auto': '1fr auto',
+              'auto-auto': 'auto auto',
+              'auto-fill-150': 'repeat(auto-fill, minmax(150px, 1fr));',
+              '3fr-2fr': '3fr 2fr',
+            },
+            gridTemplateRows: {
+              'auto-1fr': 'auto 1fr',
+              '1fr-auto': '1fr auto',
+              'auto-auto': 'auto auto',
+              'auto-fill-150': 'repeat(auto-fill, minmax(150px, 1fr));',
+              '3fr-2fr': '3fr 2fr',
+            },
+            spacing: {
+              '60px': '60px',
+            },
+            colors: {
+              primary: 'rgb(146 56 56)',
+            },
+          }
+        }
+      }
+    </script>
+    <style type="text/tailwindcss" lang="scss">
+      @layer utilities {
+        .primary-scrollbar::-webkit-scrollbar-track {
+            -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3);
+            -webkit-border-radius: 10px;
+            border-radius: 10px;
+        }
+
+        .primary-scrollbar::-webkit-scrollbar {
+            width: 12px;
+        }
+
+        .primary-scrollbar::-webkit-scrollbar-thumb {
+            -webkit-border-radius: 10px;
+            border-radius: 10px;
+            background: rgb(146 56 56);
+            -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.5);
+        }
+        .primary-scrollbar::-webkit-scrollbar-thumb:window-inactive {
+            background: rgba(146,56,56, 0.8)
+        }
+        .bg-primary {
+            background-color: theme('colors.primary');
+        }
+        .ring-primary {
+            --tw-ring-color: theme('colors.primary');
+        }
+        .primary_mail {
+          color: rgb(14 165 233);
+        }
+        .verified {
+            color: rgb(16 185 129);
+        }
+        .unverified {
+            color: rgb(239 68 68);
+        }
+        .messages {
+            display: grid;
+            position: fixed;
+            gap: 1rem;
+            top: 10px;
+            right: 10px;
+            z-index: 100;
+        }
+        .form-errors {
+          display: grid;
+          margin-top: 1rem;
+          margin-bottom: 1rem;
+          color: #eeeff1;
+        }
+        .facebook {
+          background-color: rgb(59, 89, 152);
+        }
+        .google {
+          background-color: rgb(219, 68, 55);
+        }
+        .apple {
+          background-color: rgb(0, 0, 0);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    {% block body %}
+
+    {% if messages %}
+      <div class="messages">
+        {% for message in messages %}
+          <div class="message {% if message.tags %}{{ message.tags }}{% endif %} bg-red-100 rounded-lg py-5 px-6 text-base text-blue-700 inline-flex items-center w-full" role="alert">
+            <svg aria-hidden="true" focusable="false" data-prefix="fas" data-icon="info-circle" class="w-4 h-4 mr-2 fill-current" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+              <path fill="currentColor" d="M256 8C119.043 8 8 119.083 8 256c0 136.997 111.043 248 248 248s248-111.003 248-248C504 119.083 392.957 8 256 8zm0 110c23.196 0 42 18.804 42 42s-18.804 42-42 42-42-18.804-42-42 18.804-42 42-42zm56 254c0 6.627-5.373 12-12 12h-88c-6.627 0-12-5.373-12-12v-24c0-6.627 5.373-12 12-12h12v-64h-12c-6.627 0-12-5.373-12-12v-24c0-6.627 5.373-12 12-12h64c6.627 0 12 5.373 12 12v100h12c6.627 0 12 5.373 12 12v24z"></path>
+            </svg>
+            {{message}}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="h-full bg-zinc-900 relative">
+      <nav class="menu fixed z-50 grid items-center justify-center px-4 pt-4 pb-4 backdrop-opacity-10 backdrop-invert bg-primary/95 w-full">
+        <div class="grid items-center w-full relative max-w-5xl text-gray-100">
+          <ul class="grid grid-cols-4 gap-10">
+            {% if user.is_authenticated %}
+              <li class="text-lg font-semibold"><a class="font-medium text-gray-300 hover:underline text-primary-500" href="{% url 'account_email' %}">Change E-mail</a></li>
+                <li class="text-lg font-semibold"><a class="font-medium text-gray-300 hover:underline text-primary-500" href="{% url 'account_change_password' %}">Change Password</a></li>
+              <li class="text-lg font-semibold"><a class="font-medium text-gray-300 hover:underline text-primary-500" href="{% url 'two-factor-setup' %}">Two Factor Authentication</a></li>
+              <li class="text-lg font-semibold"><a class="font-medium text-gray-300 hover:underline text-primary-500" href="{% url 'account_logout' %}">Sign Out</a></li>
+            {% else %}
+              <li class="text-lg font-semibold"><a class="font-medium text-gray-300 hover:underline text-primary-500" href="{% url 'account_login' %}">Sign In</a></li>
+              <li class="text-lg font-semibold"><a class="font-medium text-gray-300 hover:underline text-primary-500" href="{% url 'account_signup' %}">Sign Up</a></li>
+              <li class="text-lg font-semibold"><a class="font-medium text-gray-300 hover:underline text-primary-500" href="{% url 'account_reset_password' %}">Reset Password</a></li>
+            {% endif %}
+          </ul>
+        </div>
+      </nav>
+      <div class="grid h-full min-h-screen max-w-screen-xl mx-auto text-gray-400">
+        <section class="h-auto grid grid-rows-auto-1fr items-center mt-60px mb-60px">
+          {% block content %}
+          {% endblock %}
+          {% endblock %}
+          {% block extra_body %}
+          {% endblock %}
+        </section>
+      </div>
+    </div>
+
+  </body>
+
+  <script>
+      // Select all messages
+      const messages = document.querySelectorAll('.messages .message');
+
+      // Hide each message after 3 seconds
+      messages.forEach(message => {
+        setTimeout(() => {
+          message.style.transition = 'opacity 1s ease-in-out';
+          message.style.opacity = 0;
+        }, 3000);
+      });
+  </script>
+
+</html>

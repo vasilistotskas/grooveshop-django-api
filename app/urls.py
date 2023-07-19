@@ -1,10 +1,12 @@
 from django.conf import settings
+from django.conf.urls.i18n import i18n_patterns
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.http import HttpResponse
 from django.urls import include
 from django.urls import path
+from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_GET
 from drf_spectacular.views import SpectacularAPIView
 from drf_spectacular.views import SpectacularRedocView
@@ -34,8 +36,8 @@ front_urls = [
 router = routers.SimpleRouter()
 router.register(r"active_users", ActiveUserViewSet, basename="active_users")
 
-urlpatterns = [
-    path("admin/", admin.site.urls),
+urlpatterns = i18n_patterns(
+    path(_("admin/"), admin.site.urls),
     path("api/v1/api-token-auth/", views.obtain_auth_token),
     path("api/v1/", include(router.urls)),
     path("api/v1/", include("product.urls")),
@@ -53,8 +55,10 @@ urlpatterns = [
     path("api/v1/", include("cart.urls")),
     path("accounts/", include("allauth_2fa.urls")),
     path("accounts/", include("allauth.urls")),
+    # rosetta
+    path("rosetta/", include("rosetta.urls")),
     # admin html editor
-    path("tinymce/", include("tinymce.urls")),  # vue urls
+    path("tinymce/", include("tinymce.urls")),
     # Spectacular
     path("api/v1/schema/", SpectacularAPIView.as_view(), name="schema"),
     # Optional UI:
@@ -69,7 +73,8 @@ urlpatterns = [
         name="redoc",
     ),
     path("", include(front_urls)),
-]
+    prefix_default_language=False,
+)
 
 urlpatterns += static(
     settings.MEDIA_URL,

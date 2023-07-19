@@ -1,23 +1,36 @@
 from typing import Dict
 from typing import Type
 
+from drf_spectacular.utils import extend_schema_field
+from parler_rest.fields import TranslatedFieldsField
+from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
+from core.api.schema import generate_schema_multi_lang
 from core.api.serializers import BaseExpandSerializer
 from slider.models import Slide
 from slider.models import Slider
 
 
-class SliderSerializer(serializers.ModelSerializer):
+@extend_schema_field(generate_schema_multi_lang(Slider))
+class TranslatedFieldsFieldExtendSlider(TranslatedFieldsField):
+    pass
+
+
+@extend_schema_field(generate_schema_multi_lang(Slide))
+class TranslatedFieldsFieldExtendSlide(TranslatedFieldsField):
+    pass
+
+
+class SliderSerializer(TranslatableModelSerializer):
+    translations = TranslatedFieldsFieldExtendSlider(shared_model=Slider)
+
     class Meta:
         model = Slider
         fields = (
+            "translations",
             "id",
-            "name",
-            "url",
-            "title",
-            "description",
             "main_image_absolute_url",
             "main_image_filename",
             "thumbnail",
@@ -25,24 +38,20 @@ class SliderSerializer(serializers.ModelSerializer):
         )
 
 
-class SlideSerializer(BaseExpandSerializer):
+class SlideSerializer(TranslatableModelSerializer, BaseExpandSerializer):
+    translations = TranslatedFieldsFieldExtendSlide(shared_model=Slide)
     slider = PrimaryKeyRelatedField(queryset=Slider.objects.all())
 
     class Meta:
         model = Slide
         fields = (
+            "translations",
             "id",
             "slider",
-            "url",
-            "title",
-            "subtitle",
-            "description",
             "discount",
-            "button_label",
             "show_button",
             "date_start",
             "date_end",
-            "order_position",
             "main_image_absolute_url",
             "main_image_filename",
             "thumbnail",

@@ -1,5 +1,6 @@
 import json
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -16,7 +17,7 @@ class BlogAuthorViewSetTestCase(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(password="bar", email="email@email.com")
         self.author = BlogAuthor.objects.create(
-            user_id=self.user.id, website="https://www.google.com", bio="bio"
+            user_id=self.user.id, website="https://www.google.com"
         )
 
     def test_list(self):
@@ -29,17 +30,28 @@ class BlogAuthorViewSetTestCase(APITestCase):
     def test_create_valid(self):
         new_user = User.objects.create_user(password="bar", email="email_new@email.com")
         payload = {
+            "translations": {},
             "user": new_user.id,
             "website": "https://www.google.com",
-            "bio": "bio",
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "bio": f"Translation for {language_name}",
+            }
+
+            payload["translations"][language_code] = translation_payload
+
         response = self.client.post(
             "/api/v1/blog/author/", json.dumps(payload), content_type="application/json"
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_create_invalid(self):
-        payload = {"user": "INVALID", "website": "", "bio": ""}
+        payload = {"user": "INVALID", "website": ""}
         response = self.client.post(
             "/api/v1/blog/author/", json.dumps(payload), content_type="application/json"
         )
@@ -59,10 +71,21 @@ class BlogAuthorViewSetTestCase(APITestCase):
 
     def test_update_valid(self):
         payload = {
+            "translations": {},
             "user": self.user.id,
             "website": "https://www.google.com",
-            "bio": "bio",
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "bio": f"Translation for {language_name}",
+            }
+
+            payload["translations"][language_code] = translation_payload
+
         response = self.client.put(
             f"/api/v1/blog/author/{self.author.id}/",
             json.dumps(payload),
@@ -71,7 +94,7 @@ class BlogAuthorViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_update_invalid(self):
-        payload = {"user": "", "website": "", "bio": ""}
+        payload = {"user": "", "website": ""}
         response = self.client.put(
             f"/api/v1/blog/author/{self.author.id}/",
             json.dumps(payload),
@@ -80,7 +103,7 @@ class BlogAuthorViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_partial_update_valid(self):
-        payload = {"user": self.user.id, "bio": "bio"}
+        payload = {"user": self.user.id}
         response = self.client.patch(
             f"/api/v1/blog/author/{self.author.id}/",
             json.dumps(payload),
@@ -89,7 +112,7 @@ class BlogAuthorViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_partial_update_invalid(self):
-        payload = {"user": "", "bio": ""}
+        payload = {"user": ""}
         response = self.client.patch(
             f"/api/v1/blog/author/{self.author.id}/",
             json.dumps(payload),

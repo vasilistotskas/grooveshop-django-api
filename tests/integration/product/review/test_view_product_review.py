@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from django.conf import settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -21,9 +22,7 @@ class ProductReviewViewSetTestCase(APITestCase):
             email="test@test.com", password="test12345@!"
         )
         self.product = Product.objects.create(
-            name="test",
-            slug="test",
-            description="test",
+            slug="slug_one",
             price=10.00,
             active=True,
             stock=10,
@@ -34,7 +33,6 @@ class ProductReviewViewSetTestCase(APITestCase):
         self.product_review = ProductReview.objects.create(
             product=self.product,
             user=self.user_account,
-            comment="test",
             rate=1,
             status="True",
         )
@@ -50,9 +48,7 @@ class ProductReviewViewSetTestCase(APITestCase):
 
     def test_create_valid(self):
         product = Product.objects.create(
-            name="test_two",
-            slug="test_two",
-            description="test_two",
+            slug="slug_two",
             price=10.00,
             active=True,
             stock=10,
@@ -60,13 +56,25 @@ class ProductReviewViewSetTestCase(APITestCase):
             hits=0,
             weight=0.00,
         )
+
         payload = {
+            "translations": {},
             "product": product.id,
             "user": self.user_account.id,
-            "comment": "test_one",
             "rate": 1,
             "status": "True",
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "comment": f"Translation for {language_name}",
+            }
+
+            payload["translations"][language_code] = translation_payload
+
         response = self.client.post(
             "/api/v1/product/review/",
             json.dumps(payload),
@@ -79,7 +87,6 @@ class ProductReviewViewSetTestCase(APITestCase):
         payload = {
             "product": "INVALID",
             "user": "INVALID",
-            "comment": True,
             "rate": False,
             "status": 12345,
         }
@@ -105,24 +112,35 @@ class ProductReviewViewSetTestCase(APITestCase):
 
     def test_update_valid(self):
         payload = {
+            "translations": {},
             "product": self.product.id,
             "user": self.user_account.id,
-            "comment": "test",
             "rate": 5,
             "status": "True",
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "comment": f"Translation for {language_name}",
+            }
+
+            payload["translations"][language_code] = translation_payload
+
         response = self.client.put(
             f"/api/v1/product/review/{self.product_review.pk}/",
             json.dumps(payload),
             content_type="application/json",
         )
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_update_invalid(self):
         payload = {
             "product": "123",
             "user": "123",
-            "comment": True,
             "rate": False,
             "status": 12345,
         }

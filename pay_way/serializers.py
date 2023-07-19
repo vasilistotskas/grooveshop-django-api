@@ -1,14 +1,24 @@
-from rest_framework import serializers
+from drf_spectacular.utils import extend_schema_field
+from parler_rest.fields import TranslatedFieldsField
+from parler_rest.serializers import TranslatableModelSerializer
 
+from core.api.schema import generate_schema_multi_lang
 from pay_way.models import PayWay
 
 
-class PayWaySerializer(serializers.ModelSerializer):
+@extend_schema_field(generate_schema_multi_lang(PayWay))
+class TranslatedFieldsFieldExtend(TranslatedFieldsField):
+    pass
+
+
+class PayWaySerializer(TranslatableModelSerializer):
+    translations = TranslatedFieldsFieldExtend(shared_model=PayWay)
+
     class Meta:
         model = PayWay
         fields = (
+            "translations",
             "id",
-            "name",
             "active",
             "cost",
             "free_for_order_amount",

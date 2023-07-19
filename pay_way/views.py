@@ -18,10 +18,15 @@ class PayWayViewSet(ModelViewSet):
     serializer_class = PayWaySerializer
     pagination_class = PayWayPagination
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
-    filterset_fields = ["name", "active", "cost", "free_for_order_amount"]
-    ordering_fields = ["name", "cost", "free_for_order_amount", "created_at"]
+    filterset_fields = ["translations__name", "active", "cost", "free_for_order_amount"]
+    ordering_fields = [
+        "translations__name",
+        "cost",
+        "free_for_order_amount",
+        "created_at",
+    ]
     ordering = ["-created_at"]
-    search_fields = ["name"]
+    search_fields = ["translations__name"]
 
     def list(self, request, *args, **kwargs) -> Response:
         queryset = self.filter_queryset(self.get_queryset())

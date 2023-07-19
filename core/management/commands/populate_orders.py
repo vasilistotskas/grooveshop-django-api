@@ -18,7 +18,7 @@ class Command(BaseCommand):
         for _ in range(30):
             country: Country = Country.objects.get(alpha_2="GR")
             try:
-                pay_way = PayWay.objects.get(name="Credit Card")
+                pay_way = PayWay.objects.get(id=1)
             except PayWay.DoesNotExist:
                 pay_way = PayWay.objects.create(
                     name="Credit Card",

@@ -2,22 +2,26 @@ import os
 
 from django.conf import settings
 from django.db import models
+from django.utils.translation import gettext_lazy as _
+from parler.models import TranslatableModel
+from parler.models import TranslatedFields
 from tinymce.models import HTMLField
 
 from blog.enum.blog_post_enum import PostStatusEnum
 from core.models import PublishableModel
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
+from seo.models import SeoModel
 
 
-class BlogPost(TimeStampMixinModel, PublishableModel, UUIDModel):
-    id = models.AutoField(primary_key=True)
-    title = models.CharField(max_length=255, unique=True)
-    subtitle = models.CharField(max_length=255, blank=True, null=True)
+class BlogPost(
+    TranslatableModel, SeoModel, TimeStampMixinModel, PublishableModel, UUIDModel
+):
+    id = models.BigAutoField(primary_key=True)
     slug = models.SlugField(max_length=255, unique=True)
-    body = HTMLField()
-    meta_description = models.CharField(max_length=150, blank=True, null=True)
-    image = models.ImageField(upload_to="uploads/blog/", blank=True, null=True)
+    image = models.ImageField(
+        _("Image"), upload_to="uploads/blog/", blank=True, null=True
+    )
     likes = models.ManyToManyField(
         "user.UserAccount", related_name="blog_post_likes", blank=True
     )
@@ -37,16 +41,26 @@ class BlogPost(TimeStampMixinModel, PublishableModel, UUIDModel):
         null=True,
     )
     status = models.CharField(
-        max_length=20, choices=PostStatusEnum.choices(), default="draft"
+        _("Status"), max_length=20, choices=PostStatusEnum.choices(), default="draft"
     )
-    featured = models.BooleanField(default=False)
-    view_count = models.IntegerField(default=0)
+    featured = models.BooleanField(_("Featured"), default=False)
+    view_count = models.IntegerField(_("View Count"), default=0)
+    translations = TranslatedFields(
+        title=models.CharField(_("Title"), max_length=255, blank=True, null=True),
+        subtitle=models.CharField(_("Subtitle"), max_length=255, blank=True, null=True),
+        body=HTMLField(_("Body"), blank=True, null=True),
+    )
 
     class Meta:
+        verbose_name = _("Blog Post")
+        verbose_name_plural = _("Blog Posts")
         ordering = ["-published_at"]
 
+    def __unicode__(self):
+        return self.safe_translation_getter("title", any_language=True)
+
     def __str__(self):
-        return self.title
+        return self.safe_translation_getter("title", any_language=True)
 
     @property
     def main_image_absolute_url(self) -> str:
@@ -73,7 +87,3 @@ class BlogPost(TimeStampMixinModel, PublishableModel, UUIDModel):
     @property
     def get_post_tags_count(self) -> int:
         return self.tags.count()
-
-    @property
-    def absolute_url(self) -> str:
-        return f"/blog/{self.slug}"

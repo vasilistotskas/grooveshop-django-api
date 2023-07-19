@@ -1,6 +1,5 @@
 import os
 
-from django.conf import settings
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import BaseCommand
@@ -30,7 +29,6 @@ class Command(BaseCommand):
             name = faker.name()
             slider = Slider.objects.create(
                 name=name,
-                url=settings.APP_BASE_URL,
                 title=faker.text(20),
                 description=faker.text(50),
                 image=img,
@@ -39,7 +37,6 @@ class Command(BaseCommand):
             for _ in range(4):
                 Slide.objects.create(
                     slider_id=slider.id,
-                    url=settings.APP_BASE_URL,
                     title=faker.text(20),
                     subtitle=faker.text(20),
                     description=faker.text(50),
@@ -48,7 +45,6 @@ class Command(BaseCommand):
                     show_button=True,
                     date_start=now(),
                     date_end=now(),
-                    order_position=i,
                     image=img,
                 )
                 i = i + 1

@@ -39,33 +39,33 @@ class BlogPostTestCase(TestCase):
         self.post.tags.add(tag)
 
     def test___str__(self):
-        post = BlogPost.objects.get(title="title")
+        post = BlogPost.objects.get(slug="slug")
         self.assertEqual(str(post), post.title)
 
     def test_get_main_image_filename(self):
-        post = BlogPost.objects.get(title="title")
+        post = BlogPost.objects.get(slug="slug")
         image: str = ""
         if post.image is not None:
             image = os.path.basename(post.image.name)
         self.assertEqual(post.main_image_filename, image)
 
     def test_main_image_absolute_url(self):
-        post = BlogPost.objects.get(title="title")
+        post = BlogPost.objects.get(slug="slug")
         image: str = ""
         if post.image and hasattr(post.image, "url"):
             image = settings.APP_BASE_URL + post.image.url
         self.assertEqual(post.main_image_absolute_url, image)
 
     def test_number_of_likes(self):
-        post = BlogPost.objects.get(title="title")
+        post = BlogPost.objects.get(slug="slug")
         self.assertEqual(post.number_of_likes, 0)
 
     def test_number_of_comments(self):
-        post = BlogPost.objects.get(title="title")
+        post = BlogPost.objects.get(slug="slug")
         self.assertEqual(post.number_of_comments, 0)
 
     def test_get_post_tags_count(self):
-        post = BlogPost.objects.get(title="title")
+        post = BlogPost.objects.get(slug="slug")
         self.assertEqual(post.get_post_tags_count, 1)
 
 

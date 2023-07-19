@@ -22,10 +22,10 @@ class SliderViewSet(ModelViewSet):
     serializer_class = SliderSerializer
     pagination_class = SliderPagination
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
-    filterset_fields = ["id", "name"]
-    ordering_fields = ["id", "name", "created_at"]
+    filterset_fields = ["id", "translations__name"]
+    ordering_fields = ["id", "translations__name", "created_at"]
     ordering = ["id"]
-    search_fields = ["id", "name"]
+    search_fields = ["id", "translations__name"]
 
     def list(self, request, *args, **kwargs) -> Response:
         queryset = self.filter_queryset(self.get_queryset())
@@ -75,10 +75,10 @@ class SlideViewSet(BaseExpandView, ModelViewSet):
     serializer_class = SlideSerializer
     pagination_class = SlidePagination
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
-    filterset_fields = ["id", "slider", "title"]
-    ordering_fields = ["id", "slider", "order_position", "created_at"]
+    filterset_fields = ["id", "slider", "translations__title"]
+    ordering_fields = ["id", "slider", "created_at"]
     ordering = ["id"]
-    search_fields = ["id", "title"]
+    search_fields = ["id", "translations__title"]
 
     def list(self, request, *args, **kwargs) -> Response:
         queryset = self.filter_queryset(self.get_queryset())

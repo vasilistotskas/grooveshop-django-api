@@ -1,15 +1,16 @@
 import admin_thumbnails
 from django.contrib import admin
 from django.contrib import messages
+from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext
 from mptt.admin import DraggableMPTTAdmin
+from parler.admin import TranslatableAdmin
 
 from core.admin import ExportModelAdmin
 from product.models.category import ProductCategory
 from product.models.favourite import ProductFavourite
 from product.models.product import Product
 from product.models.product import ProductImages
-from product.models.product import ProductTranslation
 from product.models.review import ProductReview
 
 
@@ -18,15 +19,13 @@ def category_update_action(category):
         return queryset.update(category=category)
 
     category_update.__name__ = "make_action_%s" % category.name
-    category_update.short_description = (
-        "Change category to '%s' for selected products" % category
-    )
+    category_update.short_description = _("Update category to %s") % category.name
     return category_update
 
 
 @admin.register(ProductCategory)
-class CategoryAdmin(DraggableMPTTAdmin):
-    mptt_indent_field = "name"
+class CategoryAdmin(TranslatableAdmin, DraggableMPTTAdmin):
+    mptt_indent_field = "translations__name"
     list_display = (
         "tree_actions",
         "indented_title",
@@ -34,7 +33,7 @@ class CategoryAdmin(DraggableMPTTAdmin):
         "related_products_cumulative_count",
     )
     list_display_links = ("indented_title",)
-    prepopulated_fields = {"slug": ("name",)}
+    search_fields = ("translations__name",)
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -50,13 +49,20 @@ class CategoryAdmin(DraggableMPTTAdmin):
         )
         return qs
 
+    def get_prepopulated_fields(self, request, obj=None):
+        # can't use `prepopulated_fields = ..` because it breaks the admin validation
+        # for translated fields. This is the official django-parler workaround.
+        return {
+            "slug": ("name",),
+        }
+
     def related_products_count(self, instance):
         return instance.products_count
 
     setattr(
         related_products_count,
         "short_description",
-        "Related products (for this specific category)",
+        _("Related products (for this specific category)"),
     )
 
     def related_products_cumulative_count(self, instance):
@@ -65,7 +71,7 @@ class CategoryAdmin(DraggableMPTTAdmin):
     setattr(
         related_products_cumulative_count,
         "short_description",
-        "Related products (in tree)",
+        _("Related products (in tree)"),
     )
 
 
@@ -83,10 +89,9 @@ class ProductImageInline(admin.TabularInline):
 
 
 @admin.register(Product)
-class ProductAdmin(ExportModelAdmin):
+class ProductAdmin(TranslatableAdmin, ExportModelAdmin):
     list_display = [
         "id",
-        "name",
         "category",
         "price",
         "colored_stock",
@@ -94,11 +99,17 @@ class ProductAdmin(ExportModelAdmin):
         "image_tag",
         "likes_counter",
     ]
-    search_fields = ["id", "category__name", "name", "product_code"]
+    search_fields = ["id", "category__name", "translations__name", "product_code"]
     list_filter = ["category"]
     inlines = [ProductImageInline]
-    prepopulated_fields = {"slug": ("name",)}
     readonly_fields = ("image_tag",)
+
+    def get_prepopulated_fields(self, request, obj=None):
+        # can't use `prepopulated_fields = ..` because it breaks the admin validation
+        # for translated fields. This is the official django-parler workaround.
+        return {
+            "slug": ("name",),
+        }
 
     def boolean_status(self, obj):
         return obj.active == "True"
@@ -112,7 +123,7 @@ class ProductAdmin(ExportModelAdmin):
     setattr(
         boolean_status,
         "short_description",
-        "STATUS",
+        _("Status"),
     )
 
     actions = [
@@ -121,43 +132,24 @@ class ProductAdmin(ExportModelAdmin):
     ]
 
 
-@admin.register(ProductTranslation)
-class ProductTranslationAdmin(admin.ModelAdmin):
-    model = ProductTranslation
-    list_display = (
-        "product_id",
-        "name",
-        "description",
-    )
-    list_filter = (
-        "product_id",
-        "name",
-    )
-    list_editable = (
-        "name",
-        "description",
-    )
-    search_fields = (
-        "product_id",
-        "name",
-    )
-    date_hierarchy = "updated_at"
-    save_on_top = True
-
-
 @admin.register(ProductReview)
-class ReviewAdmin(admin.ModelAdmin):
+class ReviewAdmin(TranslatableAdmin):
     list_display = ["comment", "status", "created_at"]
     list_filter = ["status"]
     actions = ["make_published", "make_unpublished"]
+    search_fields = ["translations__comment"]
 
     def make_published(self, request, queryset):
         updated = queryset.update(status="True")
         self.message_user(
             request,
             ngettext(
-                "%d comment was successfully marked as published.",
-                "%d comments were successfully marked as published.",
+                _(
+                    "%d comment was successfully marked as published.",
+                ),
+                _(
+                    "%d comments were successfully marked as published.",
+                ),
                 updated,
             )
             % updated,
@@ -169,8 +161,12 @@ class ReviewAdmin(admin.ModelAdmin):
         self.message_user(
             request,
             ngettext(
-                "%d comment was successfully marked as published.",
-                "%d comments were successfully marked as published.",
+                _(
+                    "%d comment was successfully marked as published.",
+                ),
+                _(
+                    "%d comments were successfully marked as published.",
+                ),
                 updated,
             )
             % updated,
@@ -180,11 +176,11 @@ class ReviewAdmin(admin.ModelAdmin):
     setattr(
         make_published,
         "short_description",
-        "Mark selected comments as published",
+        _("Mark selected comments as published"),
     )
 
     setattr(
         make_unpublished,
         "short_description",
-        "Mark selected comments as unpublished",
+        _("Mark selected comments as unpublished"),
     )

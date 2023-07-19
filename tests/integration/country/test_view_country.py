@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from django.conf import settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -32,10 +33,20 @@ class CountryViewSetTestCase(APITestCase):
         payload = {
             "alpha_2": "CY",
             "alpha_3": "CYP",
-            "name": "Cyprus",
+            "translations": {},
             "iso_cc": 196,
             "phone_code": 357,
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "name": f"Translation for {language_name}",
+            }
+
+            payload["translations"][language_code] = translation_payload
 
         response = self.client.post(
             "/api/v1/country/", json.dumps(payload), content_type="application/json"
@@ -72,16 +83,27 @@ class CountryViewSetTestCase(APITestCase):
         payload = {
             "alpha_2": "GR",
             "alpha_3": "GRC",
-            "name": "Greece",
+            "translations": {},
             "iso_cc": 300,
             "phone_code": 30,
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "name": f"Translation for {language_name}",
+            }
+
+            payload["translations"][language_code] = translation_payload
 
         response = self.client.put(
             f"/api/v1/country/{self.country.pk}/",
             json.dumps(payload),
             content_type="application/json",
         )
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_update_invalid(self):

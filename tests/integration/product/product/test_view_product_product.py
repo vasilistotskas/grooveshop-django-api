@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from django.conf import settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -16,9 +17,7 @@ class ProductViewSetTestCase(APITestCase):
 
     def setUp(self):
         self.product = Product.objects.create(
-            name="test",
-            slug="test",
-            description="test",
+            slug="slug_one",
             price=10.00,
             active=True,
             stock=10,
@@ -36,15 +35,13 @@ class ProductViewSetTestCase(APITestCase):
 
     def test_create_valid(self):
         category = ProductCategory.objects.create(
-            name="test",
-            slug="test",
-            description="test",
+            slug="slug_two",
         )
         vat = Vat.objects.create(value=20)
+
         payload = {
-            "name": "test_one",
-            "slug": "test_one",
-            "description": "test_one",
+            "translations": {},
+            "slug": "slug_three",
             "price": 10.00,
             "active": True,
             "stock": 10,
@@ -54,6 +51,18 @@ class ProductViewSetTestCase(APITestCase):
             "category": category.pk,
             "vat": vat.pk,
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "name": f"Translation for {language_name}",
+                "description": f"Translation for {language_name}",
+            }
+
+            payload["translations"][language_code] = translation_payload
+
         response = self.client.post(
             "/api/v1/product/", json.dumps(payload), content_type="application/json"
         )
@@ -62,9 +71,7 @@ class ProductViewSetTestCase(APITestCase):
 
     def test_create_invalid(self):
         payload = {
-            "name": "invalid",
             "slug": True,
-            "description": True,
             "price": "invalid",
             "active": "invalid",
             "stock": "invalid",
@@ -90,15 +97,12 @@ class ProductViewSetTestCase(APITestCase):
 
     def test_update_valid(self):
         category = ProductCategory.objects.create(
-            name="test_two",
-            slug="test_two",
-            description="test_two",
+            slug="slug_four",
         )
         vat = Vat.objects.create(value=25)
         payload = {
-            "name": "test_one",
-            "slug": "test_one",
-            "description": "test_one",
+            "translations": {},
+            "slug": "slug_five",
             "price": 10.00,
             "active": True,
             "stock": 10,
@@ -108,18 +112,29 @@ class ProductViewSetTestCase(APITestCase):
             "category": category.pk,
             "vat": vat.pk,
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "name": f"Translation for {language_name}",
+                "description": f"Translation for {language_name}",
+            }
+
+            payload["translations"][language_code] = translation_payload
+
         response = self.client.put(
             f"/api/v1/product/{self.product.pk}/",
             json.dumps(payload),
             content_type="application/json",
         )
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_update_invalid(self):
         payload = {
-            "name": "invalid",
             "slug": True,
-            "description": True,
             "price": "invalid",
             "active": "invalid",
             "stock": "invalid",
@@ -136,9 +151,7 @@ class ProductViewSetTestCase(APITestCase):
 
     def test_partial_update_valid(self):
         payload = {
-            "name": "test_one",
-            "slug": "test_one",
-            "description": "test_one",
+            "slug": "slug_six",
             "price": 10.00,
             "active": True,
             "stock": 10,
@@ -155,9 +168,7 @@ class ProductViewSetTestCase(APITestCase):
 
     def test_partial_update_invalid(self):
         payload = {
-            "name": "invalid",
             "slug": True,
-            "description": True,
             "price": "invalid",
             "active": "invalid",
             "stock": "invalid",

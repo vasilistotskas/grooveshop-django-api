@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
-  title: Django Spectacular
+  title: DeepWeb API
   version: 1.0.0
-  description: Django Spectacular Description
+  description: DeepWeb API description
 paths:
   /api/v1/active_users/active_users_count/:
     get:
@@ -501,10 +501,6 @@ paths:
         name: id
         schema:
           type: integer
-      - in: query
-        name: name
-        schema:
-          type: string
       - name: ordering
         required: false
         in: query
@@ -527,6 +523,10 @@ paths:
         required: false
         in: query
         description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: translations_Name
         schema:
           type: string
       tags:
@@ -586,10 +586,6 @@ paths:
         name: id
         schema:
           type: integer
-      - in: query
-        name: name
-        schema:
-          type: string
       - name: ordering
         required: false
         in: query
@@ -612,6 +608,10 @@ paths:
         required: false
         in: query
         description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: translations_Name
         schema:
           type: string
       tags:
@@ -1936,10 +1936,6 @@ paths:
         name: id
         schema:
           type: integer
-      - in: query
-        name: name
-        schema:
-          type: string
       - name: ordering
         required: false
         in: query
@@ -1962,6 +1958,10 @@ paths:
         required: false
         in: query
         description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: translations_Name
         schema:
           type: string
       tags:
@@ -2025,10 +2025,6 @@ paths:
         name: id
         schema:
           type: integer
-      - in: query
-        name: name
-        schema:
-          type: string
       - name: ordering
         required: false
         in: query
@@ -2051,6 +2047,10 @@ paths:
         required: false
         in: query
         description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: translations_Name
         schema:
           type: string
       tags:
@@ -2920,10 +2920,6 @@ paths:
         name: isoCc
         schema:
           type: integer
-      - in: query
-        name: name
-        schema:
-          type: string
       - name: ordering
         required: false
         in: query
@@ -2950,6 +2946,10 @@ paths:
         required: false
         in: query
         description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: translations_Name
         schema:
           type: string
       tags:
@@ -3017,10 +3017,6 @@ paths:
         name: isoCc
         schema:
           type: integer
-      - in: query
-        name: name
-        schema:
-          type: string
       - name: ordering
         required: false
         in: query
@@ -3047,6 +3043,10 @@ paths:
         required: false
         in: query
         description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: translations_Name
         schema:
           type: string
       tags:
@@ -3107,7 +3107,8 @@ paths:
         name: alpha2
         schema:
           type: string
-        description: A unique value identifying this country.
+          title: Country Code Alpha 2
+        description: A unique value identifying this Country.
         required: true
       tags:
       - api
@@ -3130,7 +3131,8 @@ paths:
         name: alpha2
         schema:
           type: string
-        description: A unique value identifying this country.
+          title: Country Code Alpha 2
+        description: A unique value identifying this Country.
         required: true
       tags:
       - api
@@ -3165,7 +3167,8 @@ paths:
         name: alpha2
         schema:
           type: string
-        description: A unique value identifying this country.
+          title: Country Code Alpha 2
+        description: A unique value identifying this Country.
         required: true
       tags:
       - api
@@ -3199,7 +3202,8 @@ paths:
         name: alpha2
         schema:
           type: string
-        description: A unique value identifying this country.
+          title: Country Code Alpha 2
+        description: A unique value identifying this Country.
         required: true
       tags:
       - api
@@ -3219,7 +3223,8 @@ paths:
         name: alpha2
         schema:
           type: string
-        description: A unique value identifying this country.
+          title: Country Code Alpha 2
+        description: A unique value identifying this Country.
         required: true
       - in: path
         name: format
@@ -3249,7 +3254,8 @@ paths:
         name: alpha2
         schema:
           type: string
-        description: A unique value identifying this country.
+          title: Country Code Alpha 2
+        description: A unique value identifying this Country.
         required: true
       - in: path
         name: format
@@ -3291,7 +3297,8 @@ paths:
         name: alpha2
         schema:
           type: string
-        description: A unique value identifying this country.
+          title: Country Code Alpha 2
+        description: A unique value identifying this Country.
         required: true
       - in: path
         name: format
@@ -3332,7 +3339,8 @@ paths:
         name: alpha2
         schema:
           type: string
-        description: A unique value identifying this country.
+          title: Country Code Alpha 2
+        description: A unique value identifying this Country.
         required: true
       - in: path
         name: format
@@ -3564,20 +3572,6 @@ paths:
         name: freeForOrderAmount
         schema:
           type: number
-      - in: query
-        name: name
-        schema:
-          type: string
-          enum:
-          - Credit Card
-          - Pay On Delivery
-          - Pay On Store
-          - PayPal
-        description: |-
-          * `Credit Card` - CREDIT_CARD
-          * `Pay On Delivery` - PAY_ON_DELIVERY
-          * `Pay On Store` - PAY_ON_STORE
-          * `PayPal` - PAY_PAL
       - name: ordering
         required: false
         in: query
@@ -3602,6 +3596,21 @@ paths:
         description: A search term.
         schema:
           type: string
+      - in: query
+        name: translations_Name
+        schema:
+          type: string
+          nullable: true
+          enum:
+          - Credit Card
+          - Pay On Delivery
+          - Pay On Store
+          - PayPal
+        description: |-
+          * `Credit Card` - CREDIT_CARD
+          * `Pay On Delivery` - PAY_ON_DELIVERY
+          * `Pay On Store` - PAY_ON_STORE
+          * `PayPal` - PAY_PAL
       tags:
       - api
       security:
@@ -4260,10 +4269,6 @@ paths:
         name: id
         schema:
           type: integer
-      - in: query
-        name: name
-        schema:
-          type: string
       - name: ordering
         required: false
         in: query
@@ -4286,6 +4291,10 @@ paths:
         required: false
         in: query
         description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: translations_Name
         schema:
           type: string
       tags:
@@ -4345,10 +4354,6 @@ paths:
         name: id
         schema:
           type: integer
-      - in: query
-        name: name
-        schema:
-          type: string
       - name: ordering
         required: false
         in: query
@@ -4371,6 +4376,10 @@ paths:
         required: false
         in: query
         description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: translations_Name
         schema:
           type: string
       tags:
@@ -6006,10 +6015,7 @@ paths:
         name: alpha2
         schema:
           type: string
-      - in: query
-        name: name
-        schema:
-          type: string
+          title: Country Code Alpha 2
       - name: ordering
         required: false
         in: query
@@ -6032,6 +6038,10 @@ paths:
         required: false
         in: query
         description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: translations_Name
         schema:
           type: string
       tags:
@@ -6088,6 +6098,7 @@ paths:
         name: alpha2
         schema:
           type: string
+          title: Country Code Alpha 2
       - in: path
         name: format
         schema:
@@ -6095,10 +6106,6 @@ paths:
           enum:
           - .json
         required: true
-      - in: query
-        name: name
-        schema:
-          type: string
       - name: ordering
         required: false
         in: query
@@ -6121,6 +6128,10 @@ paths:
         required: false
         in: query
         description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: translations_Name
         schema:
           type: string
       tags:
@@ -6181,7 +6192,7 @@ paths:
         name: alpha
         schema:
           type: string
-        description: A unique value identifying this region.
+        description: A unique value identifying this Region.
         required: true
       tags:
       - api
@@ -6204,7 +6215,7 @@ paths:
         name: alpha
         schema:
           type: string
-        description: A unique value identifying this region.
+        description: A unique value identifying this Region.
         required: true
       tags:
       - api
@@ -6239,7 +6250,7 @@ paths:
         name: alpha
         schema:
           type: string
-        description: A unique value identifying this region.
+        description: A unique value identifying this Region.
         required: true
       tags:
       - api
@@ -6273,7 +6284,7 @@ paths:
         name: alpha
         schema:
           type: string
-        description: A unique value identifying this region.
+        description: A unique value identifying this Region.
         required: true
       tags:
       - api
@@ -6293,7 +6304,7 @@ paths:
         name: alpha
         schema:
           type: string
-        description: A unique value identifying this region.
+        description: A unique value identifying this Region.
         required: true
       - in: path
         name: format
@@ -6323,7 +6334,7 @@ paths:
         name: alpha
         schema:
           type: string
-        description: A unique value identifying this region.
+        description: A unique value identifying this Region.
         required: true
       - in: path
         name: format
@@ -6365,7 +6376,7 @@ paths:
         name: alpha
         schema:
           type: string
-        description: A unique value identifying this region.
+        description: A unique value identifying this Region.
         required: true
       - in: path
         name: format
@@ -6406,7 +6417,7 @@ paths:
         name: alpha
         schema:
           type: string
-        description: A unique value identifying this region.
+        description: A unique value identifying this Region.
         required: true
       - in: path
         name: format
@@ -6433,7 +6444,7 @@ paths:
         name: alpha
         schema:
           type: string
-        description: A unique value identifying this region.
+        description: A unique value identifying this Region.
         required: true
       tags:
       - api
@@ -6457,7 +6468,7 @@ paths:
         name: alpha
         schema:
           type: string
-        description: A unique value identifying this region.
+        description: A unique value identifying this Region.
         required: true
       - in: path
         name: format
@@ -6648,7 +6659,7 @@ paths:
         schema:
           type: integer
       - in: query
-        name: title
+        name: translations_Title
         schema:
           type: string
       tags:
@@ -6737,7 +6748,7 @@ paths:
         schema:
           type: integer
       - in: query
-        name: title
+        name: translations_Title
         schema:
           type: string
       tags:
@@ -7042,10 +7053,6 @@ paths:
         name: id
         schema:
           type: integer
-      - in: query
-        name: name
-        schema:
-          type: string
       - name: ordering
         required: false
         in: query
@@ -7068,6 +7075,10 @@ paths:
         required: false
         in: query
         description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: translations_Name
         schema:
           type: string
       tags:
@@ -7127,10 +7138,6 @@ paths:
         name: id
         schema:
           type: integer
-      - in: query
-        name: name
-        schema:
-          type: string
       - name: ordering
         required: false
         in: query
@@ -7153,6 +7160,10 @@ paths:
         required: false
         in: query
         description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: translations_Name
         schema:
           type: string
       tags:
@@ -7500,7 +7511,7 @@ paths:
         schema:
           type: string
       - in: query
-        name: title
+        name: translations_Title
         schema:
           type: string
       tags:
@@ -7603,7 +7614,7 @@ paths:
         schema:
           type: string
       - in: query
-        name: title
+        name: translations_Title
         schema:
           type: string
       tags:
@@ -8367,6 +8378,7 @@ paths:
         name: country
         schema:
           type: string
+          title: Country Code Alpha 2
       - in: query
         name: floor
         schema:
@@ -8499,6 +8511,7 @@ paths:
         name: country
         schema:
           type: string
+          title: Country Code Alpha 2
       - in: query
         name: floor
         schema:
@@ -9383,7 +9396,26 @@ components:
       - ''
     BlogAuthor:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                bio:
+                  type: string
+            de:
+              type: object
+              properties:
+                bio:
+                  type: string
+            el:
+              type: object
+              properties:
+                bio:
+                  type: string
         id:
           type: integer
           readOnly: true
@@ -9394,9 +9426,6 @@ components:
           format: uri
           nullable: true
           maxLength: 200
-        bio:
-          type: string
-          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -9410,18 +9439,41 @@ components:
           readOnly: true
       required:
       - id
+      - translations
       - updatedAt
       - user
       - uuid
     BlogCategory:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+            de:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
         id:
           type: integer
           readOnly: true
-        name:
-          type: string
-          maxLength: 200
         slug:
           type: string
           maxLength: 50
@@ -9451,20 +9503,36 @@ components:
       - id
       - mainImageAbsoluteUrl
       - mainImageFilename
-      - name
       - slug
       - sortOrder
+      - translations
       - updatedAt
       - uuid
     BlogComment:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                content:
+                  type: string
+            de:
+              type: object
+              properties:
+                content:
+                  type: string
+            el:
+              type: object
+              properties:
+                content:
+                  type: string
         id:
           type: integer
           readOnly: true
-        content:
-          type: string
-          maxLength: 1000
         isApproved:
           type: boolean
         likes:
@@ -9490,37 +9558,55 @@ components:
           type: integer
           readOnly: true
       required:
-      - content
       - id
       - likes
       - numberOfLikes
       - post
+      - translations
       - updatedAt
       - user
       - uuid
     BlogPost:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                body:
+                  type: string
+            de:
+              type: object
+              properties:
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                body:
+                  type: string
+            el:
+              type: object
+              properties:
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                body:
+                  type: string
         id:
           type: integer
           readOnly: true
-        title:
-          type: string
-          maxLength: 255
-        subtitle:
-          type: string
-          nullable: true
-          maxLength: 255
         slug:
           type: string
           maxLength: 255
           pattern: ^[-a-zA-Z0-9_]+$
-        body:
-          type: string
-        metaDescription:
-          type: string
-          nullable: true
-          maxLength: 150
         likes:
           type: array
           items:
@@ -9573,7 +9659,6 @@ components:
           readOnly: true
       required:
       - author
-      - body
       - category
       - getPostTagsCount
       - id
@@ -9584,7 +9669,7 @@ components:
       - numberOfLikes
       - slug
       - tags
-      - title
+      - translations
       - updatedAt
       - uuid
     BlogPostStatusEnum:
@@ -9599,13 +9684,41 @@ components:
         * `archived` - ARCHIVED
     BlogTag:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                body:
+                  type: string
+            de:
+              type: object
+              properties:
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                body:
+                  type: string
+            el:
+              type: object
+              properties:
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                body:
+                  type: string
         id:
           type: integer
           readOnly: true
-        name:
-          type: string
-          maxLength: 50
         active:
           type: boolean
         createdAt:
@@ -9629,8 +9742,8 @@ components:
       required:
       - getTagPostsCount
       - id
-      - name
       - sortOrder
+      - translations
       - updatedAt
       - uuid
     Cart:
@@ -9709,19 +9822,38 @@ components:
       - totalPrice
     Country:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
-        name:
-          type: string
-          maxLength: 50
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                name:
+                  type: string
+            de:
+              type: object
+              properties:
+                name:
+                  type: string
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
         alpha2:
           type: string
+          title: Country Code Alpha 2
           maxLength: 2
         alpha3:
           type: string
+          title: Country Code Alpha 3
           maxLength: 3
         isoCc:
           type: integer
           nullable: true
+          title: ISO Country Code
         phoneCode:
           type: integer
           nullable: true
@@ -9743,8 +9875,8 @@ components:
       required:
       - alpha2
       - alpha3
-      - name
       - sortOrder
+      - translations
       - updatedAt
       - uuid
     DocumentTypeEnum:
@@ -9797,18 +9929,6 @@ components:
         * `0` - HOME
         * `1` - OFFICE
         * `2` - OTHER
-    NameEnum:
-      enum:
-      - Credit Card
-      - Pay On Delivery
-      - Pay On Store
-      - PayPal
-      type: string
-      description: |-
-        * `Credit Card` - CREDIT_CARD
-        * `Pay On Delivery` - PAY_ON_DELIVERY
-        * `Pay On Store` - PAY_ON_STORE
-        * `PayPal` - PAY_PAL
     NullEnum:
       enum:
       - null
@@ -9843,10 +9963,10 @@ components:
           - $ref: '#/components/schemas/NullEnum'
         street:
           type: string
-          maxLength: 100
+          maxLength: 255
         streetNumber:
           type: string
-          maxLength: 100
+          maxLength: 255
         payWay:
           allOf:
           - $ref: '#/components/schemas/PayWay'
@@ -9855,30 +9975,30 @@ components:
           $ref: '#/components/schemas/OrderStatusEnum'
         firstName:
           type: string
-          maxLength: 100
+          maxLength: 255
         lastName:
           type: string
-          maxLength: 100
+          maxLength: 255
         email:
           type: string
-          maxLength: 100
+          maxLength: 255
         zipcode:
           type: string
-          maxLength: 100
+          maxLength: 255
         place:
           type: string
           nullable: true
-          maxLength: 100
+          maxLength: 255
         city:
           type: string
-          maxLength: 100
+          maxLength: 255
         phone:
           type: string
-          maxLength: 100
+          maxLength: 255
         mobilePhone:
           type: string
           nullable: true
-          maxLength: 100
+          maxLength: 255
         customerNotes:
           type: string
           nullable: true
@@ -10409,7 +10529,26 @@ components:
             $ref: '#/components/schemas/Vat'
     PatchedBlogAuthor:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                bio:
+                  type: string
+            de:
+              type: object
+              properties:
+                bio:
+                  type: string
+            el:
+              type: object
+              properties:
+                bio:
+                  type: string
         id:
           type: integer
           readOnly: true
@@ -10420,9 +10559,6 @@ components:
           format: uri
           nullable: true
           maxLength: 200
-        bio:
-          type: string
-          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -10436,13 +10572,35 @@ components:
           readOnly: true
     PatchedBlogCategory:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+            de:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
         id:
           type: integer
           readOnly: true
-        name:
-          type: string
-          maxLength: 200
         slug:
           type: string
           maxLength: 50
@@ -10470,13 +10628,29 @@ components:
           readOnly: true
     PatchedBlogComment:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                content:
+                  type: string
+            de:
+              type: object
+              properties:
+                content:
+                  type: string
+            el:
+              type: object
+              properties:
+                content:
+                  type: string
         id:
           type: integer
           readOnly: true
-        content:
-          type: string
-          maxLength: 1000
         isApproved:
           type: boolean
         likes:
@@ -10503,27 +10677,45 @@ components:
           readOnly: true
     PatchedBlogPost:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                body:
+                  type: string
+            de:
+              type: object
+              properties:
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                body:
+                  type: string
+            el:
+              type: object
+              properties:
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                body:
+                  type: string
         id:
           type: integer
           readOnly: true
-        title:
-          type: string
-          maxLength: 255
-        subtitle:
-          type: string
-          nullable: true
-          maxLength: 255
         slug:
           type: string
           maxLength: 255
           pattern: ^[-a-zA-Z0-9_]+$
-        body:
-          type: string
-        metaDescription:
-          type: string
-          nullable: true
-          maxLength: 150
         likes:
           type: array
           items:
@@ -10576,13 +10768,41 @@ components:
           readOnly: true
     PatchedBlogTag:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                body:
+                  type: string
+            de:
+              type: object
+              properties:
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                body:
+                  type: string
+            el:
+              type: object
+              properties:
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                body:
+                  type: string
         id:
           type: integer
           readOnly: true
-        name:
-          type: string
-          maxLength: 50
         active:
           type: boolean
         createdAt:
@@ -10664,19 +10884,38 @@ components:
           readOnly: true
     PatchedCountry:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
-        name:
-          type: string
-          maxLength: 50
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                name:
+                  type: string
+            de:
+              type: object
+              properties:
+                name:
+                  type: string
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
         alpha2:
           type: string
+          title: Country Code Alpha 2
           maxLength: 2
         alpha3:
           type: string
+          title: Country Code Alpha 3
           maxLength: 3
         isoCc:
           type: integer
           nullable: true
+          title: ISO Country Code
         phoneCode:
           type: integer
           nullable: true
@@ -10726,10 +10965,10 @@ components:
           - $ref: '#/components/schemas/NullEnum'
         street:
           type: string
-          maxLength: 100
+          maxLength: 255
         streetNumber:
           type: string
-          maxLength: 100
+          maxLength: 255
         payWay:
           allOf:
           - $ref: '#/components/schemas/PayWay'
@@ -10738,30 +10977,30 @@ components:
           $ref: '#/components/schemas/OrderStatusEnum'
         firstName:
           type: string
-          maxLength: 100
+          maxLength: 255
         lastName:
           type: string
-          maxLength: 100
+          maxLength: 255
         email:
           type: string
-          maxLength: 100
+          maxLength: 255
         zipcode:
           type: string
-          maxLength: 100
+          maxLength: 255
         place:
           type: string
           nullable: true
-          maxLength: 100
+          maxLength: 255
         city:
           type: string
-          maxLength: 100
+          maxLength: 255
         phone:
           type: string
-          maxLength: 100
+          maxLength: 255
         mobilePhone:
           type: string
           nullable: true
-          maxLength: 100
+          maxLength: 255
         customerNotes:
           type: string
           nullable: true
@@ -10798,12 +11037,29 @@ components:
           readOnly: true
     PatchedPayWay:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                name:
+                  type: string
+            de:
+              type: object
+              properties:
+                name:
+                  type: string
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
         id:
           type: integer
           readOnly: true
-        name:
-          $ref: '#/components/schemas/NameEnum'
         active:
           type: boolean
         cost:
@@ -10847,25 +11103,44 @@ components:
           readOnly: true
     PatchedProduct:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+            de:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
         id:
           type: integer
           readOnly: true
-        name:
-          type: string
-          maxLength: 255
         slug:
           type: string
-          maxLength: 50
+          maxLength: 255
           pattern: ^[-a-zA-Z0-9_]+$
         category:
           type: integer
         absoluteUrl:
           type: string
           readOnly: true
-        description:
-          type: string
-          nullable: true
         price:
           type: number
           format: double
@@ -10973,20 +11248,39 @@ components:
           readOnly: true
     PatchedProductCategory:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+            de:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
         id:
           type: integer
           readOnly: true
-        name:
-          type: string
-          maxLength: 255
         slug:
           type: string
-          maxLength: 50
+          maxLength: 255
           pattern: ^[-a-zA-Z0-9_]+$
-        description:
-          type: string
-          nullable: true
         categoryMenuImageOneAbsoluteUrl:
           type: string
           readOnly: true
@@ -11107,7 +11401,26 @@ components:
           nullable: true
     PatchedProductReview:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                comment:
+                  type: string
+            de:
+              type: object
+              properties:
+                comment:
+                  type: string
+            el:
+              type: object
+              properties:
+                comment:
+                  type: string
         id:
           type: integer
           readOnly: true
@@ -11115,9 +11428,6 @@ components:
           type: integer
         user:
           type: integer
-        comment:
-          type: string
-          maxLength: 250
         rate:
           $ref: '#/components/schemas/RateEnum'
         status:
@@ -11141,15 +11451,32 @@ components:
           readOnly: true
     PatchedRegion:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                name:
+                  type: string
+            de:
+              type: object
+              properties:
+                name:
+                  type: string
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
         alpha:
           type: string
           maxLength: 10
         alpha2:
           type: string
-        name:
-          type: string
-          maxLength: 100
+          title: Country Code Alpha 2
         createdAt:
           type: string
           format: date-time
@@ -11167,28 +11494,61 @@ components:
           readOnly: true
     PatchedSlide:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                name:
+                  type: string
+                url:
+                  type: string
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                description:
+                  type: string
+                buttonLabel:
+                  type: string
+            de:
+              type: object
+              properties:
+                name:
+                  type: string
+                url:
+                  type: string
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                description:
+                  type: string
+                buttonLabel:
+                  type: string
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
+                url:
+                  type: string
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                description:
+                  type: string
+                buttonLabel:
+                  type: string
         id:
           type: integer
           readOnly: true
         slider:
           type: integer
-        url:
-          type: string
-          nullable: true
-          maxLength: 255
-        title:
-          type: string
-          nullable: true
-          maxLength: 40
-        subtitle:
-          type: string
-          nullable: true
-          maxLength: 40
-        description:
-          type: string
-          nullable: true
-          maxLength: 255
         discount:
           type: number
           format: double
@@ -11196,10 +11556,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-        buttonLabel:
-          type: string
-          nullable: true
-          maxLength: 10
         showButton:
           type: boolean
         dateStart:
@@ -11208,8 +11564,6 @@ components:
         dateEnd:
           type: string
           format: date-time
-        orderPosition:
-          type: integer
         mainImageAbsoluteUrl:
           type: string
           readOnly: true
@@ -11237,25 +11591,47 @@ components:
           readOnly: true
     PatchedSlider:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                name:
+                  type: string
+                url:
+                  type: string
+                title:
+                  type: string
+                description:
+                  type: string
+            de:
+              type: object
+              properties:
+                name:
+                  type: string
+                url:
+                  type: string
+                title:
+                  type: string
+                description:
+                  type: string
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
+                url:
+                  type: string
+                title:
+                  type: string
+                description:
+                  type: string
         id:
           type: integer
           readOnly: true
-        name:
-          type: string
-          maxLength: 40
-        url:
-          type: string
-          nullable: true
-          maxLength: 255
-        title:
-          type: string
-          nullable: true
-          maxLength: 40
-        description:
-          type: string
-          nullable: true
-          maxLength: 255
         mainImageAbsoluteUrl:
           type: string
           readOnly: true
@@ -11272,22 +11648,44 @@ components:
           nullable: true
     PatchedTip:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
-        title:
-          type: string
-          maxLength: 200
-        content:
-          type: string
-          maxLength: 1000
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+                url:
+                  type: string
+            de:
+              type: object
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+                url:
+                  type: string
+            el:
+              type: object
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+                url:
+                  type: string
         kind:
           $ref: '#/components/schemas/KindEnum'
         icon:
           type: string
           format: uri
           nullable: true
-        url:
-          type: string
-          maxLength: 200
         active:
           type: boolean
         createdAt:
@@ -11314,7 +11712,8 @@ components:
         email:
           type: string
           format: email
-          maxLength: 255
+          title: Email Address
+          maxLength: 254
         image:
           type: string
           format: uri
@@ -11328,33 +11727,37 @@ components:
         phone:
           type: string
           nullable: true
-          maxLength: 100
+          maxLength: 255
         city:
           type: string
           nullable: true
-          maxLength: 100
+          maxLength: 255
         zipcode:
           type: string
           nullable: true
-          maxLength: 100
+          title: Zip Code
+          maxLength: 255
         address:
           type: string
           nullable: true
-          maxLength: 100
+          maxLength: 255
         place:
           type: string
           nullable: true
-          maxLength: 100
+          maxLength: 255
         country:
           type: string
+          title: Country Code Alpha 2
           nullable: true
         region:
           type: string
           nullable: true
         isActive:
           type: boolean
+          title: Active
         isStaff:
           type: boolean
+          title: Staff
         birthDate:
           type: string
           format: date
@@ -11404,25 +11807,26 @@ components:
           readOnly: true
         title:
           type: string
-          maxLength: 100
+          maxLength: 255
         firstName:
           type: string
-          maxLength: 100
+          maxLength: 255
         lastName:
           type: string
-          maxLength: 100
+          maxLength: 255
         street:
           type: string
-          maxLength: 100
+          maxLength: 255
         streetNumber:
           type: string
-          maxLength: 100
+          maxLength: 255
         city:
           type: string
-          maxLength: 100
+          maxLength: 255
         zipcode:
           type: string
-          maxLength: 100
+          title: Zip Code
+          maxLength: 255
         floor:
           nullable: true
           oneOf:
@@ -11438,21 +11842,22 @@ components:
         phone:
           type: string
           nullable: true
-          maxLength: 100
+          maxLength: 255
         mobilePhone:
           type: string
           nullable: true
-          maxLength: 100
+          maxLength: 255
         notes:
           type: string
           nullable: true
-          maxLength: 100
+          maxLength: 255
         isMain:
           type: boolean
         user:
           type: integer
         country:
           type: string
+          title: Country Code Alpha 2
         region:
           type: string
     PatchedVat:
@@ -11481,12 +11886,29 @@ components:
           readOnly: true
     PayWay:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                name:
+                  type: string
+            de:
+              type: object
+              properties:
+                name:
+                  type: string
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
         id:
           type: integer
           readOnly: true
-        name:
-          $ref: '#/components/schemas/NameEnum'
         active:
           type: boolean
         cost:
@@ -11532,31 +11954,50 @@ components:
       - iconAbsoluteUrl
       - iconFilename
       - id
-      - name
       - sortOrder
+      - translations
       - updatedAt
       - uuid
     Product:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+            de:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
         id:
           type: integer
           readOnly: true
-        name:
-          type: string
-          maxLength: 255
         slug:
           type: string
-          maxLength: 50
+          maxLength: 255
           pattern: ^[-a-zA-Z0-9_]+$
         category:
           type: integer
         absoluteUrl:
           type: string
           readOnly: true
-        description:
-          type: string
-          nullable: true
         price:
           type: number
           format: double
@@ -11671,12 +12112,12 @@ components:
       - likesCounter
       - mainImageAbsoluteUrl
       - mainImageFilename
-      - name
       - price
       - priceSavePercent
       - reviewAverage
       - reviewCounter
       - slug
+      - translations
       - updatedAt
       - uuid
       - vat
@@ -11684,20 +12125,39 @@ components:
       - vatValue
     ProductCategory:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+            de:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
         id:
           type: integer
           readOnly: true
-        name:
-          type: string
-          maxLength: 255
         slug:
           type: string
-          maxLength: 50
+          maxLength: 255
           pattern: ^[-a-zA-Z0-9_]+$
-        description:
-          type: string
-          nullable: true
         categoryMenuImageOneAbsoluteUrl:
           type: string
           readOnly: true
@@ -11764,9 +12224,9 @@ components:
       - categoryMenuMainBannerFilename
       - id
       - level
-      - name
       - recursiveProductCount
       - slug
+      - translations
       - treeId
       - updatedAt
       - uuid
@@ -11850,7 +12310,26 @@ components:
       - uuid
     ProductReview:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                comment:
+                  type: string
+            de:
+              type: object
+              properties:
+                comment:
+                  type: string
+            el:
+              type: object
+              properties:
+                comment:
+                  type: string
         id:
           type: integer
           readOnly: true
@@ -11858,9 +12337,6 @@ components:
           type: integer
         user:
           type: integer
-        comment:
-          type: string
-          maxLength: 250
         rate:
           $ref: '#/components/schemas/RateEnum'
         status:
@@ -11886,6 +12362,7 @@ components:
       - id
       - product
       - rate
+      - translations
       - updatedAt
       - user
       - uuid
@@ -11925,15 +12402,32 @@ components:
         * `10` - TEN
     Region:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                name:
+                  type: string
+            de:
+              type: object
+              properties:
+                name:
+                  type: string
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
         alpha:
           type: string
           maxLength: 10
         alpha2:
           type: string
-        name:
-          type: string
-          maxLength: 100
+          title: Country Code Alpha 2
         createdAt:
           type: string
           format: date-time
@@ -11952,34 +12446,67 @@ components:
       required:
       - alpha
       - alpha2
-      - name
       - sortOrder
+      - translations
       - updatedAt
       - uuid
     Slide:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                name:
+                  type: string
+                url:
+                  type: string
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                description:
+                  type: string
+                buttonLabel:
+                  type: string
+            de:
+              type: object
+              properties:
+                name:
+                  type: string
+                url:
+                  type: string
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                description:
+                  type: string
+                buttonLabel:
+                  type: string
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
+                url:
+                  type: string
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                description:
+                  type: string
+                buttonLabel:
+                  type: string
         id:
           type: integer
           readOnly: true
         slider:
           type: integer
-        url:
-          type: string
-          nullable: true
-          maxLength: 255
-        title:
-          type: string
-          nullable: true
-          maxLength: 40
-        subtitle:
-          type: string
-          nullable: true
-          maxLength: 40
-        description:
-          type: string
-          nullable: true
-          maxLength: 255
         discount:
           type: number
           format: double
@@ -11987,10 +12514,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-        buttonLabel:
-          type: string
-          nullable: true
-          maxLength: 10
         showButton:
           type: boolean
         dateStart:
@@ -11999,8 +12522,6 @@ components:
         dateEnd:
           type: string
           format: date-time
-        orderPosition:
-          type: integer
         mainImageAbsoluteUrl:
           type: string
           readOnly: true
@@ -12032,32 +12553,54 @@ components:
       - id
       - mainImageAbsoluteUrl
       - mainImageFilename
-      - orderPosition
       - slider
       - sortOrder
+      - translations
       - updatedAt
       - uuid
     Slider:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                name:
+                  type: string
+                url:
+                  type: string
+                title:
+                  type: string
+                description:
+                  type: string
+            de:
+              type: object
+              properties:
+                name:
+                  type: string
+                url:
+                  type: string
+                title:
+                  type: string
+                description:
+                  type: string
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
+                url:
+                  type: string
+                title:
+                  type: string
+                description:
+                  type: string
         id:
           type: integer
           readOnly: true
-        name:
-          type: string
-          maxLength: 40
-        url:
-          type: string
-          nullable: true
-          maxLength: 255
-        title:
-          type: string
-          nullable: true
-          maxLength: 40
-        description:
-          type: string
-          nullable: true
-          maxLength: 255
         mainImageAbsoluteUrl:
           type: string
           readOnly: true
@@ -12076,25 +12619,47 @@ components:
       - id
       - mainImageAbsoluteUrl
       - mainImageFilename
-      - name
+      - translations
     Tip:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
-        title:
-          type: string
-          maxLength: 200
-        content:
-          type: string
-          maxLength: 1000
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+                url:
+                  type: string
+            de:
+              type: object
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+                url:
+                  type: string
+            el:
+              type: object
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+                url:
+                  type: string
         kind:
           $ref: '#/components/schemas/KindEnum'
         icon:
           type: string
           format: uri
           nullable: true
-        url:
-          type: string
-          maxLength: 200
         active:
           type: boolean
         createdAt:
@@ -12113,12 +12678,10 @@ components:
           format: uuid
           readOnly: true
       required:
-      - content
       - kind
       - sortOrder
-      - title
+      - translations
       - updatedAt
-      - url
       - uuid
     UserAccount:
       type: object
@@ -12129,7 +12692,8 @@ components:
         email:
           type: string
           format: email
-          maxLength: 255
+          title: Email Address
+          maxLength: 254
         image:
           type: string
           format: uri
@@ -12143,33 +12707,37 @@ components:
         phone:
           type: string
           nullable: true
-          maxLength: 100
+          maxLength: 255
         city:
           type: string
           nullable: true
-          maxLength: 100
+          maxLength: 255
         zipcode:
           type: string
           nullable: true
-          maxLength: 100
+          title: Zip Code
+          maxLength: 255
         address:
           type: string
           nullable: true
-          maxLength: 100
+          maxLength: 255
         place:
           type: string
           nullable: true
-          maxLength: 100
+          maxLength: 255
         country:
           type: string
+          title: Country Code Alpha 2
           nullable: true
         region:
           type: string
           nullable: true
         isActive:
           type: boolean
+          title: Active
         isStaff:
           type: boolean
+          title: Staff
         birthDate:
           type: string
           format: date
@@ -12229,25 +12797,26 @@ components:
           readOnly: true
         title:
           type: string
-          maxLength: 100
+          maxLength: 255
         firstName:
           type: string
-          maxLength: 100
+          maxLength: 255
         lastName:
           type: string
-          maxLength: 100
+          maxLength: 255
         street:
           type: string
-          maxLength: 100
+          maxLength: 255
         streetNumber:
           type: string
-          maxLength: 100
+          maxLength: 255
         city:
           type: string
-          maxLength: 100
+          maxLength: 255
         zipcode:
           type: string
-          maxLength: 100
+          title: Zip Code
+          maxLength: 255
         floor:
           nullable: true
           oneOf:
@@ -12263,21 +12832,22 @@ components:
         phone:
           type: string
           nullable: true
-          maxLength: 100
+          maxLength: 255
         mobilePhone:
           type: string
           nullable: true
-          maxLength: 100
+          maxLength: 255
         notes:
           type: string
           nullable: true
-          maxLength: 100
+          maxLength: 255
         isMain:
           type: boolean
         user:
           type: integer
         country:
           type: string
+          title: Country Code Alpha 2
         region:
           type: string
       required:

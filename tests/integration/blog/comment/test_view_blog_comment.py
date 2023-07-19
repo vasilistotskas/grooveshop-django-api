@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -33,9 +34,7 @@ class BlogCommentViewSetTestCase(APITestCase):
             category_id=category.id,
             author_id=author.id,
         )
-        self.comment = BlogComment.objects.create(
-            content="content", post_id=post.id, user_id=user.id
-        )
+        self.comment = BlogComment.objects.create(post_id=post.id, user_id=user.id)
 
     def test_list(self):
         response = self.client.get("/api/v1/blog/comment/")
@@ -62,11 +61,22 @@ class BlogCommentViewSetTestCase(APITestCase):
         post.likes.add(user)
 
         payload = {
-            "content": "content",
+            "translations": {},
             "post": post.id,
             "user": user.id,
             "likes": [user.id],
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "content": f"Translation for {language_name}",
+            }
+
+            payload["translations"][language_code] = translation_payload
+
         response = self.client.post(
             "/api/v1/blog/comment/",
             json.dumps(payload),
@@ -77,8 +87,8 @@ class BlogCommentViewSetTestCase(APITestCase):
 
     def test_create_invalid(self):
         payload = {
-            "content": "",
             "post": "",
+            "content": "",
         }
         response = self.client.post(
             "/api/v1/blog/comment/",
@@ -116,11 +126,22 @@ class BlogCommentViewSetTestCase(APITestCase):
         )
 
         payload = {
-            "content": "content",
+            "translations": {},
             "post": post.id,
             "user": user.id,
             "likes": [user.id],
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "content": f"Translation for {language_name}",
+            }
+
+            payload["translations"][language_code] = translation_payload
+
         response = self.client.put(
             f"/api/v1/blog/comment/{self.comment.id}/",
             json.dumps(payload),
@@ -130,7 +151,6 @@ class BlogCommentViewSetTestCase(APITestCase):
 
     def test_update_invalid(self):
         payload = {
-            "content": "",
             "post": "",
         }
         response = self.client.put(
@@ -141,9 +161,7 @@ class BlogCommentViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_partial_update_valid(self):
-        payload = {
-            "content": "content",
-        }
+        payload = {}
         response = self.client.patch(
             f"/api/v1/blog/comment/{self.comment.id}/",
             json.dumps(payload),
@@ -153,7 +171,6 @@ class BlogCommentViewSetTestCase(APITestCase):
 
     def test_partial_update_invalid(self):
         payload = {
-            "content": "",
             "post": "",
         }
         response = self.client.patch(

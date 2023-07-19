@@ -1,16 +1,18 @@
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
 
 
 class Vat(TimeStampMixinModel, UUIDModel):
-    id = models.AutoField(primary_key=True)
-    value = models.DecimalField(max_digits=11, decimal_places=1)
+    id = models.BigAutoField(primary_key=True)
+    value = models.DecimalField(_("Value"), max_digits=11, decimal_places=1)
 
     class Meta:
-        verbose_name_plural = "Value Added Tax"
-        ordering = ["-updated_at"]
+        verbose_name = _("Vat")
+        verbose_name_plural = _("Vats")
+        ordering = ["-created_at"]
 
     def __str__(self):
         return "%s" % self.value

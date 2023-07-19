@@ -13,6 +13,7 @@ from django.core.cache import cache
 from django.db import models
 from django.http import HttpRequest
 from django.utils.safestring import mark_safe
+from django.utils.translation import gettext_lazy as _
 
 from core import caches
 from core.models import TimeStampMixinModel
@@ -57,14 +58,15 @@ class UserAccountManager(BaseUserManager):
 
 
 class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinModel):
-    email = models.EmailField(max_length=255, unique=True)
-    first_name = models.CharField(max_length=255)
-    last_name = models.CharField(max_length=255)
-    phone = models.CharField(max_length=100, blank=True, null=True)
-    city = models.CharField(max_length=100, blank=True, null=True)
-    zipcode = models.CharField(max_length=100, blank=True, null=True)
-    address = models.CharField(max_length=100, blank=True, null=True)
-    place = models.CharField(max_length=100, blank=True, null=True)
+    id = models.BigAutoField(primary_key=True)
+    email = models.EmailField(_("Email Address"), max_length=254, unique=True)
+    first_name = models.CharField(_("First Name"), max_length=255, blank=True, null=True)
+    last_name = models.CharField(_("Last Name"), max_length=255, blank=True, null=True)
+    phone = models.CharField(_("Phone"), max_length=255, blank=True, null=True)
+    city = models.CharField(_("City"), max_length=255, blank=True, null=True)
+    zipcode = models.CharField(_("Zip Code"), max_length=255, blank=True, null=True)
+    address = models.CharField(_("Address"), max_length=255, blank=True, null=True)
+    place = models.CharField(_("Place"), max_length=255, blank=True, null=True)
     country = models.ForeignKey(
         "country.Country",
         related_name="user_account_country",
@@ -81,10 +83,12 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
         default=None,
         on_delete=models.SET_NULL,
     )
-    image = models.ImageField(upload_to="uploads/users/", blank=True, null=True)
-    is_active = models.BooleanField(default=True)
-    is_staff = models.BooleanField(default=False)
-    birth_date = models.DateField(blank=True, null=True)
+    image = models.ImageField(
+        _("Image"), upload_to="uploads/users/", blank=True, null=True
+    )
+    is_active = models.BooleanField(_("Active"), default=True)
+    is_staff = models.BooleanField(_("Staff"), default=False)
+    birth_date = models.DateField(_("Birth Date"), blank=True, null=True)
 
     objects: UserAccountManager = UserAccountManager()
 
@@ -134,17 +138,17 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
 
 
 class UserAddress(TimeStampMixinModel, UUIDModel):
-    id = models.AutoField(primary_key=True)
+    id = models.BigAutoField(primary_key=True)
     user = models.ForeignKey(
         "user.UserAccount", related_name="address_user", on_delete=models.CASCADE
     )
-    title = models.CharField(max_length=100)
-    first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
-    street = models.CharField(max_length=100)
-    street_number = models.CharField(max_length=100)
-    city = models.CharField(max_length=100)
-    zipcode = models.CharField(max_length=100)
+    title = models.CharField(_("Title"), max_length=255)
+    first_name = models.CharField(_("First Name"), max_length=255)
+    last_name = models.CharField(_("Last Name"), max_length=255)
+    street = models.CharField(_("Street"), max_length=255)
+    street_number = models.CharField(_("Street Number"), max_length=255)
+    city = models.CharField(_("City"), max_length=255)
+    zipcode = models.CharField(_("Zip Code"), max_length=255)
     country = models.ForeignKey(
         "country.Country",
         related_name="address_country",
@@ -162,6 +166,7 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
         on_delete=models.SET_NULL,
     )
     floor = models.CharField(
+        _("Floor"),
         max_length=50,
         choices=FloorChoicesEnum.choices(),
         null=True,
@@ -169,20 +174,22 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
         default=None,
     )
     location_type = models.CharField(
+        _("Location Type"),
         max_length=100,
         choices=LocationChoicesEnum.choices(),
         null=True,
         blank=True,
         default=None,
     )
-    phone = models.CharField(max_length=100, null=True, blank=True, default=None)
-    mobile_phone = models.CharField(max_length=100, null=True, blank=True, default=None)
-    notes = models.CharField(max_length=100, null=True, blank=True, default=None)
+    phone = models.CharField(max_length=255, null=True, blank=True, default=None)
+    mobile_phone = models.CharField(max_length=255, null=True, blank=True, default=None)
+    notes = models.CharField(max_length=255, null=True, blank=True, default=None)
     is_main = models.BooleanField(default=False)
 
     class Meta:
-        verbose_name_plural = "User's Addresses"
-        ordering = ["-is_main", "id"]
+        verbose_name = _("User Address")
+        verbose_name_plural = _("User Addresses")
+        ordering = ["-created_at"]
 
     def __str__(self):
         return self.title

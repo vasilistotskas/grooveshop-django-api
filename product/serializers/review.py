@@ -1,9 +1,13 @@
 from typing import Dict
 from typing import Type
 
+from drf_spectacular.utils import extend_schema_field
+from parler_rest.fields import TranslatedFieldsField
+from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
+from core.api.schema import generate_schema_multi_lang
 from core.api.serializers import BaseExpandSerializer
 from product.models.product import Product
 from product.models.review import ProductReview
@@ -12,17 +16,23 @@ from user.models import UserAccount
 from user.serializers.account import UserAccountSerializer
 
 
-class ProductReviewSerializer(BaseExpandSerializer):
+@extend_schema_field(generate_schema_multi_lang(ProductReview))
+class TranslatedFieldsFieldExtend(TranslatedFieldsField):
+    pass
+
+
+class ProductReviewSerializer(TranslatableModelSerializer, BaseExpandSerializer):
+    translations = TranslatedFieldsFieldExtend(shared_model=ProductReview)
     product = PrimaryKeyRelatedField(queryset=Product.objects.all())
     user = PrimaryKeyRelatedField(queryset=UserAccount.objects.all())
 
     class Meta:
         model = ProductReview
         fields = (
+            "translations",
             "id",
             "product",
             "user",
-            "comment",
             "rate",
             "status",
             "created_at",

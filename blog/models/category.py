@@ -2,24 +2,38 @@ import os
 
 from django.conf import settings
 from django.db import models
+from django.utils.translation import gettext_lazy as _
+from parler.models import TranslatableModel
+from parler.models import TranslatedFields
 
 from core.models import SortableModel
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
 
 
-class BlogCategory(TimeStampMixinModel, SortableModel, UUIDModel):
-    id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=200)
+class BlogCategory(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
+    id = models.BigAutoField(primary_key=True)
     slug = models.SlugField(unique=True)
-    description = models.TextField()
-    image = models.ImageField(upload_to="uploads/blog/", blank=True, null=True)
+    image = models.ImageField(
+        _("Image"), upload_to="uploads/blog/", blank=True, null=True
+    )
+    translations = TranslatedFields(
+        name=models.CharField(
+            _("Name"), max_length=50, blank=True, null=True, unique=True
+        ),
+        description=models.TextField(_("Description"), blank=True, null=True),
+    )
 
     class Meta:
-        ordering = ["-name"]
+        verbose_name = _("Blog Category")
+        verbose_name_plural = _("Blog Categories")
+        ordering = ["sort_order"]
+
+    def __unicode__(self):
+        return self.safe_translation_getter("name", any_language=True)
 
     def __str__(self):
-        return self.name
+        return self.safe_translation_getter("name", any_language=True)
 
     def get_ordering_queryset(self):
         return BlogCategory.objects.all()
@@ -41,7 +55,3 @@ class BlogCategory(TimeStampMixinModel, SortableModel, UUIDModel):
     @property
     def get_category_posts_count(self) -> int:
         return self.blog_post_category.count()
-
-    @property
-    def absolute_url(self) -> str:
-        return f"/blog/category/{self.slug}"

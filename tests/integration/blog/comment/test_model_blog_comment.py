@@ -21,6 +21,7 @@ class BlogCommentTestCase(TestCase):
             user_id=user.id, website="https://www.google.com", bio="bio"
         )
         post = BlogPost.objects.create(
+            slug="slug",
             title="title",
             subtitle="subtitle",
             category_id=category.id,
@@ -29,12 +30,12 @@ class BlogCommentTestCase(TestCase):
         BlogComment.objects.create(content=self.content, post_id=post.id)
 
     def test___str__(self):
-        post_id = BlogPost.objects.get(title="title").id
+        post_id = BlogPost.objects.get(slug="slug").id
         comment = BlogComment.objects.get(post_id=post_id)
         self.assertEqual(str(comment), comment.content)
 
     def test_number_of_likes(self):
-        post_id = BlogPost.objects.get(title="title").id
+        post_id = BlogPost.objects.get(slug="slug").id
         comment = BlogComment.objects.get(post_id=post_id)
         self.assertEqual(comment.number_of_likes, 0)
 

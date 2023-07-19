@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from django.conf import settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -14,8 +15,6 @@ class TipViewSetTestCase(APITestCase):
 
     def setUp(self):
         self.tip = Tip.objects.create(
-            title="title",
-            content="content",
             kind="success",
             active=True,
         )
@@ -29,12 +28,24 @@ class TipViewSetTestCase(APITestCase):
 
     def test_create_valid(self):
         payload = {
-            "title": "title_two",
-            "content": "content_two",
-            "kind": "error",
+            "translations": {},
+            "kind": "success",
             "active": True,
             "url": "https://www.google.com",
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "title": f"Title Translation for {language_name}",
+                "content": f"Content Translation for {language_name}",
+                "url": f"https://www.google.com/{language_code}",
+            }
+
+            payload["translations"][language_code] = translation_payload
+
         response = self.client.post(
             "/api/v1/tip/", json.dumps(payload), content_type="application/json"
         )
@@ -43,8 +54,6 @@ class TipViewSetTestCase(APITestCase):
 
     def test_create_invalid(self):
         payload = {
-            "title": "INVALID",
-            "content": "INVALID",
             "kind": "INVALID",
             "active": "INVALID",
         }
@@ -67,23 +76,33 @@ class TipViewSetTestCase(APITestCase):
 
     def test_update_valid(self):
         payload = {
-            "title": "title_three",
-            "content": "content_three",
+            "translations": {},
             "kind": "error",
             "active": True,
-            "url": "https://www.google.com",
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "title": f"Title Translation for {language_name}",
+                "content": f"Content Translation for {language_name}",
+                "url": f"https://www.google.com/{language_code}",
+            }
+
+            payload["translations"][language_code] = translation_payload
+
         response = self.client.put(
             f"/api/v1/tip/{self.tip.pk}/",
             json.dumps(payload),
             content_type="application/json",
         )
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_update_invalid(self):
         payload = {
-            "title": "INVALID",
-            "content": "INVALID",
             "kind": "INVALID",
             "active": "INVALID",
         }
@@ -96,22 +115,33 @@ class TipViewSetTestCase(APITestCase):
 
     def test_partial_update_valid(self):
         payload = {
-            "title": "title_four",
-            "content": "content_four",
+            "translations": {},
             "kind": "error",
             "active": True,
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "title": f"Title Translation for {language_name}",
+                "content": f"Content Translation for {language_name}",
+                "url": f"https://www.google.com/{language_code}",
+            }
+
+            payload["translations"][language_code] = translation_payload
+
         response = self.client.patch(
             f"/api/v1/tip/{self.tip.pk}/",
             json.dumps(payload),
             content_type="application/json",
         )
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_partial_update_invalid(self):
         payload = {
-            "title": "INVALID",
-            "content": "INVALID",
             "kind": "INVALID",
             "active": "INVALID",
         }

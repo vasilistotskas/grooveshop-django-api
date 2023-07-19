@@ -49,7 +49,17 @@ class SessionTraceMiddleware:
 
         request.session["last_activity"] = now()
         request.session["referer"] = request.META.get("HTTP_REFERER", None)
-        request.session.save()
+        try:
+            request.session.save()
+        except Exception as e:
+            logger.error(
+                "SessionTraceMiddleware error",
+                extra={
+                    "request": request,
+                    "response": response,
+                    "exception": e,
+                },
+            )
 
         if hasattr(request, "user") and request.user.is_authenticated:
             caches.set(

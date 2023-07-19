@@ -1,16 +1,25 @@
-from rest_framework import serializers
+from drf_spectacular.utils import extend_schema_field
+from parler_rest.fields import TranslatedFieldsField
+from parler_rest.serializers import TranslatableModelSerializer
 
+from core.api.schema import generate_schema_multi_lang
 from product.models.category import ProductCategory
 
 
-class ProductCategorySerializer(serializers.ModelSerializer):
+@extend_schema_field(generate_schema_multi_lang(ProductCategory))
+class TranslatedFieldsFieldExtend(TranslatedFieldsField):
+    pass
+
+
+class ProductCategorySerializer(TranslatableModelSerializer):
+    translations = TranslatedFieldsFieldExtend(shared_model=ProductCategory)
+
     class Meta:
         model = ProductCategory
         fields = (
+            "translations",
             "id",
-            "name",
             "slug",
-            "description",
             "category_menu_image_one_absolute_url",
             "category_menu_image_one_filename",
             "category_menu_image_two_absolute_url",

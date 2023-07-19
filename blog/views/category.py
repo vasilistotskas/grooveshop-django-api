@@ -18,10 +18,10 @@ class BlogCategoryViewSet(ModelViewSet):
     serializer_class = BlogCategorySerializer
     pagination_class = BlogCategoryPagination
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
-    filterset_fields = ["id", "name"]
-    ordering_fields = ["id", "name", "created_at"]
+    filterset_fields = ["id", "translations__name"]
+    ordering_fields = ["id", "translations__name", "created_at"]
     ordering = ["id"]
-    search_fields = ["id", "name"]
+    search_fields = ["id", "translations__name"]
 
     def list(self, request, *args, **kwargs) -> Response:
         queryset = self.filter_queryset(self.get_queryset())

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from django.conf import settings
 from django.utils.timezone import now
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -16,22 +17,11 @@ class SlideViewSetTestCase(APITestCase):
     slider: Slider
 
     def setUp(self):
-        self.slider = Slider.objects.create(
-            name="test",
-            url="http://localhost:8000/",
-            title="test",
-            description="test",
-        )
+        self.slider = Slider.objects.create()
 
         self.slide = Slide.objects.create(
             slider=self.slider,
-            url="https://www.youtube.com/watch?v=1",
-            title="title",
-            subtitle="subtitle",
-            description="description",
-            button_label="test",
             show_button=True,
-            order_position=1,
             date_start=now(),
             date_end=now(),
         )
@@ -44,25 +34,32 @@ class SlideViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_valid(self):
-        slider = Slider.objects.create(
-            name="test_new",
-            url="http://localhost:8000/",
-            title="test_new",
-            description="test_new",
-        )
+        slider = Slider.objects.create()
+
         payload = {
+            "translations": {},
             "slider": slider.pk,
-            "url": "https://www.youtube.com/watch?v=1",
-            "title": "title",
-            "subtitle": "subtitle",
-            "description": "description",
             "discount": 10,
-            "button_label": "button",
             "show_button": True,
-            "order_position": 1,
             "date_start": str(now()),
             "date_end": str(now()),
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "name": f"Translation for {language_name}",
+                "url": "https://www.youtube.com/watch?v=1",
+                "title": f"Title for {language_name}",
+                "subtitle": f"Subtitle for {language_name}",
+                "description": f"Description for {language_name}",
+                "button_label": f"Button label for {language_name}",
+            }
+
+            payload["translations"][language_code] = translation_payload
+
         response = self.client.post(
             "/api/v1/slide/", json.dumps(payload), content_type="application/json"
         )
@@ -72,14 +69,8 @@ class SlideViewSetTestCase(APITestCase):
     def test_create_invalid(self):
         payload = {
             "slider": self.slider.pk,
-            "url": True,
-            "title": True,
-            "subtitle": True,
-            "description": True,
             "discount": "INVALID",
-            "button_label": True,
             "show_button": "INVALID",
-            "order_position": "INVALID",
         }
         response = self.client.post(
             "/api/v1/slide/", json.dumps(payload), content_type="application/json"
@@ -100,18 +91,29 @@ class SlideViewSetTestCase(APITestCase):
 
     def test_update_valid(self):
         payload = {
+            "translations": {},
             "slider": self.slider.pk,
-            "url": "https://www.youtube.com/watch?v=1",
-            "title": "title",
-            "subtitle": "subtitle",
-            "description": "description",
             "discount": 10,
-            "button_label": "button",
             "show_button": True,
-            "order_position": 1,
             "date_end": str(now()),
             "date_start": str(now()),
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "name": f"Translation for {language_name}",
+                "url": "https://www.youtube.com/watch?v=1",
+                "title": f"Title for {language_name}",
+                "subtitle": f"Subtitle for {language_name}",
+                "description": f"Description for {language_name}",
+                "button_label": f"Button label for {language_name}",
+            }
+
+            payload["translations"][language_code] = translation_payload
+
         response = self.client.put(
             f"/api/v1/slide/{self.slide.pk}/",
             json.dumps(payload),
@@ -122,14 +124,8 @@ class SlideViewSetTestCase(APITestCase):
     def test_update_invalid(self):
         payload = {
             "slider": self.slider.pk,
-            "url": True,
-            "title": True,
-            "subtitle": True,
-            "description": True,
             "discount": "INVALID",
-            "button_label": True,
             "show_button": "INVALID",
-            "order_position": "INVALID",
         }
         response = self.client.put(
             f"/api/v1/slide/{self.slide.pk}/",
@@ -141,14 +137,8 @@ class SlideViewSetTestCase(APITestCase):
     def test_partial_update_valid(self):
         payload = {
             "slider": self.slider.pk,
-            "url": "https://www.youtube.com/watch?v=1",
-            "title": "title",
-            "subtitle": "subtitle",
-            "description": "description",
             "discount": 10,
-            "button_label": "button",
             "show_button": True,
-            "order_position": 1,
             "date_end": str(now()),
             "date_start": str(now()),
         }
@@ -162,14 +152,8 @@ class SlideViewSetTestCase(APITestCase):
     def test_partial_update_invalid(self):
         payload = {
             "slider": self.slider.pk,
-            "url": True,
-            "title": True,
-            "subtitle": True,
-            "description": True,
             "discount": "INVALID",
-            "button_label": True,
             "show_button": "INVALID",
-            "order_position": "INVALID",
         }
         response = self.client.patch(
             f"/api/v1/slide/{self.slide.pk}/",

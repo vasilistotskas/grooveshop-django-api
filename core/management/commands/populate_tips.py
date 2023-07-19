@@ -1,12 +1,10 @@
 import os
 import random
 
-from django.conf import settings
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import BaseCommand
 from django.utils.timezone import now
-from faker import Faker
 
 from app.settings import BASE_DIR
 from tip.models import Tip
@@ -14,8 +12,6 @@ from tip.models import Tip
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        faker = Faker()
-
         img = "uploads/tip/no_photo.jpg"
         if not default_storage.exists(img):
             img_path = os.path.join(BASE_DIR, "files/images") + "/no_photo.jpg"
@@ -29,11 +25,8 @@ class Command(BaseCommand):
 
         for _ in range(4):
             obj, created = Tip.objects.get_or_create(
-                title=faker.text(20),
-                content=faker.text(50),
                 kind=random.choice(tip_kinds),
                 icon=img,
-                url=settings.APP_BASE_URL,
                 created_at=now(),
                 active=True,
             )

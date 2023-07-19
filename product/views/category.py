@@ -18,14 +18,14 @@ class ProductCategoryViewSet(ModelViewSet):
     serializer_class = ProductCategorySerializer
     pagination_class = ProductCategoryPagination
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
-    filterset_fields = ["id", "name"]
+    filterset_fields = ["id", "translations__name"]
     ordering_fields = [
         "id",
-        "name",
+        "translations__name",
         "created_at",
     ]
     ordering = ["id"]
-    search_fields = ["id", "name"]
+    search_fields = ["id", "translations__name"]
 
     def list(self, request, *args, **kwargs) -> Response:
         queryset = self.get_queryset().get_cached_trees()

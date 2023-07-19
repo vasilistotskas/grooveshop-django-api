@@ -1,6 +1,9 @@
 from typing import Dict
 from typing import Type
 
+from drf_spectacular.utils import extend_schema_field
+from parler_rest.fields import TranslatedFieldsField
+from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
@@ -11,26 +14,30 @@ from blog.models.tag import BlogTag
 from blog.serializers.author import BlogAuthorSerializer
 from blog.serializers.category import BlogCategorySerializer
 from blog.serializers.tag import BlogTagSerializer
+from core.api.schema import generate_schema_multi_lang
 from core.api.serializers import BaseExpandSerializer
 from user.models import UserAccount
 from user.serializers.account import UserAccountSerializer
 
 
-class BlogPostSerializer(BaseExpandSerializer):
+@extend_schema_field(generate_schema_multi_lang(BlogPost))
+class TranslatedFieldsFieldExtend(TranslatedFieldsField):
+    pass
+
+
+class BlogPostSerializer(TranslatableModelSerializer, BaseExpandSerializer):
     likes = PrimaryKeyRelatedField(queryset=UserAccount.objects.all(), many=True)
     category = PrimaryKeyRelatedField(queryset=BlogCategory.objects.all())
     tags = PrimaryKeyRelatedField(queryset=BlogTag.objects.all(), many=True)
     author = PrimaryKeyRelatedField(queryset=BlogAuthor.objects.all())
+    translations = TranslatedFieldsFieldExtend(shared_model=BlogPost)
 
     class Meta:
         model = BlogPost
         fields = (
+            "translations",
             "id",
-            "title",
-            "subtitle",
             "slug",
-            "body",
-            "meta_description",
             "likes",
             "category",
             "tags",

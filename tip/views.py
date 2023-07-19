@@ -18,10 +18,10 @@ class TipViewSet(ModelViewSet):
     serializer_class = TipSerializer
     pagination_class = TipPagination
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
-    filterset_fields = ["id", "title", "kind", "active"]
-    ordering_fields = ["id", "title", "kind", "active", "created_at"]
+    filterset_fields = ["id", "translations__title", "kind", "active"]
+    ordering_fields = ["id", "translations__title", "kind", "active", "created_at"]
     ordering = ["id"]
-    search_fields = ["id", "title"]
+    search_fields = ["id", "translations__title"]
 
     def list(self, request, *args, **kwargs) -> Response:
         queryset = self.filter_queryset(self.get_queryset())

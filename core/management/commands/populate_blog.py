@@ -28,7 +28,6 @@ class Command(BaseCommand):
                 subtitle=faker.text(20),
                 slug=slugify(name),
                 body=faker.text(100),
-                meta_description=faker.text(10),
                 is_published=True,
                 author=BlogAuthor.objects.get(id=author_id),
                 image=img,

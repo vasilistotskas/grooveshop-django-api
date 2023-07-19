@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from django.conf import settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -14,7 +15,7 @@ class PayWayViewSetTestCase(APITestCase):
 
     def setUp(self):
         self.pay_way = PayWay.objects.create(
-            name="Credit Card", active=True, cost=10, free_for_order_amount=100
+            active=True, cost=10, free_for_order_amount=100
         )
 
     def test_list(self):
@@ -26,11 +27,21 @@ class PayWayViewSetTestCase(APITestCase):
 
     def test_create_valid(self):
         payload = {
-            "name": "Pay On Delivery",
+            "translations": {},
             "active": True,
             "cost": 5,
             "free_for_order_amount": 50,
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+
+            translation_payload = {
+                "name": "Credit Card",
+            }
+
+            payload["translations"][language_code] = translation_payload
+
         response = self.client.post(
             "/api/v1/pay_way/", json.dumps(payload), content_type="application/json"
         )
@@ -63,16 +74,27 @@ class PayWayViewSetTestCase(APITestCase):
 
     def test_update_valid(self):
         payload = {
-            "name": "Credit Card",
+            "translations": {},
             "active": True,
             "cost": 5,
             "free_for_order_amount": 50,
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+
+            translation_payload = {
+                "name": "Credit Card",
+            }
+
+            payload["translations"][language_code] = translation_payload
+
         response = self.client.put(
             f"/api/v1/pay_way/{self.pay_way.pk}/",
             json.dumps(payload),
             content_type="application/json",
         )
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_update_invalid(self):

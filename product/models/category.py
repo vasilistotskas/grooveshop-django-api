@@ -2,52 +2,96 @@ import os
 
 from django.conf import settings
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 from mptt.fields import TreeForeignKey
+from mptt.managers import TreeManager
 from mptt.models import MPTTModel
+from mptt.querysets import TreeQuerySet
+from parler.managers import TranslatableManager
+from parler.managers import TranslatableQuerySet
+from parler.models import TranslatableModel
+from parler.models import TranslatedFields
 from tinymce.models import HTMLField
 
+from core.models import SortableModel
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
 from product.models.product import Product
 from seo.models import SeoModel
 
 
-class ProductCategory(MPTTModel, UUIDModel, TimeStampMixinModel, SeoModel):
-    id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=255, unique=True)
-    slug = models.SlugField(unique=True)
-    description = HTMLField(null=True, blank=True)
+class CategoryQuerySet(TranslatableQuerySet, TreeQuerySet):
+    def as_manager(cls):
+        # make sure creating managers from querysets works.
+        manager = CategoryManager.from_queryset(cls)()
+        manager._built_with_as_manager = True
+        return manager
+
+    as_manager.queryset_only = True
+    as_manager = classmethod(as_manager)
+
+
+class CategoryManager(TreeManager, TranslatableManager):
+    _queryset_class = CategoryQuerySet
+
+
+class ProductCategory(
+    TranslatableModel,
+    SortableModel,
+    MPTTModel,
+    UUIDModel,
+    TimeStampMixinModel,
+    SeoModel,
+):
+    id = models.BigAutoField(primary_key=True)
+    slug = models.SlugField(_("Slug"), max_length=255, unique=True)
     menu_image_one = models.ImageField(
-        upload_to="uploads/categories/", null=True, blank=True
+        _("Menu Image One"), upload_to="uploads/categories/", null=True, blank=True
     )
     menu_image_two = models.ImageField(
-        upload_to="uploads/categories/", null=True, blank=True
+        _("Menu Image Two"), upload_to="uploads/categories/", null=True, blank=True
     )
     menu_main_banner = models.ImageField(
-        upload_to="uploads/categories/", null=True, blank=True
+        _("Menu Main Banner"), upload_to="uploads/categories/", null=True, blank=True
     )
     parent = TreeForeignKey(
         "self", blank=True, null=True, related_name="children", on_delete=models.CASCADE
     )
+    translations = TranslatedFields(
+        name=models.CharField(
+            _("Name"), max_length=255, blank=True, null=True, unique=True
+        ),
+        description=HTMLField(_("Description"), blank=True, null=True),
+    )
+
+    objects = CategoryManager()
 
     class Meta:
-        verbose_name_plural = "Categories"
-        ordering = ("id",)
+        verbose_name = _("Product Category")
+        verbose_name_plural = _("Product Categories")
+        ordering = ["sort_order"]
 
     class MPTTMeta:
-        order_insertion_by: list[str] = ["name"]
+        order_insertion_by: list[str] = ["sort_order"]
 
     def __init__(self, *args, **kwargs):
         super(ProductCategory, self).__init__(*args, **kwargs)
         self.sub_categories_list = None
 
+    def __unicode__(self):
+        return self.safe_translation_getter("name", any_language=True)
+
     def __str__(self):
-        full_path: list[str] = [self.name]
+        full_path: list[str] = [self.safe_translation_getter("name", any_language=True)]
         k = self.parent
         while k is not None:
+            print("======================= k.name =======================", k.name)
             full_path.append(k.name)
             k = k.parent
         return " / ".join(full_path[::-1])
+
+    def get_ordering_queryset(self):
+        return ProductCategory.objects.filter(parent=self.parent)
 
     @property
     def recursive_product_count(self) -> int:

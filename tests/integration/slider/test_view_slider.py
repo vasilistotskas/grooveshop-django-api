@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from django.conf import settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -13,12 +14,7 @@ class SliderViewSetTestCase(APITestCase):
     slider: Slider
 
     def setUp(self):
-        self.slider = Slider.objects.create(
-            name="test",
-            url="http://localhost:8000/",
-            title="test",
-            description="test",
-        )
+        self.slider = Slider.objects.create()
 
     def test_list(self):
         response = self.client.get("/api/v1/slider/")
@@ -29,11 +25,22 @@ class SliderViewSetTestCase(APITestCase):
 
     def test_create_valid(self):
         payload = {
-            "name": "test_one",
-            "url": "http://localhost:8000/",
-            "title": "test_one",
-            "description": "test_one",
+            "translations": {},
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "name": f"Translation for {language_name}",
+                "url": "https://www.youtube.com/watch?v=1",
+                "title": f"Title for {language_name}",
+                "description": f"Description for {language_name}",
+            }
+
+            payload["translations"][language_code] = translation_payload
+
         response = self.client.post(
             "/api/v1/slider/", json.dumps(payload), content_type="application/json"
         )
@@ -42,7 +49,6 @@ class SliderViewSetTestCase(APITestCase):
 
     def test_create_invalid(self):
         payload = {
-            "name": "test",
             "url": "http://localhost:8000/",
         }
         response = self.client.post(
@@ -64,11 +70,22 @@ class SliderViewSetTestCase(APITestCase):
 
     def test_update_valid(self):
         payload = {
-            "name": "test_two",
-            "url": "http://localhost:8000/",
-            "title": "test_two",
-            "description": "test_two",
+            "translations": {},
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "name": f"Translation for {language_name}",
+                "url": "https://www.youtube.com/watch?v=1",
+                "title": f"Title for {language_name}",
+                "description": f"Description for {language_name}",
+            }
+
+            payload["translations"][language_code] = translation_payload
+
         response = self.client.put(
             f"/api/v1/slider/{self.slider.pk}/",
             json.dumps(payload),
@@ -78,7 +95,6 @@ class SliderViewSetTestCase(APITestCase):
 
     def test_update_invalid(self):
         payload = {
-            "name": "test",
             "title": "INVALID INVALID INVALID INVALID INVALID INVALID INVALID INVALID "
             "INVALID INVALID INVALID INVALID INVALID INVALID "
             "INVALID INVALID INVALID INVALID",
@@ -94,7 +110,6 @@ class SliderViewSetTestCase(APITestCase):
 
     def test_partial_update_valid(self):
         payload = {
-            "name": "test_three",
             "url": "http://localhost:8000/",
             "title": "test_three",
             "description": "test_three",
@@ -108,18 +123,14 @@ class SliderViewSetTestCase(APITestCase):
 
     def test_partial_update_invalid(self):
         payload = {
-            "name": "test",
-            "title": "INVALID INVALID INVALID INVALID INVALID INVALID INVALID INVALID "
-            "INVALID INVALID INVALID INVALID INVALID INVALID "
-            "INVALID INVALID INVALID INVALID",
-            "url": "http://localhost:8000/",
-            "image": "test",
+            "translations": {},
         }
         response = self.client.patch(
             f"/api/v1/slider/{self.slider.pk}/",
             json.dumps(payload),
             content_type="application/json",
         )
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_destroy_valid(self):

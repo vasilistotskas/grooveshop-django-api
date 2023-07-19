@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from django.conf import settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -14,9 +15,7 @@ class ProductCategoryViewSetTestCase(APITestCase):
 
     def setUp(self):
         self.product_category = ProductCategory.objects.create(
-            name="test",
-            slug="test",
-            description="test",
+            slug="slug_one",
         )
 
     def test_list(self):
@@ -28,10 +27,22 @@ class ProductCategoryViewSetTestCase(APITestCase):
 
     def test_create_valid(self):
         payload = {
-            "name": "test_one",
+            "translations": {},
             "slug": "test_one",
             "description": "test_one",
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "name": f"Translation for {language_name}",
+                "description": f"Translation for {language_name}",
+            }
+
+            payload["translations"][language_code] = translation_payload
+
         response = self.client.post(
             "/api/v1/product/category/",
             json.dumps(payload),
@@ -66,10 +77,21 @@ class ProductCategoryViewSetTestCase(APITestCase):
 
     def test_update_valid(self):
         payload = {
-            "name": "test_two",
+            "translations": {},
             "slug": "test_two",
-            "description": "test_two",
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "name": f"Translation for {language_name}",
+                "description": f"Translation for {language_name}",
+            }
+
+            payload["translations"][language_code] = translation_payload
+
         response = self.client.put(
             f"/api/v1/product/category/{self.product_category.pk}/",
             json.dumps(payload),
@@ -79,7 +101,6 @@ class ProductCategoryViewSetTestCase(APITestCase):
 
     def test_update_invalid(self):
         payload = {
-            "name": "test_two",
             "slug": "test_two",
             "description": "test_two",
             "parent": False,
@@ -93,7 +114,7 @@ class ProductCategoryViewSetTestCase(APITestCase):
 
     def test_partial_update_valid(self):
         payload = {
-            "name": "test_three",
+            "slug": "test_three",
         }
         response = self.client.patch(
             f"/api/v1/product/category/{self.product_category.pk}/",

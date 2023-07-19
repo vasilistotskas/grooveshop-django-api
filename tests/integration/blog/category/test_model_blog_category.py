@@ -20,18 +20,18 @@ class BlogCategoryTestCase(TestCase):
         )
 
     def test___str__(self):
-        category = BlogCategory.objects.get(name="name")
+        category = BlogCategory.objects.get(slug="slug")
         self.assertEqual(str(category), category.name)
 
     def test_main_image_absolute_url(self):
-        category = BlogCategory.objects.get(name="name")
+        category = BlogCategory.objects.get(slug="slug")
         image: str = ""
         if category.image and hasattr(category.image, "url"):
             image = settings.APP_BASE_URL + category.image.url
         self.assertEqual(category.main_image_absolute_url, image)
 
     def test_get_main_image_filename(self):
-        category = BlogCategory.objects.get(name="name")
+        category = BlogCategory.objects.get(slug="slug")
         image: str = ""
         if category.image is not None:
             image = os.path.basename(category.image.name)

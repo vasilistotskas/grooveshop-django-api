@@ -25,7 +25,7 @@ class OrderAdmin(admin.ModelAdmin):
         "paid_amount",
     ]
     list_filter = ["email"]
-    search_fields = ["email"]
+    search_fields = ["email", "id", "first_name", "last_name", "phone"]
     readonly_fields = (
         "first_name",
         "last_name",

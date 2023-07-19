@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 
 import environ
+from django.utils.translation import gettext_lazy as _
 
 env = environ.Env(
     # set casting, default value
@@ -12,7 +13,8 @@ env = environ.Env(
     APP_BASE_URL=(str, "http://localhost:8000"),
     NUXT_BASE_URL=(str, "http://localhost:3000"),
     APP_MAIN_HOST_NAME=(str, "localhost"),
-    MEDIA_STREAM_URL=(str, "http://localhost:3003/media_stream-image"),
+    MEDIA_STREAM_PATH=(str, "http://localhost:3003/media_stream-image"),
+    MEDIA_STREAM_BASE_URL=(str, "http://localhost:3003"),
     ALLOWED_HOSTS=(str, "[*]"),
     CORS_ORIGIN_ALLOW_ALL=(bool, True),
     SITE_NAME=(str, "Django"),
@@ -21,7 +23,7 @@ env = environ.Env(
     USE_I18N=(bool, True),
     USE_L10N=(bool, True),
     USE_TZ=(bool, True),
-    LANGUAGE_CODE=(str, "en-us"),
+    LANGUAGE_CODE=(str, "en"),
     DB_HOST=(str, "db"),
     DB_NAME=(str, "devdb"),
     DB_USER=(str, "devuser"),
@@ -38,13 +40,14 @@ env = environ.Env(
     EMAIL_HOST_PASSWORD=(str, ""),
     EMAIL_USE_TLS=(bool, False),
     DEFAULT_FROM_EMAIL=(str, "webmaster@localhost"),
+    DEEPL_AUTH_KEY=(str, "changeme"),
 )
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Take environment variables from .env file
-environ.Env.read_env(os.path.join(BASE_DIR.parent, ".env"))
+environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 
 # Quick-start development settings - unsuitable for production
 
@@ -60,11 +63,19 @@ if "celery" in sys.argv[0]:
 
 APP_BASE_URL = str(env("APP_BASE_URL"))
 NUXT_BASE_URL = str(env("NUXT_BASE_URL"))
-APP_MAIN_HOST_NAME = str(env("APP_MAIN_HOST_NAME"))
-MEDIA_STREAM_URL = str(env("MEDIA_STREAM_URL"))
-BASE_URL = APP_BASE_URL
+MEDIA_STREAM_BASE_URL = str(env("MEDIA_STREAM_BASE_URL"))
 
-ALLOWED_HOSTS = [APP_MAIN_HOST_NAME, "127.0.0.1", "http://localhost:3003", "backend"]
+MEDIA_STREAM_PATH = str(env("MEDIA_STREAM_PATH"))
+APP_MAIN_HOST_NAME = str(env("APP_MAIN_HOST_NAME"))
+
+ALLOWED_HOSTS = [
+    APP_MAIN_HOST_NAME,
+    NUXT_BASE_URL,
+    MEDIA_STREAM_BASE_URL,
+    "localhost",
+    "127.0.0.1",
+    "backend",
+]
 ALLOWED_HOSTS.extend(
     filter(
         None,
@@ -77,17 +88,17 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_WHITELIST = [
     APP_BASE_URL,
     NUXT_BASE_URL,
-    "http://localhost:3003",
+    MEDIA_STREAM_BASE_URL,
 ]
 CSRF_TRUSTED_ORIGINS = [
     APP_BASE_URL,
     NUXT_BASE_URL,
-    "http://localhost:3003",
+    MEDIA_STREAM_BASE_URL,
 ]
 CORS_ALLOWED_ORIGINS = [
     APP_BASE_URL,
     NUXT_BASE_URL,
-    "http://localhost:3003",
+    MEDIA_STREAM_BASE_URL,
 ]
 INTERNAL_IPS = [
     "127.0.0.1",
@@ -96,7 +107,7 @@ INTERNAL_IPS = [
 if DEBUG:
     import socket  # only if you haven't already imported this
 
-    hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
+    hostname, aliaslist, ips = socket.gethostbyname_ex(socket.gethostname())
     INTERNAL_IPS = [ip[: ip.rfind(".")] + ".1" for ip in ips] + [
         "127.0.0.1",
         "10.0.2.2",
@@ -136,6 +147,8 @@ THIRD_PARTY_APPS = [
     "corsheaders",
     "mptt",
     "tinymce",
+    "rosetta",
+    "parler",
     "django_filters",
     "drf_spectacular",
     "allauth",
@@ -158,6 +171,7 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -354,6 +368,43 @@ TIME_ZONE = env("TIME_ZONE")
 USE_I18N = env("USE_I18N")
 USE_L10N = env("USE_L10N")
 USE_TZ = env("USE_TZ")
+LANGUAGES = [
+    ("en", _("English")),
+    ("de", _("German")),
+    ("el", _("Greek")),
+]
+# Locales available path
+LOCALE_PATHS = [os.path.join(BASE_DIR, "locale/")]
+
+# Rosseta
+ROSETTA_MESSAGES_PER_PAGE = 25
+ROSETTA_ENABLE_TRANSLATION_SUGGESTIONS = True
+ROSETTA_SHOW_AT_ADMIN_PANEL = True
+
+# Parler
+PARLER_DEFAULT_LANGUAGE_CODE = "en"
+PARLER_LANGUAGES = {
+    # 1 is from the SITE_ID
+    SITE_ID: (
+        {
+            "code": "en",
+        },
+        {
+            "code": "de",
+        },
+        {
+            "code": "el",
+        },
+    ),
+    "default": {
+        "fallbacks": ["en"],  # defaults to PARLER_DEFAULT_LANGUAGE_CODE
+        "hide_untranslated": False,  # the default; let .active_translations() return fallbacks too.
+    },
+}
+PARLER_ENABLE_CACHING = True
+
+# DeepL
+DEEPL_AUTH_KEY = env("DEEPL_AUTH_KEY")
 
 # Email Settings
 EMAIL_BACKEND = env("EMAIL_BACKEND")

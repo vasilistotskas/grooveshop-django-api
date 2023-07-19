@@ -21,9 +21,7 @@ class ProductFavouriteViewSetTestCase(APITestCase):
             email="test@test.com", password="test12345@!"
         )
         self.product = Product.objects.create(
-            name="test",
-            slug="test",
-            description="test",
+            slug="slug_one",
             price=10.00,
             active=True,
             stock=10,
@@ -45,9 +43,7 @@ class ProductFavouriteViewSetTestCase(APITestCase):
 
     def test_create_valid(self):
         product = Product.objects.create(
-            name="test_two",
-            slug="test_two",
-            description="test_two",
+            slug="slug_two",
             price=10.00,
             active=True,
             stock=10,

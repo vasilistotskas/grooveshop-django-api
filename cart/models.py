@@ -1,11 +1,15 @@
+from decimal import Decimal
+
 from django.db import models
 from django.utils.timezone import now
+from django.utils.translation import gettext_lazy as _
 
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
 
 
 class Cart(TimeStampMixinModel, UUIDModel):
+    id = models.BigAutoField(primary_key=True)
     user = models.ForeignKey(
         "user.UserAccount",
         related_name="cart_user",
@@ -14,10 +18,11 @@ class Cart(TimeStampMixinModel, UUIDModel):
         default=None,
         on_delete=models.CASCADE,
     )
-    last_activity = models.DateTimeField(auto_now=True)
+    last_activity = models.DateTimeField(_("Last Activity"), auto_now=True)
 
     class Meta:
-        verbose_name_plural = "Cart"
+        verbose_name = _("Cart")
+        verbose_name_plural = _("Carts")
         ordering = ["-created_at"]
         unique_together = ["user"]
 
@@ -53,21 +58,23 @@ class Cart(TimeStampMixinModel, UUIDModel):
 
 
 class CartItem(TimeStampMixinModel, UUIDModel):
+    id = models.BigAutoField(primary_key=True)
     cart = models.ForeignKey(
         "cart.Cart", related_name="cart_item_cart", on_delete=models.CASCADE
     )
     product = models.ForeignKey(
         "product.Product", related_name="cart_item_product", on_delete=models.CASCADE
     )
-    quantity = models.PositiveIntegerField(default=1)
+    quantity = models.PositiveIntegerField(_("Quantity"), default=1)
 
     class Meta:
-        verbose_name_plural = "Cart Items"
+        verbose_name = _("Cart Item")
+        verbose_name_plural = _("Cart Items")
         ordering = ["id"]
         unique_together = (("cart", "product"),)
 
     def __str__(self):
-        return f"{self.product.name} - {self.quantity}"
+        return f"{self.product.safe_translation_getter('name', any_language=True)} - {self.quantity}"
 
     @property
     def total_price(self) -> float:
@@ -78,7 +85,7 @@ class CartItem(TimeStampMixinModel, UUIDModel):
         return self.quantity * self.product.discount_value
 
     @property
-    def product_discount_percent(self) -> float:
+    def product_discount_percent(self) -> Decimal:
         return self.product.discount_percent
 
     def update_quantity(self, quantity) -> None:

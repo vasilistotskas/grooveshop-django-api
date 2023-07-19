@@ -1,4 +1,5 @@
 from django.contrib import admin
+from parler.admin import TranslatableAdmin
 
 from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
@@ -8,24 +9,29 @@ from blog.models.tag import BlogTag
 
 
 @admin.register(BlogAuthor)
-class BlogAuthorAdmin(admin.ModelAdmin):
-    model = BlogAuthor
+class BlogAuthorAdmin(TranslatableAdmin):
+    search_fields = (
+        "user__email",
+        "user__first_name",
+        "user__last_name",
+    )
 
 
 @admin.register(BlogTag)
-class BlogTagAdmin(admin.ModelAdmin):
-    model = BlogTag
+class BlogTagAdmin(TranslatableAdmin):
+    list_filter = ("active",)
+    list_display = ("name", "active")
+    list_editable = ("active",)
+    search_fields = ("translations__name",)
 
 
 @admin.register(BlogCategory)
-class BlogCategoryAdmin(admin.ModelAdmin):
-    model = BlogCategory
+class BlogCategoryAdmin(TranslatableAdmin):
+    search_fields = ("translations__name",)
 
 
 @admin.register(BlogPost)
-class BlogPostAdmin(admin.ModelAdmin):
-    model = BlogPost
-
+class BlogPostAdmin(TranslatableAdmin):
     list_display = (
         "id",
         "title",
@@ -39,29 +45,38 @@ class BlogPostAdmin(admin.ModelAdmin):
         "published_at",
     )
     list_editable = (
-        "title",
-        "subtitle",
         "slug",
         "published_at",
         "is_published",
     )
     search_fields = (
-        "title",
-        "subtitle",
+        "translations__title",
+        "translations__subtitle",
         "slug",
-        "body",
+        "translations__body",
     )
-    prepopulated_fields = {
-        "slug": (
-            "title",
-            "subtitle",
-        )
-    }
+
+    def get_prepopulated_fields(self, request, obj=None):
+        # can't use `prepopulated_fields = ..` because it breaks the admin validation
+        # for translated fields. This is the official django-parler workaround.
+        return {
+            "slug": (
+                "title",
+                "subtitle",
+            ),
+        }
+
     date_hierarchy = "published_at"
     save_on_top = True
 
 
 @admin.register(BlogComment)
-class BlogCommentAdmin(admin.ModelAdmin):
-    model = BlogComment
+class BlogCommentAdmin(TranslatableAdmin):
     date_hierarchy = "created_at"
+    search_fields = (
+        "user__email",
+        "user__first_name",
+        "user__last_name",
+        "post__translations__title",
+        "post__translations__subtitle",
+    )

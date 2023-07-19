@@ -46,15 +46,15 @@ class Command(BaseCommand):
             for _ in range(200):
                 product_price = randrange(20, 300)
                 name = faker.text(20) + str(i)
+                slug = slugify(name)
                 try:
                     product = Product.objects.get(
-                        name=name,
+                        slug=slug,
                     )
                 except Product.DoesNotExist:
                     product = Product.objects.create(
                         category_id=category.id,
-                        name=name,
-                        slug=slugify(name),
+                        slug=slug,
                         description=faker.text(50),
                         price=product_price,
                         active="True",

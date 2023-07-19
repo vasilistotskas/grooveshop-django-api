@@ -18,13 +18,18 @@ class CountryViewSet(ModelViewSet):
     serializer_class = CountrySerializer
     pagination_class = CountryPagination
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
-    filterset_fields = ["alpha_2", "alpha_3", "name", "iso_cc", "phone_code"]
-    ordering_fields = ["alpha_2", "name", "-created_at"]
+    filterset_fields = [
+        "alpha_2",
+        "alpha_3",
+        "translations__name",
+        "iso_cc",
+        "phone_code",
+    ]
+    ordering_fields = ["alpha_2", "translations__name", "-created_at"]
     ordering = ["-created_at"]
     search_fields = [
         "alpha_2",
         "alpha_3",
-        "name",
         "iso_cc",
         "phone_code",
     ]

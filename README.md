@@ -47,6 +47,13 @@
    ### Run specific shell command through docker exec :
    -     docker exec -it <container_id> sh -c "<command>"
 
+   ### Run Locale Message generation through docker exec :
+   -     docker exec -it <container_id> sh -c "django-admin makemessages -l <locale>"
+   -     docker exec -it <container_id> sh -c "django-admin makemessages --all --ignore=env"
+
+   ### Run Locale Message compilation through docker exec :
+   -     docker exec -it <container_id> sh -c "django-admin compilemessages --ignore=env"
+
 
 ## PYTHON
   ### --- VERSION 3.11.0 ---
@@ -77,7 +84,7 @@
   -     Step 1: cd src
   -     AVAILABLE COMMANDS :
         pre-commit run --all-files
-        black backend
+        black .
 
   ### Poetry :
   -     Install poetry : curl -sSL https://install.python-poetry.org | python3 - OR (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -

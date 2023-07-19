@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 
+from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -17,9 +18,7 @@ class BlogCategoryViewSetTestCase(APITestCase):
     category: BlogCategory
 
     def setUp(self):
-        self.category = BlogCategory.objects.create(
-            name="name", slug="slug", description="description", image=self.image
-        )
+        self.category = BlogCategory.objects.create(slug="slug", image=self.image)
 
     def test_list(self):
         response = self.client.get("/api/v1/blog/category/")
@@ -29,7 +28,22 @@ class BlogCategoryViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_valid(self):
-        payload = {"name": "name", "slug": "slug_one", "description": "description"}
+        payload = {
+            "slug": "slug_one",
+            "translations": {},
+        }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "name": f"Translation for {language_name}",
+                "description": f"Translation for {language_name}",
+            }
+
+            payload["translations"][language_code] = translation_payload
+
         response = self.client.post(
             "/api/v1/blog/category/",
             json.dumps(payload),
@@ -39,9 +53,7 @@ class BlogCategoryViewSetTestCase(APITestCase):
 
     def test_create_invalid(self):
         payload = {
-            "name": "",
             "slug": "",
-            "description": "",
         }
         response = self.client.post(
             "/api/v1/blog/category/",
@@ -64,10 +76,21 @@ class BlogCategoryViewSetTestCase(APITestCase):
 
     def test_update_valid(self):
         payload = {
-            "name": "name",
+            "translations": {},
             "slug": "slug_two",
-            "description": "description",
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "name": f"Translation for {language_name}",
+                "description": f"Translation for {language_name}",
+            }
+
+            payload["translations"][language_code] = translation_payload
+
         response = self.client.put(
             f"/api/v1/blog/category/{self.category.id}/",
             json.dumps(payload),
@@ -86,7 +109,7 @@ class BlogCategoryViewSetTestCase(APITestCase):
 
     def test_partial_update_valid(self):
         payload = {
-            "name": "name",
+            "slug": "slug_three",
         }
         response = self.client.patch(
             f"/api/v1/blog/category/{self.category.id}/",

@@ -28,4 +28,4 @@ class UserAccountAdmin(admin.ModelAdmin):
         "is_staff",
     ]
     inlines = [AddressInline]
-    search_fields = ["email", "phone"]
+    search_fields = ["email", "phone", "first_name", "last_name"]

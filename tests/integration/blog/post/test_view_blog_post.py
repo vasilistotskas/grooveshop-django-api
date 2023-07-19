@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -51,6 +52,7 @@ class BlogPostViewSetTestCase(APITestCase):
         )
         tag = BlogTag.objects.create(name="name", active=True)
         payload = {
+            "translations": {},
             "slug": "slug_one",
             "title": "title_one",
             "body": "body_one",
@@ -60,6 +62,16 @@ class BlogPostViewSetTestCase(APITestCase):
             "likes": [user.id],
             "tags": [tag.id],
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "name": f"Translation for {language_name}",
+            }
+
+            payload["translations"][language_code] = translation_payload
 
         response = self.client.post(
             "/api/v1/blog/post/", json.dumps(payload), content_type="application/json"
@@ -102,6 +114,7 @@ class BlogPostViewSetTestCase(APITestCase):
         )
         tag = BlogTag.objects.create(name="name_two", active=True)
         payload = {
+            "translations": {},
             "slug": "slug_two",
             "title": "title_two",
             "body": "body_two",
@@ -111,6 +124,17 @@ class BlogPostViewSetTestCase(APITestCase):
             "likes": [user.id],
             "tags": [tag.id],
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "name": f"Translation for {language_name}",
+            }
+
+            payload["translations"][language_code] = translation_payload
+
         response = self.client.put(
             f"/api/v1/blog/post/{self.post.id}/",
             json.dumps(payload),

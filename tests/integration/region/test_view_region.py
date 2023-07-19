@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from django.conf import settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -18,14 +19,12 @@ class RegionViewSetTestCase(APITestCase):
         self.country = Country.objects.create(
             alpha_2="GR",
             alpha_3="GRC",
-            name="Greece",
             iso_cc=300,
             phone_code=30,
         )
         self.region = Region.objects.create(
             alpha="GR-I",
             alpha_2=self.country,
-            name="Central Greece",
         )
 
     def test_list(self):
@@ -39,15 +38,25 @@ class RegionViewSetTestCase(APITestCase):
         country = Country.objects.create(
             alpha_2="CY",
             alpha_3="CYP",
-            name="Cyprus",
             iso_cc=196,
             phone_code=357,
         )
         payload = {
+            "translations": {},
             "alpha": "CY-III",
             "alpha_2": country.pk,
-            "name": "Central Cyprus",
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "name": f"Translation for {language_name}",
+            }
+
+            payload["translations"][language_code] = translation_payload
+
         response = self.client.post(
             "/api/v1/region/", json.dumps(payload), content_type="application/json"
         )
@@ -58,7 +67,6 @@ class RegionViewSetTestCase(APITestCase):
         payload = {
             "alpha": "INVALID_ALPHA",
             "alpha_2": "INVALID",
-            "name": "INVALID",
         }
         response = self.client.post(
             "/api/v1/region/", json.dumps(payload), content_type="application/json"
@@ -81,15 +89,25 @@ class RegionViewSetTestCase(APITestCase):
         country = Country.objects.create(
             alpha_2="CY",
             alpha_3="CYP",
-            name="Cyprus",
             iso_cc=196,
             phone_code=357,
         )
         payload = {
+            "translations": {},
             "alpha": "GR-I",
             "alpha_2": country.pk,
-            "name": "Central Cyprus",
         }
+
+        for language in settings.LANGUAGES:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "name": f"Translation for {language_name}",
+            }
+
+            payload["translations"][language_code] = translation_payload
+
         response = self.client.put(
             f"/api/v1/region/{self.region.pk}/",
             json.dumps(payload),
@@ -101,7 +119,6 @@ class RegionViewSetTestCase(APITestCase):
         payload = {
             "alpha": "INVALID_ALPHA",
             "alpha_2": "INVALID",
-            "name": "INVALID",
         }
         response = self.client.put(
             f"/api/v1/region/{self.region.pk}/",
@@ -111,9 +128,7 @@ class RegionViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_partial_update_valid(self):
-        payload = {
-            "name": "Central Greece",
-        }
+        payload = {}
         response = self.client.patch(
             f"/api/v1/region/{self.region.pk}/",
             json.dumps(payload),
@@ -125,7 +140,6 @@ class RegionViewSetTestCase(APITestCase):
         payload = {
             "alpha": "INVALID_ALPHA",
             "alpha_2": "INVALID",
-            "name": "INVALID",
         }
         response = self.client.patch(
             f"/api/v1/region/{self.region.pk}/",

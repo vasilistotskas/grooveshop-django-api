@@ -13,18 +13,19 @@ from django.db.models.fields.files import ImageFieldFile
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.safestring import SafeString
+from django.utils.translation import gettext_lazy as _
 from mptt.fields import TreeForeignKey
+from parler.models import TranslatableModel
+from parler.models import TranslatedFields
 from tinymce.models import HTMLField
 
 from core.models import SortableModel
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
-from core.utils.translations import TranslationProxy
 from helpers.image_resize import make_thumbnail
 from product.models.favourite import ProductFavourite
 from product.models.review import ProductReview
 from seo.models import SeoModel
-from seo.models import SeoModelTranslation
 
 
 def generate_unique_code():
@@ -38,10 +39,10 @@ def generate_unique_code():
     return code
 
 
-class Product(TimeStampMixinModel, SeoModel, UUIDModel):
-    id = models.AutoField(primary_key=True)
+class Product(TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel):
+    id = models.BigAutoField(primary_key=True)
     product_code = models.CharField(
-        unique=True, max_length=100, default=generate_unique_code
+        _("Product Code"), unique=True, max_length=100, default=generate_unique_code
     )
     category = TreeForeignKey(
         "product.ProductCategory",
@@ -50,13 +51,13 @@ class Product(TimeStampMixinModel, SeoModel, UUIDModel):
         null=True,
         blank=True,
     )
-    name = models.CharField(unique=True, max_length=255)
-    slug = models.SlugField(unique=True)
-    description = HTMLField(null=True, blank=True)
-    price = models.DecimalField(max_digits=11, decimal_places=2)
-    active = models.BooleanField(default=True)
-    stock = models.PositiveIntegerField(default=1)
-    discount_percent = models.DecimalField(max_digits=11, decimal_places=2, default=0.0)
+    slug = models.SlugField(_("Slug"), max_length=255, unique=True)
+    price = models.DecimalField(_("Price"), max_digits=11, decimal_places=2)
+    active = models.BooleanField(_("Active"), default=True)
+    stock = models.PositiveIntegerField(_("Stock"), default=0)
+    discount_percent = models.DecimalField(
+        _("Discount Percent"), max_digits=11, decimal_places=2, default=0.0
+    )
     vat = models.ForeignKey(
         "vat.Vat",
         related_name="product_vat",
@@ -64,28 +65,45 @@ class Product(TimeStampMixinModel, SeoModel, UUIDModel):
         null=True,
         on_delete=models.SET_NULL,
     )
-    hits = models.PositiveIntegerField(default=0)
+    hits = models.PositiveIntegerField(_("Hits"), default=0)
     weight = models.DecimalField(
-        max_digits=11, decimal_places=2, default=0.0, verbose_name="Weight (kg)"
+        _("Weight (kg)"), max_digits=11, decimal_places=2, default=0.0
     )
     final_price = models.DecimalField(
-        max_digits=11, decimal_places=2, default=0.0, editable=False
+        _("Final Price"), max_digits=11, decimal_places=2, default=0.0, editable=False
     )
     discount_value = models.DecimalField(
-        max_digits=11, decimal_places=2, default=0.0, editable=False
+        _("Discount Value"),
+        max_digits=11,
+        decimal_places=2,
+        default=0.0,
+        editable=False,
     )
     price_save_percent = models.DecimalField(
-        max_digits=11, decimal_places=2, default=0.0, editable=False
+        _("Price Save Percent"),
+        max_digits=11,
+        decimal_places=2,
+        default=0.0,
+        editable=False,
     )
 
-    translated = TranslationProxy()
+    translations = TranslatedFields(
+        name=models.CharField(
+            _("Name"), max_length=255, blank=True, null=True, unique=True
+        ),
+        description=HTMLField(_("Description"), blank=True, null=True),
+    )
 
     class Meta:
-        app_label = "product"
-        ordering = ("-id",)
+        verbose_name = _("Product")
+        verbose_name_plural = _("Products")
+        ordering = ["-created_at"]
 
-    def __str__(self) -> str:
-        return self.name
+    def __unicode__(self):
+        return self.safe_translation_getter("name", any_language=True) or u""
+
+    def __str__(self):
+        return self.safe_translation_getter("name", any_language=True) or u""
 
     def save(self, *args, **kwargs):
         vat_value = 0.0
@@ -188,44 +206,8 @@ class Product(TimeStampMixinModel, SeoModel, UUIDModel):
         return f"/{self.id}/{self.slug}"
 
 
-class ProductTranslation(TimeStampMixinModel, UUIDModel, SeoModelTranslation):
-    product = models.ForeignKey(
-        "product.Product", related_name="product_translations", on_delete=models.CASCADE
-    )
-    name = models.CharField(max_length=250, blank=True, null=True)
-    description = HTMLField(null=True, blank=True)
-
-    class Meta:
-        unique_together = (("language_code", "product"),)
-
-    def __str__(self) -> str:
-        return self.name if self.name else str(self.pk)
-
-    def __repr__(self) -> str:
-        class_ = type(self)
-        return "%s(pk=%r, name=%r, product_pk=%r)" % (
-            class_.__name__,
-            self.pk,
-            self.name,
-            self.product_id,
-        )
-
-    def get_translated_object_id(self):
-        return "Product", self.product_id
-
-    def get_translated_keys(self):
-        translated_keys = super().get_translated_keys()
-        translated_keys.update(
-            {
-                "name": self.name,
-                "description": self.description,
-            }
-        )
-        return translated_keys
-
-
 class ProductImages(TimeStampMixinModel, SortableModel, UUIDModel):
-    id = models.AutoField(primary_key=True)
+    id = models.BigAutoField(primary_key=True)
     title = models.CharField(max_length=50)
     product = models.ForeignKey(
         "product.Product", related_name="product_images", on_delete=models.CASCADE

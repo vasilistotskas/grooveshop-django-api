@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.db import models
 from django.db.models import QuerySet
+from django.utils.translation import gettext_lazy as _
 
 from core.models import SortableModel
 from core.models import TimeStampMixinModel
@@ -12,7 +13,7 @@ from user.enum.address import LocationChoicesEnum
 
 
 class Order(TimeStampMixinModel, UUIDModel):
-    id = models.AutoField(primary_key=True)
+    id = models.BigAutoField(primary_key=True)
     user = models.ForeignKey(
         "user.UserAccount",
         related_name="order_user",
@@ -49,32 +50,40 @@ class Order(TimeStampMixinModel, UUIDModel):
         blank=True,
         default=None,
     )
-    email = models.CharField(max_length=100)
-    first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
-    street = models.CharField(max_length=100)
-    street_number = models.CharField(max_length=100)
-    city = models.CharField(max_length=100)
-    zipcode = models.CharField(max_length=100)
-    place = models.CharField(max_length=100, blank=True, null=True)
-    phone = models.CharField(max_length=100)
-    mobile_phone = models.CharField(max_length=100, null=True, blank=True, default=None)
-    paid_amount = models.DecimalField(max_digits=8, decimal_places=2)
-    customer_notes = models.TextField(blank=True, null=True)
-    status = models.CharField(
-        max_length=20, choices=StatusEnum.choices(), default=StatusEnum.PENDING.value
+    email = models.CharField(_("Email"), max_length=255)
+    first_name = models.CharField(_("First Name"), max_length=255)
+    last_name = models.CharField(_("Last Name"), max_length=255)
+    street = models.CharField(_("Street"), max_length=255)
+    street_number = models.CharField(_("Street Number"), max_length=255)
+    city = models.CharField(_("City"), max_length=255)
+    zipcode = models.CharField(_("Zipcode"), max_length=255)
+    place = models.CharField(_("Place"), max_length=255, blank=True, null=True)
+    phone = models.CharField(_("Phone"), max_length=255)
+    mobile_phone = models.CharField(
+        _("Mobile Phone"), max_length=255, null=True, blank=True, default=None
     )
-    shipping_price = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    paid_amount = models.DecimalField(_("Paid Amount"), max_digits=8, decimal_places=2)
+    customer_notes = models.TextField(_("Customer Notes"), null=True, blank=True)
+    status = models.CharField(
+        _("Status"),
+        max_length=20,
+        choices=StatusEnum.choices(),
+        default=StatusEnum.PENDING.value,
+    )
+    shipping_price = models.DecimalField(
+        _("Shipping Price"), max_digits=8, decimal_places=2, default=0
+    )
     document_type = models.CharField(
+        _("Document Type"),
         max_length=10,
-        choices=[("receipt", "Receipt"), ("invoice", "Invoice")],
+        choices=[("receipt", _("Receipt")), ("invoice", _("Invoice"))],
         default="receipt",
     )
 
     class Meta:
-        ordering = [
-            "-created_at",
-        ]
+        verbose_name = _("Order")
+        verbose_name_plural = _("Orders")
+        ordering = ["-created_at"]
 
     def __str__(self):
         return self.first_name
@@ -92,15 +101,20 @@ class Order(TimeStampMixinModel, UUIDModel):
 
 
 class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
-    id = models.AutoField(primary_key=True)
+    id = models.BigAutoField(primary_key=True)
     order = models.ForeignKey(
         "order.Order", related_name="order_item_order", on_delete=models.CASCADE
     )
     product = models.ForeignKey(
         "product.Product", related_name="order_item_product", on_delete=models.CASCADE
     )
-    price = models.DecimalField(max_digits=8, decimal_places=2)
-    quantity = models.IntegerField(default=1)
+    price = models.DecimalField(_("Price"), max_digits=8, decimal_places=2)
+    quantity = models.IntegerField(_("Quantity"), default=1)
+
+    class Meta:
+        verbose_name = _("Order Item")
+        verbose_name_plural = _("Order Items")
+        ordering = ["sort_order"]
 
     def __str__(self):
         return "%s" % self.id

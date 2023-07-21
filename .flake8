@@ -1,0 +1,22 @@
+[flake8]
+show-source = True
+statistics = False
+doctests = True
+strictness = long
+docstring-style = numpy
+max-line-length = 140
+extend-ignore = E203, H101, H238, H301, H306, W503
+exclude =
+    .*/,
+    __pycache__/,
+    node_modules/,
+    */migrations/
+ignore = E203,H101,H238,H301,H306,W503
+max-complexity = 31
+
+[flake8.report]
+exclude_lines =
+    pragma: no cover
+    raise NotImplementedError
+    return NotImplemented
+    if TYPE_CHECKING:

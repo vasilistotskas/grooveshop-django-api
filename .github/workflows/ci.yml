@@ -115,6 +115,8 @@ jobs:
     permissions:
       id-token: write
       contents: write
+      issues: write
+      pull-requests: write
 
     steps:
     - uses: actions/checkout@v3
@@ -124,4 +126,4 @@ jobs:
     - name: Python Semantic Release
       uses: python-semantic-release/python-semantic-release@master
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+        github_token: ${{ secrets.DJANGO_TOKEN }}

@@ -11,7 +11,6 @@ from core.api.schema import generate_schema_multi_lang
 from core.api.serializers import BaseExpandSerializer
 from product.models.category import ProductCategory
 from product.models.product import Product
-from product.models.product import ProductImages
 from product.serializers.category import ProductCategorySerializer
 from vat.models import Vat
 from vat.serializers import VatSerializer
@@ -62,29 +61,3 @@ class ProductSerializer(TranslatableModelSerializer, BaseExpandSerializer):
 
     def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:
         return {"category": ProductCategorySerializer, "vat": VatSerializer}
-
-
-class ProductImagesSerializer(BaseExpandSerializer):
-    product = PrimaryKeyRelatedField(queryset=Product.objects.all())
-
-    class Meta:
-        model = ProductImages
-        fields = (
-            "id",
-            "title",
-            "product",
-            "image",
-            "thumbnail",
-            "is_main",
-            "product_image_absolute_url",
-            "product_image_filename",
-            "created_at",
-            "updated_at",
-            "uuid",
-            "sort_order",
-        )
-
-    def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:
-        return {
-            "product": ProductSerializer,
-        }

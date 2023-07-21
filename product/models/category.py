@@ -58,9 +58,7 @@ class ProductCategory(
         "self", blank=True, null=True, related_name="children", on_delete=models.CASCADE
     )
     translations = TranslatedFields(
-        name=models.CharField(
-            _("Name"), max_length=255, blank=True, null=True, unique=True
-        ),
+        name=models.CharField(_("Name"), max_length=255, blank=True, null=True),
         description=HTMLField(_("Description"), blank=True, null=True),
     )
 
@@ -85,7 +83,6 @@ class ProductCategory(
         full_path: list[str] = [self.safe_translation_getter("name", any_language=True)]
         k = self.parent
         while k is not None:
-            print("======================= k.name =======================", k.name)
             full_path.append(k.name)
             k = k.parent
         return " / ".join(full_path[::-1])

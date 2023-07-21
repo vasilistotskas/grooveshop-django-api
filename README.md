@@ -28,15 +28,6 @@
 
    #### Seed database with fake data through docker compose :
    -     docker compose run backend sh -c "python manage.py populate_all"
-   -   #### Separate seed commands :
-   -     docker compose run backend sh -c "python manage.py populate_users"
-         docker compose run backend sh -c "python manage.py populate_products"
-         docker compose run backend sh -c "python manage.py populate_orders"
-         docker compose run backend sh -c "python manage.py populate_blog"
-         docker compose run backend sh -c "python manage.py populate_reviews"
-         docker compose run backend sh -c "python manage.py populate_countries"
-         docker compose run backend sh -c "python manage.py populate_sliders"
-         docker compose run backend sh -c "python manage.py populate_tips"
 
    #### Run docker compose for specific yml file :
    -     docker compose -f <docker compose-file.yml> up -d --build

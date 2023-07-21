@@ -11,7 +11,7 @@ from rest_framework.viewsets import ModelViewSet
 
 from core.api.views import BaseExpandView
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
-from user.models import UserAddress
+from user.models.address import UserAddress
 from user.paginators.address import UserAddressPagination
 from user.serializers.address import UserAddressSerializer
 

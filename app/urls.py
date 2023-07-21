@@ -2,12 +2,16 @@ from django.conf import settings
 from django.conf.urls.i18n import i18n_patterns
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.contrib.auth.models import User
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.http import HttpResponse
 from django.urls import include
 from django.urls import path
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_GET
+from django_otp.admin import OTPAdminSite
+from django_otp.plugins.otp_totp.admin import TOTPDeviceAdmin
+from django_otp.plugins.otp_totp.models import TOTPDevice
 from drf_spectacular.views import SpectacularAPIView
 from drf_spectacular.views import SpectacularRedocView
 from drf_spectacular.views import SpectacularSwaggerView
@@ -36,8 +40,19 @@ front_urls = [
 router = routers.SimpleRouter()
 router.register(r"active_users", ActiveUserViewSet, basename="active_users")
 
+
+class OTPAdmin(OTPAdminSite):
+    pass
+
+
+admin_site_otp = OTPAdmin(name="OTPAdmin")
+admin_site_otp.register(User)
+admin_site_otp.register(TOTPDevice, TOTPDeviceAdmin)
+
+
 urlpatterns = i18n_patterns(
-    path(_("admin/"), admin.site.urls),
+    path(_("admin/"), admin_site_otp.urls),
+    path(_("admin_no_otp/"), admin.site.urls),
     path("api/v1/api-token-auth/", views.obtain_auth_token),
     path("api/v1/", include(router.urls)),
     path("api/v1/", include("product.urls")),

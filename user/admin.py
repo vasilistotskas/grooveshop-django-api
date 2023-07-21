@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from user.models import UserAccount
-from user.models import UserAddress
+from user.models.address import UserAddress
 
 
 class AddressInline(admin.TabularInline):

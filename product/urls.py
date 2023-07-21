@@ -3,7 +3,7 @@ from rest_framework.urlpatterns import format_suffix_patterns
 
 from product.views.category import ProductCategoryViewSet
 from product.views.favourite import ProductFavouriteViewSet
-from product.views.product import ProductImagesViewSet
+from product.views.images import ProductImagesViewSet
 from product.views.product import ProductViewSet
 from product.views.review import ProductReviewViewSet
 

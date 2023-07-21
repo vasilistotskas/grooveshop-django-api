@@ -159,6 +159,7 @@ THIRD_PARTY_APPS = [
     # Configure the django-otp package.
     "django_otp",
     "django_otp.plugins.otp_totp",
+    "django_otp.plugins.otp_hotp",
     "django_otp.plugins.otp_static",
     # Enable two-factor auth.
     "allauth_2fa",

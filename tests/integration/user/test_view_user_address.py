@@ -8,7 +8,7 @@ from rest_framework.test import APITestCase
 from country.models import Country
 from region.models import Region
 from user.models import UserAccount
-from user.models import UserAddress
+from user.models.address import UserAddress
 from user.serializers.address import UserAddressSerializer
 
 

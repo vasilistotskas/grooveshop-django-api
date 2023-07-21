@@ -1,0 +1,264 @@
+[2023-07-20 17:51:08] ERROR | log_response | django.request | Internal Server Error: /api/v1/product/
+Traceback (most recent call last):
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\views\decorators\csrf.py", line 56, in wrapper_view
+    return view_func(*args, **kwargs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\viewsets.py", line 125, in view
+    return self.dispatch(request, *args, **kwargs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\views.py", line 509, in dispatch
+    response = self.handle_exception(exc)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\views.py", line 469, in handle_exception
+    self.raise_uncaught_exception(exc)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\views.py", line 480, in raise_uncaught_exception
+    raise exc
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\views.py", line 506, in dispatch
+    response = handler(request, *args, **kwargs)
+  File "C:\Dev\grooveshop-django-api\product\views\product.py", line 43, in list
+    return self.get_paginated_response(serializer.data)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 768, in data
+    ret = super().data
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 253, in data
+    self._data = self.to_representation(self.instance)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 686, in to_representation
+    return [
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 687, in <listcomp>
+    self.child.to_representation(item) for item in iterable
+  File "C:\Dev\grooveshop-django-api\core\api\serializers.py", line 17, in to_representation
+    data = super().to_representation(instance)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 509, in to_representation
+    attribute = field.get_attribute(instance)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\fields.py", line 446, in get_attribute
+    return get_attribute(instance, self.source_attrs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\fields.py", line 96, in get_attribute
+    instance = getattr(instance, attr)
+  File "C:\Dev\grooveshop-django-api\product\models\product.py", line 164, in main_image_absolute_url
+    img = ProductImages.objects.get(product_id=self.id, is_main=True)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\db\models\query.py", line 640, in get
+    raise self.model.MultipleObjectsReturned(
+product.models.images.ProductImages.MultipleObjectsReturned: get() returned more than one ProductImages -- it returned 2!
+[2023-07-20 17:51:08] ERROR | log_message | django.server | "GET /api/v1/product/?ordering=-createdAt& HTTP/1.1" 500 198661
+[2023-07-20 17:51:08] ERROR | log_response | django.request | Internal Server Error: /api/v1/product/
+Traceback (most recent call last):
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\views\decorators\csrf.py", line 56, in wrapper_view
+    return view_func(*args, **kwargs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\viewsets.py", line 125, in view
+    return self.dispatch(request, *args, **kwargs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\views.py", line 509, in dispatch
+    response = self.handle_exception(exc)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\views.py", line 469, in handle_exception
+    self.raise_uncaught_exception(exc)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\views.py", line 480, in raise_uncaught_exception
+    raise exc
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\views.py", line 506, in dispatch
+    response = handler(request, *args, **kwargs)
+  File "C:\Dev\grooveshop-django-api\product\views\product.py", line 43, in list
+    return self.get_paginated_response(serializer.data)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 768, in data
+    ret = super().data
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 253, in data
+    self._data = self.to_representation(self.instance)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 686, in to_representation
+    return [
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 687, in <listcomp>
+    self.child.to_representation(item) for item in iterable
+  File "C:\Dev\grooveshop-django-api\core\api\serializers.py", line 17, in to_representation
+    data = super().to_representation(instance)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 509, in to_representation
+    attribute = field.get_attribute(instance)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\fields.py", line 446, in get_attribute
+    return get_attribute(instance, self.source_attrs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\fields.py", line 96, in get_attribute
+    instance = getattr(instance, attr)
+  File "C:\Dev\grooveshop-django-api\product\models\product.py", line 164, in main_image_absolute_url
+    img = ProductImages.objects.get(product_id=self.id, is_main=True)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\db\models\query.py", line 640, in get
+    raise self.model.MultipleObjectsReturned(
+product.models.images.ProductImages.MultipleObjectsReturned: get() returned more than one ProductImages -- it returned 2!
+[2023-07-20 17:51:08] ERROR | log_message | django.server | "GET /api/v1/product/?ordering=-createdAt& HTTP/1.1" 500 198661
+[2023-07-20 17:51:08] ERROR | log_response | django.request | Internal Server Error: /api/v1/product/
+Traceback (most recent call last):
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\views\decorators\csrf.py", line 56, in wrapper_view
+    return view_func(*args, **kwargs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\viewsets.py", line 125, in view
+    return self.dispatch(request, *args, **kwargs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\views.py", line 509, in dispatch
+    response = self.handle_exception(exc)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\views.py", line 469, in handle_exception
+    self.raise_uncaught_exception(exc)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\views.py", line 480, in raise_uncaught_exception
+    raise exc
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\views.py", line 506, in dispatch
+    response = handler(request, *args, **kwargs)
+  File "C:\Dev\grooveshop-django-api\product\views\product.py", line 43, in list
+    return self.get_paginated_response(serializer.data)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 768, in data
+    ret = super().data
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 253, in data
+    self._data = self.to_representation(self.instance)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 686, in to_representation
+    return [
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 687, in <listcomp>
+    self.child.to_representation(item) for item in iterable
+  File "C:\Dev\grooveshop-django-api\core\api\serializers.py", line 17, in to_representation
+    data = super().to_representation(instance)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 509, in to_representation
+    attribute = field.get_attribute(instance)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\fields.py", line 446, in get_attribute
+    return get_attribute(instance, self.source_attrs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\fields.py", line 96, in get_attribute
+    instance = getattr(instance, attr)
+  File "C:\Dev\grooveshop-django-api\product\models\product.py", line 164, in main_image_absolute_url
+    img = ProductImages.objects.get(product_id=self.id, is_main=True)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\db\models\query.py", line 640, in get
+    raise self.model.MultipleObjectsReturned(
+product.models.images.ProductImages.MultipleObjectsReturned: get() returned more than one ProductImages -- it returned 2!
+[2023-07-20 17:51:08] ERROR | log_message | django.server | "GET /api/v1/product/?ordering=-createdAt& HTTP/1.1" 500 198661
+[2023-07-20 17:51:08] ERROR | log_response | django.request | Internal Server Error: /api/v1/product/
+Traceback (most recent call last):
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\views\decorators\csrf.py", line 56, in wrapper_view
+    return view_func(*args, **kwargs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\viewsets.py", line 125, in view
+    return self.dispatch(request, *args, **kwargs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\views.py", line 509, in dispatch
+    response = self.handle_exception(exc)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\views.py", line 469, in handle_exception
+    self.raise_uncaught_exception(exc)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\views.py", line 480, in raise_uncaught_exception
+    raise exc
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\views.py", line 506, in dispatch
+    response = handler(request, *args, **kwargs)
+  File "C:\Dev\grooveshop-django-api\product\views\product.py", line 43, in list
+    return self.get_paginated_response(serializer.data)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 768, in data
+    ret = super().data
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 253, in data
+    self._data = self.to_representation(self.instance)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 686, in to_representation
+    return [
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 687, in <listcomp>
+    self.child.to_representation(item) for item in iterable
+  File "C:\Dev\grooveshop-django-api\core\api\serializers.py", line 17, in to_representation
+    data = super().to_representation(instance)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 509, in to_representation
+    attribute = field.get_attribute(instance)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\fields.py", line 446, in get_attribute
+    return get_attribute(instance, self.source_attrs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\fields.py", line 96, in get_attribute
+    instance = getattr(instance, attr)
+  File "C:\Dev\grooveshop-django-api\product\models\product.py", line 164, in main_image_absolute_url
+    img = ProductImages.objects.get(product_id=self.id, is_main=True)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\db\models\query.py", line 640, in get
+    raise self.model.MultipleObjectsReturned(
+product.models.images.ProductImages.MultipleObjectsReturned: get() returned more than one ProductImages -- it returned 2!
+[2023-07-20 17:51:08] ERROR | log_message | django.server | "GET /api/v1/product/?ordering=-createdAt& HTTP/1.1" 500 198661
+[2023-07-20 17:51:34] ERROR | log_response | django.request | Internal Server Error: /api/v1/product/
+Traceback (most recent call last):
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\views\decorators\csrf.py", line 56, in wrapper_view
+    return view_func(*args, **kwargs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\viewsets.py", line 125, in view
+    return self.dispatch(request, *args, **kwargs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\views.py", line 509, in dispatch
+    response = self.handle_exception(exc)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\views.py", line 469, in handle_exception
+    self.raise_uncaught_exception(exc)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\views.py", line 480, in raise_uncaught_exception
+    raise exc
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\views.py", line 506, in dispatch
+    response = handler(request, *args, **kwargs)
+  File "C:\Dev\grooveshop-django-api\product\views\product.py", line 43, in list
+    return self.get_paginated_response(serializer.data)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 768, in data
+    ret = super().data
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 253, in data
+    self._data = self.to_representation(self.instance)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 686, in to_representation
+    return [
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 687, in <listcomp>
+    self.child.to_representation(item) for item in iterable
+  File "C:\Dev\grooveshop-django-api\core\api\serializers.py", line 17, in to_representation
+    data = super().to_representation(instance)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 509, in to_representation
+    attribute = field.get_attribute(instance)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\fields.py", line 446, in get_attribute
+    return get_attribute(instance, self.source_attrs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\fields.py", line 96, in get_attribute
+    instance = getattr(instance, attr)
+  File "C:\Dev\grooveshop-django-api\product\models\product.py", line 164, in main_image_absolute_url
+    img = ProductImages.objects.get(product_id=self.id, is_main=True)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\db\models\query.py", line 640, in get
+    raise self.model.MultipleObjectsReturned(
+product.models.images.ProductImages.MultipleObjectsReturned: get() returned more than one ProductImages -- it returned 2!
+[2023-07-20 17:51:34] ERROR | log_message | django.server | "GET /api/v1/product/?ordering=-createdAt& HTTP/1.1" 500 198661
+[2023-07-20 17:51:34] ERROR | log_response | django.request | Internal Server Error: /api/v1/product/
+Traceback (most recent call last):
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\views\decorators\csrf.py", line 56, in wrapper_view
+    return view_func(*args, **kwargs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\viewsets.py", line 125, in view
+    return self.dispatch(request, *args, **kwargs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\views.py", line 509, in dispatch
+    response = self.handle_exception(exc)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\views.py", line 469, in handle_exception
+    self.raise_uncaught_exception(exc)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\views.py", line 480, in raise_uncaught_exception
+    raise exc
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\views.py", line 506, in dispatch
+    response = handler(request, *args, **kwargs)
+  File "C:\Dev\grooveshop-django-api\product\views\product.py", line 43, in list
+    return self.get_paginated_response(serializer.data)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 768, in data
+    ret = super().data
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 253, in data
+    self._data = self.to_representation(self.instance)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 686, in to_representation
+    return [
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 687, in <listcomp>
+    self.child.to_representation(item) for item in iterable
+  File "C:\Dev\grooveshop-django-api\core\api\serializers.py", line 17, in to_representation
+    data = super().to_representation(instance)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\serializers.py", line 509, in to_representation
+    attribute = field.get_attribute(instance)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\fields.py", line 446, in get_attribute
+    return get_attribute(instance, self.source_attrs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\rest_framework\fields.py", line 96, in get_attribute
+    instance = getattr(instance, attr)
+  File "C:\Dev\grooveshop-django-api\product\models\product.py", line 164, in main_image_absolute_url
+    img = ProductImages.objects.get(product_id=self.id, is_main=True)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+  File "C:\Dev\grooveshop-django-api\venv\lib\site-packages\django\db\models\query.py", line 640, in get
+    raise self.model.MultipleObjectsReturned(
+product.models.images.ProductImages.MultipleObjectsReturned: get() returned more than one ProductImages -- it returned 2!
+[2023-07-20 17:51:34] ERROR | log_message | django.server | "GET /api/v1/product/?ordering=-createdAt& HTTP/1.1" 500 198661

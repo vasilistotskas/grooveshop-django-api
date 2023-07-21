@@ -9,8 +9,8 @@ from parler.admin import TranslatableAdmin
 from core.admin import ExportModelAdmin
 from product.models.category import ProductCategory
 from product.models.favourite import ProductFavourite
+from product.models.images import ProductImages
 from product.models.product import Product
-from product.models.product import ProductImages
 from product.models.review import ProductReview
 
 

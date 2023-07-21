@@ -25,9 +25,7 @@ class Slider(TranslatableModel, TimeStampMixinModel, UUIDModel):
         _("Video"), upload_to="uploads/sliders/videos/", null=True, blank=True
     )
     translations = TranslatedFields(
-        name=models.CharField(
-            _("Name"), max_length=50, blank=True, null=True, unique=True
-        ),
+        name=models.CharField(_("Name"), max_length=50, blank=True, null=True),
         url=models.CharField(_("Url"), max_length=255, blank=True, null=True),
         title=models.CharField(_("Title"), max_length=40, blank=True, null=True),
         description=models.CharField(

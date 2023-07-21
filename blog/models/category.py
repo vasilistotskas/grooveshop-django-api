@@ -18,9 +18,7 @@ class BlogCategory(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDMo
         _("Image"), upload_to="uploads/blog/", blank=True, null=True
     )
     translations = TranslatedFields(
-        name=models.CharField(
-            _("Name"), max_length=50, blank=True, null=True, unique=True
-        ),
+        name=models.CharField(_("Name"), max_length=50, blank=True, null=True),
         description=models.TextField(_("Description"), blank=True, null=True),
     )
 

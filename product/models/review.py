@@ -6,7 +6,7 @@ from parler.models import TranslatedFields
 from core.models import PublishableModel
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
-from product.enum.review import RateChoicesEnum
+from product.enum.review import RateEnum
 from product.enum.review import StatusEnum
 
 
@@ -22,9 +22,7 @@ class ProductReview(
     user = models.ForeignKey(
         "user.UserAccount", related_name="product_review_user", on_delete=models.CASCADE
     )
-    rate = models.PositiveSmallIntegerField(
-        _("Rate"), choices=RateChoicesEnum.choices()
-    )
+    rate = models.PositiveSmallIntegerField(_("Rate"), choices=RateEnum.choices())
     status = models.CharField(
         _("Status"), max_length=250, choices=StatusEnum.choices(), default="New"
     )

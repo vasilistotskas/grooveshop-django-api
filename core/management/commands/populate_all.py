@@ -1,104 +1,63 @@
-import io
+# seed_all.py
 import time
 
-from django.core import management
-from django.core.management import BaseCommand
+from django.core.management import call_command
+from django.core.management.base import BaseCommand
+from django.db import transaction
 
 
 class Command(BaseCommand):
+    help = "Seed all models in the specified order."
+
     def handle(self, *args, **options):
-        start_time = time.time()
-        with io.StringIO() as out:
-            populate_users_start_time = time.time()
-            management.call_command("populate_users", stdout=out)
-            populate_users_response = str(out.getvalue())
-            populate_users_end_time = round(
-                (time.time() - populate_users_start_time), 2
-            )
+        seed_commands = [
+            "populate_user_account",
+            "populate_country",
+            "populate_region",
+            "populate_pay_way",
+            "populate_vat",
+            "populate_product_category",
+            "populate_product",
+            "populate_product_image",
+            "populate_product_review",
+            "populate_product_favourite",
+            "populate_slider",
+            "populate_tip",
+            "populate_blog_author",
+            "populate_blog_category",
+            "populate_blog_tag",
+            "populate_blog_post",
+            "populate_blog_comment",
+            "populate_user_address",
+            "populate_order",
+        ]
 
-        with io.StringIO() as out:
-            populate_products_start_time = time.time()
-            management.call_command("populate_products", stdout=out)
-            populate_products_response = str(out.getvalue())
-            populate_products_end_time = round(
-                (time.time() - populate_products_start_time), 2
-            )
+        total_time = 0
 
-        with io.StringIO() as out:
-            populate_blog_start_time = time.time()
-            management.call_command("populate_blog", stdout=out)
-            populate_blog_response = str(out.getvalue())
-            populate_blog_end_time = round((time.time() - populate_blog_start_time), 2)
+        for command_name in seed_commands:
+            self.stdout.write(f"Running {command_name}...")
+            start_time = time.time()
 
-        with io.StringIO() as out:
-            populate_reviews_start_time = time.time()
-            management.call_command("populate_reviews", stdout=out)
-            populate_reviews_response = str(out.getvalue())
-            populate_reviews_end_time = round(
-                (time.time() - populate_reviews_start_time), 2
-            )
+            try:
+                with transaction.atomic():
+                    call_command(command_name, *args, **options)
+            except Exception as e:
+                self.stderr.write(
+                    self.style.ERROR(f"{command_name} failed with error: {e}")
+                )
+                continue
 
-        with io.StringIO() as out:
-            populate_countries_start_time = time.time()
-            management.call_command("populate_countries", stdout=out)
-            populate_countries_response = str(out.getvalue())
-            populate_countries_end_time = round(
-                (time.time() - populate_countries_start_time), 2
-            )
-
-        with io.StringIO() as out:
-            populate_sliders_start_time = time.time()
-            management.call_command("populate_sliders", stdout=out)
-            populate_sliders_response = str(out.getvalue())
-            populate_sliders_end_time = round(
-                (time.time() - populate_sliders_start_time), 2
-            )
-
-        with io.StringIO() as out:
-            populate_tips_start_time = time.time()
-            management.call_command("populate_tips", stdout=out)
-            populate_tips_response = str(out.getvalue())
-            populate_tips_end_time = round((time.time() - populate_tips_start_time), 2)
-
-        with io.StringIO() as out:
-            populate_orders_start_time = time.time()
-            management.call_command("populate_orders", stdout=out)
-            populate_orders_response = str(out.getvalue())
-            populate_orders_end_time = round(
-                (time.time() - populate_orders_start_time), 2
+            end_time = time.time()
+            execution_time = end_time - start_time
+            total_time += execution_time
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"{command_name} completed successfully in {execution_time:.2f} seconds."
+                )
             )
 
         self.stdout.write(
-            f"populate_users_response : {populate_users_response} ---> "
-            f"{populate_users_end_time} seconds"
+            self.style.SUCCESS(
+                f"All seed commands completed successfully in {total_time:.2f} seconds."
+            )
         )
-        self.stdout.write(
-            f"populate_products_response : {populate_products_response} ---> "
-            f"{populate_products_end_time} seconds"
-        )
-        self.stdout.write(
-            f"populate_blog_response : {populate_blog_response} ---> "
-            f"{populate_blog_end_time} seconds"
-        )
-        self.stdout.write(
-            f"populate_reviews_response : {populate_reviews_response} ---> "
-            f"{populate_reviews_end_time} seconds"
-        )
-        self.stdout.write(
-            f"populate_countries_response : {populate_countries_response} ---> "
-            f"{populate_countries_end_time} seconds"
-        )
-        self.stdout.write(
-            f"populate_sliders_response : {populate_sliders_response} ---> "
-            f"{populate_sliders_end_time} seconds"
-        )
-        self.stdout.write(
-            f"populate_tips_response : {populate_tips_response} ---> "
-            f"{populate_tips_end_time} seconds"
-        )
-        self.stdout.write(
-            f"populate_orders_response : {populate_orders_response} ---> "
-            f"{populate_orders_end_time} seconds"
-        )
-
-        self.stdout.write(f"Succeed in {round((time.time() - start_time), 2)} seconds")

@@ -29,9 +29,7 @@ class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         _("Image Flag"), blank=True, null=True, upload_to="uploads/country/"
     )
     translations = TranslatedFields(
-        name=models.CharField(
-            _("Name"), max_length=50, blank=True, null=True, unique=True
-        )
+        name=models.CharField(_("Name"), max_length=50, blank=True, null=True)
     )
 
     class Meta:

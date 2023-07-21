@@ -129,11 +129,16 @@ jobs:
       with:
         github_token: ${{ secrets.DJANGO_TOKEN }}
 
-    - name: Publish package distributions to PyPI
+    - name: Publish distribution 📦 to Test PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
-      # NOTE: DO NOT wrap the conditional in ${{ }} as it will always evaluate to true.
-      # See https://github.com/actions/runner/issues/1173
+      with:
+        password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+        repository-url: https://test.pypi.org/legacy/
+    - name: Publish distribution 📦 to PyPI
       if: steps.release.outputs.released == 'true'
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        password: ${{ secrets.PYPI_API_TOKEN }}
 
     - name: Publish package distributions to GitHub Releases
       uses: python-semantic-release/upload-to-gh-release@main

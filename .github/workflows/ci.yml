@@ -124,14 +124,30 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Clear dist_build directory
-        run: rm -rf dist_build/
+      - name: Clear dist directory
+        run: rm -rf dist/
 
       - name: Python Semantic Release
         id: release
         uses: python-semantic-release/python-semantic-release@master
         with:
           github_token: ${{ secrets.DJANGO_TOKEN }}
+
+      - name: Install pypa/build
+        run: python3 -m pip install build --user
+
+      - name: Build a binary wheel and a source tarball
+        run: python3 -m build --sdist --wheel --outdir dist/
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: dist
+          path: dist/
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: dist
+          path: dist/
 
       - name: Publish package distributions 📦 to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1

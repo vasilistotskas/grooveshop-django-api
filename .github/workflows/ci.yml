@@ -156,6 +156,8 @@ jobs:
 
       - name: Publish distribution 📦 to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist_build/
         # NOTE: DO NOT wrap the conditional in ${{ }} as it will always evaluate to true.
         # See https://github.com/actions/runner/issues/1173
         if: steps.release.outputs.released == 'true'
@@ -165,3 +167,4 @@ jobs:
         if: steps.release.outputs.released == 'true'
         with:
           github_token: ${{ secrets.DJANGO_TOKEN }}
+          artifacts: dist_build/*

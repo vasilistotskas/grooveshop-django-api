@@ -167,4 +167,3 @@ jobs:
         if: steps.release.outputs.released == 'true'
         with:
           github_token: ${{ secrets.DJANGO_TOKEN }}
-          artifacts: dist_build/*

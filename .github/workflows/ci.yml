@@ -8,7 +8,7 @@ on:
     branches: [ "main" ]
 
 jobs:
-  Quality:
+  quality:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
@@ -34,8 +34,8 @@ jobs:
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         python -m poetry run flake8 . --exclude .venv --count --exit-zero --max-complexity=31 --max-line-length=140 --statistics
 
-  Testing:
-    needs: Quality
+  testing:
+    needs: quality
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 4
@@ -108,10 +108,11 @@ jobs:
           name: python-coverage-comment-action
           # If you use a different name, update COMMENT_FILENAME accordingly
           path: python-coverage-comment-action.txt
-  Release:
-    needs: Testing
+  release:
+    needs: testing
     runs-on: ubuntu-latest
     concurrency: release
+    environment: release
     permissions:
       id-token: write
       contents: write
@@ -132,25 +133,18 @@ jobs:
         with:
           github_token: ${{ secrets.DJANGO_TOKEN }}
 
-      - name: Install pypa/build
-        run: python3 -m pip install build --user
-
-      - name: Build a binary wheel and a source tarball
-        run: python3 -m build --sdist --wheel --outdir dist_build/
-
-      - name: Publish distribution 📦 to Test PyPI
+      - name: Publish package distributions 📦 to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
           repository-url: https://test.pypi.org/legacy/
 
       - name: Publish distribution 📦 to PyPI
-        if: steps.release.outputs.released == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
+        # NOTE: DO NOT wrap the conditional in ${{ }} as it will always evaluate to true.
+        # See https://github.com/actions/runner/issues/1173
+        if: steps.release.outputs.released == 'true'
 
-      - name: Publish package distributions to GitHub Releases
+      - name: Publish package distributions 📦 to GitHub Releases
         uses: python-semantic-release/upload-to-gh-release@main
         if: steps.release.outputs.released == 'true'
         with:

@@ -1,0 +1,50 @@
+{% extends "account/base.html" %}
+
+{% load i18n %}
+{% load form_filters %}
+{% block head_title %}{% trans "Two-Factor Authentication Backup Tokens" %}{% endblock %}
+
+{% block content %}
+  <h1 class="grid p-10 items-center justify-items-center text-xl font-black">
+    {% trans "Two-Factor Authentication Backup Tokens" %}
+  </h1>
+
+  <div class="grid items-center justify-items-center w-full h-full g-6 text-gray-800">
+    <div class="w-full rounded-lg shadow border md:mt-0 sm:max-w-md xl:p-0 bg-zinc-800 border-gray-700">
+        <div class="grid gap-4 p-12 sm:p-8">
+          {% if backup_tokens %}
+            {% if reveal_tokens %}
+              <div class="grid gap-1 p-2 pr-6 max-h-40 overflow-y-scroll primary-scrollbar rounded-lg shadow border border-gray-700">
+                <div class="w-full grid ctrlHolder items-center justify-items-center font-light text-gray-300">
+                  <ul class="w-full grid gap-2">
+                    {% for token in backup_tokens %}
+                      <li class="text-lg font-semibold">{{ token.token }}</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              </div>
+
+            {% else %}
+              <p class="grid items-center justify-items-center font-light text-gray-300">
+                {% trans 'Backup tokens have been generated, but are not revealed here for security reasons. Press the button below to generate new ones.' %}
+              </p>
+            {% endif %}
+          {% else %}
+            <p class="grid items-center justify-items-center font-light text-gray-300">
+              {% trans 'No tokens. Press the button below to generate some.' %}
+            </p>
+          {% endif %}
+
+          <form method="post">
+            {% csrf_token %}
+            <button type="submit" class="w-full text-white ring-2 ring-primary outline-none font-medium rounded-lg text-sm px-5 py-2.5 text-center bg-primary-600 hover:bg-primary-700 ring-primary-800 mb-5">
+              {% trans 'Generate backup tokens' %}
+            </button>
+          </form>
+
+          <a class="font-medium text-gray-300 hover:underline text-primary-500" href="{% url 'two-factor-remove' %}">Disable Two Factor</a>
+        </div>
+    </div>
+  </div>
+
+{% endblock %}

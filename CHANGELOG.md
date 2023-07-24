@@ -3,7 +3,17 @@
 
 
 
+## v0.9.2 (2023-07-24)
+
+### Fix
+
+* fix(templates/CHANGELOG.md): Remove auto generated template from semantic release changelog, meaby will be created again , trying to figure it out. ([`74312e6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/74312e67403286537c386505f60d44e7a656bcca))
+
 ## v0.9.1 (2023-07-24)
+
+### Chore
+
+* chore(release): release version 0.9.1 [skip ci] ([`35fb0ce`](https://github.com/vasilistotskas/grooveshop-django-api/commit/35fb0ce20183396d8c22452dd8545f905dce18fd))
 
 ### Fix
 

@@ -1,0 +1,30 @@
+{% extends "account/base.html" %}
+
+{% load i18n %}
+{% load account %}
+
+{% block head_title %}{% trans "Confirm E-mail Address" %}{% endblock %}
+
+
+{% block content %}
+    <h1 class="grid p-10 items-center justify-items-center text-xl font-black">{% trans "Confirm E-mail Address" %}</h1>
+
+    {% if confirmation %}
+        {% user_display confirmation.email_address.user as user_display %}
+        <div class="grid items-center justify-items-center w-full h-full g-6 text-gray-800">
+            <div class="w-full rounded-lg shadow border md:mt-0 sm:max-w-md xl:p-0 bg-zinc-800 border-gray-700">
+                <div class="p-12 sm:p-8">
+                    <p class="grid items-center justify-items-center font-light text-gray-300">{% blocktrans with confirmation.email_address.email as email %}Please confirm that <a href="mailto:{{ email }}">{{ email }}</a> is an e-mail address for user {{ user_display }}.{% endblocktrans %}</p>
+                    <form class="email_confirm" method="post" action="{% url 'account_confirm_email' confirmation.key %}">
+                        {% csrf_token %}
+                        <button class="w-full text-white ring-2 ring-primary outline-none font-medium rounded-lg text-sm px-5 py-2.5 text-center bg-primary-600 hover:bg-primary-700 ring-primary-800" type="submit">{% trans 'Confirm' %}</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        {% url 'account_email' as email_url %}
+        <p class="grid items-center justify-items-center font-light text-gray-300">{% blocktrans %}This e-mail confirmation link expired or is invalid. Please <a href="{{ email_url }}">issue a new e-mail confirmation request</a>.{% endblocktrans %}</p>
+    {% endif %}
+
+{% endblock %}

@@ -3,7 +3,17 @@
 
 
 
+## v0.10.0 (2023-07-26)
+
+### Feature
+
+* feat(tests): Rewrite Blog tests ([`d8e682a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d8e682afa0855af633118b65aefd615d8fb6d5e6))
+
 ## v0.9.2 (2023-07-24)
+
+### Chore
+
+* chore(release): release version 0.9.2 [skip ci] ([`8a87529`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8a8752943a40e9ae01d61f5d0b015d8df562ad79))
 
 ### Fix
 

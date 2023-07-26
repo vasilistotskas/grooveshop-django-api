@@ -1,87 +1,138 @@
-from __future__ import annotations
-
-import os
-
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 
-from app.settings import BASE_DIR
 from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
 from blog.models.post import BlogPost
-from blog.models.tag import BlogTag
+from helpers.seed import get_or_create_default_image
 
+languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
 
 
-class BlogPostTestCase(TestCase):
-    post: BlogPost
-    image: str | SimpleUploadedFile = ""
+class BlogPostModelTestCase(TestCase):
+    user = None
+    author = None
+    post = None
+    category = None
 
     def setUp(self):
-        user = User.objects.create_user(password="bar", email="email@email.com")
-        author = BlogAuthor.objects.create(
-            user_id=user.id, website="https://www.google.com", bio="bio"
+        self.user = User.objects.create_user(
+            email="testuser@example.com", password="testpassword"
         )
-        category = BlogCategory.objects.create(
-            name="name", slug="slug", description="description"
+
+        image_post = get_or_create_default_image("uploads/blog/no_photo.jpg")
+        self.author = BlogAuthor.objects.create(user=self.user)
+
+        image_category = get_or_create_default_image("uploads/blog/no_photo.jpg")
+        self.category = BlogCategory.objects.create(
+            slug="sample-category", image=image_category
         )
+        for language in languages:
+            self.category.set_current_language(language)
+            self.category.name = f"Category name in {language}"
+            self.category.description = f"Category description in {language}"
+            self.category.save()
+        self.category.set_current_language(default_language)
+
         self.post = BlogPost.objects.create(
-            title="title",
-            slug="slug",
-            author_id=author.id,
-            category_id=category.id,
-            image=self.image,
+            slug="test-post",
+            author=self.author,
+            category=self.category,
+            image=image_post,
+            status="draft",
+            featured=True,
+            view_count=0,
         )
-        tag = BlogTag.objects.create(name="name")
-        self.post.tags.add(tag)
 
-    def test___str__(self):
-        post = BlogPost.objects.get(slug="slug")
-        self.assertEqual(str(post), post.title)
+        for language in languages:
+            self.post.set_current_language(language)
+            self.post.title = f"Title in {language}"
+            self.post.subtitle = f"Subtitle in {language}"
+            self.post.body = f"Body in {language}"
+            self.post.save()
+        self.post.set_current_language(default_language)
 
-    def test_get_main_image_filename(self):
-        post = BlogPost.objects.get(slug="slug")
-        image: str = ""
-        if post.image is not None:
-            image = os.path.basename(post.image.name)
-        self.assertEqual(post.main_image_filename, image)
+    def test_fields(self):
+        # Test if the fields are saved correctly
+        self.assertEqual(self.post.slug, "test-post")
+        self.assertIsNotNone(self.post.image)
+        self.assertEqual(self.post.status, "draft")
+        self.assertEqual(self.post.featured, True)
+        self.assertEqual(self.post.view_count, 0)
+
+    def test_verbose_names(self):
+        # Test verbose names for fields
+        self.assertEqual(
+            BlogPost._meta.get_field("slug").verbose_name,
+            "slug",
+        )
+        self.assertEqual(
+            BlogPost._meta.get_field("image").verbose_name,
+            "Image",
+        )
+        self.assertEqual(
+            BlogPost._meta.get_field("status").verbose_name,
+            "Status",
+        )
+        self.assertEqual(
+            BlogPost._meta.get_field("featured").verbose_name,
+            "Featured",
+        )
+        self.assertEqual(
+            BlogPost._meta.get_field("view_count").verbose_name,
+            "View Count",
+        )
+
+    def test_meta_verbose_names(self):
+        # Test verbose names from the Meta class
+        self.assertEqual(
+            BlogPost._meta.verbose_name,
+            "Blog Post",
+        )
+        self.assertEqual(
+            BlogPost._meta.verbose_name_plural,
+            "Blog Posts",
+        )
+
+    def test_translations(self):
+        # Test if translations are saved correctly
+        for language in languages:
+            self.post.set_current_language(language)
+            self.assertEqual(
+                self.post.title,
+                f"Title in {language}",
+            )
+            self.assertEqual(
+                self.post.subtitle,
+                f"Subtitle in {language}",
+            )
+            self.assertEqual(
+                self.post.body,
+                f"Body in {language}",
+            )
+
+    def test_str_representation(self):
+        self.assertEqual(
+            str(self.post),
+            self.post.safe_translation_getter("title", any_language=True),
+        )
 
     def test_main_image_absolute_url(self):
-        post = BlogPost.objects.get(slug="slug")
-        image: str = ""
-        if post.image and hasattr(post.image, "url"):
-            image = settings.APP_BASE_URL + post.image.url
-        self.assertEqual(post.main_image_absolute_url, image)
+        expected_url = settings.APP_BASE_URL + self.post.image.url
+        self.assertEqual(self.post.main_image_absolute_url, expected_url)
+
+    def test_main_image_filename(self):
+        expected_filename = "no_photo.jpg"
+        self.assertEqual(self.post.main_image_filename, expected_filename)
 
     def test_number_of_likes(self):
-        post = BlogPost.objects.get(slug="slug")
-        self.assertEqual(post.number_of_likes, 0)
+        self.assertEqual(self.post.number_of_likes, 0)
 
     def test_number_of_comments(self):
-        post = BlogPost.objects.get(slug="slug")
-        self.assertEqual(post.number_of_comments, 0)
+        self.assertEqual(self.post.number_of_comments, 0)
 
     def test_get_post_tags_count(self):
-        post = BlogPost.objects.get(slug="slug")
-        self.assertEqual(post.get_post_tags_count, 1)
-
-
-class WithImage(BlogPostTestCase):
-    image: str | SimpleUploadedFile = "uploads/blog/no_photo.jpg"
-
-    def setUp(self):
-        super().setUp()
-        image_path = os.path.join(BASE_DIR, "files/images") + "/no_photo.jpg"
-        with open(image_path, "rb") as image:
-            self.image = SimpleUploadedFile(
-                name="no_photo.jpg", content=image.read(), content_type="image/jpeg"
-            )
-        self.post.image = self.image
-        self.post.save()
-
-
-class WithoutImage(BlogPostTestCase):
-    image: str | SimpleUploadedFile = ""
+        self.assertEqual(self.post.get_post_tags_count, 0)

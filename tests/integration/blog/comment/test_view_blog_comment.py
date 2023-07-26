@@ -1,190 +1,192 @@
-from __future__ import annotations
-
-import json
-
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from blog.models.author import BlogAuthor
-from blog.models.category import BlogCategory
 from blog.models.comment import BlogComment
 from blog.models.post import BlogPost
 from blog.serializers.comment import BlogCommentSerializer
 
+languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
 
 
 class BlogCommentViewSetTestCase(APITestCase):
-    comment: BlogComment
+    comment = None
+    user = None
+    post = None
+    author = None
 
     def setUp(self):
-        user = User.objects.create_user(password="bar", email="email@email.com")
-        category = BlogCategory.objects.create(
-            name="name", slug="slug", description="description"
+        self.user = User.objects.create_user(
+            email="testuser@example.com", password="testpassword"
         )
-        author = BlogAuthor.objects.create(
-            user_id=user.id, website="https://www.google.com", bio="bio"
+        self.author = BlogAuthor.objects.create(user=self.user)
+        self.post = BlogPost.objects.create(
+            slug="test-post",
+            title="Test Post",
+            body="This is a test post.",
+            author=self.author,
         )
-        post = BlogPost.objects.create(
-            slug="slug",
-            title="title",
-            subtitle="subtitle",
-            category_id=category.id,
-            author_id=author.id,
+        self.comment = BlogComment.objects.create(
+            is_approved=True, user=self.user, post=self.post
         )
-        self.comment = BlogComment.objects.create(post_id=post.id, user_id=user.id)
+        for language in languages:
+            self.comment.set_current_language(language)
+            self.comment.content = f"Comment Content in {language}"
+            self.comment.save()
 
-    def test_list(self):
-        response = self.client.get("/api/v1/blog/comment/")
+    @staticmethod
+    def get_comment_detail_url(pk):
+        return reverse("blog-comment-detail", args=[pk])
+
+    @staticmethod
+    def get_comment_list_url():
+        return reverse("blog-comment-list")
+
+    def test_list_comments(self):
+        url = self.get_comment_list_url()
+        response = self.client.get(url)
         comments = BlogComment.objects.all()
         serializer = BlogCommentSerializer(comments, many=True)
         self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_valid(self):
-        user = User.objects.create_user(password="bar_one", email="email_one@email.com")
-        category = BlogCategory.objects.create(
-            name="name_one", slug="slug_one", description="description_one"
+        user = User.objects.create_user(
+            email="testuser2@example.com", password="testpassword2"
         )
-        author = BlogAuthor.objects.create(
-            user_id=user.id, website="https://www.google.com", bio="bio_one"
-        )
+        author = BlogAuthor.objects.create(user=user)
         post = BlogPost.objects.create(
-            slug="slug_one",
-            title="title_one",
-            subtitle="subtitle_one",
-            category_id=category.id,
-            author_id=author.id,
+            slug="test-post-2",
+            title="Test Post 2",
+            body="This is another test post.",
+            author=author,
         )
-        post.likes.add(user)
 
         payload = {
-            "translations": {},
-            "post": post.id,
             "user": user.id,
-            "likes": [user.id],
+            "post": post.id,
+            "is_approved": True,
+            "likes": [],
+            "translations": {},
         }
 
-        for language in settings.LANGUAGES:
+        for language in languages:
             language_code = language[0]
             language_name = language[1]
 
             translation_payload = {
-                "content": f"Translation for {language_name}",
+                "content": f"Comment Content in {language_name}",
             }
 
             payload["translations"][language_code] = translation_payload
 
-        response = self.client.post(
-            "/api/v1/blog/comment/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
-
+        url = self.get_comment_list_url()
+        response = self.client.post(url, data=payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_create_invalid(self):
         payload = {
-            "post": "",
-            "content": "",
+            "user": "invalid_user_id",
+            "post": "invalid_post_id",
+            "translations": {
+                "invalid_lang_code": {
+                    "content": "Comment Content in invalid language code",
+                }
+            },
         }
-        response = self.client.post(
-            "/api/v1/blog/comment/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+        url = self.get_comment_list_url()
+        response = self.client.post(url, data=payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_retrieve_valid(self):
-        response = self.client.get(f"/api/v1/blog/comment/{self.comment.id}/")
-        comment = BlogComment.objects.get(id=self.comment.id)
-        serializer = BlogCommentSerializer(comment)
+        url = self.get_comment_detail_url(self.comment.pk)
+        response = self.client.get(url)
+        serializer = BlogCommentSerializer(self.comment)
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_retrieve_invalid(self):
-        invalid_id = BlogComment.objects.latest("id").id + 1
-        response = self.client.get(f"/api/v1/blog/comment/{invalid_id}/")
+        invalid_comment_id = 9999  # An ID that doesn't exist in the database
+        url = self.get_comment_detail_url(invalid_comment_id)
+        response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_update_valid(self):
-        user = User.objects.create_user(password="bar_two", email="email_two@email.com")
-        category = BlogCategory.objects.create(
-            name="name_two", slug="slug_two", description="description_two"
-        )
-        author = BlogAuthor.objects.create(
-            user_id=user.id, website="https://www.google.com", bio="bio_two"
-        )
-        post = BlogPost.objects.create(
-            slug="slug_two",
-            title="title_two",
-            subtitle="subtitle_two",
-            category_id=category.id,
-            author_id=author.id,
-        )
-
         payload = {
+            "user": self.user.id,
+            "post": self.post.id,
+            "is_approved": False,
+            "likes": [],
             "translations": {},
-            "post": post.id,
-            "user": user.id,
-            "likes": [user.id],
         }
 
-        for language in settings.LANGUAGES:
+        for language in languages:
             language_code = language[0]
             language_name = language[1]
 
             translation_payload = {
-                "content": f"Translation for {language_name}",
+                "content": f"Comment Content in {language_name}",
             }
 
             payload["translations"][language_code] = translation_payload
 
-        response = self.client.put(
-            f"/api/v1/blog/comment/{self.comment.id}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+        url = self.get_comment_detail_url(self.comment.pk)
+        response = self.client.put(url, data=payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_update_invalid(self):
         payload = {
-            "post": "",
+            "user": "invalid_user_id",
+            "post": "invalid_post_id",
+            "translations": {
+                "invalid_lang_code": {
+                    "content": "Partial update with invalid language code",
+                },
+            },
         }
-        response = self.client.put(
-            f"/api/v1/blog/comment/{self.comment.id}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+        url = self.get_comment_detail_url(self.comment.pk)
+        response = self.client.put(url, data=payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_partial_update_valid(self):
-        payload = {}
-        response = self.client.patch(
-            f"/api/v1/blog/comment/{self.comment.id}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+        payload = {
+            "translations": {
+                default_language: {
+                    "content": f"Partial update with {default_language} language code"
+                },
+            },
+        }
+        url = self.get_comment_detail_url(self.comment.pk)
+        response = self.client.patch(url, data=payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_partial_update_invalid(self):
         payload = {
-            "post": "",
+            "user": "invalid_user_id",
+            "post": "invalid_post_id",
+            "translations": {
+                "invalid_lang_code": {
+                    "content": "Partial update with invalid language code",
+                },
+            },
         }
-        response = self.client.patch(
-            f"/api/v1/blog/comment/{self.comment.id}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+        url = self.get_comment_detail_url(self.comment.pk)
+        response = self.client.patch(url, data=payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_destroy_valid(self):
-        response = self.client.delete(f"/api/v1/blog/comment/{self.comment.id}/")
+        url = self.get_comment_detail_url(self.comment.pk)
+        response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(BlogComment.objects.filter(pk=self.comment.pk).exists())
 
     def test_destroy_invalid(self):
-        invalid_id = BlogComment.objects.latest("id").id + 1
-        response = self.client.delete(f"/api/v1/blog/comment/{invalid_id}/")
+        invalid_comment_id = 9999
+        url = self.get_comment_detail_url(invalid_comment_id)
+        response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

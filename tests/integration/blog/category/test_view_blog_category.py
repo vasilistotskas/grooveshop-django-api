@@ -1,27 +1,39 @@
-from __future__ import annotations
-
-import json
-import os
-
 from django.conf import settings
-from django.core.files.uploadedfile import SimpleUploadedFile
+from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from app.settings import BASE_DIR
 from blog.models.category import BlogCategory
 from blog.serializers.category import BlogCategorySerializer
 
+languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
+
 
 class BlogCategoryViewSetTestCase(APITestCase):
-    image: str | SimpleUploadedFile = ""
-    category: BlogCategory
+    category = None
 
     def setUp(self):
-        self.category = BlogCategory.objects.create(slug="slug", image=self.image)
+        self.category = BlogCategory.objects.create(slug="test-category")
 
-    def test_list(self):
-        response = self.client.get("/api/v1/blog/category/")
+        for language in languages:
+            self.category.set_current_language(language)
+            self.category.name = f"Category Name in {language}"
+            self.category.description = f"Category Description in {language}"
+            self.category.save()
+        self.category.set_current_language(default_language)
+
+    @staticmethod
+    def get_category_detail_url(pk):
+        return reverse("blog-category-detail", args=[pk])
+
+    @staticmethod
+    def get_category_list_url():
+        return reverse("blog-category-list")
+
+    def test_list_categories(self):
+        url = self.get_category_list_url()
+        response = self.client.get(url)
         categories = BlogCategory.objects.all()
         serializer = BlogCategorySerializer(categories, many=True)
         self.assertEqual(response.data["results"], serializer.data)
@@ -29,129 +41,124 @@ class BlogCategoryViewSetTestCase(APITestCase):
 
     def test_create_valid(self):
         payload = {
-            "slug": "slug_one",
+            "slug": "new-category",
             "translations": {},
         }
 
-        for language in settings.LANGUAGES:
+        for language in languages:
             language_code = language[0]
             language_name = language[1]
 
             translation_payload = {
-                "name": f"Translation for {language_name}",
-                "description": f"Translation for {language_name}",
+                "name": f"New Category Name in {language_name}",
+                "description": f"New Category Description in {language_name}",
             }
 
             payload["translations"][language_code] = translation_payload
 
-        response = self.client.post(
-            "/api/v1/blog/category/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+        url = self.get_category_list_url()
+        response = self.client.post(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_create_invalid(self):
         payload = {
             "slug": "",
+            "translations": {
+                "invalid_lang_code": {
+                    "description": "Description for invalid language code",
+                },
+            },
         }
-        response = self.client.post(
-            "/api/v1/blog/category/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+        url = self.get_category_list_url()
+        response = self.client.post(url, data=payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_retrieve_valid(self):
-        response = self.client.get(f"/api/v1/blog/category/{self.category.id}/")
-        category = BlogCategory.objects.get(id=self.category.id)
+        url = self.get_category_detail_url(self.category.pk)
+        response = self.client.get(url)
+        category = BlogCategory.objects.get(pk=self.category.pk)
         serializer = BlogCategorySerializer(category)
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_retrieve_invalid(self):
-        invalid_id = BlogCategory.objects.latest("id").id + 1
-        response = self.client.get(f"/api/v1/blog/category/{invalid_id}/")
+        invalid_category_id = 9999  # An ID that doesn't exist in the database
+        url = self.get_category_detail_url(invalid_category_id)
+        response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_update_valid(self):
         payload = {
+            "slug": "updated-category",
             "translations": {},
-            "slug": "slug_two",
         }
 
-        for language in settings.LANGUAGES:
+        for language in languages:
             language_code = language[0]
             language_name = language[1]
 
             translation_payload = {
-                "name": f"Translation for {language_name}",
-                "description": f"Translation for {language_name}",
+                "name": f"Updated Category Name in {language_name}",
+                "description": f"Updated Category Description in {language_name}",
             }
 
             payload["translations"][language_code] = translation_payload
 
-        response = self.client.put(
-            f"/api/v1/blog/category/{self.category.id}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+        url = self.get_category_detail_url(self.category.pk)
+        response = self.client.put(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_update_invalid(self):
-        payload = {"slug": ""}
-        response = self.client.put(
-            f"/api/v1/blog/category/{self.category.id}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+        payload = {
+            "slug": "",
+            "translations": {
+                "invalid_lang_code": {
+                    "name": "Updated Category with invalid language code",
+                    "description": "Description for invalid language code",
+                },
+            },
+        }
+        url = self.get_category_detail_url(self.category.pk)
+        response = self.client.put(url, data=payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_partial_update_valid(self):
         payload = {
-            "slug": "slug_three",
+            "translations": {
+                default_language: {
+                    "name": f"Partial update for {default_language}",
+                },
+            },
         }
-        response = self.client.patch(
-            f"/api/v1/blog/category/{self.category.id}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+
+        url = self.get_category_detail_url(self.category.pk)
+        response = self.client.patch(url, data=payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_partial_update_invalid(self):
         payload = {
             "slug": "",
+            "translations": {
+                "invalid_lang_code": {
+                    "name": "Partial update with invalid language code",
+                    "description": "Description for invalid language code",
+                },
+            },
         }
-        response = self.client.patch(
-            f"/api/v1/blog/category/{self.category.id}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+        url = self.get_category_detail_url(self.category.pk)
+        response = self.client.patch(url, data=payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_destroy_valid(self):
-        response = self.client.delete(f"/api/v1/blog/category/{self.category.id}/")
+        url = self.get_category_detail_url(self.category.pk)
+        response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(BlogCategory.objects.filter(pk=self.category.pk).exists())
 
     def test_destroy_invalid(self):
-        invalid_id = BlogCategory.objects.latest("id").id + 1
-        response = self.client.delete(f"/api/v1/blog/category/{invalid_id}/")
+        invalid_category_id = 9999  # An ID that doesn't exist in the database
+        url = self.get_category_detail_url(invalid_category_id)
+        response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-
-class WithImage(BlogCategoryViewSetTestCase):
-    image: str | SimpleUploadedFile = "uploads/blog/no_photo.jpg"
-
-    def setUp(self):
-        super().setUp()
-        image_path = os.path.join(BASE_DIR, "files/images") + "/no_photo.jpg"
-        with open(image_path, "rb") as image:
-            self.image = SimpleUploadedFile(
-                name="no_photo.jpg", content=image.read(), content_type="image/jpeg"
-            )
-        self.category.image = self.image
-        self.category.save()
-
-
-class WithoutImage(BlogCategoryViewSetTestCase):
-    image: str | SimpleUploadedFile = ""

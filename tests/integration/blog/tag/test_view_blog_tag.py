@@ -1,129 +1,156 @@
-from __future__ import annotations
-
-import json
-
 from django.conf import settings
-from django.contrib.auth import get_user_model
+from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from blog.models.tag import BlogTag
 from blog.serializers.tag import BlogTagSerializer
 
-User = get_user_model()
+languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
 class BlogTagViewSetTestCase(APITestCase):
-    tag: BlogTag
+    tag = None
 
     def setUp(self):
-        self.tag = BlogTag.objects.create()
+        self.tag = BlogTag.objects.create(active=True)
 
-    def test_list(self):
-        response = self.client.get("/api/v1/blog/tag/")
+        for language in languages:
+            self.tag.set_current_language(language)
+            self.tag.name = f"Tag name in {language}"
+            self.tag.save()
+        self.tag.set_current_language(default_language)
+
+    @staticmethod
+    def get_tag_detail_url(pk):
+        return reverse("blog-tag-detail", args=[pk])
+
+    @staticmethod
+    def get_tag_list_url():
+        return reverse("blog-tag-list")
+
+    def test_list_tags(self):
+        url = self.get_tag_list_url()
+        response = self.client.get(url)
         tags = BlogTag.objects.all()
         serializer = BlogTagSerializer(tags, many=True)
         self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_valid(self):
-        payload = {"translations": {}}
+        payload = {
+            "active": True,
+            "translations": {},
+        }
 
-        for language in settings.LANGUAGES:
+        for language in languages:
             language_code = language[0]
             language_name = language[1]
 
             translation_payload = {
-                "name": f"Translation for {language_name}",
+                "name": f"Tag name in {language_name}",
             }
 
             payload["translations"][language_code] = translation_payload
 
-        response = self.client.post(
-            "/api/v1/blog/tag/", json.dumps(payload), content_type="application/json"
-        )
-
+        url = self.get_tag_list_url()
+        response = self.client.post(url, data=payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_create_invalid(self):
-        payload = {"translations": {}}
-
-        response = self.client.post(
-            "/api/v1/blog/tag/", json.dumps(payload), content_type="application/json"
-        )
-
+        payload = {
+            "active": "invalid",
+            "translations": {
+                "invalid_lang_code": {
+                    "name": "Tag name with invalid language code",
+                },
+            },
+        }
+        url = self.get_tag_list_url()
+        response = self.client.post(url, data=payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_retrieve_valid(self):
-        response = self.client.get(f"/api/v1/blog/tag/{self.tag.id}/")
-        tag = BlogTag.objects.get(id=self.tag.id)
+        url = self.get_tag_detail_url(self.tag.pk)
+        response = self.client.get(url)
+        tag = BlogTag.objects.get(pk=self.tag.pk)
         serializer = BlogTagSerializer(tag)
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_retrieve_invalid(self):
-        invalid_id = BlogTag.objects.latest("id").id + 1
-        response = self.client.get(f"/api/v1/blog/tag/{invalid_id}/")
+        invalid_tag_id = 9999  # An ID that doesn't exist in the database
+        url = self.get_tag_detail_url(invalid_tag_id)
+        response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_update_valid(self):
         payload = {
+            "active": False,
             "translations": {},
         }
 
-        for language in settings.LANGUAGES:
+        for language in languages:
             language_code = language[0]
             language_name = language[1]
 
             translation_payload = {
-                "name": f"Translation for {language_name}",
+                "name": f"Updated Tag name in {language_name}",
             }
 
             payload["translations"][language_code] = translation_payload
 
-        response = self.client.put(
-            f"/api/v1/blog/tag/{self.tag.id}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+        url = self.get_tag_detail_url(self.tag.pk)
+        response = self.client.put(url, data=payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_update_invalid(self):
-        payload = {}
-        response = self.client.put(
-            f"/api/v1/blog/tag/{self.tag.id}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+        payload = {
+            "active": "invalid",
+            "translations": {
+                "invalid_lang_code": {
+                    "name": "Updated Tag name with invalid language code",
+                },
+            },
+        }
+        url = self.get_tag_detail_url(self.tag.pk)
+        response = self.client.put(url, data=payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_partial_update_valid(self):
         payload = {
-            "name": "test_three",
+            "translations": {
+                default_language: {
+                    "name": f"Updated Tag name in {default_language}",
+                }
+            },
         }
-        response = self.client.patch(
-            f"/api/v1/blog/tag/{self.tag.id}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+        url = self.get_tag_detail_url(self.tag.pk)
+        response = self.client.patch(url, data=payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_partial_update_invalid(self):
         payload = {
             "active": "invalid",
+            "translations": {
+                "invalid_lang_code": {
+                    "name": "Partial update with invalid language code",
+                },
+            },
         }
-        response = self.client.patch(
-            f"/api/v1/blog/tag/{self.tag.id}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+        url = self.get_tag_detail_url(self.tag.pk)
+        response = self.client.patch(url, data=payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_destroy_valid(self):
-        response = self.client.delete(f"/api/v1/blog/tag/{self.tag.id}/")
+        url = self.get_tag_detail_url(self.tag.pk)
+        response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(BlogTag.objects.filter(pk=self.tag.pk).exists())
 
     def test_destroy_invalid(self):
-        invalid_id = BlogTag.objects.latest("id").id + 1
-        response = self.client.delete(f"/api/v1/blog/tag/{invalid_id}/")
+        invalid_tag_id = 9999  # An ID that doesn't exist in the database
+        url = self.get_tag_detail_url(invalid_tag_id)
+        response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

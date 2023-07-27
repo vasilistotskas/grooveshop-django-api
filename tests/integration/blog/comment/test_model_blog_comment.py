@@ -73,8 +73,9 @@ class BlogCommentModelTestCase(TestCase):
             )
 
     def test_str_representation(self):
-        expected_content = self.comment.safe_translation_getter("content")
-        self.assertEqual(str(self.comment), expected_content)
+        self.assertEqual(
+            str(self.comment), self.comment.safe_translation_getter("content")
+        )
 
     def test_number_of_likes(self):
         # Create another user to simulate a "like" action

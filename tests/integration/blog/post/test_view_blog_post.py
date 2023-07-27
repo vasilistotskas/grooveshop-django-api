@@ -136,6 +136,7 @@ class BlogPostViewSetTestCase(APITestCase):
             "likes": [],
             "tags": [],
             "status": "published",  # Change the status to "published" for the test
+            "translations": {},
         }
 
         for language in languages:
@@ -148,7 +149,7 @@ class BlogPostViewSetTestCase(APITestCase):
                 "body": f"This is an updated test post body in {language_name}",
             }
 
-            payload[language_code] = translation_payload
+            payload["translations"][language_code] = translation_payload
 
         response = self.client.patch(url, data=payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)

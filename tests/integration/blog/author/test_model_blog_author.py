@@ -65,4 +65,4 @@ class BlogAuthorModelTestCase(TestCase):
 
     def test_str_representation(self):
         # Test the __str__ method returns the user's email
-        self.assertEqual(str(self.author), "testuser@example.com")
+        self.assertEqual(str(self.author), self.user.email)

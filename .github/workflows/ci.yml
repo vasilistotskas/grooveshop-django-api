@@ -137,7 +137,7 @@ jobs:
         run: python3 -m pip install build --user
 
       - name: Build a binary wheel and a source tarball
-        run: python3 -m build --sdist --wheel --outdir dist_build/
+        run: python setup.py sdist bdist_wheel
 
       - uses: actions/upload-artifact@v3
         with:

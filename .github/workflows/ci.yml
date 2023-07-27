@@ -137,7 +137,7 @@ jobs:
         run: python3 -m pip install build --user
 
       - name: Build a binary wheel and a source tarball
-        run: python setup.py sdist bdist_wheel
+        run: python3 -m build --sdist --wheel --outdir dist_build/
 
       - uses: actions/upload-artifact@v3
         with:
@@ -153,6 +153,7 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist_build/
 
       - name: Publish distribution 📦 to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

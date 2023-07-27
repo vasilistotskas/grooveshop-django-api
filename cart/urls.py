@@ -15,10 +15,12 @@ urlpatterns = [
                 "delete": "destroy",
             }
         ),
+        name="cart-detail",
     ),
     path(
         "cart/item/",
         CartItemViewSet.as_view({"get": "list", "post": "create"}),
+        name="cart-item-list",
     ),
     path(
         "cart/item/<int:pk>",
@@ -30,6 +32,7 @@ urlpatterns = [
                 "delete": "destroy",
             }
         ),
+        name="cart-item-detail",
     ),
 ]
 

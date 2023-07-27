@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from rest_framework import status
-from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
@@ -21,7 +20,8 @@ class CartViewSet(ModelViewSet):
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        context["cart"] = self.get_queryset()
+        cart_service = CartService(self.request)
+        context["cart"] = cart_service.cart
         return context
 
     def retrieve(self, request, *args, **kwargs) -> Response:
@@ -57,43 +57,33 @@ class CartItemViewSet(ModelViewSet):
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):
             return CartItem.objects.none()
-        service = CartService(self.request)
-        return service.cart_items
+        return CartItem.objects.filter(cart__user=self.request.user)
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        context["cart"] = self.get_cart()
+        context["cart"] = CartService(self.request).cart
         return context
 
-    def get_cart(self):
-        service = CartService(self.request)
-        return service.cart
-
     def list(self, request, *args, **kwargs):
-        service = CartService(self.request)
-        queryset = service.cart_items
+        queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs):
         serializer = CartItemCreateSerializer(data=request.data)
-        serializer.context["cart"] = self.get_cart()
+        serializer.context["cart"] = CartService(self.request).cart
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def retrieve(self, request, pk=None, *args, **kwargs) -> Response:
-        service = CartService(self.request)
-        queryset = service.cart_items
-        cart_item = get_object_or_404(queryset, pk=pk)
+        cart_item = self.get_object()
         serializer = self.get_serializer(cart_item)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def update(self, request, pk=None, *args, **kwargs) -> Response:
-        service = CartService(self.request)
-        queryset = service.cart_items
-        cart_item = get_object_or_404(queryset, pk=pk)
+        cart_item = self.get_object()
         serializer = self.get_serializer(cart_item, data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -101,9 +91,7 @@ class CartItemViewSet(ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def partial_update(self, request, pk=None, *args, **kwargs) -> Response:
-        service = CartService(self.request)
-        queryset = service.cart_items
-        cart_item = get_object_or_404(queryset, pk=pk)
+        cart_item = self.get_object()
         serializer = self.get_serializer(cart_item, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
@@ -111,8 +99,6 @@ class CartItemViewSet(ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, pk=None, *args, **kwargs) -> Response:
-        service = CartService(self.request)
-        queryset = service.cart_items
-        cart_item = get_object_or_404(queryset, pk=pk)
+        cart_item = self.get_object()
         cart_item.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

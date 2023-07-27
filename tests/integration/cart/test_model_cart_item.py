@@ -1,0 +1,94 @@
+from decimal import Decimal
+
+from django.test import TestCase
+
+from cart.models import Cart
+from cart.models import CartItem
+from product.models.product import Product
+
+
+class CartItemModelTestCase(TestCase):
+    cart_item = None
+    cart = None
+    product = None
+
+    def setUp(self):
+        self.cart = Cart.objects.create()
+        self.product = Product.objects.create(
+            name="Product 1",
+            slug="product_one",
+            price=10.00,
+            active=True,
+            stock=10,
+            discount_percent=5.00,
+            hits=0,
+            weight=0.00,
+        )
+        self.cart_item = CartItem.objects.create(
+            cart=self.cart, product=self.product, quantity=3
+        )
+
+    def test_fields(self):
+        self.assertEqual(self.cart_item.cart, self.cart)
+        self.assertEqual(self.cart_item.product, self.product)
+        self.assertEqual(self.cart_item.quantity, 3)
+
+    def test_verbose_names(self):
+        self.assertEqual(self.cart_item._meta.get_field("cart").verbose_name, "cart")
+        self.assertEqual(
+            self.cart_item._meta.get_field("product").verbose_name, "product"
+        )
+        self.assertEqual(
+            self.cart_item._meta.get_field("quantity").verbose_name, "Quantity"
+        )
+
+    def test_meta_verbose_names(self):
+        self.assertEqual(self.cart_item._meta.verbose_name, "Cart Item")
+        self.assertEqual(self.cart_item._meta.verbose_name_plural, "Cart Items")
+
+    def test_str_representation(self):
+        expected_str = f"{self.product.safe_translation_getter('name', any_language=True)} - {self.cart_item.quantity}"
+        self.assertEqual(str(self.cart_item), expected_str)
+
+    def test_total_price(self):
+        expected_total_price = self.cart_item.quantity * self.product.final_price
+        self.assertEqual(self.cart_item.total_price, expected_total_price)
+
+    def test_total_discount_value(self):
+        expected_total_discount = self.cart_item.quantity * self.product.discount_value
+        self.assertEqual(self.cart_item.total_discount_value, expected_total_discount)
+
+    def test_product_discount_percent(self):
+        self.assertEqual(self.cart_item.product_discount_percent, Decimal("5.00"))
+
+    def test_update_quantity(self):
+        new_quantity = 5
+        self.cart_item.update_quantity(new_quantity)
+        self.assertEqual(self.cart_item.quantity, new_quantity)
+
+    def test_cart_item_unique_together_constraint(self):
+        # Test if the unique_together constraint for 'cart' and 'product' fields works correctly
+        # Attempt to create another cart item with the same cart and product and verify it raises the appropriate error
+        with self.assertRaises(Exception) as raised:
+            CartItem.objects.create(cart=self.cart, product=self.product, quantity=3)
+        self.assertEqual(
+            raised.exception.args[0],
+            "UNIQUE constraint failed: cart_cartitem.cart_id, cart_cartitem.product_id",
+        )
+
+    def test_cart_item_ordering(self):
+        # Test if the ordering works correctly based on the 'id' field
+        product_2 = Product.objects.create(
+            name="Product 2",
+            slug="product_two",
+            price=10.00,
+            active=True,
+            stock=10,
+            discount_percent=5.00,
+            hits=0,
+            weight=0.00,
+        )
+        cart_item_2 = CartItem.objects.create(
+            cart=self.cart, product=product_2, quantity=3
+        )
+        self.assertLess(self.cart_item.id, cart_item_2.id)

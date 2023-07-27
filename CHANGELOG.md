@@ -3,7 +3,27 @@
 
 
 
+## v0.10.1 (2023-07-27)
+
+### Chore
+
+* chore(requirements.txt): update requirements
+
+python-semantic-release==8.0.4
+drf-spectacular==0.26.4
+pylint==2.17.5 ([`ac04533`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ac0453383e49a8448d5f4e33408eae3e8ac374ad))
+
+* chore(tests): Blog test minor update ([`d0728e3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d0728e38bc9c4b3d03c17c0c7fc05d9fc549b9c9))
+
+### Fix
+
+* fix(ci.yml): Build the dist_build dir correctly ([`5977d77`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5977d779e5dcf841994dc3d877e91b711de9b597))
+
 ## v0.10.0 (2023-07-26)
+
+### Chore
+
+* chore(release): release version 0.10.0 [skip ci] ([`e5de424`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e5de42497b69e2552fdcf5d945fb7a5504b93763))
 
 ### Feature
 

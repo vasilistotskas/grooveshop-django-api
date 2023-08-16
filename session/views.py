@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import json
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
-from django.core.cache import cache
 from django.http import JsonResponse
+from django.utils import timezone
 from django.utils.timezone import now
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status
@@ -17,6 +16,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
 from core import caches
+from core.caches import cache_instance
 from user.models import UserAccount
 from user.serializers.account import UserAccountSerializer
 
@@ -61,16 +61,15 @@ class ActiveUserViewSet(ViewSet):
     @action(detail=False, methods=["get"])
     def active_users_count(self, request):
         active_users = 0
-        for key in cache.keys(caches.USER + "_*"):
-            if key.split("_")[1] != "NONE":
-                cache_session = caches.get(key)
-                if cache_session.get("last_activity") and cache_session.get("user"):
-                    user_serialized = json.loads(cache_session.get("user"))
-                    user_pk = user_serialized[0]["pk"]
-                    user = get_object_or_404(User, pk=user_pk)
-                    last_activity = cache_session.get("last_activity")
-                    if (
-                        now() - last_activity < timedelta(minutes=5)
-                    ) and user.is_authenticated:
-                        active_users += 1
+        last_activity_threshold = timezone.now() - timedelta(minutes=15)
+
+        # Iterate through the cached user data and count active users
+        for key in cache_instance.keys(caches.USER_AUTHENTICATED + "_*"):
+            user_data = cache_instance.get(key)
+            if not user_data:
+                continue
+            last_activity = user_data.get("last_activity")
+            if last_activity and last_activity > last_activity_threshold:
+                active_users += 1
+
         return Response({"active_users": active_users})

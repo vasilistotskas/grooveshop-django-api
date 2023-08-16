@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel
 from parler.models import TranslatedFields
 
@@ -30,7 +31,7 @@ class ProductReview(
         comment=models.CharField(_("Comment"), max_length=250, blank=True, null=True)
     )
 
-    class Meta:
+    class Meta(TypedModelMeta):
         verbose_name = _("Product Review")
         verbose_name_plural = _("Product Reviews")
         ordering = ["-created_at"]

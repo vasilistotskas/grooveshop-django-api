@@ -1,4 +1,8 @@
+import os
+
 from django.conf import settings
+from django.core.files.storage import default_storage
+from django.test import override_settings
 from django.test import TestCase
 
 from blog.models.category import BlogCategory
@@ -8,6 +12,13 @@ languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
+@override_settings(
+    STORAGES={
+        "default": {
+            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
+        },
+    }
+)
 class BlogCategoryModelTestCase(TestCase):
     category = None
 
@@ -27,7 +38,7 @@ class BlogCategoryModelTestCase(TestCase):
     def test_fields(self):
         # Test if the fields are saved correctly
         self.assertEqual(self.category.slug, "sample-category")
-        self.assertIsNotNone(self.category.image)
+        self.assertTrue(default_storage.exists(self.category.image.path))
 
     def test_verbose_names(self):
         # Test verbose names for fields
@@ -51,6 +62,13 @@ class BlogCategoryModelTestCase(TestCase):
             "Blog Categories",
         )
 
+    def test_unicode_representation(self):
+        # Test the __unicode__ method returns the translated name
+        self.assertEqual(
+            self.category.__unicode__(),
+            self.category.safe_translation_getter("name"),
+        )
+
     def test_translations(self):
         # Test if translations are saved correctly
         for language in languages:
@@ -68,7 +86,7 @@ class BlogCategoryModelTestCase(TestCase):
         # Test the __str__ method returns the translated name
         self.assertEqual(
             str(self.category),
-            self.category.safe_translation_getter("name", any_language=True),
+            self.category.safe_translation_getter("name"),
         )
 
     def test_get_category_posts_count(self):
@@ -84,7 +102,5 @@ class BlogCategoryModelTestCase(TestCase):
 
     def test_main_image_filename(self):
         # Test if main_image_filename returns the correct filename
-        expected_filename = (
-            "no_photo.jpg"  # Assuming the default image filename is "no_photo.jpg"
-        )
+        expected_filename = os.path.basename(self.category.image.name)
         self.assertEqual(self.category.main_image_filename, expected_filename)

@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -15,6 +16,13 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
 
 
+@override_settings(
+    STORAGES={
+        "default": {
+            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
+        },
+    }
+)
 class BlogPostViewSetTestCase(APITestCase):
     post = None
     user = None
@@ -66,15 +74,15 @@ class BlogPostViewSetTestCase(APITestCase):
     def get_post_list_url():
         return reverse("blog-post-list")
 
-    def test_list_blog_posts(self):
+    def test_list(self):
         url = self.get_post_list_url()
         response = self.client.get(url)
         serializer = BlogPostSerializer(BlogPost.objects.all(), many=True)
+
         self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_valid(self):
-        url = self.get_post_list_url()
         payload = {
             "slug": "new-test-post",
             "category": self.category.id,
@@ -97,7 +105,9 @@ class BlogPostViewSetTestCase(APITestCase):
 
             payload["translations"][language_code] = translation_payload
 
+        url = self.get_post_list_url()
         response = self.client.post(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_create_invalid(self):
@@ -105,31 +115,35 @@ class BlogPostViewSetTestCase(APITestCase):
             "author": "invalid_author_id",
             "translations": {
                 "invalid_lang_code": {
-                    "title": "Post Title in invalid language code",
-                    "subtitle": "Post Subtitle in invalid language code",
-                    "body": "This is a post body in invalid language code",
+                    "title": "Translation for invalid language code",
+                    "subtitle": "Translation for invalid language code",
+                    "body": "Translation for invalid language code",
                 }
             },
         }
+
         url = self.get_post_list_url()
         response = self.client.post(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_retrieve_valid(self):
         url = self.get_post_detail_url(self.post.id)
         response = self.client.get(url)
-        serializer = BlogPostSerializer(self.post)
+        post = BlogPost.objects.get(id=self.post.id)
+        serializer = BlogPostSerializer(post)
+
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_retrieve_invalid(self):
-        invalid_post_id = 999999
+        invalid_post_id = 9999
         url = self.get_post_detail_url(invalid_post_id)
         response = self.client.get(url)
+
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_update_valid(self):
-        url = self.get_post_detail_url(self.post.id)
         payload = {
             "slug": "updated-test-post",
             "category": self.category.id,
@@ -151,7 +165,9 @@ class BlogPostViewSetTestCase(APITestCase):
 
             payload["translations"][language_code] = translation_payload
 
+        url = self.get_post_detail_url(self.post.id)
         response = self.client.patch(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_update_invalid(self):
@@ -160,12 +176,14 @@ class BlogPostViewSetTestCase(APITestCase):
             "status": "invalid_status",  # Set an invalid status for the test
             "translations": {
                 "invalid_lang_code": {
-                    "content": "Partial update with invalid language code",
+                    "content": "Translation for invalid language code",
                 },
             },
         }
+
         url = self.get_post_detail_url(self.post.id)
         response = self.client.patch(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_partial_update_valid(self):
@@ -176,8 +194,10 @@ class BlogPostViewSetTestCase(APITestCase):
                 },
             },
         }
+
         url = self.get_post_detail_url(self.post.id)
         response = self.client.patch(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_partial_update_invalid(self):
@@ -185,22 +205,26 @@ class BlogPostViewSetTestCase(APITestCase):
             "author": "invalid_author_id",  # Set an invalid author ID for the test
             "translations": {
                 "invalid_lang_code": {
-                    "title": "Partial Update Test Post Title",
+                    "title": "Translation for invalid language code",
                 },
             },
         }
+
         url = self.get_post_detail_url(self.post.id)
         response = self.client.patch(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_destroy_valid(self):
         url = self.get_post_detail_url(self.post.id)
         response = self.client.delete(url)
+
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(BlogPost.objects.filter(id=self.post.id).exists())
 
     def test_destroy_invalid(self):
-        invalid_post_id = 999999
+        invalid_post_id = 9999
         url = self.get_post_detail_url(invalid_post_id)
         response = self.client.delete(url)
+
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

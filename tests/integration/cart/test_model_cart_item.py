@@ -29,11 +29,13 @@ class CartItemModelTestCase(TestCase):
         )
 
     def test_fields(self):
+        # Test if the fields are saved correctly
         self.assertEqual(self.cart_item.cart, self.cart)
         self.assertEqual(self.cart_item.product, self.product)
         self.assertEqual(self.cart_item.quantity, 3)
 
     def test_verbose_names(self):
+        # Test verbose names for fields
         self.assertEqual(self.cart_item._meta.get_field("cart").verbose_name, "cart")
         self.assertEqual(
             self.cart_item._meta.get_field("product").verbose_name, "product"
@@ -43,11 +45,13 @@ class CartItemModelTestCase(TestCase):
         )
 
     def test_meta_verbose_names(self):
-        self.assertEqual(self.cart_item._meta.verbose_name, "Cart Item")
-        self.assertEqual(self.cart_item._meta.verbose_name_plural, "Cart Items")
+        # Test verbose names from the Meta class
+        self.assertEqual(CartItem._meta.verbose_name, "Cart Item")
+        self.assertEqual(CartItem._meta.verbose_name_plural, "Cart Items")
 
     def test_str_representation(self):
-        expected_str = f"{self.product.safe_translation_getter('name', any_language=True)} - {self.cart_item.quantity}"
+        # Test the __str__ method returns the translated name - cart item quantity
+        expected_str = f"{self.product.safe_translation_getter('name')} - {self.cart_item.quantity}"
         self.assertEqual(str(self.cart_item), expected_str)
 
     def test_total_price(self):

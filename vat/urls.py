@@ -7,6 +7,7 @@ urlpatterns = [
     path(
         "vat/",
         VatViewSet.as_view({"get": "list", "post": "create"}),
+        name="vat-list",
     ),
     path(
         "vat/<int:pk>/",
@@ -18,6 +19,7 @@ urlpatterns = [
                 "delete": "destroy",
             }
         ),
+        name="vat-detail",
     ),
 ]
 

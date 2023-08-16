@@ -46,6 +46,13 @@
    -     docker exec -it <container_id> sh -c "django-admin compilemessages --ignore=env"
 
 
+## CELERY:
+  ### Run local celery worker :
+  -     celery -A app beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+  -     celery -A app --broker=redis://localhost:6379/0 flower --port=5555
+  -     celery -A app worker -l info --logfile=./logs/celery.log
+  -     celery -A app worker -l info -P solo --logfile=./logs/celery.log
+
 ## PYTHON
   ### --- VERSION 3.11.0 ---
   ### Virtual Environment :
@@ -81,6 +88,7 @@
   -     Install poetry : curl -sSL https://install.python-poetry.org | python3 - OR (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
         Create poetry project : poetry new <project_name>
         Install dependencies : poetry install
+        Upgrade poetry : pip install --upgrade poetry
         Update poetry lock file : poetry lock
         Add dependency : poetry add <dependency_name>
         Remove dependency : poetry remove <dependency_name>

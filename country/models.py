@@ -1,5 +1,9 @@
+import os
+
+from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel
 from parler.models import TranslatedFields
 
@@ -32,7 +36,8 @@ class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         name=models.CharField(_("Name"), max_length=50, blank=True, null=True)
     )
 
-    class Meta:
+    class Meta(TypedModelMeta):
+        ordering = ["sort_order"]
         verbose_name = _("Country")
         verbose_name_plural = _("Countries")
 
@@ -44,3 +49,17 @@ class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
 
     def get_ordering_queryset(self):
         return Country.objects.all()
+
+    @property
+    def main_image_absolute_url(self) -> str:
+        image_flag: str = ""
+        if self.image_flag and hasattr(self.image_flag, "url"):
+            return settings.APP_BASE_URL + self.image_flag.url
+        return image_flag
+
+    @property
+    def main_image_filename(self) -> str:
+        if self.image_flag and hasattr(self.image_flag, "name"):
+            return os.path.basename(self.image_flag.name)
+        else:
+            return ""

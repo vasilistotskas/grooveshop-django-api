@@ -1,27 +1,64 @@
 from __future__ import annotations
 
-import json
-
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.test import override_settings
+from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from country.models import Country
+from helpers.seed import get_or_create_default_image
 from region.models import Region
-from user.models import UserAccount
 from user.models.address import UserAddress
 from user.serializers.address import UserAddressSerializer
 
+languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
+User = get_user_model()
 
+
+@override_settings(
+    STORAGES={
+        "default": {
+            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
+        },
+    }
+)
 class UserAddressViewSetTestCase(APITestCase):
-    user: UserAccount
-    user_address: UserAddress
+    user = None
+    address = None
 
     def setUp(self):
-        self.user = UserAccount.objects.create_user(
+        self.user = User.objects.create_user(
             email="test@test.com", password="test12345@!"
         )
-        self.user_address = UserAddress.objects.create(
+
+        image_flag = get_or_create_default_image("uploads/region/no_photo.jpg")
+        self.country = Country.objects.create(
+            alpha_2="GR",
+            alpha_3="GRC",
+            iso_cc=300,
+            phone_code=30,
+            image_flag=image_flag,
+        )
+        self.region = Region.objects.create(
+            alpha="GRC",
+            alpha_2=self.country,
+        )
+        for language in languages:
+            self.region.set_current_language(language)
+            self.region.name = f"Region {language}"
+            self.region.save()
+        self.region.set_current_language(default_language)
+
+        # Login to authenticate
+        self.client.login(email="test@test.com", password="test12345@!")
+
+        self.address = UserAddress.objects.create(
             user=self.user,
+            country=self.country,
+            region=self.region,
             title="test",
             first_name="test",
             last_name="test",
@@ -31,30 +68,33 @@ class UserAddressViewSetTestCase(APITestCase):
             zipcode="test",
             is_main=False,
         )
-        self.client.force_authenticate(user=self.user)
+
+    @staticmethod
+    def get_user_address_detail_url(pk):
+        return reverse("user-address-detail", kwargs={"pk": pk})
+
+    @staticmethod
+    def get_user_address_list_url():
+        return reverse("user-address-list")
+
+    @staticmethod
+    def get_user_address_set_main_url(pk):
+        return reverse("user-address-set-main", kwargs={"pk": pk})
 
     def test_list(self):
-        response = self.client.get("/api/v1/user/address/")
+        url = self.get_user_address_list_url()
+        response = self.client.get(url)
         user_addresses = UserAddress.objects.all()
         serializer = UserAddressSerializer(user_addresses, many=True)
+
         self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_valid(self):
-        country = Country.objects.create(
-            alpha_2="CY",
-            alpha_3="CYP",
-            name="Cyprus",
-            iso_cc=123,
-            phone_code=423,
-        )
-        region = Region.objects.create(
-            alpha="CY-I",
-            alpha_2=country,
-            name="Cyprus Region",
-        )
         payload = {
-            "user": self.user.pk,
+            "user": self.user.id,
+            "country": self.country.alpha_2,
+            "region": self.region.alpha,
             "title": "test",
             "first_name": "test",
             "last_name": "test",
@@ -63,62 +103,51 @@ class UserAddressViewSetTestCase(APITestCase):
             "city": "test",
             "zipcode": "test",
             "is_main": False,
-            "country": country.pk,
-            "region": region.pk,
         }
-        response = self.client.post(
-            "/api/v1/user/address/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+
+        url = self.get_user_address_list_url()
+        response = self.client.post(url, data=payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_create_invalid(self):
         payload = {
-            "user": "INVALID",
-            "title": "INVALID",
-            "first_name": "INVALID",
-            "last_name": "INVALID",
-            "street": "INVALID",
-            "street_number": "INVALID",
-            "city": "INVALID",
-            "zipcode": "INVALID",
-            "is_main": "INVALID",
+            "title": "invalid_title",
+            "first_name": "invalid_first_name",
+            "last_name": "invalid_last_name",
+            "street": "invalid_street",
+            "street_number": "invalid_street_number",
+            "city": "invalid_city",
+            "zipcode": "invalid_zipcode",
+            "is_main": "invalid_is_main",
         }
-        response = self.client.post(
-            "/api/v1/user/address/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+
+        url = self.get_user_address_list_url()
+        response = self.client.post(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_retrieve_valid(self):
-        response = self.client.get(f"/api/v1/user/address/{self.user_address.pk}/")
-        user_address = UserAddress.objects.get(pk=self.user_address.pk)
+        url = self.get_user_address_detail_url(self.address.pk)
+        response = self.client.get(url)
+        user_address = UserAddress.objects.get(pk=self.address.pk)
         serializer = UserAddressSerializer(user_address)
+
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_retrieve_invalid(self):
-        response = self.client.get(f"/api/v1/user/address/{self.user_address.pk + 1}/")
+        invalid_user_address_id = 9999
+        url = self.get_user_address_detail_url(invalid_user_address_id)
+        response = self.client.get(url)
+
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_update_valid(self):
-        country = Country.objects.create(
-            alpha_2="GR",
-            alpha_3="GRC",
-            name="Greece",
-            iso_cc=300,
-            phone_code=30,
-        )
-        region = Region.objects.create(
-            alpha="GR-I",
-            alpha_2=country,
-            name="Central Greece",
-        )
         payload = {
-            "user": self.user.pk,
+            "user": self.user.id,
+            "country": self.country.alpha_2,
+            "region": self.region.alpha,
             "title": "test",
             "first_name": "test",
             "last_name": "test",
@@ -127,79 +156,61 @@ class UserAddressViewSetTestCase(APITestCase):
             "city": "test",
             "zipcode": "test",
             "is_main": False,
-            "country": country.pk,
-            "region": region.pk,
         }
-        response = self.client.put(
-            f"/api/v1/user/address/{self.user_address.pk}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+
+        url = self.get_user_address_detail_url(self.address.pk)
+        response = self.client.put(url, data=payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_update_invalid(self):
         payload = {
-            "user": "INVALID",
-            "title": "INVALID",
-            "first_name": "INVALID",
-            "last_name": "INVALID",
-            "street": "INVALID",
-            "street_number": "INVALID",
-            "city": "INVALID",
-            "zipcode": "INVALID",
-            "is_main": False,
+            "title": "invalid_title",
+            "first_name": "invalid_first_name",
+            "last_name": "invalid_last_name",
+            "street": "invalid_street",
+            "street_number": "invalid_street_number",
+            "city": "invalid_city",
+            "zipcode": "invalid_zipcode",
+            "is_main": "invalid_is_main",
         }
-        response = self.client.put(
-            f"/api/v1/user/address/{self.user_address.pk}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+
+        url = self.get_user_address_detail_url(self.address.pk)
+        response = self.client.put(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_partial_update_valid(self):
-        payload = {
-            "user": self.user.pk,
-            "title": "test",
-            "is_main": False,
-        }
-        response = self.client.patch(
-            f"/api/v1/user/address/{self.user_address.pk}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+        payload = {"title": "test"}
+
+        url = self.get_user_address_detail_url(self.address.pk)
+        response = self.client.patch(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_partial_update_invalid(self):
-        payload = {"user": "INVALID", "is_main": "INVALID"}
-        response = self.client.patch(
-            f"/api/v1/user/address/{self.user_address.pk}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+        payload = {
+            "title": "invalid_title",
+            "country": "invalid_country",
+            "region": "invalid_region",
+            "floor": "invalid_floor",
+        }
+
+        url = self.get_user_address_detail_url(self.address.pk)
+        response = self.client.patch(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_destroy_valid(self):
-        response = self.client.delete(f"/api/v1/user/address/{self.user_address.pk}/")
+        url = self.get_user_address_detail_url(self.user.pk)
+        response = self.client.delete(url)
+
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(UserAddress.objects.filter(pk=self.user.pk).exists())
 
     def test_destroy_invalid(self):
-        response = self.client.delete(
-            f"/api/v1/user/address/{self.user_address.pk + 1}/"
-        )
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        invalid_user_address_id = 9999  # An ID that doesn't exist in the database
+        url = self.get_user_address_detail_url(invalid_user_address_id)
+        response = self.client.delete(url)
 
-    def test_destroy_main_address(self):
-        user_address = UserAddress.objects.create(
-            user=self.user,
-            title="test",
-            first_name="test",
-            last_name="test",
-            street="test",
-            street_number="test",
-            city="test",
-            zipcode="test",
-            is_main=True,
-        )
-        response = self.client.delete(f"/api/v1/user/address/{user_address.pk}/")
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

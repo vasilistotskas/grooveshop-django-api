@@ -47,11 +47,12 @@ class BlogCommentViewSetTestCase(APITestCase):
     def get_comment_list_url():
         return reverse("blog-comment-list")
 
-    def test_list_comments(self):
+    def test_list(self):
         url = self.get_comment_list_url()
         response = self.client.get(url)
         comments = BlogComment.objects.all()
         serializer = BlogCommentSerializer(comments, many=True)
+
         self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -80,13 +81,14 @@ class BlogCommentViewSetTestCase(APITestCase):
             language_name = language[1]
 
             translation_payload = {
-                "content": f"Comment Content in {language_name}",
+                "content": f"New Comment Content in {language_name}",
             }
 
             payload["translations"][language_code] = translation_payload
 
         url = self.get_comment_list_url()
         response = self.client.post(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_create_invalid(self):
@@ -95,18 +97,22 @@ class BlogCommentViewSetTestCase(APITestCase):
             "post": "invalid_post_id",
             "translations": {
                 "invalid_lang_code": {
-                    "content": "Comment Content in invalid language code",
+                    "content": "Translation for invalid language code",
                 }
             },
         }
+
         url = self.get_comment_list_url()
         response = self.client.post(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_retrieve_valid(self):
         url = self.get_comment_detail_url(self.comment.pk)
         response = self.client.get(url)
-        serializer = BlogCommentSerializer(self.comment)
+        comment = BlogComment.objects.get(pk=self.comment.pk)
+        serializer = BlogCommentSerializer(comment)
+
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -114,6 +120,7 @@ class BlogCommentViewSetTestCase(APITestCase):
         invalid_comment_id = 9999  # An ID that doesn't exist in the database
         url = self.get_comment_detail_url(invalid_comment_id)
         response = self.client.get(url)
+
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_update_valid(self):
@@ -130,13 +137,14 @@ class BlogCommentViewSetTestCase(APITestCase):
             language_name = language[1]
 
             translation_payload = {
-                "content": f"Comment Content in {language_name}",
+                "content": f"Updated Comment Content in {language_name}",
             }
 
             payload["translations"][language_code] = translation_payload
 
         url = self.get_comment_detail_url(self.comment.pk)
         response = self.client.put(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_update_invalid(self):
@@ -145,12 +153,14 @@ class BlogCommentViewSetTestCase(APITestCase):
             "post": "invalid_post_id",
             "translations": {
                 "invalid_lang_code": {
-                    "content": "Partial update with invalid language code",
+                    "content": "Translation for invalid language code",
                 },
             },
         }
+
         url = self.get_comment_detail_url(self.comment.pk)
         response = self.client.put(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_partial_update_valid(self):
@@ -161,8 +171,10 @@ class BlogCommentViewSetTestCase(APITestCase):
                 },
             },
         }
+
         url = self.get_comment_detail_url(self.comment.pk)
         response = self.client.patch(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_partial_update_invalid(self):
@@ -171,17 +183,20 @@ class BlogCommentViewSetTestCase(APITestCase):
             "post": "invalid_post_id",
             "translations": {
                 "invalid_lang_code": {
-                    "content": "Partial update with invalid language code",
+                    "content": "Translation for invalid language code",
                 },
             },
         }
+
         url = self.get_comment_detail_url(self.comment.pk)
         response = self.client.patch(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_destroy_valid(self):
         url = self.get_comment_detail_url(self.comment.pk)
         response = self.client.delete(url)
+
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(BlogComment.objects.filter(pk=self.comment.pk).exists())
 
@@ -189,4 +204,5 @@ class BlogCommentViewSetTestCase(APITestCase):
         invalid_comment_id = 9999
         url = self.get_comment_detail_url(invalid_comment_id)
         response = self.client.delete(url)
+
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

@@ -1,5 +1,9 @@
+import os
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.files.storage import default_storage
+from django.test import override_settings
 from django.test import TestCase
 
 from blog.models.author import BlogAuthor
@@ -12,6 +16,13 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
 
 
+@override_settings(
+    STORAGES={
+        "default": {
+            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
+        },
+    }
+)
 class BlogPostModelTestCase(TestCase):
     user = None
     author = None
@@ -58,10 +69,10 @@ class BlogPostModelTestCase(TestCase):
     def test_fields(self):
         # Test if the fields are saved correctly
         self.assertEqual(self.post.slug, "test-post")
-        self.assertIsNotNone(self.post.image)
         self.assertEqual(self.post.status, "draft")
         self.assertEqual(self.post.featured, True)
         self.assertEqual(self.post.view_count, 0)
+        self.assertTrue(default_storage.exists(self.post.image.path))
 
     def test_verbose_names(self):
         # Test verbose names for fields
@@ -97,6 +108,13 @@ class BlogPostModelTestCase(TestCase):
             "Blog Posts",
         )
 
+    def test_unicode_representation(self):
+        # Test the __unicode__ method returns the translated name
+        self.assertEqual(
+            self.post.__unicode__(),
+            self.post.safe_translation_getter("title"),
+        )
+
     def test_translations(self):
         # Test if translations are saved correctly
         for language in languages:
@@ -115,17 +133,20 @@ class BlogPostModelTestCase(TestCase):
             )
 
     def test_str_representation(self):
+        # Test the __str__ method returns the translated title
         self.assertEqual(
             str(self.post),
-            self.post.safe_translation_getter("title", any_language=True),
+            self.post.safe_translation_getter("title"),
         )
 
     def test_main_image_absolute_url(self):
+        # Test if main_image_absolute_url returns the correct URL
         expected_url = settings.APP_BASE_URL + self.post.image.url
         self.assertEqual(self.post.main_image_absolute_url, expected_url)
 
     def test_main_image_filename(self):
-        expected_filename = "no_photo.jpg"
+        # Test if main_image_filename returns the correct filename
+        expected_filename = os.path.basename(self.post.image.name)
         self.assertEqual(self.post.main_image_filename, expected_filename)
 
     def test_number_of_likes(self):

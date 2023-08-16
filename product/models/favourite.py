@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from django_stubs_ext.db.models import TypedModelMeta
 
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
@@ -14,7 +15,7 @@ class ProductFavourite(TimeStampMixinModel, UUIDModel):
         "product.Product", related_name="product_favourite", on_delete=models.CASCADE
     )
 
-    class Meta:
+    class Meta(TypedModelMeta):
         verbose_name = _("Product Favourite")
         verbose_name_plural = _("Product Favourites")
         unique_together = (("user", "product"),)

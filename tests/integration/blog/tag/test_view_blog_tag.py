@@ -30,11 +30,12 @@ class BlogTagViewSetTestCase(APITestCase):
     def get_tag_list_url():
         return reverse("blog-tag-list")
 
-    def test_list_tags(self):
+    def test_list(self):
         url = self.get_tag_list_url()
         response = self.client.get(url)
         tags = BlogTag.objects.all()
         serializer = BlogTagSerializer(tags, many=True)
+
         self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -49,26 +50,29 @@ class BlogTagViewSetTestCase(APITestCase):
             language_name = language[1]
 
             translation_payload = {
-                "name": f"Tag name in {language_name}",
+                "name": f"New Tag name in {language_name}",
             }
 
             payload["translations"][language_code] = translation_payload
 
         url = self.get_tag_list_url()
         response = self.client.post(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_create_invalid(self):
         payload = {
-            "active": "invalid",
+            "active": "invalid_active",
             "translations": {
                 "invalid_lang_code": {
-                    "name": "Tag name with invalid language code",
+                    "name": "Translation for invalid language code",
                 },
             },
         }
+
         url = self.get_tag_list_url()
         response = self.client.post(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_retrieve_valid(self):
@@ -76,6 +80,7 @@ class BlogTagViewSetTestCase(APITestCase):
         response = self.client.get(url)
         tag = BlogTag.objects.get(pk=self.tag.pk)
         serializer = BlogTagSerializer(tag)
+
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -83,6 +88,7 @@ class BlogTagViewSetTestCase(APITestCase):
         invalid_tag_id = 9999  # An ID that doesn't exist in the database
         url = self.get_tag_detail_url(invalid_tag_id)
         response = self.client.get(url)
+
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_update_valid(self):
@@ -103,19 +109,22 @@ class BlogTagViewSetTestCase(APITestCase):
 
         url = self.get_tag_detail_url(self.tag.pk)
         response = self.client.put(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_update_invalid(self):
         payload = {
-            "active": "invalid",
+            "active": "invalid_active",
             "translations": {
                 "invalid_lang_code": {
-                    "name": "Updated Tag name with invalid language code",
+                    "name": "Translation for invalid language code",
                 },
             },
         }
+
         url = self.get_tag_detail_url(self.tag.pk)
         response = self.client.put(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_partial_update_valid(self):
@@ -126,8 +135,10 @@ class BlogTagViewSetTestCase(APITestCase):
                 }
             },
         }
+
         url = self.get_tag_detail_url(self.tag.pk)
         response = self.client.patch(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_partial_update_invalid(self):
@@ -135,17 +146,20 @@ class BlogTagViewSetTestCase(APITestCase):
             "active": "invalid",
             "translations": {
                 "invalid_lang_code": {
-                    "name": "Partial update with invalid language code",
+                    "name": "Translation for invalid language code",
                 },
             },
         }
+
         url = self.get_tag_detail_url(self.tag.pk)
         response = self.client.patch(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_destroy_valid(self):
         url = self.get_tag_detail_url(self.tag.pk)
         response = self.client.delete(url)
+
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(BlogTag.objects.filter(pk=self.tag.pk).exists())
 
@@ -153,4 +167,5 @@ class BlogTagViewSetTestCase(APITestCase):
         invalid_tag_id = 9999  # An ID that doesn't exist in the database
         url = self.get_tag_detail_url(invalid_tag_id)
         response = self.client.delete(url)
+
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

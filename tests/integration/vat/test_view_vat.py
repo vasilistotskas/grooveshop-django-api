@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import json
-
+from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -10,98 +9,115 @@ from vat.serializers import VatSerializer
 
 
 class VatViewSetTestCase(APITestCase):
-    vat: Vat
+    vat = None
 
     def setUp(self):
-        self.vat = Vat.objects.create(value=20)
+        self.vat = Vat.objects.create(
+            value=21.0,
+        )
+
+    @staticmethod
+    def get_vat_detail_url(pk):
+        return reverse("vat-detail", kwargs={"pk": pk})
+
+    @staticmethod
+    def get_vat_list_url():
+        return reverse("vat-list")
 
     def test_list(self):
-        response = self.client.get("/api/v1/vat/")
+        url = self.get_vat_list_url()
+        response = self.client.get(url)
         vats = Vat.objects.all()
         serializer = VatSerializer(vats, many=True)
+
         self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_valid(self):
         payload = {
-            "value": 23,
+            "value": 25.0,
         }
-        response = self.client.post(
-            "/api/v1/vat/", json.dumps(payload), content_type="application/json"
-        )
+        url = self.get_vat_list_url()
+        response = self.client.post(url, data=payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_create_invalid(self):
         payload = {
-            "value": 0.12345678910,
+            "value": "invalid_value",
         }
-        response = self.client.post(
-            "/api/v1/vat/", json.dumps(payload), content_type="application/json"
-        )
+
+        url = self.get_vat_list_url()
+        response = self.client.post(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_retrieve_valid(self):
-        response = self.client.get(f"/api/v1/vat/{self.vat.id}/")
+        url = self.get_vat_detail_url(self.vat.id)
+        response = self.client.get(url)
         vat = Vat.objects.get(id=self.vat.id)
         serializer = VatSerializer(vat)
+
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_retrieve_invalid(self):
-        invalid_id = Vat.objects.latest("id").id + 1
-        response = self.client.get(f"/api/v1/vat/{invalid_id}/")
+        invalid_vat_id = 9999  # An ID that doesn't exist in the database
+        url = self.get_vat_detail_url(invalid_vat_id)
+        response = self.client.get(url)
+
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_update_valid(self):
         payload = {
-            "value": 27,
+            "value": 25.0,
         }
-        response = self.client.put(
-            f"/api/v1/vat/{self.vat.id}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+
+        url = self.get_vat_detail_url(self.vat.pk)
+        response = self.client.put(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_update_invalid(self):
         payload = {
-            "value": 0.12345678910,
+            "value": "invalid_value",
         }
-        response = self.client.put(
-            f"/api/v1/vat/{self.vat.id}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+
+        url = self.get_vat_detail_url(self.vat.pk)
+        response = self.client.put(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_partial_update_valid(self):
         payload = {
-            "value": 30,
+            "value": 25.0,
         }
-        response = self.client.patch(
-            f"/api/v1/vat/{self.vat.id}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+
+        url = self.get_vat_detail_url(self.vat.pk)
+        response = self.client.patch(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_partial_update_invalid(self):
         payload = {
-            "value": 0.12345678910,
+            "value": "invalid_value",
         }
-        response = self.client.patch(
-            f"/api/v1/vat/{self.vat.id}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+
+        url = self.get_vat_detail_url(self.vat.pk)
+        response = self.client.patch(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_destroy_valid(self):
-        response = self.client.delete(f"/api/v1/vat/{self.vat.id}/")
+        url = self.get_vat_detail_url(self.vat.pk)
+        response = self.client.delete(url)
+
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Vat.objects.filter(pk=self.vat.pk).exists())
 
     def test_destroy_invalid(self):
-        invalid_id = Vat.objects.latest("id").id + 1
-        response = self.client.delete(f"/api/v1/vat/{invalid_id}/")
+        invalid_vat_id = 9999  # An ID that doesn't exist in the database
+        url = self.get_vat_detail_url(invalid_vat_id)
+        response = self.client.delete(url)
+
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

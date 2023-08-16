@@ -51,25 +51,28 @@ class Command(BaseCommand):
         created_addresses = []
         with transaction.atomic():
             for user in users:
-                first_name = user.first_name if user.first_name else faker.first_name()
-                last_name = user.last_name if user.last_name else faker.last_name()
-                main_address = UserAddress.objects.create(
-                    user=user,
-                    title="Main Address",
-                    first_name=first_name,
-                    last_name=last_name,
-                    street=faker.street_name(),
-                    street_number=faker.building_number(),
-                    city=faker.city(),
-                    zipcode=faker.zipcode(),
-                    floor=faker.random_element(floor_choices),
-                    location_type=faker.random_element(location_choices),
-                    phone=faker.phone_number(),
-                    mobile_phone=faker.phone_number(),
-                    notes=faker.sentence(),
-                    is_main=True,
-                )
-                created_addresses.append(main_address)
+                if not user.address_user.filter(is_main=True).exists():
+                    first_name = (
+                        user.first_name if user.first_name else faker.first_name()
+                    )
+                    last_name = user.last_name if user.last_name else faker.last_name()
+                    main_address = UserAddress.objects.create(
+                        user=user,
+                        title="Main Address",
+                        first_name=first_name,
+                        last_name=last_name,
+                        street=faker.street_name(),
+                        street_number=faker.building_number(),
+                        city=faker.city(),
+                        zipcode=faker.zipcode(),
+                        floor=faker.random_element(floor_choices),
+                        location_type=faker.random_element(location_choices),
+                        phone=faker.phone_number(),
+                        mobile_phone=faker.phone_number(),
+                        notes=faker.sentence(),
+                        is_main=True,
+                    )
+                    created_addresses.append(main_address)
 
                 # Create additional UserAddress instances for the user
                 for _ in range(total_addresses - 1):

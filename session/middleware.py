@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from cart.service import CartService
 from core import caches
+from core.caches import cache_instance
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ class SessionTraceMiddleware:
 
         self.process_user_data(request)
         self.ensure_cart_id(request)
-        self.save_session(request, response)
+        # self.save_session(request, response)
         self.update_cache(request)
 
         return response
@@ -56,6 +57,7 @@ class SessionTraceMiddleware:
             cart_id = cart_service.cart.id
             request.session["pre_log_in_cart_id"] = pre_log_in_cart_id
             request.session["cart_id"] = cart_id
+            self.save_session(request, None)
 
     def save_session(self, request, response):
         request.session["last_activity"] = timezone.now()
@@ -74,10 +76,11 @@ class SessionTraceMiddleware:
             )
 
     def update_cache(self, request):
+        # Make a cache key for the user, if the there is no user, use the session key
         user_cache_key = (
-            caches.USER + "_" + str(request.user.id)
+            caches.USER_AUTHENTICATED + "_" + str(request.user.id)
             if request.user.is_authenticated
-            else caches.USER + "_" + request.session.session_key
+            else caches.USER_UNAUTHENTICATED + "_" + request.session.session_key
         )
         cache_data = {
             "last_activity": request.session["last_activity"],
@@ -88,7 +91,7 @@ class SessionTraceMiddleware:
             if "cart_id" in request.session
             else None,
         }
-        caches.set(user_cache_key, cache_data, caches.ONE_HOUR)
+        cache_instance.set(user_cache_key, cache_data, caches.ONE_HOUR)
 
     def log_request(self, request, response):
         logger.info(

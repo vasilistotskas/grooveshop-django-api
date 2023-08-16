@@ -7,6 +7,7 @@ urlpatterns = [
     path(
         "region/",
         RegionViewSet.as_view({"get": "list", "post": "create"}),
+        name="region-list",
     ),
     path(
         "region/<str:pk>/",
@@ -18,10 +19,12 @@ urlpatterns = [
                 "delete": "destroy",
             }
         ),
+        name="region-detail",
     ),
     path(
         "region/<str:pk>/get_regions_by_country_alpha_2/",
         RegionViewSet.as_view({"get": "get_regions_by_country_alpha_2"}),
+        name="region-get-regions-by-country-alpha-2",
     ),
 ]
 

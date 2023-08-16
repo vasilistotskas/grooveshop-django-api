@@ -1,149 +1,153 @@
-from __future__ import annotations
-
-import json
-
+from django.contrib.auth import get_user_model
+from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from product.models.favourite import ProductFavourite
 from product.models.product import Product
 from product.serializers.favourite import ProductFavouriteSerializer
-from user.models import UserAccount
+
+User = get_user_model()
 
 
 class ProductFavouriteViewSetTestCase(APITestCase):
-    user_account: UserAccount
-    product: Product
-    product_favourite: ProductFavourite
+    user = None
+    product = None
+    product_favourite = None
 
     def setUp(self):
-        self.user_account = UserAccount.objects.create_user(
+        self.user = User.objects.create_user(
             email="test@test.com", password="test12345@!"
         )
         self.product = Product.objects.create(
-            slug="slug_one",
-            price=10.00,
+            product_code="P123",
+            name="Sample Product",
+            slug="sample-product",
+            price=100.0,
             active=True,
             stock=10,
-            discount_percent=0.00,
-            hits=0,
-            weight=0.00,
         )
         self.product_favourite = ProductFavourite.objects.create(
             product=self.product,
-            user=self.user_account,
+            user=self.user,
         )
 
+    @staticmethod
+    def get_product_favourite_detail_url(pk):
+        return reverse("product-favourite-detail", args=[pk])
+
+    @staticmethod
+    def get_product_favourite_list_url():
+        return reverse("product-favourite-list")
+
     def test_list(self):
-        response = self.client.get("/api/v1/product/favourite/")
-        product_favourites = ProductFavourite.objects.all()
-        serializer = ProductFavouriteSerializer(product_favourites, many=True)
+        url = self.get_product_favourite_list_url()
+        response = self.client.get(url)
+        favourites = ProductFavourite.objects.all()
+        serializer = ProductFavouriteSerializer(favourites, many=True)
+
         self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_valid(self):
-        product = Product.objects.create(
-            slug="slug_two",
-            price=10.00,
+        product_2 = Product.objects.create(
+            product_code="P456",
+            name="Sample Product 2",
+            slug="sample-product-2",
+            price=100.0,
             active=True,
             stock=10,
-            discount_percent=0.00,
-            hits=0,
-            weight=0.00,
         )
+
         payload = {
-            "product": product.id,
-            "user": self.user_account.id,
+            "product": product_2.id,
+            "user": self.user.id,
         }
-        response = self.client.post(
-            "/api/v1/product/favourite/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+
+        url = self.get_product_favourite_list_url()
+        response = self.client.post(url, payload)
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_create_invalid(self):
         payload = {
-            "product": "INVALID",
-            "user": "INVALID",
+            "product": "invalid_product",
+            "user": "invalid_user",
         }
-        response = self.client.post(
-            "/api/v1/product/favourite/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+
+        url = self.get_product_favourite_list_url()
+        response = self.client.post(url, payload)
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_retrieve_valid(self):
-        response = self.client.get(
-            f"/api/v1/product/favourite/{self.product_favourite.pk}/"
-        )
-        product_favourite = ProductFavourite.objects.get(pk=self.product_favourite.pk)
-        serializer = ProductFavouriteSerializer(product_favourite)
+        url = self.get_product_favourite_detail_url(self.product.id)
+        response = self.client.get(url)
+        favourite = ProductFavourite.objects.get(pk=self.product.id)
+        serializer = ProductFavouriteSerializer(favourite)
+
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_retrieve_invalid(self):
-        response = self.client.get(
-            f"/api/v1/product/favourite/{self.product_favourite.pk + 1}/"
-        )
+        invalid_product_favourite_id = 999999
+        url = self.get_product_favourite_detail_url(invalid_product_favourite_id)
+        response = self.client.get(url)
+
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_update_valid(self):
         payload = {
             "product": self.product.id,
-            "user": self.user_account.id,
+            "user": self.user.id,
         }
-        response = self.client.put(
-            f"/api/v1/product/favourite/{self.product_favourite.pk}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+
+        url = self.get_product_favourite_detail_url(self.product.id)
+        response = self.client.put(url, payload)
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_update_invalid(self):
         payload = {
-            "product": True,
-            "user": True,
+            "product": "invalid_product",
+            "user": "invalid_user",
         }
-        response = self.client.put(
-            f"/api/v1/product/favourite/{self.product_favourite.pk}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+
+        url = self.get_product_favourite_detail_url(self.product.id)
+        response = self.client.put(url, payload)
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_partial_update_valid(self):
         payload = {
             "product": self.product.id,
         }
-        response = self.client.patch(
-            f"/api/v1/product/favourite/{self.product_favourite.pk}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+
+        url = self.get_product_favourite_detail_url(self.product.id)
+        response = self.client.patch(url, payload)
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_partial_update_invalid(self):
         payload = {
-            "product": True,
+            "product": "invalid_product",
         }
-        response = self.client.patch(
-            f"/api/v1/product/favourite/{self.product_favourite.pk}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+
+        url = self.get_product_favourite_detail_url(self.product.id)
+        response = self.client.patch(url, payload)
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_destroy_valid(self):
-        response = self.client.delete(
-            f"/api/v1/product/favourite/{self.product_favourite.pk}/"
-        )
+        url = self.get_product_favourite_detail_url(self.product.id)
+        response = self.client.delete(url)
+
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(ProductFavourite.objects.filter(pk=self.product.id).exists())
 
     def test_destroy_invalid(self):
-        response = self.client.get(
-            f"/api/v1/product/favourite/{self.product_favourite.pk + 1}/"
-        )
+        invalid_product_favourite_id = 999999
+        url = self.get_product_favourite_detail_url(invalid_product_favourite_id)
+        response = self.client.delete(url)
+
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

@@ -6,6 +6,7 @@ urlpatterns = [
     path(
         "pay_way/",
         PayWayViewSet.as_view({"get": "list", "post": "create"}),
+        name="payway-list",
     ),
     path(
         "pay_way/<str:pk>/",
@@ -17,5 +18,6 @@ urlpatterns = [
                 "delete": "destroy",
             }
         ),
+        name="payway-detail",
     ),
 ]

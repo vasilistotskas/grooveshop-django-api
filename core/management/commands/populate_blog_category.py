@@ -44,6 +44,10 @@ class Command(BaseCommand):
             for _ in range(total):
                 slug = faker.slug()
 
+                # Ensure the slug value is unique for each category
+                while BlogCategory.objects.filter(slug=slug).exists():
+                    slug = faker.slug()
+
                 # Create a new BlogCategory object
                 category, created = BlogCategory.objects.get_or_create(
                     slug=slug,

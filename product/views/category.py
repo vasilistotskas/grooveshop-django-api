@@ -8,12 +8,13 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+from core.utils.views import TranslationsProcessingMixin
 from product.models.category import ProductCategory
 from product.paginators.category import ProductCategoryPagination
 from product.serializers.category import ProductCategorySerializer
 
 
-class ProductCategoryViewSet(ModelViewSet):
+class ProductCategoryViewSet(TranslationsProcessingMixin, ModelViewSet):
     queryset = ProductCategory.objects.all()
     serializer_class = ProductCategorySerializer
     pagination_class = ProductCategoryPagination
@@ -37,7 +38,15 @@ class ProductCategoryViewSet(ModelViewSet):
             return self.get_paginated_response(data)
         return Response(data, status=status.HTTP_200_OK)
 
+    def recursive_node_to_dict(self, node):
+        result = self.get_serializer(instance=node).data
+        children = [self.recursive_node_to_dict(c) for c in node.get_children()]
+        if children:
+            result["children"] = children
+        return result
+
     def create(self, request, *args, **kwargs) -> Response:
+        request = self.process_translations_data(request)
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -51,6 +60,7 @@ class ProductCategoryViewSet(ModelViewSet):
 
     def update(self, request, pk=None, *args, **kwargs) -> Response:
         category = get_object_or_404(ProductCategory, id=pk)
+        request = self.process_translations_data(request)
         serializer = self.get_serializer(category, data=request.data)
         if serializer.is_valid():
             serializer.save()

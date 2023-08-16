@@ -1,5 +1,8 @@
+from typing import List
+
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from django_stubs_ext.db.models import TypedModelMeta
 
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
@@ -51,12 +54,18 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
         blank=True,
         default=None,
     )
-    phone = models.CharField(max_length=255, null=True, blank=True, default=None)
-    mobile_phone = models.CharField(max_length=255, null=True, blank=True, default=None)
-    notes = models.CharField(max_length=255, null=True, blank=True, default=None)
-    is_main = models.BooleanField(default=False)
+    phone = models.CharField(
+        _("Phone Number"), max_length=255, null=True, blank=True, default=None
+    )
+    mobile_phone = models.CharField(
+        _("Mobile Phone Number"), max_length=255, null=True, blank=True, default=None
+    )
+    notes = models.CharField(
+        _("Notes"), max_length=255, null=True, blank=True, default=None
+    )
+    is_main = models.BooleanField(_("Is Main"), default=False)
 
-    class Meta:
+    class Meta(TypedModelMeta):
         verbose_name = _("User Address")
         verbose_name_plural = _("User Addresses")
         ordering = ["-created_at"]
@@ -65,11 +74,12 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
         return self.title
 
     @classmethod
-    def get_user_addresses(cls, user) -> models.QuerySet:
+    # Return type is a list of UserAddress
+    def get_user_addresses(cls, user) -> List["UserAddress"]:
         return cls.objects.filter(user=user)
 
     @classmethod
-    def get_main_address(cls, user) -> models.QuerySet:
+    def get_main_address(cls, user) -> "UserAddress":
         return cls.objects.filter(user=user, is_main=True).first()
 
     @classmethod

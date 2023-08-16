@@ -3,14 +3,14 @@ from django.db import transaction
 from faker import Faker
 
 from helpers.seed import get_or_create_default_image
-from product.models.images import ProductImages
+from product.models.image import ProductImage
 from product.models.product import Product
 
 faker = Faker()
 
 
 class Command(BaseCommand):
-    help = "Seed ProductImages model."
+    help = "Seed ProductImage model."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -36,7 +36,7 @@ class Command(BaseCommand):
         if not products:
             self.stdout.write(
                 self.style.ERROR(
-                    "Insufficient data. Aborting seeding ProductImages model."
+                    "Insufficient data. Aborting seeding ProductImage model."
                 )
             )
             return
@@ -46,18 +46,19 @@ class Command(BaseCommand):
         created_images = []
         with transaction.atomic():
             for product in products:
-                main_image = ProductImages.objects.create(
-                    title="Main Image",
-                    product=product,
-                    is_main=True,
-                    image=img,
-                )
+                if not product.product_images.filter(is_main=True).exists():
+                    main_image = ProductImage.objects.create(
+                        title="Main Image",
+                        product=product,
+                        is_main=True,
+                        image=img,
+                    )
 
-                created_images.append(main_image)
+                    created_images.append(main_image)
 
                 for _ in range(total_images - 1):
                     title = faker.word()
-                    image = ProductImages.objects.create(
+                    image = ProductImage.objects.create(
                         title=title,
                         product=product,
                         is_main=False,
@@ -67,6 +68,6 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Successfully seeded {len(created_images)} ProductImages instances."
+                f"Successfully seeded {len(created_images)} ProductImage instances."
             )
         )

@@ -33,24 +33,24 @@ class BlogTagModelTestCase(TestCase):
         self.assertEqual(BlogTag._meta.verbose_name, "Blog Tag")
         self.assertEqual(BlogTag._meta.verbose_name_plural, "Blog Tags")
 
+    def test_unicode_representation(self):
+        # Test the __unicode__ method returns the translated name
+        self.assertEqual(
+            self.blog_tag.__unicode__(),
+            self.blog_tag.safe_translation_getter("name"),
+        )
+
     def test_translations(self):
         # Test if translations are saved correctly
         for language in languages:
             self.blog_tag.set_current_language(language)
             self.assertEqual(self.blog_tag.name, f"Tag name in {language}")
 
-    def test_unicode_representation(self):
-        # Test the __unicode__ method returns the tag's name
-        self.assertEqual(
-            str(self.blog_tag),
-            self.blog_tag.safe_translation_getter("name", any_language=True),
-        )
-
     def test_str_representation(self):
-        # Test the __str__ method returns the tag's name
+        # Test the __str__ method returns the translated name
         self.assertEqual(
             str(self.blog_tag),
-            self.blog_tag.safe_translation_getter("name", any_language=True),
+            self.blog_tag.safe_translation_getter("name"),
         )
 
     def test_get_ordering_queryset(self):

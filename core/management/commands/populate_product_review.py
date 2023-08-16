@@ -22,7 +22,7 @@ class Command(BaseCommand):
             "total_reviews",
             type=int,
             help="Indicates the number of reviews to be seeded.",
-            default=500,
+            default=1000,
             nargs="?",
         )
 

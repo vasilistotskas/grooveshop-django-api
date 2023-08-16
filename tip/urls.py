@@ -7,6 +7,7 @@ urlpatterns = [
     path(
         "tip/",
         TipViewSet.as_view({"get": "list", "post": "create"}),
+        name="tip-list",
     ),
     path(
         "tip/<str:pk>/",
@@ -18,6 +19,7 @@ urlpatterns = [
                 "delete": "destroy",
             }
         ),
+        name="tip-detail",
     ),
 ]
 

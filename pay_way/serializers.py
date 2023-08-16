@@ -1,13 +1,13 @@
 from drf_spectacular.utils import extend_schema_field
-from parler_rest.fields import TranslatedFieldsField
 from parler_rest.serializers import TranslatableModelSerializer
 
 from core.api.schema import generate_schema_multi_lang
+from core.utils.serializers import TranslatedFieldExtended
 from pay_way.models import PayWay
 
 
 @extend_schema_field(generate_schema_multi_lang(PayWay))
-class TranslatedFieldsFieldExtend(TranslatedFieldsField):
+class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
 
 

@@ -1,189 +1,216 @@
-from __future__ import annotations
-
-import json
-
 from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from product.models.product import Product
 from product.models.review import ProductReview
 from product.serializers.review import ProductReviewSerializer
-from user.models import UserAccount
+
+languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
+User = get_user_model()
 
 
 class ProductReviewViewSetTestCase(APITestCase):
-    user_account: UserAccount
-    product: Product
-    product_review: ProductReview
+    user = None
+    product = None
+    product_review = None
 
     def setUp(self):
-        self.user_account = UserAccount.objects.create_user(
+        self.user = User.objects.create_user(
             email="test@test.com", password="test12345@!"
         )
+        # Login to authenticate
+        self.client.login(email="test@test.com", password="test12345@!")
         self.product = Product.objects.create(
-            slug="slug_one",
-            price=10.00,
+            slug="sample-product",
+            name="Sample Product",
+            description="Sample Product Description",
+            price=100.0,
             active=True,
             stock=10,
-            discount_percent=0.00,
-            hits=0,
-            weight=0.00,
         )
         self.product_review = ProductReview.objects.create(
             product=self.product,
-            user=self.user_account,
-            rate=1,
-            status="True",
+            user=self.user,
+            rate=5,
+            status="New",
         )
+        for language in languages:
+            self.product_review.set_current_language(language)
+            self.product_review.comment = f"Sample Comment {language}"
+            self.product_review.save()
+        self.product_review.set_current_language(default_language)
 
-        self.client.force_authenticate(user=self.user_account)
+    @staticmethod
+    def get_product_review_detail_url(pk):
+        return reverse("product-review-detail", args=[pk])
+
+    @staticmethod
+    def get_product_review_list_url():
+        return reverse("product-review-list")
 
     def test_list(self):
-        response = self.client.get("/api/v1/product/review/")
-        product_reviews = ProductReview.objects.all()
-        serializer = ProductReviewSerializer(product_reviews, many=True)
+        url = self.get_product_review_list_url()
+        response = self.client.get(url)
+        reviews = ProductReview.objects.all()
+        serializer = ProductReviewSerializer(reviews, many=True)
+
         self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_valid(self):
-        product = Product.objects.create(
-            slug="slug_two",
-            price=10.00,
+        product_2 = Product.objects.create(
+            slug="sample-product-2",
+            name="Sample Product 2",
+            description="Sample Product Description 2",
+            price=100.0,
             active=True,
             stock=10,
-            discount_percent=0.00,
-            hits=0,
-            weight=0.00,
         )
-
         payload = {
+            "product": product_2.pk,
+            "user": self.user.pk,
+            "rate": 5,
+            "status": "New",
             "translations": {},
-            "product": product.id,
-            "user": self.user_account.id,
-            "rate": 1,
-            "status": "True",
         }
 
-        for language in settings.LANGUAGES:
+        for language in languages:
             language_code = language[0]
             language_name = language[1]
 
             translation_payload = {
-                "comment": f"Translation for {language_name}",
+                "comment": f"New Review comment in {language_name}",
             }
 
             payload["translations"][language_code] = translation_payload
 
-        response = self.client.post(
-            "/api/v1/product/review/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+        url = self.get_product_review_list_url()
+        response = self.client.post(url, data=payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_create_invalid(self):
         payload = {
-            "product": "INVALID",
-            "user": "INVALID",
-            "rate": False,
-            "status": 12345,
+            "product": "invalid_product",
+            "user": "invalid_user",
+            "rate": "invalid_rate",
+            "status": "invalid_status",
+            "translations": {
+                "invalid_language": {
+                    "comment": "invalid_comment",
+                }
+            },
         }
-        response = self.client.post(
-            "/api/v1/product/review/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+
+        url = self.get_product_review_list_url()
+        response = self.client.post(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_retrieve_valid(self):
-        response = self.client.get(f"/api/v1/product/review/{self.product_review.pk}/")
-        product_review = ProductReview.objects.get(pk=self.product_review.pk)
-        serializer = ProductReviewSerializer(product_review)
+        url = self.get_product_review_detail_url(self.product_review.pk)
+        response = self.client.get(url)
+        review = ProductReview.objects.get(pk=self.product_review.pk)
+        serializer = ProductReviewSerializer(review)
+
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_retrieve_invalid(self):
-        response = self.client.get(
-            f"/api/v1/product/review/{self.product_review.pk + 1}/"
-        )
+        invalid_product_review_pk = 999999
+        url = self.get_product_review_detail_url(invalid_product_review_pk)
+        response = self.client.get(url)
+
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_update_valid(self):
         payload = {
+            "product": self.product.pk,
+            "user": self.user.pk,
+            "rate": 1,
+            "status": "New",
             "translations": {},
-            "product": self.product.id,
-            "user": self.user_account.id,
-            "rate": 5,
-            "status": "True",
         }
 
-        for language in settings.LANGUAGES:
+        for language in languages:
             language_code = language[0]
             language_name = language[1]
 
             translation_payload = {
-                "comment": f"Translation for {language_name}",
+                "comment": f"Updated Review comment in {language_name}",
             }
 
             payload["translations"][language_code] = translation_payload
 
-        response = self.client.put(
-            f"/api/v1/product/review/{self.product_review.pk}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+        url = self.get_product_review_detail_url(self.product_review.pk)
+        response = self.client.put(url, data=payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_update_invalid(self):
         payload = {
-            "product": "123",
-            "user": "123",
-            "rate": False,
-            "status": 12345,
+            "product": "invalid_product",
+            "user": "invalid_user",
+            "rate": "invalid_rate",
+            "status": "invalid_status",
+            "translations": {
+                "invalid_language": {
+                    "comment": "invalid_comment",
+                }
+            },
         }
-        response = self.client.put(
-            f"/api/v1/product/review/{self.product_review.pk}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+
+        url = self.get_product_review_detail_url(self.product_review.pk)
+        response = self.client.put(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_partial_update_valid(self):
         payload = {
-            "status": "False",
+            "rate": 1,
+            "translations": {
+                default_language: {
+                    "comment": "Updated Review comment",
+                }
+            },
         }
-        response = self.client.patch(
-            f"/api/v1/product/review/{self.product_review.pk}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+
+        url = self.get_product_review_detail_url(self.product_review.pk)
+        response = self.client.patch(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_partial_update_invalid(self):
         payload = {
-            "product": "123",
-            "user": "123",
-            "rate": False,
-            "status": 12345,
+            "rate": "invalid_rate",
+            "translations": {
+                "invalid_language": {
+                    "comment": "invalid_comment",
+                }
+            },
         }
-        response = self.client.patch(
-            f"/api/v1/product/review/{self.product_review.pk}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+
+        url = self.get_product_review_detail_url(self.product_review.pk)
+        response = self.client.patch(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_destroy_valid(self):
-        response = self.client.delete(
-            f"/api/v1/product/review/{self.product_review.pk}/"
-        )
+        url = self.get_product_review_detail_url(self.product_review.pk)
+        response = self.client.delete(url)
+
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(
+            ProductReview.objects.filter(pk=self.product_review.pk).exists()
+        )
 
     def test_destroy_invalid(self):
-        response = self.client.get(
-            f"/api/v1/product/review/{self.product_review.pk + 1}/"
-        )
+        invalid_product_review_pk = 999999
+        url = self.get_product_review_detail_url(invalid_product_review_pk)
+        response = self.client.delete(url)
+
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

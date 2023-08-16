@@ -1,26 +1,65 @@
 from __future__ import annotations
 
-import json
-
 from django.conf import settings
+from django.test import override_settings
+from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from core.utils.tests import compare_serializer_and_response
+from helpers.seed import get_or_create_default_image
 from slider.models import Slider
 from slider.serializers import SliderSerializer
 
 
+languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
+
+
+@override_settings(
+    STORAGES={
+        "default": {
+            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
+        },
+    }
+)
 class SliderViewSetTestCase(APITestCase):
-    slider: Slider
+    slider = None
 
     def setUp(self):
-        self.slider = Slider.objects.create()
+        image = get_or_create_default_image("uploads/sliders/no_photo.jpg")
+        self.slider = Slider.objects.create(
+            image=image,
+        )
+        for language in languages:
+            self.slider.set_current_language(language)
+            self.slider.name = f"Slider 1_{language}"
+            self.slider.url = "https://www.example.com/"
+            self.slider.title = f"Slider Title_{language}"
+            self.slider.description = f"Slider Description_{language}"
+            self.slider.save()
+        self.slider.set_current_language(default_language)
+
+    @staticmethod
+    def get_slider_detail_url(pk):
+        return reverse("slider-detail", args=[pk])
+
+    @staticmethod
+    def get_slider_list_url():
+        return reverse("slider-list")
 
     def test_list(self):
-        response = self.client.get("/api/v1/slider/")
+        url = self.get_slider_list_url()
+        response = self.client.get(url)
         sliders = Slider.objects.all()
         serializer = SliderSerializer(sliders, many=True)
-        self.assertEqual(response.data["results"], serializer.data)
+        for response_item, serializer_item in zip(
+            response.data["results"], serializer.data
+        ):
+            compare_serializer_and_response(
+                serializer_item, response_item, ["thumbnail"]
+            )
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_valid(self):
@@ -28,44 +67,57 @@ class SliderViewSetTestCase(APITestCase):
             "translations": {},
         }
 
-        for language in settings.LANGUAGES:
+        for language in languages:
             language_code = language[0]
             language_name = language[1]
 
             translation_payload = {
-                "name": f"Translation for {language_name}",
-                "url": "https://www.youtube.com/watch?v=1",
-                "title": f"Title for {language_name}",
-                "description": f"Description for {language_name}",
+                "name": f"New Slider in {language_name}",
+                "url": "https://www.example.com/",
+                "title": f"New Slider Title in {language_name}",
+                "description": f"New Slider Description in {language_name}",
             }
 
             payload["translations"][language_code] = translation_payload
 
-        response = self.client.post(
-            "/api/v1/slider/", json.dumps(payload), content_type="application/json"
-        )
+        url = self.get_slider_list_url()
+        response = self.client.post(url, data=payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_create_invalid(self):
         payload = {
-            "url": "http://localhost:8000/",
+            "image": "invalid_image",
+            "video": "invalid_video",
+            "translations": {
+                "invalid_lang_code": {
+                    "name": "Translation for invalid language code",
+                    "url": "Translation for invalid language code",
+                    "title": "Translation for invalid language code",
+                    "description": "Translation for invalid language code",
+                }
+            },
         }
-        response = self.client.post(
-            "/api/v1/slider/", json.dumps(payload), content_type="application/json"
-        )
+
+        url = self.get_slider_list_url()
+        response = self.client.post(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_retrieve_valid(self):
-        response = self.client.get(f"/api/v1/slider/{self.slider.pk}/")
+        url = self.get_slider_detail_url(self.slider.pk)
+        response = self.client.get(url)
         slider = Slider.objects.get(pk=self.slider.pk)
         serializer = SliderSerializer(slider)
-        self.assertEqual(response.data, serializer.data)
+        compare_serializer_and_response(serializer.data, response.data, ["thumbnail"])
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_retrieve_invalid(self):
-        invalid_slider = "invalid"
-        response = self.client.get(f"/api/v1/slider/{invalid_slider}/")
+        invalid_slider_id = 9999
+        url = self.get_slider_detail_url(invalid_slider_id)
+        response = self.client.get(url)
+
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_update_valid(self):
@@ -73,71 +125,94 @@ class SliderViewSetTestCase(APITestCase):
             "translations": {},
         }
 
-        for language in settings.LANGUAGES:
+        for language in languages:
             language_code = language[0]
             language_name = language[1]
 
             translation_payload = {
-                "name": f"Translation for {language_name}",
-                "url": "https://www.youtube.com/watch?v=1",
-                "title": f"Title for {language_name}",
-                "description": f"Description for {language_name}",
+                "name": f"Updated Slider in {language_name}",
+                "url": "https://www.example.com/",
+                "title": f"Updated Slider Title in {language_name}",
+                "description": f"Updated Slider Description in {language_name}",
             }
 
             payload["translations"][language_code] = translation_payload
 
-        response = self.client.put(
-            f"/api/v1/slider/{self.slider.pk}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+        url = self.get_slider_detail_url(self.slider.pk)
+        response = self.client.patch(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_update_invalid(self):
         payload = {
-            "title": "INVALID INVALID INVALID INVALID INVALID INVALID INVALID INVALID "
-            "INVALID INVALID INVALID INVALID INVALID INVALID "
-            "INVALID INVALID INVALID INVALID",
-            "url": "http://localhost:8000/",
-            "image": "test",
+            "image": "invalid_image",
+            "video": "invalid_video",
+            "translations": {
+                "invalid_lang_code": {
+                    "name": "Translation for invalid language code",
+                    "url": "Translation for invalid language code",
+                    "title": "Translation for invalid language code",
+                    "description": "Translation for invalid language code",
+                }
+            },
         }
-        response = self.client.put(
-            f"/api/v1/slider/{self.slider.pk}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+
+        url = self.get_slider_detail_url(self.slider.pk)
+        response = self.client.patch(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_partial_update_valid(self):
         payload = {
-            "url": "http://localhost:8000/",
-            "title": "test_three",
-            "description": "test_three",
+            "translations": {},
         }
-        response = self.client.patch(
-            f"/api/v1/slider/{self.slider.pk}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+
+        for language in languages:
+            language_code = language[0]
+            language_name = language[1]
+
+            translation_payload = {
+                "name": f"Updated Slider in {language_name}",
+                "url": "https://www.example.com/",
+                "title": f"Updated Slider Title in {language_name}",
+                "description": f"Updated Slider Description in {language_name}",
+            }
+
+            payload["translations"][language_code] = translation_payload
+
+        url = self.get_slider_detail_url(self.slider.pk)
+        response = self.client.patch(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_partial_update_invalid(self):
         payload = {
-            "translations": {},
+            "video": "invalid_video",
+            "translations": {
+                "invalid_lang_code": {
+                    "name": "Translation for invalid language code",
+                    "url": "Translation for invalid language code",
+                    "title": "Translation for invalid language code",
+                    "description": "Translation for invalid language code",
+                }
+            },
         }
-        response = self.client.patch(
-            f"/api/v1/slider/{self.slider.pk}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+
+        url = self.get_slider_detail_url(self.slider.pk)
+        response = self.client.patch(url, data=payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_destroy_valid(self):
-        response = self.client.delete(f"/api/v1/slider/{self.slider.pk}/")
+        url = self.get_slider_detail_url(self.slider.pk)
+        response = self.client.delete(url)
+
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Slider.objects.filter(pk=self.slider.pk).exists())
 
     def test_destroy_invalid(self):
-        invalid_slider = "invalid"
-        response = self.client.delete(f"/api/v1/slider/{invalid_slider}/")
+        invalid_slider_id = 9999
+        url = self.get_slider_detail_url(invalid_slider_id)
+        response = self.client.delete(url)
+
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

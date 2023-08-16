@@ -8,6 +8,7 @@ urlpatterns = [
     path(
         "slider/",
         SliderViewSet.as_view({"get": "list", "post": "create"}),
+        name="slider-list",
     ),
     path(
         "slider/<str:pk>/",
@@ -19,10 +20,12 @@ urlpatterns = [
                 "delete": "destroy",
             }
         ),
+        name="slider-detail",
     ),
     path(
         "slide/",
         SlideViewSet.as_view({"get": "list", "post": "create"}),
+        name="slide-list",
     ),
     path(
         "slide/<str:pk>/",
@@ -34,6 +37,7 @@ urlpatterns = [
                 "delete": "destroy",
             }
         ),
+        name="slide-detail",
     ),
 ]
 

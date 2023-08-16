@@ -31,11 +31,12 @@ class BlogCategoryViewSetTestCase(APITestCase):
     def get_category_list_url():
         return reverse("blog-category-list")
 
-    def test_list_categories(self):
+    def test_list(self):
         url = self.get_category_list_url()
         response = self.client.get(url)
         categories = BlogCategory.objects.all()
         serializer = BlogCategorySerializer(categories, many=True)
+
         self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -63,15 +64,18 @@ class BlogCategoryViewSetTestCase(APITestCase):
 
     def test_create_invalid(self):
         payload = {
-            "slug": "",
+            "slug": False,
+            "image": "invalid_image",
             "translations": {
                 "invalid_lang_code": {
-                    "description": "Description for invalid language code",
+                    "description": "Translation for invalid language code",
                 },
             },
         }
+
         url = self.get_category_list_url()
         response = self.client.post(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_retrieve_valid(self):
@@ -79,6 +83,7 @@ class BlogCategoryViewSetTestCase(APITestCase):
         response = self.client.get(url)
         category = BlogCategory.objects.get(pk=self.category.pk)
         serializer = BlogCategorySerializer(category)
+
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -86,6 +91,7 @@ class BlogCategoryViewSetTestCase(APITestCase):
         invalid_category_id = 9999  # An ID that doesn't exist in the database
         url = self.get_category_detail_url(invalid_category_id)
         response = self.client.get(url)
+
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_update_valid(self):
@@ -112,16 +118,19 @@ class BlogCategoryViewSetTestCase(APITestCase):
 
     def test_update_invalid(self):
         payload = {
-            "slug": "",
+            "slug": False,
+            "image": "invalid_image",
             "translations": {
                 "invalid_lang_code": {
-                    "name": "Updated Category with invalid language code",
-                    "description": "Description for invalid language code",
+                    "name": "Translation for invalid language code",
+                    "description": "Translation for invalid language code",
                 },
             },
         }
+
         url = self.get_category_detail_url(self.category.pk)
         response = self.client.put(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_partial_update_valid(self):
@@ -135,6 +144,7 @@ class BlogCategoryViewSetTestCase(APITestCase):
 
         url = self.get_category_detail_url(self.category.pk)
         response = self.client.patch(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_partial_update_invalid(self):
@@ -142,18 +152,21 @@ class BlogCategoryViewSetTestCase(APITestCase):
             "slug": "",
             "translations": {
                 "invalid_lang_code": {
-                    "name": "Partial update with invalid language code",
-                    "description": "Description for invalid language code",
+                    "name": "Translation for invalid language code",
+                    "description": "Translation for invalid language code",
                 },
             },
         }
+
         url = self.get_category_detail_url(self.category.pk)
         response = self.client.patch(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_destroy_valid(self):
         url = self.get_category_detail_url(self.category.pk)
         response = self.client.delete(url)
+
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(BlogCategory.objects.filter(pk=self.category.pk).exists())
 
@@ -161,4 +174,5 @@ class BlogCategoryViewSetTestCase(APITestCase):
         invalid_category_id = 9999  # An ID that doesn't exist in the database
         url = self.get_category_detail_url(invalid_category_id)
         response = self.client.delete(url)
+
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

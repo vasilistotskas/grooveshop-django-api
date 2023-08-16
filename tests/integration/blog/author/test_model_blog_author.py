@@ -54,6 +54,10 @@ class BlogAuthorModelTestCase(TestCase):
             "Blog Authors",
         )
 
+    def test_unicode_representation(self):
+        # Test the __unicode__ method returns the translated name
+        self.assertEqual(str(self.author), self.author.user.email)
+
     def test_translations(self):
         # Test if translations are saved correctly
         for language in languages:

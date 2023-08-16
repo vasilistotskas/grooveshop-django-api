@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.db import models
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
+from django_stubs_ext.db.models import TypedModelMeta
 
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
@@ -20,7 +21,7 @@ class Cart(TimeStampMixinModel, UUIDModel):
     )
     last_activity = models.DateTimeField(_("Last Activity"), auto_now=True)
 
-    class Meta:
+    class Meta(TypedModelMeta):
         verbose_name = _("Cart")
         verbose_name_plural = _("Carts")
         ordering = ["-created_at"]
@@ -29,7 +30,7 @@ class Cart(TimeStampMixinModel, UUIDModel):
     def __str__(self):
         return f"Cart {self.user} - {self.id}"
 
-    def get_items(self) -> list["CartItem"]:
+    def get_items(self) -> models.QuerySet:
         return self.cart_item_cart.prefetch_related("product").all()
 
     def refresh_last_activity(self):

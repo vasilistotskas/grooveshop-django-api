@@ -5151,7 +5151,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedProductImagesList'
+                $ref: '#/components/schemas/PaginatedProductImageList'
           description: ''
     post:
       operationId: api_v1_product_images_create
@@ -5161,13 +5161,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/ProductImages'
+              $ref: '#/components/schemas/ProductImage'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/ProductImages'
+              $ref: '#/components/schemas/ProductImage'
           application/json:
             schema:
-              $ref: '#/components/schemas/ProductImages'
+              $ref: '#/components/schemas/ProductImage'
         required: true
       security:
       - basicAuth: []
@@ -5179,7 +5179,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProductImages'
+                $ref: '#/components/schemas/ProductImage'
           description: ''
   /api/v1/product/images{format}:
     get:
@@ -5240,7 +5240,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedProductImagesList'
+                $ref: '#/components/schemas/PaginatedProductImageList'
           description: ''
     post:
       operationId: api_v1_product_images_formatted_create
@@ -5258,13 +5258,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/ProductImages'
+              $ref: '#/components/schemas/ProductImage'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/ProductImages'
+              $ref: '#/components/schemas/ProductImage'
           application/json:
             schema:
-              $ref: '#/components/schemas/ProductImages'
+              $ref: '#/components/schemas/ProductImage'
         required: true
       security:
       - basicAuth: []
@@ -5276,7 +5276,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProductImages'
+                $ref: '#/components/schemas/ProductImage'
           description: ''
   /api/v1/product/images/{id}/:
     get:
@@ -5299,7 +5299,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProductImages'
+                $ref: '#/components/schemas/ProductImage'
           description: ''
     put:
       operationId: api_v1_product_images_update
@@ -5315,13 +5315,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/ProductImages'
+              $ref: '#/components/schemas/ProductImage'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/ProductImages'
+              $ref: '#/components/schemas/ProductImage'
           application/json:
             schema:
-              $ref: '#/components/schemas/ProductImages'
+              $ref: '#/components/schemas/ProductImage'
         required: true
       security:
       - basicAuth: []
@@ -5333,7 +5333,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProductImages'
+                $ref: '#/components/schemas/ProductImage'
           description: ''
     patch:
       operationId: api_v1_product_images_partial_update
@@ -5349,13 +5349,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedProductImages'
+              $ref: '#/components/schemas/PatchedProductImage'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedProductImages'
+              $ref: '#/components/schemas/PatchedProductImage'
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedProductImages'
+              $ref: '#/components/schemas/PatchedProductImage'
       security:
       - basicAuth: []
       - cookieAuth: []
@@ -5366,7 +5366,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProductImages'
+                $ref: '#/components/schemas/ProductImage'
           description: ''
     delete:
       operationId: api_v1_product_images_destroy
@@ -5414,7 +5414,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProductImages'
+                $ref: '#/components/schemas/ProductImage'
           description: ''
     put:
       operationId: api_v1_product_images_formatted_update
@@ -5437,13 +5437,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/ProductImages'
+              $ref: '#/components/schemas/ProductImage'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/ProductImages'
+              $ref: '#/components/schemas/ProductImage'
           application/json:
             schema:
-              $ref: '#/components/schemas/ProductImages'
+              $ref: '#/components/schemas/ProductImage'
         required: true
       security:
       - basicAuth: []
@@ -5455,7 +5455,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProductImages'
+                $ref: '#/components/schemas/ProductImage'
           description: ''
     patch:
       operationId: api_v1_product_images_formatted_partial_update
@@ -5478,13 +5478,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedProductImages'
+              $ref: '#/components/schemas/PatchedProductImage'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedProductImages'
+              $ref: '#/components/schemas/PatchedProductImage'
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedProductImages'
+              $ref: '#/components/schemas/PatchedProductImage'
       security:
       - basicAuth: []
       - cookieAuth: []
@@ -5495,7 +5495,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProductImages'
+                $ref: '#/components/schemas/ProductImage'
           description: ''
     delete:
       operationId: api_v1_product_images_formatted_destroy
@@ -10327,7 +10327,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ProductFavourite'
-    PaginatedProductImagesList:
+    PaginatedProductImageList:
       type: object
       properties:
         count:
@@ -10346,7 +10346,7 @@ components:
         results:
           type: array
           items:
-            $ref: '#/components/schemas/ProductImages'
+            $ref: '#/components/schemas/ProductImage'
     PaginatedProductList:
       type: object
       properties:
@@ -11358,7 +11358,7 @@ components:
           type: string
           format: uuid
           readOnly: true
-    PatchedProductImages:
+    PatchedProductImage:
       type: object
       properties:
         id:
@@ -12259,7 +12259,7 @@ components:
       - updatedAt
       - user
       - uuid
-    ProductImages:
+    ProductImage:
       type: object
       properties:
         id:

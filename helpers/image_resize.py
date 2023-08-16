@@ -1,10 +1,11 @@
 from io import BytesIO
 
 from django.core.files import File
+from django.db.models.fields.files import ImageFieldFile
 from PIL import Image
 
 
-def make_thumbnail(image, size):
+def make_thumbnail(image: ImageFieldFile, size: tuple) -> File:
     if image:
         img = Image.open(image)
         img.convert("RGB")
@@ -22,6 +23,8 @@ def make_thumbnail(image, size):
         else:
             img.save(thumb_io, "JPEG", quality=95)
 
-        thumbnail = File(thumb_io, name=image.name)
+        # Construct the File object for the thumbnail
+        thumbnail_name = image.name.split("/")[-1]  # Extract the filename
+        thumbnail = File(thumb_io, name=thumbnail_name)
 
         return thumbnail

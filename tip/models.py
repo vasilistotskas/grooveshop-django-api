@@ -4,6 +4,7 @@ from django.conf import settings
 from django.db import models
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
+from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel
 from parler.models import TranslatedFields
 from tinymce.models import HTMLField
@@ -32,7 +33,7 @@ class Tip(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         url=models.CharField(_("Url"), max_length=255, blank=True, null=True),
     )
 
-    class Meta:
+    class Meta(TypedModelMeta):
         verbose_name = _("Tip")
         verbose_name_plural = _("Tips")
         ordering = ["sort_order"]

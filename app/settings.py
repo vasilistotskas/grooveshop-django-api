@@ -5,6 +5,8 @@ from pathlib import Path
 import environ
 from django.utils.translation import gettext_lazy as _
 
+from core.utils.cache import CustomCacheConfig
+
 env = environ.Env(
     # set casting, default value
     SECRET_KEY=(str, "django-insecure-1#t2p3u4^=5)6@7(8)9-0"),
@@ -21,7 +23,6 @@ env = environ.Env(
     APPEND_SLASH=(bool, False),
     TIME_ZONE=(str, "Europe/Athens"),
     USE_I18N=(bool, True),
-    USE_L10N=(bool, True),
     USE_TZ=(bool, True),
     LANGUAGE_CODE=(str, "en"),
     DB_HOST=(str, "db"),
@@ -41,6 +42,11 @@ env = environ.Env(
     EMAIL_USE_TLS=(bool, False),
     DEFAULT_FROM_EMAIL=(str, "webmaster@localhost"),
     DEEPL_AUTH_KEY=(str, "changeme"),
+    REDIS_URL=(str, "redis://localhost:6379/0"),
+    CELERY_BROKER_URL=(str, "redis://localhost:6379/0"),
+    CELERY_RESULT_BACKEND=(str, "django-db"),
+    CELERY_CACHE_BACKEND=(str, "django-cache"),
+    EXPLORER_TOKEN=(str, "changeme"),
 )
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -113,6 +119,7 @@ if DEBUG:
         "10.0.2.2",
     ]
 
+custom_cache_config = CustomCacheConfig()
 
 # Application definition
 DJANGO_APPS = [
@@ -165,6 +172,8 @@ THIRD_PARTY_APPS = [
     "allauth_2fa",
     "django_celery_beat",
     "django_celery_results",
+    # Django sql explorer
+    "explorer",
 ]
 INSTALLED_APPS = DJANGO_APPS + PROJECT_APPS + THIRD_PARTY_APPS
 
@@ -323,20 +332,33 @@ if SYSTEM_ENV == "GITHUB_WORKFLOW":
         }
     }
 
-# Cache
-if SYSTEM_ENV == "docker":
+CACHES = {}
+if SYSTEM_ENV != "GITHUB_WORKFLOW":
     CACHES = {
         "default": {
             "BACKEND": "django_redis.cache.RedisCache",
             "LOCATION": "redis://redis:6379/0",
             "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
-        }
+        },
+        "fallback": {
+            "BACKEND": "django.core.cache.backends.dummy.DummyCache",
+        },
     }
 
+if CACHES:
+    CACHES = {
+        "default": custom_cache_config.cache_backend,
+        "fallback": {
+            "BACKEND": "django.core.cache.backends.dummy.DummyCache",
+        },
+    }
+REDIS_HEALTHY = custom_cache_config.ready_healthy
+
 # Celery
-CELERY_BROKER_URL = "redis://redis:6379"
-CELERY_RESULT_BACKEND = "django-db"
-CELERY_CACHE_BACKEND = "django-cache"
+CELERY_BROKER_URL = env("CELERY_BROKER_URL")
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND")
+CELERY_CACHE_BACKEND = env("CELERY_CACHE_BACKEND")
+CELERY_TASK_TRACK_STARTED = True
 CELERY_ENABLE_UTC = False
 CELERY_TIMEZONE = env("TIME_ZONE")
 CELERY_ACCEPT_CONTENT = ["application/json"]
@@ -367,7 +389,6 @@ AUTH_PASSWORD_VALIDATORS = [
 LANGUAGE_CODE = env("LANGUAGE_CODE")
 TIME_ZONE = env("TIME_ZONE")
 USE_I18N = env("USE_I18N")
-USE_L10N = env("USE_L10N")
 USE_TZ = env("USE_TZ")
 LANGUAGES = [
     ("en", _("English")),
@@ -424,7 +445,14 @@ MEDIA_URL = "media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 STATICFILES_DIRS = (BASE_DIR.joinpath("files"),)
-STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+    },
+}
 
 # Tinymce admin panel editor config
 TINYMCE_DEFAULT_CONFIG = {
@@ -490,6 +518,17 @@ SPECTACULAR_SETTINGS = {
         "drf_spectacular.hooks.postprocess_schema_enums",
     ],
 }
+
+# Django sql explorer
+EXPLORER_CONNECTIONS = {"Default": "default"}
+EXPLORER_DEFAULT_CONNECTION = "default"
+EXPLORER_DEFAULT_ROWS = 1000
+EXPLORER_SCHEMA_INCLUDE_TABLE_PREFIXES = None  # shows all tables
+EXPLORER_AUTORUN_QUERY_WITH_PARAMS = False
+EXPLORER_TASKS_ENABLED = True if REDIS_HEALTHY else False
+EXPLORER_ASYNC_SCHEMA = True if REDIS_HEALTHY else False
+EXPLORER_TOKEN_AUTH_ENABLED = False if DEBUG else True
+EXPLORER_TOKEN = env("EXPLORER_TOKEN")
 
 # logs
 LOGGING = {

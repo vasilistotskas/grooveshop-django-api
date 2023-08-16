@@ -7,8 +7,8 @@ from faker import Faker
 
 from country.models import Country
 from order.enum.status_enum import StatusEnum
-from order.models import Order
-from order.models import OrderItem
+from order.models.item import OrderItem
+from order.models.order import Order
 from pay_way.models import PayWay
 from product.models.product import Product
 from region.models import Region

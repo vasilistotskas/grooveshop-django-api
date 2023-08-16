@@ -12,6 +12,7 @@ from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.safestring import SafeString
 from django.utils.translation import gettext_lazy as _
+from django_stubs_ext.db.models import TypedModelMeta
 from mptt.fields import TreeForeignKey
 from parler.models import TranslatableModel
 from parler.models import TranslatedFields
@@ -19,9 +20,8 @@ from tinymce.models import HTMLField
 
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
-from helpers.image_resize import make_thumbnail
 from product.models.favourite import ProductFavourite
-from product.models.images import ProductImages
+from product.models.image import ProductImage
 from product.models.review import ProductReview
 from seo.models import SeoModel
 
@@ -56,6 +56,8 @@ class Product(TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel):
     weight = models.DecimalField(
         _("Weight (kg)"), max_digits=11, decimal_places=2, default=0.0
     )
+
+    # final_price, discount_value, price_save_percent are calculated fields on save method
     final_price = models.DecimalField(
         _("Final Price"), max_digits=11, decimal_places=2, default=0.0, editable=False
     )
@@ -79,7 +81,7 @@ class Product(TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel):
         description=HTMLField(_("Description"), blank=True, null=True),
     )
 
-    class Meta:
+    class Meta(TypedModelMeta):
         verbose_name = _("Product")
         verbose_name_plural = _("Products")
         ordering = ["-created_at"]
@@ -95,14 +97,13 @@ class Product(TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel):
         if self.vat:
             vat_value = (self.price * self.vat.value) / 100
 
-        self.discount_value = (self.price * self.discount_percent) / 100
+        if self.price is not None and self.discount_percent is not None:
+            self.discount_value = (self.price * self.discount_percent) / 100
+
         self.final_price = (
             float(self.price) + float(vat_value) - float(self.discount_value)
         )
-        self.price_save_percent = (
-            (self.price - self.discount_value)
-            * (self.price - self.price - self.discount_value)
-        ) / self.price
+        self.price_save_percent = (self.discount_value / self.price) * 100
         super().save(*args, **kwargs)
 
     @property
@@ -149,7 +150,9 @@ class Product(TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel):
 
     @property
     def main_image_absolute_url(self) -> str:
-        img = ProductImages.objects.get(product_id=self.id, is_main=True)
+        img = ProductImage.objects.get(product_id=self.id, is_main=True)
+        if not img:
+            return ""
         image: str = ""
         if img.image and hasattr(img.image, "url"):
             return settings.APP_BASE_URL + img.image.url
@@ -157,21 +160,26 @@ class Product(TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel):
 
     @property
     def main_image_filename(self) -> str:
-        product_image = ProductImages.objects.get(product_id=self.id, is_main=True)
+        product_image = ProductImage.objects.get(product_id=self.id, is_main=True)
+        if not product_image:
+            return ""
         return os.path.basename(product_image.image.name)
 
     @property
     def image_tag(self) -> str:
-        img = ProductImages.objects.get(product_id=self.id, is_main=True)
+        no_img_url = "/static/images/no_photo.jpg"
+        no_img_markup = f'<img src="{no_img_url}" width="100" height="100" />'
+        try:
+            img = ProductImage.objects.get(product_id=self.id, is_main=True)
+        except ProductImage.DoesNotExist:
+            return no_img_markup
+
         if img.thumbnail:
-            return mark_safe('<img src="{}"/>'.format(img.thumbnail.url))
-        else:
-            if img.image:
-                img.thumbnail = make_thumbnail(img.image, (100, 100))
-                img.save()
-                return mark_safe('<img src="{}"/>'.format(img.thumbnail.url))
-            else:
-                return ""
+            return mark_safe(
+                '<img src="{}" width="100" height="100" />'.format(img.thumbnail.url)
+            )
+
+        return no_img_markup
 
     @property
     def colored_stock(self) -> SafeString | SafeString:

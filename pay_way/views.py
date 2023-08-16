@@ -8,12 +8,13 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+from core.utils.views import TranslationsProcessingMixin
 from pay_way.models import PayWay
 from pay_way.paginators import PayWayPagination
 from pay_way.serializers import PayWaySerializer
 
 
-class PayWayViewSet(ModelViewSet):
+class PayWayViewSet(TranslationsProcessingMixin, ModelViewSet):
     queryset = PayWay.objects.all()
     serializer_class = PayWaySerializer
     pagination_class = PayWayPagination
@@ -38,6 +39,7 @@ class PayWayViewSet(ModelViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs) -> Response:
+        request = self.process_translations_data(request)
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -51,6 +53,7 @@ class PayWayViewSet(ModelViewSet):
 
     def update(self, request, pk=None, *args, **kwargs) -> Response:
         pay_way = get_object_or_404(PayWay, pk=pk)
+        request = self.process_translations_data(request)
         serializer = self.get_serializer(pay_way, data=request.data)
         if serializer.is_valid():
             serializer.save()

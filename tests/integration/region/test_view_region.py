@@ -1,158 +1,191 @@
-from __future__ import annotations
-
-import json
-
 from django.conf import settings
+from django.test import override_settings
+from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from country.models import Country
+from helpers.seed import get_or_create_default_image
 from region.models import Region
 from region.serializers import RegionSerializer
 
+languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
+
+@override_settings(
+    STORAGES={
+        "default": {
+            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
+        },
+    }
+)
 class RegionViewSetTestCase(APITestCase):
-    region: Region
-    country: Country
+    region = None
+    country = None
 
     def setUp(self):
+        image_flag = get_or_create_default_image("uploads/region/no_photo.jpg")
         self.country = Country.objects.create(
             alpha_2="GR",
             alpha_3="GRC",
             iso_cc=300,
             phone_code=30,
+            image_flag=image_flag,
         )
         self.region = Region.objects.create(
-            alpha="GR-I",
+            alpha="GRC",
             alpha_2=self.country,
         )
+        for language in languages:
+            self.region.set_current_language(language)
+            self.region.name = f"Region {language}"
+            self.region.save()
+        self.region.set_current_language(default_language)
+
+    @staticmethod
+    def get_region_detail_url(pk):
+        return reverse("region-detail", args=[pk])
+
+    @staticmethod
+    def get_region_list_url():
+        return reverse("region-list")
 
     def test_list(self):
-        response = self.client.get("/api/v1/region/")
+        url = self.get_region_list_url()
+        response = self.client.get(url)
         regions = Region.objects.all()
         serializer = RegionSerializer(regions, many=True)
+
         self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_valid(self):
-        country = Country.objects.create(
-            alpha_2="CY",
-            alpha_3="CYP",
-            iso_cc=196,
-            phone_code=357,
-        )
         payload = {
+            "alpha": "GRD",
+            "alpha_2": self.region.alpha_2.pk,
             "translations": {},
-            "alpha": "CY-III",
-            "alpha_2": country.pk,
         }
-
-        for language in settings.LANGUAGES:
+        for language in languages:
             language_code = language[0]
             language_name = language[1]
 
             translation_payload = {
-                "name": f"Translation for {language_name}",
+                "name": f"New Region name in {language_name}",
             }
 
             payload["translations"][language_code] = translation_payload
 
-        response = self.client.post(
-            "/api/v1/region/", json.dumps(payload), content_type="application/json"
-        )
+        url = self.get_region_list_url()
+        response = self.client.post(url, data=payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_create_invalid(self):
         payload = {
-            "alpha": "INVALID_ALPHA",
-            "alpha_2": "INVALID",
+            "alpha": "invalid_alpha",
+            "alpha_2": "invalid_alpha_2",
+            "translations": {
+                "invalid_lang_code": {
+                    "name": "Translation for invalid language code",
+                }
+            },
         }
-        response = self.client.post(
-            "/api/v1/region/", json.dumps(payload), content_type="application/json"
-        )
+
+        url = self.get_region_list_url()
+        response = self.client.post(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_retrieve_valid(self):
-        response = self.client.get(f"/api/v1/region/{self.region.pk}/")
-        region = Region.objects.get(pk=self.region.pk)
+        url = self.get_region_detail_url(self.region.alpha)
+        response = self.client.get(url)
+        region = Region.objects.get(alpha=self.region.alpha)
         serializer = RegionSerializer(region)
+
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_retrieve_invalid(self):
-        invalid_region = "invalid"
-        response = self.client.get(f"/api/v1/region/{invalid_region}/")
+        url = self.get_region_detail_url(999)
+        response = self.client.get(url)
+
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_update_valid(self):
-        country = Country.objects.create(
-            alpha_2="CY",
-            alpha_3="CYP",
-            iso_cc=196,
-            phone_code=357,
-        )
         payload = {
+            "alpha": "GRC",
+            "alpha_2": self.region.alpha_2.pk,
             "translations": {},
-            "alpha": "GR-I",
-            "alpha_2": country.pk,
         }
-
-        for language in settings.LANGUAGES:
+        for language in languages:
             language_code = language[0]
             language_name = language[1]
 
             translation_payload = {
-                "name": f"Translation for {language_name}",
+                "name": f"Updated Region name in {language_name}",
             }
 
             payload["translations"][language_code] = translation_payload
 
-        response = self.client.put(
-            f"/api/v1/region/{self.region.pk}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+        url = self.get_region_detail_url(self.region.pk)
+        response = self.client.put(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_update_invalid(self):
         payload = {
-            "alpha": "INVALID_ALPHA",
-            "alpha_2": "INVALID",
+            "alpha": "invalid_alpha",
+            "alpha_2": "invalid_alpha_2",
+            "translations": {
+                "invalid_lang_code": {
+                    "name": "Translation for invalid language code",
+                }
+            },
         }
-        response = self.client.put(
-            f"/api/v1/region/{self.region.pk}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+
+        url = self.get_region_detail_url(self.region.pk)
+        response = self.client.put(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_partial_update_valid(self):
-        payload = {}
-        response = self.client.patch(
-            f"/api/v1/region/{self.region.pk}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+        payload = {
+            "translations": {
+                default_language: {
+                    "name": f"Updated Region {default_language}",
+                }
+            },
+        }
+
+        url = self.get_region_detail_url(self.region.pk)
+        response = self.client.patch(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_partial_update_invalid(self):
         payload = {
-            "alpha": "INVALID_ALPHA",
-            "alpha_2": "INVALID",
+            "alpha": "invalid_alpha",
+            "translations": {
+                "invalid_lang_code": {
+                    "name": "Translation for invalid language code",
+                }
+            },
         }
-        response = self.client.patch(
-            f"/api/v1/region/{self.region.pk}/",
-            json.dumps(payload),
-            content_type="application/json",
-        )
+
+        url = self.get_region_detail_url(self.region.pk)
+        response = self.client.patch(url, data=payload, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_destroy_valid(self):
-        response = self.client.delete(f"/api/v1/region/{self.region.pk}/")
+        url = self.get_region_detail_url(self.region.pk)
+        response = self.client.delete(url)
+
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
     def test_destroy_invalid(self):
-        invalid_region = "invalid"
-        response = self.client.delete(f"/api/v1/region/{invalid_region}/")
+        url = self.get_region_detail_url(999)
+        response = self.client.delete(url)
+
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

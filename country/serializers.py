@@ -26,4 +26,6 @@ class CountrySerializer(TranslatableModelSerializer):
             "updated_at",
             "sort_order",
             "uuid",
+            "main_image_absolute_url",
+            "main_image_filename",
         )

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from typing import Any
 from typing import List
 
 from django.conf import settings
@@ -9,13 +8,14 @@ from django.contrib.auth.models import AbstractBaseUser
 from django.contrib.auth.models import BaseUserManager
 from django.contrib.auth.models import PermissionsMixin
 from django.contrib.sessions.models import Session
-from django.core.cache import cache
 from django.db import models
 from django.http import HttpRequest
+from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
 from core import caches
+from core.caches import cache_instance
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
 
@@ -100,19 +100,25 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
         return self.email
 
     def remove_all_sessions(self, request: HttpRequest) -> None:
-        # Session DB
-        user_sessions: List[Any] = []
-        for session in Session.objects.all():
-            if str(self.pk) == session.get_decoded().get("_auth_user_id"):
-                user_sessions.append(session.pk)
-        Session.objects.filter(pk__in=user_sessions).delete()
+        # Get the user's primary key
+        user_id = self.pk
+
+        # Delete all sessions associated with the user's primary key
+        Session.objects.filter(
+            expire_date__gte=timezone.now(),
+            session_data__contains=f'auth_user_id": "{user_id}"',
+        ).delete()
 
         # Session Cache
-        user_cache_keys = cache.keys(f"{caches.USER}_*{self.pk}_*")
+        user_cache_keys = cache_instance.keys(
+            f"{caches.USER_AUTHENTICATED}_*{user_id}_*"
+        )
         for key in user_cache_keys:
-            caches.delete(key)
+            cache_instance.delete(key)
 
-        return None
+        # Clear the cache for the current user
+        user_cache_key = caches.USER_AUTHENTICATED + "_" + str(user_id)
+        cache_instance.delete(user_cache_key)
 
     @property
     def main_image_absolute_url(self) -> str:

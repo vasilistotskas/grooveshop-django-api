@@ -3,6 +3,7 @@ import os
 from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from django_stubs_ext.db.models import TypedModelMeta
 from mptt.fields import TreeForeignKey
 from mptt.managers import TreeManager
 from mptt.models import MPTTModel
@@ -64,13 +65,13 @@ class ProductCategory(
 
     objects = CategoryManager()
 
-    class Meta:
+    class Meta(TypedModelMeta):
         verbose_name = _("Product Category")
         verbose_name_plural = _("Product Categories")
         ordering = ["sort_order"]
 
     class MPTTMeta:
-        order_insertion_by: list[str] = ["sort_order"]
+        order_insertion_by = ["sort_order"]
 
     def __init__(self, *args, **kwargs):
         super(ProductCategory, self).__init__(*args, **kwargs)
@@ -88,7 +89,9 @@ class ProductCategory(
         return " / ".join(full_path[::-1])
 
     def get_ordering_queryset(self):
-        return ProductCategory.objects.filter(parent=self.parent)
+        return ProductCategory.objects.filter(parent=self.parent).get_descendants(
+            include_self=True
+        )
 
     @property
     def recursive_product_count(self) -> int:

@@ -18,7 +18,6 @@ from drf_spectacular.views import SpectacularSwaggerView
 from rest_framework import routers
 from rest_framework.authtoken import views
 
-from session.views import ActiveUserViewSet
 
 app_name = "app"
 
@@ -38,7 +37,6 @@ front_urls = [
 ]
 
 router = routers.SimpleRouter()
-router.register(r"active_users", ActiveUserViewSet, basename="active_users")
 
 
 class OTPAdmin(OTPAdminSite):
@@ -87,6 +85,8 @@ urlpatterns = i18n_patterns(
         SpectacularRedocView.as_view(url_name="schema"),
         name="redoc",
     ),
+    # Django sql explorer
+    path("explorer/", include("explorer.urls")),
     path("", include(front_urls)),
     prefix_default_language=False,
 )

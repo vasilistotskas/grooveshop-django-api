@@ -1,13 +1,15 @@
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from blog.models.author import BlogAuthor
 from blog.models.comment import BlogComment
 from blog.models.post import BlogPost
-from user.models import UserAccount
 
 languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
+
+User = get_user_model()
 
 
 class BlogCommentModelTestCase(TestCase):
@@ -17,7 +19,7 @@ class BlogCommentModelTestCase(TestCase):
     post = None
 
     def setUp(self):
-        self.user = UserAccount.objects.create(
+        self.user = User.objects.create_user(
             email="testuser@example.com", password="testpassword"
         )
         self.author = BlogAuthor.objects.create(user=self.user)
@@ -63,6 +65,13 @@ class BlogCommentModelTestCase(TestCase):
             "Blog Comments",
         )
 
+    def test_unicode_representation(self):
+        # Test the __unicode__ method returns the translated name
+        self.assertEqual(
+            self.comment.__unicode__(),
+            self.comment.safe_translation_getter("content"),
+        )
+
     def test_translations(self):
         # Test if translations are saved correctly
         for language in languages:
@@ -73,13 +82,14 @@ class BlogCommentModelTestCase(TestCase):
             )
 
     def test_str_representation(self):
+        # Test the __str__ method returns the translated content
         self.assertEqual(
             str(self.comment), self.comment.safe_translation_getter("content")
         )
 
     def test_number_of_likes(self):
         # Create another user to simulate a "like" action
-        other_user = UserAccount.objects.create(
+        other_user = User.objects.create_user(
             email="testuser2@example.com", password="testpassword"
         )
 

@@ -4,6 +4,7 @@ from django.conf import settings
 from django.db import models
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
+from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel
 from parler.models import TranslatedFields
 
@@ -33,7 +34,7 @@ class Slider(TranslatableModel, TimeStampMixinModel, UUIDModel):
         ),
     )
 
-    class Meta:
+    class Meta(TypedModelMeta):
         verbose_name = _("Slider")
         verbose_name_plural = _("Sliders")
         ordering = ["-created_at"]
@@ -77,13 +78,19 @@ class Slide(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     slider = models.ForeignKey(
         "slider.Slider", related_name="slide_slider", on_delete=models.CASCADE
     )
-    discount = models.DecimalField(max_digits=11, decimal_places=2, default=0.0)
-    show_button = models.BooleanField(blank=False, null=False, default=True)
-    date_start = models.DateTimeField(auto_now_add=False)
-    date_end = models.DateTimeField(auto_now_add=False)
-    image = models.ImageField(upload_to="uploads/slides/", blank=True, null=True)
+    discount = models.DecimalField(
+        _("Discount"), max_digits=11, decimal_places=2, default=0.0
+    )
+    show_button = models.BooleanField(
+        _("Show Button"), blank=False, null=False, default=False
+    )
+    date_start = models.DateTimeField(_("Date Start"), auto_now_add=False)
+    date_end = models.DateTimeField(_("Date End"), auto_now_add=False)
+    image = models.ImageField(
+        _("Image"), upload_to="uploads/slides/", blank=True, null=True
+    )
     thumbnail = models.ImageField(
-        upload_to="uploads/slides/thumbnails/", blank=True, null=True
+        _("Thumbnail"), upload_to="uploads/slides/thumbnails/", blank=True, null=True
     )
     translations = TranslatedFields(
         name=models.CharField(_("Name"), max_length=50, blank=True, null=True),
@@ -98,7 +105,7 @@ class Slide(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         ),
     )
 
-    class Meta:
+    class Meta(TypedModelMeta):
         verbose_name = _("Slide")
         verbose_name_plural = _("Slides")
         ordering = ["sort_order"]

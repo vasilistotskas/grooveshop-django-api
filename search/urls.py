@@ -4,7 +4,7 @@ from rest_framework.urlpatterns import format_suffix_patterns
 from search import views
 
 urlpatterns = [
-    path("search-product", views.SearchProduct.as_view()),
+    path("search-product", views.SearchProduct.as_view(), name="search-product"),
 ]
 
 urlpatterns = format_suffix_patterns(urlpatterns)

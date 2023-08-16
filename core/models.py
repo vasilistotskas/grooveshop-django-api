@@ -1,5 +1,4 @@
 import uuid
-from gettext import gettext as _
 from typing import Any
 
 from django.db import models
@@ -10,10 +9,13 @@ from django.db.models import Q
 from django.db.models import QuerySet
 from django.utils import timezone as tz
 from django.utils.timezone import now
+from django.utils.translation import gettext_lazy as _
 
 
 class SortableModel(models.Model):
-    sort_order = models.IntegerField(editable=False, db_index=True, null=True)
+    sort_order = models.IntegerField(
+        _("Sort Order"), editable=False, db_index=True, null=True
+    )
 
     class Meta:
         abstract = True
@@ -71,8 +73,8 @@ class PublishedQuerySet(models.QuerySet):
 
 
 class PublishableModel(models.Model):
-    published_at = models.DateTimeField(blank=True, null=True)
-    is_published = models.BooleanField(default=False)
+    published_at = models.DateTimeField(_("Published At"), null=True, blank=True)
+    is_published = models.BooleanField(_("Is Published"), default=False)
 
     objects: Any = models.Manager.from_queryset(PublishedQuerySet)()
 

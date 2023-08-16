@@ -5,13 +5,20 @@ from django.test import TestCase
 from cart.models import Cart
 from cart.models import CartItem
 from cart.service import CartService
-from core import caches
+from cart.service import ProcessUserCartOption
+from core.caches import cache_instance
 from product.models.product import Product
 
 User = get_user_model()
 
 
 class CartServiceTest(TestCase):
+    user = None
+    factory = None
+    request = None
+    cart = None
+    product = None
+
     def setUp(self):
         self.user = User.objects.create_user(
             email="testuser@example.com", password="testpassword"
@@ -66,10 +73,10 @@ class CartServiceTest(TestCase):
         # Create a cart for the pre-login user and add a cart item
         pre_login_cart = Cart.objects.create()
         cart_service.create_cart_item(self.product, 2)
-        caches.set(str(self.user.id), pre_login_cart.id, 3600)
+        cache_instance.set(str(self.user.id), pre_login_cart.id, 3600)
 
         # Merge carts with "merge" option
-        cart_service.process_user_cart(self.request, option="merge")
+        cart_service.process_user_cart(self.request, option=ProcessUserCartOption.MERGE)
 
         # Check that the cart items are now associated with the user's cart
         self.assertEqual(self.cart.cart_item_cart.count(), 1)
@@ -81,7 +88,7 @@ class CartServiceTest(TestCase):
         cart_service.create_cart_item(self.product, 2)
 
         # Clean user's cart with "clean" option
-        cart_service.process_user_cart(self.request, option="clean")
+        cart_service.process_user_cart(self.request, option=ProcessUserCartOption.CLEAN)
 
         # Check that the cart items in the user's cart are deleted
         self.assertEqual(self.cart.cart_item_cart.count(), 0)

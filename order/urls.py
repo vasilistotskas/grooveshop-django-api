@@ -1,11 +1,13 @@
 from django.urls import path
 
-from order.views import OrderViewSet
+from order.views.order import Checkout
+from order.views.order import OrderViewSet
 
 urlpatterns = [
     path(
         "order/",
         OrderViewSet.as_view({"get": "list", "post": "create"}),
+        name="order-list",
     ),
     path(
         "order/<int:pk>/",
@@ -17,5 +19,11 @@ urlpatterns = [
                 "delete": "destroy",
             }
         ),
+        name="order-detail",
+    ),
+    path(
+        "checkout/",
+        Checkout.as_view(),
+        name="checkout",
     ),
 ]

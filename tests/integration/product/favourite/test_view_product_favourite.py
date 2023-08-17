@@ -81,9 +81,9 @@ class ProductFavouriteViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_retrieve_valid(self):
-        url = self.get_product_favourite_detail_url(self.product.id)
+        url = self.get_product_favourite_detail_url(self.product_favourite.id)
         response = self.client.get(url)
-        favourite = ProductFavourite.objects.get(pk=self.product.id)
+        favourite = ProductFavourite.objects.get(pk=self.product_favourite.id)
         serializer = ProductFavouriteSerializer(favourite)
 
         self.assertEqual(response.data, serializer.data)
@@ -102,7 +102,7 @@ class ProductFavouriteViewSetTestCase(APITestCase):
             "user": self.user.id,
         }
 
-        url = self.get_product_favourite_detail_url(self.product.id)
+        url = self.get_product_favourite_detail_url(self.product_favourite.id)
         response = self.client.put(url, payload)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -113,7 +113,7 @@ class ProductFavouriteViewSetTestCase(APITestCase):
             "user": "invalid_user",
         }
 
-        url = self.get_product_favourite_detail_url(self.product.id)
+        url = self.get_product_favourite_detail_url(self.product_favourite.id)
         response = self.client.put(url, payload)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -123,7 +123,7 @@ class ProductFavouriteViewSetTestCase(APITestCase):
             "product": self.product.id,
         }
 
-        url = self.get_product_favourite_detail_url(self.product.id)
+        url = self.get_product_favourite_detail_url(self.product_favourite.id)
         response = self.client.patch(url, payload)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -133,17 +133,17 @@ class ProductFavouriteViewSetTestCase(APITestCase):
             "product": "invalid_product",
         }
 
-        url = self.get_product_favourite_detail_url(self.product.id)
+        url = self.get_product_favourite_detail_url(self.product_favourite.id)
         response = self.client.patch(url, payload)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_destroy_valid(self):
-        url = self.get_product_favourite_detail_url(self.product.id)
+        url = self.get_product_favourite_detail_url(self.product_favourite.id)
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(ProductFavourite.objects.filter(pk=self.product.id).exists())
+        self.assertFalse(ProductFavourite.objects.filter(pk=self.product_favourite.id).exists())
 
     def test_destroy_invalid(self):
         invalid_product_favourite_id = 999999

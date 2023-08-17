@@ -165,11 +165,6 @@ class OrderViewSetTestCase(APITestCase):
         url = self.get_order_list_url()
         response = self.client.post(url, data=payload, format="json")
 
-        print(
-            "============== test_create_valid - response.data==============",
-            response.data,
-        )
-
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Order.objects.count(), 2)
 

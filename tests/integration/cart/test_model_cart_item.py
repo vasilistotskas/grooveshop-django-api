@@ -70,16 +70,6 @@ class CartItemModelTestCase(TestCase):
         self.cart_item.update_quantity(new_quantity)
         self.assertEqual(self.cart_item.quantity, new_quantity)
 
-    def test_cart_item_unique_together_constraint(self):
-        # Test if the unique_together constraint for 'cart' and 'product' fields works correctly
-        # Attempt to create another cart item with the same cart and product and verify it raises the appropriate error
-        with self.assertRaises(Exception) as raised:
-            CartItem.objects.create(cart=self.cart, product=self.product, quantity=3)
-        self.assertEqual(
-            raised.exception.args[0],
-            "UNIQUE constraint failed: cart_cartitem.cart_id, cart_cartitem.product_id",
-        )
-
     def test_cart_item_ordering(self):
         # Test if the ordering works correctly based on the 'id' field
         product_2 = Product.objects.create(

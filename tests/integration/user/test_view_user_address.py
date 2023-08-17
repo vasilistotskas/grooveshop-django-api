@@ -202,11 +202,11 @@ class UserAddressViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_destroy_valid(self):
-        url = self.get_user_address_detail_url(self.user.pk)
+        url = self.get_user_address_detail_url(self.address.pk)
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(UserAddress.objects.filter(pk=self.user.pk).exists())
+        self.assertFalse(UserAddress.objects.filter(pk=self.address.pk).exists())
 
     def test_destroy_invalid(self):
         invalid_user_address_id = 9999  # An ID that doesn't exist in the database

@@ -3,9 +3,17 @@
 
 
 
+## v0.12.0 (2023-08-17)
+
+### Feature
+
+* feat: New Unit tests implemented and remove unused methods and files. ([`db41415`](https://github.com/vasilistotskas/grooveshop-django-api/commit/db414155306e2284952391e156291cee28dbf9a5))
+
 ## v0.11.4 (2023-08-17)
 
 ### Chore
+
+* chore(release): release version 0.11.4 [skip ci] ([`c663567`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c663567f0d6312ab5b310e89cf4764efdb9f14fb))
 
 * chore(README.md): Added Coverage Status ([`0d30ec0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0d30ec06ba4293a842a0ec3fc470e532f9b3f501))
 

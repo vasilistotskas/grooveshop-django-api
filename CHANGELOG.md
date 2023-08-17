@@ -3,7 +3,21 @@
 
 
 
+## v0.11.4 (2023-08-17)
+
+### Chore
+
+* chore(README.md): Added Coverage Status ([`0d30ec0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0d30ec06ba4293a842a0ec3fc470e532f9b3f501))
+
+### Fix
+
+* fix(ci.yml): Publish package distributions to TestPyPI if released. ([`f11972b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f11972b8a50cc61d55febaa66ec2a06028b6f986))
+
 ## v0.11.3 (2023-08-17)
+
+### Chore
+
+* chore(release): release version 0.11.3 [skip ci] ([`f86a244`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f86a244f23e47636222345c02a6b69209731b249))
 
 ### Fix
 

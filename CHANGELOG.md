@@ -3,9 +3,17 @@
 
 
 
+## v0.11.3 (2023-08-17)
+
+### Fix
+
+* fix(ci.yml): Remove upload-to-gh-release step ([`8540ef8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8540ef884dc60e9b63f3d5a4318cfcb67635c64e))
+
 ## v0.11.2 (2023-08-17)
 
 ### Chore
+
+* chore(release): release version 0.11.2 [skip ci] ([`a8eace2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a8eace2e0288d8b8be650c92742d41c319586c44))
 
 * chore(app): Added static folder ([`6d6b287`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6d6b28797336bcc0805f5857af2f2b3a9d1c6481))
 

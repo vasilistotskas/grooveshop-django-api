@@ -1,3 +1,4 @@
+[![Coverage Status](https://coveralls.io/repos/github/vasilistotskas/grooveshop-django-api/badge.svg?branch=main)](https://coveralls.io/github/vasilistotskas/grooveshop-django-api?branch=main)
 # [GrooveShop](https://github.com/vasilistotskas/grooveShop)
 ####   -    [Django](https://github.com/vasilistotskas/grooveShop/tree/master/src)
 ####   -    [Nuxt3](https://github.com/vasilistotskas/grooveShop/tree/master/storefrontUINodeNuxt/src)

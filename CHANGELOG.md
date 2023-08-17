@@ -3,7 +3,17 @@
 
 
 
+## v0.11.1 (2023-08-17)
+
+### Fix
+
+* fix(poetry): update python-semantic-release in requirements and pyproject. ([`4ca745d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4ca745d011a4362f0d427784d65c3e78c0712533))
+
 ## v0.11.0 (2023-08-17)
+
+### Chore
+
+* chore(release): release version 0.11.0 [skip ci] ([`2538db1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2538db1cbf7a151f72f82cd3087bf64c96fc5891))
 
 ### Feature
 

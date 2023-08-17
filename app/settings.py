@@ -332,20 +332,7 @@ if SYSTEM_ENV == "GITHUB_WORKFLOW":
         }
     }
 
-CACHES = {}
 if SYSTEM_ENV != "GITHUB_WORKFLOW":
-    CACHES = {
-        "default": {
-            "BACKEND": "django_redis.cache.RedisCache",
-            "LOCATION": "redis://redis:6379/0",
-            "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
-        },
-        "fallback": {
-            "BACKEND": "django.core.cache.backends.dummy.DummyCache",
-        },
-    }
-
-if CACHES:
     CACHES = {
         "default": custom_cache_config.cache_backend,
         "fallback": {

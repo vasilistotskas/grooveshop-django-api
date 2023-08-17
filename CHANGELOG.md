@@ -3,7 +3,21 @@
 
 
 
+## v0.11.2 (2023-08-17)
+
+### Chore
+
+* chore(app): Added static folder ([`6d6b287`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6d6b28797336bcc0805f5857af2f2b3a9d1c6481))
+
+### Fix
+
+* fix(ci.yml): Use GITHUB_TOKEN and add tag ([`d0f14ef`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d0f14ef27d22f14c1aaf8ef89270353ae1786eed))
+
 ## v0.11.1 (2023-08-17)
+
+### Chore
+
+* chore(release): release version 0.11.1 [skip ci] ([`3f35a84`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3f35a84cae1f6ac3200c2d4fae7cef5137d84e0a))
 
 ### Fix
 

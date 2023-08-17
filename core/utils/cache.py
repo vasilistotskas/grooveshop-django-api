@@ -32,7 +32,6 @@ class CustomCacheConfig:
             return {
                 "BACKEND": "django.core.cache.backends.redis.RedisCache",
                 "LOCATION": self.redis_location,
-                "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
             }
         else:
             return {

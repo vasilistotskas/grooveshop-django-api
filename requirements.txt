@@ -15,7 +15,7 @@ gunicorn==21.2.0
 whitenoise==6.5.0
 django-filter==23.2
 black==23.7.0
-python-semantic-release==8.0.6
+python-semantic-release==8.0.7
 flake8==6.1.0
 coverage==7.3.0
 drf-spectacular==0.26.4

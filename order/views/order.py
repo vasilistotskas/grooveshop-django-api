@@ -20,6 +20,7 @@ User = get_user_model()
 
 
 class Checkout(APIView):
+    serializer_class = CheckoutSerializer
     queryset = Order.objects.all()
 
     def create_order(self, request: Request, serializer: CheckoutSerializer) -> None:

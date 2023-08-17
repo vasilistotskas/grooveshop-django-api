@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 from django.core.cache import BaseCache
@@ -12,6 +13,8 @@ logger = logging.getLogger(__name__)
 DEFAULT_CACHE_ALIAS = "default"
 FALLBACK_CACHE_ALIAS = "fallback"
 
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "app.settings")
+
 
 class CustomCache(BaseCache):
     cache: BaseCache
@@ -22,7 +25,8 @@ class CustomCache(BaseCache):
             self.cache = caches[DEFAULT_CACHE_ALIAS]
         except Exception as exc:
             logger.warning("Error connecting to cache: %s", str(exc))
-            self.cache = caches[FALLBACK_CACHE_ALIAS]
+            if os.environ.get("SYSTEM_ENV") != "GITHUB_WORKFLOW":
+                self.cache = caches[FALLBACK_CACHE_ALIAS]
 
     def get(
         self, key: Any, default: Any | None = None, version: int | None = None

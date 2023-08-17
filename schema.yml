@@ -21,9 +21,71 @@ paths:
               schema:
                 $ref: '#/components/schemas/UserAccount'
           description: ''
+  /api/v1/active_users/active_users_count{format}:
+    get:
+      operationId: api_v1_active_users_active_users_count_formatted_retrieve
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAccount'
+          description: ''
   /api/v1/active_users/refresh_last_activity/:
     post:
       operationId: api_v1_active_users_refresh_last_activity_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserAccount'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserAccount'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserAccount'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAccount'
+          description: ''
+  /api/v1/active_users/refresh_last_activity{format}:
+    post:
+      operationId: api_v1_active_users_refresh_last_activity_formatted_create
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
       tags:
       - api
       requestBody:
@@ -2904,6 +2966,35 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/checkout/:
+    post:
+      operationId: api_v1_checkout_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Checkout'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Checkout'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Checkout'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Checkout'
+          description: ''
   /api/v1/country/:
     get:
       operationId: api_v1_country_list
@@ -3428,13 +3519,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/Order'
+              $ref: '#/components/schemas/OrderCreateUpdate'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/Order'
+              $ref: '#/components/schemas/OrderCreateUpdate'
           application/json:
             schema:
-              $ref: '#/components/schemas/Order'
+              $ref: '#/components/schemas/OrderCreateUpdate'
         required: true
       security:
       - basicAuth: []
@@ -3446,7 +3537,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Order'
+                $ref: '#/components/schemas/OrderCreateUpdate'
           description: ''
   /api/v1/order/{id}/:
     get:
@@ -3485,13 +3576,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/Order'
+              $ref: '#/components/schemas/OrderCreateUpdate'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/Order'
+              $ref: '#/components/schemas/OrderCreateUpdate'
           application/json:
             schema:
-              $ref: '#/components/schemas/Order'
+              $ref: '#/components/schemas/OrderCreateUpdate'
         required: true
       security:
       - basicAuth: []
@@ -3503,7 +3594,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Order'
+                $ref: '#/components/schemas/OrderCreateUpdate'
           description: ''
     patch:
       operationId: api_v1_order_partial_update
@@ -3519,13 +3610,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedOrder'
+              $ref: '#/components/schemas/PatchedOrderCreateUpdate'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedOrder'
+              $ref: '#/components/schemas/PatchedOrderCreateUpdate'
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedOrder'
+              $ref: '#/components/schemas/PatchedOrderCreateUpdate'
       security:
       - basicAuth: []
       - cookieAuth: []
@@ -3536,7 +3627,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Order'
+                $ref: '#/components/schemas/OrderCreateUpdate'
           description: ''
     delete:
       operationId: api_v1_order_destroy
@@ -5099,9 +5190,9 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/product/images/:
+  /api/v1/product/image/:
     get:
-      operationId: api_v1_product_images_list
+      operationId: api_v1_product_image_list
       parameters:
       - in: query
         name: id
@@ -5154,7 +5245,7 @@ paths:
                 $ref: '#/components/schemas/PaginatedProductImageList'
           description: ''
     post:
-      operationId: api_v1_product_images_create
+      operationId: api_v1_product_image_create
       tags:
       - api
       requestBody:
@@ -5181,9 +5272,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProductImage'
           description: ''
-  /api/v1/product/images{format}:
+  /api/v1/product/image{format}:
     get:
-      operationId: api_v1_product_images_formatted_list
+      operationId: api_v1_product_image_formatted_list
       parameters:
       - in: path
         name: format
@@ -5243,7 +5334,7 @@ paths:
                 $ref: '#/components/schemas/PaginatedProductImageList'
           description: ''
     post:
-      operationId: api_v1_product_images_formatted_create
+      operationId: api_v1_product_image_formatted_create
       parameters:
       - in: path
         name: format
@@ -5278,9 +5369,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProductImage'
           description: ''
-  /api/v1/product/images/{id}/:
+  /api/v1/product/image/{id}/:
     get:
-      operationId: api_v1_product_images_retrieve
+      operationId: api_v1_product_image_retrieve
       parameters:
       - in: path
         name: id
@@ -5302,7 +5393,7 @@ paths:
                 $ref: '#/components/schemas/ProductImage'
           description: ''
     put:
-      operationId: api_v1_product_images_update
+      operationId: api_v1_product_image_update
       parameters:
       - in: path
         name: id
@@ -5336,7 +5427,7 @@ paths:
                 $ref: '#/components/schemas/ProductImage'
           description: ''
     patch:
-      operationId: api_v1_product_images_partial_update
+      operationId: api_v1_product_image_partial_update
       parameters:
       - in: path
         name: id
@@ -5369,7 +5460,7 @@ paths:
                 $ref: '#/components/schemas/ProductImage'
           description: ''
     delete:
-      operationId: api_v1_product_images_destroy
+      operationId: api_v1_product_image_destroy
       parameters:
       - in: path
         name: id
@@ -5386,9 +5477,9 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/product/images/{id}{format}:
+  /api/v1/product/image/{id}{format}:
     get:
-      operationId: api_v1_product_images_formatted_retrieve
+      operationId: api_v1_product_image_formatted_retrieve
       parameters:
       - in: path
         name: format
@@ -5417,7 +5508,7 @@ paths:
                 $ref: '#/components/schemas/ProductImage'
           description: ''
     put:
-      operationId: api_v1_product_images_formatted_update
+      operationId: api_v1_product_image_formatted_update
       parameters:
       - in: path
         name: format
@@ -5458,7 +5549,7 @@ paths:
                 $ref: '#/components/schemas/ProductImage'
           description: ''
     patch:
-      operationId: api_v1_product_images_formatted_partial_update
+      operationId: api_v1_product_image_formatted_partial_update
       parameters:
       - in: path
         name: format
@@ -5498,7 +5589,7 @@ paths:
                 $ref: '#/components/schemas/ProductImage'
           description: ''
     delete:
-      operationId: api_v1_product_images_formatted_destroy
+      operationId: api_v1_product_image_formatted_destroy
       parameters:
       - in: path
         name: format
@@ -9820,6 +9911,147 @@ components:
       - productDiscountPercent
       - totalDiscountValue
       - totalPrice
+    Checkout:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        user:
+          type: integer
+          nullable: true
+        country:
+          type: string
+          title: Country Code Alpha 2
+          nullable: true
+        region:
+          type: string
+          nullable: true
+        floor:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/FloorEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        locationType:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/LocationTypeEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        street:
+          type: string
+          maxLength: 255
+        streetNumber:
+          type: string
+          maxLength: 255
+        payWay:
+          type: integer
+          nullable: true
+        status:
+          $ref: '#/components/schemas/StatusAe9Enum'
+        firstName:
+          type: string
+          maxLength: 255
+        lastName:
+          type: string
+          maxLength: 255
+        email:
+          type: string
+          maxLength: 255
+        zipcode:
+          type: string
+          maxLength: 255
+        place:
+          type: string
+          nullable: true
+          maxLength: 255
+        city:
+          type: string
+          maxLength: 255
+        phone:
+          type: string
+          maxLength: 255
+        mobilePhone:
+          type: string
+          nullable: true
+          maxLength: 255
+        paidAmount:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        customerNotes:
+          type: string
+          nullable: true
+        orderItemOrder:
+          type: array
+          items:
+            $ref: '#/components/schemas/CheckoutItem'
+        shippingPrice:
+          type: number
+          format: double
+          maximum: 1000000
+          minimum: -1000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        documentType:
+          $ref: '#/components/schemas/DocumentTypeEnum'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        totalPriceItems:
+          type: number
+          format: double
+          readOnly: true
+        totalPriceExtra:
+          type: number
+          format: double
+          readOnly: true
+        fullAddress:
+          type: string
+          readOnly: true
+      required:
+      - city
+      - email
+      - firstName
+      - fullAddress
+      - id
+      - lastName
+      - orderItemOrder
+      - paidAmount
+      - phone
+      - street
+      - streetNumber
+      - totalPriceExtra
+      - totalPriceItems
+      - updatedAt
+      - uuid
+      - zipcode
+    CheckoutItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        product:
+          type: integer
+        quantity:
+          type: integer
+      required:
+      - id
+      - product
     Country:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -9872,9 +10104,17 @@ components:
           type: string
           format: uuid
           readOnly: true
+        mainImageAbsoluteUrl:
+          type: string
+          readOnly: true
+        mainImageFilename:
+          type: string
+          readOnly: true
       required:
       - alpha2
       - alpha3
+      - mainImageAbsoluteUrl
+      - mainImageFilename
       - sortOrder
       - translations
       - updatedAt
@@ -9972,7 +10212,7 @@ components:
           - $ref: '#/components/schemas/PayWay'
           readOnly: true
         status:
-          $ref: '#/components/schemas/OrderStatusEnum'
+          $ref: '#/components/schemas/StatusAe9Enum'
         firstName:
           type: string
           maxLength: 255
@@ -10002,6 +10242,14 @@ components:
         customerNotes:
           type: string
           nullable: true
+        paidAmount:
+          type: number
+          format: double
+          maximum: 1000000
+          minimum: -1000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          nullable: true
         orderItemOrder:
           type: array
           items:
@@ -10026,7 +10274,11 @@ components:
           type: string
           format: uuid
           readOnly: true
-        totalPrice:
+        totalPriceItems:
+          type: number
+          format: double
+          readOnly: true
+        totalPriceExtra:
           type: number
           format: double
           readOnly: true
@@ -10047,7 +10299,136 @@ components:
       - region
       - street
       - streetNumber
-      - totalPrice
+      - totalPriceExtra
+      - totalPriceItems
+      - updatedAt
+      - uuid
+      - zipcode
+    OrderCreateUpdate:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        user:
+          type: integer
+          nullable: true
+        country:
+          type: string
+          title: Country Code Alpha 2
+          nullable: true
+        region:
+          type: string
+          nullable: true
+        floor:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/FloorEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        locationType:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/LocationTypeEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        street:
+          type: string
+          maxLength: 255
+        streetNumber:
+          type: string
+          maxLength: 255
+        payWay:
+          type: integer
+          nullable: true
+        status:
+          $ref: '#/components/schemas/StatusAe9Enum'
+        firstName:
+          type: string
+          maxLength: 255
+        lastName:
+          type: string
+          maxLength: 255
+        email:
+          type: string
+          maxLength: 255
+        zipcode:
+          type: string
+          maxLength: 255
+        place:
+          type: string
+          nullable: true
+          maxLength: 255
+        city:
+          type: string
+          maxLength: 255
+        phone:
+          type: string
+          maxLength: 255
+        mobilePhone:
+          type: string
+          nullable: true
+          maxLength: 255
+        paidAmount:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        customerNotes:
+          type: string
+          nullable: true
+        orderItemOrder:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItemCreateUpdate'
+        shippingPrice:
+          type: number
+          format: double
+          maximum: 1000000
+          minimum: -1000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        documentType:
+          $ref: '#/components/schemas/DocumentTypeEnum'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        totalPriceItems:
+          type: number
+          format: double
+          readOnly: true
+        totalPriceExtra:
+          type: number
+          format: double
+          readOnly: true
+        fullAddress:
+          type: string
+          readOnly: true
+      required:
+      - city
+      - email
+      - firstName
+      - fullAddress
+      - id
+      - lastName
+      - orderItemOrder
+      - paidAmount
+      - phone
+      - street
+      - streetNumber
+      - totalPriceExtra
+      - totalPriceItems
       - updatedAt
       - uuid
       - zipcode
@@ -10095,18 +10476,27 @@ components:
       - totalPrice
       - updatedAt
       - uuid
-    OrderStatusEnum:
-      enum:
-      - Sent
-      - Paid and sent
-      - Canceled
-      - Pending
-      type: string
-      description: |-
-        * `Sent` - SENT
-        * `Paid and sent` - PAID_AND_SENT
-        * `Canceled` - CANCELED
-        * `Pending` - PENDING
+    OrderItemCreateUpdate:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        product:
+          type: integer
+        price:
+          type: number
+          format: double
+          maximum: 1000000
+          minimum: -1000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        quantity:
+          type: integer
+      required:
+      - id
+      - price
+      - product
     PaginatedBlogAuthorList:
       type: object
       properties:
@@ -10934,7 +11324,13 @@ components:
           type: string
           format: uuid
           readOnly: true
-    PatchedOrder:
+        mainImageAbsoluteUrl:
+          type: string
+          readOnly: true
+        mainImageFilename:
+          type: string
+          readOnly: true
+    PatchedOrderCreateUpdate:
       type: object
       properties:
         id:
@@ -10944,13 +11340,12 @@ components:
           type: integer
           nullable: true
         country:
-          allOf:
-          - $ref: '#/components/schemas/Country'
-          readOnly: true
+          type: string
+          title: Country Code Alpha 2
+          nullable: true
         region:
-          allOf:
-          - $ref: '#/components/schemas/Region'
-          readOnly: true
+          type: string
+          nullable: true
         floor:
           nullable: true
           oneOf:
@@ -10970,11 +11365,10 @@ components:
           type: string
           maxLength: 255
         payWay:
-          allOf:
-          - $ref: '#/components/schemas/PayWay'
-          readOnly: true
+          type: integer
+          nullable: true
         status:
-          $ref: '#/components/schemas/OrderStatusEnum'
+          $ref: '#/components/schemas/StatusAe9Enum'
         firstName:
           type: string
           maxLength: 255
@@ -11001,13 +11395,21 @@ components:
           type: string
           nullable: true
           maxLength: 255
+        paidAmount:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
         customerNotes:
           type: string
           nullable: true
         orderItemOrder:
           type: array
           items:
-            $ref: '#/components/schemas/OrderItem'
+            $ref: '#/components/schemas/OrderItemCreateUpdate'
         shippingPrice:
           type: number
           format: double
@@ -11028,7 +11430,11 @@ components:
           type: string
           format: uuid
           readOnly: true
-        totalPrice:
+        totalPriceItems:
+          type: number
+          format: double
+          readOnly: true
+        totalPriceExtra:
           type: number
           format: double
           readOnly: true
@@ -11360,13 +11766,29 @@ components:
           readOnly: true
     PatchedProductImage:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                title:
+                  type: string
+            de:
+              type: object
+              properties:
+                title:
+                  type: string
+            el:
+              type: object
+              properties:
+                title:
+                  type: string
         id:
           type: integer
           readOnly: true
-        title:
-          type: string
-          maxLength: 50
         product:
           type: integer
         image:
@@ -11378,10 +11800,10 @@ components:
           nullable: true
         isMain:
           type: boolean
-        productImageAbsoluteUrl:
+        mainImageAbsoluteUrl:
           type: string
           readOnly: true
-        productImageFilename:
+        mainImageFilename:
           type: string
           readOnly: true
         createdAt:
@@ -11844,10 +12266,12 @@ components:
         phone:
           type: string
           nullable: true
+          title: Phone Number
           maxLength: 255
         mobilePhone:
           type: string
           nullable: true
+          title: Mobile Phone Number
           maxLength: 255
         notes:
           type: string
@@ -12261,13 +12685,29 @@ components:
       - uuid
     ProductImage:
       type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                title:
+                  type: string
+            de:
+              type: object
+              properties:
+                title:
+                  type: string
+            el:
+              type: object
+              properties:
+                title:
+                  type: string
         id:
           type: integer
           readOnly: true
-        title:
-          type: string
-          maxLength: 50
         product:
           type: integer
         image:
@@ -12279,10 +12719,10 @@ components:
           nullable: true
         isMain:
           type: boolean
-        productImageAbsoluteUrl:
+        mainImageAbsoluteUrl:
           type: string
           readOnly: true
-        productImageFilename:
+        mainImageFilename:
           type: string
           readOnly: true
         createdAt:
@@ -12303,11 +12743,11 @@ components:
       required:
       - id
       - image
+      - mainImageAbsoluteUrl
+      - mainImageFilename
       - product
-      - productImageAbsoluteUrl
-      - productImageFilename
       - sortOrder
-      - title
+      - translations
       - updatedAt
       - uuid
     ProductReview:
@@ -12622,6 +13062,18 @@ components:
       - mainImageAbsoluteUrl
       - mainImageFilename
       - translations
+    StatusAe9Enum:
+      enum:
+      - Sent
+      - Paid and sent
+      - Canceled
+      - Pending
+      type: string
+      description: |-
+        * `Sent` - SENT
+        * `Paid and sent` - PAID_AND_SENT
+        * `Canceled` - CANCELED
+        * `Pending` - PENDING
     Tip:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -12834,10 +13286,12 @@ components:
         phone:
           type: string
           nullable: true
+          title: Phone Number
           maxLength: 255
         mobilePhone:
           type: string
           nullable: true
+          title: Mobile Phone Number
           maxLength: 255
         notes:
           type: string

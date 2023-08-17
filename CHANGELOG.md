@@ -3,9 +3,35 @@
 
 
 
+## v0.11.0 (2023-08-17)
+
+### Feature
+
+* feat(tests): Rewrite Cart tests/service and session middleware code cleanup. ([`02effab`](https://github.com/vasilistotskas/grooveshop-django-api/commit/02effabade8e9e389a56c66e0eca90d60fb1c92d))
+
+### Fix
+
+* fix(tests): Testing fixes ([`50f75dc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/50f75dce38cd44bc845a7537f58bdc99a461467a))
+
+* fix(caches): fix empty caches at settings.py ([`287d2ed`](https://github.com/vasilistotskas/grooveshop-django-api/commit/287d2edfa13be5aff41fc2630da3a8f6eb3fe690))
+
+* fix(app): caches dont use fallback in github env, schema.yml generate and added serializer_class in order checkout api view ([`9abb939`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9abb93923050044ced20327b3c7e1f35417ba394))
+
+### Refactor
+
+* refactor(app): Changes in Description
+
+1) Tests implemented and improved for application.
+2) Add name in all URL paths (reverse) usage.
+3) Cache Refactor.
+4) Multi language translations.
+5) requirements.txt and pyproject.toml update. ([`da506b6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/da506b696f4b08eae15ac020c72a560d8cb02c9e))
+
 ## v0.10.1 (2023-07-27)
 
 ### Chore
+
+* chore(release): release version 0.10.1 [skip ci] ([`ed839b1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ed839b1706b9292c4edc813afcfa707c5c780ccf))
 
 * chore(requirements.txt): update requirements
 

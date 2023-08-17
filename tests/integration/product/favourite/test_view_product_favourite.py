@@ -143,7 +143,9 @@ class ProductFavouriteViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(ProductFavourite.objects.filter(pk=self.product_favourite.id).exists())
+        self.assertFalse(
+            ProductFavourite.objects.filter(pk=self.product_favourite.id).exists()
+        )
 
     def test_destroy_invalid(self):
         invalid_product_favourite_id = 999999

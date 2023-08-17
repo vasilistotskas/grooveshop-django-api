@@ -1,18 +1,33 @@
 from __future__ import annotations
 
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
+from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from cart.models import CartItem
+from cart.paginators import CartItemPagination
+from cart.paginators import CartPagination
 from cart.serializers import CartItemCreateSerializer
 from cart.serializers import CartItemSerializer
 from cart.serializers import CartSerializer
 from cart.service import CartService
+from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 
 
 class CartViewSet(ModelViewSet):
     serializer_class = CartSerializer
+    pagination_class = CartPagination
+    filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
+    filterset_fields = [
+        "user",
+    ]
+    ordering_fields = ["user", "-created_at"]
+    ordering = ["-created_at"]
+    search_fields = [
+        "user",
+    ]
 
     def get_queryset(self):
         service = CartService(self.request)
@@ -53,6 +68,16 @@ class CartViewSet(ModelViewSet):
 
 class CartItemViewSet(ModelViewSet):
     serializer_class = CartItemSerializer
+    pagination_class = CartItemPagination
+    filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
+    filterset_fields = [
+        "cart",
+    ]
+    ordering = ["-created_at"]
+    ordering_fields = ["cart", "-created_at"]
+    search_fields = [
+        "cart",
+    ]
 
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):

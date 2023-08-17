@@ -78,9 +78,9 @@ class SessionTraceMiddleware:
     def update_cache(self, request):
         # Make a cache key for the user, if the there is no user, use the session key
         user_cache_key = (
-            caches.USER_AUTHENTICATED + "_" + str(request.user.id)
+            str(caches.USER_AUTHENTICATED) + "_" + str(request.user.id)
             if request.user.is_authenticated
-            else caches.USER_UNAUTHENTICATED + "_" + request.session.session_key
+            else str(caches.USER_UNAUTHENTICATED) + "_" + request.session.session_key
         )
         cache_data = {
             "last_activity": request.session["last_activity"],

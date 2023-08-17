@@ -2,7 +2,8 @@ import os
 
 from django.conf import settings
 from django.core.files.storage import default_storage
-from django.test import TestCase, override_settings
+from django.test import override_settings
+from django.test import TestCase
 
 from country.models import Country
 from helpers.seed import get_or_create_default_image
@@ -11,11 +12,13 @@ languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
-@override_settings(STORAGES={
-    "default": {
-        "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
-    },
-})
+@override_settings(
+    STORAGES={
+        "default": {
+            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
+        },
+    }
+)
 class CountryModelTestCase(TestCase):
     country = None
 
@@ -95,7 +98,9 @@ class CountryModelTestCase(TestCase):
 
     def test_str_representation(self):
         # Test the __str__ method returns the translated name
-        self.assertEqual(str(self.country), self.country.safe_translation_getter("name"))
+        self.assertEqual(
+            str(self.country), self.country.safe_translation_getter("name")
+        )
 
     def test_get_ordering_queryset(self):
         # Test if get_ordering_queryset returns Country queryset

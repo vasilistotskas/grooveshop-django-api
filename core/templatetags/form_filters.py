@@ -5,7 +5,7 @@ from django.utils.safestring import mark_safe
 
 register = template.Library()
 
-class_re = re.compile(r'(?<=class=["\'])(.*)(?=["\'])')
+class_re = re.compile(r'(<[^>]+class=["\'])(.*)(["\'][^>]*>)')
 
 
 @register.filter
@@ -15,10 +15,14 @@ def add_class(value, css_class):
     if match:
         m = re.search(
             r"^%s$|^%s\s|\s%s\s|\s%s$" % (css_class, css_class, css_class, css_class),
-            match.group(1),
+            match.group(2),
         )
         if not m:
-            return mark_safe(class_re.sub(match.group(1) + " " + css_class, string))
+            modified = class_re.sub(
+                r"\1" + match.group(2) + " " + css_class + r"\3", string
+            )
+            return mark_safe(modified)
     else:
-        return mark_safe(string.replace(">", f' class="{css_class}">'))
+        modified = string.replace(">", f' class="{css_class}">', 1)
+        return mark_safe(modified)
     return value

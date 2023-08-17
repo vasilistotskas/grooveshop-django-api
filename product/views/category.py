@@ -38,13 +38,6 @@ class ProductCategoryViewSet(TranslationsProcessingMixin, ModelViewSet):
             return self.get_paginated_response(data)
         return Response(data, status=status.HTTP_200_OK)
 
-    def recursive_node_to_dict(self, node):
-        result = self.get_serializer(instance=node).data
-        children = [self.recursive_node_to_dict(c) for c in node.get_children()]
-        if children:
-            result["children"] = children
-        return result
-
     def create(self, request, *args, **kwargs) -> Response:
         request = self.process_translations_data(request)
         serializer = self.get_serializer(data=request.data)

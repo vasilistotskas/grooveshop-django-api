@@ -69,7 +69,4 @@ class ProductReviewModelTestCase(TestCase):
         # Test if translations are saved correctly
         for language in languages:
             self.product_review.set_current_language(language)
-            self.assertEqual(
-                self.product_review.comment, f"Sample Comment {language}"
-            )
-
+            self.assertEqual(self.product_review.comment, f"Sample Comment {language}")

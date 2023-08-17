@@ -2,7 +2,8 @@ import os
 
 from django.conf import settings
 from django.core.files.storage import default_storage
-from django.test import TestCase, override_settings
+from django.test import override_settings
+from django.test import TestCase
 
 from helpers.seed import get_or_create_default_image
 from order.enum.pay_way_enum import PayWayEnum
@@ -12,11 +13,13 @@ languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
-@override_settings(STORAGES={
-    "default": {
-        "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
-    },
-})
+@override_settings(
+    STORAGES={
+        "default": {
+            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
+        },
+    }
+)
 class PayWayModelTestCase(TestCase):
     pay_way = None
 
@@ -90,7 +93,9 @@ class PayWayModelTestCase(TestCase):
 
     def test_str_representation(self):
         # Test the __str__ method returns the translated name
-        self.assertEqual(str(self.pay_way), self.pay_way.safe_translation_getter("name"))
+        self.assertEqual(
+            str(self.pay_way), self.pay_way.safe_translation_getter("name")
+        )
 
     def test_get_ordering_queryset(self):
         # Test if get_ordering_queryset returns PayWay queryset

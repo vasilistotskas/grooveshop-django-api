@@ -9,6 +9,10 @@ from rest_framework import serializers
 
 
 class BaseExpandSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = None
+        fields = "__all__"
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.expand = self.context.get("expand", False)

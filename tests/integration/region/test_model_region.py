@@ -1,5 +1,6 @@
 from django.conf import settings
-from django.test import TestCase, override_settings
+from django.test import override_settings
+from django.test import TestCase
 
 from country.models import Country
 from helpers.seed import get_or_create_default_image
@@ -9,11 +10,13 @@ languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
-@override_settings(STORAGES={
-    "default": {
-        "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
-    },
-})
+@override_settings(
+    STORAGES={
+        "default": {
+            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
+        },
+    }
+)
 class RegionModelTestCase(TestCase):
     region = None
     country = None

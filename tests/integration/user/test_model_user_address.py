@@ -1,6 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from user.enum.address import FloorChoicesEnum, LocationChoicesEnum
+
+from user.enum.address import FloorChoicesEnum
+from user.enum.address import LocationChoicesEnum
 from user.models.address import UserAddress
 
 
@@ -54,9 +56,7 @@ class UserAddressModelTestCase(TestCase):
 
     def test_verbose_names(self):
         # Test verbose names for fields
-        self.assertEqual(
-            UserAddress._meta.get_field("user").verbose_name, "user"
-        )
+        self.assertEqual(UserAddress._meta.get_field("user").verbose_name, "user")
         self.assertEqual(UserAddress._meta.get_field("title").verbose_name, "Title")
         self.assertEqual(
             UserAddress._meta.get_field("first_name").verbose_name, "First Name"
@@ -69,16 +69,21 @@ class UserAddressModelTestCase(TestCase):
             UserAddress._meta.get_field("street_number").verbose_name, "Street Number"
         )
         self.assertEqual(UserAddress._meta.get_field("city").verbose_name, "City")
-        self.assertEqual(UserAddress._meta.get_field("zipcode").verbose_name, "Zip Code")
+        self.assertEqual(
+            UserAddress._meta.get_field("zipcode").verbose_name, "Zip Code"
+        )
         self.assertEqual(UserAddress._meta.get_field("country").verbose_name, "country")
         self.assertEqual(UserAddress._meta.get_field("region").verbose_name, "region")
         self.assertEqual(UserAddress._meta.get_field("floor").verbose_name, "Floor")
         self.assertEqual(
             UserAddress._meta.get_field("location_type").verbose_name, "Location Type"
         )
-        self.assertEqual(UserAddress._meta.get_field("phone").verbose_name, "Phone Number")
         self.assertEqual(
-            UserAddress._meta.get_field("mobile_phone").verbose_name, "Mobile Phone Number"
+            UserAddress._meta.get_field("phone").verbose_name, "Phone Number"
+        )
+        self.assertEqual(
+            UserAddress._meta.get_field("mobile_phone").verbose_name,
+            "Mobile Phone Number",
         )
         self.assertEqual(UserAddress._meta.get_field("notes").verbose_name, "Notes")
         self.assertEqual(UserAddress._meta.get_field("is_main").verbose_name, "Is Main")

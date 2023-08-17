@@ -5,8 +5,9 @@ from django.contrib.sessions.models import Session
 from django.test import RequestFactory
 from django.test import TestCase
 from django.utils import timezone
-from core.caches import cache_instance
+
 from core import caches
+from core.caches import cache_instance
 
 User = get_user_model()
 

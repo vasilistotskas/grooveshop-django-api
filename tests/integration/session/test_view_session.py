@@ -7,8 +7,9 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
-from core.caches import cache_instance
+
 from core import caches
+from core.caches import cache_instance
 
 User = get_user_model()
 

@@ -3,7 +3,37 @@
 
 
 
+## v0.13.0 (2023-08-23)
+
+### Chore
+
+* chore(order): Migrations for paid_amount field. ([`da8276c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/da8276cff863e5e9dd294d46eb9e6f10c6f0bf0e))
+
+* chore: requirements.txt and pyproject.toml update
+
+Packages Updated:
+django-allauth==0.54.0 to 0.55.0
+click==8.1.6 to 8.1.7 ([`b4a61a3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b4a61a3da44ee44234b51fc0923b5898be40a265))
+
+* chore: Remove useless folders ([`705c306`](https://github.com/vasilistotskas/grooveshop-django-api/commit/705c306b49b871e05baea087c08f032de1534f87))
+
+### Feature
+
+* feat(testing): New unit tests.
+
+Tests for generate_schema_multi_lang method implemented.
+Tests for BaseExpandSerializer class implemented.
+Tests for PascalSnakeCaseOrderingFilter class implemented. ([`355ae53`](https://github.com/vasilistotskas/grooveshop-django-api/commit/355ae533d4f5b2d9fdb368db10f7312af847292f))
+
+### Fix
+
+* fix: Lint and PEP fixes and generate_random_password method improved ([`5d74052`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5d74052c62e7f8e663b97804cc76895c7ffa663b))
+
 ## v0.12.0 (2023-08-17)
+
+### Chore
+
+* chore(release): release version 0.12.0 [skip ci] ([`99f2eec`](https://github.com/vasilistotskas/grooveshop-django-api/commit/99f2eec7ca7901de770ec0abd5e3fb6989741ce4))
 
 ### Feature
 

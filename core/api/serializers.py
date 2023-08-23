@@ -9,6 +9,8 @@ from rest_framework import serializers
 
 
 class BaseExpandSerializer(serializers.ModelSerializer):
+    expand = False
+
     class Meta:
         model = None
         fields = "__all__"
@@ -19,7 +21,8 @@ class BaseExpandSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance) -> OrderedDict[Any, Any | None]:
         data = super().to_representation(instance)
-        if self.expand:
+        expand = self.context.get("expand", False)
+        if expand:
             expand_fields = self.get_expand_fields()
             for field_name, field_serializer_class in expand_fields.items():
                 if isinstance(data[field_name], list):

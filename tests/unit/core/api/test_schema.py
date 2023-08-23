@@ -81,4 +81,3 @@ class GenerateSchemaMultiLangTest(TestCase):
 
         # Restore the original languages
         settings.PARLER_LANGUAGES[settings.SITE_ID] = original_languages
-

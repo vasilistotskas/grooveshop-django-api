@@ -52,7 +52,9 @@ class Command(BaseCommand):
                 try:
                     user = User.objects.create_user(
                         email=email,
-                        password=generate_random_password(),
+                        password=generate_random_password(
+                            use_digits=True, use_special_chars=True
+                        ),
                         first_name=first_name,
                         last_name=last_name,
                         phone=phone,
@@ -68,7 +70,9 @@ class Command(BaseCommand):
                     email = faker.unique.email()
                     user = User.objects.create_user(
                         email=email,
-                        password=generate_random_password(),
+                        password=generate_random_password(
+                            use_digits=True, use_special_chars=True
+                        ),
                         first_name=first_name,
                         last_name=last_name,
                         phone=phone,

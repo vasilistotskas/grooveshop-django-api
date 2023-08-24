@@ -3,7 +3,20 @@
 
 
 
+## v0.14.2 (2023-08-24)
+
+### Fix
+
+* fix: Rename StatusEnum in order and review.
+
+order status: StatusEnum -&gt; OrderStatusEnum
+review status: StatusEnum -&gt; ReviewStatusEnum ([`1b623c8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1b623c88372d42e6c4ba1d9116060dd75ae93832))
+
 ## v0.14.1 (2023-08-24)
+
+### Chore
+
+* chore(release): release version 0.14.1 [skip ci] ([`9e8f37e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9e8f37eb5b5526c507196c7b26b461e6ac16932a))
 
 ### Fix
 

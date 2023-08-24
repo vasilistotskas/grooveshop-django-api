@@ -3,9 +3,17 @@
 
 
 
+## v0.14.0 (2023-08-24)
+
+### Feature
+
+* feat(pagination): Cursor pagination fixed and tests implemented. ([`441078e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/441078eea389a82ce50183ccfe077cb397722122))
+
 ## v0.13.0 (2023-08-23)
 
 ### Chore
+
+* chore(release): release version 0.13.0 [skip ci] ([`2b497c8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b497c8076412a03ca44262c0af3b873a7e91964))
 
 * chore(order): Migrations for paid_amount field. ([`da8276c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/da8276cff863e5e9dd294d46eb9e6f10c6f0bf0e))
 

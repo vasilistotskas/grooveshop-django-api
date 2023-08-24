@@ -3,7 +3,17 @@
 
 
 
+## v0.14.1 (2023-08-24)
+
+### Fix
+
+* fix(templates): Change template dir to core/templates. ([`3a57eb5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a57eb57e0abeafac98c68d6122a644874c06952))
+
 ## v0.14.0 (2023-08-24)
+
+### Chore
+
+* chore(release): release version 0.14.0 [skip ci] ([`5ce3fa7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ce3fa7a1b8e4feb239df2f843d2062a2413f50a))
 
 ### Feature
 

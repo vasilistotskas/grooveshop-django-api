@@ -3,7 +3,7 @@ from enum import unique
 
 
 @unique
-class StatusEnum(Enum):
+class ReviewStatusEnum(Enum):
     NEW = "New"
     TRUE = "True"
     FALSE = "False"

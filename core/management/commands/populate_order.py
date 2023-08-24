@@ -6,7 +6,7 @@ from django.db import transaction
 from faker import Faker
 
 from country.models import Country
-from order.enum.status_enum import StatusEnum
+from order.enum.status_enum import OrderStatusEnum
 from order.models.item import OrderItem
 from order.models.order import Order
 from pay_way.models import PayWay
@@ -50,7 +50,7 @@ class Command(BaseCommand):
         # Get enum
         floor_choices = [choice[0] for choice in FloorChoicesEnum.choices()]
         location_choices = [choice[0] for choice in LocationChoicesEnum.choices()]
-        status_choices = [choice[0] for choice in StatusEnum.choices()]
+        status_choices = [choice[0] for choice in OrderStatusEnum.choices()]
 
         if not users or not products or not countries or not regions or not pay_ways:
             self.stdout.write(

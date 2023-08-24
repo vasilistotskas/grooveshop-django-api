@@ -5,7 +5,7 @@ from rest_framework.test import APITestCase
 
 from country.models import Country
 from helpers.seed import get_or_create_default_image
-from order.enum.status_enum import StatusEnum
+from order.enum.status_enum import OrderStatusEnum
 from pay_way.models import PayWay
 from product.models.product import Product
 from region.models import Region
@@ -92,7 +92,7 @@ class CheckoutViewAPITest(APITestCase):
             "street": "123 Main St",
             "street_number": "Apt 4B",
             "pay_way": self.pay_way.id,
-            "status": StatusEnum.PENDING.value,
+            "status": OrderStatusEnum.PENDING.value,
             "first_name": "John",
             "last_name": "Doe",
             "email": "test@test.com",

@@ -10,7 +10,7 @@ from django_stubs_ext.db.models import TypedModelMeta
 
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
-from order.enum.status_enum import StatusEnum
+from order.enum.status_enum import OrderStatusEnum
 from user.enum.address import FloorChoicesEnum
 from user.enum.address import LocationChoicesEnum
 
@@ -75,8 +75,8 @@ class Order(TimeStampMixinModel, UUIDModel):
     status = models.CharField(
         _("Status"),
         max_length=20,
-        choices=StatusEnum.choices(),
-        default=StatusEnum.PENDING.value,
+        choices=OrderStatusEnum.choices(),
+        default=OrderStatusEnum.PENDING.value,
     )
     shipping_price = models.DecimalField(
         _("Shipping Price"), max_digits=8, decimal_places=2, default=0

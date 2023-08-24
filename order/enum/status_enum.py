@@ -3,7 +3,7 @@ from enum import unique
 
 
 @unique
-class StatusEnum(Enum):
+class OrderStatusEnum(Enum):
     SENT = "Sent"
     PAID_AND_SENT = "Paid and sent"
     CANCELED = "Canceled"

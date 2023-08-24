@@ -6,7 +6,7 @@ from django.db import transaction
 from faker import Faker
 
 from product.enum.review import RateEnum
-from product.enum.review import StatusEnum
+from product.enum.review import ReviewStatusEnum
 from product.models.product import Product
 from product.models.review import ProductReview
 
@@ -52,7 +52,7 @@ class Command(BaseCommand):
         ]
 
         rate_choices = [choice[0] for choice in RateEnum.choices()]
-        status_choices = [choice[0] for choice in StatusEnum.choices()]
+        status_choices = [choice[0] for choice in ReviewStatusEnum.choices()]
 
         created_reviews = []
         with transaction.atomic():

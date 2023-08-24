@@ -7,7 +7,7 @@ from rest_framework.test import APITestCase
 
 from country.models import Country
 from helpers.seed import get_or_create_default_image
-from order.enum.status_enum import StatusEnum
+from order.enum.status_enum import OrderStatusEnum
 from order.models.order import Order
 from order.serializers.order import OrderSerializer
 from pay_way.models import PayWay
@@ -78,7 +78,7 @@ class OrderViewSetTestCase(APITestCase):
             phone="123-456-7890",
             mobile_phone="123-456-7890",
             paid_amount=Decimal("150.00"),
-            status=StatusEnum.PENDING.value,
+            status=OrderStatusEnum.PENDING.value,
             shipping_price=Decimal("10.00"),
         )
 
@@ -146,7 +146,7 @@ class OrderViewSetTestCase(APITestCase):
             "phone": "123-456-7890",
             "mobile_phone": "123-456-7890",
             "paid_amount": Decimal("150.00"),
-            "status": StatusEnum.PENDING.value,
+            "status": OrderStatusEnum.PENDING.value,
             "shipping_price": Decimal("10.00"),
             "order_item_order": [
                 {
@@ -242,7 +242,7 @@ class OrderViewSetTestCase(APITestCase):
             "phone": "123-456-7890",
             "mobile_phone": "123-456-7890",
             "paid_amount": Decimal("150.00"),
-            "status": StatusEnum.SENT.value,
+            "status": OrderStatusEnum.SENT.value,
             "shipping_price": Decimal("10.00"),
             "order_item_order": [
                 {
@@ -305,7 +305,7 @@ class OrderViewSetTestCase(APITestCase):
     def test_partial_update_valid(self):
         # We just update the status field
         payload = {
-            "status": StatusEnum.SENT.value,
+            "status": OrderStatusEnum.SENT.value,
         }
 
         url = self.get_order_detail_url(self.order.id)

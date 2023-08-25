@@ -3,7 +3,21 @@
 
 
 
+## v0.15.0 (2023-08-25)
+
+### Chore
+
+* chore: migration files and compile locales. ([`9889b75`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9889b75fa27f9f1d856f4a51fa16cf096171b921))
+
+### Feature
+
+* feat(enum): New enum for order document type and move pay way enum in pay way app. ([`6066e4a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6066e4a52313f5703979f6deaf16f78553ae5db4))
+
 ## v0.14.2 (2023-08-24)
+
+### Chore
+
+* chore(release): release version 0.14.2 [skip ci] ([`2b697b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b697b540d8f12b39bc2146fd33029b1aeb2f617))
 
 ### Fix
 

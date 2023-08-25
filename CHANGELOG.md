@@ -3,9 +3,17 @@
 
 
 
+## v0.16.0 (2023-08-25)
+
+### Feature
+
+* feat(seed): Add new dump images for product image seeding, refactor method get_or_create_default_image to be also able to create image from non /media path. ([`71b9790`](https://github.com/vasilistotskas/grooveshop-django-api/commit/71b979021a5e0356d728d50e5de14355f08b03b1))
+
 ## v0.15.0 (2023-08-25)
 
 ### Chore
+
+* chore(release): release version 0.15.0 [skip ci] ([`1dca7cc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1dca7cc38e0819f04ed74a17220477fd2dd10e54))
 
 * chore: migration files and compile locales. ([`9889b75`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9889b75fa27f9f1d856f4a51fa16cf096171b921))
 

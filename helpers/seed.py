@@ -1,3 +1,4 @@
+import mimetypes
 import os
 
 from django.core.files.storage import default_storage
@@ -5,25 +6,48 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 
 from app.settings import BASE_DIR
 
+DEFAULT_IMAGE_PATH = os.path.join(BASE_DIR, "files/images/no_photo.jpg")
 
-def get_or_create_default_image(image_path: str) -> SimpleUploadedFile:
-    if default_storage.exists(image_path):
-        # If the image exists, open and return it as an image file
-        with default_storage.open(image_path, "rb") as f:
-            image = SimpleUploadedFile(
-                name=os.path.basename(image_path),
-                content=f.read(),
-                content_type="image/jpeg",
+
+def get_or_create_default_image(
+    image_path: str, use_default_storage: bool = True
+) -> SimpleUploadedFile:
+    if use_default_storage:
+        if default_storage.exists(image_path):
+            with default_storage.open(image_path, "rb") as f:
+                return create_uploaded_image(f.read(), image_path)
+        else:
+            img_data = read_default_image()
+            default_storage.save(
+                image_path,
+                create_uploaded_image(img_data, image_path),
             )
-        return image
+            return create_uploaded_image(img_data, image_path)
     else:
-        # If the image doesn't exist, create and return the default image
-        default_path = os.path.join(BASE_DIR, "files/images") + "/no_photo.jpg"
-        with open(default_path, "rb") as f:
-            img = SimpleUploadedFile(
-                name=os.path.basename(image_path),
-                content=f.read(),
-                content_type="image/jpeg",
-            )
-            default_storage.save(image_path, img)
-        return img
+        if os.path.exists(image_path):
+            with open(image_path, "rb") as f:
+                return create_uploaded_image(f.read(), image_path)
+        else:
+            img_data = read_default_image()
+            with open(image_path, "wb") as img_file:
+                img_file.write(img_data)
+            return create_uploaded_image(img_data, image_path)
+
+
+def read_default_image():
+    with open(DEFAULT_IMAGE_PATH, "rb") as f:
+        return f.read()
+
+
+def create_uploaded_image(content, image_path):
+    mime_type, _ = mimetypes.guess_type(image_path)
+    if mime_type is None:
+        mime_type = (
+            "application/octet-stream"  # Default to a binary type if not recognized
+        )
+
+    return SimpleUploadedFile(
+        name=os.path.basename(image_path),
+        content=content,
+        content_type=mime_type,
+    )

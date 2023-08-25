@@ -1,3 +1,6 @@
+import os
+import random
+
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from faker import Faker
@@ -41,28 +44,41 @@ class Command(BaseCommand):
             )
             return
 
-        img = get_or_create_default_image("uploads/products/no_photo.jpg")
+        img_folder = os.path.join(os.path.dirname(__file__), "images", "products")
+        img_files = os.listdir(img_folder)
+        if not img_files:
+            self.stdout.write(
+                self.style.ERROR("No image files found in the seed_images folder.")
+            )
+            return
 
         created_images = []
         with transaction.atomic():
             for product in products:
                 if not product.product_images.filter(is_main=True).exists():
+                    img_filename = random.choice(img_files)
+                    img_path = os.path.join(img_folder, img_filename)
                     main_image = ProductImage.objects.create(
                         title="Main Image",
                         product=product,
                         is_main=True,
-                        image=img,
+                        image=get_or_create_default_image(
+                            img_path, use_default_storage=False
+                        ),
                     )
-
                     created_images.append(main_image)
 
                 for _ in range(total_images - 1):
                     title = faker.word()
+                    img_filename = random.choice(img_files)
+                    img_path = os.path.join(img_folder, img_filename)
                     image = ProductImage.objects.create(
                         title=title,
                         product=product,
                         is_main=False,
-                        image=img,
+                        image=get_or_create_default_image(
+                            img_path, use_default_storage=False
+                        ),
                     )
                     created_images.append(image)
 

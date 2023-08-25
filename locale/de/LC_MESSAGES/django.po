@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-08-24 12:29+0300\n"
+"POT-Creation-Date: 2023-08-25 13:37+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -104,32 +104,32 @@ msgstr ""
 msgid "Status"
 msgstr ""
 
-#: .\blog\models\post.py:47
+#: .\blog\models\post.py:50
 msgid "Featured"
 msgstr ""
 
-#: .\blog\models\post.py:48
+#: .\blog\models\post.py:51
 msgid "View Count"
 msgstr ""
 
-#: .\blog\models\post.py:50 .\product\models\image.py:30 .\slider\models.py:31
+#: .\blog\models\post.py:53 .\product\models\image.py:30 .\slider\models.py:31
 #: .\slider\models.py:98 .\tip\models.py:31 .\user\models\address.py:18
 msgid "Title"
 msgstr ""
 
-#: .\blog\models\post.py:51 .\slider\models.py:99
+#: .\blog\models\post.py:54 .\slider\models.py:99
 msgid "Subtitle"
 msgstr ""
 
-#: .\blog\models\post.py:52
+#: .\blog\models\post.py:55
 msgid "Body"
 msgstr ""
 
-#: .\blog\models\post.py:56
+#: .\blog\models\post.py:59
 msgid "Blog Post"
 msgstr ""
 
-#: .\blog\models\post.py:57
+#: .\blog\models\post.py:60
 msgid "Blog Posts"
 msgstr ""
 
@@ -1062,15 +1062,15 @@ msgstr ""
 msgid "Rate"
 msgstr ""
 
-#: .\product\models\review.py:31
+#: .\product\models\review.py:34
 msgid "Comment"
 msgstr ""
 
-#: .\product\models\review.py:35
+#: .\product\models\review.py:38
 msgid "Product Review"
 msgstr ""
 
-#: .\product\models\review.py:36
+#: .\product\models\review.py:39
 msgid "Product Reviews"
 msgstr ""
 

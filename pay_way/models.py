@@ -11,7 +11,7 @@ from parler.models import TranslatedFields
 from core.models import SortableModel
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
-from order.enum.pay_way_enum import PayWayEnum
+from pay_way.enum.pay_way_enum import PayWayEnum
 
 
 class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):

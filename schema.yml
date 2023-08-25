@@ -9993,7 +9993,7 @@ components:
           type: integer
           nullable: true
         status:
-          $ref: '#/components/schemas/StatusAe9Enum'
+          $ref: '#/components/schemas/OrderStatusEnum'
         firstName:
           type: string
           maxLength: 255
@@ -10169,8 +10169,8 @@ components:
       - invoice
       type: string
       description: |-
-        * `receipt` - Receipt
-        * `invoice` - Invoice
+        * `receipt` - RECEIPT
+        * `invoice` - INVOICE
     FloorEnum:
       enum:
       - 0
@@ -10256,7 +10256,7 @@ components:
           - $ref: '#/components/schemas/PayWay'
           readOnly: true
         status:
-          $ref: '#/components/schemas/StatusAe9Enum'
+          $ref: '#/components/schemas/OrderStatusEnum'
         firstName:
           type: string
           maxLength: 255
@@ -10386,7 +10386,7 @@ components:
           type: integer
           nullable: true
         status:
-          $ref: '#/components/schemas/StatusAe9Enum'
+          $ref: '#/components/schemas/OrderStatusEnum'
         firstName:
           type: string
           maxLength: 255
@@ -10541,6 +10541,18 @@ components:
       - id
       - price
       - product
+    OrderStatusEnum:
+      enum:
+      - Sent
+      - Paid and sent
+      - Canceled
+      - Pending
+      type: string
+      description: |-
+        * `Sent` - SENT
+        * `Paid and sent` - PAID_AND_SENT
+        * `Canceled` - CANCELED
+        * `Pending` - PENDING
     PaginatedBlogAuthorList:
       type: object
       properties:
@@ -11412,7 +11424,7 @@ components:
           type: integer
           nullable: true
         status:
-          $ref: '#/components/schemas/StatusAe9Enum'
+          $ref: '#/components/schemas/OrderStatusEnum'
         firstName:
           type: string
           maxLength: 255
@@ -13106,18 +13118,6 @@ components:
       - mainImageAbsoluteUrl
       - mainImageFilename
       - translations
-    StatusAe9Enum:
-      enum:
-      - Sent
-      - Paid and sent
-      - Canceled
-      - Pending
-      type: string
-      description: |-
-        * `Sent` - SENT
-        * `Paid and sent` - PAID_AND_SENT
-        * `Canceled` - CANCELED
-        * `Pending` - PENDING
     Tip:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.

@@ -6,7 +6,7 @@ from django.test import override_settings
 from django.test import TestCase
 
 from helpers.seed import get_or_create_default_image
-from order.enum.pay_way_enum import PayWayEnum
+from pay_way.enum.pay_way_enum import PayWayEnum
 from pay_way.models import PayWay
 
 languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]

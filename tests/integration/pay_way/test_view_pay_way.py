@@ -6,7 +6,7 @@ from rest_framework.test import APITestCase
 
 from core.utils.tests import compare_serializer_and_response
 from helpers.seed import get_or_create_default_image
-from order.enum.pay_way_enum import PayWayEnum
+from pay_way.enum.pay_way_enum import PayWayEnum
 from pay_way.models import PayWay
 from pay_way.serializers import PayWaySerializer
 

@@ -503,6 +503,10 @@ SPECTACULAR_SETTINGS = {
         "drf_spectacular.contrib.djangorestframework_camel_case.camelize_serializer_fields",
         "drf_spectacular.hooks.postprocess_schema_enums",
     ],
+    "ENUM_NAME_OVERRIDES": {
+        # Used by Checkout, Order, OrderCreateUpdate, PatchedOrderCreateUpdate
+        "OrderStatusEnum": "order.enum.status_enum.OrderStatusEnum",
+    },
 }
 
 # Django sql explorer

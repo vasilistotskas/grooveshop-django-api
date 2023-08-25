@@ -28,7 +28,7 @@ class ProductReview(
         _("Status"),
         max_length=250,
         choices=ReviewStatusEnum.choices(),
-        default=ReviewStatusEnum.NEW.value
+        default=ReviewStatusEnum.NEW.value,
     )
     translations = TranslatedFields(
         comment=models.CharField(_("Comment"), max_length=250, blank=True, null=True)

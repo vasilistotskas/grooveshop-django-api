@@ -10,6 +10,7 @@ from django_stubs_ext.db.models import TypedModelMeta
 
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
+from order.enum.document_type_enum import OrderDocumentTypeEnum
 from order.enum.status_enum import OrderStatusEnum
 from user.enum.address import FloorChoicesEnum
 from user.enum.address import LocationChoicesEnum
@@ -84,8 +85,8 @@ class Order(TimeStampMixinModel, UUIDModel):
     document_type = models.CharField(
         _("Document Type"),
         max_length=10,
-        choices=[("receipt", _("Receipt")), ("invoice", _("Invoice"))],
-        default="receipt",
+        choices=OrderDocumentTypeEnum.choices(),
+        default=OrderDocumentTypeEnum.RECEIPT.value,
     )
     paid_amount = models.DecimalField(
         _("Paid Amount"),

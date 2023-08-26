@@ -3,7 +3,17 @@
 
 
 
+## v0.17.0 (2023-08-26)
+
+### Feature
+
+* feat(settings): Security improved, minor type cast at populate_user_address command. ([`8f43775`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8f4377596401975ae521b3c2e24622e4eddf65c6))
+
 ## v0.16.0 (2023-08-25)
+
+### Chore
+
+* chore(release): release version 0.16.0 [skip ci] ([`d5fd42d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d5fd42d2a5442a7cfdded6803e27320767c2e8ee))
 
 ### Feature
 

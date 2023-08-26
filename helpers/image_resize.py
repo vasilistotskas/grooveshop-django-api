@@ -1,11 +1,12 @@
 from io import BytesIO
+from typing import Union
 
 from django.core.files import File
 from django.db.models.fields.files import ImageFieldFile
 from PIL import Image
 
 
-def make_thumbnail(image: ImageFieldFile, size: tuple) -> File:
+def make_thumbnail(image: Union[ImageFieldFile, File], size: tuple) -> File:
     if image:
         img = Image.open(image)
         img.convert("RGB")

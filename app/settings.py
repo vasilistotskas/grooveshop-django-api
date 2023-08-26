@@ -9,7 +9,7 @@ from core.utils.cache import CustomCacheConfig
 
 env = environ.Env(
     # set casting, default value
-    SECRET_KEY=(str, "django-insecure-1#t2p3u4^=5)6@7(8)9-0"),
+    SECRET_KEY=(str, "django-insecure-1#t2p3u4^=5)6@7(8)9-0^(*79$_*3#=3+"),
     DEBUG=(bool, True),
     SYSTEM_ENV=(str, "dev"),
     APP_BASE_URL=(str, "http://localhost:8000"),
@@ -63,6 +63,13 @@ SECRET_KEY = env("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = bool(int(env("DEBUG")))
 SYSTEM_ENV = env("SYSTEM_ENV")
+
+# Security
+SECURE_SSL_REDIRECT = False if DEBUG else True
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https") if DEBUG else None
+SECURE_HSTS_SECONDS = 0 if DEBUG else 3600
+SECURE_HSTS_INCLUDE_SUBDOMAINS = False if DEBUG else True
+SECURE_HSTS_PRELOAD = False if DEBUG else True
 
 if "celery" in sys.argv[0]:
     DEBUG = False
@@ -214,10 +221,13 @@ AUTH_USER_MODEL = "user.UserAccount"
 
 # Sessions and Cookies
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
-CSRF_COOKIE_SAMESITE = "Strict"
 SESSION_COOKIE_SAMESITE = "Strict"
-CSRF_COOKIE_HTTPONLY = False
-SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_HTTPONLY = False if DEBUG else True
+SESSION_COOKIE_SECURE = False if DEBUG else True
+
+CSRF_COOKIE_SAMESITE = "Strict"
+CSRF_COOKIE_HTTPONLY = False if DEBUG else True
+CSRF_COOKIE_SECURE = False if DEBUG else True
 
 CORS_ALLOW_METHODS = [
     "DELETE",

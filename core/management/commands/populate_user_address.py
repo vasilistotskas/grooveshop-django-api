@@ -6,6 +6,7 @@ from faker import Faker
 
 from user.enum.address import FloorChoicesEnum
 from user.enum.address import LocationChoicesEnum
+from user.models import UserAccount
 from user.models.address import UserAddress
 
 User = get_user_model()
@@ -35,7 +36,7 @@ class Command(BaseCommand):
             )
             return
 
-        users = list(User.objects.all())
+        users: list[UserAccount] = list(User.objects.all())
 
         if not users:
             self.stdout.write(
@@ -48,7 +49,7 @@ class Command(BaseCommand):
         floor_choices = [choice[0] for choice in FloorChoicesEnum.choices()]
         location_choices = [choice[0] for choice in LocationChoicesEnum.choices()]
 
-        created_addresses = []
+        created_addresses: list[UserAddress] = []
         with transaction.atomic():
             for user in users:
                 if not user.address_user.filter(is_main=True).exists():

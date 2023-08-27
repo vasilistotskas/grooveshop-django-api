@@ -2,6 +2,7 @@ import os
 
 from django.conf import settings
 from django.core.files.storage import default_storage
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.test import TestCase
 
@@ -21,9 +22,9 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
     }
 )
 class ProductImageModelTestCase(TestCase):
-    product = None
-    product_image = None
-    default_image = None
+    product: Product = None
+    product_image: ProductImage = None
+    default_image: SimpleUploadedFile = None
 
     def setUp(self):
         self.product = Product.objects.create(
@@ -112,3 +113,8 @@ class ProductImageModelTestCase(TestCase):
         # Test if main_image_filename returns the correct filename
         expected_filename = os.path.basename(self.product_image.image.url)
         self.assertEqual(self.product_image.main_image_filename, expected_filename)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.product_image.delete()
+        self.product.delete()

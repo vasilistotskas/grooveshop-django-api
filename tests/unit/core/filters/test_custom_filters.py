@@ -7,6 +7,9 @@ from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 
 
 class PascalSnakeCaseOrderingFilterTest(APITestCase):
+    view: BlogPostViewSet = None
+    filter: PascalSnakeCaseOrderingFilter = None
+
     def setUp(self):
         self.view = BlogPostViewSet.as_view({"get": "list"})
         self.filter = PascalSnakeCaseOrderingFilter()
@@ -50,3 +53,7 @@ class PascalSnakeCaseOrderingFilterTest(APITestCase):
         )
         default_ordering = self.filter.get_default_ordering(self.view)
         self.assertEqual(result, default_ordering)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        BlogPost.objects.all().delete()

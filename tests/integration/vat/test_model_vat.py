@@ -4,7 +4,7 @@ from vat.models import Vat
 
 
 class VatModelTestCase(TestCase):
-    vat = None
+    vat: Vat = None
 
     def setUp(self):
         # Create a sample Vat instance for testing
@@ -43,3 +43,7 @@ class VatModelTestCase(TestCase):
         Vat.objects.create(value=20.0)
         Vat.objects.create(value=30.0)
         self.assertEqual(Vat.get_highest_vat_value(), 30.0)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.vat.delete()

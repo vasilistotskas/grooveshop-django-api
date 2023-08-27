@@ -15,6 +15,8 @@ User = get_user_model()
 
 
 class ActiveUserViewSetTest(APITestCase):
+    user: User = None
+
     def setUp(self):
         self.user = User.objects.create_user(
             email="testuser@example.com", password="testpassword"
@@ -83,3 +85,7 @@ class ActiveUserViewSetTest(APITestCase):
         self.assertEqual(
             response.data["active_users"], 1
         )  # Only user2 should be active, user1's last_activity is too old
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.user.delete()

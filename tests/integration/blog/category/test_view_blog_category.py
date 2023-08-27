@@ -11,7 +11,7 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
 class BlogCategoryViewSetTestCase(APITestCase):
-    category = None
+    category: BlogCategory = None
 
     def setUp(self):
         self.category = BlogCategory.objects.create(slug="test-category")
@@ -176,3 +176,7 @@ class BlogCategoryViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.category.delete()

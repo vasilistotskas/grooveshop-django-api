@@ -21,8 +21,8 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
     }
 )
 class TipModelTestCase(TestCase):
-    tip = None
-    default_icon = None
+    tip: Tip = None
+    default_icon: str = None
 
     def setUp(self):
         # Create a sample Tip instance for testing
@@ -113,3 +113,7 @@ class TipModelTestCase(TestCase):
         # Test if main_image_filename returns the correct filename
         expected_filename = os.path.basename(self.tip.icon.name)
         self.assertEqual(self.tip.main_image_filename, expected_filename)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.tip.delete()

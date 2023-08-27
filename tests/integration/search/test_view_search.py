@@ -6,9 +6,9 @@ from product.models.product import Product
 
 
 class SearchProductAPITest(APITestCase):
-    product1 = None
-    product2 = None
-    product3 = None
+    product1: Product = None
+    product2: Product = None
+    product3: Product = None
 
     def setUp(self):
         # Create some test products
@@ -56,3 +56,9 @@ class SearchProductAPITest(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 0)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.product1.delete()
+        self.product2.delete()
+        self.product3.delete()

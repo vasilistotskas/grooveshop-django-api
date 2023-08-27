@@ -18,8 +18,8 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
     }
 )
 class RegionModelTestCase(TestCase):
-    region = None
-    country = None
+    region: Region = None
+    country: Country = None
 
     def setUp(self):
         # Create a sample Country instance for testing
@@ -90,3 +90,8 @@ class RegionModelTestCase(TestCase):
         queryset = self.region.get_ordering_queryset()
         self.assertTrue(queryset.exists())
         self.assertTrue(self.region in queryset)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.region.delete()
+        self.country.delete()

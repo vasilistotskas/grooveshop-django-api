@@ -24,7 +24,7 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
     }
 )
 class TipViewSetTestCase(APITestCase):
-    tip = None
+    tip: Tip = None
 
     def setUp(self):
         # Create a sample Tip instance for testing
@@ -214,3 +214,7 @@ class TipViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.tip.delete()

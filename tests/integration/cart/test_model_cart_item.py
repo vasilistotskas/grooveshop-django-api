@@ -8,9 +8,9 @@ from product.models.product import Product
 
 
 class CartItemModelTestCase(TestCase):
-    cart_item = None
-    cart = None
-    product = None
+    cart_item: CartItem = None
+    cart: Cart = None
+    product: Product = None
 
     def setUp(self):
         self.cart = Cart.objects.create()
@@ -86,3 +86,9 @@ class CartItemModelTestCase(TestCase):
             cart=self.cart, product=product_2, quantity=3
         )
         self.assertLess(self.cart_item.id, cart_item_2.id)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.cart_item.delete()
+        self.cart.delete()
+        self.product.delete()

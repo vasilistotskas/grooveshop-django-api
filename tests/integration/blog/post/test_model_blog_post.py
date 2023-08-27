@@ -24,10 +24,10 @@ User = get_user_model()
     }
 )
 class BlogPostModelTestCase(TestCase):
-    user = None
-    author = None
-    post = None
-    category = None
+    post: BlogPost = None
+    user: User = None
+    author: BlogAuthor = None
+    category: BlogCategory = None
 
     def setUp(self):
         self.user = User.objects.create_user(
@@ -157,3 +157,10 @@ class BlogPostModelTestCase(TestCase):
 
     def test_get_post_tags_count(self):
         self.assertEqual(self.post.get_post_tags_count, 0)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.post.delete()
+        self.author.delete()
+        self.user.delete()
+        self.category.delete()

@@ -50,3 +50,7 @@ class AddClassFilterTest(TestCase):
         )
         rendered = template.render(Context({"value": template_string}))
         self.assertEqual(rendered, expected_output)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        pass

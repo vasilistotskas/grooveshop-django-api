@@ -11,6 +11,13 @@ User = get_user_model()
 
 
 class CartItemViewSetTest(APITestCase):
+    user: User = None
+    cart: Cart = None
+    product: Product = None
+    cart_item: CartItem = None
+    detail_url: str = None
+    update_data: dict = None
+
     def setUp(self):
         self.user = User.objects.create_user(
             email="testuser@example.com", password="testpassword"
@@ -67,3 +74,10 @@ class CartItemViewSetTest(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(CartItem.objects.count(), 0)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.cart_item.delete()
+        self.cart.delete()
+        self.user.delete()
+        self.product.delete()

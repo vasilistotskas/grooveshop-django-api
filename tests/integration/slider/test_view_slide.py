@@ -27,8 +27,8 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
     }
 )
 class SlideViewSetTestCase(APITestCase):
-    slide = None
-    slider = None
+    slide: Slide = None
+    slider: Slider = None
 
     def setUp(self):
         image = get_or_create_default_image("uploads/slides/no_photo.jpg")
@@ -230,3 +230,8 @@ class SlideViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.slide.delete()
+        self.slider.delete()

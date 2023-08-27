@@ -290,3 +290,10 @@ class CategoryModelTestCase(TestCase):
         self.assertEqual(
             self.category.category_menu_main_banner_filename, expected_filename
         )
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.user.delete()
+        self.vat.delete()
+        self.sub_category.delete()
+        self.category.delete()

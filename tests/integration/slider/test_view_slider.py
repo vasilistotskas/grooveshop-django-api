@@ -24,7 +24,7 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
     }
 )
 class SliderViewSetTestCase(APITestCase):
-    slider = None
+    slider: Slider = None
 
     def setUp(self):
         image = get_or_create_default_image("uploads/sliders/no_photo.jpg")
@@ -216,3 +216,7 @@ class SliderViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.slider.delete()

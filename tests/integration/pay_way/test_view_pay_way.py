@@ -22,7 +22,7 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
     }
 )
 class PayWayViewSetTestCase(APITestCase):
-    pay_way = None
+    pay_way: PayWay = None
 
     def setUp(self):
         image_icon = get_or_create_default_image("uploads/pay_way/no_photo.jpg")
@@ -195,3 +195,7 @@ class PayWayViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.pay_way.delete()

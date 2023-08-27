@@ -13,8 +13,8 @@ User = get_user_model()
 
 
 class UserAccountModelTest(TestCase):
-    factory = None
-    user_data = None
+    factory: RequestFactory = None
+    user_data: dict = None
 
     def setUp(self):
         self.factory = RequestFactory()
@@ -88,3 +88,7 @@ class UserAccountModelTest(TestCase):
         # Assert that the cache for the current user is empty
         user_cache_key = caches.USER_AUTHENTICATED + "_" + str(user.id)
         self.assertIsNone(cache_instance.get(user_cache_key))
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        cache_instance.clear()

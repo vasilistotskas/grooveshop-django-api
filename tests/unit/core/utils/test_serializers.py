@@ -33,7 +33,9 @@ class TestTranslatedFieldExtended(TestCase):
         }
         self.assertEqual(result, expected_result)
 
-    # Add more test cases for various scenarios
+    def tearDown(self) -> None:
+        super().tearDown()
+        pass
 
 
 class TestFlattenDictForFormData(TestCase):
@@ -57,6 +59,10 @@ class TestFlattenDictForFormData(TestCase):
         }
         self.assertDictEqual(result, expected_result)
 
+    def tearDown(self) -> None:
+        super().tearDown()
+        pass
+
 
 class TestMultiSerializerMixin(TestCase):
     def test_get_serializer_class_with_default_action(self):
@@ -64,3 +70,7 @@ class TestMultiSerializerMixin(TestCase):
         mixin.action = "unknown_action"
         serializer_class = mixin.get_serializer_class()
         self.assertIsNone(serializer_class)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        pass

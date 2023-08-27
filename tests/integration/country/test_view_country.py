@@ -20,7 +20,7 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
     }
 )
 class CountryViewSetTestCase(APITestCase):
-    country = None
+    country: Country = None
 
     def setUp(self):
         image_flag = get_or_create_default_image("uploads/country/no_photo.jpg")
@@ -199,3 +199,7 @@ class CountryViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.country.delete()

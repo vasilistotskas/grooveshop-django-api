@@ -13,6 +13,11 @@ User = get_user_model()
 
 
 class TestBaseExpandSerializer(TestCase):
+    user: User = None
+    product: Product = None
+    instance: ProductFavourite = None
+    serializer: BaseExpandSerializer = None
+
     def setUp(self):
         self.user = User.objects.create_user(
             email="test@test.com", password="test12345@!"
@@ -159,3 +164,9 @@ class TestBaseExpandSerializer(TestCase):
         }
 
         self.assertEqual(data, expected_data)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.user.delete()
+        self.product.delete()
+        self.instance.delete()

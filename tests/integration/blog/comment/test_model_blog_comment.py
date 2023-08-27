@@ -13,10 +13,10 @@ User = get_user_model()
 
 
 class BlogCommentModelTestCase(TestCase):
-    comment = None
-    user = None
-    author = None
-    post = None
+    comment: BlogComment = None
+    user: User = None
+    author: BlogAuthor = None
+    post: BlogPost = None
 
     def setUp(self):
         self.user = User.objects.create_user(
@@ -101,3 +101,10 @@ class BlogCommentModelTestCase(TestCase):
 
         # Now, there should be one like
         self.assertEqual(self.comment.number_of_likes, 1)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.comment.delete()
+        self.post.delete()
+        self.author.delete()
+        self.user.delete()

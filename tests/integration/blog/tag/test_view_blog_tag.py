@@ -11,7 +11,7 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
 class BlogTagViewSetTestCase(APITestCase):
-    tag = None
+    tag: BlogTag = None
 
     def setUp(self):
         self.tag = BlogTag.objects.create(active=True)
@@ -169,3 +169,7 @@ class BlogTagViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.tag.delete()

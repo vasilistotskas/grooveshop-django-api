@@ -11,9 +11,9 @@ User = get_user_model()
 
 
 class ProductReviewModelTestCase(TestCase):
-    user = None
-    product = None
-    product_review = None
+    user: User = None
+    product: Product = None
+    product_review: ProductReview = None
 
     def setUp(self):
         self.user = User.objects.create_user(
@@ -70,3 +70,9 @@ class ProductReviewModelTestCase(TestCase):
         for language in languages:
             self.product_review.set_current_language(language)
             self.assertEqual(self.product_review.comment, f"Sample Comment {language}")
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.user.delete()
+        self.product.delete()
+        self.product_review.delete()

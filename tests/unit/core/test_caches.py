@@ -6,6 +6,10 @@ from core.caches import CustomCache
 
 
 class CustomCacheTestCase(TestCase):
+    cache_instance: CustomCache = None
+    key: str = None
+    value: str = None
+
     def setUp(self):
         self.cache_instance = CustomCache(params={})
         self.key = "test_key"
@@ -111,3 +115,10 @@ class CustomCacheTestCase(TestCase):
             self.cache_instance.cache.__class__ = MockRedisCache
             keys = self.cache_instance.keys("prefix")
             self.assertEqual(keys, [self.key, "another_key"])
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.cache_instance.clear()
+        self.cache_instance = None
+        self.key = None
+        self.value = None

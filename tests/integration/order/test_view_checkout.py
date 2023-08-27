@@ -6,6 +6,7 @@ from rest_framework.test import APITestCase
 from country.models import Country
 from helpers.seed import get_or_create_default_image
 from order.enum.status_enum import OrderStatusEnum
+from order.models.order import Order
 from pay_way.models import PayWay
 from product.models.product import Product
 from region.models import Region
@@ -16,10 +17,10 @@ User = get_user_model()
 
 
 class CheckoutViewAPITest(APITestCase):
-    order = None
-    pay_way = None
-    country = None
-    region = None
+    order: Order = None
+    pay_way: PayWay = None
+    country: Country = None
+    region: Region = None
 
     def setUp(self):
         # Create a sample user for testing
@@ -160,3 +161,10 @@ class CheckoutViewAPITest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(Product.objects.get(pk=product_3.id).stock, 10)
         self.assertEqual(Product.objects.get(pk=product_4.id).stock, 15)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.user.delete()
+        self.pay_way.delete()
+        self.country.delete()
+        self.region.delete()

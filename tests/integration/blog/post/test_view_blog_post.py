@@ -24,10 +24,10 @@ User = get_user_model()
     }
 )
 class BlogPostViewSetTestCase(APITestCase):
-    post = None
-    user = None
-    author = None
-    category = None
+    post: BlogPost = None
+    user: User = None
+    author: BlogAuthor = None
+    category: BlogCategory = None
 
     def setUp(self):
         self.user = User.objects.create_user(
@@ -228,3 +228,10 @@ class BlogPostViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.post.delete()
+        self.author.delete()
+        self.user.delete()
+        self.category.delete()

@@ -12,7 +12,7 @@ User = get_user_model()
 
 
 class UserAccountViewSetTestCase(APITestCase):
-    user = None
+    user: User = None
 
     def setUp(self):
         self.user = User.objects.create_user(
@@ -144,3 +144,7 @@ class UserAccountViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.user.delete()

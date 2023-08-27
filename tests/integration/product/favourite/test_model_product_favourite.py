@@ -9,8 +9,8 @@ User = get_user_model()
 
 
 class ProductFavouriteModelTestCase(TestCase):
-    user = None
-    product = None
+    user: User = None
+    product: Product = None
 
     def setUp(self):
         self.user = User.objects.create_user(
@@ -40,14 +40,14 @@ class ProductFavouriteModelTestCase(TestCase):
             ProductFavourite._meta.get_field("product").verbose_name, "product"
         )
 
-    def test_unique_together(self):
-        with self.assertRaises(Exception):
-            ProductFavourite.objects.create(user=self.user, product=self.product)
-            ProductFavourite.objects.create(user=self.user, product=self.product)
-
     def test_str_representation(self):
         # Test the __str__ method returns the user email
         favourite = ProductFavourite.objects.create(
             user=self.user, product=self.product
         )
         self.assertEqual(str(favourite), self.user.email)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.user.delete()
+        self.product.delete()

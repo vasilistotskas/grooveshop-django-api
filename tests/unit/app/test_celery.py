@@ -76,3 +76,9 @@ class CeleryConfigTestCase(TestCase):
         celery.debug_task()
 
         self.assertTrue(celery.debug_task.called)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        celery.app = None
+        celery.settings.REDIS_HEALTHY = None
+        celery.debug_task = None

@@ -9,7 +9,7 @@ from vat.serializers import VatSerializer
 
 
 class VatViewSetTestCase(APITestCase):
-    vat = None
+    vat: Vat = None
 
     def setUp(self):
         self.vat = Vat.objects.create(
@@ -121,3 +121,7 @@ class VatViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.vat.delete()

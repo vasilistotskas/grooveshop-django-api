@@ -1,5 +1,6 @@
 import os
 from decimal import Decimal
+from typing import List
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -28,13 +29,13 @@ User = get_user_model()
     }
 )
 class ProductModelTestCase(TestCase):
-    product = None
-    user = None
-    category = None
-    vat = None
-    product_images = []
-    product_reviews = []
-    product_favourite = None
+    product: Product = None
+    user: User = None
+    category: ProductCategory = None
+    vat: Vat = None
+    product_images: List[ProductImage] = []
+    product_reviews: List[ProductReview] = []
+    product_favourite: ProductFavourite = None
 
     def setUp(self):
         # Create a sample user for testing
@@ -301,3 +302,11 @@ class ProductModelTestCase(TestCase):
     def test_absolute_url_property(self):
         expected_absolute_url = f"/{self.product.id}/{self.product.slug}"
         self.assertEqual(self.product.absolute_url, expected_absolute_url)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.product_favourite.delete()
+        self.product.delete()
+        self.user.delete()
+        self.category.delete()
+        self.vat.delete()

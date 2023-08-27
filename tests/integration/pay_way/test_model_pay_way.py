@@ -21,7 +21,7 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
     }
 )
 class PayWayModelTestCase(TestCase):
-    pay_way = None
+    pay_way: PayWay = None
 
     def setUp(self):
         # Create a sample PayWay instance for testing
@@ -113,3 +113,7 @@ class PayWayModelTestCase(TestCase):
         # Test the icon_filename property
         icon_filename = self.pay_way.icon_filename
         self.assertEqual(icon_filename, os.path.basename(self.pay_way.icon.name))
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.pay_way.delete()

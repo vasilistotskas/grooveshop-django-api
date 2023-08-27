@@ -10,8 +10,8 @@ User = get_user_model()
 
 
 class UserAddressModelTestCase(TestCase):
-    user = None
-    address = None
+    user: User = None
+    address: UserAddress = None
 
     def setUp(self):
         # Create a sample user for testing
@@ -225,3 +225,8 @@ class UserAddressModelTestCase(TestCase):
         count = UserAddress.get_user_address_count(self.user)
 
         self.assertEqual(count, 3)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.user.delete()
+        self.address.delete()

@@ -12,8 +12,8 @@ from product.models.product import Product
 
 class OrderModelTestCase(TestCase):
     order: Order = None
-    product_1 = None
-    product_2 = None
+    product_1: Product = None
+    product_2: Product = None
 
     def setUp(self):
         self.order = Order.objects.create(
@@ -194,3 +194,9 @@ class OrderModelTestCase(TestCase):
     def test_str_representation(self):
         # Test the __str__ method returns the first_name
         self.assertEqual(str(self.order), self.order.first_name)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.order.delete()
+        self.product_1.delete()
+        self.product_2.delete()

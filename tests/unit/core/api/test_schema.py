@@ -81,3 +81,7 @@ class GenerateSchemaMultiLangTest(TestCase):
 
         # Restore the original languages
         settings.PARLER_LANGUAGES[settings.SITE_ID] = original_languages
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        BlogPost.objects.all().delete()

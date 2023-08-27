@@ -20,9 +20,12 @@ User = get_user_model()
 
 
 class SessionTraceMiddlewareTest(TestCase):
+    middleware: SessionTraceMiddleware = None
+    factory: RequestFactory = None
+
     def setUp(self):
         self.middleware = SessionTraceMiddleware(Mock())
-        self.factory = RequestFactory()  # Add this line
+        self.factory = RequestFactory()
 
     def test_process_user_data_authenticated(self):
         request = self.factory.get("/")
@@ -141,3 +144,7 @@ class SessionTraceMiddlewareTest(TestCase):
                 expected_data,
                 caches.ONE_HOUR,
             )
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        pass

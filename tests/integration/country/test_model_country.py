@@ -20,7 +20,7 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
     }
 )
 class CountryModelTestCase(TestCase):
-    country = None
+    country: Country = None
 
     def setUp(self):
         # Create a sample Country instance for testing
@@ -117,3 +117,7 @@ class CountryModelTestCase(TestCase):
         # Test if main_image_filename returns the correct filename
         expected_filename = os.path.basename(self.country.image_flag.name)
         self.assertEqual(self.country.main_image_filename, expected_filename)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.country.delete()

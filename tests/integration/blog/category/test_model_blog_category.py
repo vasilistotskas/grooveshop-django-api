@@ -20,7 +20,7 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
     }
 )
 class BlogCategoryModelTestCase(TestCase):
-    category = None
+    category: BlogCategory = None
 
     def setUp(self):
         # Create a sample BlogCategory instance for testing
@@ -104,3 +104,7 @@ class BlogCategoryModelTestCase(TestCase):
         # Test if main_image_filename returns the correct filename
         expected_filename = os.path.basename(self.category.image.name)
         self.assertEqual(self.category.main_image_filename, expected_filename)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.category.delete()

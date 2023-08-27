@@ -10,10 +10,10 @@ User = get_user_model()
 
 
 class CartModelTestCase(TestCase):
-    cart = None
-    user = None
-    cart_item_1 = None
-    cart_item_2 = None
+    cart: Cart = None
+    user: User = None
+    cart_item_1: CartItem = None
+    cart_item_2: CartItem = None
 
     def setUp(self):
         self.user = User.objects.create_user(
@@ -98,3 +98,10 @@ class CartModelTestCase(TestCase):
         last_activity_before_refresh = self.cart.last_activity
         self.cart.refresh_last_activity()
         self.assertNotEqual(self.cart.last_activity, last_activity_before_refresh)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.cart.delete()
+        self.user.delete()
+        self.cart_item_1.delete()
+        self.cart_item_2.delete()

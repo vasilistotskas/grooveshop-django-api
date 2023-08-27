@@ -9,9 +9,9 @@ from product.models.product import Product
 
 
 class OrderItemModelTestCase(TestCase):
-    order = None
-    product = None
-    order_item = None
+    order: Order = None
+    product: Product = None
+    order_item: OrderItem = None
 
     def setUp(self):
         self.order = Order.objects.create(
@@ -70,3 +70,9 @@ class OrderItemModelTestCase(TestCase):
         # Test verbose names from the Meta class
         self.assertEqual(OrderItem._meta.verbose_name, _("Order Item"))
         self.assertEqual(OrderItem._meta.verbose_name_plural, _("Order Items"))
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.order_item.delete()
+        self.order.delete()
+        self.product.delete()

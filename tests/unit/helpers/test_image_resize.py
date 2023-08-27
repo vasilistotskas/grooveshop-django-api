@@ -28,3 +28,7 @@ class TestMakeThumbnail(TestCase):
         # Ensure the thumbnail is 100x100
         thumbnail_img = Image.open(thumbnail)
         self.assertEqual(thumbnail_img.size, (100, 67))
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        pass

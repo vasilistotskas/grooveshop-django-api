@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import List
 
 from django.contrib.auth import get_user_model
 from django.urls import reverse
@@ -8,6 +9,7 @@ from rest_framework.test import APITestCase
 from country.models import Country
 from helpers.seed import get_or_create_default_image
 from order.enum.status_enum import OrderStatusEnum
+from order.models.item import OrderItem
 from order.models.order import Order
 from order.serializers.order import OrderSerializer
 from pay_way.models import PayWay
@@ -20,11 +22,11 @@ User = get_user_model()
 
 
 class OrderViewSetTestCase(APITestCase):
-    order = None
-    pay_way = None
-    country = None
-    region = None
-    order_items = None
+    order: Order = None
+    pay_way: PayWay = None
+    country: Country = None
+    region: Region = None
+    order_items: List[OrderItem] = None
 
     def setUp(self):
         # Create a sample user for testing
@@ -337,3 +339,11 @@ class OrderViewSetTestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertTrue(Order.objects.filter(id=self.order.id).exists())
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.order.delete()
+        self.user.delete()
+        self.pay_way.delete()
+        self.country.delete()
+        self.region.delete()

@@ -23,8 +23,8 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
     }
 )
 class SlideModelTestCase(TestCase):
-    slide = None
-    slider = None
+    slide: Slide = None
+    slider: Slider = None
 
     def setUp(self):
         image = get_or_create_default_image("uploads/slides/no_photo.jpg")
@@ -120,3 +120,8 @@ class SlideModelTestCase(TestCase):
         # Test if main_image_filename returns the correct filename
         expected_filename = os.path.basename(self.slide.image.name)
         self.assertEqual(self.slide.main_image_filename, expected_filename)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.slide.delete()
+        self.slider.delete()

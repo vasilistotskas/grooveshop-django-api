@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.core.handlers.wsgi import WSGIRequest
 from django.test import RequestFactory
 from django.test import TestCase
 
@@ -13,11 +14,11 @@ User = get_user_model()
 
 
 class CartServiceTest(TestCase):
-    user = None
-    factory = None
-    request = None
-    cart = None
-    product = None
+    user: User = None
+    factory: RequestFactory = None
+    request: WSGIRequest = None
+    cart: Cart = None
+    product: Product = None
 
     def setUp(self):
         self.user = User.objects.create_user(
@@ -164,3 +165,9 @@ class CartServiceTest(TestCase):
 
         self.assertEqual(len(cart_service), 0)
         self.assertEqual(self.cart.cart_item_cart.count(), 0)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.user.delete()
+        self.cart.delete()
+        self.product.delete()

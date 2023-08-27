@@ -7,6 +7,8 @@ from product.models.product import Product
 
 
 class CursorPaginatorTest(TestCase):
+    factory: RequestFactory = None
+
     def setUp(self):
         self.factory = RequestFactory()
         # Create some test data
@@ -52,5 +54,6 @@ class CursorPaginatorTest(TestCase):
         self.assertIn("results", response.data)
         self.assertEqual(response.data["page_total_results"], len(data))
 
-    def tearDown(self):
+    def tearDown(self) -> None:
+        super().tearDown()
         Product.objects.all().delete()

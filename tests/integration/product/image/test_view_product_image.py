@@ -27,9 +27,9 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
     }
 )
 class ProductImageViewSetTestCase(APITestCase):
-    product = None
-    product_image = None
-    default_image = None
+    product: Product = None
+    product_image: ProductImage = None
+    default_image: SimpleUploadedFile = None
 
     def setUp(self):
         self.product = Product.objects.create(
@@ -213,3 +213,8 @@ class ProductImageViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.product_image.delete()
+        self.product.delete()

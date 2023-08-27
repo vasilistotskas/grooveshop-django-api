@@ -10,8 +10,8 @@ User = get_user_model()
 
 
 class BlogAuthorModelTestCase(TestCase):
-    author = None
-    user = None
+    author: BlogAuthor = None
+    user: User = None
 
     def setUp(self):
         self.user = User.objects.create_user(
@@ -70,3 +70,8 @@ class BlogAuthorModelTestCase(TestCase):
     def test_str_representation(self):
         # Test the __str__ method returns the user's email
         self.assertEqual(str(self.author), self.user.email)
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        self.author.delete()
+        self.user.delete()

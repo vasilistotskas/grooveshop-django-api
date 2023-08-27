@@ -3,7 +3,27 @@
 
 
 
+## v0.18.0 (2023-08-27)
+
+### Chore
+
+* chore(static): Added static folder ([`cd8359f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cd8359fbdbff35162248e1348f62594234eb83c8))
+
+### Feature
+
+* feat(tests): Typing improvements and tearDown class added in tests. ([`bfee3c3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bfee3c3c3a00008e1ee3848d406fbca5c94adefe))
+
+* feat(tests): Create tests for simple search and make_thumbnail method. ([`7c7fbe6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7c7fbe672e24bbf7c19c3b374d42ba16ec9a5436))
+
+### Fix
+
+* fix(search): Search improve. ([`1217337`](https://github.com/vasilistotskas/grooveshop-django-api/commit/12173371d76eb7042025235decbf4516e423d508))
+
 ## v0.17.0 (2023-08-26)
+
+### Chore
+
+* chore(release): release version 0.17.0 [skip ci] ([`3d96c47`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3d96c4773ac5499477293b719be52bcc65d2832a))
 
 ### Feature
 

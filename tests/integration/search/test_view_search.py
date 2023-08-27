@@ -45,10 +45,10 @@ class SearchProductAPITest(APITestCase):
 
     def test_search_products(self):
         url = reverse("search-product")
-        response = self.client.get(url, {"query": "1"})
+        response = self.client.get(url, {"query": "product"})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(len(response.data["results"]), 3)
 
     def test_search_products_no_results(self):
         url = reverse("search-product")

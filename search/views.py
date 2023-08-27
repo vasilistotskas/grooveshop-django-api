@@ -15,5 +15,5 @@ class SearchProduct(generics.ListAPIView):
         query = self.request.query_params.get("query")
 
         if query is not None:
-            queryset = queryset.filter(Q(id__contains=query))
+            queryset = queryset.filter(Q(id__icontains=query) | Q(slug__icontains=query))
         return queryset

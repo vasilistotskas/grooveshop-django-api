@@ -3,9 +3,22 @@
 
 
 
+## v0.19.0 (2023-08-29)
+
+### Feature
+
+* feat(commands): Seed commands improvements.
+
+1) total var name change based on options total name.
+2) faker seed instance for each lang using different seed.
+3) check for available_languages.
+4) checks for models with unique together. ([`721bf6a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/721bf6a83cf54ca6ee485c8dc4f7ed067e71a600))
+
 ## v0.18.0 (2023-08-27)
 
 ### Chore
+
+* chore(release): release version 0.18.0 [skip ci] ([`1c5223d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1c5223d71c192b7b1c5da3d96a377690da5b0e0d))
 
 * chore(static): Added static folder ([`cd8359f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cd8359fbdbff35162248e1348f62594234eb83c8))
 

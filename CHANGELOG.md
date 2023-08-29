@@ -3,7 +3,26 @@
 
 
 
+## v0.20.0 (2023-08-29)
+
+### Feature
+
+* feat: Search improved, versions bump, minor fixes/improvements.
+
+1) Default db postgres, added DB_PORT new env var, and update name DB_PASS env var to DB_PASSWORD.
+2) Country model translations name field max_length change.
+3) Order model country and region field on delete set null.
+4) populate_country command fixed.
+5) Faker and python-semantic-release versions bump.
+6) Product fields `discount_value`, `final_price`, `price_save_percent` calculation removed from save method and implement signal and method update_calculated_fields.
+7) ProductQuerySet: new methods update_search_vector for search usage and update_calculated_fields.
+8) Product Search prototype and tests implemented. ([`bff87a5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bff87a57d1851cd5b316a3b941ad59d99e067945))
+
 ## v0.19.0 (2023-08-29)
+
+### Chore
+
+* chore(release): release version 0.19.0 [skip ci] ([`cf56421`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cf56421fe6c358f35784e2b42fee76ca1e00d1ab))
 
 ### Feature
 

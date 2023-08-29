@@ -33,7 +33,7 @@ class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         _("Image Flag"), blank=True, null=True, upload_to="uploads/country/"
     )
     translations = TranslatedFields(
-        name=models.CharField(_("Name"), max_length=50, blank=True, null=True)
+        name=models.CharField(_("Name"), max_length=100, blank=True, null=True)
     )
 
     class Meta(TypedModelMeta):
@@ -42,10 +42,10 @@ class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         verbose_name_plural = _("Countries")
 
     def __unicode__(self):
-        return self.safe_translation_getter("name", any_language=True)
+        return self.safe_translation_getter("name", any_language=True) or ""
 
     def __str__(self):
-        return self.safe_translation_getter("name", any_language=True)
+        return self.safe_translation_getter("name", any_language=True) or ""
 
     def get_ordering_queryset(self):
         return Country.objects.all()

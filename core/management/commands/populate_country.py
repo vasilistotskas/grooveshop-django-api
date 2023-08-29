@@ -82,10 +82,7 @@ class Command(BaseCommand):
         with transaction.atomic():
             for _ in range(total_countries):
                 # Create a new Country object for this translation
-                (
-                    country,
-                    created,
-                ) = Country.objects.get_or_create(
+                country, created = Country.objects.get_or_create(
                     alpha_2=self.generate_alpha_2(),
                     alpha_3=self.generate_alpha_3(),
                     iso_cc=self.generate_iso_cc(),
@@ -93,21 +90,21 @@ class Command(BaseCommand):
                     image_flag=img,
                 )
 
-            if created:
-                for lang in available_languages:
-                    name = f"{faker.country()}-{lang}"
-                    lang_seed = hash(f"{country.alpha_2}{lang}")
-                    faker.seed_instance(lang_seed)
-                    while (
-                        Country.objects.filter(translations__name=name).exists()
-                        and iterations < options["max_iterations"]
-                    ):
+                if created:
+                    for lang in available_languages:
+                        lang_seed = hash(f"{country.alpha_2}{lang}")
+                        faker.seed_instance(lang_seed)
                         name = f"{faker.country()}-{lang}"
-                        iterations += 1
-                    country.set_current_language(lang)
-                    country.name = name
-                    country.save()
-                created_countries.append(country)
+                        while (
+                            Country.objects.filter(translations__name=name).exists()
+                            and iterations < options["max_iterations"]
+                        ):
+                            name = f"{faker.country()}-{lang}"
+                            iterations += 1
+                        country.set_current_language(lang)
+                        country.name = name
+                        country.save()
+                    created_countries.append(country)
 
         self.stdout.write(
             self.style.SUCCESS(

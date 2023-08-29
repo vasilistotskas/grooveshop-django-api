@@ -5,15 +5,21 @@ import uuid
 from decimal import Decimal
 
 from django.conf import settings
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.search import SearchVector
+from django.contrib.postgres.search import SearchVectorField
 from django.db import models
 from django.db.models import Avg
 from django.db.models import Count
+from django.db.models import Subquery
+from django.db.models.functions import Coalesce
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.safestring import SafeString
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from mptt.fields import TreeForeignKey
+from parler.managers import TranslatableQuerySet
 from parler.models import TranslatableModel
 from parler.models import TranslatedFields
 from tinymce.models import HTMLField
@@ -24,6 +30,75 @@ from product.models.favourite import ProductFavourite
 from product.models.image import ProductImage
 from product.models.review import ProductReview
 from seo.models import SeoModel
+
+
+class ProductQuerySet(TranslatableQuerySet):
+    def update_search_vector(self, weights: dict[str, str] | None = None):
+        translated_fields = self.model._parler_meta.get_translated_fields()
+        search_vector_fields = [f"translations__{field}" for field in translated_fields]
+
+        search_vector = SearchVector(*search_vector_fields)
+
+        if weights:
+            search_vector = SearchVector(
+                *[
+                    SearchVector(f"translations__{field}", weight=weights[field])
+                    for field in translated_fields
+                ]
+            )
+
+        subquery = self.annotate(updated_vector=search_vector).values("updated_vector")[
+            :1
+        ]
+
+        return self.update(search_vector=Subquery(subquery))
+
+    def update_calculated_fields(self):
+        vat_subquery = models.Subquery(
+            Product.objects.filter(vat__isnull=False).values("vat__value")[:1]
+        )
+
+        annotated_queryset = self.annotate(
+            vat_value_annotation=models.ExpressionWrapper(
+                (models.F("price") * Coalesce(vat_subquery, 0)) / 100,
+                output_field=models.DecimalField(decimal_places=2, max_digits=11),
+            ),
+            discount_value_annotation=models.ExpressionWrapper(
+                (models.F("price") * models.F("discount_percent")) / 100,
+                output_field=models.DecimalField(decimal_places=2, max_digits=11),
+            ),
+            final_price_annotation=models.ExpressionWrapper(
+                models.F("price")
+                + models.F("vat_value_annotation")
+                - models.F("discount_value_annotation"),
+                output_field=models.DecimalField(decimal_places=2, max_digits=11),
+            ),
+            price_save_percent_annotation=models.ExpressionWrapper(
+                (models.F("discount_value_annotation") / models.F("price")) * 100,
+                output_field=models.DecimalField(decimal_places=2, max_digits=11),
+            ),
+        )
+
+        return annotated_queryset.update(
+            discount_value=models.F("discount_value_annotation"),
+            final_price=models.F("final_price_annotation"),
+            price_save_percent=models.F("price_save_percent_annotation"),
+        )
+
+
+class ProductManager(models.Manager):
+    def get_queryset(self) -> ProductQuerySet:
+        return ProductQuerySet(self.model, using=self._db)
+
+    def update_search_vector(self):
+        weights = {
+            "name": "A",
+            "description": "B",
+        }
+        return self.get_queryset().update_search_vector(weights=weights)
+
+    def update_calculated_fields(self):
+        return self.get_queryset().update_calculated_fields()
 
 
 class Product(TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel):
@@ -80,31 +155,23 @@ class Product(TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel):
         name=models.CharField(_("Name"), max_length=255, blank=True, null=True),
         description=HTMLField(_("Description"), blank=True, null=True),
     )
+    search_vector = SearchVectorField(null=True)
+
+    objects = ProductManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Product")
         verbose_name_plural = _("Products")
         ordering = ["-created_at"]
+        indexes = [
+            GinIndex(fields=["search_vector"]),
+        ]
 
     def __unicode__(self):
         return self.safe_translation_getter("name", any_language=True) or ""
 
     def __str__(self):
         return self.safe_translation_getter("name", any_language=True) or ""
-
-    def save(self, *args, **kwargs):
-        vat_value = 0.0
-        if self.vat:
-            vat_value = (self.price * self.vat.value) / 100
-
-        if self.price is not None and self.discount_percent is not None:
-            self.discount_value = (self.price * self.discount_percent) / 100
-
-        self.final_price = (
-            float(self.price) + float(vat_value) - float(self.discount_value)
-        )
-        self.price_save_percent = (self.discount_value / self.price) * 100
-        super().save(*args, **kwargs)
 
     @property
     def likes_counter(self) -> int:

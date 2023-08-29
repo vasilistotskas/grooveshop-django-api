@@ -9760,6 +9760,8 @@ components:
           type: boolean
         viewCount:
           type: integer
+          maximum: 2147483647
+          minimum: -2147483648
         createdAt:
           type: string
           format: date-time
@@ -9936,6 +9938,8 @@ components:
           readOnly: true
         quantity:
           type: integer
+          maximum: 2147483647
+          minimum: 0
         totalPrice:
           type: number
           format: double
@@ -10093,6 +10097,8 @@ components:
           type: integer
         quantity:
           type: integer
+          maximum: 2147483647
+          minimum: -2147483648
       required:
       - id
       - product
@@ -10128,10 +10134,14 @@ components:
           maxLength: 3
         isoCc:
           type: integer
+          maximum: 32767
+          minimum: 0
           nullable: true
           title: ISO Country Code
         phoneCode:
           type: integer
+          maximum: 32767
+          minimum: 0
           nullable: true
         createdAt:
           type: string
@@ -10493,6 +10503,8 @@ components:
           $ref: '#/components/schemas/Product'
         quantity:
           type: integer
+          maximum: 2147483647
+          minimum: -2147483648
         createdAt:
           type: string
           format: date-time
@@ -10537,6 +10549,8 @@ components:
           exclusiveMinimum: true
         quantity:
           type: integer
+          maximum: 2147483647
+          minimum: -2147483648
       required:
       - id
       - price
@@ -11180,6 +11194,8 @@ components:
           type: boolean
         viewCount:
           type: integer
+          maximum: 2147483647
+          minimum: -2147483648
         createdAt:
           type: string
           format: date-time
@@ -11316,6 +11332,8 @@ components:
           readOnly: true
         quantity:
           type: integer
+          maximum: 2147483647
+          minimum: 0
         totalPrice:
           type: number
           format: double
@@ -11360,10 +11378,14 @@ components:
           maxLength: 3
         isoCc:
           type: integer
+          maximum: 32767
+          minimum: 0
           nullable: true
           title: ISO Country Code
         phoneCode:
           type: integer
+          maximum: 32767
+          minimum: 0
           nullable: true
         createdAt:
           type: string
@@ -11634,11 +11656,15 @@ components:
           readOnly: true
         hits:
           type: integer
+          maximum: 2147483647
+          minimum: 0
         likesCounter:
           type: integer
           readOnly: true
         stock:
           type: integer
+          maximum: 2147483647
+          minimum: 0
         active:
           type: boolean
         weight:
@@ -11907,7 +11933,10 @@ components:
         user:
           type: integer
         rate:
-          $ref: '#/components/schemas/RateEnum'
+          allOf:
+          - $ref: '#/components/schemas/RateEnum'
+          minimum: 0
+          maximum: 32767
         status:
           $ref: '#/components/schemas/ProductReviewStatusEnum'
         createdAt:
@@ -12511,11 +12540,15 @@ components:
           readOnly: true
         hits:
           type: integer
+          maximum: 2147483647
+          minimum: 0
         likesCounter:
           type: integer
           readOnly: true
         stock:
           type: integer
+          maximum: 2147483647
+          minimum: 0
         active:
           type: boolean
         weight:
@@ -12836,7 +12869,10 @@ components:
         user:
           type: integer
         rate:
-          $ref: '#/components/schemas/RateEnum'
+          allOf:
+          - $ref: '#/components/schemas/RateEnum'
+          minimum: 0
+          maximum: 32767
         status:
           $ref: '#/components/schemas/ProductReviewStatusEnum'
         createdAt:

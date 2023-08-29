@@ -35,14 +35,14 @@ class Order(TimeStampMixinModel, UUIDModel):
     country = models.ForeignKey(
         "country.Country",
         related_name="order_country",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
     )
     region = models.ForeignKey(
         "region.Region",
         related_name="order_region",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
     )

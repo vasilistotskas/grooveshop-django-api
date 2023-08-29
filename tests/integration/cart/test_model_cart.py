@@ -69,12 +69,18 @@ class CartModelTestCase(TestCase):
         self.assertEqual(self.cart.get_items().count(), 2)
 
     def test_total_price(self):
+        self.cart_item_1.refresh_from_db()
+        self.cart_item_2.refresh_from_db()
+
         expected_total_price = (
             self.cart_item_1.total_price + self.cart_item_2.total_price
         )
         self.assertEqual(self.cart.total_price, expected_total_price)
 
     def test_total_discount_value(self):
+        self.cart_item_1.refresh_from_db()
+        self.cart_item_2.refresh_from_db()
+
         expected_total_discount = (
             self.cart_item_1.total_discount_value
             + self.cart_item_2.total_discount_value

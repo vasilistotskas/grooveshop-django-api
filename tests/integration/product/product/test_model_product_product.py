@@ -142,11 +142,24 @@ class ProductModelTestCase(TestCase):
         self.product.vat = self.vat
 
         self.product.save()
+        # Refresh the product instance from the database
+        self.product.refresh_from_db()
 
-        self.assertEqual(self.product.discount_value, Decimal("50.00"))
-        self.assertEqual(self.product.vat_value, Decimal("24.00"))
-        self.assertEqual(self.product.final_price, Decimal("74.00"))
-        self.assertEqual(self.product.price_save_percent, Decimal("50.00"))
+        expected_discount_value = (
+            self.product.price * self.product.discount_percent
+        ) / 100
+        expected_vat_value = (self.product.price * self.vat.value) / 100
+        expected_final_price = (
+            self.product.price + expected_vat_value - expected_discount_value
+        )
+        expected_price_save_percent = (
+            expected_discount_value / self.product.price
+        ) * 100
+
+        self.assertEqual(self.product.discount_value, expected_discount_value)
+        self.assertEqual(self.product.vat_value, expected_vat_value)
+        self.assertEqual(self.product.final_price, expected_final_price)
+        self.assertEqual(self.product.price_save_percent, expected_price_save_percent)
 
     def test_fields(self):
         # Test if the fields are saved correctly

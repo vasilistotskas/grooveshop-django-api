@@ -28,7 +28,8 @@ env = environ.Env(
     DB_HOST=(str, "db"),
     DB_NAME=(str, "devdb"),
     DB_USER=(str, "devuser"),
-    DB_PASS=(str, "changeme"),
+    DB_PASSWORD=(str, "changeme"),
+    DB_PORT=(str, "5432"),
     DB_HOST_TEST=(str, "db_replica"),
     DB_NAME_TEST=(str, "devdb_replica"),
     DB_TEST_MIRROR=(str, "default"),
@@ -137,6 +138,7 @@ DJANGO_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.sites",
+    "django.contrib.postgres",
 ]
 PROJECT_APPS = [
     "user",
@@ -305,29 +307,22 @@ WSGI_APPLICATION = "app.wsgi.application"
 # Database
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
+        "ENGINE": "django.db.backends.postgresql",
+        "HOST": env("DB_HOST"),
+        "NAME": env("DB_NAME"),
+        "USER": env("DB_USER"),
+        "PASSWORD": env("DB_PASSWORD"),
+        "PORT": env("DB_PORT"),
+    },
+    "replica": {
+        "ENGINE": "django.db.backends.postgresql",
+        "HOST": env("DB_HOST_TEST"),
+        "NAME": env("DB_NAME_TEST"),
+        "TEST": {
+            "MIRROR": env("DB_TEST_MIRROR"),
+        },
+    },
 }
-
-if SYSTEM_ENV == "docker":
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "HOST": env("DB_HOST"),
-            "NAME": env("DB_NAME"),
-            "USER": env("DB_USER"),
-            "PASSWORD": env("DB_PASS"),
-        },
-        "replica": {
-            "ENGINE": "django.db.backends.postgresql",
-            "HOST": env("DB_HOST_TEST"),
-            "NAME": env("DB_NAME_TEST"),
-            "TEST": {
-                "MIRROR": env("DB_TEST_MIRROR"),
-            },
-        },
-    }
 
 if SYSTEM_ENV == "GITHUB_WORKFLOW":
     DATABASES = {
@@ -335,7 +330,7 @@ if SYSTEM_ENV == "GITHUB_WORKFLOW":
             "ENGINE": "django.db.backends.postgresql",
             "NAME": "postgres",
             "USER": env("DB_USER"),
-            "PASSWORD": env("DB_PASS"),
+            "PASSWORD": env("DB_PASSWORD"),
             "HOST": "127.0.0.1",
             "PORT": "5432",
         }

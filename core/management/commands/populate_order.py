@@ -32,9 +32,9 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        total = options["total_orders"]
+        total_orders = options["total_orders"]
 
-        if total < 1:
+        if total_orders < 1:
             self.stdout.write(
                 self.style.WARNING("Total number of orders must be greater than 0.")
             )
@@ -62,7 +62,7 @@ class Command(BaseCommand):
         created_orders = []
 
         with transaction.atomic():
-            for _ in range(total):
+            for _ in range(total_orders):
                 # Randomly select user, product, country, and region
                 user = faker.random_element(users)
                 product = faker.random_element(products)

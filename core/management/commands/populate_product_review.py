@@ -51,6 +51,10 @@ class Command(BaseCommand):
             lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
         ]
 
+        if not available_languages:
+            self.stdout.write(self.style.ERROR("No languages found."))
+            return
+
         rate_choices = [choice[0] for choice in RateEnum.choices()]
         status_choices = [choice[0] for choice in ReviewStatusEnum.choices()]
 
@@ -62,6 +66,10 @@ class Command(BaseCommand):
                 rate = faker.random_element(rate_choices)
                 status = faker.random_element(status_choices)
 
+                # Ensure the user does not review the same product twice
+                if ProductReview.objects.filter(product=product, user=user).exists():
+                    continue
+
                 # Create a new ProductReview object
                 review, created = ProductReview.objects.get_or_create(
                     product=product,
@@ -72,7 +80,8 @@ class Command(BaseCommand):
 
                 if created:
                     for lang in available_languages:
-                        faker.seed_instance(lang)
+                        lang_seed = hash(f"{review.id}{lang}")
+                        faker.seed_instance(lang_seed)
                         comment = faker.text(max_nb_chars=250)
                         review.set_current_language(lang)
                         review.comment = comment

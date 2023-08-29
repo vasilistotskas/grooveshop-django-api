@@ -50,6 +50,10 @@ class Command(BaseCommand):
             lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
         ]
 
+        if not available_languages:
+            self.stdout.write(self.style.ERROR("No languages found."))
+            return
+
         created_sliders = []
         created_slides = []
         with transaction.atomic():
@@ -58,7 +62,8 @@ class Command(BaseCommand):
                 slider = Slider.objects.create(image=slider_img)
 
                 for lang in available_languages:
-                    faker.seed_instance(lang)
+                    lang_seed = hash(f"{slider.id}{lang}")
+                    faker.seed_instance(lang_seed)
                     name = faker.word()
                     url = faker.url()
                     title = faker.word()
@@ -97,7 +102,8 @@ class Command(BaseCommand):
                     )
 
                     for lang in available_languages:
-                        faker.seed_instance(lang)
+                        lang_seed = hash(f"{slide.id}{lang}")
+                        faker.seed_instance(lang_seed)
                         name = faker.word()
                         url = faker.url()
                         title = faker.word()

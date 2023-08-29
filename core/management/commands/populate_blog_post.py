@@ -52,6 +52,10 @@ class Command(BaseCommand):
             lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
         ]
 
+        if not available_languages:
+            self.stdout.write(self.style.ERROR("No languages found."))
+            return
+
         status_choices = [choice[0] for choice in PostStatusEnum.choices()]
 
         created_posts = []
@@ -92,7 +96,8 @@ class Command(BaseCommand):
 
                 if created:
                     for lang in available_languages:
-                        faker.seed_instance(lang)
+                        lang_seed = hash(f"{post.id}{lang}")
+                        faker.seed_instance(lang_seed)
                         title = faker.sentence(nb_words=5)
                         subtitle = faker.sentence(nb_words=10)
                         body = faker.paragraph(nb_sentences=10)

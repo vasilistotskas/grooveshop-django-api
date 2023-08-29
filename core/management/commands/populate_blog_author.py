@@ -23,12 +23,12 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        total = options["total_authors"]
+        total_authors = options["total_authors"]
         languages = [
             lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
         ]
 
-        if total < 1:
+        if total_authors < 1:
             self.stdout.write(
                 self.style.WARNING("Total number of authors must be greater than 0.")
             )
@@ -48,7 +48,7 @@ class Command(BaseCommand):
         created_authors = []
 
         with transaction.atomic():
-            for _ in range(total):
+            for _ in range(total_authors):
                 # If there are no more user accounts left, break the loop to avoid duplicates
                 if not user_accounts:
                     break
@@ -68,9 +68,8 @@ class Command(BaseCommand):
 
                 if created:
                     for lang in languages:
-                        faker.seed_instance(
-                            lang
-                        )  # Seed Faker instance for each language
+                        lang_seed = hash(f"{user.id}{lang}")
+                        faker.seed_instance(lang_seed)
                         bio = faker.paragraph()
                         author.set_current_language(lang)
                         author.bio = bio

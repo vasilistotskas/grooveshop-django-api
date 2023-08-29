@@ -38,6 +38,10 @@ class Command(BaseCommand):
             lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
         ]
 
+        if not available_languages:
+            self.stdout.write(self.style.ERROR("No languages found."))
+            return
+
         tip_kind_choices = [choice[0] for choice in TipKindEnum.choices()]
 
         created_tips = []
@@ -50,7 +54,8 @@ class Command(BaseCommand):
                 tip = Tip.objects.create(kind=kind, icon=img, active=active)
 
                 for lang in available_languages:
-                    faker.seed_instance(lang)
+                    lang_seed = hash(f"{kind}{active}{lang}")
+                    faker.seed_instance(lang_seed)
                     title = faker.word()
                     content = faker.text(max_nb_chars=500)
                     url = faker.url()

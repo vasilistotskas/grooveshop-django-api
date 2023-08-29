@@ -19,7 +19,7 @@ class Command(BaseCommand):
             "total_products",
             type=int,
             help="Indicates the number of products to be seeded.",
-            default=500,
+            default=100,
             nargs="?",
         )
 
@@ -45,6 +45,10 @@ class Command(BaseCommand):
         available_languages = [
             lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
         ]
+
+        if not available_languages:
+            self.stdout.write(self.style.ERROR("No languages found."))
+            return
 
         created_products = []
         with transaction.atomic():
@@ -76,9 +80,11 @@ class Command(BaseCommand):
 
                 if created:
                     for lang in available_languages:
-                        faker.seed_instance(lang)
-                        name = faker.word()
-                        description = faker.text()
+                        lang_seed = hash(f"{lang}{product.id}")
+                        faker.seed_instance(lang_seed)
+
+                        name = f"{faker.word()}_{product.id}"
+                        description = f"{faker.text()}_{product.id}"
                         product.set_current_language(lang)
                         product.name = name
                         product.description = description

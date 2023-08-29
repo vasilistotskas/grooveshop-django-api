@@ -48,6 +48,10 @@ class Command(BaseCommand):
             lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
         ]
 
+        if not available_languages:
+            self.stdout.write(self.style.ERROR("No languages found."))
+            return
+
         created_comments = []
         with transaction.atomic():
             for _ in range(total_comments):
@@ -57,6 +61,10 @@ class Command(BaseCommand):
                 likes = faker.random_elements(
                     users, unique=True, length=faker.random_int(min=0, max=5)
                 )
+
+                # Ensure the user does not comment on the same post twice
+                if BlogComment.objects.filter(user=user, post=blog_post).exists():
+                    continue
 
                 # Create a new BlogComment object
                 comment, created = BlogComment.objects.get_or_create(
@@ -68,7 +76,10 @@ class Command(BaseCommand):
 
                 if created:
                     for lang in available_languages:
-                        faker.seed_instance(lang)
+                        lang_seed = hash(
+                            f"{comment.user.id}{comment.post.id}{lang}{comment.id}"
+                        )
+                        faker.seed_instance(lang_seed)
                         content = faker.text(max_nb_chars=1000)
                         comment.set_current_language(lang)
                         comment.content = content

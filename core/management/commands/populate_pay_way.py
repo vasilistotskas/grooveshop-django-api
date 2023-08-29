@@ -42,6 +42,10 @@ class Command(BaseCommand):
             lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
         ]
 
+        if not available_languages:
+            self.stdout.write(self.style.ERROR("No languages found."))
+            return
+
         created_pay_ways = []
         with transaction.atomic():
             for _ in range(total_pay_ways):
@@ -60,7 +64,8 @@ class Command(BaseCommand):
 
                 if created:
                     for lang in available_languages:
-                        faker.seed_instance(lang)
+                        lang_seed = hash(f"{pay_way.id}{lang}")
+                        faker.seed_instance(lang_seed)
                         pay_way.set_current_language(lang)
                         pay_way.name = name
                         pay_way.save()

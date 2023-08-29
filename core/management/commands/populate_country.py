@@ -46,21 +46,21 @@ class Command(BaseCommand):
             "total_countries",
             type=int,
             help="Indicates the number of countries to be seeded.",
-            default=12,
+            default=20,
             nargs="?",
         )
         parser.add_argument(
             "max_iterations",
             type=int,
             help="Indicates the maximum " "number of iterations to " "be used.",
-            default=100,
+            default=200,
             nargs="?",
         )
 
     def handle(self, *args, **options):
-        total = options["total_countries"]
+        total_countries = options["total_countries"]
 
-        if total < 1:
+        if total_countries < 1:
             self.stdout.write(
                 self.style.WARNING("Total number of countries must be greater than 0.")
             )
@@ -68,65 +68,49 @@ class Command(BaseCommand):
 
         img = get_or_create_default_image("uploads/country/no_photo.jpg")
 
-        languages = [
+        available_languages = [
             lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
         ]
 
-        if not languages:
+        if not available_languages:
             self.stdout.write(self.style.ERROR("No languages found."))
             return
 
-        created_countries = 0
+        created_countries = []
+        iterations = 0
 
         with transaction.atomic():
-            for _ in range(total):
-                used_languages = []  # To keep track of used language codes
+            for _ in range(total_countries):
+                # Create a new Country object for this translation
+                (
+                    country,
+                    created,
+                ) = Country.objects.get_or_create(
+                    alpha_2=self.generate_alpha_2(),
+                    alpha_3=self.generate_alpha_3(),
+                    iso_cc=self.generate_iso_cc(),
+                    phone_code=self.generate_phone_code(),
+                    image_flag=img,
+                )
 
-                for lang in languages:
-                    # Ensure each language code is used only once
-                    if lang not in used_languages:
-                        country_data = {
-                            "alpha_2": self.generate_alpha_2(),
-                            "alpha_3": self.generate_alpha_3(),
-                            "iso_cc": self.generate_iso_cc(),
-                            "phone_code": self.generate_phone_code(),
-                            "names": {},
-                        }
+            if created:
+                for lang in available_languages:
+                    name = f"{faker.country()}-{lang}"
+                    lang_seed = hash(f"{country.alpha_2}{lang}")
+                    faker.seed_instance(lang_seed)
+                    while (
+                        Country.objects.filter(translations__name=name).exists()
+                        and iterations < options["max_iterations"]
+                    ):
                         name = f"{faker.country()}-{lang}"
-
-                        # Limit the loop iterations for uniqueness
-                        # Check if the translation with the same name exists
-                        iterations = 0
-                        while (
-                            Country.objects.filter(translations__name=name).exists()
-                            and iterations < options["max_iterations"]
-                        ):
-                            name = f"{faker.country()}-{lang}"
-                            iterations += 1
-
-                        country_data["names"][lang] = name
-                        used_languages.append(lang)
-
-                        # Create a new Country object for this translation
-                        (
-                            translation_country_obj,
-                            created,
-                        ) = Country.objects.get_or_create(
-                            alpha_2=country_data["alpha_2"],
-                            alpha_3=country_data["alpha_3"],
-                            iso_cc=country_data["iso_cc"],
-                            phone_code=country_data["phone_code"],
-                            image_flag=img,
-                        )
-                        translation_country_obj.set_current_language(lang)
-                        translation_country_obj.name = name
-                        translation_country_obj.save()
-
-                if created:
-                    created_countries += 1
+                        iterations += 1
+                    country.set_current_language(lang)
+                    country.name = name
+                    country.save()
+                created_countries.append(country)
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Successfully seeded {created_countries} Country models."
+                f"Successfully seeded {len(created_countries)} Country models."
             )
         )

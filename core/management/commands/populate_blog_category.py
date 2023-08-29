@@ -23,9 +23,9 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        total = options["total_categories"]
+        total_categories = options["total_categories"]
 
-        if total < 1:
+        if total_categories < 1:
             self.stdout.write(
                 self.style.WARNING("Total number of categories must be greater than 0.")
             )
@@ -37,11 +37,15 @@ class Command(BaseCommand):
             lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
         ]
 
+        if not available_languages:
+            self.stdout.write(self.style.ERROR("No languages found."))
+            return
+
         # Create a list to store created categories
         created_categories = []
 
         with transaction.atomic():
-            for _ in range(total):
+            for _ in range(total_categories):
                 slug = faker.slug()
 
                 # Ensure the slug value is unique for each category
@@ -56,9 +60,8 @@ class Command(BaseCommand):
 
                 if created:
                     for lang in available_languages:
-                        faker.seed_instance(
-                            lang
-                        )  # Seed Faker instance for each language
+                        lang_seed = hash(f"{slug}{lang}")
+                        faker.seed_instance(lang_seed)
                         name = faker.word()
                         description = faker.text()
                         category.set_current_language(lang)

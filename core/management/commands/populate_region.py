@@ -44,6 +44,10 @@ class Command(BaseCommand):
             lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
         ]
 
+        if not available_languages:
+            self.stdout.write(self.style.ERROR("No languages found."))
+            return
+
         created_regions = []
         with transaction.atomic():
             for _ in range(total_regions):
@@ -62,7 +66,8 @@ class Command(BaseCommand):
 
                 if created:
                     for lang in available_languages:
-                        faker.seed_instance(lang)
+                        lang_seed = hash(f"{alpha}{lang}")
+                        faker.seed_instance(lang_seed)
                         name = faker.word()
                         region.set_current_language(lang)
                         region.name = name

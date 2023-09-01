@@ -3,7 +3,22 @@
 
 
 
+## v0.21.0 (2023-09-01)
+
+### Feature
+
+* feat(enums): Replace enum and usage with django built in models.TextChoices and models.IntegerChoices
+
+Versions bump.
+Locales compile.
+Run Migrations.
+Api schema.yml updated. ([`1897e29`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1897e298d73183524847d00eb26f95c2cd8e915e))
+
 ## v0.20.0 (2023-08-29)
+
+### Chore
+
+* chore(release): release version 0.20.0 [skip ci] ([`b56961e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b56961e91927e2f56e7ea7ab2f9954376605697e))
 
 ### Feature
 

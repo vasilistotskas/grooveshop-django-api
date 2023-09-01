@@ -38,17 +38,15 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
         default=None,
         on_delete=models.SET_NULL,
     )
-    floor = models.CharField(
+    floor = models.PositiveSmallIntegerField(
         _("Floor"),
-        max_length=50,
         choices=FloorChoicesEnum.choices,
         null=True,
         blank=True,
         default=None,
     )
-    location_type = models.CharField(
+    location_type = models.PositiveSmallIntegerField(
         _("Location Type"),
-        max_length=100,
         choices=LocationChoicesEnum.choices,
         null=True,
         blank=True,

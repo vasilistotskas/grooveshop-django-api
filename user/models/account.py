@@ -13,6 +13,7 @@ from django.http import HttpRequest
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
+from django_stubs_ext.db.models import TypedModelMeta
 
 from core import caches
 from core.caches import cache_instance
@@ -95,6 +96,11 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
 
     USERNAME_FIELD: str = "email"
     REQUIRED_FIELDS: List[str] = []
+
+    class Meta(TypedModelMeta):
+        verbose_name = _("User Account")
+        verbose_name_plural = _("User Accounts")
+        ordering = ["-created_at"]
 
     def __str__(self):
         return self.email

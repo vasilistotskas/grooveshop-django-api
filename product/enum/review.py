@@ -9,13 +9,13 @@ class ReviewStatusEnum(models.TextChoices):
 
 
 class RateEnum(models.IntegerChoices):
-    ONE = 1
-    TWO = 2
-    THREE = 3
-    FOUR = 4
-    FIVE = 5
-    SIX = 6
-    SEVEN = 7
-    EIGHT = 8
-    NINE = 9
-    TEN = 10
+    ONE = 1, _("One")
+    TWO = 2, _("Two")
+    THREE = 3, _("Three")
+    FOUR = 4, _("Four")
+    FIVE = 5, _("Five")
+    SIX = 6, _("Six")
+    SEVEN = 7, _("Seven")
+    EIGHT = 8, _("Eight")
+    NINE = 9, _("Nine")
+    TEN = 10, _("Ten")

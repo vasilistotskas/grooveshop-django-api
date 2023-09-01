@@ -18,7 +18,7 @@ class Command(BaseCommand):
             "total_regions",
             type=int,
             help="Indicates the number of regions to be seeded.",
-            default=20,
+            default=100,
             nargs="?",
         )
 

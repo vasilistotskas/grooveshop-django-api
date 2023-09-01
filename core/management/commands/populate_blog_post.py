@@ -56,7 +56,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR("No languages found."))
             return
 
-        status_choices = [choice[0] for choice in PostStatusEnum.choices()]
+        status_choices = [choice[0] for choice in PostStatusEnum.choices]
 
         created_posts = []
         with transaction.atomic():

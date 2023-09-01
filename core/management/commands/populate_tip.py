@@ -42,7 +42,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR("No languages found."))
             return
 
-        tip_kind_choices = [choice[0] for choice in TipKindEnum.choices()]
+        tip_kind_choices = [choice[0] for choice in TipKindEnum.choices]
 
         created_tips = []
         with transaction.atomic():

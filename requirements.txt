@@ -7,9 +7,9 @@ django-admin-thumbnails==0.2.8
 django-mptt==0.14.0
 django-js-asset==2.1.0
 django-redis==5.3.0
-celery==5.3.1
+celery==5.3.3
 Faker==19.3.1
-django-environ==0.10.0
+django-environ==0.11.1
 django-tinymce==3.6.1
 gunicorn==21.2.0
 whitenoise==6.5.0
@@ -21,7 +21,7 @@ coverage==7.3.0
 drf-spectacular==0.26.4
 pylint==2.17.5
 pre-commit==3.3.3
-django-allauth==0.55.0
+django-allauth==0.55.2
 django-allauth-2fa==0.11.1
 django-celery-beat==2.5.0
 django-celery-results==2.5.1
@@ -46,3 +46,5 @@ pytest-django==4.5.2
 django-stubs==4.2.3
 django-sql-explorer==3.2.1
 hiredis==2.2.3
+channels==4.0.0
+channels-redis==4.1.0

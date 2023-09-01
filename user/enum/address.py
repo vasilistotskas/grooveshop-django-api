@@ -1,9 +1,7 @@
-from enum import Enum
-from enum import unique
+from django.db import models
 
 
-@unique
-class FloorChoicesEnum(Enum):
+class FloorChoicesEnum(models.IntegerChoices):
     BASEMENT = 0
     GROUND_FLOOR = 1
     FIRST_FLOOR = 2
@@ -13,17 +11,8 @@ class FloorChoicesEnum(Enum):
     FIFTH_FLOOR = 6
     SIXTH_FLOOR_PLUS = 7
 
-    @classmethod
-    def choices(cls) -> list:
-        return [(name.value, name.name) for name in cls]
 
-
-@unique
-class LocationChoicesEnum(Enum):
+class LocationChoicesEnum(models.IntegerChoices):
     HOME = 0
     OFFICE = 1
     OTHER = 2
-
-    @classmethod
-    def choices(cls) -> list:
-        return [(name.value, name.name) for name in cls]

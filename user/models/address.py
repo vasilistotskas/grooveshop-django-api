@@ -41,7 +41,7 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
     floor = models.CharField(
         _("Floor"),
         max_length=50,
-        choices=FloorChoicesEnum.choices(),
+        choices=FloorChoicesEnum.choices,
         null=True,
         blank=True,
         default=None,
@@ -49,7 +49,7 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
     location_type = models.CharField(
         _("Location Type"),
         max_length=100,
-        choices=LocationChoicesEnum.choices(),
+        choices=LocationChoicesEnum.choices,
         null=True,
         blank=True,
         default=None,

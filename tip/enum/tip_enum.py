@@ -1,14 +1,9 @@
-from enum import Enum
-from enum import unique
+from django.db import models
+from django.utils.translation import gettext_lazy as _
 
 
-@unique
-class TipKindEnum(Enum):
-    SUCCESS = "success"
-    INFO = "info"
-    ERROR = "error"
-    WARNING = "warning"
-
-    @classmethod
-    def choices(cls) -> list:
-        return [(name.value, name.name) for name in cls]
+class TipKindEnum(models.TextChoices):
+    SUCCESS = "SUCCESS", _("Success")
+    INFO = "INFO", _("Info")
+    ERROR = "ERROR", _("Error")
+    WARNING = "WARNING", _("Warning")

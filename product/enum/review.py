@@ -1,20 +1,14 @@
-from enum import Enum
-from enum import unique
+from django.db import models
+from django.utils.translation import gettext_lazy as _
 
 
-@unique
-class ReviewStatusEnum(Enum):
-    NEW = "New"
-    TRUE = "True"
-    FALSE = "False"
-
-    @classmethod
-    def choices(cls) -> list:
-        return [(name.value, name.name) for name in cls]
+class ReviewStatusEnum(models.TextChoices):
+    NEW = "NEW", _("New")
+    TRUE = "TRUE", _("True")
+    FALSE = "FALSE", _("False")
 
 
-@unique
-class RateEnum(Enum):
+class RateEnum(models.IntegerChoices):
     ONE = 1
     TWO = 2
     THREE = 3
@@ -25,7 +19,3 @@ class RateEnum(Enum):
     EIGHT = 8
     NINE = 9
     TEN = 10
-
-    @classmethod
-    def choices(cls) -> list:
-        return [(name.value, name.name) for name in cls]

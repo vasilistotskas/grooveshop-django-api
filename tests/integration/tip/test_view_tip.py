@@ -64,7 +64,7 @@ class TipViewSetTestCase(APITestCase):
 
     def test_create_valid(self):
         payload = {
-            "kind": TipKindEnum.SUCCESS.value,
+            "kind": TipKindEnum.SUCCESS,
             "translations": {},
         }
 
@@ -121,7 +121,7 @@ class TipViewSetTestCase(APITestCase):
 
     def test_update_valid(self):
         payload = {
-            "kind": TipKindEnum.ERROR.value,
+            "kind": TipKindEnum.ERROR,
             "translations": {},
         }
 
@@ -162,7 +162,7 @@ class TipViewSetTestCase(APITestCase):
 
     def test_partial_update_valid(self):
         payload = {
-            "kind": TipKindEnum.ERROR.value,
+            "kind": TipKindEnum.ERROR,
             "translations": {},
         }
 

@@ -23,12 +23,12 @@ class ProductReview(
     user = models.ForeignKey(
         "user.UserAccount", related_name="product_review_user", on_delete=models.CASCADE
     )
-    rate = models.PositiveSmallIntegerField(_("Rate"), choices=RateEnum.choices())
+    rate = models.PositiveSmallIntegerField(_("Rate"), choices=RateEnum.choices)
     status = models.CharField(
         _("Status"),
         max_length=250,
-        choices=ReviewStatusEnum.choices(),
-        default=ReviewStatusEnum.NEW.value,
+        choices=ReviewStatusEnum.choices,
+        default=ReviewStatusEnum.NEW,
     )
     translations = TranslatedFields(
         comment=models.CharField(_("Comment"), max_length=250, blank=True, null=True)

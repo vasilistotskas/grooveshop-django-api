@@ -3527,15 +3527,15 @@ paths:
         schema:
           type: string
           enum:
-          - Canceled
-          - Paid and sent
-          - Pending
-          - Sent
+          - CANCELED
+          - PAID_AND_SENT
+          - PENDING
+          - SENT
         description: |-
-          * `Sent` - SENT
-          * `Paid and sent` - PAID_AND_SENT
-          * `Canceled` - CANCELED
-          * `Pending` - PENDING
+          * `SENT` - Sent
+          * `PAID_AND_SENT` - Paid and Sent
+          * `CANCELED` - Canceled
+          * `PENDING` - Pending
       - in: query
         name: userId
         schema:
@@ -3737,15 +3737,15 @@ paths:
           type: string
           nullable: true
           enum:
-          - Credit Card
-          - Pay On Delivery
-          - Pay On Store
-          - PayPal
+          - CREDIT_CARD
+          - PAY_ON_DELIVERY
+          - PAY_ON_STORE
+          - PAY_PAL
         description: |-
-          * `Credit Card` - CREDIT_CARD
-          * `Pay On Delivery` - PAY_ON_DELIVERY
-          * `Pay On Store` - PAY_ON_STORE
-          * `PayPal` - PAY_PAL
+          * `CREDIT_CARD` - Credit Card
+          * `PAY_ON_DELIVERY` - Pay On Delivery
+          * `PAY_ON_STORE` - Pay On Store
+          * `PAY_PAL` - PayPal
       tags:
       - api
       security:
@@ -7612,15 +7612,15 @@ paths:
         schema:
           type: string
           enum:
-          - error
-          - info
-          - success
-          - warning
+          - ERROR
+          - INFO
+          - SUCCESS
+          - WARNING
         description: |-
-          * `success` - SUCCESS
-          * `info` - INFO
-          * `error` - ERROR
-          * `warning` - WARNING
+          * `SUCCESS` - Success
+          * `INFO` - Info
+          * `ERROR` - Error
+          * `WARNING` - Warning
       - name: ordering
         required: false
         in: query
@@ -7715,15 +7715,15 @@ paths:
         schema:
           type: string
           enum:
-          - error
-          - info
-          - success
-          - warning
+          - ERROR
+          - INFO
+          - SUCCESS
+          - WARNING
         description: |-
-          * `success` - SUCCESS
-          * `info` - INFO
-          * `error` - ERROR
-          * `warning` - WARNING
+          * `SUCCESS` - Success
+          * `INFO` - Info
+          * `ERROR` - Error
+          * `WARNING` - Warning
       - name: ordering
         required: false
         in: query
@@ -8529,14 +8529,14 @@ paths:
           - 6
           - 7
         description: |-
-          * `0` - BASEMENT
-          * `1` - GROUND_FLOOR
-          * `2` - FIRST_FLOOR
-          * `3` - SECOND_FLOOR
-          * `4` - THIRD_FLOOR
-          * `5` - FOURTH_FLOOR
-          * `6` - FIFTH_FLOOR
-          * `7` - SIXTH_FLOOR_PLUS
+          * `0` - Basement
+          * `1` - Ground Floor
+          * `2` - First Floor
+          * `3` - Second Floor
+          * `4` - Third Floor
+          * `5` - Fourth Floor
+          * `6` - Fifth Floor
+          * `7` - Sixth Floor Plus
       - in: query
         name: id
         schema:
@@ -8555,9 +8555,9 @@ paths:
           - 1
           - 2
         description: |-
-          * `0` - HOME
-          * `1` - OFFICE
-          * `2` - OTHER
+          * `0` - Home
+          * `1` - Office
+          * `2` - Other
       - name: ordering
         required: false
         in: query
@@ -8662,14 +8662,14 @@ paths:
           - 6
           - 7
         description: |-
-          * `0` - BASEMENT
-          * `1` - GROUND_FLOOR
-          * `2` - FIRST_FLOOR
-          * `3` - SECOND_FLOOR
-          * `4` - THIRD_FLOOR
-          * `5` - FOURTH_FLOOR
-          * `6` - FIFTH_FLOOR
-          * `7` - SIXTH_FLOOR_PLUS
+          * `0` - Basement
+          * `1` - Ground Floor
+          * `2` - First Floor
+          * `3` - Second Floor
+          * `4` - Third Floor
+          * `5` - Fourth Floor
+          * `6` - Fifth Floor
+          * `7` - Sixth Floor Plus
       - in: path
         name: format
         schema:
@@ -8695,9 +8695,9 @@ paths:
           - 1
           - 2
         description: |-
-          * `0` - HOME
-          * `1` - OFFICE
-          * `2` - OTHER
+          * `0` - Home
+          * `1` - Office
+          * `2` - Other
       - name: ordering
         required: false
         in: query
@@ -9811,14 +9811,14 @@ components:
       - uuid
     BlogPostStatusEnum:
       enum:
-      - draft
-      - published
-      - archived
+      - DRAFT
+      - PUBLISHED
+      - ARCHIVED
       type: string
       description: |-
-        * `draft` - DRAFT
-        * `published` - PUBLISHED
-        * `archived` - ARCHIVED
+        * `DRAFT` - Draft
+        * `PUBLISHED` - Published
+        * `ARCHIVED` - Archived
     BlogTag:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -10175,12 +10175,12 @@ components:
       - uuid
     DocumentTypeEnum:
       enum:
-      - receipt
-      - invoice
+      - RECEIPT
+      - INVOICE
       type: string
       description: |-
-        * `receipt` - RECEIPT
-        * `invoice` - INVOICE
+        * `RECEIPT` - Receipt
+        * `INVOICE` - Invoice
     FloorEnum:
       enum:
       - 0
@@ -10193,26 +10193,26 @@ components:
       - 7
       type: integer
       description: |-
-        * `0` - BASEMENT
-        * `1` - GROUND_FLOOR
-        * `2` - FIRST_FLOOR
-        * `3` - SECOND_FLOOR
-        * `4` - THIRD_FLOOR
-        * `5` - FOURTH_FLOOR
-        * `6` - FIFTH_FLOOR
-        * `7` - SIXTH_FLOOR_PLUS
+        * `0` - Basement
+        * `1` - Ground Floor
+        * `2` - First Floor
+        * `3` - Second Floor
+        * `4` - Third Floor
+        * `5` - Fourth Floor
+        * `6` - Fifth Floor
+        * `7` - Sixth Floor Plus
     KindEnum:
       enum:
-      - success
-      - info
-      - error
-      - warning
+      - SUCCESS
+      - INFO
+      - ERROR
+      - WARNING
       type: string
       description: |-
-        * `success` - SUCCESS
-        * `info` - INFO
-        * `error` - ERROR
-        * `warning` - WARNING
+        * `SUCCESS` - Success
+        * `INFO` - Info
+        * `ERROR` - Error
+        * `WARNING` - Warning
     LocationTypeEnum:
       enum:
       - 0
@@ -10220,9 +10220,9 @@ components:
       - 2
       type: integer
       description: |-
-        * `0` - HOME
-        * `1` - OFFICE
-        * `2` - OTHER
+        * `0` - Home
+        * `1` - Office
+        * `2` - Other
     NullEnum:
       enum:
       - null
@@ -10557,16 +10557,16 @@ components:
       - product
     OrderStatusEnum:
       enum:
-      - Sent
-      - Paid and sent
-      - Canceled
-      - Pending
+      - SENT
+      - PAID_AND_SENT
+      - CANCELED
+      - PENDING
       type: string
       description: |-
-        * `Sent` - SENT
-        * `Paid and sent` - PAID_AND_SENT
-        * `Canceled` - CANCELED
-        * `Pending` - PENDING
+        * `SENT` - Sent
+        * `PAID_AND_SENT` - Paid and Sent
+        * `CANCELED` - Canceled
+        * `PENDING` - Pending
     PaginatedBlogAuthorList:
       type: object
       properties:
@@ -12902,14 +12902,14 @@ components:
       - uuid
     ProductReviewStatusEnum:
       enum:
-      - New
-      - 'True'
-      - 'False'
+      - NEW
+      - 'TRUE'
+      - 'FALSE'
       type: string
       description: |-
-        * `New` - NEW
-        * `True` - TRUE
-        * `False` - FALSE
+        * `NEW` - New
+        * `TRUE` - True
+        * `FALSE` - False
     RateEnum:
       enum:
       - 1
@@ -12924,16 +12924,16 @@ components:
       - 10
       type: integer
       description: |-
-        * `1` - ONE
-        * `2` - TWO
-        * `3` - THREE
-        * `4` - FOUR
-        * `5` - FIVE
-        * `6` - SIX
-        * `7` - SEVEN
-        * `8` - EIGHT
-        * `9` - NINE
-        * `10` - TEN
+        * `1` - One
+        * `2` - Two
+        * `3` - Three
+        * `4` - Four
+        * `5` - Five
+        * `6` - Six
+        * `7` - Seven
+        * `8` - Eight
+        * `9` - Nine
+        * `10` - Ten
     Region:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.

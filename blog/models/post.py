@@ -44,8 +44,8 @@ class BlogPost(
     status = models.CharField(
         _("Status"),
         max_length=20,
-        choices=PostStatusEnum.choices(),
-        default=PostStatusEnum.DRAFT.value,
+        choices=PostStatusEnum.choices,
+        default=PostStatusEnum.DRAFT,
     )
     featured = models.BooleanField(_("Featured"), default=False)
     view_count = models.IntegerField(_("View Count"), default=0)

@@ -4,11 +4,6 @@ from user.models import UserAccount
 from user.models.address import UserAddress
 
 
-class AddressInline(admin.TabularInline):
-    model = UserAddress
-    extra = 1
-
-
 @admin.register(UserAccount)
 class UserAccountAdmin(admin.ModelAdmin):
     list_display = [
@@ -27,5 +22,28 @@ class UserAccountAdmin(admin.ModelAdmin):
         "is_active",
         "is_staff",
     ]
-    inlines = [AddressInline]
     search_fields = ["email", "phone", "first_name", "last_name"]
+
+
+@admin.register(UserAddress)
+class UserAddressAdmin(admin.ModelAdmin):
+    list_display = [
+        "user",
+        "title",
+        "first_name",
+        "last_name",
+        "street",
+        "street_number",
+        "city",
+        "zipcode",
+        "country",
+        "region",
+        "floor",
+        "location_type",
+        "phone",
+        "mobile_phone",
+        "notes",
+        "is_main",
+    ]
+    list_filter = ["floor", "location_type"]
+    search_fields = ["user__email", "title", "first_name", "last_name", "street"]

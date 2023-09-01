@@ -34,7 +34,7 @@ class PayWayViewSetTestCase(APITestCase):
         )
         for language in languages:
             self.pay_way.set_current_language(language)
-            self.pay_way.name = PayWayEnum.CREDIT_CARD.value
+            self.pay_way.name = PayWayEnum.CREDIT_CARD
             self.pay_way.save()
         self.pay_way.set_current_language(default_language)
 
@@ -70,7 +70,7 @@ class PayWayViewSetTestCase(APITestCase):
             language_code = language[0]
 
             translation_payload = {
-                "name": PayWayEnum.CREDIT_CARD.value,
+                "name": PayWayEnum.CREDIT_CARD,
             }
 
             payload["translations"][language_code] = translation_payload
@@ -125,7 +125,7 @@ class PayWayViewSetTestCase(APITestCase):
             language_code = language[0]
 
             translation_payload = {
-                "name": PayWayEnum.PAY_ON_STORE.value,
+                "name": PayWayEnum.PAY_ON_STORE,
             }
 
             payload["translations"][language_code] = translation_payload
@@ -157,7 +157,7 @@ class PayWayViewSetTestCase(APITestCase):
             "active": False,
             "translations": {
                 default_language: {
-                    "name": PayWayEnum.PAY_ON_STORE.value,
+                    "name": PayWayEnum.PAY_ON_STORE,
                 }
             },
         }

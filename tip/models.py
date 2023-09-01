@@ -18,7 +18,7 @@ from tip.validators import validate_file_extension
 
 class Tip(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
-    kind = models.CharField(_("Kind"), max_length=25, choices=TipKindEnum.choices())
+    kind = models.CharField(_("Kind"), max_length=25, choices=TipKindEnum.choices)
     icon = models.FileField(
         _("Icon"),
         upload_to="uploads/tip/",

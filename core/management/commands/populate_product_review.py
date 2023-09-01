@@ -55,8 +55,8 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR("No languages found."))
             return
 
-        rate_choices = [choice[0] for choice in RateEnum.choices()]
-        status_choices = [choice[0] for choice in ReviewStatusEnum.choices()]
+        rate_choices = [choice[0] for choice in RateEnum.choices]
+        status_choices = [choice[0] for choice in ReviewStatusEnum.choices]
 
         created_reviews = []
         with transaction.atomic():

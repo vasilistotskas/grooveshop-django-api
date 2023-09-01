@@ -25,7 +25,7 @@ class OrderModelTestCase(TestCase):
             city="New York",
             zipcode="10001",
             phone="123-456-7890",
-            status=OrderStatusEnum.PENDING.value,
+            status=OrderStatusEnum.PENDING,
             shipping_price=Decimal("10.00"),
         )
 
@@ -76,7 +76,7 @@ class OrderModelTestCase(TestCase):
             city="New York",
             zipcode="10001",
             phone="123-456-7890",
-            status=OrderStatusEnum.PENDING.value,
+            status=OrderStatusEnum.PENDING,
             shipping_price=Decimal("10.00"),
         )
 
@@ -100,7 +100,7 @@ class OrderModelTestCase(TestCase):
             city="New York",
             zipcode="10001",
             phone="123-456-7890",
-            status=OrderStatusEnum.PENDING.value,
+            status=OrderStatusEnum.PENDING,
             shipping_price=Decimal("10.00"),
             pay_way=pay_way,
         )
@@ -133,7 +133,7 @@ class OrderModelTestCase(TestCase):
             city="New York",
             zipcode="10001",
             phone="123-456-7890",
-            status=OrderStatusEnum.PENDING.value,
+            status=OrderStatusEnum.PENDING,
             shipping_price=Decimal("10.00"),
         )
         self.assertEqual(order.total_price_extra, order.shipping_price)
@@ -155,7 +155,7 @@ class OrderModelTestCase(TestCase):
         self.assertEqual(self.order.city, "New York")
         self.assertEqual(self.order.zipcode, "10001")
         self.assertEqual(self.order.phone, "123-456-7890")
-        self.assertEqual(self.order.status, OrderStatusEnum.PENDING.value)
+        self.assertEqual(self.order.status, OrderStatusEnum.PENDING)
         self.assertEqual(self.order.shipping_price, Decimal("10.00"))
         self.assertEqual(self.order.paid_amount, Decimal("0.00"))
 

@@ -6,6 +6,7 @@ from django.db import transaction
 from faker import Faker
 
 from country.models import Country
+from order.enum.document_type_enum import OrderDocumentTypeEnum
 from order.enum.status_enum import OrderStatusEnum
 from order.models.item import OrderItem
 from order.models.order import Order
@@ -48,9 +49,10 @@ class Command(BaseCommand):
         pay_ways = list(PayWay.objects.all())
 
         # Get enum
-        floor_choices = [choice[0] for choice in FloorChoicesEnum.choices()]
-        location_choices = [choice[0] for choice in LocationChoicesEnum.choices()]
-        status_choices = [choice[0] for choice in OrderStatusEnum.choices()]
+        floor_choices = [choice[0] for choice in FloorChoicesEnum.choices]
+        location_choices = [choice[0] for choice in LocationChoicesEnum.choices]
+        status_choices = [choice[0] for choice in OrderStatusEnum.choices]
+        document_type_choices = [choice[0] for choice in OrderDocumentTypeEnum.choices]
 
         if not users or not products or not countries or not regions or not pay_ways:
             self.stdout.write(
@@ -91,7 +93,7 @@ class Command(BaseCommand):
                 customer_notes = faker.text(max_nb_chars=200)
                 status = faker.random_element(status_choices)
                 shipping_price = Decimal(faker.random_number(digits=2))
-                document_type = faker.random_element(elements=["receipt", "invoice"])
+                document_type = faker.random_element(document_type_choices)
 
                 # Create a new Order object
                 order = Order.objects.create(

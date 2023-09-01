@@ -89,7 +89,7 @@ class BlogPostViewSetTestCase(APITestCase):
             "likes": [],
             "tags": [],
             "author": self.author.id,
-            "status": "draft",
+            "status": "DRAFT",
             "translations": {},
         }
 
@@ -149,7 +149,7 @@ class BlogPostViewSetTestCase(APITestCase):
             "category": self.category.id,
             "likes": [],
             "tags": [],
-            "status": "published",  # Change the status to "published" for the test
+            "status": "PUBLISHED",  # Change the status to "published" for the test
             "translations": {},
         }
 

@@ -34,7 +34,7 @@ class Command(BaseCommand):
             )
             return
 
-        pay_way_choices = [choice[0] for choice in PayWayEnum.choices()]
+        pay_way_choices = [choice[0] for choice in PayWayEnum.choices]
 
         img = get_or_create_default_image("uploads/pay_way/no_photo.jpg")
 

@@ -74,7 +74,7 @@ class ProductReviewViewSetTestCase(APITestCase):
             "product": product_2.pk,
             "user": self.user.pk,
             "rate": 5,
-            "status": "New",
+            "status": "NEW",
             "translations": {},
         }
 
@@ -132,7 +132,7 @@ class ProductReviewViewSetTestCase(APITestCase):
             "product": self.product.pk,
             "user": self.user.pk,
             "rate": 1,
-            "status": "New",
+            "status": "NEW",
             "translations": {},
         }
 

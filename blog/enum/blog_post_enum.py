@@ -1,13 +1,8 @@
-from enum import Enum
-from enum import unique
+from django.db import models
+from django.utils.translation import gettext_lazy as _
 
 
-@unique
-class PostStatusEnum(Enum):
-    DRAFT = "draft"
-    PUBLISHED = "published"
-    ARCHIVED = "archived"
-
-    @classmethod
-    def choices(cls) -> list:
-        return [(name.value, name.name) for name in cls]
+class PostStatusEnum(models.TextChoices):
+    DRAFT = "DRAFT", _("Draft")
+    PUBLISHED = "PUBLISHED", _("Published")
+    ARCHIVED = "ARCHIVED", _("Archived")

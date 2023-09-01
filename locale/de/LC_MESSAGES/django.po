@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-08-29 15:08+0300\n"
+"POT-Creation-Date: 2023-09-01 12:57+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,24 +18,36 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: .\app\settings.py:385
+#: .\app\settings.py:397
 msgid "English"
 msgstr ""
 
-#: .\app\settings.py:386
+#: .\app\settings.py:398
 msgid "German"
 msgstr ""
 
-#: .\app\settings.py:387
+#: .\app\settings.py:399
 msgid "Greek"
 msgstr ""
 
-#: .\app\urls.py:52
+#: .\app\urls.py:55
 msgid "admin/"
 msgstr ""
 
-#: .\app\urls.py:53
+#: .\app\urls.py:56
 msgid "admin_no_otp/"
+msgstr ""
+
+#: .\blog\enum\blog_post_enum.py:6
+msgid "Draft"
+msgstr ""
+
+#: .\blog\enum\blog_post_enum.py:7
+msgid "Published"
+msgstr ""
+
+#: .\blog\enum\blog_post_enum.py:8
+msgid "Archived"
 msgstr ""
 
 #: .\blog\models\author.py:14
@@ -812,6 +824,30 @@ msgstr ""
 msgid "Countries"
 msgstr ""
 
+#: .\order\enum\document_type_enum.py:6
+msgid "Receipt"
+msgstr ""
+
+#: .\order\enum\document_type_enum.py:7
+msgid "Invoice"
+msgstr ""
+
+#: .\order\enum\status_enum.py:6
+msgid "Sent"
+msgstr ""
+
+#: .\order\enum\status_enum.py:7
+msgid "Paid and Sent"
+msgstr ""
+
+#: .\order\enum\status_enum.py:8
+msgid "Canceled"
+msgstr ""
+
+#: .\order\enum\status_enum.py:9
+msgid "Pending"
+msgstr ""
+
 #: .\order\models\item.py:20 .\product\models\product.py:117
 #: .\tests\integration\order\test_model_order_item.py:63
 msgid "Price"
@@ -911,6 +947,22 @@ msgstr ""
 msgid "Orders"
 msgstr ""
 
+#: .\pay_way\enum\pay_way_enum.py:6
+msgid "Credit Card"
+msgstr ""
+
+#: .\pay_way\enum\pay_way_enum.py:7
+msgid "Pay On Delivery"
+msgstr ""
+
+#: .\pay_way\enum\pay_way_enum.py:8
+msgid "Pay On Store"
+msgstr ""
+
+#: .\pay_way\enum\pay_way_enum.py:9
+msgid "PayPal"
+msgstr ""
+
 #: .\pay_way\models.py:20
 msgid "Cost"
 msgstr ""
@@ -960,6 +1012,18 @@ msgstr ""
 
 #: .\product\admin.py:185
 msgid "Mark selected comments as unpublished"
+msgstr ""
+
+#: .\product\enum\review.py:6
+msgid "New"
+msgstr ""
+
+#: .\product\enum\review.py:7
+msgid "True"
+msgstr ""
+
+#: .\product\enum\review.py:8
+msgid "False"
 msgstr ""
 
 #: .\product\models\category.py:48 .\product\models\product.py:116
@@ -1128,6 +1192,22 @@ msgstr ""
 
 #: .\tests\integration\order\test_model_order_item.py:60
 msgid "product"
+msgstr ""
+
+#: .\tip\enum\tip_enum.py:6
+msgid "Success"
+msgstr ""
+
+#: .\tip\enum\tip_enum.py:7
+msgid "Info"
+msgstr ""
+
+#: .\tip\enum\tip_enum.py:8
+msgid "Error"
+msgstr ""
+
+#: .\tip\enum\tip_enum.py:9
+msgid "Warning"
 msgstr ""
 
 #: .\tip\models.py:21

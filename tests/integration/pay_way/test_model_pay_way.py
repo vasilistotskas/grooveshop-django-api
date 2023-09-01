@@ -34,7 +34,7 @@ class PayWayModelTestCase(TestCase):
         )
         for language in languages:
             self.pay_way.set_current_language(language)
-            self.pay_way.name = PayWayEnum.CREDIT_CARD.value
+            self.pay_way.name = PayWayEnum.CREDIT_CARD
             self.pay_way.save()
         self.pay_way.set_current_language(default_language)
 
@@ -88,7 +88,7 @@ class PayWayModelTestCase(TestCase):
             self.pay_way.set_current_language(language)
             self.assertEqual(
                 self.pay_way.name,
-                PayWayEnum.CREDIT_CARD.value,
+                PayWayEnum.CREDIT_CARD,
             )
 
     def test_str_representation(self):

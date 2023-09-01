@@ -46,8 +46,8 @@ class Command(BaseCommand):
             )
             return
 
-        floor_choices = [choice[0] for choice in FloorChoicesEnum.choices()]
-        location_choices = [choice[0] for choice in LocationChoicesEnum.choices()]
+        floor_choices = [choice[0] for choice in FloorChoicesEnum.choices]
+        location_choices = [choice[0] for choice in LocationChoicesEnum.choices]
 
         created_addresses: list[UserAddress] = []
         with transaction.atomic():

@@ -3,7 +3,17 @@
 
 
 
+## v0.21.1 (2023-09-01)
+
+### Fix
+
+* fix: User address model integer enum choices fields from CharField to PositiveSmallIntegerField, added translated description for IntegerChoices. ([`4c7e390`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4c7e390bd064f93303b2b26135a2c6eb3550016a))
+
 ## v0.21.0 (2023-09-01)
+
+### Chore
+
+* chore(release): release version 0.21.0 [skip ci] ([`ac6ea4e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ac6ea4e98b7d0b4d757d6ea957ed609bb68df607))
 
 ### Feature
 

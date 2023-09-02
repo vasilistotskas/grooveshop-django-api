@@ -1,0 +1,213 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<meta content="IE=edge" http-equiv="X-UA-Compatible" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1, shrink-to-fit=no"
+		/>
+		<meta content="width=device-width,initial-scale=1.0" name="viewport" />
+		<meta name="theme-color" content="#ffffff" />
+
+    <link
+			href="{% static 'favicon/apple-icon-57x57.png' %}"
+			rel="apple-touch-icon"
+			sizes="57x57"
+		/>
+		<link
+			href="{% static 'favicon/apple-icon-60x60.png' %}"
+			rel="apple-touch-icon"
+			sizes="60x60"
+		/>
+		<link
+			href="{% static 'favicon/apple-icon-72x72.png' %}"
+			rel="apple-touch-icon"
+			sizes="72x72"
+		/>
+		<link
+			href="{% static 'favicon/apple-icon-76x76.png' %}"
+			rel="apple-touch-icon"
+			sizes="76x76"
+		/>
+		<link
+			href="{% static 'favicon/apple-icon-114x114.png' %}"
+			rel="apple-touch-icon"
+			sizes="114x114"
+		/>
+		<link
+			href="{% static 'favicon/apple-icon-120x120.png' %}"
+			rel="apple-touch-icon"
+			sizes="120x120"
+		/>
+		<link
+			href="{% static 'favicon/apple-icon-144x144.png' %}"
+			rel="apple-touch-icon"
+			sizes="144x144"
+		/>
+		<link
+			href="{% static 'favicon/apple-icon-152x152.png' %}"
+			rel="apple-touch-icon"
+			sizes="152x152"
+		/>
+		<link
+			href="{% static 'favicon/apple-icon-180x180.png' %}"
+			rel="apple-touch-icon"
+			sizes="180x180"
+		/>
+		<link
+			href="{% static 'favicon/android-icon-192x192.png' %}"
+			rel="icon"
+			sizes="192x192"
+			type="image/png"
+		/>
+    <link
+			href="{% static 'favicon/favicon-16x16.png' %}"
+			rel="icon"
+			sizes="16x16"
+			type="image/png"
+		/>
+		<link
+			href="{% static 'favicon/favicon-32x32.png' %}"
+			rel="icon"
+			sizes="32x32"
+			type="image/png"
+		/>
+		<link
+			href="{% static 'favicon/favicon-96x96.png' %}"
+			rel="icon"
+			sizes="96x96"
+			type="image/png"
+		/>
+		<link
+			crossorigin="use-credentials"
+			href="{% static 'favicon/manifest.json' %}"
+			rel="manifest"
+		/>
+
+    <meta name="description" content="grooveShop Main Page" />
+    <meta name="keywords" content="grooveShop, shop" />
+    <meta name="author" content="vasilistotskas" />
+    <title>{{ app_title }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <style>
+    /* Custom CSS to remove rounded corners from .alert class */
+    .alert {
+      border-radius: 0;
+    }
+  </style>
+  <body class="bg-gray-100">
+    <div class="px-4 py-16 mx-auto max-w-7xl">
+      <h1 class="mb-6 text-6xl font-bold text-center text-gray-800">
+        {{ app_title }} API
+      </h1>
+      <div class="max-w-lg mx-auto">
+        <div class="grid gap-4 justify-center md:grid-cols-2">
+          <a href="{% url 'swagger-ui' %}" class="px-6 py-3 text-lg font-medium text-white bg-blue-500
+          rounded-md">Swagger Ui</a>
+          <a href="{% url 'redoc' %}" class="px-6 py-3 text-lg font-medium text-gray-700 border border-gray-400
+          rounded-md">Redoc</a>
+          {% if user.is_authenticated %}
+                    <!-- User is authenticated, display logout button or other authenticated content -->
+                    <a href="{% url 'account_logout' %}" class="px-6 py-3 text-lg font-medium text-red-500 bg-white border border-red-500
+                    rounded-md">Logout</a>
+                {% else %}
+                    <!-- User is not authenticated, display login button -->
+                    <a href="{% url 'account_login' %}" class="px-6 py-3 text-lg
+                    font-medium text-green-500 bg-white border border-green-500
+                    rounded-md">Login</a>
+                {% endif %}
+        </div>
+      </div>
+    </div>
+    <div id="notifications" class="fixed bottom-4 right-4 z-50"></div>
+  </body>
+
+  <footer>
+    <script>
+      const websocketProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+      const wsEndpoint = `${websocketProtocol}://${window.location.host}/ws/notifications/`;
+      const socket = new WebSocket(wsEndpoint);
+
+      // New event listener to capture incoming messages
+      socket.addEventListener("message", (event) => {
+        const messageData = JSON.parse(event.data);
+        console.log("Received notification:", messageData.message); // Log the received message to the console
+        showNotification(messageData.message);
+      });
+
+      function showNotification(notificationHTML) {
+        const notificationsContainer = document.getElementById("notifications");
+        notificationsContainer.classList.add(
+          "grid",
+          "items-center",
+          "justify-center"
+        );
+
+        // Create a new alert div
+        const alertDiv = document.createElement("div");
+        alertDiv.classList.add(
+          "flex",
+          "gap-2",
+          "items-center",
+          "bg-blue-100",
+          "border",
+          "border-blue-400",
+          "text-blue-700",
+          "px-4",
+          "py-3",
+          "rounded",
+          "relative",
+          "mb-2",
+          "alert"
+        );
+
+        // Set role attribute
+        alertDiv.setAttribute("role", "alert");
+
+        // Set inner HTML
+        alertDiv.innerHTML = notificationHTML;
+
+        // Create the close button
+        const closeButton = document.createElement("button");
+        closeButton.setAttribute("type", "button");
+        closeButton.classList.add(
+          "h-full",
+          "relative",
+          "grid",
+          "items-center",
+          "justify-center",
+          "p-0"
+        )
+        closeButton.setAttribute("data-bs-dismiss", "alert");
+        closeButton.setAttribute("aria-label", "Close");
+
+        // Create close icon
+        const closeIcon = document.createElement("span");
+        closeIcon.classList.add("text-xl");
+        closeIcon.innerHTML = "&times;";
+
+        closeButton.addEventListener("click", () => {
+            notificationsContainer.removeChild(alertDiv); // Remove the alert div
+        });
+
+        closeButton.appendChild(closeIcon);
+        alertDiv.appendChild(closeButton);
+
+        notificationsContainer.appendChild(alertDiv);
+      }
+
+      socket.onopen = (event) => {
+        console.log("WebSocket connection opened!");
+      };
+
+      socket.onclose = (event) => {
+        console.log("WebSocket connection closed!");
+      };
+
+    </script>
+  </footer>
+</html>

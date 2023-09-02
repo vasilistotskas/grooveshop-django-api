@@ -49,9 +49,12 @@
 ## CELERY:
   ### Run local celery worker :
   -     celery -A app beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
-  -     celery -A app --broker=redis://localhost:6379/0 flower --port=5555
+  -     celery -A app --broker=redis://localhost:6379/0 flower --port=5555 | celery -A app --broker=amqp://guest:guest@localhost:5672/ flower --port=5555
   -     celery -A app worker -l info --logfile=./logs/celery.log
   -     celery -A app worker -l info -P solo --logfile=./logs/celery.log
+
+## Run with Uvicorn :
+  -     uvicorn app.asgi:application --host 0.0.0.0 --port 8000 --workers 4 --log-level debug --reload
 
 ## PYTHON
   ### --- VERSION 3.11.0 ---

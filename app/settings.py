@@ -9,7 +9,7 @@ from core.utils.cache import CustomCacheConfig
 
 env = environ.Env(
     # set casting, default value
-    SECRET_KEY=(str, "django-insecure-1#t2p3u4^=5)6@7(8)9-0^(*79$_*3#=3+"),
+    SECRET_KEY=(str, "django-insecure-0000000000000000000000000000000000"),
     DEBUG=(bool, True),
     SYSTEM_ENV=(str, "dev"),
     APP_BASE_URL=(str, "http://localhost:8000"),
@@ -44,7 +44,7 @@ env = environ.Env(
     DEFAULT_FROM_EMAIL=(str, "webmaster@localhost"),
     DEEPL_AUTH_KEY=(str, "changeme"),
     REDIS_URL=(str, "redis://localhost:6379/0"),
-    CELERY_BROKER_URL=(str, "redis://localhost:6379/0"),
+    CELERY_BROKER_URL=(str, "amqp://guest:guest@localhost:5672/"),
     CELERY_RESULT_BACKEND=(str, "django-db"),
     CELERY_CACHE_BACKEND=(str, "django-cache"),
     EXPLORER_TOKEN=(str, "changeme"),
@@ -156,6 +156,7 @@ PROJECT_APPS = [
     "pay_way",
     "session",
     "cart",
+    "notification",
 ]
 THIRD_PARTY_APPS = [
     "rest_framework",
@@ -359,6 +360,17 @@ CELERY_RESULT_EXTENDED = True
 
 # Celery Beat
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+
+# Channels Configuration
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            # "hosts": [("redis", 6379)],
+            "hosts": [("localhost", 6379)],
+        },
+    },
+}
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [

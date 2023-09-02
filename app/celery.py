@@ -1,9 +1,11 @@
 import logging
 import os
 
+from asgiref.sync import async_to_sync
 from celery import Celery
 from celery.schedules import crontab
 from celery.signals import setup_logging
+from channels.layers import get_channel_layer
 from django.conf import settings
 
 
@@ -49,6 +51,20 @@ if settings.REDIS_HEALTHY:
         debug = bool(int(os.environ.get("DEBUG", 0)))
         if debug:
             logging.debug(f"Request: {self.request!r}")
+
+    @app.task(bind=True, name="Debug Task Notification")
+    def debug_task_notification(self):
+        debug = bool(int(os.environ.get("DEBUG", 0)))
+        if debug:
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                "notifications",
+                {
+                    "type": "send_notification",
+                    "message": "Debug Task Notification Message",
+                },
+            )
+            logging.debug(f"Request: {self.request!r}, Notification sent.")
 
 else:
     app = None

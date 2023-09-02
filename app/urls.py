@@ -18,6 +18,8 @@ from drf_spectacular.views import SpectacularSwaggerView
 from rest_framework import routers
 from rest_framework.authtoken import views
 
+from core.view import MainPageView
+from notification.consumers import NotificationConsumer
 
 app_name = "app"
 
@@ -49,6 +51,7 @@ admin_site_otp.register(TOTPDevice, TOTPDeviceAdmin)
 
 
 urlpatterns = i18n_patterns(
+    path("", MainPageView.as_view(), name="main_page"),
     path(_("admin/"), admin_site_otp.urls),
     path(_("admin_no_otp/"), admin.site.urls),
     path("api/v1/api-token-auth/", views.obtain_auth_token),
@@ -90,6 +93,8 @@ urlpatterns = i18n_patterns(
     path("", include(front_urls)),
     prefix_default_language=False,
 )
+
+websocket_urlpatterns = [path("ws/notifications/", NotificationConsumer.as_asgi())]
 
 urlpatterns += static(
     settings.MEDIA_URL,

@@ -3,7 +3,30 @@
 
 
 
+## v0.22.0 (2023-09-02)
+
+### Chore
+
+* chore(schema.yml): Generate schema.yml ([`6500b80`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6500b80ab6bc00cd0b56a35497cc68a397c584c3))
+
+### Feature
+
+* feat(Notifications): Notifications App implemented, Ui for home page prototype.
+
+Change, CELERY_BROKER_URL and CELERY_RESULT_BACKEND envs.
+Added CHANNEL_LAYERS in settings.py.
+Celery New task debug_task_notification.
+asgi ProtocolTypeRouter added for websocket.
+websocket_urlpatterns with `ws/notifications/` path in urls.py.
+NotificationConsumer implemented.
+README.md updated.
+Make new migration files. ([`833116f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/833116fd8646090e6b632a8bfe1b6b50146512ac))
+
 ## v0.21.1 (2023-09-01)
+
+### Chore
+
+* chore(release): release version 0.21.1 [skip ci] ([`26ce29e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/26ce29e99cde9c9d93fb4e159a9cded42d4e238f))
 
 ### Fix
 

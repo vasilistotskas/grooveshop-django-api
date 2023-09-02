@@ -12338,15 +12338,17 @@ components:
           maxLength: 255
         floor:
           nullable: true
+          minimum: 0
+          maximum: 32767
           oneOf:
           - $ref: '#/components/schemas/FloorEnum'
-          - $ref: '#/components/schemas/BlankEnum'
           - $ref: '#/components/schemas/NullEnum'
         locationType:
           nullable: true
+          minimum: 0
+          maximum: 32767
           oneOf:
           - $ref: '#/components/schemas/LocationTypeEnum'
-          - $ref: '#/components/schemas/BlankEnum'
           - $ref: '#/components/schemas/NullEnum'
         phone:
           type: string
@@ -13353,15 +13355,17 @@ components:
           maxLength: 255
         floor:
           nullable: true
+          minimum: 0
+          maximum: 32767
           oneOf:
           - $ref: '#/components/schemas/FloorEnum'
-          - $ref: '#/components/schemas/BlankEnum'
           - $ref: '#/components/schemas/NullEnum'
         locationType:
           nullable: true
+          minimum: 0
+          maximum: 32767
           oneOf:
           - $ref: '#/components/schemas/LocationTypeEnum'
-          - $ref: '#/components/schemas/BlankEnum'
           - $ref: '#/components/schemas/NullEnum'
         phone:
           type: string

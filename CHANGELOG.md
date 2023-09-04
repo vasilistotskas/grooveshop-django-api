@@ -3,9 +3,21 @@
 
 
 
+## v0.23.0 (2023-09-04)
+
+### Feature
+
+* feat: Fixes and versions bump.
+
+- Remove `translation` fields from API filtering and ordering.
+- Auth and Permissions add to user API view.
+- `DEFAULT_PERMISSION_CLASSES` , `DEFAULT_THROTTLE_CLASSES` and `DEFAULT_THROTTLE_RATES` added. ([`3538ee6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3538ee6d4d856f83e86c1e48dc919edcbe199536))
+
 ## v0.22.0 (2023-09-02)
 
 ### Chore
+
+* chore(release): release version 0.22.0 [skip ci] ([`386cd7c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/386cd7ce3ba781bfed41812e02a0a50db13a14f8))
 
 * chore(schema.yml): Generate schema.yml ([`6500b80`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6500b80ab6bc00cd0b56a35497cc68a397c584c3))
 

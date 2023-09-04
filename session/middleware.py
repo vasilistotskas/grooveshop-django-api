@@ -47,9 +47,8 @@ class SessionTraceMiddleware:
         request.session["user"] = None
 
     def ensure_cart_id(self, request):
-        try:
-            cart_id = request.session["cart_id"]
-        except KeyError:
+        # if request session has not attribute cart_id
+        if not hasattr(request.session, "cart_id"):
             cart_service = CartService(request)
             if cart_service.cart is None:
                 cart_service.cart = cart_service.get_or_create_cart()
@@ -74,6 +73,7 @@ class SessionTraceMiddleware:
                     "exception": e,
                 },
             )
+            raise e
 
     def update_cache(self, request):
         # Make a cache key for the user, if the there is no user, use the session key

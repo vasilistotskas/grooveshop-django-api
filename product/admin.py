@@ -112,18 +112,12 @@ class ProductAdmin(TranslatableAdmin, ExportModelAdmin):
         }
 
     def boolean_status(self, obj):
-        return obj.active == "True"
+        return True if obj.active else False
 
     setattr(
         boolean_status,
         "boolean",
         True,
-    )
-
-    setattr(
-        boolean_status,
-        "short_description",
-        _("Status"),
     )
 
     actions = [

@@ -587,10 +587,6 @@ paths:
         description: A search term.
         schema:
           type: string
-      - in: query
-        name: translations_Name
-        schema:
-          type: string
       tags:
       - api
       security:
@@ -670,10 +666,6 @@ paths:
         required: false
         in: query
         description: A search term.
-        schema:
-          type: string
-      - in: query
-        name: translations_Name
         schema:
           type: string
       tags:
@@ -2022,10 +2014,6 @@ paths:
         description: A search term.
         schema:
           type: string
-      - in: query
-        name: translations_Name
-        schema:
-          type: string
       tags:
       - api
       security:
@@ -2109,10 +2097,6 @@ paths:
         required: false
         in: query
         description: A search term.
-        schema:
-          type: string
-      - in: query
-        name: translations_Name
         schema:
           type: string
       tags:
@@ -3731,21 +3715,6 @@ paths:
         description: A search term.
         schema:
           type: string
-      - in: query
-        name: translations_Name
-        schema:
-          type: string
-          nullable: true
-          enum:
-          - CREDIT_CARD
-          - PAY_ON_DELIVERY
-          - PAY_ON_STORE
-          - PAY_PAL
-        description: |-
-          * `CREDIT_CARD` - Credit Card
-          * `PAY_ON_DELIVERY` - Pay On Delivery
-          * `PAY_ON_STORE` - Pay On Store
-          * `PAY_PAL` - PayPal
       tags:
       - api
       security:
@@ -4428,10 +4397,6 @@ paths:
         description: A search term.
         schema:
           type: string
-      - in: query
-        name: translations_Name
-        schema:
-          type: string
       tags:
       - api
       security:
@@ -4511,10 +4476,6 @@ paths:
         required: false
         in: query
         description: A search term.
-        schema:
-          type: string
-      - in: query
-        name: translations_Name
         schema:
           type: string
       tags:
@@ -6175,10 +6136,6 @@ paths:
         description: A search term.
         schema:
           type: string
-      - in: query
-        name: translations_Name
-        schema:
-          type: string
       tags:
       - api
       security:
@@ -6263,10 +6220,6 @@ paths:
         required: false
         in: query
         description: A search term.
-        schema:
-          type: string
-      - in: query
-        name: translations_Name
         schema:
           type: string
       tags:
@@ -6793,10 +6746,6 @@ paths:
         name: slider
         schema:
           type: integer
-      - in: query
-        name: translations_Title
-        schema:
-          type: string
       tags:
       - api
       security:
@@ -6882,10 +6831,6 @@ paths:
         name: slider
         schema:
           type: integer
-      - in: query
-        name: translations_Title
-        schema:
-          type: string
       tags:
       - api
       security:
@@ -7212,10 +7157,6 @@ paths:
         description: A search term.
         schema:
           type: string
-      - in: query
-        name: translations_Name
-        schema:
-          type: string
       tags:
       - api
       security:
@@ -7295,10 +7236,6 @@ paths:
         required: false
         in: query
         description: A search term.
-        schema:
-          type: string
-      - in: query
-        name: translations_Name
         schema:
           type: string
       tags:
@@ -7645,10 +7582,6 @@ paths:
         description: A search term.
         schema:
           type: string
-      - in: query
-        name: translations_Title
-        schema:
-          type: string
       tags:
       - api
       security:
@@ -7746,10 +7679,6 @@ paths:
         required: false
         in: query
         description: A search term.
-        schema:
-          type: string
-      - in: query
-        name: translations_Title
         schema:
           type: string
       tags:
@@ -8085,10 +8014,9 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
       - cookieAuth: []
+      - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '200':
           content:
@@ -8113,10 +8041,9 @@ paths:
               $ref: '#/components/schemas/UserAccount'
         required: true
       security:
-      - basicAuth: []
       - cookieAuth: []
+      - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '201':
           content:
@@ -8170,10 +8097,9 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
       - cookieAuth: []
+      - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '200':
           content:
@@ -8206,10 +8132,9 @@ paths:
               $ref: '#/components/schemas/UserAccount'
         required: true
       security:
-      - basicAuth: []
       - cookieAuth: []
+      - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '201':
           content:
@@ -8229,10 +8154,9 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
       - cookieAuth: []
+      - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '200':
           content:
@@ -8263,10 +8187,9 @@ paths:
               $ref: '#/components/schemas/UserAccount'
         required: true
       security:
-      - basicAuth: []
       - cookieAuth: []
+      - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '200':
           content:
@@ -8296,10 +8219,9 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedUserAccount'
       security:
-      - basicAuth: []
       - cookieAuth: []
+      - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '200':
           content:
@@ -8318,10 +8240,9 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
       - cookieAuth: []
+      - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '204':
           description: No response body
@@ -8344,10 +8265,9 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
       - cookieAuth: []
+      - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '200':
           content:
@@ -8385,10 +8305,9 @@ paths:
               $ref: '#/components/schemas/UserAccount'
         required: true
       security:
-      - basicAuth: []
       - cookieAuth: []
+      - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '200':
           content:
@@ -8425,10 +8344,9 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedUserAccount'
       security:
-      - basicAuth: []
       - cookieAuth: []
+      - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '200':
           content:
@@ -8454,10 +8372,9 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
       - cookieAuth: []
+      - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '204':
           description: No response body

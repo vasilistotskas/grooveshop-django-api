@@ -16,10 +16,10 @@ from drf_spectacular.views import SpectacularAPIView
 from drf_spectacular.views import SpectacularRedocView
 from drf_spectacular.views import SpectacularSwaggerView
 from rest_framework import routers
-from rest_framework.authtoken import views
 
 from core.view import MainPageView
 from notification.consumers import NotificationConsumer
+from user.views.account import ObtainAuthTokenView
 
 app_name = "app"
 
@@ -54,7 +54,7 @@ urlpatterns = i18n_patterns(
     path("", MainPageView.as_view(), name="main_page"),
     path(_("admin/"), admin_site_otp.urls),
     path(_("admin_no_otp/"), admin.site.urls),
-    path("api/v1/api-token-auth/", views.obtain_auth_token),
+    path("api/v1/api-token-auth/", ObtainAuthTokenView.as_view()),
     path("api/v1/", include(router.urls)),
     path("api/v1/", include("product.urls")),
     path("api/v1/", include("order.urls")),

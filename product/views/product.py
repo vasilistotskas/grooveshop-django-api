@@ -23,7 +23,6 @@ class ProductViewSet(BaseExpandView, ModelViewSet):
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
     filterset_class = ProductFilter
     ordering_fields = [
-        "translations__name",
         "price",
         "created_at",
         "discount_value",
@@ -33,7 +32,7 @@ class ProductViewSet(BaseExpandView, ModelViewSet):
         "likes_counter",
     ]
     ordering = ["-created_at"]
-    search_fields = ["id", "translations__name"]
+    search_fields = ["id"]
 
     def list(self, request, *args, **kwargs) -> Response:
         queryset = self.filter_queryset(self.get_queryset())

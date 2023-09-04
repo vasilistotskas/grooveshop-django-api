@@ -18,8 +18,8 @@ class BlogTagViewSet(ModelViewSet):
     serializer_class = BlogTagSerializer
     pagination_class = BlogTagPagination
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
-    filterset_fields = ["id", "translations__name", "active"]
-    ordering_fields = ["id", "translations__name", "active", "created_at"]
+    filterset_fields = ["id", "active"]
+    ordering_fields = ["id", "active", "created_at"]
     ordering = ["id"]
     search_fields = ["id", "translations__name"]
 

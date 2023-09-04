@@ -164,7 +164,7 @@ class Product(TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel):
         verbose_name_plural = _("Products")
         ordering = ["-created_at"]
         indexes = [
-            GinIndex(fields=["search_vector"]),
+            GinIndex(fields=["search_vector"], name="product_search_vector_idx"),
         ]
 
     def __unicode__(self):

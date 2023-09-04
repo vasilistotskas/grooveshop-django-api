@@ -120,12 +120,6 @@
   -     Generate schema : python manage.py spectacular --color --file schema.yml
 
 
-## MEDIA STREAM:
-  ### NPM :
-   ### --- VERSION 18.16.0 ---
-   -     Step 1: cd mediaStream
-   -     Run npm Install : npm install
-
 
 ## GIT
   ### --- VERSION 2.36.0.windows.1 ---

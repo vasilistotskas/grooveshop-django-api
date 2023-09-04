@@ -28,16 +28,15 @@ class SessionTraceMiddlewareTest(TestCase):
         self.factory = RequestFactory()
 
     def test_process_user_data_authenticated(self):
-        request = self.factory.get("/")
-
-        # Manually apply session middleware to the request
-        session_middleware = SessionMiddleware(self.middleware)
-        session_middleware.process_request(request)
-
         user = User.objects.create_user(
             email="testuser@example.com", password="testpassword"
         )
+        request = self.factory.get("/")
         request.user = user
+
+        session_middleware = SessionMiddleware(self.middleware)
+        session_middleware.process_request(request)
+
         self.middleware.process_user_data(request)
         self.assertEqual(
             request.session["user"],
@@ -47,7 +46,6 @@ class SessionTraceMiddlewareTest(TestCase):
     def test_process_user_data_unauthenticated(self):
         request = self.factory.get("/")
 
-        # Manually apply session middleware to the request
         session_middleware = SessionMiddleware(self.middleware)
         session_middleware.process_request(request)
 
@@ -57,7 +55,6 @@ class SessionTraceMiddlewareTest(TestCase):
     def test_ensure_cart_id_existing_cart_id(self):
         request = self.factory.get("/")
 
-        # Manually apply session middleware to the request
         session_middleware = SessionMiddleware(self.middleware)
         session_middleware.process_request(request)
 
@@ -70,10 +67,8 @@ class SessionTraceMiddlewareTest(TestCase):
         mock_get_or_create_cart.return_value = Cart(id=456)
         request = self.factory.get("/")
 
-        # Manually set the user attribute on the request
         request.user = AnonymousUser()
 
-        # Manually apply session middleware to the request
         session_middleware = SessionMiddleware(self.middleware)
         session_middleware.process_request(request)
 
@@ -86,64 +81,65 @@ class SessionTraceMiddlewareTest(TestCase):
             email="testuser@example.com", password="testpassword"
         )
         request = self.factory.get("/")
+        request.user = user
 
-        # Manually apply session middleware to the request
         session_middleware = SessionMiddleware(self.middleware)
         session_middleware.process_request(request)
+        if request.session.session_key is None:
+            request.session.create()
 
-        request.user = user
         request.session["last_activity"] = timezone.now()
         request.session["user"] = json.dumps({"id": user.id, "email": user.email})
         request.META["HTTP_REFERER"] = "http://example.com"
         request.session["cart_id"] = 789
-        with patch.object(cache_instance, "set") as mock_set:
-            self.middleware.update_cache(request)
-            expected_data = {
-                "last_activity": request.session["last_activity"],
-                "user": request.session["user"],
-                "referer": request.META.get("HTTP_REFERER"),
-                "session_key": request.session.session_key,
-                "cart_id": request.session["cart_id"],
-            }
-            mock_set.assert_called_once_with(
-                f"{caches.USER_AUTHENTICATED}_{user.id}", expected_data, caches.ONE_HOUR
-            )
+
+        user_cache_key = caches.USER_AUTHENTICATED + "_" + str(user.id)
+        self.middleware.update_cache(request)
+
+        cache = cache_instance.get(user_cache_key)
+        expected_cache = {
+            "session_key": request.session.session_key,
+            "last_activity": request.session["last_activity"],
+            "user": request.session["user"],
+            "referer": request.META["HTTP_REFERER"],
+            "cart_id": request.session["cart_id"],
+        }
+
+        self.assertEqual(cache, expected_cache)
 
     def test_update_cache_unauthenticated(self):
         request = self.factory.get("/")
 
-        # Manually apply session middleware to the request
         session_middleware = SessionMiddleware(self.middleware)
         session_middleware.process_request(request)
+        if request.session.session_key is None:
+            request.session.create()
 
         request.user = AnonymousUser()
         request.session["last_activity"] = timezone.now()
         request.session["user"] = None
         request.META["HTTP_REFERER"] = "http://example.com"
-
-        # Manually set the session_key attribute if it's None
-        if request.session.session_key is None:
-            request.session.create()
-
-        request.session.modified = True  # Mark the session as modified
-
         request.session["cart_id"] = 789
-        with patch.object(cache_instance, "set") as mock_set:
-            self.middleware.update_cache(request)
-            expected_data = {
-                "last_activity": request.session["last_activity"],
-                "user": request.session["user"],
-                "referer": request.META.get("HTTP_REFERER"),
-                "session_key": request.session.session_key,
-                "cart_id": request.session.get(
-                    "cart_id"
-                ),  # Use .get() to handle None case
-            }
-            mock_set.assert_called_once_with(
-                f"{caches.USER_UNAUTHENTICATED}_{request.session.session_key}",
-                expected_data,
-                caches.ONE_HOUR,
-            )
+        request.session.modified = True
+
+        non_user_cache_key = (
+            str(caches.USER_UNAUTHENTICATED) + "_" + request.session.session_key
+        )
+        self.middleware.update_cache(request)
+
+        cache = cache_instance.get(non_user_cache_key)
+        expected_cache = {
+            "session_key": request.session.session_key,
+            "last_activity": request.session["last_activity"],
+            "user": request.session["user"],
+            "referer": request.META["HTTP_REFERER"],
+            "cart_id": request.session["cart_id"],
+        }
+
+        self.assertEqual(
+            cache,
+            expected_cache,
+        )
 
     def tearDown(self) -> None:
         super().tearDown()

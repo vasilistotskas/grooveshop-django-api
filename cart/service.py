@@ -18,7 +18,11 @@ class ProcessUserCartOption(Enum):
 
 class CartService:
     def __init__(self, request):
-        self.user = request.user if request.user.is_authenticated else None
+        self.user = (
+            request.user
+            if hasattr(request, "user") and request.user.is_authenticated
+            else None
+        )
         cart_id = request.session.get("cart_id")
         self.cart = self.get_or_create_cart(cart_id)
         self.cart_items = []

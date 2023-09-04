@@ -16,8 +16,13 @@ class UserAccountViewSetTestCase(APITestCase):
 
     def setUp(self):
         self.user = User.objects.create_user(
-            email="test@test.com", password="test12345@!"
+            email="test@test.com",
+            password="test12345@!",
+            is_superuser=True,
+            is_staff=True,
         )
+
+        self.client.login(email="test@test.com", password="test12345@!")
 
     @staticmethod
     def get_user_account_detail_url(pk):

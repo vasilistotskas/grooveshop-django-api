@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.filters import SearchFilter
@@ -16,17 +18,21 @@ from slider.paginators import SliderPagination
 from slider.serializers import SliderSerializer
 from slider.serializers import SlideSerializer
 
+DEFAULT_SLIDER_CACHE_TTL = 60 * 60 * 2
+DEFAULT_SLIDE_CACHE_TTL = 60 * 60 * 2
+
 
 class SliderViewSet(ModelViewSet):
     queryset = Slider.objects.all()
     serializer_class = SliderSerializer
     pagination_class = SliderPagination
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
-    filterset_fields = ["id", "translations__name"]
-    ordering_fields = ["id", "translations__name", "created_at"]
+    filterset_fields = ["id"]
+    ordering_fields = ["id", "created_at"]
     ordering = ["id"]
-    search_fields = ["id", "translations__name"]
+    search_fields = ["id"]
 
+    @method_decorator(cache_page(DEFAULT_SLIDER_CACHE_TTL))
     def list(self, request, *args, **kwargs) -> Response:
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
@@ -43,6 +49,7 @@ class SliderViewSet(ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @method_decorator(cache_page(DEFAULT_SLIDER_CACHE_TTL))
     def retrieve(self, request, pk=None, *args, **kwargs) -> Response:
         slider = get_object_or_404(Slider, pk=pk)
         serializer = self.get_serializer(slider)
@@ -75,11 +82,12 @@ class SlideViewSet(BaseExpandView, ModelViewSet):
     serializer_class = SlideSerializer
     pagination_class = SlidePagination
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
-    filterset_fields = ["id", "slider", "translations__title"]
+    filterset_fields = ["id", "slider"]
     ordering_fields = ["id", "slider", "created_at"]
     ordering = ["id"]
-    search_fields = ["id", "translations__title"]
+    search_fields = ["id"]
 
+    @method_decorator(cache_page(DEFAULT_SLIDE_CACHE_TTL))
     def list(self, request, *args, **kwargs) -> Response:
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
@@ -96,6 +104,7 @@ class SlideViewSet(BaseExpandView, ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @method_decorator(cache_page(DEFAULT_SLIDE_CACHE_TTL))
     def retrieve(self, request, pk=None, *args, **kwargs) -> Response:
         slide = get_object_or_404(Slide, pk=pk)
         serializer = self.get_serializer(slide)

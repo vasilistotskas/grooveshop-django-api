@@ -3,7 +3,17 @@
 
 
 
+## v0.24.0 (2023-09-10)
+
+### Feature
+
+* feat: Auth api endpoints and views + packages bump. ([`edc306e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/edc306e74145203d68fdb8856149cd93686bb193))
+
 ## v0.23.0 (2023-09-04)
+
+### Chore
+
+* chore(release): release version 0.23.0 [skip ci] ([`f9f07db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f9f07db2c84a866a1324580742ab69330bb053e2))
 
 ### Feature
 

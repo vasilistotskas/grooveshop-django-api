@@ -1,0 +1,15 @@
+<!-- Signup form -->
+<form class="max-w-lg mx-auto space-y-4 p-4 bg-white border border-gray-300 rounded
+shadow-lg ajax-post" role="form" action="{% url 'rest_resend_email' %}" method="post">{% csrf_token %}
+  <div class="flex items-center gap-2">
+    <label for="email" class="text-sm w-full">E-mail</label>
+    <input name="email" type="text" class="w-full border border-gray-300 p-2 rounded"
+           id="email" placeholder="Email" autocomplete="username" required>
+  </div>
+
+  <div class="flex justify-end">
+    <button type="submit" class="px-4 py-2 bg-blue-500 text-white font-bold rounded">Resend</button>
+  </div>
+
+  <div class="api-response"></div>
+</form>

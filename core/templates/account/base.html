@@ -94,35 +94,7 @@
     <title>{% block head_title %}{% endblock %}</title>
     {% block extra_head %}
     {% endblock %}
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            gridTemplateColumns: {
-              'auto-1fr': 'auto 1fr',
-              '1fr-auto': '1fr auto',
-              'auto-auto': 'auto auto',
-              'auto-fill-150': 'repeat(auto-fill, minmax(150px, 1fr));',
-              '3fr-2fr': '3fr 2fr',
-            },
-            gridTemplateRows: {
-              'auto-1fr': 'auto 1fr',
-              '1fr-auto': '1fr auto',
-              'auto-auto': 'auto auto',
-              'auto-fill-150': 'repeat(auto-fill, minmax(150px, 1fr));',
-              '3fr-2fr': '3fr 2fr',
-            },
-            spacing: {
-              '60px': '60px',
-            },
-            colors: {
-              primary: 'rgb(146 56 56)',
-            },
-          }
-        }
-      }
-    </script>
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
     <style type="text/tailwindcss" lang="scss">
       @layer utilities {
         .primary-scrollbar::-webkit-scrollbar-track {
@@ -185,6 +157,7 @@
       }
     </style>
   </head>
+  {% load django_browser_reload %}
   <body>
     {% block body %}
 
@@ -231,6 +204,7 @@
 
   </body>
 
+  {% django_browser_reload_script %}
   <script>
       // Select all messages
       const messages = document.querySelectorAll('.messages .message');

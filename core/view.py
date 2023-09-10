@@ -3,8 +3,8 @@ from django.shortcuts import render
 from django.views import View
 
 
-class MainPageView(View):
-    template_name = "main_page.html"
+class HomeView(View):
+    template_name = "home.html"
 
     def get(self, request):
         app_title = settings.SITE_NAME

@@ -1,0 +1,367 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<meta content="IE=edge" http-equiv="X-UA-Compatible" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1, shrink-to-fit=no"
+		/>
+		<meta content="width=device-width,initial-scale=1.0" name="viewport" />
+		<meta name="theme-color" content="#ffffff" />
+    <meta name="description" content="grooveShop Home Page" />
+    <meta name="keywords" content="grooveShop, shop" />
+    <meta name="author" content="vasilistotskas" />
+
+    <link
+			href="{% static 'favicon/apple-icon-57x57.png' %}"
+			rel="apple-touch-icon"
+			sizes="57x57"
+		/>
+		<link
+			href="{% static 'favicon/apple-icon-60x60.png' %}"
+			rel="apple-touch-icon"
+			sizes="60x60"
+		/>
+		<link
+			href="{% static 'favicon/apple-icon-72x72.png' %}"
+			rel="apple-touch-icon"
+			sizes="72x72"
+		/>
+		<link
+			href="{% static 'favicon/apple-icon-76x76.png' %}"
+			rel="apple-touch-icon"
+			sizes="76x76"
+		/>
+		<link
+			href="{% static 'favicon/apple-icon-114x114.png' %}"
+			rel="apple-touch-icon"
+			sizes="114x114"
+		/>
+		<link
+			href="{% static 'favicon/apple-icon-120x120.png' %}"
+			rel="apple-touch-icon"
+			sizes="120x120"
+		/>
+		<link
+			href="{% static 'favicon/apple-icon-144x144.png' %}"
+			rel="apple-touch-icon"
+			sizes="144x144"
+		/>
+		<link
+			href="{% static 'favicon/apple-icon-152x152.png' %}"
+			rel="apple-touch-icon"
+			sizes="152x152"
+		/>
+		<link
+			href="{% static 'favicon/apple-icon-180x180.png' %}"
+			rel="apple-touch-icon"
+			sizes="180x180"
+		/>
+		<link
+			href="{% static 'favicon/android-icon-192x192.png' %}"
+			rel="icon"
+			sizes="192x192"
+			type="image/png"
+		/>
+    <link
+			href="{% static 'favicon/favicon-16x16.png' %}"
+			rel="icon"
+			sizes="16x16"
+			type="image/png"
+		/>
+		<link
+			href="{% static 'favicon/favicon-32x32.png' %}"
+			rel="icon"
+			sizes="32x32"
+			type="image/png"
+		/>
+		<link
+			href="{% static 'favicon/favicon-96x96.png' %}"
+			rel="icon"
+			sizes="96x96"
+			type="image/png"
+		/>
+		<link
+			crossorigin="use-credentials"
+			href="{% static 'favicon/manifest.json' %}"
+			rel="manifest"
+		/>
+
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <title>{{ app_title }} 123</title>
+
+    <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+  </head>
+  <style>
+    /* Custom CSS to remove rounded corners from .alert class */
+    .alert {
+      border-radius: 0;
+    }
+    .group:hover .group-hover\:block {
+      display: block;
+    }
+  </style>
+  {% load django_browser_reload %}
+  <body role="document">
+    <div class="bg-black text-white grid items-center justify-items-center">
+      <div class="container mx-auto flex gap-4">
+        <ul class="flex justify-end space-x-4 py-4">
+          <li class="relative group">
+            <a href="#" class="block py-2 px-4">API endpoints<span class="caret"></span></a>
+
+            <ul class="absolute left-0 hidden bg-white text-black group-hover:block
+            py-2 rounded shadow-lg" id="menu" role="menu" aria-labelledby="button" tabindex="-1">
+              <!-- these pages don't require user token -->
+              <li>
+                <a href="{% url 'signup' %}" class="block px-4 py-2 hover:bg-gray-100
+                text-xs">
+                  Signup
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'email-verification' %}" class="block px-4 py-2
+                hover:bg-gray-100 text-xs">
+                  E-mail verification
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'resend-email-verification' %}" class="block px-4 py-2
+                hover:bg-gray-100 text-xs">
+                  Resend E-mail verification
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'login' %}" class="block px-4 py-2 hover:bg-gray-100
+                text-xs">
+                  Login
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'password-reset' %}" class="block px-4 py-2
+                hover:bg-gray-100 text-xs">
+                  Password Reset
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'password-reset-confirm' %}" class="block px-4 py-2
+                hover:bg-gray-100 text-xs">
+                  Password Reset Confirm
+                </a>
+              </li>
+              <li class="border-t mt-2"></li>
+              <!-- these pages require user token -->
+              <li>
+                <a href="{% url 'user-details' %}" class="block px-4 py-2
+                hover:bg-gray-100 text-xs">
+                  User details
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'logout' %}" class="block px-4 py-2 hover:bg-gray-100
+                text-xs">
+                  Logout
+                </a>
+              </li>
+              <li>
+                <a href="{% url 'password-change' %}" class="block px-4 py-2
+                hover:bg-gray-100 text-xs">
+                Password change
+                </a>
+              </li>
+            </ul>
+          </li>
+        </ul>
+
+        <div class="flex items-center justify-between py-4">
+          <button type="button" class="block text-white focus:outline-none">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="text-white text-2xl font-bold" href="/">{{ app_title }}</a>
+        </div>
+
+        <div class="hidden md:flex md:items-center md:justify-between md:py-4">
+          <ul class="flex space-x-4">
+            <li>
+              <a target="_blank" href="{% url 'swagger-ui' %}" class="block">API Docs
+                Swagger UI
+              </a>
+            </li>
+            <li><a target="_blank" href="{% url 'redoc' %}" class="block">API Docs Redoc
+            </a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="container mx-auto p-4">
+      {% block content %}{% endblock %}
+    </div>
+    <div id="notifications" class="fixed bottom-4 right-4 z-50"></div>
+  </body>
+  <footer>
+    {% django_browser_reload_script %}
+    <script type="text/javascript">
+      const websocketProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+      const wsEndpoint = `${websocketProtocol}://${window.location.host}/ws/notifications/`;
+      const socket = new WebSocket(wsEndpoint);
+
+      // New event listener to capture incoming messages
+      socket.addEventListener("message", (event) => {
+        const messageData = JSON.parse(event.data);
+        console.log("Received notification:", messageData.message); // Log the received message to the console
+        showNotification(messageData.message);
+      });
+
+      function showNotification(notificationHTML) {
+        const notificationsContainer = document.getElementById("notifications");
+        notificationsContainer.classList.add(
+          "grid",
+          "items-center",
+          "justify-center"
+        );
+
+        // Create a new alert div
+        const alertDiv = document.createElement("div");
+        alertDiv.classList.add(
+          "flex",
+          "gap-2",
+          "items-center",
+          "bg-blue-100",
+          "border",
+          "border-blue-400",
+          "text-blue-700",
+          "px-4",
+          "py-3",
+          "rounded",
+          "relative",
+          "mb-2",
+          "alert"
+        );
+
+        // Set role attribute
+        alertDiv.setAttribute("role", "alert");
+
+        // Set inner HTML
+        alertDiv.innerHTML = notificationHTML;
+
+        // Create the close button
+        const closeButton = document.createElement("button");
+        closeButton.setAttribute("type", "button");
+        closeButton.classList.add(
+          "h-full",
+          "relative",
+          "grid",
+          "items-center",
+          "justify-center",
+          "p-0"
+        )
+        closeButton.setAttribute("data-bs-dismiss", "alert");
+        closeButton.setAttribute("aria-label", "Close");
+
+        // Create close icon
+        const closeIcon = document.createElement("span");
+        closeIcon.classList.add("text-xl");
+        closeIcon.innerHTML = "&times;";
+
+        closeButton.addEventListener("click", () => {
+            notificationsContainer.removeChild(alertDiv); // Remove the alert div
+        });
+
+        closeButton.appendChild(closeIcon);
+        alertDiv.appendChild(closeButton);
+
+        notificationsContainer.appendChild(alertDiv);
+      }
+
+      socket.onopen = (event) => {
+        console.log("WebSocket connection opened!", event);
+      };
+
+      socket.onclose = (event) => {
+        console.log("WebSocket connection closed!", event);
+      };
+
+      function error_response(data) {
+          const apiResponse = document.querySelector('.api-response');
+          if (data) {
+            apiResponse.innerHTML = data
+          }
+      }
+
+      function success_response(data) {
+          const apiResponse = document.querySelector('.api-response');
+          if (data) {
+            apiResponse.innerHTML = data
+          }
+      }
+
+      document.addEventListener('DOMContentLoaded', function() {
+          const submitButtons = document.querySelectorAll('form.ajax-post button[type=submit]');
+          const menu = document.getElementById('menu');
+
+          menu.addEventListener('mouseleave', function() {
+              menu.classList.add('hidden');
+          });
+
+          menu.addEventListener('mouseenter', function() {
+              menu.classList.remove('hidden');
+          });
+
+          submitButtons.forEach(function(button) {
+              button.addEventListener('click', function(event) {
+                  event.preventDefault();
+                  const form = button.closest('form');
+                  const formData = new FormData(form);
+
+                  const jsonData = {};
+                  formData.forEach((value, key) => {
+                      jsonData[key] = value;
+                  });
+
+                  const url = form.getAttribute('action');
+                  const method = form.getAttribute('method');
+                  const csrf_token = document.getElementsByName('csrfmiddlewaretoken')[0].value;
+
+                  const apiResponse = document.querySelector('.api-response');
+                  apiResponse.innerHTML = "API Response: Loading...";
+
+                  fetch(url, {
+                      method: method,
+                      headers: {
+                          'Content-Type': 'application/json',
+                          'X-CSRFToken': csrf_token,
+                      },
+                      body: JSON.stringify(jsonData),
+                  })
+                  .then(response => {
+                      if (!response.ok) {
+                          console.log('response', response)
+                          throw new Error(response.statusText);
+                      }
+                      return response.json();
+                  })
+                  .then(data => {
+                      console.log('data', data)
+                      success_response(data);
+                  })
+                  .catch(error => {
+                      console.log('error', error)
+                      error_response(error);
+                  });
+              });
+          });
+      });
+    </script>
+    {% block script %}{% endblock %}
+  </footer>
+</html>

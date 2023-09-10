@@ -48,6 +48,7 @@ env = environ.Env(
     CELERY_RESULT_BACKEND=(str, "django-db"),
     CELERY_CACHE_BACKEND=(str, "django-cache"),
     EXPLORER_TOKEN=(str, "changeme"),
+    GOOGLE_CALLBACK_URL=(str, "http://localhost:8000/accounts/google/login/callback/"),
 )
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -168,22 +169,22 @@ THIRD_PARTY_APPS = [
     "parler",
     "django_filters",
     "drf_spectacular",
+    "dj_rest_auth",
     "allauth",
     "allauth.account",
+    "allauth_2fa",
+    "dj_rest_auth.registration",
     "allauth.socialaccount",
     "allauth.socialaccount.providers.facebook",
     "allauth.socialaccount.providers.google",
-    # Configure the django-otp package.
     "django_otp",
     "django_otp.plugins.otp_totp",
     "django_otp.plugins.otp_hotp",
     "django_otp.plugins.otp_static",
-    # Enable two-factor auth.
-    "allauth_2fa",
     "django_celery_beat",
     "django_celery_results",
-    # Django sql explorer
     "explorer",
+    "django_browser_reload",
 ]
 INSTALLED_APPS = DJANGO_APPS + PROJECT_APPS + THIRD_PARTY_APPS
 
@@ -205,6 +206,7 @@ MIDDLEWARE = [
     # entering two-factor credentials.
     "allauth_2fa.middleware.AllauthTwoFactorMiddleware",
     "djangorestframework_camel_case.middleware.CamelCaseMiddleWare",
+    "django_browser_reload.middleware.BrowserReloadMiddleware",
 ]
 
 
@@ -266,6 +268,37 @@ AUTHENTICATION_BACKENDS = [
     "allauth.account.auth_backends.AuthenticationBackend",
 ]
 
+REST_AUTH = {
+    "LOGIN_SERIALIZER": "user.serializers.account.UserLoginSerializer",
+    "TOKEN_SERIALIZER": "dj_rest_auth.serializers.TokenSerializer",
+    "JWT_SERIALIZER": "dj_rest_auth.serializers.JWTSerializer",
+    "JWT_SERIALIZER_WITH_EXPIRATION": "dj_rest_auth.serializers.JWTSerializerWithExpiration",
+    "JWT_TOKEN_CLAIMS_SERIALIZER": "rest_framework_simplejwt.serializers.TokenObtainPairSerializer",
+    "USER_DETAILS_SERIALIZER": "user.serializers.account.UserSerializer",
+    "PASSWORD_RESET_SERIALIZER": "dj_rest_auth.serializers.PasswordResetSerializer",
+    "PASSWORD_RESET_CONFIRM_SERIALIZER": "dj_rest_auth.serializers.PasswordResetConfirmSerializer",
+    "PASSWORD_CHANGE_SERIALIZER": "dj_rest_auth.serializers.PasswordChangeSerializer",
+    "REGISTER_SERIALIZER": "user.serializers.account.UserRegisterSerializer",
+    "REGISTER_PERMISSION_CLASSES": ("rest_framework.permissions.AllowAny",),
+    "TOKEN_MODEL": "rest_framework.authtoken.models.Token",
+    "TOKEN_CREATOR": "dj_rest_auth.utils.default_create_token",
+    "PASSWORD_RESET_USE_SITES_DOMAIN": False,
+    "OLD_PASSWORD_FIELD_ENABLED": False,
+    "LOGOUT_ON_PASSWORD_CHANGE": False,
+    "SESSION_LOGIN": True,
+    "USE_JWT": True,
+    "JWT_AUTH_COOKIE": "jwt-auth",
+    "JWT_AUTH_REFRESH_COOKIE": "jwt-refresh-auth",
+    "JWT_AUTH_REFRESH_COOKIE_PATH": "/",
+    "JWT_AUTH_SECURE": False,
+    "JWT_AUTH_HTTPONLY": True,
+    "JWT_AUTH_SAMESITE": "Lax",
+    "JWT_AUTH_RETURN_EXPIRATION": False,
+    "JWT_AUTH_COOKIE_USE_CSRF": False,
+    "JWT_AUTH_COOKIE_ENFORCE_CSRF_ON_UNAUTHENTICATED": False,
+}
+
+GOOGLE_CALLBACK_URL = env("GOOGLE_CALLBACK_URL")
 SOCIALACCOUNT_PROVIDERS = {
     "facebook": {
         "METHOD": "oauth2",
@@ -284,7 +317,7 @@ SOCIALACCOUNT_PROVIDERS = {
             "short_name",
         ],
         "EXCHANGE_TOKEN": True,
-        "VERIFIED_EMAIL": False,
+        "VERIFIED_EMAIL": False if DEBUG else True,
         "LOCALE_FUNC": lambda request: "en_US",
         "VERSION": "v15.0",
         "GRAPH_API_URL": "https://graph.facebook.com/v15.0/",
@@ -292,7 +325,7 @@ SOCIALACCOUNT_PROVIDERS = {
     "google": {
         "SCOPE": ["profile", "email"],
         "AUTH_PARAMS": {"access_type": "online"},
-        "OAUTH_PKCE_ENABLED": True,
+        "OAUTH_PKCE_ENABLED": False if DEBUG else True,
     },
 }
 
@@ -481,6 +514,7 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.BasicAuthentication",
         "rest_framework.authentication.SessionAuthentication",
         "rest_framework.authentication.TokenAuthentication",
+        "dj_rest_auth.jwt_auth.JWTCookieAuthentication",
     ],
     # Permissions
     "DEFAULT_PERMISSION_CLASSES": [

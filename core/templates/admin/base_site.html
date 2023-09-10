@@ -1,0 +1,8 @@
+{% extends "admin/base_site.html" %}
+
+{% load django_browser_reload %}
+
+{% block extrahead %}
+    {{ block.super }}
+    {% django_browser_reload_script %}
+{% endblock %}

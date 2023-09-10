@@ -85,8 +85,7 @@ class SessionTraceMiddlewareTest(TestCase):
 
         session_middleware = SessionMiddleware(self.middleware)
         session_middleware.process_request(request)
-        if request.session.session_key is None:
-            request.session.create()
+        request.session.create()
 
         request.session["last_activity"] = timezone.now()
         request.session["user"] = json.dumps({"id": user.id, "email": user.email})
@@ -112,8 +111,7 @@ class SessionTraceMiddlewareTest(TestCase):
 
         session_middleware = SessionMiddleware(self.middleware)
         session_middleware.process_request(request)
-        if request.session.session_key is None:
-            request.session.create()
+        request.session.create()
 
         request.user = AnonymousUser()
         request.session["last_activity"] = timezone.now()

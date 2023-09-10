@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="flex flex-col items-center mb-16">
+    <h3 class="text-3xl font-bold">Retrieve User Details</h3>
+    <hr class="border-2 border-gray-400 w-16 my-4">
+    <div class="flex items-center gap-2">
+      <label for="token" class="text-lg font-bold">User Token</label>
+      <div class="ml-4">
+        <input name="token" type="text" class="border border-gray-400 py-2 px-4 rounded" id="token" placeholder="Token">
+        <p class="text-gray-600 text-sm mt-2">Token received after login</p>
+      </div>
+    </div>
+    <button id="get-user-details" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-4">GET user details</button>
+  </div>
+
+  <div class="flex flex-col items-center mb-8">
+    <h3 class="text-3xl font-bold">Update User Details</h3>
+    <hr class="border-2 border-gray-400 w-16 my-4">
+    {% include "fragments/user_details_form.html" %}
+  </div>
+{% endblock %}
+
+{% block script %}
+    <script type="text/javascript">
+      document.addEventListener('DOMContentLoaded', function() {
+        const csrf_token = document.getElementsByName('csrfmiddlewaretoken')[0].value;
+
+        document.getElementById('get-user-details').addEventListener('click', function() {
+          const token = document.querySelector('input[name=token]').value;
+          const csrf_token = document.getElementsByName('csrfmiddlewaretoken')[0].value;
+
+          fetch("{% url 'rest_user_details' %}", {
+              headers: {
+                  'Authorization': 'Token ' + token,
+                  'X-CSRFToken': csrf_token
+              }
+          })
+          .then(response => response.json())
+          .then(data => {
+              document.querySelector('input[name=username]').value = data.username;
+              document.querySelector('input[name=email]').value = data.email;
+          });
+
+          return false;
+        });
+
+        document.querySelectorAll('form button[type=submit]').forEach(function(button) {
+          button.addEventListener('click', function() {
+            const form = button.closest('form');
+            const formData = new FormData(form);
+            const url = form.getAttribute('action');
+            const method = form.getAttribute('method');
+            const token = document.querySelector('input[name=token]').value;
+
+            const jsonData = {};
+            formData.forEach((value, key) => {
+                jsonData[key] = value;
+            });
+
+            fetch(url, {
+              method: method,
+              headers: {
+                  'Authorization': 'Token ' + token,
+                  'Content-Type': 'application/json',
+                  'X-CSRFToken': csrf_token,
+              },
+              body: JSON.stringify(jsonData),
+            })
+            .then(response => response.json())
+            .then(data => success_response(data))
+            .catch(error => error_response(error));
+
+            return false;
+          });
+        });
+      });
+    </script>
+{% endblock %}

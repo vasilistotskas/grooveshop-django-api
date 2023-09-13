@@ -13526,14 +13526,6 @@ components:
         * `NEW` - New
         * `TRUE` - True
         * `FALSE` - False
-    ProviderEnum:
-      enum:
-      - facebook
-      - google
-      type: string
-      description: |-
-        * `facebook` - Facebook
-        * `google` - Google
     RateEnum:
       enum:
       - 1
@@ -13794,7 +13786,8 @@ components:
           type: integer
           readOnly: true
         provider:
-          $ref: '#/components/schemas/ProviderEnum'
+          type: string
+          maxLength: 200
         uid:
           type: string
           maxLength: 191

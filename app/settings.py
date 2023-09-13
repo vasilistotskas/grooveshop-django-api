@@ -204,6 +204,7 @@ MIDDLEWARE = [
     # Reset login flow middleware. If this middleware is included, the login
     # flow is reset if another page is loaded between login and successfully
     # entering two-factor credentials.
+    "allauth.account.middleware.AccountMiddleware",
     "allauth_2fa.middleware.AllauthTwoFactorMiddleware",
     "djangorestframework_camel_case.middleware.CamelCaseMiddleWare",
     "django_browser_reload.middleware.BrowserReloadMiddleware",

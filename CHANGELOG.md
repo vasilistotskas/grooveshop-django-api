@@ -3,7 +3,17 @@
 
 
 
+## v0.25.0 (2023-09-13)
+
+### Feature
+
+* feat: Versions bump, add allauth `AccountMiddleware` in settings.py. ([`4b42395`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4b423958945db60ccc83014ca0b1b73c1e447475))
+
 ## v0.24.0 (2023-09-10)
+
+### Chore
+
+* chore(release): release version 0.24.0 [skip ci] ([`60d4ba7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/60d4ba7217888ca2e65857759c855077514697ad))
 
 ### Feature
 

@@ -215,11 +215,10 @@
       const wsEndpoint = `${websocketProtocol}://${window.location.host}/ws/notifications/`;
       const socket = new WebSocket(wsEndpoint);
 
-      // New event listener to capture incoming messages
       socket.addEventListener("message", (event) => {
-        const messageData = JSON.parse(event.data);
-        console.log("Received notification:", messageData.message); // Log the received message to the console
-        showNotification(messageData.message);
+        const data = JSON.parse(event.data);
+        console.log("Received notification:", data.translations);
+        showNotification(data.translations);
       });
 
       function showNotification(notificationHTML) {
@@ -230,7 +229,6 @@
           "justify-center"
         );
 
-        // Create a new alert div
         const alertDiv = document.createElement("div");
         alertDiv.classList.add(
           "flex",
@@ -248,13 +246,9 @@
           "alert"
         );
 
-        // Set role attribute
         alertDiv.setAttribute("role", "alert");
-
-        // Set inner HTML
         alertDiv.innerHTML = notificationHTML;
 
-        // Create the close button
         const closeButton = document.createElement("button");
         closeButton.setAttribute("type", "button");
         closeButton.classList.add(
@@ -268,13 +262,12 @@
         closeButton.setAttribute("data-bs-dismiss", "alert");
         closeButton.setAttribute("aria-label", "Close");
 
-        // Create close icon
         const closeIcon = document.createElement("span");
         closeIcon.classList.add("text-xl");
         closeIcon.innerHTML = "&times;";
 
         closeButton.addEventListener("click", () => {
-            notificationsContainer.removeChild(alertDiv); // Remove the alert div
+            notificationsContainer.removeChild(alertDiv);
         });
 
         closeButton.appendChild(closeIcon);

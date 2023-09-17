@@ -1,54 +1,98 @@
-from django import forms
 from django.contrib import admin
-from django.http import HttpResponseRedirect
-from django.urls import path
+from django.contrib.auth import get_user_model
+from parler.admin import TranslatableAdmin
 
-from notification.models import Notification
-from notification.tasks import send_notification_task
+from notification.models.notification import Notification
+from notification.models.user import NotificationUser
 
-
-class SendNotificationForm(forms.Form):
-    message = forms.CharField(label="Notification Message", max_length=200)
+User = get_user_model()
 
 
 @admin.register(Notification)
-class NotificationAdmin(admin.ModelAdmin):
-    add_form_template = "admin/custom_add_form.html"
+class NotificationAdmin(TranslatableAdmin):
+    list_display = [
+        "id",
+        "link",
+        "kind",
+        "message",
+        "created_at",
+        "updated_at",
+    ]
+    list_filter = [
+        "kind",
+        "created_at",
+        "updated_at",
+    ]
+    search_fields = [
+        "translations__message",
+    ]
+    readonly_fields = [
+        "created_at",
+        "updated_at",
+    ]
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "link",
+                    "kind",
+                    "message",
+                )
+            },
+        ),
+        (
+            "System",
+            {
+                "fields": (
+                    "created_at",
+                    "updated_at",
+                )
+            },
+        ),
+    )
 
-    def add_view(self, request, form_url="", extra_context=None):
-        if request.method == "POST":
-            form = SendNotificationForm(request.POST)
-            if form.is_valid():
-                message = form.cleaned_data["message"]
 
-                Notification.objects.create(message=message)
-
-                send_notification_task.delay(message)
-
-                # channel_layer = get_channel_layer()
-                # async_to_sync(channel_layer.group_send)(
-                #     "notifications",
-                #     {
-                #         "type": "send_notification",
-                #         "message": message
-                #     }
-                # )
-
-                return HttpResponseRedirect("../")
-        else:
-            form = SendNotificationForm()
-
-        context = self.get_changeform_initial_data(request)
-        context["form"] = form
-        return super().add_view(request, form_url, extra_context=context)
-
-    def get_urls(self):
-        urls = super().get_urls()
-        custom_url = [
-            path(
-                "send-notification/",
-                self.admin_site.admin_view(self.add_view),
-                name="send-notification",
-            ),
-        ]
-        return custom_url + urls
+@admin.register(NotificationUser)
+class NotificationUserAdmin(admin.ModelAdmin):
+    list_display = [
+        "id",
+        "user",
+        "notification",
+        "seen",
+        "created_at",
+        "updated_at",
+    ]
+    list_filter = [
+        "seen",
+        "created_at",
+        "updated_at",
+    ]
+    search_fields = [
+        "user__email",
+    ]
+    readonly_fields = [
+        "created_at",
+        "updated_at",
+    ]
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "user",
+                    "notification",
+                    "seen",
+                )
+            },
+        ),
+        (
+            "System",
+            {
+                "fields": (
+                    "created_at",
+                    "updated_at",
+                )
+            },
+        ),
+    )

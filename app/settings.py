@@ -47,7 +47,6 @@ env = environ.Env(
     CELERY_BROKER_URL=(str, "amqp://guest:guest@localhost:5672/"),
     CELERY_RESULT_BACKEND=(str, "django-db"),
     CELERY_CACHE_BACKEND=(str, "django-cache"),
-    EXPLORER_TOKEN=(str, "changeme"),
     GOOGLE_CALLBACK_URL=(str, "http://localhost:8000/accounts/google/login/callback/"),
 )
 
@@ -183,7 +182,6 @@ THIRD_PARTY_APPS = [
     "django_otp.plugins.otp_static",
     "django_celery_beat",
     "django_celery_results",
-    "explorer",
     "django_browser_reload",
 ]
 INSTALLED_APPS = DJANGO_APPS + PROJECT_APPS + THIRD_PARTY_APPS
@@ -391,6 +389,7 @@ CELERY_ACCEPT_CONTENT = ["application/json"]
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_EXTENDED = True
+CELERY_TASK_RESULT_EXPIRES = 3600
 
 # Celery Beat
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
@@ -579,17 +578,6 @@ SPECTACULAR_SETTINGS = {
         "OrderStatusEnum": "order.enum.status_enum.OrderStatusEnum",
     },
 }
-
-# Django sql explorer
-EXPLORER_CONNECTIONS = {"Default": "default"}
-EXPLORER_DEFAULT_CONNECTION = "default"
-EXPLORER_DEFAULT_ROWS = 1000
-EXPLORER_SCHEMA_INCLUDE_TABLE_PREFIXES = None  # shows all tables
-EXPLORER_AUTORUN_QUERY_WITH_PARAMS = False
-EXPLORER_TASKS_ENABLED = True if REDIS_HEALTHY else False
-EXPLORER_ASYNC_SCHEMA = True if REDIS_HEALTHY else False
-EXPLORER_TOKEN_AUTH_ENABLED = False if DEBUG else True
-EXPLORER_TOKEN = env("EXPLORER_TOKEN")
 
 # logs
 LOGGING = {

@@ -1,3 +1,6 @@
+from __future__ import absolute_import
+from __future__ import unicode_literals
+
 import logging
 import os
 
@@ -20,27 +23,22 @@ def setup_celery_logging(loglevel=None, **kwargs):
 
 
 def create_celery_app():
-    app = Celery("app")
-    app.conf.enable_utc = False
-    app.conf.update(timezone=os.environ.get("TIME_ZONE"))
-    app.config_from_object(settings, namespace="CELERY")
+    tasker = Celery("app")
+    tasker.conf.enable_utc = False
+    tasker.conf.update(timezone=os.environ.get("TIME_ZONE"))
+    tasker.config_from_object("django.conf:settings", namespace="CELERY")
 
     # Celery Beat Settings
-    app.conf.beat_schedule = {
+    tasker.conf.beat_schedule = {
         "clear_sessions_for_none_users_task-every-week": {
             "task": "core.tasks.clear_sessions_for_none_users_task",
             "schedule": crontab(minute=0, hour=0, day_of_week="mon"),
-        },
-        "explorer.tasks.truncate_querylogs": {
-            "task": "explorer.tasks.truncate_querylogs",
-            "schedule": crontab(hour=1, minute=0),
-            "kwargs": {"days": 30},
-        },
+        }
     }
 
-    app.autodiscover_tasks()
+    tasker.autodiscover_tasks()
 
-    return app
+    return tasker
 
 
 if settings.REDIS_HEALTHY:

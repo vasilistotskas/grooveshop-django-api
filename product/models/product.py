@@ -33,18 +33,37 @@ from seo.models import SeoModel
 
 
 class ProductQuerySet(TranslatableQuerySet):
-    def update_search_vector(self, weights: dict[str, str] | None = None):
-        translated_fields = self.model._parler_meta.get_translated_fields()
-        search_vector_fields = [f"translations__{field}" for field in translated_fields]
+    def update_search_vector(self, weights: dict | None = None):
+        if weights is None:
+            weights = {}
+
+        translated_fields = weights.pop("translations", None)
+        if translated_fields:
+            translation_weights = {
+                f"translations__{field}": weight
+                for field, weight in translated_fields.items()
+            }
+            weights.update(translation_weights)
+
+        search_vector_fields = []
+
+        if translated_fields:
+            translated_search_vector_fields = [
+                f"translations__{field}" for field in translated_fields
+            ]
+            search_vector_fields.extend(translated_search_vector_fields)
+
+        non_translated_fields = list(weights.keys())
+        search_vector_fields.extend(non_translated_fields)
 
         search_vector = SearchVector(*search_vector_fields)
 
         if weights:
             search_vector = SearchVector(
                 *[
-                    SearchVector(f"translations__{field}", weight=weights[field])
-                    for field in translated_fields
-                ]
+                    SearchVector(field, weight=weight)
+                    for field, weight in weights.items()
+                ],
             )
 
         subquery = self.annotate(updated_vector=search_vector).values("updated_vector")[
@@ -53,7 +72,7 @@ class ProductQuerySet(TranslatableQuerySet):
 
         return self.update(search_vector=Subquery(subquery))
 
-    def update_calculated_fields(self):
+    def update_calculated_fields(self) -> ProductQuerySet:
         vat_subquery = models.Subquery(
             Product.objects.filter(vat__isnull=False).values("vat__value")[:1]
         )
@@ -92,12 +111,16 @@ class ProductManager(models.Manager):
 
     def update_search_vector(self):
         weights = {
-            "name": "A",
-            "description": "B",
+            "slug": "C",
+            "id": "B",
+            "translations": {
+                "name": "A",
+                "description": "D",
+            },
         }
         return self.get_queryset().update_search_vector(weights=weights)
 
-    def update_calculated_fields(self):
+    def update_calculated_fields(self) -> ProductQuerySet:
         return self.get_queryset().update_calculated_fields()
 
 

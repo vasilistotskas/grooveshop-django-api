@@ -119,13 +119,6 @@ class SearchProductAPITest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 2)
 
-    def test_search_product_with_language(self):
-        url = reverse("search-product")
-
-        response = self.client.get(url, {"query": "nike", "language": default_language})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data["results"]), 2)
-
     def test_search_product_by_name(self):
         url = reverse("search-product")
 

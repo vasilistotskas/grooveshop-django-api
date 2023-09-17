@@ -1,13 +1,14 @@
 # populate_blog_author.py
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from faker import Faker
 
 from blog.models.author import BlogAuthor
-from user.models import UserAccount
 
 faker = Faker()
+User = get_user_model()
 
 
 class Command(BaseCommand):
@@ -35,12 +36,10 @@ class Command(BaseCommand):
             return
 
         # Get all existing user accounts
-        user_accounts = list(UserAccount.objects.all())
+        users = list(User.objects.all())
 
-        if not user_accounts:
-            self.stdout.write(
-                self.style.ERROR("No existing UserAccount instances found.")
-            )
+        if not users:
+            self.stdout.write(self.style.ERROR("No existing User instances found."))
             self.stdout.write(self.style.WARNING("Aborting seeding BlogAuthor model."))
             return
 
@@ -50,12 +49,12 @@ class Command(BaseCommand):
         with transaction.atomic():
             for _ in range(total_authors):
                 # If there are no more user accounts left, break the loop to avoid duplicates
-                if not user_accounts:
+                if not users:
                     break
 
                 # Randomly select a user account and remove it from the list to avoid duplicates
-                user = faker.random_element(user_accounts)
-                user_accounts.remove(user)
+                user = faker.random_element(users)
+                users.remove(user)
 
                 # Generate random data for website and bio
                 website = faker.url()[:255]  # Trim to fit URLField max length

@@ -13,7 +13,7 @@ from user.enum.address import LocationChoicesEnum
 class UserAddress(TimeStampMixinModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
     user = models.ForeignKey(
-        "user.UserAccount", related_name="address_user", on_delete=models.CASCADE
+        "user.UserAccount", related_name="user_address", on_delete=models.CASCADE
     )
     title = models.CharField(_("Title"), max_length=255)
     first_name = models.CharField(_("First Name"), max_length=255)
@@ -67,6 +67,13 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
         verbose_name = _("User Address")
         verbose_name_plural = _("User Addresses")
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "is_main"],
+                condition=models.Q(is_main=True),
+                name="unique_main_address",
+            )
+        ]
 
     def __str__(self):
         return self.title

@@ -13,7 +13,7 @@ class Cart(TimeStampMixinModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
     user = models.ForeignKey(
         "user.UserAccount",
-        related_name="cart_user",
+        related_name="user_cart",
         null=True,
         blank=True,
         default=None,

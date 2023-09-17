@@ -1,14 +1,15 @@
 # populate_blog_comment.py
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from faker import Faker
 
 from blog.models.comment import BlogComment
 from blog.models.post import BlogPost
-from user.models import UserAccount
 
 faker = Faker()
+User = get_user_model()
 
 
 class Command(BaseCommand):
@@ -33,7 +34,7 @@ class Command(BaseCommand):
             return
 
         # Get all existing users and blog posts
-        users = list(UserAccount.objects.all())
+        users = list(User.objects.all())
         blog_posts = list(BlogPost.objects.all())
 
         if not users or not blog_posts:

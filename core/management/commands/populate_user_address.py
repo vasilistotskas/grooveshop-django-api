@@ -52,7 +52,7 @@ class Command(BaseCommand):
         created_addresses: list[UserAddress] = []
         with transaction.atomic():
             for user in users:
-                if not user.address_user.filter(is_main=True).exists():
+                if not user.user_address.filter(is_main=True).exists():
                     first_name = (
                         user.first_name if user.first_name else faker.first_name()
                     )

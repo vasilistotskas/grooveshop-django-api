@@ -1,6 +1,7 @@
 from typing import Dict
 from typing import Type
 
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
@@ -9,13 +10,14 @@ from country.models import Country
 from country.serializers import CountrySerializer
 from region.models import Region
 from region.serializers import RegionSerializer
-from user.models import UserAccount
 from user.models.address import UserAddress
 from user.serializers.account import UserAccountSerializer
 
+User = get_user_model()
+
 
 class UserAddressSerializer(BaseExpandSerializer):
-    user = PrimaryKeyRelatedField(queryset=UserAccount.objects.all())
+    user = PrimaryKeyRelatedField(queryset=User.objects.all())
     country = PrimaryKeyRelatedField(queryset=Country.objects.all())
     region = PrimaryKeyRelatedField(queryset=Region.objects.all())
 

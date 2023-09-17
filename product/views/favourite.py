@@ -36,14 +36,11 @@ class ProductFavouriteViewSet(BaseExpandView, ModelViewSet):
     def list(self, request, *args, **kwargs) -> Response:
         queryset = self.filter_queryset(self.get_queryset())
 
-        # Check for 'pagination' query parameter
         pagination_param = request.query_params.get("pagination", "true")
         if pagination_param.lower() == "false":
-            # Return non-paginated response
             serializer = self.get_serializer(queryset, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
-        # Return paginated response
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)

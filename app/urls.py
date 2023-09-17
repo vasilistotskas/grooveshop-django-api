@@ -52,9 +52,17 @@ admin_site_otp.register(TOTPDevice, TOTPDeviceAdmin)
 urlpatterns = i18n_patterns(
     path("__reload__/", include("django_browser_reload.urls")),
     path("", HomeView.as_view(), name="home"),
+    path("", include(front_urls)),
     path("auth/", include("core.auth.urls.auth")),
     path(_("admin/"), admin_site_otp.urls),
     path(_("admin_no_otp/"), admin.site.urls),
+    path("accounts/", include("allauth_2fa.urls")),
+    path("accounts/", include("allauth.urls")),
+    # rosetta
+    path("rosetta/", include("rosetta.urls")),
+    # admin html editor
+    path("tinymce/", include("tinymce.urls")),
+    # api
     path("api/v1/api-token-auth/", ObtainAuthTokenView.as_view()),
     path("api/v1/auth/", include("core.auth.urls.base")),
     path("api/v1/auth/registration/", include("core.auth.urls.registration")),
@@ -73,15 +81,8 @@ urlpatterns = i18n_patterns(
     path("api/v1/", include("pay_way.urls")),
     path("api/v1/", include("session.urls")),
     path("api/v1/", include("cart.urls")),
-    path("accounts/", include("allauth_2fa.urls")),
-    path("accounts/", include("allauth.urls")),
-    # rosetta
-    path("rosetta/", include("rosetta.urls")),
-    # admin html editor
-    path("tinymce/", include("tinymce.urls")),
-    # Spectacular
+    path("api/v1/", include("notification.urls")),
     path("api/v1/schema/", SpectacularAPIView.as_view(), name="schema"),
-    # Optional UI:
     path(
         "api/v1/schema/swagger-ui/",
         SpectacularSwaggerView.as_view(url_name="schema"),
@@ -92,9 +93,6 @@ urlpatterns = i18n_patterns(
         SpectacularRedocView.as_view(url_name="schema"),
         name="redoc",
     ),
-    # Django sql explorer
-    path("explorer/", include("explorer.urls")),
-    path("", include(front_urls)),
     prefix_default_language=False,
 )
 

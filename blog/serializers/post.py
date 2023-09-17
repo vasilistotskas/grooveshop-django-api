@@ -1,6 +1,7 @@
 from typing import Dict
 from typing import Type
 
+from django.contrib.auth import get_user_model
 from drf_spectacular.utils import extend_schema_field
 from parler_rest.fields import TranslatedFieldsField
 from parler_rest.serializers import TranslatableModelSerializer
@@ -16,8 +17,9 @@ from blog.serializers.category import BlogCategorySerializer
 from blog.serializers.tag import BlogTagSerializer
 from core.api.schema import generate_schema_multi_lang
 from core.api.serializers import BaseExpandSerializer
-from user.models import UserAccount
 from user.serializers.account import UserAccountSerializer
+
+User = get_user_model()
 
 
 @extend_schema_field(generate_schema_multi_lang(BlogPost))
@@ -26,7 +28,7 @@ class TranslatedFieldsFieldExtend(TranslatedFieldsField):
 
 
 class BlogPostSerializer(TranslatableModelSerializer, BaseExpandSerializer):
-    likes = PrimaryKeyRelatedField(queryset=UserAccount.objects.all(), many=True)
+    likes = PrimaryKeyRelatedField(queryset=User.objects.all(), many=True)
     category = PrimaryKeyRelatedField(queryset=BlogCategory.objects.all())
     tags = PrimaryKeyRelatedField(queryset=BlogTag.objects.all(), many=True)
     author = PrimaryKeyRelatedField(queryset=BlogAuthor.objects.all())
@@ -54,7 +56,7 @@ class BlogPostSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "main_image_filename",
             "number_of_likes",
             "number_of_comments",
-            "get_post_tags_count",
+            "post_tags_count",
         )
 
     def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:

@@ -202,7 +202,7 @@ class UserAddressModelTestCase(TestCase):
             phone="123-456-7890",
             mobile_phone="987-654-3210",
             notes="Sample notes",
-            is_main=True,
+            is_main=False,
         )
         UserAddress.objects.create(
             user=self.user,
@@ -220,7 +220,7 @@ class UserAddressModelTestCase(TestCase):
             phone="123-456-7890",
             mobile_phone="987-654-3210",
             notes="Sample notes",
-            is_main=True,
+            is_main=False,
         )
         count = UserAddress.get_user_address_count(self.user)
 

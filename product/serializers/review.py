@@ -1,6 +1,7 @@
 from typing import Dict
 from typing import Type
 
+from django.contrib.auth import get_user_model
 from drf_spectacular.utils import extend_schema_field
 from parler_rest.fields import TranslatedFieldsField
 from parler_rest.serializers import TranslatableModelSerializer
@@ -12,8 +13,9 @@ from core.api.serializers import BaseExpandSerializer
 from product.models.product import Product
 from product.models.review import ProductReview
 from product.serializers.product import ProductSerializer
-from user.models import UserAccount
 from user.serializers.account import UserAccountSerializer
+
+User = get_user_model()
 
 
 @extend_schema_field(generate_schema_multi_lang(ProductReview))
@@ -24,7 +26,7 @@ class TranslatedFieldsFieldExtend(TranslatedFieldsField):
 class ProductReviewSerializer(TranslatableModelSerializer, BaseExpandSerializer):
     translations = TranslatedFieldsFieldExtend(shared_model=ProductReview)
     product = PrimaryKeyRelatedField(queryset=Product.objects.all())
-    user = PrimaryKeyRelatedField(queryset=UserAccount.objects.all())
+    user = PrimaryKeyRelatedField(queryset=User.objects.all())
 
     class Meta:
         model = ProductReview

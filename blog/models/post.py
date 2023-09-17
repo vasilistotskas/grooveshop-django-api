@@ -89,5 +89,5 @@ class BlogPost(
         return self.blog_comment_post.count()
 
     @property
-    def get_post_tags_count(self) -> int:
+    def post_tags_count(self) -> int:
         return self.tags.count()

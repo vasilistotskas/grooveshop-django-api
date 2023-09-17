@@ -12,7 +12,7 @@ from core.models import UUIDModel
 class Region(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     alpha = models.CharField(_("Alpha"), max_length=10, primary_key=True, unique=True)
     alpha_2 = models.ForeignKey(
-        "country.Country", related_name="region_alpha_2", on_delete=models.CASCADE
+        "country.Country", related_name="region_country", on_delete=models.CASCADE
     )
     translations = TranslatedFields(
         name=models.CharField(_("Name"), max_length=100, blank=True, null=True)

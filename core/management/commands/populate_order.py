@@ -1,6 +1,7 @@
 # populate_order.py
 from decimal import Decimal
 
+from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from faker import Faker
@@ -15,9 +16,9 @@ from product.models.product import Product
 from region.models import Region
 from user.enum.address import FloorChoicesEnum
 from user.enum.address import LocationChoicesEnum
-from user.models import UserAccount
 
 faker = Faker()
+User = get_user_model()
 
 
 class Command(BaseCommand):
@@ -42,7 +43,7 @@ class Command(BaseCommand):
             return
 
         # Get all existing users, products, countries, and regions
-        users = list(UserAccount.objects.all())
+        users = list(User.objects.all())
         products = list(Product.objects.all())
         countries = list(Country.objects.all())
         regions = list(Region.objects.all())

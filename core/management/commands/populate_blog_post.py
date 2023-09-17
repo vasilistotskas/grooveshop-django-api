@@ -1,5 +1,6 @@
 # populate_blog_post.py
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils.text import slugify
@@ -10,9 +11,9 @@ from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
 from blog.models.post import BlogPost
 from blog.models.tag import BlogTag
-from user.models import UserAccount
 
 faker = Faker()
+User = get_user_model()
 
 
 class Command(BaseCommand):
@@ -40,7 +41,7 @@ class Command(BaseCommand):
         categories = list(BlogCategory.objects.all())
         tags = list(BlogTag.objects.all())
         authors = list(BlogAuthor.objects.all())
-        users = list(UserAccount.objects.all())
+        users = list(User.objects.all())
 
         if not categories or not tags or not authors or not users:
             self.stdout.write(

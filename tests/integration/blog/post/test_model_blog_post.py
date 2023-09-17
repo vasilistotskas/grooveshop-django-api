@@ -155,8 +155,8 @@ class BlogPostModelTestCase(TestCase):
     def test_number_of_comments(self):
         self.assertEqual(self.post.number_of_comments, 0)
 
-    def test_get_post_tags_count(self):
-        self.assertEqual(self.post.get_post_tags_count, 0)
+    def test_post_tags_count(self):
+        self.assertEqual(self.post.post_tags_count, 0)
 
     def tearDown(self) -> None:
         super().tearDown()

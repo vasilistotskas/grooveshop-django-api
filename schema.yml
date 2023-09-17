@@ -4103,6 +4103,403 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/notification/user/:
+    get:
+      operationId: api_v1_notification_user_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: pageSize
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedNotificationUserList'
+          description: ''
+  /api/v1/notification/user{format}:
+    get:
+      operationId: api_v1_notification_user_formatted_list
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: pageSize
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedNotificationUserList'
+          description: ''
+  /api/v1/notification/user/mark_all_as_seen/:
+    post:
+      operationId: api_v1_notification_user_mark_all_as_seen_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationUser'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationUser'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationUser'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationUser'
+          description: ''
+  /api/v1/notification/user/mark_all_as_seen{format}:
+    post:
+      operationId: api_v1_notification_user_mark_all_as_seen_formatted_create
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationUser'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationUser'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationUser'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationUser'
+          description: ''
+  /api/v1/notification/user/mark_all_as_unseen/:
+    post:
+      operationId: api_v1_notification_user_mark_all_as_unseen_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationUser'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationUser'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationUser'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationUser'
+          description: ''
+  /api/v1/notification/user/mark_all_as_unseen{format}:
+    post:
+      operationId: api_v1_notification_user_mark_all_as_unseen_formatted_create
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationUser'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationUser'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationUser'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationUser'
+          description: ''
+  /api/v1/notification/user/mark_as_seen/:
+    post:
+      operationId: api_v1_notification_user_mark_as_seen_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationUserAction'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationUserAction'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationUserAction'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationUserAction'
+          description: ''
+  /api/v1/notification/user/mark_as_seen{format}:
+    post:
+      operationId: api_v1_notification_user_mark_as_seen_formatted_create
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationUserAction'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationUserAction'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationUserAction'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationUserAction'
+          description: ''
+  /api/v1/notification/user/mark_as_unseen/:
+    post:
+      operationId: api_v1_notification_user_mark_as_unseen_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationUserAction'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationUserAction'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationUserAction'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationUserAction'
+          description: ''
+  /api/v1/notification/user/mark_as_unseen{format}:
+    post:
+      operationId: api_v1_notification_user_mark_as_unseen_formatted_create
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationUserAction'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationUserAction'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationUserAction'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationUserAction'
+          description: ''
+  /api/v1/notification/user/unseen_count/:
+    get:
+      operationId: api_v1_notification_user_unseen_count_retrieve
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationUser'
+          description: ''
+  /api/v1/notification/user/unseen_count{format}:
+    get:
+      operationId: api_v1_notification_user_unseen_count_formatted_retrieve
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationUser'
+          description: ''
   /api/v1/order/:
     get:
       operationId: api_v1_order_list
@@ -7204,7 +7601,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Region'
           description: ''
-  /api/v1/search-product:
+  /api/v1/search/product/:
     get:
       operationId: api_v1_search_product_list
       parameters:
@@ -7212,12 +7609,6 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
-        schema:
-          type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
         schema:
           type: integer
       tags:
@@ -7232,9 +7623,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedProductList'
+                $ref: '#/components/schemas/PaginatedSearchProductList'
           description: ''
-  /api/v1/search-product{format}:
+  /api/v1/search/product{format}:
     get:
       operationId: api_v1_search_product_formatted_list
       parameters:
@@ -7251,12 +7642,6 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
-        schema:
-          type: integer
       tags:
       - api
       security:
@@ -7269,7 +7654,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedProductList'
+                $ref: '#/components/schemas/PaginatedSearchProductList'
           description: ''
   /api/v1/session/clear_all/:
     post:
@@ -10333,19 +10718,19 @@ components:
         numberOfComments:
           type: integer
           readOnly: true
-        getPostTagsCount:
+        postTagsCount:
           type: integer
           readOnly: true
       required:
       - author
       - category
-      - getPostTagsCount
       - id
       - likes
       - mainImageAbsoluteUrl
       - mainImageFilename
       - numberOfComments
       - numberOfLikes
+      - postTagsCount
       - slug
       - tags
       - translations
@@ -10765,6 +11150,29 @@ components:
         * `0` - Home
         * `1` - Office
         * `2` - Other
+    NotificationUser:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        user:
+          type: integer
+        notification:
+          type: integer
+        seen:
+          type: boolean
+      required:
+      - id
+      - notification
+      - user
+    NotificationUserAction:
+      type: object
+      properties:
+        notificationUserId:
+          type: integer
+      required:
+      - notificationUserId
     NullEnum:
       enum:
       - null
@@ -11249,6 +11657,26 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Country'
+    PaginatedNotificationUserList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationUser'
     PaginatedOrderList:
       type: object
       properties:
@@ -11409,6 +11837,26 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Region'
+    PaginatedSearchProductList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchProduct'
     PaginatedSlideList:
       type: object
       properties:
@@ -11827,7 +12275,7 @@ components:
         numberOfComments:
           type: integer
           readOnly: true
-        getPostTagsCount:
+        postTagsCount:
           type: integer
           readOnly: true
     PatchedBlogTag:
@@ -13608,6 +14056,91 @@ components:
           format: email
       required:
       - email
+    SearchProduct:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchProductResult'
+        headlines:
+          type: object
+          additionalProperties:
+            type: string
+        searchRanks:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+        resultCount:
+          type: integer
+        similarities:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+      required:
+      - headlines
+      - resultCount
+      - results
+      - searchRanks
+      - similarities
+    SearchProductResult:
+      type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        mainImageFilename:
+          type: string
+        absoluteUrl:
+          type: string
+        translations:
+          type: object
+          properties:
+            en:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+            de:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+        searchRank:
+          type: number
+          format: double
+          readOnly: true
+        headline:
+          type: string
+          readOnly: true
+        similarity:
+          type: number
+          format: double
+          readOnly: true
+      required:
+      - absoluteUrl
+      - headline
+      - id
+      - mainImageFilename
+      - searchRank
+      - similarity
+      - slug
+      - translations
     Slide:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.

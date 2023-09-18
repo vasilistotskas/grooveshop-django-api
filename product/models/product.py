@@ -33,38 +33,12 @@ from seo.models import SeoModel
 
 
 class ProductQuerySet(TranslatableQuerySet):
-    def update_search_vector(self, weights: dict | None = None):
-        if weights is None:
-            weights = {}
-
-        translated_fields = weights.pop("translations", None)
-        if translated_fields:
-            translation_weights = {
-                f"translations__{field}": weight
-                for field, weight in translated_fields.items()
-            }
-            weights.update(translation_weights)
-
-        search_vector_fields = []
-
-        if translated_fields:
-            translated_search_vector_fields = [
-                f"translations__{field}" for field in translated_fields
-            ]
-            search_vector_fields.extend(translated_search_vector_fields)
-
-        non_translated_fields = list(weights.keys())
-        search_vector_fields.extend(non_translated_fields)
-
-        search_vector = SearchVector(*search_vector_fields)
-
-        if weights:
-            search_vector = SearchVector(
-                *[
-                    SearchVector(field, weight=weight)
-                    for field, weight in weights.items()
-                ],
-            )
+    def update_search_vector(self):
+        search_vector = (
+            SearchVector("translations__name", weight="A")
+            + SearchVector("slug", weight="B")
+            + SearchVector("translations__description", weight="C")
+        )
 
         subquery = self.annotate(updated_vector=search_vector).values("updated_vector")[
             :1
@@ -110,15 +84,7 @@ class ProductManager(models.Manager):
         return ProductQuerySet(self.model, using=self._db)
 
     def update_search_vector(self):
-        weights = {
-            "slug": "C",
-            "id": "B",
-            "translations": {
-                "name": "A",
-                "description": "D",
-            },
-        }
-        return self.get_queryset().update_search_vector(weights=weights)
+        return self.get_queryset().update_search_vector()
 
     def update_calculated_fields(self) -> ProductQuerySet:
         return self.get_queryset().update_calculated_fields()
@@ -175,8 +141,10 @@ class Product(TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel):
     )
 
     translations = TranslatedFields(
-        name=models.CharField(_("Name"), max_length=255, blank=True, null=True),
-        description=HTMLField(_("Description"), blank=True, null=True),
+        name=models.CharField(
+            _("Name"), max_length=255, blank=True, null=True, db_index=True
+        ),
+        description=HTMLField(_("Description"), blank=True, null=True, db_index=True),
     )
     search_vector = SearchVectorField(null=True)
 

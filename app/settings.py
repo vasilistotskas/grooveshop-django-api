@@ -141,8 +141,8 @@ DJANGO_APPS = [
     "django.contrib.postgres",
 ]
 PROJECT_APPS = [
-    "user",
     "core",
+    "user",
     "product",
     "order",
     "search",

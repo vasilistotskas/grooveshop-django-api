@@ -20,15 +20,23 @@ class SearchProduct(ModelViewSet):
     limit = 20
 
     def get_queryset(self):
-        queryset = Product.objects.all()
         query = self.request.query_params.get("query", None)
         language = self.request.query_params.get("language", default_language)
 
         if query:
             search_query = SearchQuery(query, search_type="websearch", config="simple")
-            lookup = Q(search_vector=search_query, translations__language_code=language)
+
+            lookup = (
+                Q(search_vector=search_query)
+                | Q(translations__name__search=search_query)
+                | Q(translations__description__search=search_query)
+                | Q(slug__search=search_query)
+            ) & Q(translations__language_code=language)
+
             queryset = (
-                Product.objects.filter(lookup)
+                Product.objects.only("id", "slug")
+                .prefetch_related("translations")
+                .filter(lookup)
                 .annotate(
                     search_rank=SearchRank(F("search_vector"), search_query),
                     headline=SearchHeadline(
@@ -44,7 +52,7 @@ class SearchProduct(ModelViewSet):
             )
             return queryset
 
-        return queryset.none()
+        return Product.objects.none()
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())

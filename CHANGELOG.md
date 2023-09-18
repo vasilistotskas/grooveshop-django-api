@@ -3,7 +3,55 @@
 
 
 
+## v0.26.0 (2023-09-18)
+
+### Chore
+
+* chore: Improvements.
+
+- Env updated.
+- Gitignore Update.
+- Remove django-sql-explorer.
+- README Cleanup.
+- API schema generate.
+- Locales update.
+- .idea update. ([`4622f0c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4622f0cb02cec6364e46d04a9b4482c31be43d4f))
+
+### Feature
+
+* feat(search): Search improvements.
+
+- Added 001_pg_trigram_extension.py in core.
+- Search functionality and performance improve.
+- Run migrations. ([`2436d9a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2436d9a987b1f863f0785fec3a2d26f7615b995d))
+
+* feat(search): Search improve.
+
+- Pass weights on product_post_save signal.
+- ProductQuerySet fixed, weights pass fixed.
+- Api View return a lot of better reasults included `results`, `headlines`, `search_ranks`, `result_count` and `similarities`
+- SearchProductSerializer and SearchProductResultSerializer implemented. ([`da8ee4b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/da8ee4bed192ef23fa4dd1c4681108ff229b67bc))
+
+* feat: Celery, uvicorn and Notifications.
+
+- celery.py rename to celery_setup.py.
+- Create uvicorn_server.py to be able to run with uvicorn.
+- Notification feature.
+- settings.py improvements ([`bbc5f45`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bbc5f45cc25b6f1881c752fb48ffafc90f79d5a0))
+
+* feat: Changes to naming, cleanup, AddressModel change and migrations.
+
+- App urls cleanup.
+- UserAccount usage from import replaced with get_user_model().
+- Model `related_name` usage improve for readability.
+- UserAddress Model add contstraint.
+- Run migrations. ([`5a3f590`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5a3f590c4e91a1abdeee65e187b46516fb08ed33))
+
 ## v0.25.0 (2023-09-13)
+
+### Chore
+
+* chore(release): release version 0.25.0 [skip ci] ([`f21e4d9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f21e4d9cbb3bb8a2c45be48d3f1fd41f604306ca))
 
 ### Feature
 

@@ -3,9 +3,29 @@
 
 
 
+## v0.26.1 (2023-09-20)
+
+### Chore
+
+* chore: Versions bump.
+
+- pillow
+- django-filter
+- python-semantic-release
+- dj-rest-auth
+- urllib3
+- pydantic
+- rich ([`00f4489`](https://github.com/vasilistotskas/grooveshop-django-api/commit/00f448946aae902f94296f0e52693a6bce155bee))
+
+### Fix
+
+* fix(cart): Serializer create method fix using try catch. ([`1391aac`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1391aac5730a6ef85de8bcc9f005cec81613acc9))
+
 ## v0.26.0 (2023-09-18)
 
 ### Chore
+
+* chore(release): release version 0.26.0 [skip ci] ([`665a681`](https://github.com/vasilistotskas/grooveshop-django-api/commit/665a6812f5512ee0c9c0253c2428a0afa6295933))
 
 * chore: Improvements.
 

@@ -3,9 +3,17 @@
 
 
 
+## v0.26.2 (2023-09-23)
+
+### Fix
+
+* fix(populate_user_address): Command fix check for main address. ([`770f6fb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/770f6fbfe2c12ec13b1ce2d351edf4d14a07ec08))
+
 ## v0.26.1 (2023-09-20)
 
 ### Chore
+
+* chore(release): release version 0.26.1 [skip ci] ([`1822f9f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1822f9f44478c44d89a36df1c5f9db8d2650c81a))
 
 * chore: Versions bump.
 

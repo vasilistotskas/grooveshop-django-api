@@ -1,4 +1,6 @@
 # populate_user_address.py
+import time
+
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
@@ -26,6 +28,8 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        total_time = 0
+        start_time = time.time()
         total_addresses = options["total_addresses"]
 
         if total_addresses < 1:
@@ -49,7 +53,7 @@ class Command(BaseCommand):
         floor_choices = [choice[0] for choice in FloorChoicesEnum.choices]
         location_choices = [choice[0] for choice in LocationChoicesEnum.choices]
 
-        created_addresses: list[UserAddress] = []
+        objects_to_insert: list[UserAddress] = []
         with transaction.atomic():
             for user in users:
                 try:
@@ -63,7 +67,7 @@ class Command(BaseCommand):
                         user.first_name if user.first_name else faker.first_name()
                     )
                     last_name = user.last_name if user.last_name else faker.last_name()
-                    main_address = UserAddress.objects.create(
+                    main_address = UserAddress(
                         user=user,
                         title="Main Address",
                         first_name=first_name,
@@ -79,11 +83,10 @@ class Command(BaseCommand):
                         notes=faker.sentence(),
                         is_main=True,
                     )
-                    created_addresses.append(main_address)
+                    objects_to_insert.append(main_address)
 
-                # Create additional UserAddress instances for the user
                 for _ in range(total_addresses - 1):
-                    address = UserAddress.objects.create(
+                    address = UserAddress(
                         user=user,
                         title=faker.word().capitalize(),
                         first_name=faker.first_name(),
@@ -99,10 +102,14 @@ class Command(BaseCommand):
                         notes=faker.sentence(),
                         is_main=False,
                     )
-                    created_addresses.append(address)
+                    objects_to_insert.append(address)
+            UserAddress.objects.bulk_create(objects_to_insert)
 
+        end_time = time.time()
+        execution_time = end_time - start_time
+        total_time += execution_time
         self.stdout.write(
             self.style.SUCCESS(
-                f"Successfully seeded {len(created_addresses)} UserAddress instances."
+                f"{len(objects_to_insert)} UserAddress instances created successfully in {execution_time:.2f} seconds."
             )
         )

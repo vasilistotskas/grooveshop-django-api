@@ -1,4 +1,6 @@
 # populate_product_favourite.py
+import time
+
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
@@ -25,6 +27,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         total_favourites = options["total_favourites"]
+        total_time = 0
+        start_time = time.time()
 
         if total_favourites < 1:
             self.stdout.write(
@@ -32,7 +36,6 @@ class Command(BaseCommand):
             )
             return
 
-        # Get all existing users and products
         users = list(User.objects.all())
         products = list(Product.objects.all())
 
@@ -44,23 +47,41 @@ class Command(BaseCommand):
             )
             return
 
-        created_favourites = []
+        objects_to_insert = []
+        picked_users = []
+        picked_products = []
         with transaction.atomic():
             for _ in range(total_favourites):
                 user = faker.random_element(users)
                 product = faker.random_element(products)
 
-                # Create a new ProductFavourite object
-                favourite, created = ProductFavourite.objects.get_or_create(
+                product_favourite_exists = ProductFavourite.objects.filter(
+                    user=user, product=product
+                ).exists()
+
+                if (
+                    product_favourite_exists
+                    or user in picked_users
+                    or product in picked_products
+                ):
+                    continue
+
+                favourite = ProductFavourite(
                     user=user,
                     product=product,
                 )
 
-                if created:
-                    created_favourites.append(favourite)
+                objects_to_insert.append(favourite)
+                picked_users.append(user)
+                picked_products.append(product)
+            ProductFavourite.objects.bulk_create(objects_to_insert)
 
+        end_time = time.time()
+        execution_time = end_time - start_time
+        total_time += execution_time
         self.stdout.write(
             self.style.SUCCESS(
-                f"Successfully seeded {len(created_favourites)} ProductFavourite instances."
+                f"{len(objects_to_insert)} ProductFavourite instances created "
+                f"successfully in {execution_time:.2f} seconds."
             )
         )

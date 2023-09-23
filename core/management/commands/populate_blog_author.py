@@ -1,4 +1,6 @@
 # populate_blog_author.py
+import time
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
@@ -24,8 +26,10 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        total_time = 0
+        start_time = time.time()
         total_authors = options["total_authors"]
-        languages = [
+        available_languages = [
             lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
         ]
 
@@ -35,48 +39,44 @@ class Command(BaseCommand):
             )
             return
 
-        # Get all existing user accounts
-        users = list(User.objects.all())
+        users = User.objects.all()
 
         if not users:
             self.stdout.write(self.style.ERROR("No existing User instances found."))
             self.stdout.write(self.style.WARNING("Aborting seeding BlogAuthor model."))
             return
 
-        # Create a list to store created authors
-        created_authors = []
-
+        objects_to_insert = []
+        picked_users = []
         with transaction.atomic():
             for _ in range(total_authors):
-                # If there are no more user accounts left, break the loop to avoid duplicates
-                if not users:
-                    break
-
-                # Randomly select a user account and remove it from the list to avoid duplicates
                 user = faker.random_element(users)
-                users.remove(user)
-
-                # Generate random data for website and bio
-                website = faker.url()[:255]  # Trim to fit URLField max length
+                website = faker.url()[:255]
                 bio = faker.paragraph()
 
-                # Create a new BlogAuthor object for the user
-                author, created = BlogAuthor.objects.get_or_create(
-                    user=user, defaults={"website": website, "bio": bio}
-                )
+                user_exists = BlogAuthor.objects.filter(user=user).exists()
+                if user_exists or user in picked_users:
+                    continue
 
-                if created:
-                    for lang in languages:
-                        lang_seed = hash(f"{user.id}{lang}")
-                        faker.seed_instance(lang_seed)
-                        bio = faker.paragraph()
-                        author.set_current_language(lang)
-                        author.bio = bio
-                        author.save()
-                    created_authors.append(author)
+                author = BlogAuthor(user=user, website=website, bio=bio)
+                objects_to_insert.append(author)
+                picked_users.append(user)
+            BlogAuthor.objects.bulk_create(objects_to_insert)
 
+            for author in objects_to_insert:
+                for lang in available_languages:
+                    lang_seed = hash(f"{author.user.id}{lang}")
+                    faker.seed_instance(lang_seed)
+                    bio = faker.paragraph()
+                    author.set_current_language(lang)
+                    author.bio = bio
+                    author.save()
+
+        end_time = time.time()
+        execution_time = end_time - start_time
+        total_time += execution_time
         self.stdout.write(
             self.style.SUCCESS(
-                f"Successfully seeded {len(created_authors)} BlogAuthor instances."
+                f"{len(objects_to_insert)} BlogAuthor instances created successfully in {execution_time:.2f} seconds."
             )
         )

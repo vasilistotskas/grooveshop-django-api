@@ -1,5 +1,6 @@
 import os
 import random
+import time
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
@@ -26,6 +27,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         total_images = options["total_images"]
+        total_time = 0
+        start_time = time.time()
 
         if total_images < 1:
             self.stdout.write(
@@ -33,7 +36,6 @@ class Command(BaseCommand):
             )
             return
 
-        # Get all existing products
         products = list(Product.objects.all())
 
         if not products:
@@ -52,13 +54,19 @@ class Command(BaseCommand):
             )
             return
 
-        created_images = []
+        objects_to_insert = []
         with transaction.atomic():
             for product in products:
-                if not product.product_images.filter(is_main=True).exists():
+                try:
+                    product.product_images.get(is_main=True)
+                    main_image_exists = True
+                except ProductImage.DoesNotExist:
+                    main_image_exists = False
+
+                if not main_image_exists:
                     img_filename = random.choice(img_files)
                     img_path = os.path.join(img_folder, img_filename)
-                    main_image = ProductImage.objects.create(
+                    main_image = ProductImage(
                         title="Main Image",
                         product=product,
                         is_main=True,
@@ -66,13 +74,13 @@ class Command(BaseCommand):
                             img_path, use_default_storage=False
                         ),
                     )
-                    created_images.append(main_image)
+                    objects_to_insert.append(main_image)
 
                 for _ in range(total_images - 1):
                     title = faker.word()
                     img_filename = random.choice(img_files)
                     img_path = os.path.join(img_folder, img_filename)
-                    image = ProductImage.objects.create(
+                    image = ProductImage(
                         title=title,
                         product=product,
                         is_main=False,
@@ -80,10 +88,14 @@ class Command(BaseCommand):
                             img_path, use_default_storage=False
                         ),
                     )
-                    created_images.append(image)
+                    objects_to_insert.append(image)
+        ProductImage.objects.bulk_create(objects_to_insert)
 
+        end_time = time.time()
+        execution_time = end_time - start_time
+        total_time += execution_time
         self.stdout.write(
             self.style.SUCCESS(
-                f"Successfully seeded {len(created_images)} ProductImage instances."
+                f"{len(objects_to_insert)} ProductImage instances created successfully in {execution_time:.2f} seconds."
             )
         )

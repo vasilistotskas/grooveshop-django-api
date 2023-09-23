@@ -1,4 +1,6 @@
 # populate_product.py
+import time
+
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import transaction
@@ -25,6 +27,11 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         total_products = options["total_products"]
+        total_time = 0
+        start_time = time.time()
+        available_languages = [
+            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+        ]
 
         if total_products < 1:
             self.stdout.write(
@@ -32,7 +39,6 @@ class Command(BaseCommand):
             )
             return
 
-        # Get all existing categories and vats
         categories = list(ProductCategory.objects.all())
         vats = list(Vat.objects.all())
 
@@ -42,25 +48,16 @@ class Command(BaseCommand):
             )
             return
 
-        available_languages = [
-            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
-        ]
-
         if not available_languages:
             self.stdout.write(self.style.ERROR("No languages found."))
             return
 
-        created_products = []
+        objects_to_insert = []
         with transaction.atomic():
             for _ in range(total_products):
                 category = faker.random_element(categories)
                 vat = faker.random_element(vats)
-                slug = None
-
-                # Ensure the slug value is unique for each product
-                while not slug or Product.objects.filter(slug=slug).exists():
-                    slug = faker.slug()
-
+                slug = faker.unique.slug()
                 price = faker.pydecimal(left_digits=4, right_digits=2, positive=True)
                 stock = faker.random_int(min=0, max=1000)
                 discount_percent = faker.pydecimal(
@@ -68,7 +65,11 @@ class Command(BaseCommand):
                 )
                 weight = faker.pydecimal(left_digits=3, right_digits=2, positive=True)
 
-                product, created = Product.objects.get_or_create(
+                product_slug_exists = Product.objects.filter(slug=slug).exists()
+                if product_slug_exists:
+                    continue
+
+                product = Product(
                     slug=slug,
                     category=category,
                     vat=vat,
@@ -77,22 +78,26 @@ class Command(BaseCommand):
                     discount_percent=discount_percent,
                     weight=weight,
                 )
+                objects_to_insert.append(product)
+            Product.objects.bulk_create(objects_to_insert)
 
-                if created:
-                    for lang in available_languages:
-                        lang_seed = hash(f"{lang}{product.id}")
-                        faker.seed_instance(lang_seed)
+            for product in objects_to_insert:
+                for lang in available_languages:
+                    lang_seed = hash(f"{lang}{product.id}")
+                    faker.seed_instance(lang_seed)
 
-                        name = f"{faker.word()}_{product.id}"
-                        description = f"{faker.text()}_{product.id}"
-                        product.set_current_language(lang)
-                        product.name = name
-                        product.description = description
-                        product.save()
-                    created_products.append(product)
+                    name = f"{faker.word()}_{product.id}"
+                    description = f"{faker.text()}_{product.id}"
+                    product.set_current_language(lang)
+                    product.name = name
+                    product.description = description
+                    product.save()
 
+        end_time = time.time()
+        execution_time = end_time - start_time
+        total_time += execution_time
         self.stdout.write(
             self.style.SUCCESS(
-                f"Successfully seeded {len(created_products)} Product instances."
+                f"{len(objects_to_insert)} Product instances created successfully in {execution_time:.2f} seconds."
             )
         )

@@ -1,4 +1,5 @@
 # populate_vat.py
+import time
 from decimal import Decimal
 
 from django.core.management.base import BaseCommand
@@ -24,6 +25,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         total_vats = options["total_vats"]
+        total_time = 0
+        start_time = time.time()
 
         if total_vats < 1:
             self.stdout.write(
@@ -31,18 +34,21 @@ class Command(BaseCommand):
             )
             return
 
-        created_vats = []
+        objects_to_insert = []
         with transaction.atomic():
             for _ in range(total_vats):
                 value = Decimal(faker.random.uniform(5.0, 25.0))
 
-                # Create a new Vat object
-                vat = Vat.objects.create(value=value)
+                vat = Vat(value=value)
+                objects_to_insert.append(vat)
+            Vat.objects.bulk_create(objects_to_insert)
 
-                created_vats.append(vat)
-
+        end_time = time.time()
+        execution_time = end_time - start_time
+        total_time += execution_time
         self.stdout.write(
             self.style.SUCCESS(
-                f"Successfully seeded {len(created_vats)} Vat instances."
+                f"{len(objects_to_insert)} Vat instances created successfully "
+                f"in {execution_time:.2f} seconds."
             )
         )

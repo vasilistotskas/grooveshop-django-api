@@ -1,4 +1,6 @@
 # populate_product_review.py
+import time
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
@@ -28,6 +30,11 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         total_reviews = options["total_reviews"]
+        total_time = 0
+        start_time = time.time()
+        available_languages = [
+            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+        ]
 
         if total_reviews < 1:
             self.stdout.write(
@@ -35,7 +42,6 @@ class Command(BaseCommand):
             )
             return
 
-        # Get all existing users and products
         users = list(User.objects.all())
         products = list(Product.objects.all())
 
@@ -47,10 +53,6 @@ class Command(BaseCommand):
             )
             return
 
-        available_languages = [
-            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
-        ]
-
         if not available_languages:
             self.stdout.write(self.style.ERROR("No languages found."))
             return
@@ -58,7 +60,7 @@ class Command(BaseCommand):
         rate_choices = [choice[0] for choice in RateEnum.choices]
         status_choices = [choice[0] for choice in ReviewStatusEnum.choices]
 
-        created_reviews = []
+        objects_to_insert = []
         with transaction.atomic():
             for _ in range(total_reviews):
                 user = faker.random_element(users)
@@ -66,30 +68,30 @@ class Command(BaseCommand):
                 rate = faker.random_element(rate_choices)
                 status = faker.random_element(status_choices)
 
-                # Ensure the user does not review the same product twice
-                if ProductReview.objects.filter(product=product, user=user).exists():
-                    continue
-
-                # Create a new ProductReview object
-                review, created = ProductReview.objects.get_or_create(
+                review = ProductReview(
                     product=product,
                     user=user,
                     rate=rate,
                     status=status,
                 )
+                objects_to_insert.append(review)
+            ProductReview.objects.bulk_create(objects_to_insert)
 
-                if created:
-                    for lang in available_languages:
-                        lang_seed = hash(f"{review.id}{lang}")
-                        faker.seed_instance(lang_seed)
-                        comment = faker.text(max_nb_chars=250)
-                        review.set_current_language(lang)
-                        review.comment = comment
-                        review.save()
-                    created_reviews.append(review)
+            for review in objects_to_insert:
+                for lang in available_languages:
+                    lang_seed = hash(f"{review.id}{lang}")
+                    faker.seed_instance(lang_seed)
+                    comment = faker.text(max_nb_chars=250)
+                    review.set_current_language(lang)
+                    review.comment = comment
+                    review.save()
 
+        end_time = time.time()
+        execution_time = end_time - start_time
+        total_time += execution_time
         self.stdout.write(
             self.style.SUCCESS(
-                f"Successfully seeded {len(created_reviews)} ProductReview instances."
+                f"{len(objects_to_insert)} ProductReview instances created successfully "
+                f"in {execution_time:.2f} seconds."
             )
         )

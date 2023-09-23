@@ -1,4 +1,6 @@
 # populate_product_category.py
+import time
+
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import transaction
@@ -23,6 +25,11 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         total_categories = options["total_categories"]
+        total_time = 0
+        start_time = time.time()
+        available_languages = [
+            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+        ]
 
         if total_categories < 1:
             self.stdout.write(
@@ -30,22 +37,15 @@ class Command(BaseCommand):
             )
             return
 
-        available_languages = [
-            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
-        ]
-
         if not available_languages:
             self.stdout.write(self.style.ERROR("No languages found."))
             return
 
-        # Create a list to store created categories
-        created_categories = []
-
+        objects_to_insert = []
         with transaction.atomic():
             for _ in range(total_categories):
                 slug = faker.slug()
 
-                # Create a new ProductCategory object
                 category, created = ProductCategory.objects.get_or_create(
                     slug=slug,
                 )
@@ -60,10 +60,14 @@ class Command(BaseCommand):
                         category.name = name
                         category.description = description
                         category.save()
-                    created_categories.append(category)
+                    objects_to_insert.append(category)
 
+        end_time = time.time()
+        execution_time = end_time - start_time
+        total_time += execution_time
         self.stdout.write(
             self.style.SUCCESS(
-                f"Successfully seeded {len(created_categories)} ProductCategory instances."
+                f"{len(objects_to_insert)} ProductCategory instances created "
+                f"successfully in {execution_time:.2f} seconds."
             )
         )

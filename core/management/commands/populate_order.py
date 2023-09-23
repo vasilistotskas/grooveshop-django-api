@@ -1,4 +1,5 @@
 # populate_order.py
+import time
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -35,6 +36,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         total_orders = options["total_orders"]
+        total_time = 0
+        start_time = time.time()
 
         if total_orders < 1:
             self.stdout.write(
@@ -42,14 +45,12 @@ class Command(BaseCommand):
             )
             return
 
-        # Get all existing users, products, countries, and regions
         users = list(User.objects.all())
         products = list(Product.objects.all())
         countries = list(Country.objects.all())
         regions = list(Region.objects.all())
         pay_ways = list(PayWay.objects.all())
 
-        # Get enum
         floor_choices = [choice[0] for choice in FloorChoicesEnum.choices]
         location_choices = [choice[0] for choice in LocationChoicesEnum.choices]
         status_choices = [choice[0] for choice in OrderStatusEnum.choices]
@@ -61,19 +62,16 @@ class Command(BaseCommand):
             )
             return
 
-        # Create a list to store created orders
-        created_orders = []
-
+        order_objects_to_insert = []
+        order_item_objects_to_insert = []
         with transaction.atomic():
             for _ in range(total_orders):
-                # Randomly select user, product, country, and region
                 user = faker.random_element(users)
                 product = faker.random_element(products)
                 country = faker.random_element(countries)
                 region = faker.random_element(regions)
                 pay_way = faker.random_element(pay_ways)
 
-                # Generate random data for other fields
                 floor = faker.random_element(floor_choices)
                 location_type = faker.random_element(location_choices)
                 email = faker.email()
@@ -96,8 +94,7 @@ class Command(BaseCommand):
                 shipping_price = Decimal(faker.random_number(digits=2))
                 document_type = faker.random_element(document_type_choices)
 
-                # Create a new Order object
-                order = Order.objects.create(
+                order = Order(
                     user=user,
                     country=country,
                     region=region,
@@ -120,19 +117,26 @@ class Command(BaseCommand):
                     shipping_price=shipping_price,
                     document_type=document_type,
                 )
+                order_objects_to_insert.append(order)
 
-                # Create OrderItem for the Order
-                OrderItem.objects.create(
+                order_item = OrderItem(
                     order=order,
                     product=product,
                     price=Decimal(faker.random_number(digits=2)),
                     quantity=faker.random_int(min=1, max=10),
                 )
+                order_item_objects_to_insert.append(order_item)
 
-                created_orders.append(order)
+            Order.objects.bulk_create(order_objects_to_insert)
+            OrderItem.objects.bulk_create(order_item_objects_to_insert)
 
+        end_time = time.time()
+        execution_time = end_time - start_time
+        total_time += execution_time
         self.stdout.write(
             self.style.SUCCESS(
-                f"Successfully seeded {len(created_orders)} Order instances."
+                f"{len(order_objects_to_insert)} Order instances and"
+                f" {len(order_item_objects_to_insert)} OrderItem instances created"
+                f" successfully in {execution_time:.2f} seconds."
             )
         )

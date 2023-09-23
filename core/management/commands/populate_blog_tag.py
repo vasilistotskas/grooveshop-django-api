@@ -1,4 +1,6 @@
 # populate_blog_tag.py
+import time
+
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import transaction
@@ -23,6 +25,11 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         total_tags = options["total_tags"]
+        total_time = 0
+        start_time = time.time()
+        available_languages = [
+            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+        ]
 
         if total_tags < 1:
             self.stdout.write(
@@ -30,34 +37,33 @@ class Command(BaseCommand):
             )
             return
 
-        available_languages = [
-            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
-        ]
-
         if not available_languages:
             self.stdout.write(self.style.ERROR("No languages found."))
             return
 
-        created_tags = []
+        objects_to_insert = []
         with transaction.atomic():
             for _ in range(total_tags):
                 active = faker.boolean()
 
-                # Create a new BlogTag object
-                tag, created = BlogTag.objects.get_or_create(active=active)
+                tag = BlogTag(active=active)
+                objects_to_insert.append(tag)
+            BlogTag.objects.bulk_create(objects_to_insert)
 
-                if created:
-                    for lang in available_languages:
-                        lang_seed = hash(f"{tag.id}{lang}")
-                        faker.seed_instance(lang_seed)
-                        name = faker.word()
-                        tag.set_current_language(lang)
-                        tag.name = name
-                        tag.save()
-                    created_tags.append(tag)
+            for tag in objects_to_insert:
+                for lang in available_languages:
+                    lang_seed = hash(f"{tag.id}{lang}")
+                    faker.seed_instance(lang_seed)
+                    name = faker.word()
+                    tag.set_current_language(lang)
+                    tag.name = name
+                    tag.save()
 
+        end_time = time.time()
+        execution_time = end_time - start_time
+        total_time += execution_time
         self.stdout.write(
             self.style.SUCCESS(
-                f"Successfully seeded {len(created_tags)} BlogTag instances."
+                f"{len(objects_to_insert)} BlogTag instances created successfully in {execution_time:.2f} seconds."
             )
         )

@@ -3,7 +3,19 @@
 
 
 
+## v0.27.0 (2023-09-23)
+
+### Feature
+
+* feat(Faker): Increase command run speed using bulk_create, time of execution for each command add.
+
+- Run migrations ([`9f56577`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9f5657773827ff76158f8e63b73f9dba16589f7d))
+
 ## v0.26.2 (2023-09-23)
+
+### Chore
+
+* chore(release): release version 0.26.2 [skip ci] ([`4af42c6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4af42c6e7daab100935be6b4b278649ac53ffbdc))
 
 ### Fix
 

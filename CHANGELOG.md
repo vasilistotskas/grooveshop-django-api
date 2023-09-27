@@ -3,7 +3,21 @@
 
 
 
+## v0.28.0 (2023-09-27)
+
+### Feature
+
+* feat: Auth module improve, __unicode__ and __str__ method fallback, session and cache rewrite. ([`cc21594`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cc215943984350530d6b11c3ee0f78fb6c06035b))
+
+### Fix
+
+* fix(session/middleware.py): `update_cache` method rename to `update_session` to also set session + cache. ([`27c6a5d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/27c6a5d4a24f1d3ed08a52a8c9afdbcbf3584042))
+
 ## v0.27.0 (2023-09-23)
+
+### Chore
+
+* chore(release): release version 0.27.0 [skip ci] ([`36acc9c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/36acc9cf53207908029972e7ded332d9d6a754a2))
 
 ### Feature
 

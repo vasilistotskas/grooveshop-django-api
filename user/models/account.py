@@ -110,21 +110,30 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
         user_id = self.pk
 
         # Delete all sessions associated with the user's primary key
-        Session.objects.filter(
+        sessions = Session.objects.filter(
             expire_date__gte=timezone.now(),
-            session_data__contains=f'auth_user_id": "{user_id}"',
-        ).delete()
+            session_data__contains=f'"_auth_user_id":{user_id}',
+        )
+        sessions.delete()
 
         # Session Cache
-        user_cache_keys = cache_instance.keys(
-            f"{caches.USER_AUTHENTICATED}_*{user_id}_*"
-        )
+        user_cache_keys = cache_instance.keys(f"{caches.USER_AUTHENTICATED}{user_id}:*")
+        django_cache_keys = cache_instance.keys("django.contrib.sessions.cache*")
+
         for key in user_cache_keys:
             cache_instance.delete(key)
 
-        # Clear the cache for the current user
-        user_cache_key = caches.USER_AUTHENTICATED + "_" + str(user_id)
-        cache_instance.delete(user_cache_key)
+        request.session.flush()
+
+        for key in django_cache_keys:
+            user = cache_instance.get(key)
+            if not user:
+                continue
+            cache_user_id = user.get("_auth_user_id", None)
+            if not cache_user_id:
+                continue
+            if user and int(user.get("_auth_user_id")) == int(user_id):
+                cache_instance.delete(key)
 
     @property
     def main_image_absolute_url(self) -> str:

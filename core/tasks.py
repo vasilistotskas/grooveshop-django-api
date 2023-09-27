@@ -1,23 +1,46 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+from importlib import import_module
+
 from celery import shared_task
 from celery.utils.log import get_task_logger
-
-from core import caches
-from core.caches import cache_instance
+from django.conf import settings
+from django.core import management
 
 logger = get_task_logger(__name__)
 
 
+@shared_task(bind=True, name="Clear Expired Sessions Task")
+def clear_expired_sessions_task():
+    try:
+        management.call_command("clearsessions", verbosity=0)
+        return "All expired sessions deleted."
+    except Exception as e:
+        return f"error: {e}"
+
+
 @shared_task(bind=True, name="Clear Sessions For None Users Task")
 def clear_sessions_for_none_users_task():
-    for key in cache_instance.keys(caches.USER_AUTHENTICATED + "_*"):
-        if key.split("_")[1] == "NONE":
-            cache_instance.delete(key)
+    session_store = import_module(settings.SESSION_ENGINE).SessionStore
+    non_authenticated_sessions = []
 
-    cache_instance.set(caches.CLEAR_SESSIONS_FOR_NONE_USERS_TASK, True, caches.ONE_HOUR)
-    logger.info("Clear Sessions For None Users Task Completed")
+    # Get all session keys
+    keys = session_store().keys()
+
+    # Get all non authenticated sessions
+    for key in keys:
+        session = session_store(session_key=key)
+        if not session.get("_auth_user_id"):
+            non_authenticated_sessions.append(key)
+
+    # Delete all non authenticated sessions
+    session_store().delete_many(non_authenticated_sessions)
+
+    message = f"Cleared {len(non_authenticated_sessions)} non-authenticated sessions."
+
+    logger.info(message)
+    return message
 
 
 @shared_task(bind=True, name="Clear Carts For None Users Task")
@@ -26,4 +49,8 @@ def clear_carts_for_none_users_task():
 
     null_carts = Cart.objects.filter(user=None)
     null_carts.delete()
-    logger.info("Clear Carts For None Users Task Completed")
+
+    message = f"Cleared {len(null_carts)} null carts."
+
+    logger.info(message)
+    return message

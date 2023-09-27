@@ -78,7 +78,7 @@ class ProductCategory(
         self.sub_categories_list = None
 
     def __unicode__(self):
-        return self.safe_translation_getter("name", any_language=True)
+        return self.safe_translation_getter("name", any_language=True) or ""
 
     def __str__(self):
         full_path: list[str] = [self.safe_translation_getter("name", any_language=True)]

@@ -157,6 +157,7 @@ PROJECT_APPS = [
     "session",
     "cart",
     "notification",
+    "authentication",
 ]
 THIRD_PARTY_APPS = [
     "rest_framework",
@@ -206,6 +207,7 @@ MIDDLEWARE = [
     "allauth_2fa.middleware.AllauthTwoFactorMiddleware",
     "djangorestframework_camel_case.middleware.CamelCaseMiddleWare",
     "django_browser_reload.middleware.BrowserReloadMiddleware",
+    "core.middleware.timezone.TimezoneMiddleware",
 ]
 
 
@@ -268,16 +270,16 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 REST_AUTH = {
-    "LOGIN_SERIALIZER": "user.serializers.account.UserLoginSerializer",
-    "TOKEN_SERIALIZER": "dj_rest_auth.serializers.TokenSerializer",
-    "JWT_SERIALIZER": "dj_rest_auth.serializers.JWTSerializer",
-    "JWT_SERIALIZER_WITH_EXPIRATION": "dj_rest_auth.serializers.JWTSerializerWithExpiration",
-    "JWT_TOKEN_CLAIMS_SERIALIZER": "rest_framework_simplejwt.serializers.TokenObtainPairSerializer",
-    "USER_DETAILS_SERIALIZER": "user.serializers.account.UserSerializer",
-    "PASSWORD_RESET_SERIALIZER": "dj_rest_auth.serializers.PasswordResetSerializer",
-    "PASSWORD_RESET_CONFIRM_SERIALIZER": "dj_rest_auth.serializers.PasswordResetConfirmSerializer",
-    "PASSWORD_CHANGE_SERIALIZER": "dj_rest_auth.serializers.PasswordChangeSerializer",
-    "REGISTER_SERIALIZER": "user.serializers.account.UserRegisterSerializer",
+    "LOGIN_SERIALIZER": "authentication.serializers.AuthenticationLoginSerializer",
+    "TOKEN_SERIALIZER": "authentication.serializers.AuthenticationTokenSerializer",
+    "JWT_SERIALIZER": "authentication.serializers.AuthenticationJWTSerializer",
+    "JWT_SERIALIZER_WITH_EXPIRATION": "authentication.serializers.AuthenticationJWTSerializerWithExpiration",
+    "JWT_TOKEN_CLAIMS_SERIALIZER": "authentication.serializers.AuthenticationTokenObtainPairSerializer",
+    "USER_DETAILS_SERIALIZER": "authentication.serializers.AuthenticationSerializer",
+    "PASSWORD_RESET_SERIALIZER": "authentication.serializers.AuthenticationPasswordResetSerializer",
+    "PASSWORD_RESET_CONFIRM_SERIALIZER": "authentication.serializers.AuthenticationPasswordResetConfirmSerializer",
+    "PASSWORD_CHANGE_SERIALIZER": "authentication.serializers.AuthenticationPasswordChangeSerializer",
+    "REGISTER_SERIALIZER": "authentication.serializers.AuthenticationRegisterSerializer",
     "REGISTER_PERMISSION_CLASSES": ("rest_framework.permissions.AllowAny",),
     "TOKEN_MODEL": "rest_framework.authtoken.models.Token",
     "TOKEN_CREATOR": "dj_rest_auth.utils.default_create_token",
@@ -290,7 +292,7 @@ REST_AUTH = {
     "JWT_AUTH_REFRESH_COOKIE": "jwt-refresh-auth",
     "JWT_AUTH_REFRESH_COOKIE_PATH": "/",
     "JWT_AUTH_SECURE": False,
-    "JWT_AUTH_HTTPONLY": True,
+    "JWT_AUTH_HTTPONLY": False,
     "JWT_AUTH_SAMESITE": "Lax",
     "JWT_AUTH_RETURN_EXPIRATION": False,
     "JWT_AUTH_COOKIE_USE_CSRF": False,
@@ -376,6 +378,7 @@ if SYSTEM_ENV != "GITHUB_WORKFLOW":
             "BACKEND": "django.core.cache.backends.dummy.DummyCache",
         },
     }
+
 REDIS_HEALTHY = custom_cache_config.ready_healthy
 
 # Celery

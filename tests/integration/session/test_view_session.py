@@ -1,91 +1,119 @@
-import json
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
-from django.core.serializers.json import DjangoJSONEncoder
+from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.test import APITestCase
+from rest_framework.test import APIClient
 
 from core import caches
 from core.caches import cache_instance
+from core.caches import USER_AUTHENTICATED
 
 User = get_user_model()
 
 
-class ActiveUserViewSetTest(APITestCase):
-    user: User = None
-
+class SessionAPITestCase(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="testuser@example.com", password="testpassword"
-        )
+        cache_instance.clear()
+        self.client = APIClient()
 
-    def test_active_users_count(self):
-        # Delete all users, sessions and cache data
-        User.objects.all().delete()
+    def tearDown(self):
+        self.client.logout()
         cache_instance.clear()
 
-        # Delete all sessions
-        self.client.session.delete()
+    @staticmethod
+    def get_session_url():
+        return reverse("session")
 
-        # Set up additional users with varying last_activity timestamps
-        user1 = User.objects.create_user(
-            email="user1@example.com", password="testpassword"
+    @staticmethod
+    def get_session_clear_all_url():
+        return reverse("session-clear-all")
+
+    @staticmethod
+    def get_session_active_users_count_url():
+        return reverse("session-active-users-count")
+
+    @staticmethod
+    def get_session_refresh_last_activity_url():
+        return reverse("session-refresh-last-activity")
+
+    def test_session_view_authenticated(self):
+        user = User.objects.create_user(
+            email="testuser@example.com", password="testpassword"
         )
-        user2 = User.objects.create_user(
-            email="user2@example.com", password="testpassword"
-        )
+        self.client.force_login(user)
 
-        # Json User
-        json_user_1 = json.dumps(
-            {"id": user1.id, "email": user1.email},
-            cls=DjangoJSONEncoder,
-        )
-        json_user_2 = json.dumps(
-            {"id": user2.id, "email": user2.email},
-            cls=DjangoJSONEncoder,
-        )
-
-        # Get the current time and the time 20 minutes ago
-        now = timezone.now()
-        ten_minutes_ago = now - timedelta(minutes=20)
-
-        # Set the last_activity for user1 to 20 minutes ago
-        user1_cache_key = caches.USER_AUTHENTICATED + f"_{user1.id}"
-        user1_cache_data = {
-            "last_activity": ten_minutes_ago,
-            "user": json_user_1,
-            "cart_id": None,
-            "pre_log_in_cart_id": None,
-            "referer": None,
-            "session_key": "user1_session_key",
-        }
-        cache_instance.set(user1_cache_key, user1_cache_data, caches.ONE_HOUR)
-
-        # Set the last_activity for user2 to the current time
-        user2_cache_key = caches.USER_AUTHENTICATED + f"_{user2.id}"
-        user2_cache_data = {
-            "last_activity": now,
-            "user": json_user_2,
-            "cart_id": None,
-            "pre_log_in_cart_id": None,
-            "referer": None,
-            "session_key": "user2_session_key",
-        }
-        cache_instance.set(user2_cache_key, user2_cache_data, caches.ONE_HOUR)
-
-        # Make a GET request to the active_users_count endpoint
-        url = reverse("active-user-active-users-count")
-        response = self.client.get(url)
-
-        # Check the response status code and data
+        response = self.client.get(self.get_session_url())
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(
-            response.data["active_users"], 1
-        )  # Only user2 should be active, user1's last_activity is too old
+        self.assertEqual(response.data, {"isSessionAuthenticated": True})
 
-    def tearDown(self) -> None:
-        super().tearDown()
-        self.user.delete()
+    def test_session_view_unauthenticated(self):
+        response = self.client.get(self.get_session_url())
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {"isSessionAuthenticated": False})
+
+    def test_clear_all_user_sessions_authenticated(self):
+        user = User.objects.create_user(
+            email="testuser2@example.com", password="testpassword"
+        )
+        self.client.force_login(user)
+
+        response = self.client.post(self.get_session_clear_all_url())
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {"success": True})
+
+    def test_clear_all_user_sessions_unauthenticated(self):
+        response = self.client.post(self.get_session_clear_all_url())
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_refresh_last_activity_authenticated(self):
+        user = User.objects.create_user(
+            email="testuser3@example.com", password="testpassword"
+        )
+        self.client.force_login(user)
+
+        response = self.client.post(self.get_session_refresh_last_activity_url())
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {"success": True})
+
+    def test_refresh_last_activity_unauthenticated(self):
+        response = self.client.post(self.get_session_refresh_last_activity_url())
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data, {"success": False})
+
+    def test_active_users_count(self):
+        cache_data_1 = {
+            "last_activity": timezone.now(),
+            "user": 1,
+            "referer": "http://example.com",
+            "session_key": "session_key_1",
+            "cart_id": "cart_id_1",
+        }
+        user_1_key = f"{USER_AUTHENTICATED}1:session_key_1"
+        cache_instance.set(user_1_key, cache_data_1, caches.ONE_HOUR)
+
+        user_2_key = f"{USER_AUTHENTICATED}2:session_key_2"
+        cache_data_2 = {
+            "last_activity": timezone.now() - timedelta(minutes=20),
+            "user": 2,
+            "referer": "http://example.com",
+            "session_key": "session_key_2",
+            "cart_id": "cart_id_2",
+        }
+        cache_instance.set(user_2_key, cache_data_2, caches.ONE_HOUR)
+
+        user_3_key = f"{USER_AUTHENTICATED}3:session_key_3"
+        cache_data_3 = {
+            "last_activity": timezone.now(),
+            "user": 3,
+            "referer": "http://example.com",
+            "session_key": "session_key_3",
+            "cart_id": "cart_id_3",
+        }
+        cache_instance.set(user_3_key, cache_data_3, caches.ONE_HOUR)
+
+        response = self.client.get(self.get_session_active_users_count_url())
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {"active_users": 2})

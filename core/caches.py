@@ -10,8 +10,22 @@ from django.core.cache.backends.redis import RedisCache
 
 logger = logging.getLogger(__name__)
 
+# Constants
+
 DEFAULT_CACHE_ALIAS = "default"
 FALLBACK_CACHE_ALIAS = "fallback"
+
+ONE_HOUR = 60 * 60
+ONE_DAY = ONE_HOUR * 24
+ONE_WEEK = ONE_DAY * 7
+ONE_MONTH = ONE_DAY * 30
+ONE_YEAR = ONE_DAY * 365
+
+# Cache Keys
+SESSION_PREFIX = "session:"
+# structure should be like "<USER_AUTHENTICATED>:<user_pk>:<random_session_key>"
+USER_AUTHENTICATED = f"{SESSION_PREFIX}user_authenticated:"
+USER_UNAUTHENTICATED = f"{SESSION_PREFIX}user_unauthenticated:"
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "app.settings")
 
@@ -141,17 +155,10 @@ class CustomCache(BaseCache):
             return []
 
 
-# Constants
-ONE_HOUR = 60 * 60
-ONE_DAY = ONE_HOUR * 24
-ONE_WEEK = ONE_DAY * 7
-ONE_MONTH = ONE_DAY * 30
-ONE_YEAR = ONE_DAY * 365
-
-SESSION = "session"
-USER_AUTHENTICATED = "user_authenticated"
-USER_UNAUTHENTICATED = "user_unauthenticated"
-CLEAR_SESSIONS_FOR_NONE_USERS_TASK = "clear_sessions_for_none_users_task"
+def generate_user_cache_key(request: Any) -> str:
+    if request.user.is_authenticated and request.session.session_key:
+        return f"{USER_AUTHENTICATED}{request.user.id}:{request.session.session_key}"
+    return f"{USER_UNAUTHENTICATED}{request.session.session_key}"
 
 
 cache_instance = CustomCache(params={})

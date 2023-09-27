@@ -4,114 +4,6 @@ info:
   version: 1.0.0
   description: DeepWeb API description
 paths:
-  /api/v1/active_users/active_users_count/:
-    get:
-      operationId: api_v1_active_users_active_users_count_retrieve
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserAccount'
-          description: ''
-  /api/v1/active_users/active_users_count{format}:
-    get:
-      operationId: api_v1_active_users_active_users_count_formatted_retrieve
-      parameters:
-      - in: path
-        name: format
-        schema:
-          type: string
-          enum:
-          - .json
-        required: true
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserAccount'
-          description: ''
-  /api/v1/active_users/refresh_last_activity/:
-    post:
-      operationId: api_v1_active_users_refresh_last_activity_create
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/UserAccount'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/UserAccount'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UserAccount'
-        required: true
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserAccount'
-          description: ''
-  /api/v1/active_users/refresh_last_activity{format}:
-    post:
-      operationId: api_v1_active_users_refresh_last_activity_formatted_create
-      parameters:
-      - in: path
-        name: format
-        schema:
-          type: string
-          enum:
-          - .json
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/UserAccount'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/UserAccount'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UserAccount'
-        required: true
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserAccount'
-          description: ''
   /api/v1/api-token-auth/:
     post:
       operationId: api_v1_api_token_auth_create
@@ -329,13 +221,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/UserLogin'
+              $ref: '#/components/schemas/AuthenticationLogin'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/UserLogin'
+              $ref: '#/components/schemas/AuthenticationLogin'
           application/json:
             schema:
-              $ref: '#/components/schemas/UserLogin'
+              $ref: '#/components/schemas/AuthenticationLogin'
         required: true
       security:
       - basicAuth: []
@@ -347,7 +239,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserLogin'
+                $ref: '#/components/schemas/AuthenticationLogin'
           description: ''
   /api/v1/auth/logout/:
     get:
@@ -398,7 +290,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PasswordChange'
+              $ref: '#/components/schemas/AuthenticationPasswordChange'
         required: true
       security:
       - basicAuth: []
@@ -409,7 +301,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PasswordChange'
+                $ref: '#/components/schemas/AuthenticationPasswordChange'
           description: ''
   /api/v1/auth/password/reset/:
     post:
@@ -425,13 +317,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PasswordReset'
+              $ref: '#/components/schemas/AuthenticationPasswordReset'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PasswordReset'
+              $ref: '#/components/schemas/AuthenticationPasswordReset'
           application/json:
             schema:
-              $ref: '#/components/schemas/PasswordReset'
+              $ref: '#/components/schemas/AuthenticationPasswordReset'
         required: true
       security:
       - basicAuth: []
@@ -443,7 +335,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PasswordReset'
+                $ref: '#/components/schemas/AuthenticationPasswordReset'
           description: ''
   /api/v1/auth/password/reset/confirm/:
     post:
@@ -461,7 +353,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PasswordResetConfirm'
+              $ref: '#/components/schemas/AuthenticationPasswordResetConfirm'
         required: true
       security:
       - basicAuth: []
@@ -473,7 +365,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PasswordResetConfirm'
+                $ref: '#/components/schemas/AuthenticationPasswordResetConfirm'
           description: ''
   /api/v1/auth/registration/:
     post:
@@ -484,7 +376,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UserRegister'
+              $ref: '#/components/schemas/AuthenticationRegister'
         required: true
       security:
       - basicAuth: []
@@ -496,7 +388,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserRegister'
+                $ref: '#/components/schemas/AuthenticationRegister'
           description: ''
   /api/v1/auth/registration/resend-email/:
     post:
@@ -693,7 +585,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
+                $ref: '#/components/schemas/Authentication'
           description: ''
     put:
       operationId: api_v1_auth_user_update
@@ -712,13 +604,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/User'
+              $ref: '#/components/schemas/Authentication'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/User'
+              $ref: '#/components/schemas/Authentication'
           application/json:
             schema:
-              $ref: '#/components/schemas/User'
+              $ref: '#/components/schemas/Authentication'
       security:
       - basicAuth: []
       - cookieAuth: []
@@ -728,7 +620,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
+                $ref: '#/components/schemas/Authentication'
           description: ''
     patch:
       operationId: api_v1_auth_user_partial_update
@@ -747,13 +639,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedUser'
+              $ref: '#/components/schemas/PatchedAuthentication'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedUser'
+              $ref: '#/components/schemas/PatchedAuthentication'
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedUser'
+              $ref: '#/components/schemas/PatchedAuthentication'
       security:
       - basicAuth: []
       - cookieAuth: []
@@ -763,7 +655,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
+                $ref: '#/components/schemas/Authentication'
           description: ''
   /api/v1/blog/author/:
     get:
@@ -7656,37 +7548,28 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedSearchProductList'
           description: ''
-  /api/v1/session/clear_all/:
-    post:
-      operationId: api_v1_session_clear_all_create
+  /api/v1/session/:
+    get:
+      operationId: api_v1_session_retrieve
+      description: Returns whether the user is authenticated or not.
       tags:
       - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/UserAccount'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/UserAccount'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UserAccount'
-        required: true
       security:
       - basicAuth: []
       - cookieAuth: []
       - tokenAuth: []
+      - {}
       responses:
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserAccount'
+                $ref: '#/components/schemas/Session'
           description: ''
-  /api/v1/session/clear_all{format}:
-    post:
-      operationId: api_v1_session_clear_all_formatted_create
+  /api/v1/session{format}:
+    get:
+      operationId: api_v1_session_formatted_retrieve
+      description: Returns whether the user is authenticated or not.
       parameters:
       - in: path
         name: format
@@ -7697,28 +7580,149 @@ paths:
         required: true
       tags:
       - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/UserAccount'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/UserAccount'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UserAccount'
-        required: true
       security:
       - basicAuth: []
       - cookieAuth: []
       - tokenAuth: []
+      - {}
       responses:
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserAccount'
+                $ref: '#/components/schemas/Session'
+          description: ''
+  /api/v1/session/active_users_count/:
+    get:
+      operationId: api_v1_session_active_users_count_retrieve
+      description: Returns the number of active users.
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActiveUsersCount'
+          description: ''
+  /api/v1/session/active_users_count{format}:
+    get:
+      operationId: api_v1_session_active_users_count_formatted_retrieve
+      description: Returns the number of active users.
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActiveUsersCount'
+          description: ''
+  /api/v1/session/clear_all/:
+    post:
+      operationId: api_v1_session_clear_all_create
+      description: Clears all user sessions.
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClearAllUserSessions'
+          description: ''
+  /api/v1/session/clear_all{format}:
+    post:
+      operationId: api_v1_session_clear_all_formatted_create
+      description: Clears all user sessions.
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClearAllUserSessions'
+          description: ''
+  /api/v1/session/refresh_last_activity/:
+    post:
+      operationId: api_v1_session_refresh_last_activity_create
+      description: Refreshes the last activity of the user.
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshLastActivity'
+          description: ''
+  /api/v1/session/refresh_last_activity{format}:
+    post:
+      operationId: api_v1_session_refresh_last_activity_formatted_create
+      description: Refreshes the last activity of the user.
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshLastActivity'
           description: ''
   /api/v1/slide/:
     get:
@@ -10437,6 +10441,13 @@ paths:
           description: No response body
 components:
   schemas:
+    ActiveUsersCount:
+      type: object
+      properties:
+        activeUsers:
+          type: integer
+      required:
+      - activeUsers
     AuthToken:
       type: object
       properties:
@@ -10453,6 +10464,87 @@ components:
       - password
       - token
       - username
+    Authentication:
+      type: object
+      description: User model w/o password
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+          title: Email Address
+      required:
+      - email
+      - id
+    AuthenticationLogin:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required:
+      - password
+    AuthenticationPasswordChange:
+      type: object
+      properties:
+        newPassword1:
+          type: string
+          maxLength: 128
+        newPassword2:
+          type: string
+          maxLength: 128
+      required:
+      - newPassword1
+      - newPassword2
+    AuthenticationPasswordReset:
+      type: object
+      description: Serializer for requesting a password reset e-mail.
+      properties:
+        email:
+          type: string
+          format: email
+      required:
+      - email
+    AuthenticationPasswordResetConfirm:
+      type: object
+      description: Serializer for confirming a password reset attempt.
+      properties:
+        newPassword1:
+          type: string
+          maxLength: 128
+        newPassword2:
+          type: string
+          maxLength: 128
+        uid:
+          type: string
+        token:
+          type: string
+      required:
+      - newPassword1
+      - newPassword2
+      - token
+      - uid
+    AuthenticationRegister:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password1:
+          type: string
+          writeOnly: true
+        password2:
+          type: string
+          writeOnly: true
+      required:
+      - email
+      - password1
+      - password2
     BlankEnum:
       enum:
       - ''
@@ -11029,6 +11121,13 @@ components:
       required:
       - id
       - product
+    ClearAllUserSessions:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+      - success
     Country:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -11997,46 +12096,18 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Vat'
-    PasswordChange:
+    PatchedAuthentication:
       type: object
+      description: User model w/o password
       properties:
-        newPassword1:
-          type: string
-          maxLength: 128
-        newPassword2:
-          type: string
-          maxLength: 128
-      required:
-      - newPassword1
-      - newPassword2
-    PasswordReset:
-      type: object
-      description: Serializer for requesting a password reset e-mail.
-      properties:
+        id:
+          type: integer
+          readOnly: true
         email:
           type: string
           format: email
-      required:
-      - email
-    PasswordResetConfirm:
-      type: object
-      description: Serializer for confirming a password reset attempt.
-      properties:
-        newPassword1:
-          type: string
-          maxLength: 128
-        newPassword2:
-          type: string
-          maxLength: 128
-        uid:
-          type: string
-        token:
-          type: string
-      required:
-      - newPassword1
-      - newPassword2
-      - token
-      - uid
+          readOnly: true
+          title: Email Address
     PatchedBlogAuthor:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -13260,18 +13331,6 @@ components:
           type: string
           format: uuid
           readOnly: true
-    PatchedUser:
-      type: object
-      description: User model w/o password
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        email:
-          type: string
-          format: email
-          readOnly: true
-          title: Email Address
     PatchedUserAccount:
       type: object
       properties:
@@ -13998,6 +14057,13 @@ components:
         * `8` - Eight
         * `9` - Nine
         * `10` - Ten
+    RefreshLastActivity:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+      - success
     Region:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -14141,6 +14207,13 @@ components:
       - similarity
       - slug
       - translations
+    Session:
+      type: object
+      properties:
+        isSessionAuthenticated:
+          type: boolean
+      required:
+      - isSessionAuthenticated
     Slide:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -14439,21 +14512,6 @@ components:
           writeOnly: true
       required:
       - token
-    User:
-      type: object
-      description: User model w/o password
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        email:
-          type: string
-          format: email
-          readOnly: true
-          title: Email Address
-      required:
-      - email
-      - id
     UserAccount:
       type: object
       properties:
@@ -14639,32 +14697,6 @@ components:
       - user
       - uuid
       - zipcode
-    UserLogin:
-      type: object
-      properties:
-        email:
-          type: string
-          format: email
-        password:
-          type: string
-      required:
-      - password
-    UserRegister:
-      type: object
-      properties:
-        email:
-          type: string
-          format: email
-        password1:
-          type: string
-          writeOnly: true
-        password2:
-          type: string
-          writeOnly: true
-      required:
-      - email
-      - password1
-      - password2
     Vat:
       type: object
       properties:

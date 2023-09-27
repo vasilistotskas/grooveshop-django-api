@@ -5,15 +5,14 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.sessions.middleware import SessionMiddleware
-from django.core.serializers.json import DjangoJSONEncoder
 from django.test import RequestFactory
 from django.test import TestCase
 from django.utils import timezone
 
 from cart.models import Cart
 from cart.service import CartService
-from core import caches
 from core.caches import cache_instance
+from core.caches import generate_user_cache_key
 from session.middleware import SessionTraceMiddleware
 
 User = get_user_model()
@@ -26,31 +25,6 @@ class SessionTraceMiddlewareTest(TestCase):
     def setUp(self):
         self.middleware = SessionTraceMiddleware(Mock())
         self.factory = RequestFactory()
-
-    def test_process_user_data_authenticated(self):
-        user = User.objects.create_user(
-            email="testuser@example.com", password="testpassword"
-        )
-        request = self.factory.get("/")
-        request.user = user
-
-        session_middleware = SessionMiddleware(self.middleware)
-        session_middleware.process_request(request)
-
-        self.middleware.process_user_data(request)
-        self.assertEqual(
-            request.session["user"],
-            json.dumps({"id": user.id, "email": user.email}, cls=DjangoJSONEncoder),
-        )
-
-    def test_process_user_data_unauthenticated(self):
-        request = self.factory.get("/")
-
-        session_middleware = SessionMiddleware(self.middleware)
-        session_middleware.process_request(request)
-
-        self.middleware.process_user_data(request)
-        self.assertIsNone(request.session.get("user"))
 
     def test_ensure_cart_id_existing_cart_id(self):
         request = self.factory.get("/")
@@ -92,7 +66,7 @@ class SessionTraceMiddlewareTest(TestCase):
         request.META["HTTP_REFERER"] = "http://example.com"
         request.session["cart_id"] = 789
 
-        user_cache_key = caches.USER_AUTHENTICATED + "_" + str(user.id)
+        user_cache_key = generate_user_cache_key(request)
         self.middleware.update_cache(request)
 
         cache = cache_instance.get(user_cache_key)
@@ -120,9 +94,7 @@ class SessionTraceMiddlewareTest(TestCase):
         request.session["cart_id"] = 789
         request.session.modified = True
 
-        non_user_cache_key = (
-            str(caches.USER_UNAUTHENTICATED) + "_" + request.session.session_key
-        )
+        non_user_cache_key = generate_user_cache_key(request)
         self.middleware.update_cache(request)
 
         cache = cache_instance.get(non_user_cache_key)

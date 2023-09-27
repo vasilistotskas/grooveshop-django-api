@@ -61,10 +61,10 @@ class BlogPost(
         ordering = ["-published_at"]
 
     def __unicode__(self):
-        return self.safe_translation_getter("title", any_language=True)
+        return self.safe_translation_getter("title", any_language=True) or ""
 
     def __str__(self):
-        return self.safe_translation_getter("title", any_language=True)
+        return self.safe_translation_getter("title", any_language=True) or ""
 
     @property
     def main_image_absolute_url(self) -> str:

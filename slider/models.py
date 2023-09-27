@@ -40,10 +40,10 @@ class Slider(TranslatableModel, TimeStampMixinModel, UUIDModel):
         ordering = ["-created_at"]
 
     def __unicode__(self):
-        return self.safe_translation_getter("name", any_language=True)
+        return self.safe_translation_getter("name", any_language=True) or ""
 
     def __str__(self):
-        return self.safe_translation_getter("name", any_language=True)
+        return self.safe_translation_getter("name", any_language=True) or ""
 
     def save(self, *args, **kwargs):
         if self.image:
@@ -111,10 +111,10 @@ class Slide(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         ordering = ["sort_order"]
 
     def __unicode__(self):
-        return self.safe_translation_getter("name", any_language=True)
+        return self.safe_translation_getter("name", any_language=True) or ""
 
     def __str__(self):
-        return self.safe_translation_getter("name", any_language=True)
+        return self.safe_translation_getter("name", any_language=True) or ""
 
     def get_ordering_queryset(self):
         return Slide.objects.all()

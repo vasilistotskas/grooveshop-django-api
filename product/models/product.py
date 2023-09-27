@@ -236,6 +236,10 @@ class Product(TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel):
             return mark_safe(
                 '<img src="{}" width="100" height="100" />'.format(img.thumbnail.url)
             )
+        else:
+            return mark_safe(
+                '<img src="{}" width="100" height="100" />'.format(img.image.url)
+            )
 
         return no_img_markup
 

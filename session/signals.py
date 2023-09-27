@@ -10,6 +10,7 @@ from cart.service import CartService
 from cart.service import ProcessUserCartOption
 from core import caches
 from core.caches import cache_instance
+from core.caches import generate_user_cache_key
 
 
 @receiver(user_logged_in)
@@ -35,8 +36,9 @@ def update_session_user_log_in(sender, request, user, **kwargs):
         if hasattr(request, "session") and hasattr(request.session, "last_activity"):
             last_activity = request.session["last_activity"]
 
+        user_cache_key = generate_user_cache_key(request)
         cache_instance.set(
-            caches.USER_AUTHENTICATED + "_" + str(user.id),
+            user_cache_key,
             {
                 "last_activity": last_activity,
                 "user": json_user,
@@ -61,6 +63,8 @@ def update_session_user_log_out(sender, request, user, **kwargs):
     try:
         request.session["user"] = None
         request.session.save()
-        cache_instance.delete(caches.USER_AUTHENTICATED + "_" + str(user.id))
+        cache_instance.delete(
+            f"{caches.USER_AUTHENTICATED}{user.id}:" f"{request.session.session_key}"
+        )
     except AttributeError:
         pass

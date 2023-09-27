@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-09-16 22:49+0300\n"
+"POT-Creation-Date: 2023-09-27 20:59+0300\n"
 "PO-Revision-Date: 2023-07-12 12:32+0300\n"
 "Last-Translator:   <bill@bill.gr>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -19,15 +19,15 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Translated-Using: django-rosetta 0.9.9\n"
 
-#: .\app\settings.py:431
+#: .\app\settings.py:433
 msgid "English"
 msgstr ""
 
-#: .\app\settings.py:432
+#: .\app\settings.py:434
 msgid "German"
 msgstr ""
 
-#: .\app\settings.py:433
+#: .\app\settings.py:435
 msgid "Greek"
 msgstr ""
 
@@ -77,13 +77,13 @@ msgstr ""
 
 #: .\blog\models\category.py:22 .\blog\models\tag.py:16 .\country\models.py:36
 #: .\pay_way\models.py:29 .\product\models\category.py:62
-#: .\product\models\product.py:163 .\region\models.py:18 .\slider\models.py:29
+#: .\product\models\product.py:145 .\region\models.py:18 .\slider\models.py:29
 #: .\slider\models.py:96
 msgid "Name"
 msgstr ""
 
 #: .\blog\models\category.py:23 .\product\models\category.py:63
-#: .\product\models\product.py:164 .\slider\models.py:33 .\slider\models.py:101
+#: .\product\models\product.py:147 .\slider\models.py:33 .\slider\models.py:101
 msgid "Description"
 msgstr ""
 
@@ -147,7 +147,7 @@ msgid "Blog Posts"
 msgstr ""
 
 #: .\blog\models\tag.py:14 .\pay_way\models.py:19
-#: .\product\models\product.py:126 .\tip\models.py:29
+#: .\product\models\product.py:107 .\tip\models.py:29
 #: .\user\models\account.py:91
 msgid "Active"
 msgstr ""
@@ -905,7 +905,7 @@ msgstr ""
 msgid "Pending"
 msgstr ""
 
-#: .\order\models\item.py:20 .\product\models\product.py:125
+#: .\order\models\item.py:20 .\product\models\product.py:106
 #: .\tests\integration\order\test_model_order_item.py:63
 msgid "Price"
 msgstr ""
@@ -1123,7 +1123,7 @@ msgstr ""
 msgid "Ten"
 msgstr ""
 
-#: .\product\models\category.py:48 .\product\models\product.py:124
+#: .\product\models\category.py:48 .\product\models\product.py:105
 msgid "Slug"
 msgstr ""
 
@@ -1171,43 +1171,43 @@ msgstr ""
 msgid "Product Image"
 msgstr ""
 
-#: .\product\models\product.py:115
+#: .\product\models\product.py:96
 msgid "Product Code"
 msgstr ""
 
-#: .\product\models\product.py:127
+#: .\product\models\product.py:108
 msgid "Stock"
 msgstr ""
 
-#: .\product\models\product.py:129
+#: .\product\models\product.py:110
 msgid "Discount Percent"
 msgstr ""
 
-#: .\product\models\product.py:138
+#: .\product\models\product.py:119
 msgid "Hits"
 msgstr ""
 
-#: .\product\models\product.py:140
+#: .\product\models\product.py:121
 msgid "Weight (kg)"
 msgstr ""
 
-#: .\product\models\product.py:145
+#: .\product\models\product.py:126
 msgid "Final Price"
 msgstr ""
 
-#: .\product\models\product.py:148
+#: .\product\models\product.py:129
 msgid "Discount Value"
 msgstr ""
 
-#: .\product\models\product.py:155
+#: .\product\models\product.py:136
 msgid "Price Save Percent"
 msgstr ""
 
-#: .\product\models\product.py:171
+#: .\product\models\product.py:154
 msgid "Product"
 msgstr ""
 
-#: .\product\models\product.py:172
+#: .\product\models\product.py:155
 msgid "Products"
 msgstr ""
 
@@ -1237,6 +1237,22 @@ msgstr ""
 
 #: .\region\models.py:23
 msgid "Regions"
+msgstr ""
+
+#: .\session\views.py:26
+msgid "Returns whether the user is authenticated or not."
+msgstr ""
+
+#: .\session\views.py:44
+msgid "Clears all user sessions."
+msgstr ""
+
+#: .\session\views.py:63
+msgid "Refreshes the last activity of the user."
+msgstr ""
+
+#: .\session\views.py:89
+msgid "Returns the number of active users."
 msgstr ""
 
 #: .\slider\models.py:26
@@ -2925,7 +2941,7 @@ msgstr ""
 msgid "Unspecified response body"
 msgstr ""
 
-#: .\venv\Lib\site-packages\drf_spectacular\plumbing.py:458
+#: .\venv\Lib\site-packages\drf_spectacular\plumbing.py:460
 #, python-format
 msgid "Token-based authentication with required prefix \"%s\""
 msgstr ""

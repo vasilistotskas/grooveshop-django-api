@@ -22,10 +22,10 @@ class Notification(TranslatableModel, TimeStampMixinModel, UUIDModel):
     )
 
     def __unicode__(self):
-        return self.safe_translation_getter("message", any_language=True)
+        return self.safe_translation_getter("message", any_language=True) or ""
 
     def __str__(self):
-        return self.safe_translation_getter("message", any_language=True)
+        return self.safe_translation_getter("message", any_language=True) or ""
 
     class Meta(TypedModelMeta):
         verbose_name = _("Notification")

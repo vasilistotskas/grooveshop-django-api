@@ -1,15 +1,12 @@
-import json
 import logging
 import os
 
-from django.core.exceptions import SuspiciousOperation
-from django.core.serializers.json import DjangoJSONEncoder
-from django.db import DatabaseError
 from django.utils import timezone
 
 from cart.service import CartService
 from core import caches
 from core.caches import cache_instance
+from core.caches import generate_user_cache_key
 
 logger = logging.getLogger(__name__)
 
@@ -24,27 +21,10 @@ class SessionTraceMiddleware:
 
         response = self.get_response(request)
 
-        self.process_user_data(request)
         self.ensure_cart_id(request)
-        # self.save_session(request, response)
         self.update_cache(request)
 
         return response
-
-    def process_user_data(self, request):
-        if not hasattr(request, "user"):
-            request.session["user"] = None
-            return
-
-        if request.user.is_authenticated:
-            json_user = json.dumps(
-                {"id": request.user.id, "email": request.user.email},
-                cls=DjangoJSONEncoder,
-            )
-            request.session["user"] = json_user
-            return
-
-        request.session["user"] = None
 
     def ensure_cart_id(self, request):
         # if request session has not attribute cart_id
@@ -56,40 +36,16 @@ class SessionTraceMiddleware:
             cart_id = cart_service.cart.id
             request.session["pre_log_in_cart_id"] = pre_log_in_cart_id
             request.session["cart_id"] = cart_id
-            self.save_session(request, None)
-
-    def save_session(self, request, response):
-        request.session["last_activity"] = timezone.now()
-        request.session["referer"] = request.META.get("HTTP_REFERER", None)
-
-        try:
-            request.session.save()
-        except (DatabaseError, SuspiciousOperation) as e:
-            logger.error(
-                "SessionTraceMiddleware error",
-                extra={
-                    "request": request,
-                    "response": response,
-                    "exception": e,
-                },
-            )
-            raise e
+            return
 
     def update_cache(self, request):
-        # Make a cache key for the user, if the there is no user, use the session key
-        user_cache_key = (
-            str(caches.USER_AUTHENTICATED) + "_" + str(request.user.id)
-            if request.user.is_authenticated
-            else str(caches.USER_UNAUTHENTICATED) + "_" + request.session.session_key
-        )
+        user_cache_key = generate_user_cache_key(request)
         cache_data = {
-            "last_activity": request.session["last_activity"],
-            "user": request.session["user"],
+            "last_activity": timezone.now(),
+            "user": request.session.get("user", None),
             "referer": request.META.get("HTTP_REFERER", None),
             "session_key": request.session.session_key,
-            "cart_id": request.session["cart_id"]
-            if "cart_id" in request.session
-            else None,
+            "cart_id": request.session.get("cart_id", None),
         }
         cache_instance.set(user_cache_key, cache_data, caches.ONE_HOUR)
 

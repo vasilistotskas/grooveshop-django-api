@@ -29,10 +29,10 @@ class BlogCategory(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDMo
         ordering = ["sort_order"]
 
     def __unicode__(self):
-        return self.safe_translation_getter("name", any_language=True)
+        return self.safe_translation_getter("name", any_language=True) or ""
 
     def __str__(self):
-        return self.safe_translation_getter("name", any_language=True)
+        return self.safe_translation_getter("name", any_language=True) or ""
 
     def get_ordering_queryset(self):
         return BlogCategory.objects.all()

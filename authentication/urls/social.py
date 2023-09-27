@@ -1,11 +1,11 @@
 from django.urls import path
 
-from core.auth.views.base import AuthSocialAccountDisconnectView
-from core.auth.views.base import AuthSocialAccountListView
-from core.auth.views.social import FacebookConnect
-from core.auth.views.social import FacebookLogin
-from core.auth.views.social import GoogleConnect
-from core.auth.views.social import GoogleLogin
+from authentication.views.base import AuthSocialAccountDisconnectView
+from authentication.views.base import AuthSocialAccountListView
+from authentication.views.social import FacebookConnect
+from authentication.views.social import FacebookLogin
+from authentication.views.social import GoogleConnect
+from authentication.views.social import GoogleLogin
 
 urlpatterns = [
     path(

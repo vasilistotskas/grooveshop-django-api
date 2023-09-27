@@ -1,11 +1,11 @@
 from django.urls import path
 from django.urls import re_path
-from django.views.generic import TemplateView
 
-from core.auth.views.registration import AuthConfirmEmailView
-from core.auth.views.registration import AuthRegisterView
-from core.auth.views.registration import AuthResendEmailVerificationView
-from core.auth.views.registration import AuthVerifyEmailView
+from authentication.views.registration import AuthConfirmEmailView
+from authentication.views.registration import AuthEmailVerificationSentView
+from authentication.views.registration import AuthRegisterView
+from authentication.views.registration import AuthResendEmailVerificationView
+from authentication.views.registration import AuthVerifyEmailView
 
 urlpatterns = [
     path("", AuthRegisterView.as_view(), name="rest_register"),
@@ -32,7 +32,7 @@ urlpatterns = [
     ),
     path(
         "account-email-verification-sent/",
-        TemplateView.as_view(),
+        AuthEmailVerificationSentView.as_view(),
         name="account_email_verification_sent",
     ),
 ]

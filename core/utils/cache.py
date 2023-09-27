@@ -4,7 +4,7 @@ import redis
 
 
 class CustomCacheConfig:
-    ready_healthy: bool
+    ready_healthy: bool = False
     cache_backend: dict
     redis_location: str
 
@@ -32,9 +32,11 @@ class CustomCacheConfig:
             return {
                 "BACKEND": "django.core.cache.backends.redis.RedisCache",
                 "LOCATION": self.redis_location,
+                "KEY_PREFIX": "redis",
             }
         else:
             return {
                 "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
                 "LOCATION": "unique-snowflake",
+                "KEY_PREFIX": "locmem",
             }

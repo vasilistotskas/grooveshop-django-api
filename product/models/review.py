@@ -40,7 +40,7 @@ class ProductReview(
         ordering = ["-created_at"]
 
     def __unicode__(self):
-        return self.safe_translation_getter("comment", any_language=True)
+        return self.safe_translation_getter("comment", any_language=True) or ""
 
     def __str__(self):
-        return self.safe_translation_getter("comment", any_language=True)
+        return self.safe_translation_getter("comment", any_language=True) or ""

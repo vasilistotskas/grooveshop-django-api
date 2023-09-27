@@ -49,6 +49,7 @@ class Command(BaseCommand):
             return
 
         objects_to_insert = []
+        picked_names = []
         with transaction.atomic():
             for _ in range(total_pay_ways):
                 active = faker.boolean(chance_of_getting_true=90)
@@ -60,7 +61,7 @@ class Command(BaseCommand):
                     translations__name=name
                 ).exists()
 
-                if pay_way_name_exists:
+                if pay_way_name_exists or name in picked_names:
                     continue
 
                 pay_way = PayWay(
@@ -70,6 +71,7 @@ class Command(BaseCommand):
                     icon=img,
                 )
                 objects_to_insert.append(pay_way)
+                picked_names.append(name)
             PayWay.objects.bulk_create(objects_to_insert)
 
             for pay_way in objects_to_insert:

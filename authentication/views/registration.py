@@ -1,4 +1,5 @@
 from allauth.account.views import ConfirmEmailView
+from allauth.account.views import EmailVerificationSentView
 from dj_rest_auth.registration.views import RegisterView
 from dj_rest_auth.registration.views import ResendEmailVerificationView
 from dj_rest_auth.registration.views import VerifyEmailView
@@ -19,4 +20,8 @@ class AuthResendEmailVerificationView(ResendEmailVerificationView):
 
 
 class AuthConfirmEmailView(ConfirmEmailView):
+    pass
+
+
+class AuthEmailVerificationSentView(EmailVerificationSentView):
     pass

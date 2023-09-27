@@ -61,15 +61,9 @@ class SessionTraceMiddlewareTest(TestCase):
         session_middleware.process_request(request)
         request.session.create()
 
-        request.session["last_activity"] = timezone.now()
-        request.session["user"] = json.dumps({"id": user.id, "email": user.email})
-        request.META["HTTP_REFERER"] = "http://example.com"
-        request.session["cart_id"] = 789
-
         user_cache_key = generate_user_cache_key(request)
-        self.middleware.update_cache(request)
+        self.middleware.update_session(request)
 
-        cache = cache_instance.get(user_cache_key)
         expected_cache = {
             "session_key": request.session.session_key,
             "last_activity": request.session["last_activity"],
@@ -77,6 +71,7 @@ class SessionTraceMiddlewareTest(TestCase):
             "referer": request.META["HTTP_REFERER"],
             "cart_id": request.session["cart_id"],
         }
+        cache = cache_instance.get(user_cache_key)
 
         self.assertEqual(cache, expected_cache)
 
@@ -88,16 +83,11 @@ class SessionTraceMiddlewareTest(TestCase):
         request.session.create()
 
         request.user = AnonymousUser()
-        request.session["last_activity"] = timezone.now()
-        request.session["user"] = None
-        request.META["HTTP_REFERER"] = "http://example.com"
-        request.session["cart_id"] = 789
         request.session.modified = True
 
         non_user_cache_key = generate_user_cache_key(request)
-        self.middleware.update_cache(request)
+        self.middleware.update_session(request)
 
-        cache = cache_instance.get(non_user_cache_key)
         expected_cache = {
             "session_key": request.session.session_key,
             "last_activity": request.session["last_activity"],
@@ -105,6 +95,7 @@ class SessionTraceMiddlewareTest(TestCase):
             "referer": request.META["HTTP_REFERER"],
             "cart_id": request.session["cart_id"],
         }
+        cache = cache_instance.get(non_user_cache_key)
 
         self.assertEqual(
             cache,

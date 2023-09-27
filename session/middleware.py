@@ -22,7 +22,7 @@ class SessionTraceMiddleware:
         response = self.get_response(request)
 
         self.ensure_cart_id(request)
-        self.update_cache(request)
+        self.update_session(request)
 
         return response
 
@@ -38,14 +38,26 @@ class SessionTraceMiddleware:
             request.session["cart_id"] = cart_id
             return
 
-    def update_cache(self, request):
+    def update_session(self, request):
         user_cache_key = generate_user_cache_key(request)
+        now = timezone.now()
+        user = request.session.get("user", None)
+        http_referer = request.META.get("HTTP_REFERER", None)
+        session_key = request.session.session_key
+        cart_id = request.session.get("cart_id", None)
+
+        request.session["last_activity"] = now
+        request.session["user"] = user
+        request.META["HTTP_REFERER"] = http_referer
+        request.session["session_key"] = session_key
+        request.session["cart_id"] = cart_id
+
         cache_data = {
-            "last_activity": timezone.now(),
-            "user": request.session.get("user", None),
-            "referer": request.META.get("HTTP_REFERER", None),
-            "session_key": request.session.session_key,
-            "cart_id": request.session.get("cart_id", None),
+            "last_activity": now,
+            "user": user,
+            "referer": http_referer,
+            "session_key": session_key,
+            "cart_id": cart_id,
         }
         cache_instance.set(user_cache_key, cache_data, caches.ONE_HOUR)
 

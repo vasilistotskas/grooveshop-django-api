@@ -50,19 +50,10 @@ class CartService:
             raise CartServiceInitException()
 
         if request:
-            self.request = request
-            cart_id = request.session.get("cart_id")
-
-            if not cart_id:
-                cart = Cart.objects.create()
-                request.session["cart_id"] = cart.id
-                request.session.save()
-                self.cart = cart
-            else:
-                self.cart = self.get_or_create_cart(request)
-
+            self.get_or_create_cart(request)
         elif cart_id:
             self.cart = self.get_cart_by_id(cart_id)
+            self.cart_items = self.cart.get_items()
 
     def __str__(self):
         return f"Cart {self.cart.user}"
@@ -113,11 +104,12 @@ class CartService:
         request.session["cart_id"] = cart.id
         request.session.save()
         self.cart = cart
+        self.cart_items = cart.get_items()
         self.cart.refresh_last_activity()
         return cart
 
+    @staticmethod
     def merge_carts(
-        self,
         request: Request | HttpRequest | None,
         user_cart: Cart,
         pre_login_cart: Cart,
@@ -153,11 +145,11 @@ class CartService:
         if self.cart is None:
             raise CartNotSetException()
 
-        cart_item = CartItem.objects.create(
+        CartItem.objects.create(
             cart=self.cart, product=product, quantity=quantity
         )
-        self.cart_items.append(cart_item)
-        return cart_item
+        self.cart_items = self.cart.get_items()
+        return self.get_cart_item(product.id)
 
     def update_cart_item(self, product_id: int, quantity: int) -> CartItem:
         if self.cart is None:
@@ -165,6 +157,7 @@ class CartService:
         cart_item = self.cart.cart_item_cart.get(product_id=product_id)
         cart_item.quantity = quantity
         cart_item.save()
+        self.cart_items = self.cart.get_items()
         return cart_item
 
     def delete_cart_item(self, product_id: int) -> None:

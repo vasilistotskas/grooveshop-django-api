@@ -3,29 +3,66 @@ from __future__ import annotations
 from enum import Enum
 from enum import unique
 
+from django.http import HttpRequest
+from rest_framework.request import Request
+
 from cart.models import Cart
 from cart.models import CartItem
-from core.caches import cache_instance
 from product.models.product import Product
 
 
+class CartServiceInitException(Exception):
+    def __init__(
+        self, message="CartService init error, cart_id or request is required"
+    ):
+        self.message = message
+        super().__init__(self.message)
+
+
+class CartNotSetException(Exception):
+    def __init__(self, message="Cart is not set"):
+        self.message = message
+        super().__init__(self.message)
+
+
+class InvalidProcessCartOptionException(Exception):
+    def __init__(self, message="Invalid option"):
+        self.message = message
+        super().__init__(self.message)
+
+
 @unique
-class ProcessUserCartOption(Enum):
+class ProcessCartOption(Enum):
     MERGE = "merge"
     CLEAN = "clean"
     KEEP = "keep"
 
 
 class CartService:
-    def __init__(self, request):
-        self.user = (
-            request.user
-            if hasattr(request, "user") and request.user.is_authenticated
-            else None
-        )
-        cart_id = request.session.get("cart_id")
-        self.cart = self.get_or_create_cart(cart_id)
-        self.cart_items = []
+    def __init__(
+        self, cart_id: int | None = None, request: Request | HttpRequest | None = None
+    ):
+        self.cart_id = cart_id
+        self.cart: Cart | None = None
+        self.cart_items: list[CartItem] = []
+
+        if not cart_id and not request:
+            raise CartServiceInitException()
+
+        if request:
+            self.request = request
+            cart_id = request.session.get("cart_id")
+
+            if not cart_id:
+                cart = Cart.objects.create()
+                request.session["cart_id"] = cart.id
+                request.session.save()
+                self.cart = cart
+            else:
+                self.cart = self.get_or_create_cart(request)
+
+        elif cart_id:
+            self.cart = self.get_cart_by_id(cart_id)
 
     def __str__(self):
         return f"Cart {self.cart.user}"
@@ -36,39 +73,55 @@ class CartService:
     def __iter__(self):
         yield from self.cart_items
 
-    def process_user_cart(self, request, option: ProcessUserCartOption) -> None:
-        user_cart = self.get_or_create_cart(request.user)
-        pre_login_cart_id = cache_instance.get(str(request.user.id))
-
+    def process_cart(
+        self, request: Request | HttpRequest | None, option: ProcessCartOption
+    ) -> None:
+        cart = self.get_or_create_cart(request)
+        pre_login_cart_id = request.session.get("pre_log_in_cart_id", None)
         if not isinstance(pre_login_cart_id, (int, str)):
             pre_login_cart_id = None
-
         match option:
-            case ProcessUserCartOption.MERGE:
+            case ProcessCartOption.MERGE:
                 if pre_login_cart_id:
                     pre_login_cart = self.get_cart_by_id(int(pre_login_cart_id))
-                    self.merge_carts(request, user_cart, pre_login_cart)
+                    self.merge_carts(request, cart, pre_login_cart)
                 else:
                     pass
-            case ProcessUserCartOption.CLEAN:
-                self.clean_user_cart(user_cart)
-            case ProcessUserCartOption.KEEP:
+            case ProcessCartOption.CLEAN:
+                self.clean_cart(cart)
+            case ProcessCartOption.KEEP:
                 pass
             case _:
-                raise ValueError("Invalid option")
+                raise InvalidProcessCartOptionException()
 
-    def get_or_create_cart(self, cart_id=None) -> Cart:
-        if self.user and cart_id:
-            cart, _ = Cart.objects.get_or_create(user=self.user)
-        elif self.user:
-            cart, _ = Cart.objects.get_or_create(user=self.user)
+    def get_or_create_cart(self, request: Request | HttpRequest | None) -> Cart:
+        cart_id = request.session.get("cart_id", None)
+        user = request.user
+
+        if self.cart is not None:
+            return self.cart
+
+        if user.is_authenticated:
+            cart, _ = Cart.objects.get_or_create(user=user)
         elif cart_id:
             cart, _ = Cart.objects.get_or_create(id=int(cart_id))
+            request.session["pre_log_in_cart_id"] = cart.id
         else:
             cart = Cart.objects.create()
+            request.session["pre_log_in_cart_id"] = cart.id
+
+        request.session["cart_id"] = cart.id
+        request.session.save()
+        self.cart = cart
+        self.cart.refresh_last_activity()
         return cart
 
-    def merge_carts(self, request, user_cart: Cart, pre_login_cart: Cart) -> None:
+    def merge_carts(
+        self,
+        request: Request | HttpRequest | None,
+        user_cart: Cart,
+        pre_login_cart: Cart,
+    ) -> None:
         for item in pre_login_cart.cart_item_cart.all():
             if not CartItem.objects.filter(
                 cart=user_cart, product=item.product
@@ -76,10 +129,10 @@ class CartService:
                 item.cart = user_cart
                 item.save()
         pre_login_cart.delete()
-        cache_instance.delete(str(request.user.id))
+        request.session["pre_log_in_cart_id"] = None
 
     @staticmethod
-    def clean_user_cart(user_cart: Cart) -> None:
+    def clean_cart(user_cart: Cart) -> None:
         user_cart.cart_item_cart.all().delete()
 
     @staticmethod
@@ -97,6 +150,9 @@ class CartService:
             return None
 
     def create_cart_item(self, product: Product, quantity: int) -> CartItem:
+        if self.cart is None:
+            raise CartNotSetException()
+
         cart_item = CartItem.objects.create(
             cart=self.cart, product=product, quantity=quantity
         )
@@ -104,11 +160,15 @@ class CartService:
         return cart_item
 
     def update_cart_item(self, product_id: int, quantity: int) -> CartItem:
+        if self.cart is None:
+            raise CartNotSetException()
         cart_item = self.cart.cart_item_cart.get(product_id=product_id)
         cart_item.quantity = quantity
         cart_item.save()
         return cart_item
 
     def delete_cart_item(self, product_id: int) -> None:
+        if self.cart is None:
+            raise CartNotSetException()
         self.cart.cart_item_cart.get(product_id=product_id).delete()
         self.cart_items = self.cart.get_items()

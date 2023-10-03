@@ -16,7 +16,7 @@ class CartItemSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(serializers.IntegerField)
     def get_cart_id(self, cart_item) -> int:
-        cart = self.context.get("cart")
+        cart = cart_item.cart
         return cart.id
 
     class Meta:

@@ -28,8 +28,8 @@ class SessionAPITestCase(TestCase):
         return reverse("session")
 
     @staticmethod
-    def get_session_clear_all_url():
-        return reverse("session-clear-all")
+    def get_session_revoke_all_url():
+        return reverse("session-revoke-all")
 
     @staticmethod
     def get_session_active_users_count_url():
@@ -47,25 +47,29 @@ class SessionAPITestCase(TestCase):
 
         response = self.client.get(self.get_session_url())
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data, {"isSessionAuthenticated": True})
+        self.assertEqual(response.data["isSessionAuthenticated"], True)
+        self.assertTrue("CSRFToken" in response.data)
+        self.assertTrue("sessionid" in response.data)
 
     def test_session_view_unauthenticated(self):
         response = self.client.get(self.get_session_url())
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data, {"isSessionAuthenticated": False})
+        self.assertEqual(response.data["isSessionAuthenticated"], False)
+        self.assertTrue("CSRFToken" in response.data)
+        self.assertTrue("sessionid" in response.data)
 
-    def test_clear_all_user_sessions_authenticated(self):
+    def test_revoke_all_user_sessions_authenticated(self):
         user = User.objects.create_user(
             email="testuser2@example.com", password="testpassword"
         )
         self.client.force_login(user)
 
-        response = self.client.post(self.get_session_clear_all_url())
+        response = self.client.delete(self.get_session_revoke_all_url())
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data, {"success": True})
 
-    def test_clear_all_user_sessions_unauthenticated(self):
-        response = self.client.post(self.get_session_clear_all_url())
+    def test_revoke_all_user_sessions_unauthenticated(self):
+        response = self.client.delete(self.get_session_revoke_all_url())
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_refresh_last_activity_authenticated(self):

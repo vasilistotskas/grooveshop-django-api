@@ -57,9 +57,7 @@ class CartViewSetTest(APITestCase):
 
     def test_delete_cart(self):
         response = self.client.delete(self.detail_url)
-        cart_exists = Cart.objects.filter(pk=self.cart.pk).exists()
-
-        self.assertFalse(cart_exists)
+        self.assertFalse(Cart.objects.filter(pk=self.cart.pk).exists())
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
     def tearDown(self) -> None:

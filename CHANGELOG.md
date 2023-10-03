@@ -3,7 +3,21 @@
 
 
 
+## v0.29.1 (2023-10-03)
+
+### Fix
+
+* fix: Cart service init fix, migrations update. ([`4d48e88`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4d48e88b104710b34f265af6446a8bb062529112))
+
+### Unknown
+
+* Chore: Versions bump, migrations update, API schema generate, notification app fix. ([`0553779`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0553779988f84ec92fad401dc31e1eadaadc5246))
+
 ## v0.29.0 (2023-10-03)
+
+### Chore
+
+* chore(release): release version 0.29.0 [skip ci] ([`2204bd0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2204bd0e794135c981e38fad6a1f8d3a2965d4b4))
 
 ### Feature
 

@@ -3,7 +3,23 @@
 
 
 
+## v0.29.0 (2023-10-03)
+
+### Feature
+
+* feat: `settings.py` updated, Session auth app refactor, User model improve.
+
+- Session: Remove method `ensure_cart_id` at session middleware, new API endpoints (`session-all`, `session-refresh`, `session-revoke`, `session-revoke-all`, `session-active-users-count`, `session-refresh-last-activity`), signal updated,
+- Settings: Update CORS and Auth.
+- User: Model new method `remove_session` and properties `get_all_sessions` and `role`. ([`a142372`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a142372c233207206f52e6aa8fe1c7a1d1c28977))
+
+* feat: Cart service refactor and cleanup, tests and API view updated. ([`de29e5e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/de29e5e208ac3382585a72b4fd9e47ea7aef9e25))
+
 ## v0.28.0 (2023-09-27)
+
+### Chore
+
+* chore(release): release version 0.28.0 [skip ci] ([`fc9674e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc9674ea5494c3b402bed12f7f5825d0f42881c3))
 
 ### Feature
 

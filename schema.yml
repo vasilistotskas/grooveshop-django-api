@@ -448,17 +448,313 @@ paths:
               schema:
                 $ref: '#/components/schemas/VerifyEmail'
           description: ''
+  /api/v1/auth/session/:
+    get:
+      operationId: api_v1_auth_session_retrieve
+      description: Returns the session data.
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+          description: ''
+  /api/v1/auth/session{format}:
+    get:
+      operationId: api_v1_auth_session_formatted_retrieve
+      description: Returns the session data.
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+          description: ''
+  /api/v1/auth/session/active_users_count/:
+    get:
+      operationId: api_v1_auth_session_active_users_count_retrieve
+      description: Returns the number of active users.
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActiveUsersCount'
+          description: ''
+  /api/v1/auth/session/active_users_count{format}:
+    get:
+      operationId: api_v1_auth_session_active_users_count_formatted_retrieve
+      description: Returns the number of active users.
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActiveUsersCount'
+          description: ''
+  /api/v1/auth/session/all/:
+    get:
+      operationId: api_v1_auth_session_all_retrieve
+      description: Returns all user sessions.
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AllSessions'
+          description: ''
+  /api/v1/auth/session/all{format}:
+    get:
+      operationId: api_v1_auth_session_all_formatted_retrieve
+      description: Returns all user sessions.
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AllSessions'
+          description: ''
+  /api/v1/auth/session/refresh/:
+    post:
+      operationId: api_v1_auth_session_refresh_create
+      description: Refreshes the session.
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshSession'
+          description: ''
+  /api/v1/auth/session/refresh{format}:
+    post:
+      operationId: api_v1_auth_session_refresh_formatted_create
+      description: Refreshes the session.
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshSession'
+          description: ''
+  /api/v1/auth/session/refresh_last_activity/:
+    post:
+      operationId: api_v1_auth_session_refresh_last_activity_create
+      description: Refreshes the last activity of the user.
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshLastActivity'
+          description: ''
+  /api/v1/auth/session/refresh_last_activity{format}:
+    post:
+      operationId: api_v1_auth_session_refresh_last_activity_formatted_create
+      description: Refreshes the last activity of the user.
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshLastActivity'
+          description: ''
+  /api/v1/auth/session/revoke/{session_key}/:
+    delete:
+      operationId: api_v1_auth_session_revoke_destroy
+      description: Clears a user session.
+      parameters:
+      - in: path
+        name: sessionKey
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /api/v1/auth/session/revoke/{session_key}{format}:
+    delete:
+      operationId: api_v1_auth_session_revoke_formatted_destroy
+      description: Clears a user session.
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - in: path
+        name: sessionKey
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /api/v1/auth/session/revoke/all/:
+    delete:
+      operationId: api_v1_auth_session_revoke_all_destroy
+      description: Clears all user sessions.
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /api/v1/auth/session/revoke/all{format}:
+    delete:
+      operationId: api_v1_auth_session_revoke_all_formatted_destroy
+      description: Clears all user sessions.
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
   /api/v1/auth/socialaccounts/:
     get:
       operationId: api_v1_auth_socialaccounts_list
       description: List SocialAccounts for the currently logged in user
-      parameters:
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
-        schema:
-          type: integer
       tags:
       - api
       security:
@@ -470,7 +766,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedSocialAccountList'
+                type: array
+                items:
+                  $ref: '#/components/schemas/SocialAccount'
           description: ''
   /api/v1/auth/socialaccounts/{id}/disconnect/:
     post:
@@ -7548,182 +7846,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedSearchProductList'
           description: ''
-  /api/v1/session/:
-    get:
-      operationId: api_v1_session_retrieve
-      description: Returns whether the user is authenticated or not.
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Session'
-          description: ''
-  /api/v1/session{format}:
-    get:
-      operationId: api_v1_session_formatted_retrieve
-      description: Returns whether the user is authenticated or not.
-      parameters:
-      - in: path
-        name: format
-        schema:
-          type: string
-          enum:
-          - .json
-        required: true
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Session'
-          description: ''
-  /api/v1/session/active_users_count/:
-    get:
-      operationId: api_v1_session_active_users_count_retrieve
-      description: Returns the number of active users.
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ActiveUsersCount'
-          description: ''
-  /api/v1/session/active_users_count{format}:
-    get:
-      operationId: api_v1_session_active_users_count_formatted_retrieve
-      description: Returns the number of active users.
-      parameters:
-      - in: path
-        name: format
-        schema:
-          type: string
-          enum:
-          - .json
-        required: true
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ActiveUsersCount'
-          description: ''
-  /api/v1/session/clear_all/:
-    post:
-      operationId: api_v1_session_clear_all_create
-      description: Clears all user sessions.
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ClearAllUserSessions'
-          description: ''
-  /api/v1/session/clear_all{format}:
-    post:
-      operationId: api_v1_session_clear_all_formatted_create
-      description: Clears all user sessions.
-      parameters:
-      - in: path
-        name: format
-        schema:
-          type: string
-          enum:
-          - .json
-        required: true
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ClearAllUserSessions'
-          description: ''
-  /api/v1/session/refresh_last_activity/:
-    post:
-      operationId: api_v1_session_refresh_last_activity_create
-      description: Refreshes the last activity of the user.
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RefreshLastActivity'
-          description: ''
-  /api/v1/session/refresh_last_activity{format}:
-    post:
-      operationId: api_v1_session_refresh_last_activity_formatted_create
-      description: Refreshes the last activity of the user.
-      parameters:
-      - in: path
-        name: format
-        schema:
-          type: string
-          enum:
-          - .json
-        required: true
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RefreshLastActivity'
-          description: ''
   /api/v1/slide/:
     get:
       operationId: api_v1_slide_list
@@ -10448,6 +10570,15 @@ components:
           type: integer
       required:
       - activeUsers
+    AllSessions:
+      type: object
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Session'
+      required:
+      - sessions
     AuthToken:
       type: object
       properties:
@@ -11121,13 +11252,6 @@ components:
       required:
       - id
       - product
-    ClearAllUserSessions:
-      type: object
-      properties:
-        success:
-          type: boolean
-      required:
-      - success
     Country:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -11996,26 +12120,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Slider'
-    PaginatedSocialAccountList:
-      type: object
-      properties:
-        count:
-          type: integer
-          example: 123
-        next:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=4
-        previous:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=2
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/SocialAccount'
     PaginatedTipList:
       type: object
       properties:
@@ -14064,6 +14168,13 @@ components:
           type: boolean
       required:
       - success
+    RefreshSession:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+      - success
     Region:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -14212,8 +14323,31 @@ components:
       properties:
         isSessionAuthenticated:
           type: boolean
+        CSRFToken:
+          type: string
+        referer:
+          type: string
+          nullable: true
+        userAgent:
+          type: string
+          nullable: true
+        sessionid:
+          type: string
+          nullable: true
+        role:
+          type: string
+        lastActivity:
+          type: string
+          format: date-time
+          nullable: true
       required:
+      - CSRFToken
       - isSessionAuthenticated
+      - lastActivity
+      - referer
+      - role
+      - sessionid
+      - userAgent
     Slide:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.

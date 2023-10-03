@@ -18,10 +18,10 @@ class NotificationUser(TimeStampMixinModel, UUIDModel):
     seen = models.BooleanField(_("Seen"), default=False)
 
     def __unicode__(self):
-        return self.notification.message
+        return f"{self.user} {self.notification}"
 
     def __str__(self):
-        return self.notification.message
+        return f"{self.user} {self.notification}"
 
     class Meta:
         unique_together = (("user", "notification"),)

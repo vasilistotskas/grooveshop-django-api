@@ -217,8 +217,8 @@
 
       socket.addEventListener("message", (event) => {
         const data = JSON.parse(event.data);
-        console.log("Received notification:", data.translations);
-        showNotification(data.translations);
+        console.log("Received notification:", data);
+        showNotification(data);
       });
 
       function showNotification(notificationHTML) {
@@ -278,6 +278,10 @@
 
       socket.onopen = (event) => {
         console.log("WebSocket connection opened!", event);
+      };
+
+      socket.onmessage = (event) => {
+        console.log("WebSocket message received:", event);
       };
 
       socket.onclose = (event) => {

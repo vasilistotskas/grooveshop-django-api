@@ -59,7 +59,17 @@ if settings.REDIS_HEALTHY:
                 "notifications",
                 {
                     "type": "send_notification",
-                    "message": "Debug Task Notification Message",
+                    "user": 1,
+                    "seen": False,
+                    "link": "https://www.google.com",
+                    "kind": "info",
+                    "translations": [
+                        {
+                            "en": {
+                                "message": "This is a test notification",
+                            }
+                        },
+                    ],
                 },
             )
             logging.debug(f"Request: {self.request!r}, Notification sent.")

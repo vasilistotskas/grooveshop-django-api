@@ -14,6 +14,7 @@ def send_notification_task(
     async_to_sync(channel_layer.group_send)(
         "notifications",
         {
+            "type": "notification",
             "kind": kind,
             "user": user,
             "seen": seen,

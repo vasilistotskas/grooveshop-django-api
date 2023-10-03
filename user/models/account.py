@@ -19,7 +19,7 @@ from core import caches
 from core.caches import cache_instance
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
-
+from user.enum.account import UserRole
 
 User = settings.AUTH_USER_MODEL
 
@@ -134,6 +134,36 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
                 continue
             if user and int(user.get("_auth_user_id")) == int(user_id):
                 cache_instance.delete(key)
+
+    def remove_session(self, request: HttpRequest, session_key: str) -> None:
+        try:
+            session = Session.objects.get(session_key=session_key)
+            session.delete()
+        except Session.DoesNotExist:
+            pass
+
+        # Session Cache
+        cache_instance.delete(
+            f"{caches.USER_AUTHENTICATED}{self.pk}:" f"{request.session.session_key}"
+        )
+
+        request.session.flush()
+
+        cache_instance.delete(f"django.contrib.sessions.cache{session_key}")
+
+    @property
+    def get_all_sessions(self):
+        user_cache_keys = cache_instance.keys(f"{caches.USER_AUTHENTICATED}{self.pk}:*")
+        return cache_instance.get_many(keys=user_cache_keys)
+
+    @property
+    def role(self) -> str:
+        if self.is_superuser:
+            return UserRole.SUPERUSER
+        elif self.is_staff:
+            return UserRole.STAFF
+        else:
+            return UserRole.USER
 
     @property
     def main_image_absolute_url(self) -> str:

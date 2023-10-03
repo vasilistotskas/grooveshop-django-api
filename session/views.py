@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
+from django.middleware.csrf import get_token
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema
@@ -14,26 +15,49 @@ from rest_framework.response import Response
 from core import caches
 from core.caches import cache_instance
 from session.serializers import ActiveUsersCountSerializer
-from session.serializers import ClearAllUserSessionsSerializer
+from session.serializers import AllSessionsSerializer
 from session.serializers import RefreshLastActivitySerializer
+from session.serializers import RefreshSessionSerializer
+from session.serializers import RevokeAllUserSessionsSerializer
+from session.serializers import RevokeUserSessionSerializer
 from session.serializers import SessionSerializer
+from user.enum.account import UserRole
 from user.models import UserAccount
 
 User = get_user_model()
 
 
 @extend_schema(
-    description=_("Returns whether the user is authenticated or not."),
+    description=_("Returns the session data."),
     request=None,
     responses=SessionSerializer,
     methods=["GET"],
 )
 @api_view(["GET"])
 def session_view(request):
+    if not request.session.session_key:
+        request.session.create()
+
     if not request.user.is_authenticated:
-        data = {"isSessionAuthenticated": False}
+        data = {
+            "isSessionAuthenticated": False,
+            "CSRFToken": get_token(request),
+            "referer": request.META.get("HTTP_REFERER", None),
+            "userAgent": request.META.get("HTTP_USER_AGENT", None),
+            "sessionid": request.session.session_key,
+            "role": UserRole.GUEST.value,
+            "lastActivity": request.session.get("last_activity", None),
+        }
     else:
-        data = {"isSessionAuthenticated": True}
+        data = {
+            "isSessionAuthenticated": True,
+            "CSRFToken": get_token(request),
+            "referer": request.META.get("HTTP_REFERER", None),
+            "userAgent": request.META.get("HTTP_USER_AGENT", None),
+            "sessionid": request.session.session_key,
+            "role": request.user.role.value,
+            "lastActivity": request.session.get("last_activity", None),
+        }
 
     serializer = SessionSerializer(data=data)
     serializer.is_valid(raise_exception=True)
@@ -41,20 +65,83 @@ def session_view(request):
 
 
 @extend_schema(
-    description=_("Clears all user sessions."),
+    description=_("Returns all user sessions."),
     request=None,
-    responses=ClearAllUserSessionsSerializer,
+    responses=AllSessionsSerializer,
+    methods=["GET"],
+)
+@api_view(["GET"])
+def all_sessions(request):
+    if not request.user.is_authenticated:
+        data = [
+            {
+                "isSessionAuthenticated": False,
+                "CSRFToken": get_token(request),
+                "referer": request.META.get("HTTP_REFERER", None),
+                "userAgent": request.META.get("HTTP_USER_AGENT", None),
+                "sessionid": request.session.session_key,
+                "role": UserRole.GUEST.value,
+                "lastActivity": request.session.get("last_activity", None),
+            }
+        ]
+        serializer = SessionSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    sessions = UserAccount.get_all_sessions
+    serializer = AllSessionsSerializer(data=sessions, many=True)
+    serializer.is_valid(raise_exception=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    description=_("Refreshes the session."),
+    request=None,
+    responses=RefreshSessionSerializer,
     methods=["POST"],
 )
 @api_view(["POST"])
-def clear_all_user_sessions(request):
+def refresh_session(request):
+    request.session.save()
+    serializer = RefreshSessionSerializer(data={"success": True})
+    serializer.is_valid(raise_exception=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    description=_("Clears all user sessions."),
+    request=None,
+    responses=RevokeAllUserSessionsSerializer,
+    methods=["DELETE"],
+)
+@api_view(["DELETE"])
+def revoke_all_user_sessions(request):
     if not request.user.is_authenticated:
         return Response("Forbidden", status=status.HTTP_403_FORBIDDEN)
 
     user = get_object_or_404(UserAccount, email=request.user)
 
     UserAccount.remove_all_sessions(user, request)
-    serializer = ClearAllUserSessionsSerializer(data={"success": True})
+    serializer = RevokeAllUserSessionsSerializer(data={"success": True})
+    serializer.is_valid(raise_exception=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    description=_("Clears a user session."),
+    request=None,
+    responses=RevokeUserSessionSerializer,
+    methods=["DELETE"],
+)
+@api_view(["DELETE"])
+def revoke_user_session(request, session_key):
+    if not request.user.is_authenticated:
+        return Response("Forbidden", status=status.HTTP_403_FORBIDDEN)
+
+    user = get_object_or_404(UserAccount, email=request.user)
+
+    UserAccount.remove_session(user, request, session_key)
+    serializer = RevokeUserSessionSerializer(data={"success": True})
     serializer.is_valid(raise_exception=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 

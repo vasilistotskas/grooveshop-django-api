@@ -5,16 +5,17 @@ from django.contrib.auth.signals import user_logged_out
 from django.core.serializers.json import DjangoJSONEncoder
 from django.dispatch import receiver
 from django.utils.timezone import now
+from rest_framework.request import Request
 
 from cart.service import CartService
-from cart.service import ProcessUserCartOption
+from cart.service import ProcessCartOption
 from core import caches
 from core.caches import cache_instance
 from core.caches import generate_user_cache_key
 
 
 @receiver(user_logged_in)
-def update_session_user_log_in(sender, request, user, **kwargs):
+def update_session_user_log_in(sender, request: Request, user, **kwargs):
     try:
         request.session["user"] = user
 
@@ -23,8 +24,8 @@ def update_session_user_log_in(sender, request, user, **kwargs):
         except KeyError:
             pre_log_in_cart_id = None
 
-        cart_service = CartService(request)
-        cart_service.process_user_cart(request, option=ProcessUserCartOption.MERGE)
+        cart_service = CartService(request=request)
+        cart_service.process_cart(request, option=ProcessCartOption.MERGE)
         cart_id = cart_service.cart.id
 
         json_user = json.dumps(
@@ -59,12 +60,16 @@ def update_session_user_log_in(sender, request, user, **kwargs):
 
 
 @receiver(user_logged_out)
-def update_session_user_log_out(sender, request, user, **kwargs):
+def update_session_user_log_out(sender, request: Request, user, **kwargs):
     try:
+        cart_service = CartService(request=request)
         request.session["user"] = None
+        request.user = None
         request.session.save()
         cache_instance.delete(
             f"{caches.USER_AUTHENTICATED}{user.id}:" f"{request.session.session_key}"
         )
+        cart_service.process_cart(request, option=ProcessCartOption.CLEAN)
+
     except AttributeError:
         pass

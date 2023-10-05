@@ -3,7 +3,23 @@
 
 
 
+## v0.30.0 (2023-10-05)
+
+### Feature
+
+* feat: More at `Description`
+
+- `Versions bump`: Django, coverage, pylint, charset_normalizer, urllib3, rich, django-redis remove,
+-     `psycopg2-binary` remove and replace with fresher and recommended `psycopg[binary]`
+- User auth account adapter override
+- Model constraints to modern way
+- Migrations update ([`e3d1703`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e3d170381c44c2570f027b9b6d48816d6d4add61))
+
 ## v0.29.1 (2023-10-03)
+
+### Chore
+
+* chore(release): release version 0.29.1 [skip ci] ([`133a4f6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/133a4f640e8008e7d4d2e2953728ffbe3e213a50))
 
 ### Fix
 

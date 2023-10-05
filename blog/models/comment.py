@@ -33,8 +33,10 @@ class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel):
     class Meta(TypedModelMeta):
         verbose_name = _("Blog Comment")
         verbose_name_plural = _("Blog Comments")
-        unique_together = (("user", "post"),)
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["user", "post"], name="unique_blog_comment")
+        ]
 
     def __unicode__(self):
         return self.safe_translation_getter("content", any_language=True) or ""

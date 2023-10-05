@@ -61,6 +61,7 @@ class Command(BaseCommand):
         status_choices = [choice[0] for choice in ReviewStatusEnum.choices]
 
         objects_to_insert = []
+        user_product_review = []
         with transaction.atomic():
             for _ in range(total_reviews):
                 user = faker.random_element(users)
@@ -68,13 +69,20 @@ class Command(BaseCommand):
                 rate = faker.random_element(rate_choices)
                 status = faker.random_element(status_choices)
 
-                review = ProductReview(
-                    product=product,
-                    user=user,
-                    rate=rate,
-                    status=status,
-                )
-                objects_to_insert.append(review)
+                user_product_pair = (user, product)
+                existing_review = ProductReview.objects.filter(
+                    user=user, product=product
+                ).exists()
+
+                if not existing_review and user_product_pair not in user_product_review:
+                    user_product_review.append(user_product_pair)
+                    review = ProductReview(
+                        product=product,
+                        user=user,
+                        rate=rate,
+                        status=status,
+                    )
+                    objects_to_insert.append(review)
             ProductReview.objects.bulk_create(objects_to_insert)
 
             for review in objects_to_insert:

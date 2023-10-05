@@ -3,9 +3,6 @@ from __future__ import annotations
 from django.contrib.auth import get_user_model
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
-from rest_framework.authentication import BasicAuthentication
-from rest_framework.authentication import SessionAuthentication
-from rest_framework.authentication import TokenAuthentication
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.filters import SearchFilter
 from rest_framework.generics import get_object_or_404
@@ -27,11 +24,6 @@ class ObtainAuthTokenView(ObtainAuthToken):
 
 
 class UserAccountViewSet(ModelViewSet):
-    authentication_classes = [
-        SessionAuthentication,
-        BasicAuthentication,
-        TokenAuthentication,
-    ]
     permission_classes = [IsAuthenticated]
     queryset = User.objects.all()
     serializer_class = UserAccountSerializer

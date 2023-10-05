@@ -25,7 +25,9 @@ class Cart(TimeStampMixinModel, UUIDModel):
         verbose_name = _("Cart")
         verbose_name_plural = _("Carts")
         ordering = ["-created_at"]
-        unique_together = ["user"]
+        constraints = [
+            models.UniqueConstraint(fields=["user"], name="unique_user_cart"),
+        ]
 
     def __str__(self):
         return f"Cart {self.user} - {self.id}"
@@ -72,7 +74,9 @@ class CartItem(TimeStampMixinModel, UUIDModel):
         verbose_name = _("Cart Item")
         verbose_name_plural = _("Cart Items")
         ordering = ["id"]
-        unique_together = (("cart", "product"),)
+        constraints = [
+            models.UniqueConstraint(fields=["cart", "product"], name="unique_cart_item")
+        ]
 
     def __str__(self):
         return f"{self.product.safe_translation_getter('name', any_language=True)} - {self.quantity}"

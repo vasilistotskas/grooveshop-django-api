@@ -2,9 +2,6 @@ from __future__ import annotations
 
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
-from rest_framework.authentication import BasicAuthentication
-from rest_framework.authentication import SessionAuthentication
-from rest_framework.authentication import TokenAuthentication
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
@@ -20,11 +17,6 @@ from notification.serializers.user import NotificationUserSerializer
 
 
 class NotificationUserViewSet(MultiSerializerMixin, BaseExpandView, ModelViewSet):
-    authentication_classes = [
-        SessionAuthentication,
-        BasicAuthentication,
-        TokenAuthentication,
-    ]
     queryset = NotificationUser.objects.all()
     pagination_class = NotificationUserPagination
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]

@@ -24,7 +24,11 @@ class NotificationUser(TimeStampMixinModel, UUIDModel):
         return f"{self.user} {self.notification}"
 
     class Meta:
-        unique_together = (("user", "notification"),)
         verbose_name = _("Notification User")
         verbose_name_plural = _("Notification Users")
         ordering = ["-notification__created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "notification"], name="unique_notification_user"
+            )
+        ]

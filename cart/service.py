@@ -145,9 +145,7 @@ class CartService:
         if self.cart is None:
             raise CartNotSetException()
 
-        CartItem.objects.create(
-            cart=self.cart, product=product, quantity=quantity
-        )
+        CartItem.objects.create(cart=self.cart, product=product, quantity=quantity)
         self.cart_items = self.cart.get_items()
         return self.get_cart_item(product.id)
 

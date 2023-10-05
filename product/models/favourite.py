@@ -20,8 +20,12 @@ class ProductFavourite(TimeStampMixinModel, UUIDModel):
     class Meta(TypedModelMeta):
         verbose_name = _("Product Favourite")
         verbose_name_plural = _("Product Favourites")
-        unique_together = (("user", "product"),)
         ordering = ["-updated_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "product"], name="unique_product_favourite"
+            )
+        ]
 
     def __str__(self):
         return self.user.email

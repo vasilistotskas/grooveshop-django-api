@@ -115,6 +115,10 @@ class ProductModelTestCase(TestCase):
             user=self.user,
         )
 
+        user_2 = User.objects.create_user(
+            email="test2@test.com", password="test12345@!"
+        )
+
         # Create a sample ProductReview with status "True" instance for testing
         product_review_status_true = ProductReview.objects.create(
             product=self.product,
@@ -128,7 +132,7 @@ class ProductModelTestCase(TestCase):
         # Create a sample ProductReview with status "False" instance for testing
         product_review_status_false = ProductReview.objects.create(
             product=self.product,
-            user=self.user,
+            user=user_2,
             rate=5,
             status="False",
             comment="Sample Product Review Comment",

@@ -38,6 +38,11 @@ class ProductReview(
         verbose_name = _("Product Review")
         verbose_name_plural = _("Product Reviews")
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["product", "user"], name="unique_product_review"
+            )
+        ]
 
     def __unicode__(self):
         return self.safe_translation_getter("comment", any_language=True) or ""

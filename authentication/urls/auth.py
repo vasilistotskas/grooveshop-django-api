@@ -36,7 +36,7 @@ urlpatterns = [
         name="resend-email-verification",
     ),
     path(
-        "password-reset/confirm/<str:uidb64>/<str:token>/",
+        "password/reset/confirm/<str:uidb64>/<str:token>/",
         TemplateView.as_view(template_name="password_reset_confirm.html"),
         name="password_reset_confirm",
     ),

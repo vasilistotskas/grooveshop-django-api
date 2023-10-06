@@ -50,7 +50,7 @@ jobs:
 
     services:
       db:
-        image: postgres:13
+        image: postgres:16
         env:
           POSTGRES_DB: postgres
           POSTGRES_USER: devuser

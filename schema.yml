@@ -58,10 +58,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/SocialConnect'
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
       responses:
         '200':
           content:
@@ -107,9 +103,6 @@ paths:
             schema:
               $ref: '#/components/schemas/SocialLogin'
       security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -144,10 +137,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/SocialConnect'
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
       responses:
         '200':
           content:
@@ -193,9 +182,6 @@ paths:
             schema:
               $ref: '#/components/schemas/SocialLogin'
       security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -203,6 +189,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SocialLogin'
+          description: ''
+  /api/v1/auth/is_user_registered/:
+    post:
+      operationId: api_v1_auth_is_user_registered_create
+      description: Returns if the user is already registered or not.
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        registered:
+          content:
+            application/json:
+              schema:
+                type: boolean
           description: ''
   /api/v1/auth/login/:
     post:
@@ -4324,8 +4328,8 @@ paths:
       tags:
       - api
       security:
-      - cookieAuth: []
       - basicAuth: []
+      - cookieAuth: []
       - tokenAuth: []
       - {}
       responses:
@@ -4373,8 +4377,8 @@ paths:
       tags:
       - api
       security:
-      - cookieAuth: []
       - basicAuth: []
+      - cookieAuth: []
       - tokenAuth: []
       - {}
       responses:
@@ -4402,8 +4406,8 @@ paths:
               $ref: '#/components/schemas/NotificationUser'
         required: true
       security:
-      - cookieAuth: []
       - basicAuth: []
+      - cookieAuth: []
       - tokenAuth: []
       - {}
       responses:
@@ -4439,8 +4443,8 @@ paths:
               $ref: '#/components/schemas/NotificationUser'
         required: true
       security:
-      - cookieAuth: []
       - basicAuth: []
+      - cookieAuth: []
       - tokenAuth: []
       - {}
       responses:
@@ -4468,8 +4472,8 @@ paths:
               $ref: '#/components/schemas/NotificationUser'
         required: true
       security:
-      - cookieAuth: []
       - basicAuth: []
+      - cookieAuth: []
       - tokenAuth: []
       - {}
       responses:
@@ -4505,8 +4509,8 @@ paths:
               $ref: '#/components/schemas/NotificationUser'
         required: true
       security:
-      - cookieAuth: []
       - basicAuth: []
+      - cookieAuth: []
       - tokenAuth: []
       - {}
       responses:
@@ -4534,8 +4538,8 @@ paths:
               $ref: '#/components/schemas/NotificationUserAction'
         required: true
       security:
-      - cookieAuth: []
       - basicAuth: []
+      - cookieAuth: []
       - tokenAuth: []
       - {}
       responses:
@@ -4571,8 +4575,8 @@ paths:
               $ref: '#/components/schemas/NotificationUserAction'
         required: true
       security:
-      - cookieAuth: []
       - basicAuth: []
+      - cookieAuth: []
       - tokenAuth: []
       - {}
       responses:
@@ -4600,8 +4604,8 @@ paths:
               $ref: '#/components/schemas/NotificationUserAction'
         required: true
       security:
-      - cookieAuth: []
       - basicAuth: []
+      - cookieAuth: []
       - tokenAuth: []
       - {}
       responses:
@@ -4637,8 +4641,8 @@ paths:
               $ref: '#/components/schemas/NotificationUserAction'
         required: true
       security:
-      - cookieAuth: []
       - basicAuth: []
+      - cookieAuth: []
       - tokenAuth: []
       - {}
       responses:
@@ -4654,8 +4658,8 @@ paths:
       tags:
       - api
       security:
-      - cookieAuth: []
       - basicAuth: []
+      - cookieAuth: []
       - tokenAuth: []
       - {}
       responses:
@@ -4679,8 +4683,8 @@ paths:
       tags:
       - api
       security:
-      - cookieAuth: []
       - basicAuth: []
+      - cookieAuth: []
       - tokenAuth: []
       - {}
       responses:
@@ -9150,8 +9154,8 @@ paths:
       tags:
       - api
       security:
-      - cookieAuth: []
       - basicAuth: []
+      - cookieAuth: []
       - tokenAuth: []
       responses:
         '200':
@@ -9177,8 +9181,8 @@ paths:
               $ref: '#/components/schemas/UserAccount'
         required: true
       security:
-      - cookieAuth: []
       - basicAuth: []
+      - cookieAuth: []
       - tokenAuth: []
       responses:
         '201':
@@ -9233,8 +9237,8 @@ paths:
       tags:
       - api
       security:
-      - cookieAuth: []
       - basicAuth: []
+      - cookieAuth: []
       - tokenAuth: []
       responses:
         '200':
@@ -9268,8 +9272,8 @@ paths:
               $ref: '#/components/schemas/UserAccount'
         required: true
       security:
-      - cookieAuth: []
       - basicAuth: []
+      - cookieAuth: []
       - tokenAuth: []
       responses:
         '201':
@@ -9290,8 +9294,8 @@ paths:
       tags:
       - api
       security:
-      - cookieAuth: []
       - basicAuth: []
+      - cookieAuth: []
       - tokenAuth: []
       responses:
         '200':
@@ -9323,8 +9327,8 @@ paths:
               $ref: '#/components/schemas/UserAccount'
         required: true
       security:
-      - cookieAuth: []
       - basicAuth: []
+      - cookieAuth: []
       - tokenAuth: []
       responses:
         '200':
@@ -9355,8 +9359,8 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedUserAccount'
       security:
-      - cookieAuth: []
       - basicAuth: []
+      - cookieAuth: []
       - tokenAuth: []
       responses:
         '200':
@@ -9376,8 +9380,8 @@ paths:
       tags:
       - api
       security:
-      - cookieAuth: []
       - basicAuth: []
+      - cookieAuth: []
       - tokenAuth: []
       responses:
         '204':
@@ -9401,8 +9405,8 @@ paths:
       tags:
       - api
       security:
-      - cookieAuth: []
       - basicAuth: []
+      - cookieAuth: []
       - tokenAuth: []
       responses:
         '200':
@@ -9441,8 +9445,8 @@ paths:
               $ref: '#/components/schemas/UserAccount'
         required: true
       security:
-      - cookieAuth: []
       - basicAuth: []
+      - cookieAuth: []
       - tokenAuth: []
       responses:
         '200':
@@ -9480,8 +9484,8 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedUserAccount'
       security:
-      - cookieAuth: []
       - basicAuth: []
+      - cookieAuth: []
       - tokenAuth: []
       responses:
         '200':
@@ -9508,8 +9512,8 @@ paths:
       tags:
       - api
       security:
-      - cookieAuth: []
       - basicAuth: []
+      - cookieAuth: []
       - tokenAuth: []
       responses:
         '204':

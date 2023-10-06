@@ -14,6 +14,7 @@ env = environ.Env(
     SYSTEM_ENV=(str, "dev"),
     APP_BASE_URL=(str, "http://localhost:8000"),
     NUXT_BASE_URL=(str, "http://localhost:3000"),
+    NUXT_BASE_DOMAIN=(str, "localhost:3000"),
     APP_MAIN_HOST_NAME=(str, "localhost"),
     MEDIA_STREAM_PATH=(str, "http://localhost:3003/media_stream-image"),
     MEDIA_STREAM_BASE_URL=(str, "http://localhost:3003"),
@@ -47,7 +48,7 @@ env = environ.Env(
     CELERY_BROKER_URL=(str, "amqp://guest:guest@localhost:5672/"),
     CELERY_RESULT_BACKEND=(str, "django-db"),
     CELERY_CACHE_BACKEND=(str, "django-cache"),
-    GOOGLE_CALLBACK_URL=(str, "http://localhost:8000/accounts/google/login/callback/"),
+    GOOGLE_CALLBACK_URL=(str, "http://localhost:3000/api/auth/login/google/callback"),
 )
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -77,6 +78,7 @@ if "celery" in sys.argv[0]:
 
 APP_BASE_URL = str(env("APP_BASE_URL"))
 NUXT_BASE_URL = str(env("NUXT_BASE_URL"))
+NUXT_BASE_DOMAIN = str(env("NUXT_BASE_DOMAIN"))
 MEDIA_STREAM_BASE_URL = str(env("MEDIA_STREAM_BASE_URL"))
 
 MEDIA_STREAM_PATH = str(env("MEDIA_STREAM_PATH"))
@@ -212,13 +214,11 @@ MIDDLEWARE = [
 ]
 
 
-# Set the allauth adapter to be the 2FA adapter.
-ACCOUNT_ADAPTER = "allauth_2fa.adapter.OTPAdapter"
 ROOT_URLCONF = "app.urls"
 
 # Site info
 SITE_NAME = env("SITE_NAME")
-SITE_ID = 1
+SITE_ID = 2
 
 # Slash append
 APPEND_SLASH = env("APPEND_SLASH")
@@ -303,6 +303,7 @@ REST_AUTH = {
 }
 
 GOOGLE_CALLBACK_URL = env("GOOGLE_CALLBACK_URL")
+SOCIALACCOUNT_ADAPTER = "authentication.views.social.SocialAccountAdapter"
 SOCIALACCOUNT_PROVIDERS = {
     "facebook": {
         "METHOD": "oauth2",
@@ -329,7 +330,6 @@ SOCIALACCOUNT_PROVIDERS = {
     "google": {
         "SCOPE": ["profile", "email"],
         "AUTH_PARAMS": {"access_type": "online"},
-        "OAUTH_PKCE_ENABLED": False if DEBUG else True,
     },
 }
 

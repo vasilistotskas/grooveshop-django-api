@@ -40,23 +40,23 @@ def session_view(request):
 
     if not request.user.is_authenticated:
         data = {
-            "isSessionAuthenticated": False,
-            "CSRFToken": get_token(request),
+            "is_session_authenticated": False,
+            "CSRF_token": get_token(request),
             "referer": request.META.get("HTTP_REFERER", None),
-            "userAgent": request.META.get("HTTP_USER_AGENT", None),
+            "user_agent": request.META.get("HTTP_USER_AGENT", None),
             "sessionid": request.session.session_key,
             "role": UserRole.GUEST.value,
-            "lastActivity": request.session.get("last_activity", None),
+            "last_activity": request.session.get("last_activity", None),
         }
     else:
         data = {
-            "isSessionAuthenticated": True,
-            "CSRFToken": get_token(request),
+            "is_session_authenticated": True,
+            "CSRF_token": get_token(request),
             "referer": request.META.get("HTTP_REFERER", None),
-            "userAgent": request.META.get("HTTP_USER_AGENT", None),
+            "user_agent": request.META.get("HTTP_USER_AGENT", None),
             "sessionid": request.session.session_key,
             "role": request.user.role.value,
-            "lastActivity": request.session.get("last_activity", None),
+            "last_activity": request.session.get("last_activity", None),
         }
 
     serializer = SessionSerializer(data=data)
@@ -75,13 +75,13 @@ def all_sessions(request):
     if not request.user.is_authenticated:
         data = [
             {
-                "isSessionAuthenticated": False,
-                "CSRFToken": get_token(request),
+                "is_session_authenticated": False,
+                "CSRF_token": get_token(request),
                 "referer": request.META.get("HTTP_REFERER", None),
-                "userAgent": request.META.get("HTTP_USER_AGENT", None),
+                "user_agent": request.META.get("HTTP_USER_AGENT", None),
                 "sessionid": request.session.session_key,
                 "role": UserRole.GUEST.value,
-                "lastActivity": request.session.get("last_activity", None),
+                "last_activity": request.session.get("last_activity", None),
             }
         ]
         serializer = SessionSerializer(data=data)

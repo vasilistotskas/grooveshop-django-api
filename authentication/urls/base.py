@@ -7,6 +7,7 @@ from authentication.views.base import AuthPasswordChangeView
 from authentication.views.base import AuthPasswordResetConfirmView
 from authentication.views.base import AuthPasswordResetView
 from authentication.views.base import AuthUserDetailsView
+from authentication.views.base import is_user_registered
 
 urlpatterns = [
     # URLs that do not require a session or valid token
@@ -26,6 +27,12 @@ urlpatterns = [
         "password/change/",
         AuthPasswordChangeView.as_view(),
         name="rest_password_change",
+    ),
+    # Actions
+    path(
+        "is_user_registered/",
+        is_user_registered,
+        name="is_user_registered",
     ),
 ]
 

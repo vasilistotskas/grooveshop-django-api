@@ -3,7 +3,27 @@
 
 
 
+## v0.31.0 (2023-10-06)
+
+### Feature
+
+* feat: More at `Description`
+
+- Authentication improvement. `signal` receive after social account signed up to populate account image.
+- Authentication new API endpoint `is_user_registered` based on email.
+- Authentication `AuthenticationAllAuthPasswordResetForm` method overriding  `AllAuthPasswordResetForm` to change domain.
+- postgres in `ci.yml` version bump from `13` to `16`.
+- More lint and general fixes. ([`53cc219`](https://github.com/vasilistotskas/grooveshop-django-api/commit/53cc219b05856d48abc1f39cf8f733d51a20cfa6))
+
+### Fix
+
+* fix: session serializer camel case fixed. ([`18baf25`](https://github.com/vasilistotskas/grooveshop-django-api/commit/18baf256d87e2d5c334b5f84dd59332714537ddb))
+
 ## v0.30.0 (2023-10-05)
+
+### Chore
+
+* chore(release): release version 0.30.0 [skip ci] ([`1285f9f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1285f9f15fb03e79b8a3436560d97bfb4d1089b3))
 
 ### Feature
 

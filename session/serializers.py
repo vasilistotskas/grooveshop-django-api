@@ -2,13 +2,13 @@ from rest_framework import serializers
 
 
 class SessionSerializer(serializers.Serializer):
-    isSessionAuthenticated = serializers.BooleanField()
-    CSRFToken = serializers.CharField()
+    is_session_authenticated = serializers.BooleanField()
+    CSRF_token = serializers.CharField()
     referer = serializers.CharField(allow_null=True)
-    userAgent = serializers.CharField(allow_null=True)
+    user_agent = serializers.CharField(allow_null=True)
     sessionid = serializers.CharField(allow_null=True)
     role = serializers.CharField()
-    lastActivity = serializers.DateTimeField(allow_null=True)
+    last_activity = serializers.DateTimeField(allow_null=True)
 
 
 class AllSessionsSerializer(serializers.Serializer):

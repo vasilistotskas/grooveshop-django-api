@@ -47,15 +47,15 @@ class SessionAPITestCase(TestCase):
 
         response = self.client.get(self.get_session_url())
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["isSessionAuthenticated"], True)
-        self.assertTrue("CSRFToken" in response.data)
+        self.assertEqual(response.data["is_session_authenticated"], True)
+        self.assertTrue("CSRF_token" in response.data)
         self.assertTrue("sessionid" in response.data)
 
     def test_session_view_unauthenticated(self):
         response = self.client.get(self.get_session_url())
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["isSessionAuthenticated"], False)
-        self.assertTrue("CSRFToken" in response.data)
+        self.assertEqual(response.data["is_session_authenticated"], False)
+        self.assertTrue("CSRF_token" in response.data)
         self.assertTrue("sessionid" in response.data)
 
     def test_revoke_all_user_sessions_authenticated(self):

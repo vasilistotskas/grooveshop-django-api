@@ -24,7 +24,7 @@ DEVELOPMENT_MODE = getenv("DEVELOPMENT_MODE", "False") == "True"
 SECRET_KEY = getenv("DJANGO_SECRET_KEY", get_random_secret_key())
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = getenv("DEBUG", "False") == "True"
+DEBUG = getenv("DEBUG", "True") == "True"
 SYSTEM_ENV = getenv("SYSTEM_ENV", "dev")
 
 # Security
@@ -57,7 +57,7 @@ ALLOWED_HOSTS = [
 ALLOWED_HOSTS.extend(
     filter(
         None,
-        getenv("ALLOWED_HOSTS", "").split(","),
+        getenv("ALLOWED_HOSTS", "[*]").split(","),
     )
 )
 
@@ -72,7 +72,7 @@ CORS_ALLOWED_ORIGINS = [
     NUXT_BASE_URL,
     MEDIA_STREAM_BASE_URL,
 ]
-CORS_ORIGIN_ALLOW_ALL = getenv("CORS_ORIGIN_ALLOW_ALL", "False") == "True"
+CORS_ORIGIN_ALLOW_ALL = getenv("CORS_ORIGIN_ALLOW_ALL", "True") == "True"
 CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_WHITELIST = [
     APP_BASE_URL,
@@ -183,7 +183,7 @@ SITE_NAME = getenv("SITE_NAME", "Django")
 SITE_ID = 2
 
 # Slash append
-APPEND_SLASH = getenv("APPEND_SLASH", "True") == "True"
+APPEND_SLASH = getenv("APPEND_SLASH", "False") == "True"
 
 # User model
 AUTH_USER_MODEL = "user.UserAccount"
@@ -360,7 +360,7 @@ CELERY_RESULT_BACKEND = getenv("CELERY_RESULT_BACKEND", "django-db")
 CELERY_CACHE_BACKEND = getenv("CELERY_CACHE_BACKEND", "django-cache")
 CELERY_TASK_TRACK_STARTED = True
 CELERY_ENABLE_UTC = False
-CELERY_TIMEZONE = getenv("TIME_ZONE", "UTC")
+CELERY_TIMEZONE = getenv("TIME_ZONE", "Europe/Athens")
 CELERY_ACCEPT_CONTENT = ["application/json"]
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TASK_SERIALIZER = "json"

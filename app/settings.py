@@ -450,7 +450,7 @@ EMAIL_USE_TLS = getenv("EMAIL_USE_TLS", "False") == "True"
 DEFAULT_FROM_EMAIL = getenv("DEFAULT_FROM_EMAIL", "localhost@gmail.com")
 
 # Static files (CSS, JavaScript, Images)
-if DEVELOPMENT_MODE is True:
+if DEVELOPMENT_MODE is True or SYSTEM_ENV == "GITHUB_WORKFLOW":
     STATIC_URL = "static/"
     STATIC_ROOT = path.join(BASE_DIR, "static")
     MEDIA_URL = "media/"

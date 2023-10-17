@@ -1,3 +1,4 @@
+import logging
 from tempfile import NamedTemporaryFile
 
 import requests
@@ -6,8 +7,15 @@ from django.core.files import File
 from django.dispatch import receiver
 
 
+logger = logging.getLogger(__name__)
+
+
 @receiver(user_signed_up)
-def populate_profile(sociallogin, user, **kwargs):
+def populate_profile(sociallogin=None, user=None, **kwargs):
+    if not sociallogin or not user:
+        logger.warning("No sociallogin or user passed to populate_profile")
+        return
+
     picture_url = None
     if sociallogin.account.provider == "facebook":
         picture_url = (

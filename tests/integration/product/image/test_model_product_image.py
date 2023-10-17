@@ -76,7 +76,9 @@ class ProductImageModelTestCase(TestCase):
 
     def test_unicode_representation(self):
         # Test unicode representation
-        self.assertEqual(str(self.product_image), "Sample Main Product Image (en)")
+        self.assertEqual(
+            str(self.product_image), f"Sample Main Product Image ({default_language})"
+        )
 
     def test_translations(self):
         # Test if translations are saved correctly

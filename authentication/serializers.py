@@ -15,6 +15,8 @@ from dj_rest_auth.serializers import UserDetailsSerializer
 from django.conf import settings
 from django.contrib.auth.forms import PasswordResetForm
 from django.contrib.sites.shortcuts import get_current_site
+from django.utils.translation import gettext_lazy as _
+from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 
@@ -104,3 +106,24 @@ class AuthenticationRegisterSerializer(RegisterSerializer):
             "password1": self.validated_data.get("password1", ""),
             "email": self.validated_data.get("email", ""),
         }
+
+
+# MFA
+class AuthenticateTOTPSerializer(serializers.Serializer):
+    code = serializers.CharField()
+
+
+class ActivateTOTPSerializer(serializers.Serializer):
+    code = serializers.CharField(label=_("Authenticator code"))
+
+
+class DeactivateTOTPSerializer(serializers.Serializer):
+    pass
+
+
+class RecoveryCodeSerializer(serializers.Serializer):
+    pass
+
+
+class TOTPEnabledSerializer(serializers.Serializer):
+    enabled = serializers.BooleanField(label=_("TOTP enabled"))

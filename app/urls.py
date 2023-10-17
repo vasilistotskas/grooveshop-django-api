@@ -56,7 +56,7 @@ urlpatterns = i18n_patterns(
     path("auth/", include("authentication.urls.auth")),
     path(_("admin/"), admin_site_otp.urls),
     path(_("admin_no_otp/"), admin.site.urls),
-    path("accounts/", include("allauth_2fa.urls")),
+    path("accounts/", include("allauth.mfa.urls")),
     path("accounts/", include("allauth.urls")),
     # rosetta
     path("rosetta/", include("rosetta.urls")),
@@ -67,6 +67,7 @@ urlpatterns = i18n_patterns(
     path("api/v1/auth/", include("authentication.urls.base")),
     path("api/v1/auth/registration/", include("authentication.urls.registration")),
     path("api/v1/auth/", include("authentication.urls.social")),
+    path("api/v1/auth/", include("authentication.urls.mfa")),
     path("api/v1/", include(router.urls)),
     path("api/v1/", include("product.urls")),
     path("api/v1/", include("order.urls")),

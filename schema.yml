@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
-  title: DeepWeb API
+  title: Grooveshop API
   version: 1.0.0
-  description: DeepWeb API description
+  description: Grooveshop API description
 paths:
   /api/v1/api-token-auth/:
     post:
@@ -270,6 +270,137 @@ paths:
         assigned to the current User object.
 
         Accepts/Returns nothing.
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/v1/auth/mfa/recovery-codes/generate/:
+    post:
+      operationId: api_v1_auth_mfa_recovery_codes_generate_create
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/v1/auth/mfa/recovery-codes/list/:
+    get:
+      operationId: api_v1_auth_mfa_recovery_codes_list_retrieve
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/v1/auth/mfa/totp/activate/:
+    get:
+      operationId: api_v1_auth_mfa_totp_activate_retrieve
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivateTOTP'
+          description: ''
+    post:
+      operationId: api_v1_auth_mfa_totp_activate_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ActivateTOTP'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ActivateTOTP'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActivateTOTP'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivateTOTP'
+          description: ''
+  /api/v1/auth/mfa/totp/active/:
+    get:
+      operationId: api_v1_auth_mfa_totp_active_retrieve
+      description: Check if TOTP is enabled for the current user
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TOTPEnabled'
+          description: ''
+  /api/v1/auth/mfa/totp/authenticate/:
+    post:
+      operationId: api_v1_auth_mfa_totp_authenticate_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AuthenticateTOTP'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AuthenticateTOTP'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthenticateTOTP'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthenticateTOTP'
+          description: ''
+  /api/v1/auth/mfa/totp/deactivate/:
+    post:
+      operationId: api_v1_auth_mfa_totp_deactivate_create
       tags:
       - api
       security:
@@ -10567,6 +10698,14 @@ paths:
           description: No response body
 components:
   schemas:
+    ActivateTOTP:
+      type: object
+      properties:
+        code:
+          type: string
+          title: Authenticator code
+      required:
+      - code
     ActiveUsersCount:
       type: object
       properties:
@@ -10599,6 +10738,13 @@ components:
       - password
       - token
       - username
+    AuthenticateTOTP:
+      type: object
+      properties:
+        code:
+          type: string
+      required:
+      - code
     Authentication:
       type: object
       description: User model w/o password
@@ -10690,7 +10836,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 bio:
@@ -10739,7 +10885,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 name:
@@ -10804,7 +10950,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 content:
@@ -10862,7 +11008,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 title:
@@ -10980,7 +11126,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 title:
@@ -11263,7 +11409,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 name:
@@ -12223,7 +12369,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 bio:
@@ -12266,7 +12412,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 name:
@@ -12322,7 +12468,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 content:
@@ -12371,7 +12517,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 title:
@@ -12464,7 +12610,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 title:
@@ -12582,7 +12728,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 name:
@@ -12755,7 +12901,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 name:
@@ -12821,7 +12967,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 name:
@@ -12970,7 +13116,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 name:
@@ -13082,7 +13228,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 title:
@@ -13139,7 +13285,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 comment:
@@ -13192,7 +13338,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 name:
@@ -13235,7 +13381,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 name:
@@ -13332,7 +13478,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 name:
@@ -13389,7 +13535,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 title:
@@ -13633,7 +13779,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 name:
@@ -13707,7 +13853,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 name:
@@ -13876,7 +14022,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 name:
@@ -14010,7 +14156,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 title:
@@ -14077,7 +14223,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 comment:
@@ -14186,7 +14332,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 name:
@@ -14281,7 +14427,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 name:
@@ -14359,7 +14505,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 name:
@@ -14467,7 +14613,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 name:
@@ -14567,6 +14713,14 @@ components:
           type: string
         idToken:
           type: string
+    TOTPEnabled:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          title: TOTP enabled
+      required:
+      - enabled
     Tip:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -14574,7 +14728,7 @@ components:
         translations:
           type: object
           properties:
-            en:
+            en-us:
               type: object
               properties:
                 title:

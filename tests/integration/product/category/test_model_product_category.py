@@ -122,14 +122,13 @@ class CategoryModelTestCase(TestCase):
             )
 
     def test_str_representation_no_parent(self):
-        expected_str = f"Sample Category {default_language}"
-        self.assertEqual(str(self.category), expected_str)
+        self.assertEqual(
+            str(self.category), self.category.safe_translation_getter("name")
+        )
 
     def test_str_representation_with_parent(self):
-        expected_str = (
-            f"Sample Category {default_language} / Sample Sub Category"
-            f" {default_language}"
-        )
+        category_name = self.category.safe_translation_getter("name")
+        expected_str = f"{category_name} / Sample Sub Category" f" {default_language}"
         self.assertEqual(str(self.sub_category), expected_str)
 
     def test_str_representation_with_grandparent(self):

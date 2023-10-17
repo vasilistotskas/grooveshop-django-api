@@ -1,8 +1,8 @@
-from allauth_2fa.adapter import OTPAdapter
+from allauth.account.adapter import DefaultAccountAdapter
 from django.conf import settings
 
 
-class UserAccountAdapter(OTPAdapter):
+class UserAccountAdapter(DefaultAccountAdapter):
     def get_email_confirmation_url(self, request, emailconfirmation):
         url = (
             settings.NUXT_BASE_URL

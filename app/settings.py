@@ -1,70 +1,31 @@
-import os
 import sys
+from os import getenv
+from os import path
 from pathlib import Path
 
-import environ
+import dotenv
+from django.core.management.utils import get_random_secret_key
 from django.utils.translation import gettext_lazy as _
 
 from core.utils.cache import CustomCacheConfig
 
-env = environ.Env(
-    # set casting, default value
-    SECRET_KEY=(str, "django-insecure-0000000000000000000000000000000000"),
-    DEBUG=(bool, True),
-    SYSTEM_ENV=(str, "dev"),
-    APP_BASE_URL=(str, "http://localhost:8000"),
-    NUXT_BASE_URL=(str, "http://localhost:3000"),
-    NUXT_BASE_DOMAIN=(str, "localhost:3000"),
-    APP_MAIN_HOST_NAME=(str, "localhost"),
-    MEDIA_STREAM_PATH=(str, "http://localhost:3003/media_stream-image"),
-    MEDIA_STREAM_BASE_URL=(str, "http://localhost:3003"),
-    ALLOWED_HOSTS=(str, "[*]"),
-    CORS_ORIGIN_ALLOW_ALL=(bool, True),
-    SITE_NAME=(str, "Django"),
-    APPEND_SLASH=(bool, False),
-    TIME_ZONE=(str, "Europe/Athens"),
-    USE_I18N=(bool, True),
-    USE_TZ=(bool, True),
-    LANGUAGE_CODE=(str, "en"),
-    DB_HOST=(str, "db"),
-    DB_NAME=(str, "devdb"),
-    DB_USER=(str, "devuser"),
-    DB_PASSWORD=(str, "changeme"),
-    DB_PORT=(str, "5432"),
-    DB_HOST_TEST=(str, "db_replica"),
-    DB_NAME_TEST=(str, "devdb_replica"),
-    DB_TEST_MIRROR=(str, "default"),
-    DJANG0_SPECTACULAR_SETTINGS_TITLE=(str, "Django Spectacular"),
-    DJANG0_SPECTACULAR_SETTINGS_DESCRIPTION=(str, "Django Spectacular Description"),
-    EMAIL_BACKEND=(str, "django.core.mail.backends.smtp.EmailBackend"),
-    EMAIL_HOST=(str, "localhost"),
-    EMAIL_PORT=(str, "25"),
-    EMAIL_HOST_USER=(str, ""),
-    EMAIL_HOST_PASSWORD=(str, ""),
-    EMAIL_USE_TLS=(bool, False),
-    DEFAULT_FROM_EMAIL=(str, "webmaster@localhost"),
-    DEEPL_AUTH_KEY=(str, "changeme"),
-    REDIS_URL=(str, "redis://localhost:6379/0"),
-    CELERY_BROKER_URL=(str, "amqp://guest:guest@localhost:5672/"),
-    CELERY_RESULT_BACKEND=(str, "django-db"),
-    CELERY_CACHE_BACKEND=(str, "django-cache"),
-    GOOGLE_CALLBACK_URL=(str, "http://localhost:3000/api/auth/login/google/callback"),
-)
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Take environment variables from .env file
-environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
+# Load environment variables
+dotenv_file = BASE_DIR / ".env"
 
-# Quick-start development settings - unsuitable for production
+if path.isfile(dotenv_file):
+    dotenv.load_dotenv(dotenv_file)
+
+DEVELOPMENT_MODE = getenv("DEVELOPMENT_MODE", "False") == "True"
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = env("SECRET_KEY")
+SECRET_KEY = getenv("DJANGO_SECRET_KEY", get_random_secret_key())
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = bool(int(env("DEBUG")))
-SYSTEM_ENV = env("SYSTEM_ENV")
+DEBUG = getenv("DEBUG", "False") == "True"
+SYSTEM_ENV = getenv("SYSTEM_ENV", "dev")
 
 # Security
 SECURE_SSL_REDIRECT = False if DEBUG else True
@@ -76,13 +37,14 @@ SECURE_HSTS_PRELOAD = False if DEBUG else True
 if "celery" in sys.argv[0]:
     DEBUG = False
 
-APP_BASE_URL = str(env("APP_BASE_URL"))
-NUXT_BASE_URL = str(env("NUXT_BASE_URL"))
-NUXT_BASE_DOMAIN = str(env("NUXT_BASE_DOMAIN"))
-MEDIA_STREAM_BASE_URL = str(env("MEDIA_STREAM_BASE_URL"))
-
-MEDIA_STREAM_PATH = str(env("MEDIA_STREAM_PATH"))
-APP_MAIN_HOST_NAME = str(env("APP_MAIN_HOST_NAME"))
+APP_BASE_URL = getenv("APP_BASE_URL", "http://localhost:8000")
+NUXT_BASE_URL = getenv("NUXT_BASE_URL", "http://localhost:3000")
+NUXT_BASE_DOMAIN = getenv("NUXT_BASE_DOMAIN", "localhost:3000")
+MEDIA_STREAM_BASE_URL = getenv("MEDIA_STREAM_BASE_URL", "http://localhost:3003")
+MEDIA_STREAM_PATH = getenv(
+    "MEDIA_STREAM_PATH", "http://localhost:3003/media_stream-image"
+)
+APP_MAIN_HOST_NAME = getenv("APP_MAIN_HOST_NAME", "localhost")
 
 ALLOWED_HOSTS = [
     APP_MAIN_HOST_NAME,
@@ -95,7 +57,7 @@ ALLOWED_HOSTS = [
 ALLOWED_HOSTS.extend(
     filter(
         None,
-        env("ALLOWED_HOSTS").split(","),
+        getenv("ALLOWED_HOSTS").split(","),
     )
 )
 
@@ -110,7 +72,7 @@ CORS_ALLOWED_ORIGINS = [
     NUXT_BASE_URL,
     MEDIA_STREAM_BASE_URL,
 ]
-CORS_ORIGIN_ALLOW_ALL = bool(env("CORS_ORIGIN_ALLOW_ALL"))
+CORS_ORIGIN_ALLOW_ALL = getenv("CORS_ORIGIN_ALLOW_ALL", "False") == "True"
 CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_WHITELIST = [
     APP_BASE_URL,
@@ -170,12 +132,13 @@ THIRD_PARTY_APPS = [
     "tinymce",
     "rosetta",
     "parler",
+    "storages",
     "django_filters",
     "drf_spectacular",
     "dj_rest_auth",
     "allauth",
     "allauth.account",
-    "allauth_2fa",
+    "allauth.mfa",
     "dj_rest_auth.registration",
     "allauth.socialaccount",
     "allauth.socialaccount.providers.facebook",
@@ -207,7 +170,6 @@ MIDDLEWARE = [
     # flow is reset if another page is loaded between login and successfully
     # entering two-factor credentials.
     "allauth.account.middleware.AccountMiddleware",
-    "allauth_2fa.middleware.AllauthTwoFactorMiddleware",
     "djangorestframework_camel_case.middleware.CamelCaseMiddleWare",
     "django_browser_reload.middleware.BrowserReloadMiddleware",
     "core.middleware.timezone.TimezoneMiddleware",
@@ -217,11 +179,11 @@ MIDDLEWARE = [
 ROOT_URLCONF = "app.urls"
 
 # Site info
-SITE_NAME = env("SITE_NAME")
+SITE_NAME = getenv("SITE_NAME", "Django")
 SITE_ID = 2
 
 # Slash append
-APPEND_SLASH = env("APPEND_SLASH")
+APPEND_SLASH = getenv("APPEND_SLASH", "False") == "True"
 
 # User model
 AUTH_USER_MODEL = "user.UserAccount"
@@ -252,7 +214,7 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 22500  # higher than the count of fields
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [os.path.join(BASE_DIR, "core/templates")],
+        "DIRS": [path.join(BASE_DIR, "core/templates")],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -291,8 +253,8 @@ REST_AUTH = {
     "LOGOUT_ON_PASSWORD_CHANGE": False,
     "SESSION_LOGIN": False,
     "USE_JWT": True,
-    "JWT_AUTH_COOKIE": "jwt-auth",
-    "JWT_AUTH_REFRESH_COOKIE": "jwt-refresh-auth",
+    "JWT_AUTH_COOKIE": "jwt_auth",
+    "JWT_AUTH_REFRESH_COOKIE": "jwt_refresh_auth",
     "JWT_AUTH_REFRESH_COOKIE_PATH": "/",
     "JWT_AUTH_SECURE": False,
     "JWT_AUTH_HTTPONLY": False,
@@ -302,7 +264,7 @@ REST_AUTH = {
     "JWT_AUTH_COOKIE_ENFORCE_CSRF_ON_UNAUTHENTICATED": False,
 }
 
-GOOGLE_CALLBACK_URL = env("GOOGLE_CALLBACK_URL")
+GOOGLE_CALLBACK_URL = getenv("GOOGLE_CALLBACK_URL", "http://localhost:8000")
 SOCIALACCOUNT_ADAPTER = "authentication.views.social.SocialAccountAdapter"
 SOCIALACCOUNT_PROVIDERS = {
     "facebook": {
@@ -342,24 +304,30 @@ ACCOUNT_ADAPTER = "user.adapter.UserAccountAdapter"
 ACCOUNT_SIGNUP_REDIRECT_URL = NUXT_BASE_URL + "/account"
 LOGIN_REDIRECT_URL = NUXT_BASE_URL + "/account"
 
+# MFA
+MFA_ADAPTER = "allauth.mfa.adapter.DefaultMFAAdapter"
+MFA_RECOVERY_CODE_COUNT = 10
+MFA_TOTP_PERIOD = 30
+MFA_TOTP_DIGITS = 6
+
 WSGI_APPLICATION = "app.wsgi.application"
 
 # Database
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "HOST": env("DB_HOST"),
-        "NAME": env("DB_NAME"),
-        "USER": env("DB_USER"),
-        "PASSWORD": env("DB_PASSWORD"),
-        "PORT": env("DB_PORT"),
+        "HOST": getenv("DB_HOST", "db"),
+        "NAME": getenv("DB_NAME", "devdb"),
+        "USER": getenv("DB_USER", "devuser"),
+        "PASSWORD": getenv("DB_PASSWORD", "changeme"),
+        "PORT": getenv("DB_PORT", "5432"),
     },
     "replica": {
         "ENGINE": "django.db.backends.postgresql",
-        "HOST": env("DB_HOST_TEST"),
-        "NAME": env("DB_NAME_TEST"),
+        "HOST": getenv("DB_HOST_TEST", "db_replica"),
+        "NAME": getenv("DB_NAME_TEST", "devdb_replica"),
         "TEST": {
-            "MIRROR": env("DB_TEST_MIRROR"),
+            "MIRROR": getenv("DB_TEST_MIRROR", "default"),
         },
     },
 }
@@ -369,8 +337,8 @@ if SYSTEM_ENV == "GITHUB_WORKFLOW":
         "default": {
             "ENGINE": "django.db.backends.postgresql",
             "NAME": "postgres",
-            "USER": env("DB_USER"),
-            "PASSWORD": env("DB_PASSWORD"),
+            "USER": getenv("DB_USER"),
+            "PASSWORD": getenv("DB_PASSWORD"),
             "HOST": "127.0.0.1",
             "PORT": "5432",
         }
@@ -387,12 +355,12 @@ if SYSTEM_ENV != "GITHUB_WORKFLOW":
 REDIS_HEALTHY = custom_cache_config.ready_healthy
 
 # Celery
-CELERY_BROKER_URL = env("CELERY_BROKER_URL")
-CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND")
-CELERY_CACHE_BACKEND = env("CELERY_CACHE_BACKEND")
+CELERY_BROKER_URL = getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = getenv("CELERY_RESULT_BACKEND", "django-db")
+CELERY_CACHE_BACKEND = getenv("CELERY_CACHE_BACKEND", "django-cache")
 CELERY_TASK_TRACK_STARTED = True
 CELERY_ENABLE_UTC = False
-CELERY_TIMEZONE = env("TIME_ZONE")
+CELERY_TIMEZONE = getenv("TIME_ZONE", "UTC")
 CELERY_ACCEPT_CONTENT = ["application/json"]
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TASK_SERIALIZER = "json"
@@ -430,17 +398,17 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # Internationalization
-LANGUAGE_CODE = env("LANGUAGE_CODE")
-TIME_ZONE = env("TIME_ZONE")
-USE_I18N = env("USE_I18N")
-USE_TZ = env("USE_TZ")
+LANGUAGE_CODE = getenv("LANGUAGE_CODE", "en-us")
+TIME_ZONE = getenv("TIME_ZONE", "UTC")
+USE_I18N = getenv("USE_I18N", "True") == "True"
+USE_TZ = getenv("USE_TZ", "True") == "True"
 LANGUAGES = [
     ("en", _("English")),
     ("de", _("German")),
     ("el", _("Greek")),
 ]
 # Locales available path
-LOCALE_PATHS = [os.path.join(BASE_DIR, "locale/")]
+LOCALE_PATHS = [path.join(BASE_DIR, "locale/")]
 
 # Rosseta
 ROSETTA_MESSAGES_PER_PAGE = 25
@@ -448,12 +416,12 @@ ROSETTA_ENABLE_TRANSLATION_SUGGESTIONS = True
 ROSETTA_SHOW_AT_ADMIN_PANEL = True
 
 # Parler
-PARLER_DEFAULT_LANGUAGE_CODE = "en"
+PARLER_DEFAULT_LANGUAGE_CODE = "en-us"
 PARLER_LANGUAGES = {
     # 1 is from the SITE_ID
     SITE_ID: (
         {
-            "code": "en",
+            "code": "en-us",
         },
         {
             "code": "de",
@@ -470,33 +438,52 @@ PARLER_LANGUAGES = {
 PARLER_ENABLE_CACHING = True
 
 # DeepL
-DEEPL_AUTH_KEY = env("DEEPL_AUTH_KEY")
+DEEPL_AUTH_KEY = getenv("DEEPL_AUTH_KEY", "changeme")
 
 # Email Settings
-EMAIL_BACKEND = env("EMAIL_BACKEND")
-EMAIL_HOST = env("EMAIL_HOST")
-EMAIL_PORT = env("EMAIL_PORT")
-EMAIL_HOST_USER = env("EMAIL_HOST_USER")
-EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
-EMAIL_USE_TLS = env("EMAIL_USE_TLS")
-DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL")
+EMAIL_BACKEND = getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
+EMAIL_HOST = getenv("EMAIL_HOST", "localhost")
+EMAIL_PORT = getenv("EMAIL_PORT", "25")
+EMAIL_HOST_USER = getenv("EMAIL_HOST_USER", "localhost@gmail.com")
+EMAIL_HOST_PASSWORD = getenv("EMAIL_HOST_PASSWORD", "changeme")
+EMAIL_USE_TLS = getenv("EMAIL_USE_TLS", "False") == "True"
+DEFAULT_FROM_EMAIL = getenv("DEFAULT_FROM_EMAIL", "localhost@gmail.com")
 
 # Static files (CSS, JavaScript, Images)
-STATIC_URL = "static/"
-STATIC_ROOT = os.path.join(BASE_DIR, "static")
+if DEVELOPMENT_MODE is True:
+    STATIC_URL = "static/"
+    STATIC_ROOT = path.join(BASE_DIR, "static")
+    MEDIA_URL = "media/"
+    MEDIA_ROOT = path.join(BASE_DIR, "media")
+    STATICFILES_DIRS = (BASE_DIR.joinpath("files"),)
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+        },
+    }
+else:
+    AWS_S3_ACCESS_KEY_ID = getenv("AWS_S3_ACCESS_KEY_ID")
+    AWS_S3_SECRET_ACCESS_KEY = getenv("AWS_S3_SECRET_ACCESS_KEY")
+    AWS_STORAGE_BUCKET_NAME = getenv("AWS_STORAGE_BUCKET_NAME")
+    AWS_S3_REGION_NAME = getenv("AWS_S3_REGION_NAME")
+    AWS_S3_ENDPOINT_URL = f"https://{AWS_S3_REGION_NAME}.digitaloceanspaces.com"
+    AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
+    AWS_DEFAULT_ACL = "public-read"
+    AWS_LOCATION = "static"
+    AWS_MEDIA_LOCATION = "media"
+    AWS_S3_CUSTOM_DOMAIN = getenv("AWS_S3_CUSTOM_DOMAIN")
+    STORAGES = {
+        "default": {
+            "BACKEND": "core.storages.CustomS3Boto3Storage",
+        },
+        "staticfiles": {
+            "BACKEND": "storages.backends.s3boto3.S3StaticStorage",
+        },
+    }
 
-MEDIA_URL = "media/"
-MEDIA_ROOT = os.path.join(BASE_DIR, "media")
-
-STATICFILES_DIRS = (BASE_DIR.joinpath("files"),)
-STORAGES = {
-    "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
-    },
-    "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
-    },
-}
 
 # Tinymce admin panel editor config
 TINYMCE_DEFAULT_CONFIG = {
@@ -562,8 +549,8 @@ REST_FRAMEWORK = {
 }
 
 SPECTACULAR_SETTINGS = {
-    "TITLE": env("DJANG0_SPECTACULAR_SETTINGS_TITLE"),
-    "DESCRIPTION": env("DJANG0_SPECTACULAR_SETTINGS_DESCRIPTION"),
+    "TITLE": getenv("DJANG0_SPECTACULAR_SETTINGS_TITLE", "Django"),
+    "DESCRIPTION": getenv("DJANG0_SPECTACULAR_SETTINGS_DESCRIPTION", "Django"),
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAuthenticated"],
@@ -615,7 +602,7 @@ LOGGING = {
             "filters": ["require_debug_true"],
             "class": "logging.FileHandler",
             "formatter": "simple",
-            "filename": os.path.join(BASE_DIR, "logs/django.log"),
+            "filename": path.join(BASE_DIR, "logs/django.log"),
         },
         "console": {
             "level": "INFO",
@@ -627,7 +614,7 @@ LOGGING = {
         "logger": {
             "level": "DEBUG",
             "class": "logging.handlers.RotatingFileHandler",
-            "filename": os.path.join(BASE_DIR, "logs/django.log"),
+            "filename": path.join(BASE_DIR, "logs/django.log"),
             "formatter": "simple",
         },
     },

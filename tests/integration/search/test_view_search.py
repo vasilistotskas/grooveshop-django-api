@@ -98,8 +98,12 @@ class SearchProductAPITest(APITestCase):
             "traction on a variety of surfaces.",
         )
 
+    @staticmethod
+    def get_search_product_url():
+        return reverse("search-product")
+
     def test_search_products_lang_el(self):
-        url = reverse("search-product")
+        url = self.get_search_product_url()
         self.product1.set_current_language("el")
         self.product2.set_current_language("el")
         self.product3.set_current_language("el")
@@ -197,35 +201,35 @@ class SearchProductAPITest(APITestCase):
         self.assertEqual(len(response_description.data["results"]), 1)
 
     def test_search_products(self):
-        url = reverse("search-product")
+        url = self.get_search_product_url()
 
         response = self.client.get(url, {"query": "Nike Victori One Slides"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 2)
 
     def test_search_product_by_slug(self):
-        url = reverse("search-product")
+        url = self.get_search_product_url()
 
         response = self.client.get(url, {"query": self.product2.slug})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 1)
 
     def test_search_product_by_name(self):
-        url = reverse("search-product")
+        url = self.get_search_product_url()
 
         response = self.client.get(url, {"query": self.product2.name})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 1)
 
     def test_no_results_found(self):
-        url = reverse("search-product")
+        url = self.get_search_product_url()
 
         response = self.client.get(url, {"query": "nonexistent"})
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(response.data, None)
 
     def test_invalid_query(self):
-        url = reverse("search-product")
+        url = self.get_search_product_url()
 
         response = self.client.get(url, {"query": ""})
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)

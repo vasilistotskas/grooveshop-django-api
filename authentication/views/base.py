@@ -33,7 +33,6 @@ class AuthLoginView(LoginView):
 
 class AuthLogoutView(LogoutView):
     serializer_class = None
-    pass
 
 
 class AuthPasswordChangeView(PasswordChangeView):

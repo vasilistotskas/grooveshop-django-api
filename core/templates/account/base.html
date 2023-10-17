@@ -181,7 +181,7 @@
             {% if user.is_authenticated %}
               <li class="text-lg font-semibold"><a class="font-medium text-gray-300 hover:underline text-primary-500" href="{% url 'account_email' %}">Change E-mail</a></li>
                 <li class="text-lg font-semibold"><a class="font-medium text-gray-300 hover:underline text-primary-500" href="{% url 'account_change_password' %}">Change Password</a></li>
-              <li class="text-lg font-semibold"><a class="font-medium text-gray-300 hover:underline text-primary-500" href="{% url 'two-factor-setup' %}">Two Factor Authentication</a></li>
+              <li class="text-lg font-semibold"><a class="font-medium text-gray-300 hover:underline text-primary-500" href="{% url 'mfa_index' %}">Two Factor Authentication</a></li>
               <li class="text-lg font-semibold"><a class="font-medium text-gray-300 hover:underline text-primary-500" href="{% url 'account_logout' %}">Sign Out</a></li>
             {% else %}
               <li class="text-lg font-semibold"><a class="font-medium text-gray-300 hover:underline text-primary-500" href="{% url 'account_login' %}">Sign In</a></li>

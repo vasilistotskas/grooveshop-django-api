@@ -337,8 +337,8 @@ if SYSTEM_ENV == "GITHUB_WORKFLOW":
         "default": {
             "ENGINE": "django.db.backends.postgresql",
             "NAME": "postgres",
-            "USER": getenv("DB_USER"),
-            "PASSWORD": getenv("DB_PASSWORD"),
+            "USER": getenv("DB_USER", "devuser"),
+            "PASSWORD": getenv("DB_PASSWORD", "changeme"),
             "HOST": "127.0.0.1",
             "PORT": "5432",
         }
@@ -465,16 +465,16 @@ if DEVELOPMENT_MODE is True or SYSTEM_ENV == "GITHUB_WORKFLOW":
         },
     }
 else:
-    AWS_S3_ACCESS_KEY_ID = getenv("AWS_S3_ACCESS_KEY_ID")
-    AWS_S3_SECRET_ACCESS_KEY = getenv("AWS_S3_SECRET_ACCESS_KEY")
-    AWS_STORAGE_BUCKET_NAME = getenv("AWS_STORAGE_BUCKET_NAME")
-    AWS_S3_REGION_NAME = getenv("AWS_S3_REGION_NAME")
+    AWS_S3_ACCESS_KEY_ID = getenv("AWS_S3_ACCESS_KEY_ID", "changeme")
+    AWS_S3_SECRET_ACCESS_KEY = getenv("AWS_S3_SECRET_ACCESS_KEY", "changeme")
+    AWS_STORAGE_BUCKET_NAME = getenv("AWS_STORAGE_BUCKET_NAME", "changeme")
+    AWS_S3_REGION_NAME = getenv("AWS_S3_REGION_NAME", "changeme")
     AWS_S3_ENDPOINT_URL = f"https://{AWS_S3_REGION_NAME}.digitaloceanspaces.com"
     AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
     AWS_DEFAULT_ACL = "public-read"
     AWS_LOCATION = "static"
     AWS_MEDIA_LOCATION = "media"
-    AWS_S3_CUSTOM_DOMAIN = getenv("AWS_S3_CUSTOM_DOMAIN")
+    AWS_S3_CUSTOM_DOMAIN = getenv("AWS_S3_CUSTOM_DOMAIN", "changeme")
     STORAGES = {
         "default": {
             "BACKEND": "core.storages.CustomS3Boto3Storage",

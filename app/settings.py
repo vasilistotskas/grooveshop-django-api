@@ -57,7 +57,7 @@ ALLOWED_HOSTS = [
 ALLOWED_HOSTS.extend(
     filter(
         None,
-        getenv("ALLOWED_HOSTS").split(","),
+        getenv("ALLOWED_HOSTS", "").split(","),
     )
 )
 

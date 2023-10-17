@@ -3,7 +3,43 @@
 
 
 
+## v0.32.0 (2023-10-17)
+
+### Feature
+
+* feat: More at `Description`
+
+- Env files updated.
+- Replace `django-environ` lib with `python-dotenv`.
+- Multi factor authentication API endpoints implemented.
+- Settings and core/storages.py class for production S3 AWS storage.
+- Versions bump.
+
+More fixes and improvements. ([`8d4ff27`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8d4ff27168131749ead41fc001092dc8ed5bb72d))
+
+### Fix
+
+* fix: `settings.py` change `TIME_ZONE` default and add multilang at `test_serializers.py`. ([`d9628e8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d9628e8992d8225dc88bc97ebd4455d0440c69af))
+
+* fix(settings.py): update env defaults. ([`b371658`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b371658d6a5c5423bc8f5d15595805528edfab3c))
+
+* fix(settings.py): languages update. ([`95b2aee`](https://github.com/vasilistotskas/grooveshop-django-api/commit/95b2aeed53178f8b61bab06f01bb3ed5d6184fed))
+
+* fix(settings.py): languages update. ([`9fc02fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9fc02fd2b40960dad89831a63863ac0d54374056))
+
+* fix(settings.py): `APPEND_SLASH` default true. ([`62e519a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/62e519acaa6f3461f79d66734f0d48b4f272c9c3))
+
+* fix(settings.py): add defaults at env vars. ([`4bab314`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4bab314c9c4c346185168423060be3d8765e2900))
+
+* fix(settings.py): local static path for `GITHUB_WORKFLOW` system env ([`b113b14`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b113b14bda905889bcba113c186f1f214a7c3a90))
+
+* fix(settings.py): `ALLOWED_HOSTS` env variable default set. ([`d0b0d4a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d0b0d4a5fae05ba7fece9d1b275dc22439ef8c95))
+
 ## v0.31.0 (2023-10-06)
+
+### Chore
+
+* chore(release): release version 0.31.0 [skip ci] ([`e8b718b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e8b718b877d4a65f59c2bd01a7eda8732615cfe9))
 
 ### Feature
 

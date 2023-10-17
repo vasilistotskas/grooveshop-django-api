@@ -398,12 +398,12 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # Internationalization
-LANGUAGE_CODE = getenv("LANGUAGE_CODE", "en-us")
+LANGUAGE_CODE = getenv("LANGUAGE_CODE", "en")
 TIME_ZONE = getenv("TIME_ZONE", "UTC")
 USE_I18N = getenv("USE_I18N", "True") == "True"
 USE_TZ = getenv("USE_TZ", "True") == "True"
 LANGUAGES = [
-    ("en-us", _("English")),
+    ("en", _("English")),
     ("de", _("German")),
     ("el", _("Greek")),
 ]
@@ -416,12 +416,12 @@ ROSETTA_ENABLE_TRANSLATION_SUGGESTIONS = True
 ROSETTA_SHOW_AT_ADMIN_PANEL = True
 
 # Parler
-PARLER_DEFAULT_LANGUAGE_CODE = "en-us"
+PARLER_DEFAULT_LANGUAGE_CODE = "en"
 PARLER_LANGUAGES = {
     # 1 is from the SITE_ID
     SITE_ID: (
         {
-            "code": "en-us",
+            "code": "en",
         },
         {
             "code": "de",
@@ -431,7 +431,7 @@ PARLER_LANGUAGES = {
         },
     ),
     "default": {
-        "fallbacks": ["en-us"],  # defaults to PARLER_DEFAULT_LANGUAGE_CODE
+        "fallbacks": ["en"],  # defaults to PARLER_DEFAULT_LANGUAGE_CODE
         "hide_untranslated": False,  # the default; let .active_translations() return fallbacks too.
     },
 }

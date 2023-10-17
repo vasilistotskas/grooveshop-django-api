@@ -10836,7 +10836,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 bio:
@@ -10885,7 +10885,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 name:
@@ -10950,7 +10950,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 content:
@@ -11008,7 +11008,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 title:
@@ -11126,7 +11126,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 title:
@@ -11409,7 +11409,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 name:
@@ -12369,7 +12369,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 bio:
@@ -12412,7 +12412,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 name:
@@ -12468,7 +12468,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 content:
@@ -12517,7 +12517,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 title:
@@ -12610,7 +12610,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 title:
@@ -12728,7 +12728,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 name:
@@ -12901,7 +12901,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 name:
@@ -12967,7 +12967,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 name:
@@ -13116,7 +13116,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 name:
@@ -13228,7 +13228,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 title:
@@ -13285,7 +13285,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 comment:
@@ -13338,7 +13338,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 name:
@@ -13381,7 +13381,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 name:
@@ -13478,7 +13478,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 name:
@@ -13535,7 +13535,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 title:
@@ -13779,7 +13779,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 name:
@@ -13853,7 +13853,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 name:
@@ -14022,7 +14022,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 name:
@@ -14156,7 +14156,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 title:
@@ -14223,7 +14223,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 comment:
@@ -14332,7 +14332,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 name:
@@ -14427,7 +14427,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 name:
@@ -14505,7 +14505,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 name:
@@ -14613,7 +14613,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 name:
@@ -14728,7 +14728,7 @@ components:
         translations:
           type: object
           properties:
-            en-us:
+            en:
               type: object
               properties:
                 title:

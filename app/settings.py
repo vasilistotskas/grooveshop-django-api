@@ -183,7 +183,7 @@ SITE_NAME = getenv("SITE_NAME", "Django")
 SITE_ID = 2
 
 # Slash append
-APPEND_SLASH = getenv("APPEND_SLASH", "False") == "True"
+APPEND_SLASH = getenv("APPEND_SLASH", "True") == "True"
 
 # User model
 AUTH_USER_MODEL = "user.UserAccount"

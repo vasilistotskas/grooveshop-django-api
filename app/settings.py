@@ -403,7 +403,7 @@ TIME_ZONE = getenv("TIME_ZONE", "UTC")
 USE_I18N = getenv("USE_I18N", "True") == "True"
 USE_TZ = getenv("USE_TZ", "True") == "True"
 LANGUAGES = [
-    ("en", _("English")),
+    ("en-us", _("English")),
     ("de", _("German")),
     ("el", _("Greek")),
 ]
@@ -431,7 +431,7 @@ PARLER_LANGUAGES = {
         },
     ),
     "default": {
-        "fallbacks": ["en"],  # defaults to PARLER_DEFAULT_LANGUAGE_CODE
+        "fallbacks": ["en-us"],  # defaults to PARLER_DEFAULT_LANGUAGE_CODE
         "hide_untranslated": False,  # the default; let .active_translations() return fallbacks too.
     },
 }

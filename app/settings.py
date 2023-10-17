@@ -399,7 +399,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Internationalization
 LANGUAGE_CODE = getenv("LANGUAGE_CODE", "en")
-TIME_ZONE = getenv("TIME_ZONE", "UTC")
+TIME_ZONE = getenv("TIME_ZONE", "Europe/Athens")
 USE_I18N = getenv("USE_I18N", "True") == "True"
 USE_TZ = getenv("USE_TZ", "True") == "True"
 LANGUAGES = [

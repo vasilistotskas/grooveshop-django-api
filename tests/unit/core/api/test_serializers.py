@@ -9,6 +9,8 @@ from product.models.product import Product
 from product.serializers.product import ProductSerializer
 from user.serializers.account import UserAccountSerializer
 
+languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
 
 
@@ -30,6 +32,15 @@ class TestBaseExpandSerializer(TestCase):
             active=True,
             stock=10,
         )
+        for language in languages:
+            self.product.set_current_language(language)
+            self.product.name = f"Sample Product ({language})"
+            self.product.description = (
+                f"Sample Product Description ({language})"
+            )
+            self.product.save()
+        self.product.set_current_language(default_language)
+
         self.instance = ProductFavourite.objects.create(
             user=self.user, product=self.product
         )

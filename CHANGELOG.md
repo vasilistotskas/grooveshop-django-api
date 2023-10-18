@@ -3,7 +3,22 @@
 
 
 
+## v0.33.0 (2023-10-18)
+
+### Feature
+
+* feat: More at `Description`
+
+- python version bump to `3.12.0`
+- new lib `djmoney` add and usage in models and serializers.
+- versions bump.
+- migrations and api schema generate. ([`06faa95`](https://github.com/vasilistotskas/grooveshop-django-api/commit/06faa9547dba35b3c02e65e6849d8aa1afa5822d))
+
 ## v0.32.0 (2023-10-17)
+
+### Chore
+
+* chore(release): release version 0.32.0 [skip ci] ([`34f9ae5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/34f9ae5ac0b9585a508ddffe3f8a02602f936698))
 
 ### Feature
 

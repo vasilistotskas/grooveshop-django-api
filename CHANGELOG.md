@@ -3,7 +3,17 @@
 
 
 
+## v0.33.1 (2023-10-18)
+
+### Fix
+
+* fix(Dockerfile): copy python version 3.12 ([`1bae2ab`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1bae2ab8e873697418b1de6a36c81cf779f1bfd6))
+
 ## v0.33.0 (2023-10-18)
+
+### Chore
+
+* chore(release): release version 0.33.0 [skip ci] ([`9463f0a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9463f0af36b621fa007d07953f157e620272c2fb))
 
 ### Feature
 

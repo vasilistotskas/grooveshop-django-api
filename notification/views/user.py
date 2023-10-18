@@ -49,21 +49,21 @@ class NotificationUserViewSet(MultiSerializerMixin, BaseExpandView, ModelViewSet
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=["get"])
+    @action(detail=False, methods=["GET"])
     def unseen_count(self, request):
         if request.user.is_anonymous:
             return Response(status=status.HTTP_401_UNAUTHORIZED)
         count = self.queryset.filter(user=request.user, seen=False).count()
         return Response({"count": count}, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=["post"])
+    @action(detail=False, methods=["POST"])
     def mark_all_as_seen(self, request):
         if request.user.is_anonymous:
             return Response(status=status.HTTP_401_UNAUTHORIZED)
         self.queryset.filter(user=request.user, seen=False).update(seen=True)
         return Response({"success": True}, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=["post"])
+    @action(detail=False, methods=["POST"])
     def mark_all_as_unseen(self, request):
         if request.user.is_anonymous:
             return Response(status=status.HTTP_401_UNAUTHORIZED)
@@ -72,7 +72,7 @@ class NotificationUserViewSet(MultiSerializerMixin, BaseExpandView, ModelViewSet
 
     @action(
         detail=False,
-        methods=["post"],
+        methods=["POST"],
     )
     def mark_as_seen(self, request):
         if request.user.is_anonymous:
@@ -89,7 +89,7 @@ class NotificationUserViewSet(MultiSerializerMixin, BaseExpandView, ModelViewSet
 
     @action(
         detail=False,
-        methods=["post"],
+        methods=["POST"],
     )
     def mark_as_unseen(self, request):
         if request.user.is_anonymous:

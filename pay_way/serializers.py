@@ -1,3 +1,4 @@
+from djmoney.contrib.django_rest_framework import MoneyField
 from drf_spectacular.utils import extend_schema_field
 from parler_rest.serializers import TranslatableModelSerializer
 
@@ -13,6 +14,8 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
 
 class PayWaySerializer(TranslatableModelSerializer):
     translations = TranslatedFieldsFieldExtend(shared_model=PayWay)
+    cost = MoneyField(max_digits=19, decimal_places=4)
+    free_for_order_amount = MoneyField(max_digits=19, decimal_places=4)
 
     class Meta:
         model = PayWay

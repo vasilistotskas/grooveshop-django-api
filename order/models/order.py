@@ -1,12 +1,12 @@
-from decimal import Decimal
-
+from django.conf import settings
 from django.db import models
-from django.db.models import DecimalField
 from django.db.models import ExpressionWrapper
 from django.db.models import F
 from django.db.models import Sum
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
+from djmoney.models.fields import MoneyField
+from djmoney.money import Money
 
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
@@ -79,8 +79,8 @@ class Order(TimeStampMixinModel, UUIDModel):
         choices=OrderStatusEnum.choices,
         default=OrderStatusEnum.PENDING,
     )
-    shipping_price = models.DecimalField(
-        _("Shipping Price"), max_digits=8, decimal_places=2, default=0
+    shipping_price = MoneyField(
+        _("Shipping Price"), max_digits=19, decimal_places=4, default=0
     )
     document_type = models.CharField(
         _("Document Type"),
@@ -88,12 +88,11 @@ class Order(TimeStampMixinModel, UUIDModel):
         choices=OrderDocumentTypeEnum.choices,
         default=OrderDocumentTypeEnum.RECEIPT,
     )
-    paid_amount = models.DecimalField(
+    paid_amount = MoneyField(
         _("Paid Amount"),
-        max_digits=8,
-        decimal_places=2,
+        max_digits=19,
+        decimal_places=4,
         null=True,
-        blank=True,
         default=0,
     )
 
@@ -106,28 +105,31 @@ class Order(TimeStampMixinModel, UUIDModel):
         return self.first_name
 
     @property
-    def total_price_items(self) -> Decimal:
+    def total_price_items(self) -> Money:
         if not hasattr(self, "order_item_order") or not self.order_item_order:
-            return Decimal(0)
+            return Money(0, settings.DEFAULT_CURRENCY)
 
         total_items_price = self.order_item_order.aggregate(
             total_price=ExpressionWrapper(
                 Sum(F("price") * F("quantity")),
-                output_field=DecimalField(max_digits=8, decimal_places=2),
+                output_field=MoneyField(max_digits=19, decimal_places=4),
             )
         )["total_price"]
 
-        return total_items_price if total_items_price else Decimal(0)
+        if not total_items_price:
+            return Money(0, settings.DEFAULT_CURRENCY)
+
+        return Money(total_items_price, settings.DEFAULT_CURRENCY)
 
     @property
-    def total_price_extra(self) -> Decimal:
+    def total_price_extra(self) -> Money:
         pay_way = self.pay_way
 
         if not pay_way:
             return self.shipping_price
 
-        if self.total_price_items > pay_way.free_for_order_amount:
-            payment_cost = Decimal(0)
+        if self.total_price_items.amount > pay_way.free_for_order_amount.amount:
+            payment_cost = Money(0, settings.DEFAULT_CURRENCY)
         else:
             payment_cost = pay_way.cost
 
@@ -137,5 +139,5 @@ class Order(TimeStampMixinModel, UUIDModel):
     def full_address(self) -> str:
         return f"{self.street} {self.street_number}, {self.zipcode} {self.city}"
 
-    def calculate_order_total_amount(self) -> Decimal:
+    def calculate_order_total_amount(self) -> Money:
         return self.total_price_items + self.total_price_extra

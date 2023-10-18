@@ -1,3 +1,4 @@
+from djmoney.contrib.django_rest_framework import MoneyField
 from rest_framework import serializers
 
 from order.models.item import OrderItem
@@ -6,6 +7,8 @@ from product.serializers.product import ProductSerializer
 
 class OrderItemSerializer(serializers.ModelSerializer):
     product = ProductSerializer()
+    price = MoneyField(max_digits=19, decimal_places=4)
+    total_price = MoneyField(max_digits=19, decimal_places=4, read_only=True)
 
     class Meta:
         model = OrderItem

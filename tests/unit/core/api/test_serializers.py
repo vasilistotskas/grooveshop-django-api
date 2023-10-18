@@ -35,9 +35,7 @@ class TestBaseExpandSerializer(TestCase):
         for language in languages:
             self.product.set_current_language(language)
             self.product.name = f"Sample Product ({language})"
-            self.product.description = (
-                f"Sample Product Description ({language})"
-            )
+            self.product.description = f"Sample Product Description ({language})"
             self.product.save()
         self.product.set_current_language(default_language)
 

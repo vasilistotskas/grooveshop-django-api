@@ -18,6 +18,8 @@ from django.utils.safestring import mark_safe
 from django.utils.safestring import SafeString
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
+from djmoney.models.fields import MoneyField
+from djmoney.money import Money
 from mptt.fields import TreeForeignKey
 from parler.managers import TranslatableQuerySet
 from parler.models import TranslatableModel
@@ -54,21 +56,21 @@ class ProductQuerySet(TranslatableQuerySet):
         annotated_queryset = self.annotate(
             vat_value_annotation=models.ExpressionWrapper(
                 (models.F("price") * Coalesce(vat_subquery, 0)) / 100,
-                output_field=models.DecimalField(decimal_places=2, max_digits=11),
+                output_field=MoneyField(max_digits=19, decimal_places=4),
             ),
             discount_value_annotation=models.ExpressionWrapper(
                 (models.F("price") * models.F("discount_percent")) / 100,
-                output_field=models.DecimalField(decimal_places=2, max_digits=11),
+                output_field=MoneyField(max_digits=19, decimal_places=4),
             ),
             final_price_annotation=models.ExpressionWrapper(
                 models.F("price")
                 + models.F("vat_value_annotation")
                 - models.F("discount_value_annotation"),
-                output_field=models.DecimalField(decimal_places=2, max_digits=11),
+                output_field=MoneyField(max_digits=19, decimal_places=4),
             ),
             price_save_percent_annotation=models.ExpressionWrapper(
                 (models.F("discount_value_annotation") / models.F("price")) * 100,
-                output_field=models.DecimalField(decimal_places=2, max_digits=11),
+                output_field=MoneyField(max_digits=19, decimal_places=4),
             ),
         )
 
@@ -103,7 +105,12 @@ class Product(TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel):
         blank=True,
     )
     slug = models.SlugField(_("Slug"), max_length=255, unique=True)
-    price = models.DecimalField(_("Price"), max_digits=11, decimal_places=2)
+    price = MoneyField(
+        _("Price"),
+        max_digits=19,
+        decimal_places=4,
+        default=0,
+    )
     active = models.BooleanField(_("Active"), default=True)
     stock = models.PositiveIntegerField(_("Stock"), default=0)
     discount_percent = models.DecimalField(
@@ -122,14 +129,18 @@ class Product(TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel):
     )
 
     # final_price, discount_value, price_save_percent are calculated fields on save method
-    final_price = models.DecimalField(
-        _("Final Price"), max_digits=11, decimal_places=2, default=0.0, editable=False
+    final_price = MoneyField(
+        _("Final Price"),
+        max_digits=19,
+        decimal_places=4,
+        default=0,
+        editable=False,
     )
-    discount_value = models.DecimalField(
+    discount_value = MoneyField(
         _("Discount Value"),
-        max_digits=11,
-        decimal_places=2,
-        default=0.0,
+        max_digits=19,
+        decimal_places=4,
+        default=0,
         editable=False,
     )
     price_save_percent = models.DecimalField(
@@ -201,10 +212,11 @@ class Product(TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel):
         return 0
 
     @property
-    def vat_value(self) -> Decimal | int:
+    def vat_value(self) -> Money:
         if self.vat:
-            return (self.price * self.vat.value) / 100
-        return 0
+            value = (self.price.amount * self.vat.value) / 100
+            return Money(value, settings.DEFAULT_CURRENCY)
+        return Money(0, settings.DEFAULT_CURRENCY)
 
     @property
     def main_image_absolute_url(self) -> str:

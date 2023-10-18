@@ -136,6 +136,7 @@ THIRD_PARTY_APPS = [
     "django_filters",
     "drf_spectacular",
     "dj_rest_auth",
+    "djmoney",
     "allauth",
     "allauth.account",
     "allauth.mfa",
@@ -310,6 +311,7 @@ MFA_RECOVERY_CODE_COUNT = 10
 MFA_TOTP_PERIOD = 30
 MFA_TOTP_DIGITS = 6
 
+# WSGI
 WSGI_APPLICATION = "app.wsgi.application"
 
 # Database
@@ -414,6 +416,15 @@ LOCALE_PATHS = [path.join(BASE_DIR, "locale/")]
 ROSETTA_MESSAGES_PER_PAGE = 25
 ROSETTA_ENABLE_TRANSLATION_SUGGESTIONS = True
 ROSETTA_SHOW_AT_ADMIN_PANEL = True
+
+# Currency
+DEFAULT_CURRENCY = "EUR"
+BASE_CURRENCY = "EUR"
+CURRENCIES = ("USD", "EUR")
+CURRENCY_CHOICES = [("USD", "USD $"), ("EUR", "EUR €")]
+
+# Serialization
+SERIALIZATION_MODULES = {"json": "djmoney.serializers"}
 
 # Parler
 PARLER_DEFAULT_LANGUAGE_CODE = "en"

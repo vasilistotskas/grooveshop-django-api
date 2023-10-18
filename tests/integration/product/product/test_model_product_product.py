@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from django.test import override_settings
 from django.test import TestCase
 from django.utils.html import format_html
+from djmoney.money import Money
 
 from helpers.seed import get_or_create_default_image
 from product.models.category import ProductCategory
@@ -169,7 +170,7 @@ class ProductModelTestCase(TestCase):
         # Test if the fields are saved correctly
         self.assertEqual(self.product.product_code, "P123456")
         self.assertEqual(self.product.slug, "sample-product")
-        self.assertEqual(self.product.price, Decimal("100.00"))
+        self.assertEqual(self.product.price, Money("100.00", settings.DEFAULT_CURRENCY))
         self.assertEqual(self.product.active, True)
         self.assertEqual(self.product.stock, 10)
         self.assertEqual(self.product.discount_percent, Decimal("50.0"))
@@ -288,8 +289,8 @@ class ProductModelTestCase(TestCase):
 
     def test_vat_value(self):
         # Test vat value
-        expected_vat_value = (self.product.price * self.vat.value) / 100
-        self.assertEqual(self.product.vat_value, expected_vat_value)
+        expected_vat_value = (self.product.price.amount * self.vat.value) / 100
+        self.assertEqual(self.product.vat_value.amount, expected_vat_value)
 
     def test_main_image_absolute_url(self):
         # Test if main_image_absolute_url returns the correct URL

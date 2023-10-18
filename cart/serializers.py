@@ -1,3 +1,4 @@
+from djmoney.contrib.django_rest_framework import MoneyField
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
@@ -9,6 +10,8 @@ from product.serializers.product import ProductSerializer
 class CartItemSerializer(serializers.ModelSerializer):
     cart = serializers.SerializerMethodField("get_cart_id")
     product = serializers.SerializerMethodField("get_product")
+    total_price = MoneyField(max_digits=19, decimal_places=4, read_only=True)
+    total_discount_value = MoneyField(max_digits=19, decimal_places=4, read_only=True)
 
     @extend_schema_field(ProductSerializer)
     def get_product(self, cart_item) -> ProductSerializer:
@@ -60,6 +63,9 @@ class CartItemCreateSerializer(serializers.ModelSerializer):
 
 class CartSerializer(serializers.ModelSerializer):
     cart_items = serializers.SerializerMethodField("get_cart_items")
+    total_price = MoneyField(max_digits=19, decimal_places=4, read_only=True)
+    total_discount_value = MoneyField(max_digits=19, decimal_places=4, read_only=True)
+    total_vat_value = MoneyField(max_digits=19, decimal_places=4, read_only=True)
 
     @extend_schema_field(serializers.ListSerializer(child=CartItemSerializer()))
     def get_cart_items(self, cart: Cart) -> CartItemSerializer:

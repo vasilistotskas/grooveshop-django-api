@@ -5,6 +5,7 @@ from django.db import models
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
+from djmoney.models.fields import MoneyField
 from parler.models import TranslatableModel
 from parler.models import TranslatedFields
 
@@ -78,8 +79,11 @@ class Slide(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     slider = models.ForeignKey(
         "slider.Slider", related_name="slide_slider", on_delete=models.CASCADE
     )
-    discount = models.DecimalField(
-        _("Discount"), max_digits=11, decimal_places=2, default=0.0
+    discount = MoneyField(
+        _("Discount"),
+        max_digits=19,
+        decimal_places=4,
+        default=0,
     )
     show_button = models.BooleanField(
         _("Show Button"), blank=False, null=False, default=False

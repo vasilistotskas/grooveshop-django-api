@@ -1,9 +1,11 @@
 from decimal import Decimal
 
+from django.conf import settings
 from django.db import models
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
+from djmoney.money import Money
 
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
@@ -40,16 +42,19 @@ class Cart(TimeStampMixinModel, UUIDModel):
         self.save()
 
     @property
-    def total_price(self) -> float:
-        return sum([item.total_price for item in self.get_items()])
+    def total_price(self) -> Money:
+        price = sum([item.total_price.amount for item in self.get_items()])
+        return Money(price, settings.DEFAULT_CURRENCY)
 
     @property
-    def total_discount_value(self) -> float:
-        return sum([item.total_discount_value for item in self.get_items()])
+    def total_discount_value(self) -> Money:
+        value = sum([item.total_discount_value.amount for item in self.get_items()])
+        return Money(value, settings.DEFAULT_CURRENCY)
 
     @property
-    def total_vat_value(self) -> float:
-        return sum([item.product.vat_value for item in self.get_items()])
+    def total_vat_value(self) -> Money:
+        value = sum([item.product.vat_value.amount for item in self.get_items()])
+        return Money(value, settings.DEFAULT_CURRENCY)
 
     @property
     def total_items(self) -> int:
@@ -82,12 +87,14 @@ class CartItem(TimeStampMixinModel, UUIDModel):
         return f"{self.product.safe_translation_getter('name', any_language=True)} - {self.quantity}"
 
     @property
-    def total_price(self) -> float:
-        return self.quantity * self.product.final_price
+    def total_price(self) -> Money:
+        price = self.quantity * self.product.final_price.amount
+        return Money(price, settings.DEFAULT_CURRENCY)
 
     @property
-    def total_discount_value(self) -> float:
-        return self.quantity * self.product.discount_value
+    def total_discount_value(self) -> Money:
+        value = self.quantity * self.product.discount_value.amount
+        return Money(value, settings.DEFAULT_CURRENCY)
 
     @property
     def product_discount_percent(self) -> Decimal:

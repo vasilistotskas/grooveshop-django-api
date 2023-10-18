@@ -1,7 +1,9 @@
 from decimal import Decimal
 
+from django.conf import settings
 from django.test import TestCase
 from django.utils.translation import gettext_lazy as _
+from djmoney.money import Money
 
 from helpers.seed import get_or_create_default_image
 from order.enum.status_enum import OrderStatusEnum
@@ -62,9 +64,9 @@ class OrderModelTestCase(TestCase):
     def test_total_price_items_with_items(self):
         expected_total_price = 0
         for item in self.order.order_item_order.all():
-            expected_total_price += item.total_price
+            expected_total_price += item.total_price.amount
 
-        self.assertEqual(self.order.total_price_items, expected_total_price)
+        self.assertEqual(self.order.total_price_items.amount, expected_total_price)
 
     def test_total_price_items_with_no_items(self):
         order = Order.objects.create(
@@ -80,7 +82,7 @@ class OrderModelTestCase(TestCase):
             shipping_price=Decimal("10.00"),
         )
 
-        self.assertEqual(order.total_price_items, Decimal("0.00"))
+        self.assertEqual(order.total_price_items, Money("0", settings.DEFAULT_CURRENCY))
 
     def test_total_price_extra_with_pay_way(self):
         # Create a related PayWay
@@ -111,7 +113,7 @@ class OrderModelTestCase(TestCase):
             price=Decimal("50.00"),
             quantity=2,
         )
-        expected_total_price_extra = Decimal("10.00") + Decimal("5.00")
+        expected_total_price_extra = Money("15.00", settings.DEFAULT_CURRENCY)
         self.assertEqual(order.total_price_extra, expected_total_price_extra)
 
         # Test when total_price_items is greater than free_for_order_amount
@@ -120,7 +122,7 @@ class OrderModelTestCase(TestCase):
             price=Decimal("50.00"),
             quantity=2,
         )
-        expected_total_price_extra = Decimal("10.00")
+        expected_total_price_extra = Money("10.00", settings.DEFAULT_CURRENCY)
         self.assertEqual(order.total_price_extra, expected_total_price_extra)
 
     def test_total_price_extra_without_pay_way(self):
@@ -156,8 +158,10 @@ class OrderModelTestCase(TestCase):
         self.assertEqual(self.order.zipcode, "10001")
         self.assertEqual(self.order.phone, "123-456-7890")
         self.assertEqual(self.order.status, OrderStatusEnum.PENDING)
-        self.assertEqual(self.order.shipping_price, Decimal("10.00"))
-        self.assertEqual(self.order.paid_amount, Decimal("0.00"))
+        self.assertEqual(
+            self.order.shipping_price, Money("10.00", settings.DEFAULT_CURRENCY)
+        )
+        self.assertEqual(self.order.paid_amount, Money("0", settings.DEFAULT_CURRENCY))
 
     def test_verbose_names(self):
         # Test verbose names for fields

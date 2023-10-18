@@ -88,7 +88,7 @@ class ProductReviewViewSet(BaseExpandView, ModelViewSet):
             self.permission_classes = [IsAuthenticated]
         return super().get_permissions()
 
-    @action(detail=False, methods=["post"])
+    @action(detail=False, methods=["POST"])
     def user_had_reviewed(self, request, *args, **kwargs) -> Response:
         user_id = request.data.get("user")
         product_id = request.data.get("product")

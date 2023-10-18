@@ -101,7 +101,7 @@ class UserAddressViewSet(BaseExpandView, ModelViewSet):
         address.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["POST"])
     def set_main(self, request, pk=None, *args, **kwargs) -> Response:
         main_address = UserAddress.objects.filter(user=request.user, is_main=True)
         if main_address.exists():

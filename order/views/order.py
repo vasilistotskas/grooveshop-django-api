@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
+from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
 from rest_framework.generics import get_object_or_404
 from rest_framework.request import Request
@@ -103,3 +104,9 @@ class OrderViewSet(MultiSerializerMixin, ModelViewSet):
         product = get_object_or_404(Order, pk=pk)
         product.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["GET"])
+    def retrieve_by_uuid(self, request, uuid=None, *args, **kwargs) -> Response:
+        product = get_object_or_404(Order, uuid=uuid)
+        serializer = self.get_serializer(product)
+        return Response(serializer.data, status=status.HTTP_200_OK)

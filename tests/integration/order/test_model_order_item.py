@@ -1,7 +1,9 @@
 from decimal import Decimal
 
+from django.conf import settings
 from django.test import TestCase
 from django.utils.translation import gettext_lazy as _
+from djmoney.money import Money
 
 from order.models.item import OrderItem
 from order.models.order import Order
@@ -48,7 +50,9 @@ class OrderItemModelTestCase(TestCase):
         # Test if the fields are saved correctly
         self.assertEqual(self.order_item.order, self.order)
         self.assertEqual(self.order_item.product, self.product)
-        self.assertEqual(self.order_item.price, Decimal("20.00"))
+        self.assertEqual(
+            self.order_item.price, Money("20.00", settings.DEFAULT_CURRENCY)
+        )
         self.assertEqual(self.order_item.quantity, 3)
 
     def test_verbose_names(self):

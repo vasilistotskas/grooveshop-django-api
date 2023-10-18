@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.files.storage import default_storage
 from django.test import override_settings
 from django.test import TestCase
+from djmoney.money import Money
 
 from helpers.seed import get_or_create_default_image
 from pay_way.enum.pay_way_enum import PayWayEnum
@@ -41,8 +42,11 @@ class PayWayModelTestCase(TestCase):
     def test_fields(self):
         # Test if the fields are saved correctly
         self.assertTrue(self.pay_way.active)
-        self.assertEqual(self.pay_way.cost, 10.00)
-        self.assertEqual(self.pay_way.free_for_order_amount, 100.00)
+        self.assertEqual(self.pay_way.cost, Money("10.0", settings.DEFAULT_CURRENCY))
+        self.assertEqual(
+            self.pay_way.free_for_order_amount,
+            Money("100.0", settings.DEFAULT_CURRENCY),
+        )
         self.assertTrue(default_storage.exists(self.pay_way.icon.path))
 
     def test_verbose_names(self):

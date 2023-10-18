@@ -118,6 +118,8 @@ class CheckoutViewAPITest(APITestCase):
         url = self.get_checkout_url()
         response = self.client.post(url, data=order_data, format="json")
 
+        print("======= response.data =======", response.data)
+
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Product.objects.get(pk=product_1.id).stock, 8)
         self.assertEqual(Product.objects.get(pk=product_2.id).stock, 12)

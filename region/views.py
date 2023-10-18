@@ -69,7 +69,7 @@ class RegionViewSet(BaseExpandView, ModelViewSet):
 
     @action(
         detail=True,
-        methods=["get"],
+        methods=["GET"],
     )
     def get_regions_by_country_alpha_2(
         self, request, pk=None, *args, **kwargs

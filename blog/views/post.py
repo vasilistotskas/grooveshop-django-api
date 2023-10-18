@@ -75,7 +75,7 @@ class BlogPostViewSet(BaseExpandView, ModelViewSet):
         post.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=["POST"], permission_classes=[IsAuthenticated])
     def update_likes(self, request, pk=None) -> Response:
         if not request.user.is_authenticated:
             return Response(
@@ -96,7 +96,7 @@ class BlogPostViewSet(BaseExpandView, ModelViewSet):
 
     @action(
         detail=True,
-        methods=["post"],
+        methods=["POST"],
     )
     def update_view_count(self, request, pk=None) -> Response:
         post = get_object_or_404(BlogPost, pk=pk)

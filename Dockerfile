@@ -1,5 +1,5 @@
 # Base build
-FROM python:3.11-alpine as base
+FROM python:3.12-alpine as base
 
 RUN python -m venv /py && \
     /py/bin/pip install --upgrade pip setuptools wheel && \
@@ -18,7 +18,7 @@ RUN python -m venv /py && \
 COPY ./requirements.txt /requirements.txt
 RUN pip install -r /requirements.txt
 
-FROM python:3.11-alpine
+FROM python:3.12-alpine
 LABEL maintainer="groove.com"
 
 COPY --from=base /usr/local/lib/python3.11/site-packages/ /usr/local/lib/python3.11/site-packages/

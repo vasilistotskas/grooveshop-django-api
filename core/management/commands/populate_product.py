@@ -21,7 +21,7 @@ class Command(BaseCommand):
             "total_products",
             type=int,
             help="Indicates the number of products to be seeded.",
-            default=100,
+            default=1000,
             nargs="?",
         )
 

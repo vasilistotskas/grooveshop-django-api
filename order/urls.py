@@ -22,6 +22,11 @@ urlpatterns = [
         name="order-detail",
     ),
     path(
+        "order/uuid/<uuid:uuid>/",
+        OrderViewSet.as_view({"get": "retrieve_by_uuid"}),
+        name="order-detail-by-uuid",
+    ),
+    path(
         "checkout/",
         Checkout.as_view(),
         name="checkout",

@@ -79,7 +79,7 @@ class ProductViewSet(BaseExpandView, ModelViewSet):
         product.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["POST"])
     def update_product_hits(self, request, pk=None, *args, **kwargs) -> Response:
         product = get_object_or_404(Product, pk=pk)
         data = {"hits": product.hits + 1}

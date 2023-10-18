@@ -3,6 +3,8 @@ from decimal import Decimal
 from django.db import models
 from django.db.models import QuerySet
 from django.utils.translation import gettext_lazy as _
+from djmoney.models.fields import MoneyField
+from djmoney.money import Money
 
 from core.models import SortableModel
 from core.models import TimeStampMixinModel
@@ -17,7 +19,7 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
     product = models.ForeignKey(
         "product.Product", related_name="order_item_product", on_delete=models.CASCADE
     )
-    price = models.DecimalField(_("Price"), max_digits=8, decimal_places=2)
+    price = MoneyField(_("Price"), max_digits=19, decimal_places=4)
     quantity = models.IntegerField(_("Quantity"), default=1)
 
     class Meta:
@@ -29,8 +31,9 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
         return "%s" % self.id
 
     @property
-    def total_price(self) -> Decimal:
-        return self.price * self.quantity
+    def total_price(self) -> Money:
+        price = self.price.amount * self.quantity
+        return Money(amount=Decimal(price), currency=self.price.currency)
 
     def get_ordering_queryset(self) -> QuerySet:
         return self.order.order_item_order.all()

@@ -6,6 +6,7 @@ from django.core.files.storage import default_storage
 from django.test import override_settings
 from django.test import TestCase
 from django.utils.timezone import now
+from djmoney.money import Money
 
 from helpers.seed import get_or_create_default_image
 from slider.models import Slide
@@ -50,7 +51,7 @@ class SlideModelTestCase(TestCase):
 
     def test_fields(self):
         # Test if the fields are saved correctly
-        self.assertEqual(self.slide.discount, 0.0)
+        self.assertEqual(self.slide.discount, Money("0.0", settings.DEFAULT_CURRENCY))
         self.assertTrue(self.slide.show_button)
         self.assertTrue(default_storage.exists(self.slide.image.path))
 

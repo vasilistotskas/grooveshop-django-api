@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-09-27 20:59+0300\n"
+"POT-Creation-Date: 2023-10-19 10:58+0300\n"
 "PO-Revision-Date: 2023-07-12 12:32+0300\n"
 "Last-Translator:   <bill@bill.gr>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -19,15 +19,15 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Translated-Using: django-rosetta 0.9.9\n"
 
-#: .\app\settings.py:433
+#: .\app\settings.py:408
 msgid "English"
 msgstr ""
 
-#: .\app\settings.py:434
+#: .\app\settings.py:409
 msgid "German"
 msgstr ""
 
-#: .\app\settings.py:435
+#: .\app\settings.py:410
 msgid "Greek"
 msgstr ""
 
@@ -37,6 +37,42 @@ msgstr ""
 
 #: .\app\urls.py:58
 msgid "admin_no_otp/"
+msgstr ""
+
+#: .\authentication\serializers.py:117
+msgid "Authenticator code"
+msgstr ""
+
+#: .\authentication\serializers.py:129
+msgid "TOTP enabled"
+msgstr ""
+
+#: .\authentication\views\base.py:60
+msgid "Returns if the user is already registered or not."
+msgstr ""
+
+#: .\authentication\views\mfa.py:43 .\authentication\views\mfa.py:148
+msgid "TOTP is not enabled for this user"
+msgstr ""
+
+#: .\authentication\views\mfa.py:57
+msgid "Invalid code"
+msgstr ""
+
+#: .\authentication\views\mfa.py:77 .\authentication\views\mfa.py:111
+msgid "TOTP is already enabled for this user"
+msgstr ""
+
+#: .\authentication\views\mfa.py:166
+msgid "No TOTP authenticator found for this user"
+msgstr ""
+
+#: .\authentication\views\mfa.py:198 .\authentication\views\mfa.py:222
+msgid "No recovery codes found for this user"
+msgstr ""
+
+#: .\authentication\views\mfa.py:240
+msgid "Check if TOTP is enabled for the current user"
 msgstr ""
 
 #: .\blog\enum\blog_post_enum.py:6
@@ -68,7 +104,7 @@ msgid "Blog Authors"
 msgstr ""
 
 #: .\blog\models\category.py:19 .\blog\models\post.py:24
-#: .\product\models\image.py:24 .\slider\models.py:20 .\slider\models.py:90
+#: .\product\models\image.py:24 .\slider\models.py:21 .\slider\models.py:94
 #: .\tests\integration\slider\test_model_slider.py:48
 #: .\user\models\account.py:89
 #: .\venv\Lib\site-packages\django\db\models\fields\files.py:393
@@ -76,14 +112,14 @@ msgid "Image"
 msgstr ""
 
 #: .\blog\models\category.py:22 .\blog\models\tag.py:16 .\country\models.py:36
-#: .\pay_way\models.py:29 .\product\models\category.py:62
-#: .\product\models\product.py:145 .\region\models.py:18 .\slider\models.py:29
-#: .\slider\models.py:96
+#: .\pay_way\models.py:30 .\product\models\category.py:62
+#: .\product\models\product.py:156 .\region\models.py:18 .\slider\models.py:30
+#: .\slider\models.py:100
 msgid "Name"
 msgstr ""
 
 #: .\blog\models\category.py:23 .\product\models\category.py:63
-#: .\product\models\product.py:147 .\slider\models.py:33 .\slider\models.py:101
+#: .\product\models\product.py:158 .\slider\models.py:34 .\slider\models.py:105
 msgid "Description"
 msgstr ""
 
@@ -113,7 +149,7 @@ msgstr ""
 
 #: .\blog\models\post.py:45 .\order\models\order.py:77
 #: .\product\models\review.py:28
-#: .\tests\integration\order\test_model_order_order.py:183
+#: .\tests\integration\order\test_model_order_order.py:187
 msgid "Status"
 msgstr ""
 
@@ -125,12 +161,12 @@ msgstr ""
 msgid "View Count"
 msgstr ""
 
-#: .\blog\models\post.py:53 .\product\models\image.py:30 .\slider\models.py:31
-#: .\slider\models.py:98 .\tip\models.py:31 .\user\models\address.py:18
+#: .\blog\models\post.py:53 .\product\models\image.py:30 .\slider\models.py:32
+#: .\slider\models.py:102 .\tip\models.py:31 .\user\models\address.py:18
 msgid "Title"
 msgstr ""
 
-#: .\blog\models\post.py:54 .\slider\models.py:99
+#: .\blog\models\post.py:54 .\slider\models.py:103
 msgid "Subtitle"
 msgstr ""
 
@@ -146,8 +182,8 @@ msgstr ""
 msgid "Blog Posts"
 msgstr ""
 
-#: .\blog\models\tag.py:14 .\pay_way\models.py:19
-#: .\product\models\product.py:107 .\tip\models.py:29
+#: .\blog\models\tag.py:14 .\pay_way\models.py:20
+#: .\product\models\product.py:114 .\tip\models.py:29
 #: .\user\models\account.py:91
 msgid "Active"
 msgstr ""
@@ -160,28 +196,28 @@ msgstr ""
 msgid "Blog Tags"
 msgstr ""
 
-#: .\cart\models.py:22
+#: .\cart\models.py:24
 msgid "Last Activity"
 msgstr ""
 
-#: .\cart\models.py:25
+#: .\cart\models.py:27
 msgid "Cart"
 msgstr ""
 
-#: .\cart\models.py:26
+#: .\cart\models.py:28
 msgid "Carts"
 msgstr ""
 
-#: .\cart\models.py:69 .\order\models\item.py:21
-#: .\tests\integration\order\test_model_order_item.py:66
+#: .\cart\models.py:76 .\order\models\item.py:23
+#: .\tests\integration\order\test_model_order_item.py:70
 msgid "Quantity"
 msgstr ""
 
-#: .\cart\models.py:72
+#: .\cart\models.py:79
 msgid "Cart Item"
 msgstr ""
 
-#: .\cart\models.py:73
+#: .\cart\models.py:80
 msgid "Cart Items"
 msgstr ""
 
@@ -873,11 +909,11 @@ msgstr ""
 msgid "Seen"
 msgstr ""
 
-#: .\notification\models\user.py:28
+#: .\notification\models\user.py:27
 msgid "Notification User"
 msgstr ""
 
-#: .\notification\models\user.py:29
+#: .\notification\models\user.py:28
 msgid "Notification Users"
 msgstr ""
 
@@ -905,58 +941,58 @@ msgstr ""
 msgid "Pending"
 msgstr ""
 
-#: .\order\models\item.py:20 .\product\models\product.py:106
-#: .\tests\integration\order\test_model_order_item.py:63
+#: .\order\models\item.py:22 .\product\models\product.py:109
+#: .\tests\integration\order\test_model_order_item.py:67
 msgid "Price"
 msgstr ""
 
-#: .\order\models\item.py:24
-#: .\tests\integration\order\test_model_order_item.py:71
+#: .\order\models\item.py:26
+#: .\tests\integration\order\test_model_order_item.py:75
 msgid "Order Item"
 msgstr ""
 
-#: .\order\models\item.py:25
-#: .\tests\integration\order\test_model_order_item.py:72
+#: .\order\models\item.py:27
+#: .\tests\integration\order\test_model_order_item.py:76
 msgid "Order Items"
 msgstr ""
 
 #: .\order\models\order.py:63
-#: .\tests\integration\order\test_model_order_order.py:164
+#: .\tests\integration\order\test_model_order_order.py:168
 msgid "Email"
 msgstr ""
 
 #: .\order\models\order.py:64
-#: .\tests\integration\order\test_model_order_order.py:166
+#: .\tests\integration\order\test_model_order_order.py:170
 #: .\user\models\account.py:64 .\user\models\address.py:19
 msgid "First Name"
 msgstr ""
 
 #: .\order\models\order.py:65
-#: .\tests\integration\order\test_model_order_order.py:169
+#: .\tests\integration\order\test_model_order_order.py:173
 #: .\user\models\account.py:66 .\user\models\address.py:20
 msgid "Last Name"
 msgstr ""
 
 #: .\order\models\order.py:66
-#: .\tests\integration\order\test_model_order_order.py:171
+#: .\tests\integration\order\test_model_order_order.py:175
 #: .\user\models\address.py:21
 msgid "Street"
 msgstr ""
 
 #: .\order\models\order.py:67
-#: .\tests\integration\order\test_model_order_order.py:173
+#: .\tests\integration\order\test_model_order_order.py:177
 #: .\user\models\address.py:22
 msgid "Street Number"
 msgstr ""
 
 #: .\order\models\order.py:68
-#: .\tests\integration\order\test_model_order_order.py:175
+#: .\tests\integration\order\test_model_order_order.py:179
 #: .\user\models\account.py:68 .\user\models\address.py:23
 msgid "City"
 msgstr ""
 
 #: .\order\models\order.py:69
-#: .\tests\integration\order\test_model_order_order.py:177
+#: .\tests\integration\order\test_model_order_order.py:181
 msgid "Zipcode"
 msgstr ""
 
@@ -965,7 +1001,7 @@ msgid "Place"
 msgstr ""
 
 #: .\order\models\order.py:71
-#: .\tests\integration\order\test_model_order_order.py:179
+#: .\tests\integration\order\test_model_order_order.py:183
 #: .\user\models\account.py:67
 msgid "Phone"
 msgstr ""
@@ -979,7 +1015,7 @@ msgid "Customer Notes"
 msgstr ""
 
 #: .\order\models\order.py:83
-#: .\tests\integration\order\test_model_order_order.py:186
+#: .\tests\integration\order\test_model_order_order.py:190
 msgid "Shipping Price"
 msgstr ""
 
@@ -988,19 +1024,19 @@ msgid "Document Type"
 msgstr ""
 
 #: .\order\models\order.py:92
-#: .\tests\integration\order\test_model_order_order.py:181
+#: .\tests\integration\order\test_model_order_order.py:185
 msgid "Paid Amount"
 msgstr ""
 
-#: .\order\models\order.py:101
-#: .\tests\integration\order\test_model_order_order.py:191
+#: .\order\models\order.py:100
+#: .\tests\integration\order\test_model_order_order.py:195
 #: .\venv\Lib\site-packages\django\forms\formsets.py:484
 #: .\venv\Lib\site-packages\django\forms\formsets.py:491
 msgid "Order"
 msgstr ""
 
-#: .\order\models\order.py:102
-#: .\tests\integration\order\test_model_order_order.py:192
+#: .\order\models\order.py:101
+#: .\tests\integration\order\test_model_order_order.py:196
 msgid "Orders"
 msgstr ""
 
@@ -1020,23 +1056,23 @@ msgstr ""
 msgid "PayPal"
 msgstr ""
 
-#: .\pay_way\models.py:20
+#: .\pay_way\models.py:21
 msgid "Cost"
 msgstr ""
 
-#: .\pay_way\models.py:22
+#: .\pay_way\models.py:23
 msgid "Free For Order Amount"
 msgstr ""
 
-#: .\pay_way\models.py:25 .\tip\models.py:23
+#: .\pay_way\models.py:26 .\tip\models.py:23
 msgid "Icon"
 msgstr ""
 
-#: .\pay_way\models.py:38
+#: .\pay_way\models.py:39
 msgid "Pay Way"
 msgstr ""
 
-#: .\pay_way\models.py:39
+#: .\pay_way\models.py:40
 msgid "Pay Ways"
 msgstr ""
 
@@ -1123,7 +1159,7 @@ msgstr ""
 msgid "Ten"
 msgstr ""
 
-#: .\product\models\category.py:48 .\product\models\product.py:105
+#: .\product\models\category.py:48 .\product\models\product.py:107
 msgid "Slug"
 msgstr ""
 
@@ -1155,7 +1191,7 @@ msgstr ""
 msgid "Product Favourites"
 msgstr ""
 
-#: .\product\models\image.py:26 .\slider\models.py:23 .\slider\models.py:93
+#: .\product\models\image.py:26 .\slider\models.py:24 .\slider\models.py:97
 msgid "Thumbnail"
 msgstr ""
 
@@ -1171,43 +1207,43 @@ msgstr ""
 msgid "Product Image"
 msgstr ""
 
-#: .\product\models\product.py:96
+#: .\product\models\product.py:98
 msgid "Product Code"
 msgstr ""
 
-#: .\product\models\product.py:108
+#: .\product\models\product.py:115
 msgid "Stock"
 msgstr ""
 
-#: .\product\models\product.py:110
+#: .\product\models\product.py:117
 msgid "Discount Percent"
 msgstr ""
 
-#: .\product\models\product.py:119
+#: .\product\models\product.py:126
 msgid "Hits"
 msgstr ""
 
-#: .\product\models\product.py:121
+#: .\product\models\product.py:128
 msgid "Weight (kg)"
 msgstr ""
 
-#: .\product\models\product.py:126
+#: .\product\models\product.py:133
 msgid "Final Price"
 msgstr ""
 
-#: .\product\models\product.py:129
+#: .\product\models\product.py:140
 msgid "Discount Value"
 msgstr ""
 
-#: .\product\models\product.py:136
+#: .\product\models\product.py:147
 msgid "Price Save Percent"
 msgstr ""
 
-#: .\product\models\product.py:154
+#: .\product\models\product.py:165
 msgid "Product"
 msgstr ""
 
-#: .\product\models\product.py:155
+#: .\product\models\product.py:166
 msgid "Products"
 msgstr ""
 
@@ -1239,71 +1275,83 @@ msgstr ""
 msgid "Regions"
 msgstr ""
 
-#: .\session\views.py:26
-msgid "Returns whether the user is authenticated or not."
+#: .\session\views.py:31
+msgid "Returns the session data."
 msgstr ""
 
-#: .\session\views.py:44
+#: .\session\views.py:68
+msgid "Returns all user sessions."
+msgstr ""
+
+#: .\session\views.py:98
+msgid "Refreshes the session."
+msgstr ""
+
+#: .\session\views.py:112
 msgid "Clears all user sessions."
 msgstr ""
 
-#: .\session\views.py:63
+#: .\session\views.py:131
+msgid "Clears a user session."
+msgstr ""
+
+#: .\session\views.py:150
 msgid "Refreshes the last activity of the user."
 msgstr ""
 
-#: .\session\views.py:89
+#: .\session\views.py:176
 msgid "Returns the number of active users."
 msgstr ""
 
-#: .\slider\models.py:26
+#: .\slider\models.py:27
 msgid "Video"
 msgstr ""
 
-#: .\slider\models.py:30 .\slider\models.py:97 .\tip\models.py:33
+#: .\slider\models.py:31 .\slider\models.py:101 .\tip\models.py:33
 msgid "Url"
 msgstr ""
 
-#: .\slider\models.py:38 .\tests\integration\slider\test_model_slider.py:55
+#: .\slider\models.py:39 .\tests\integration\slider\test_model_slider.py:55
 msgid "Slider"
 msgstr ""
 
-#: .\slider\models.py:39 .\tests\integration\slider\test_model_slider.py:59
+#: .\slider\models.py:40 .\tests\integration\slider\test_model_slider.py:59
 msgid "Sliders"
 msgstr ""
 
-#: .\slider\models.py:82
+#: .\slider\models.py:83
 msgid "Discount"
 msgstr ""
 
-#: .\slider\models.py:85
+#: .\slider\models.py:89
 msgid "Show Button"
 msgstr ""
 
-#: .\slider\models.py:87
+#: .\slider\models.py:91
 msgid "Date Start"
 msgstr ""
 
-#: .\slider\models.py:88
+#: .\slider\models.py:92
 msgid "Date End"
 msgstr ""
 
-#: .\slider\models.py:104
+#: .\slider\models.py:108
 msgid "Button Label"
 msgstr ""
 
-#: .\slider\models.py:109
+#: .\slider\models.py:113
 msgid "Slide"
 msgstr ""
 
-#: .\slider\models.py:110
+#: .\slider\models.py:114
 msgid "Slides"
 msgstr ""
 
-#: .\tests\integration\order\test_model_order_item.py:57
+#: .\tests\integration\order\test_model_order_item.py:61
 msgid "order"
 msgstr ""
 
-#: .\tests\integration\order\test_model_order_item.py:60
+#: .\tests\integration\order\test_model_order_item.py:64
 msgid "product"
 msgstr ""
 
@@ -1801,11 +1849,13 @@ msgid "Ensure this value is %(limit_value)s (it is %(show_value)s)."
 msgstr ""
 
 #: .\venv\Lib\site-packages\django\core\validators.py:392
+#: .\venv\Lib\site-packages\djmoney\models\validators.py:51
 #, python-format
 msgid "Ensure this value is less than or equal to %(limit_value)s."
 msgstr ""
 
 #: .\venv\Lib\site-packages\django\core\validators.py:401
+#: .\venv\Lib\site-packages\djmoney\models\validators.py:43
 #, python-format
 msgid "Ensure this value is greater than or equal to %(limit_value)s."
 msgstr ""
@@ -2704,18 +2754,18 @@ msgstr ""
 msgid "This is not a valid IPv6 address."
 msgstr ""
 
-#: .\venv\Lib\site-packages\django\utils\text.py:78
+#: .\venv\Lib\site-packages\django\utils\text.py:84
 #, python-format
 msgctxt "String to return when truncating text"
 msgid "%(truncated_text)s…"
 msgstr ""
 
-#: .\venv\Lib\site-packages\django\utils\text.py:254
+#: .\venv\Lib\site-packages\django\utils\text.py:269
 msgid "or"
 msgstr ""
 
 #. Translators: This string is used as a separator between list elements
-#: .\venv\Lib\site-packages\django\utils\text.py:273
+#: .\venv\Lib\site-packages\django\utils\text.py:288
 #: .\venv\Lib\site-packages\django\utils\timesince.py:135
 msgid ", "
 msgstr ""
@@ -2929,6 +2979,10 @@ msgstr ""
 msgid "Connect, get help, or contribute"
 msgstr ""
 
+#: .\venv\Lib\site-packages\djmoney\contrib\django_rest_framework\fields.py:34
+msgid "{currency!r} is not a valid currency"
+msgstr ""
+
 #: .\venv\Lib\site-packages\drf_spectacular\openapi.py:1352
 #: .\venv\Lib\site-packages\drf_spectacular\openapi.py:1405
 #: .\venv\Lib\site-packages\drf_spectacular\openapi.py:1409
@@ -2976,7 +3030,7 @@ msgstr ""
 msgid "Unable to connect to qpid with SASL mechanism %s"
 msgstr ""
 
-#: .\venv\Lib\site-packages\mypy\main.py:387
+#: .\venv\Lib\site-packages\mypy\main.py:392
 #, python-format
 msgid "%(prog)s: error: %(message)s\n"
 msgstr ""

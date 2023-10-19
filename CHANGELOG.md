@@ -3,7 +3,17 @@
 
 
 
+## v0.34.0 (2023-10-19)
+
+### Feature
+
+* feat(ci): Update package versions and use cache, compile locales ([`dee4d0f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dee4d0f9737f3a9c695062482a3112de0bc2a020))
+
 ## v0.33.1 (2023-10-18)
+
+### Chore
+
+* chore(release): release version 0.33.1 [skip ci] ([`53ea5d3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/53ea5d3bb2c745be085630b4a8cbda8eaf61aa99))
 
 ### Fix
 

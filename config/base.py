@@ -186,7 +186,7 @@ USE_TZ = getenv("USE_TZ", "True") == "True"
 
 # Site info
 SITE_NAME = getenv("SITE_NAME", "Django")
-SITE_ID = int(getenv("SITE_ID", "Django"))
+SITE_ID = int(getenv("SITE_ID", 1))
 
 LANGUAGES = [
     ("en", _("English")),

@@ -1,6 +1,6 @@
 from os import getenv
 
-SITE_ID = int(getenv("SITE_ID", "Django"))
+SITE_ID = int(getenv("SITE_ID", 1))
 
 PARLER_DEFAULT_LANGUAGE_CODE = "en"
 PARLER_LANGUAGES = {

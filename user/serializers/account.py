@@ -1,5 +1,6 @@
 from django.http import HttpRequest
 from drf_spectacular.utils import extend_schema_field
+from phonenumber_field.serializerfields import PhoneNumberField
 from rest_framework import serializers
 
 from user.models import UserAccount
@@ -7,6 +8,7 @@ from user.models import UserAccount
 
 class UserAccountSerializer(serializers.ModelSerializer):
     last_login = serializers.SerializerMethodField("get_last_login")
+    phone = PhoneNumberField(required=False)
 
     @extend_schema_field(serializers.DateTimeField)
     def get_last_login(self, user_account) -> str or None:

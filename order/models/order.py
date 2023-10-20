@@ -7,6 +7,7 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
 from djmoney.money import Money
+from phonenumber_field.modelfields import PhoneNumberField
 
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
@@ -68,9 +69,9 @@ class Order(TimeStampMixinModel, UUIDModel):
     city = models.CharField(_("City"), max_length=255)
     zipcode = models.CharField(_("Zipcode"), max_length=255)
     place = models.CharField(_("Place"), max_length=255, blank=True, null=True)
-    phone = models.CharField(_("Phone"), max_length=255)
-    mobile_phone = models.CharField(
-        _("Mobile Phone"), max_length=255, null=True, blank=True, default=None
+    phone = PhoneNumberField(_("Phone Number"))
+    mobile_phone = PhoneNumberField(
+        _("Mobile Phone Number"), null=True, blank=True, default=None
     )
     customer_notes = models.TextField(_("Customer Notes"), null=True, blank=True)
     status = models.CharField(

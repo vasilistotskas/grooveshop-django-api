@@ -15,7 +15,7 @@ class SessionTraceMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        if os.environ.get("SYSTEM_ENV") == "GITHUB_WORKFLOW":
+        if os.getenv("SYSTEM_ENV", "development") == "GITHUB_WORKFLOW":
             return self.get_response(request)
 
         response = self.get_response(request)

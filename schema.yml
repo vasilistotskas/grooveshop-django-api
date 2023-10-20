@@ -11363,11 +11363,8 @@ components:
           maxLength: 255
         phone:
           type: string
-          maxLength: 255
         mobilePhone:
           type: string
-          nullable: true
-          maxLength: 255
         paidAmount:
           type: number
           format: double
@@ -11662,11 +11659,8 @@ components:
           maxLength: 255
         phone:
           type: string
-          maxLength: 255
         mobilePhone:
           type: string
-          nullable: true
-          maxLength: 255
         customerNotes:
           type: string
           nullable: true
@@ -11800,11 +11794,8 @@ components:
           maxLength: 255
         phone:
           type: string
-          maxLength: 255
         mobilePhone:
           type: string
-          nullable: true
-          maxLength: 255
         paidAmount:
           type: number
           format: double
@@ -12933,11 +12924,8 @@ components:
           maxLength: 255
         phone:
           type: string
-          maxLength: 255
         mobilePhone:
           type: string
-          nullable: true
-          maxLength: 255
         paidAmount:
           type: number
           format: double
@@ -13709,8 +13697,6 @@ components:
           maxLength: 255
         phone:
           type: string
-          nullable: true
-          maxLength: 255
         city:
           type: string
           nullable: true
@@ -13826,14 +13812,8 @@ components:
           - $ref: '#/components/schemas/NullEnum'
         phone:
           type: string
-          nullable: true
-          title: Phone Number
-          maxLength: 255
         mobilePhone:
           type: string
-          nullable: true
-          title: Mobile Phone Number
-          maxLength: 255
         notes:
           type: string
           nullable: true
@@ -14932,8 +14912,6 @@ components:
           maxLength: 255
         phone:
           type: string
-          nullable: true
-          maxLength: 255
         city:
           type: string
           nullable: true
@@ -15057,14 +15035,8 @@ components:
           - $ref: '#/components/schemas/NullEnum'
         phone:
           type: string
-          nullable: true
-          title: Phone Number
-          maxLength: 255
         mobilePhone:
           type: string
-          nullable: true
-          title: Mobile Phone Number
-          maxLength: 255
         notes:
           type: string
           nullable: true
@@ -15084,6 +15056,7 @@ components:
       - firstName
       - id
       - lastName
+      - phone
       - region
       - street
       - streetNumber

@@ -82,7 +82,7 @@ class UserAccountViewSetTestCase(APITestCase):
             "email": "test@test.com",
             "first_name": "test",
             "last_name": "test",
-            "phone": "123456789",
+            "phone": "2101234567",
             "city": "test",
             "zipcode": "12345",
             "address": "test",

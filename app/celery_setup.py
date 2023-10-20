@@ -25,7 +25,7 @@ def setup_celery_logging(loglevel=None, **kwargs):
 def create_celery_app():
     tasker = Celery("app")
     tasker.conf.enable_utc = False
-    tasker.conf.update(timezone=os.environ.get("TIME_ZONE"))
+    tasker.conf.update(timezone=os.getenv("TIME_ZONE", "UTC"))
     tasker.config_from_object("django.conf:settings", namespace="CELERY")
 
     # Celery Beat Settings
@@ -46,13 +46,13 @@ if settings.REDIS_HEALTHY:
 
     @app.task(bind=True, name="Debug Task")
     def debug_task(self):
-        debug = bool(int(os.environ.get("DEBUG", 0)))
+        debug = bool(int(os.getenv("DEBUG", 0)))
         if debug:
             logging.debug(f"Request: {self.request!r}")
 
     @app.task(bind=True, name="Debug Task Notification")
     def debug_task_notification(self):
-        debug = bool(int(os.environ.get("DEBUG", 0)))
+        debug = bool(int(os.getenv("DEBUG", 0)))
         if debug:
             channel_layer = get_channel_layer()
             async_to_sync(channel_layer.group_send)(

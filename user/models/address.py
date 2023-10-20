@@ -3,6 +3,7 @@ from typing import List
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
+from phonenumber_field.modelfields import PhoneNumberField
 
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
@@ -52,12 +53,8 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
         blank=True,
         default=None,
     )
-    phone = models.CharField(
-        _("Phone Number"), max_length=255, null=True, blank=True, default=None
-    )
-    mobile_phone = models.CharField(
-        _("Mobile Phone Number"), max_length=255, null=True, blank=True, default=None
-    )
+    phone = PhoneNumberField(_("Phone Number"), null=True, blank=True, default=None)
+    mobile_phone = PhoneNumberField(_("Mobile Phone Number"))
     notes = models.CharField(
         _("Notes"), max_length=255, null=True, blank=True, default=None
     )

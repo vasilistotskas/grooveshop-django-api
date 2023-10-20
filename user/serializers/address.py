@@ -2,6 +2,7 @@ from typing import Dict
 from typing import Type
 
 from django.contrib.auth import get_user_model
+from phonenumber_field.serializerfields import PhoneNumberField
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
@@ -20,6 +21,8 @@ class UserAddressSerializer(BaseExpandSerializer):
     user = PrimaryKeyRelatedField(queryset=User.objects.all())
     country = PrimaryKeyRelatedField(queryset=Country.objects.all())
     region = PrimaryKeyRelatedField(queryset=Region.objects.all())
+    phone = PhoneNumberField()
+    mobile_phone = PhoneNumberField(required=False)
 
     class Meta:
         model = UserAddress

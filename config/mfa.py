@@ -1,0 +1,4 @@
+MFA_ADAPTER = "allauth.mfa.adapter.DefaultMFAAdapter"
+MFA_RECOVERY_CODE_COUNT = 10
+MFA_TOTP_PERIOD = 30
+MFA_TOTP_DIGITS = 6

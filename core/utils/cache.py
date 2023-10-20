@@ -14,10 +14,10 @@ class CustomCacheConfig:
         self.cache_backend = self.get_cache_backend()
 
     def redis_location(self) -> str:
-        if os.environ.get("SYSTEM_ENV") == "docker":
+        if os.getenv("SYSTEM_ENV", "development") == "docker":
             return "redis://redis:6379/0"
         else:
-            return os.environ.get("REDIS_URL")
+            return os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
     def is_redis_healthy(self, redis_host="localhost") -> bool:
         try:

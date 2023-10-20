@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from django_stubs_ext.db.models import TypedModelMeta
 
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
@@ -23,7 +24,7 @@ class NotificationUser(TimeStampMixinModel, UUIDModel):
     def __str__(self):
         return f"{self.user} {self.notification}"
 
-    class Meta:
+    class Meta(TypedModelMeta):
         verbose_name = _("Notification User")
         verbose_name_plural = _("Notification Users")
         ordering = ["-notification__created_at"]

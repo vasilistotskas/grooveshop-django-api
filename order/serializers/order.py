@@ -1,5 +1,6 @@
 from djmoney.contrib.django_rest_framework import MoneyField
 from drf_spectacular.utils import extend_schema_field
+from phonenumber_field.serializerfields import PhoneNumberField
 from rest_framework import serializers
 
 from country.serializers import CountrySerializer
@@ -23,6 +24,8 @@ class OrderSerializer(serializers.ModelSerializer):
     shipping_price = MoneyField(max_digits=19, decimal_places=4)
     total_price_items = MoneyField(max_digits=19, decimal_places=4, read_only=True)
     total_price_extra = MoneyField(max_digits=19, decimal_places=4, read_only=True)
+    phone = PhoneNumberField()
+    mobile_phone = PhoneNumberField(required=False)
 
     @extend_schema_field(CountrySerializer)
     def get_country(self, order) -> CountrySerializer:
@@ -77,6 +80,8 @@ class OrderCreateUpdateSerializer(serializers.ModelSerializer):
     shipping_price = MoneyField(max_digits=19, decimal_places=4)
     total_price_items = MoneyField(max_digits=19, decimal_places=4, read_only=True)
     total_price_extra = MoneyField(max_digits=19, decimal_places=4, read_only=True)
+    phone = PhoneNumberField()
+    mobile_phone = PhoneNumberField(required=False)
 
     class Meta:
         model = Order
@@ -141,6 +146,8 @@ class CheckoutSerializer(serializers.ModelSerializer):
     shipping_price = MoneyField(max_digits=19, decimal_places=4)
     total_price_items = MoneyField(max_digits=19, decimal_places=4, read_only=True)
     total_price_extra = MoneyField(max_digits=19, decimal_places=4, read_only=True)
+    phone = PhoneNumberField()
+    mobile_phone = PhoneNumberField(required=False)
 
     class Meta:
         model = Order

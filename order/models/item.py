@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.db import models
 from django.db.models import QuerySet
 from django.utils.translation import gettext_lazy as _
+from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
 from djmoney.money import Money
 
@@ -22,7 +23,7 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
     price = MoneyField(_("Price"), max_digits=19, decimal_places=4)
     quantity = models.IntegerField(_("Quantity"), default=1)
 
-    class Meta:
+    class Meta(TypedModelMeta):
         verbose_name = _("Order Item")
         verbose_name_plural = _("Order Items")
         ordering = ["sort_order"]

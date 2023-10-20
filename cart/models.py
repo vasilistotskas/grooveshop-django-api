@@ -75,7 +75,7 @@ class CartItem(TimeStampMixinModel, UUIDModel):
     )
     quantity = models.PositiveIntegerField(_("Quantity"), default=1)
 
-    class Meta:
+    class Meta(TypedModelMeta):
         verbose_name = _("Cart Item")
         verbose_name_plural = _("Cart Items")
         ordering = ["id"]

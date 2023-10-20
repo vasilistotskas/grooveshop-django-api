@@ -39,7 +39,7 @@ class CustomCache(BaseCache):
             self.cache = caches[DEFAULT_CACHE_ALIAS]
         except Exception as exc:
             logger.warning("Error connecting to cache: %s", str(exc))
-            if os.environ.get("SYSTEM_ENV") != "GITHUB_WORKFLOW":
+            if os.getenv("SYSTEM_ENV", "development") != "GITHUB_WORKFLOW":
                 self.cache = caches[FALLBACK_CACHE_ALIAS]
 
     def get(

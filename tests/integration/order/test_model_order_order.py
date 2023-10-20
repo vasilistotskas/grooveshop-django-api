@@ -180,7 +180,9 @@ class OrderModelTestCase(TestCase):
         self.assertEqual(
             self.order._meta.get_field("zipcode").verbose_name, _("Zipcode")
         )
-        self.assertEqual(self.order._meta.get_field("phone").verbose_name, _("Phone"))
+        self.assertEqual(
+            self.order._meta.get_field("phone").verbose_name, _("Phone " "Number")
+        )
         self.assertEqual(
             self.order._meta.get_field("paid_amount").verbose_name, _("Paid Amount")
         )

@@ -14,6 +14,7 @@ from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
+from phonenumber_field.modelfields import PhoneNumberField
 
 from core import caches
 from core.caches import cache_instance
@@ -64,7 +65,7 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
         _("First Name"), max_length=255, blank=True, null=True
     )
     last_name = models.CharField(_("Last Name"), max_length=255, blank=True, null=True)
-    phone = models.CharField(_("Phone"), max_length=255, blank=True, null=True)
+    phone = PhoneNumberField(_("Phone Number"), null=True, blank=True, default=None)
     city = models.CharField(_("City"), max_length=255, blank=True, null=True)
     zipcode = models.CharField(_("Zip Code"), max_length=255, blank=True, null=True)
     address = models.CharField(_("Address"), max_length=255, blank=True, null=True)

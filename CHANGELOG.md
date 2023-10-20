@@ -3,7 +3,28 @@
 
 
 
+## v0.35.0 (2023-10-20)
+
+### Feature
+
+* feat: More at `Description`
+
+- settings.py split in /config folder.
+- `phonenumber_field` library and use of `PhoneNumberField` in models and serializers.
+- `pyproject.toml` clean up.
+- migrations update. ([`1c4d811`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1c4d81115d7495ee7e6752793836aa0ec0841434))
+
+### Fix
+
+* fix: add `psycopg[binary]` in requirements.txt and .env example file cleanup. ([`49408ce`](https://github.com/vasilistotskas/grooveshop-django-api/commit/49408ce1e80fca4ae449c9994cf3664aed8e38ad))
+
+* fix(config): `SITE_ID` default value fix ([`b40d7ba`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b40d7ba4f940c34626e6f8f6db6d2d1b72d6b473))
+
 ## v0.34.0 (2023-10-19)
+
+### Chore
+
+* chore(release): release version 0.34.0 [skip ci] ([`1ea22c8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1ea22c849c4ed7122206b493f6b16fe9d209de03))
 
 ### Feature
 

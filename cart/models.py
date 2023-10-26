@@ -87,6 +87,37 @@ class CartItem(TimeStampMixinModel, UUIDModel):
         return f"{self.product.safe_translation_getter('name', any_language=True)} - {self.quantity}"
 
     @property
+    def price(self) -> Money:
+        price = self.product.price.amount
+        return Money(price, settings.DEFAULT_CURRENCY)
+
+    @property
+    def final_price(self) -> Money:
+        price = self.product.final_price.amount
+        return Money(price, settings.DEFAULT_CURRENCY)
+
+    @property
+    def discount_value(self) -> Money:
+        value = self.product.discount_value.amount
+        return Money(value, settings.DEFAULT_CURRENCY)
+
+    @property
+    def price_save_percent(self) -> Decimal:
+        return self.product.price_save_percent
+
+    @property
+    def discount_percent(self) -> Decimal:
+        return self.product.discount_percent
+
+    @property
+    def vat_percent(self) -> Decimal | int:
+        return self.product.vat_percent
+
+    @property
+    def vat_value(self) -> Money:
+        return self.product.vat_value
+
+    @property
     def total_price(self) -> Money:
         price = self.quantity * self.product.final_price.amount
         return Money(price, settings.DEFAULT_CURRENCY)
@@ -95,10 +126,6 @@ class CartItem(TimeStampMixinModel, UUIDModel):
     def total_discount_value(self) -> Money:
         value = self.quantity * self.product.discount_value.amount
         return Money(value, settings.DEFAULT_CURRENCY)
-
-    @property
-    def product_discount_percent(self) -> Decimal:
-        return self.product.discount_percent
 
     def update_quantity(self, quantity) -> None:
         self.quantity = quantity

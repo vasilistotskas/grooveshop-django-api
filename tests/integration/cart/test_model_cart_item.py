@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from django.test import TestCase
 
 from cart.models import Cart
@@ -54,6 +52,29 @@ class CartItemModelTestCase(TestCase):
         expected_str = f"{self.product.safe_translation_getter('name')} - {self.cart_item.quantity}"
         self.assertEqual(str(self.cart_item), expected_str)
 
+    def test_price(self):
+        self.assertEqual(self.cart_item.price, self.product.price)
+
+    def test_final_price(self):
+        self.assertEqual(self.cart_item.final_price, self.product.final_price)
+
+    def test_discount_value(self):
+        self.assertEqual(self.cart_item.discount_value, self.product.discount_value)
+
+    def test_price_save_percent(self):
+        self.assertEqual(
+            self.cart_item.price_save_percent, self.product.price_save_percent
+        )
+
+    def test_discount_percent(self):
+        self.assertEqual(self.cart_item.discount_percent, self.product.discount_percent)
+
+    def test_vat_percent(self):
+        self.assertEqual(self.cart_item.vat_percent, self.product.vat_percent)
+
+    def test_vat_value(self):
+        self.assertEqual(self.cart_item.vat_value, self.product.vat_value)
+
     def test_total_price(self):
         expected_total_price = self.cart_item.quantity * self.product.final_price
         self.assertEqual(self.cart_item.total_price, expected_total_price)
@@ -61,9 +82,6 @@ class CartItemModelTestCase(TestCase):
     def test_total_discount_value(self):
         expected_total_discount = self.cart_item.quantity * self.product.discount_value
         self.assertEqual(self.cart_item.total_discount_value, expected_total_discount)
-
-    def test_product_discount_percent(self):
-        self.assertEqual(self.cart_item.product_discount_percent, Decimal("5.00"))
 
     def test_update_quantity(self):
         new_quantity = 5

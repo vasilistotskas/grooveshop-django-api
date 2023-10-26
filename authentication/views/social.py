@@ -1,4 +1,3 @@
-from allauth.account.models import EmailAddress
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from allauth.socialaccount.providers.facebook.views import FacebookOAuth2Adapter
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
@@ -28,29 +27,17 @@ class SocialAccountAdapter(DefaultSocialAccountAdapter):
 
         for email_address in sociallogin.email_addresses:
             if email_address.verified:
-                email = email_address
+                email = email_address.email
                 break
 
         if not email:
             return
 
         # check if given email address already exists.
-        # Note: __iexact is used to ignore cases
-        try:
-            # email_address = EmailAddress.objects.get(email__iexact=email)
-            user = User.objects.get(email=email)
-            if user:
-                pass
-            else:
-                return
-
-        # if it does not, let allauth take care of this new social account.
-        except EmailAddress.DoesNotExist:
-            return
-
-        # if it does, connect this new social login to the existing user.
-        user = user
-        sociallogin.connect(request, user)
+        user = User.objects.filter(email__iexact=email).first()
+        if user:
+            # if it does, connect this new social login to the existing user.
+            sociallogin.connect(request, user)
 
 
 class FacebookLogin(SocialLoginView):

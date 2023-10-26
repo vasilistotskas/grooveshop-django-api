@@ -14,18 +14,20 @@ dotenv_file = BASE_DIR / ".env"
 if path.isfile(dotenv_file):
     dotenv.load_dotenv(dotenv_file)
 
+SYSTEM_ENV = getenv("SYSTEM_ENV", "dev")
+
 SECRET_KEY = getenv("DJANGO_SECRET_KEY", get_random_secret_key())
 
 DEBUG = getenv("DEBUG", "True") == "True"
 
-if "celery" in sys.argv[0]:
+if SYSTEM_ENV != "docker" and "celery" in sys.argv[0]:
     dotenv.set_key(dotenv_file, "DEBUG", "False")
 
 INTERNAL_IPS = [
     "127.0.0.1",
 ]
 
-ATOMIC_REQUESTS = True
+ATOMIC_REQUESTS = False
 
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 22500
 
@@ -42,15 +44,18 @@ if DEBUG:
 
 APP_MAIN_HOST_NAME = getenv("APP_MAIN_HOST_NAME", "localhost")
 NUXT_BASE_URL = getenv("NUXT_BASE_URL", "http://localhost:3000")
+NUXT_BASE_DOMAIN = getenv("NUXT_BASE_DOMAIN", "localhost:3000")
 MEDIA_STREAM_BASE_URL = getenv("MEDIA_STREAM_BASE_URL", "http://localhost:3003")
 
 ALLOWED_HOSTS = [
     APP_MAIN_HOST_NAME,
     NUXT_BASE_URL,
     MEDIA_STREAM_BASE_URL,
+    "http://localhost:1337",
     "localhost",
     "127.0.0.1",
     "backend",
+    "[::1]",
 ]
 ALLOWED_HOSTS.extend(
     filter(

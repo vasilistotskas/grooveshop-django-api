@@ -6,7 +6,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 
 from app.settings import BASE_DIR
 
-DEFAULT_IMAGE_PATH = os.path.join(BASE_DIR, "files/images/no_photo.jpg")
+DEFAULT_IMAGE_PATH = os.path.join(BASE_DIR, "static/images/no_photo.jpg")
 
 
 def get_or_create_default_image(

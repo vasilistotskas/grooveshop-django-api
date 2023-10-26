@@ -48,7 +48,11 @@ class Slider(TranslatableModel, TimeStampMixinModel, UUIDModel):
 
     def save(self, *args, **kwargs):
         if self.image:
-            self.thumbnail = make_thumbnail(self.image, (200, 200))
+            try:
+                self.thumbnail = make_thumbnail(self.image, (200, 200))
+            except Exception as e:
+                self.thumbnail = self.image
+                print("Error while creating thumbnail: ", e)
 
         super().save(*args, **kwargs)
 
@@ -125,7 +129,11 @@ class Slide(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
 
     def save(self, *args, **kwargs):
         if self.image:
-            self.thumbnail = make_thumbnail(self.image, (200, 200))
+            try:
+                self.thumbnail = make_thumbnail(self.image, (100, 100))
+            except Exception as e:
+                print("Error while creating thumbnail: ", e)
+                self.thumbnail = self.image
 
         super().save(*args, **kwargs)
 

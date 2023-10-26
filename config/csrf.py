@@ -1,6 +1,7 @@
 from os import getenv
 
 DEBUG = getenv("DEBUG", "True") == "True"
+
 APP_BASE_URL = getenv("APP_BASE_URL", "http://localhost:8000")
 NUXT_BASE_URL = getenv("NUXT_BASE_URL", "http://localhost:3000")
 MEDIA_STREAM_BASE_URL = getenv("MEDIA_STREAM_BASE_URL", "http://localhost:3003")
@@ -17,5 +18,6 @@ CSRF_TRUSTED_ORIGINS = [
     APP_BASE_URL,
     NUXT_BASE_URL,
     MEDIA_STREAM_BASE_URL,
+    "http://localhost:1337",
 ]
 CSRF_USE_SESSIONS = False

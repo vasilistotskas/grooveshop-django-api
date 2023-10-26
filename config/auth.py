@@ -1,6 +1,7 @@
 from os import getenv
 
 DEBUG = getenv("DEBUG", "True") == "True"
+
 NUXT_BASE_URL = getenv("NUXT_BASE_URL", "http://localhost:3000")
 
 REST_AUTH = {
@@ -30,7 +31,7 @@ REST_AUTH = {
     "JWT_AUTH_SAMESITE": "Lax",
     "JWT_AUTH_RETURN_EXPIRATION": True,
     "JWT_AUTH_COOKIE_USE_CSRF": False,
-    "JWT_AUTH_COOKIE_ENFORCE_CSRF_ON_UNAUTHENTICATED": True,
+    "JWT_AUTH_COOKIE_ENFORCE_CSRF_ON_UNAUTHENTICATED": False,
 }
 
 GOOGLE_CALLBACK_URL = getenv("GOOGLE_CALLBACK_URL", "http://localhost:8000")

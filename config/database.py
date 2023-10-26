@@ -2,6 +2,8 @@ from os import getenv
 
 SYSTEM_ENV = getenv("SYSTEM_ENV", "dev")
 
+CONN_HEALTH_CHECKS = True
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",

@@ -157,7 +157,7 @@ class Product(TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel):
         ),
         description=HTMLField(_("Description"), blank=True, null=True, db_index=True),
     )
-    search_vector = SearchVectorField(null=True)
+    search_vector = SearchVectorField(blank=True, null=True)
 
     objects = ProductManager()
 

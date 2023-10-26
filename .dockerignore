@@ -1,0 +1,76 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*/__pycache__/
+**/__pycache__
+*.py[cod]
+*$py.class
+
+# C extensions
+*.c
+*.so
+
+# Docker
+.docker
+
+# Distribution / packaging files
+*.egg-info/
+*.egg
+build/
+dist/
+
+# Django specific
+*.sqlite3
+db.sqlite3
+*.pot
+*.po
+*.mo
+
+# Python artifacts
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environment
+venv/
+myenv/
+
+# Git files
+.gitignore
+
+# macOS specific files
+.DS_Store
+
+# IDE / Editor directories
+.idea/
+*.iml
+.vscode/
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+
+# Logs
+logs/
+*.log
+
+# Runtime data
+*.pid
+*.seed
+
+# Directories to hold media files and static files
+mediafiles/
+staticfiles/
+
+# Other
+node_modules/
+*.swp
+*.bak
+*.tmp

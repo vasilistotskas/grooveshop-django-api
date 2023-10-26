@@ -5,6 +5,7 @@ from typing import List
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser
+from django.contrib.auth.models import AnonymousUser
 from django.contrib.auth.models import BaseUserManager
 from django.contrib.auth.models import PermissionsMixin
 from django.contrib.sessions.models import Session
@@ -136,24 +137,34 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
             if user and int(user.get("_auth_user_id")) == int(user_id):
                 cache_instance.delete(key)
 
-    def remove_session(self, request: HttpRequest, session_key: str) -> None:
+    @staticmethod
+    def remove_session(
+        user: AbstractBaseUser | AnonymousUser, request: HttpRequest
+    ) -> None:
         try:
-            session = Session.objects.get(session_key=session_key)
+            session = Session.objects.get(session_key=request.session.session_key)
             session.delete()
         except Session.DoesNotExist:
             pass
 
         # Session Cache
-        cache_instance.delete(
-            f"{caches.USER_AUTHENTICATED}{self.pk}:" f"{request.session.session_key}"
-        )
+        if request.user.is_authenticated:
+            cache_instance.delete(
+                f"{caches.USER_AUTHENTICATED}{user.pk}:"
+                f"{request.session.session_key}"
+            )
+        else:
+            cache_instance.delete(
+                f"{caches.USER_UNAUTHENTICATED}{request.session.session_key}"
+            )
 
         request.session.flush()
 
-        cache_instance.delete(f"django.contrib.sessions.cache{session_key}")
+        cache_instance.delete(
+            f"django.contrib.sessions.cache{request.session.session_key}"
+        )
 
-    @property
-    def get_all_sessions(self):
+    def get_cache(self) -> dict:
         user_cache_keys = cache_instance.keys(f"{caches.USER_AUTHENTICATED}{self.pk}:*")
         return cache_instance.get_many(keys=user_cache_keys)
 
@@ -186,5 +197,5 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
             return mark_safe('<img src="{}" height="50"/>'.format(self.image.url))
         else:
             return mark_safe(
-                '<img src="{}" height="50"/>'.format("/files/images/default.png")
+                '<img src="{}" height="50"/>'.format("/static/images/default.png")
             )

@@ -9,6 +9,7 @@ CORS_ALLOWED_ORIGINS = [
     APP_BASE_URL,
     NUXT_BASE_URL,
     MEDIA_STREAM_BASE_URL,
+    "http://localhost:1337",
 ]
 CORS_ORIGIN_ALLOW_ALL = getenv("CORS_ORIGIN_ALLOW_ALL", "True") == "True"
 CORS_ALLOW_CREDENTIALS = True
@@ -16,6 +17,7 @@ CORS_ORIGIN_WHITELIST = [
     APP_BASE_URL,
     NUXT_BASE_URL,
     MEDIA_STREAM_BASE_URL,
+    "http://localhost:1337",
 ]
 CORS_ALLOW_METHODS = [
     "DELETE",

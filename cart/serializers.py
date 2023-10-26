@@ -10,6 +10,10 @@ from product.serializers.product import ProductSerializer
 class CartItemSerializer(serializers.ModelSerializer):
     cart = serializers.SerializerMethodField("get_cart_id")
     product = serializers.SerializerMethodField("get_product")
+    price = MoneyField(max_digits=19, decimal_places=4, read_only=True)
+    final_price = MoneyField(max_digits=19, decimal_places=4, read_only=True)
+    discount_value = MoneyField(max_digits=19, decimal_places=4, read_only=True)
+    vat_value = MoneyField(max_digits=19, decimal_places=4, read_only=True)
     total_price = MoneyField(max_digits=19, decimal_places=4, read_only=True)
     total_discount_value = MoneyField(max_digits=19, decimal_places=4, read_only=True)
 
@@ -29,9 +33,18 @@ class CartItemSerializer(serializers.ModelSerializer):
             "cart",
             "product",
             "quantity",
+            "price",
+            "final_price",
+            "discount_value",
+            "price_save_percent",
+            "discount_percent",
+            "vat_percent",
+            "vat_value",
             "total_price",
             "total_discount_value",
-            "product_discount_percent",
+            "created_at",
+            "updated_at",
+            "uuid",
         )
 
 
@@ -84,4 +97,7 @@ class CartSerializer(serializers.ModelSerializer):
             "total_items",
             "total_items_unique",
             "cart_items",
+            "created_at",
+            "updated_at",
+            "uuid",
         )

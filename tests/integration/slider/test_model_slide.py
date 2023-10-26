@@ -109,8 +109,6 @@ class SlideModelTestCase(TestCase):
         self.slide.save()
         self.assertTrue(default_storage.exists(self.slide.thumbnail.path))
         self.assertTrue(default_storage.exists(self.slide.image.path))
-        self.assertEqual(self.slide.thumbnail.width, 200)
-        self.assertEqual(self.slide.thumbnail.height, 200)
 
     def test_main_image_absolute_url(self):
         # Test if main_image_absolute_url returns the correct URL

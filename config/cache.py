@@ -1,17 +1,28 @@
 from os import getenv
 
-from core.utils.cache import CustomCacheConfig
-
 SYSTEM_ENV = getenv("SYSTEM_ENV", "dev")
 
-custom_cache_config = CustomCacheConfig()
-
-if SYSTEM_ENV != "GITHUB_WORKFLOW":
+if SYSTEM_ENV != "GITHUB_WORKFLOW" or SYSTEM_ENV != "dev":
     CACHES = {
-        "default": custom_cache_config.cache_backend,
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": SYSTEM_ENV == "docker"
+            and "redis://redis:6379/1"
+            or "redis://localhost:6379/1",
+            "KEY_PREFIX": "redis",
+        },
         "fallback": {
             "BACKEND": "django.core.cache.backends.dummy.DummyCache",
         },
     }
-
-REDIS_HEALTHY = custom_cache_config.ready_healthy
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "unique-snowflake",
+            "KEY_PREFIX": "locmem",
+        },
+        "fallback": {
+            "BACKEND": "django.core.cache.backends.dummy.DummyCache",
+        },
+    }

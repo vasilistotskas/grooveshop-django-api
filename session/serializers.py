@@ -11,23 +11,11 @@ class SessionSerializer(serializers.Serializer):
     last_activity = serializers.DateTimeField(allow_null=True)
 
 
-class AllSessionsSerializer(serializers.Serializer):
-    sessions = SessionSerializer(many=True)
-
-
-class RefreshSessionSerializer(serializers.Serializer):
-    success = serializers.BooleanField()
-
-
-class RevokeUserSessionSerializer(serializers.Serializer):
+class RevokeSessionSerializer(serializers.Serializer):
     success = serializers.BooleanField()
 
 
 class RevokeAllUserSessionsSerializer(serializers.Serializer):
-    success = serializers.BooleanField()
-
-
-class RefreshLastActivitySerializer(serializers.Serializer):
     success = serializers.BooleanField()
 
 

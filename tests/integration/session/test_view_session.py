@@ -35,10 +35,6 @@ class SessionAPITestCase(TestCase):
     def get_session_active_users_count_url():
         return reverse("session-active-users-count")
 
-    @staticmethod
-    def get_session_refresh_last_activity_url():
-        return reverse("session-refresh-last-activity")
-
     def test_session_view_authenticated(self):
         user = User.objects.create_user(
             email="testuser@example.com", password="testpassword"
@@ -71,21 +67,6 @@ class SessionAPITestCase(TestCase):
     def test_revoke_all_user_sessions_unauthenticated(self):
         response = self.client.delete(self.get_session_revoke_all_url())
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_refresh_last_activity_authenticated(self):
-        user = User.objects.create_user(
-            email="testuser3@example.com", password="testpassword"
-        )
-        self.client.force_login(user)
-
-        response = self.client.post(self.get_session_refresh_last_activity_url())
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data, {"success": True})
-
-    def test_refresh_last_activity_unauthenticated(self):
-        response = self.client.post(self.get_session_refresh_last_activity_url())
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(response.data, {"success": False})
 
     def test_active_users_count(self):
         cache_data_1 = {

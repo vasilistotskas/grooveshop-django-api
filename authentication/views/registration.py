@@ -8,7 +8,7 @@ from core.api.parsers import NoUnderscoreBeforeNumberCamelCaseJSONParser
 
 
 class AuthRegisterView(RegisterView):
-    parser_classes = (NoUnderscoreBeforeNumberCamelCaseJSONParser,)
+    parser_classes = [NoUnderscoreBeforeNumberCamelCaseJSONParser]
 
 
 class AuthVerifyEmailView(VerifyEmailView):

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-19 10:58+0300\n"
+"POT-Creation-Date: 2023-10-26 19:51+0300\n"
 "PO-Revision-Date: 2023-07-12 12:32+0300\n"
 "Last-Translator:   <bill@bill.gr>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,18 +18,6 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Translated-Using: django-rosetta 0.9.9\n"
-
-#: .\app\settings.py:408
-msgid "English"
-msgstr ""
-
-#: .\app\settings.py:409
-msgid "German"
-msgstr ""
-
-#: .\app\settings.py:410
-msgid "Greek"
-msgstr ""
 
 #: .\app\urls.py:57
 msgid "admin/"
@@ -106,7 +94,7 @@ msgstr ""
 #: .\blog\models\category.py:19 .\blog\models\post.py:24
 #: .\product\models\image.py:24 .\slider\models.py:21 .\slider\models.py:94
 #: .\tests\integration\slider\test_model_slider.py:48
-#: .\user\models\account.py:89
+#: .\user\models\account.py:91
 #: .\venv\Lib\site-packages\django\db\models\fields\files.py:393
 msgid "Image"
 msgstr ""
@@ -147,9 +135,9 @@ msgstr ""
 msgid "Blog Comments"
 msgstr ""
 
-#: .\blog\models\post.py:45 .\order\models\order.py:77
+#: .\blog\models\post.py:45 .\order\models\order.py:78
 #: .\product\models\review.py:28
-#: .\tests\integration\order\test_model_order_order.py:187
+#: .\tests\integration\order\test_model_order_order.py:189
 msgid "Status"
 msgstr ""
 
@@ -162,7 +150,7 @@ msgid "View Count"
 msgstr ""
 
 #: .\blog\models\post.py:53 .\product\models\image.py:30 .\slider\models.py:32
-#: .\slider\models.py:102 .\tip\models.py:31 .\user\models\address.py:18
+#: .\slider\models.py:102 .\tip\models.py:31 .\user\models\address.py:19
 msgid "Title"
 msgstr ""
 
@@ -184,7 +172,7 @@ msgstr ""
 
 #: .\blog\models\tag.py:14 .\pay_way\models.py:20
 #: .\product\models\product.py:114 .\tip\models.py:29
-#: .\user\models\account.py:91
+#: .\user\models\account.py:93
 msgid "Active"
 msgstr ""
 
@@ -208,7 +196,7 @@ msgstr ""
 msgid "Carts"
 msgstr ""
 
-#: .\cart\models.py:76 .\order\models\item.py:23
+#: .\cart\models.py:76 .\order\models\item.py:24
 #: .\tests\integration\order\test_model_order_item.py:70
 msgid "Quantity"
 msgstr ""
@@ -219,6 +207,18 @@ msgstr ""
 
 #: .\cart\models.py:80
 msgid "Cart Items"
+msgstr ""
+
+#: .\config\base.py:197
+msgid "English"
+msgstr ""
+
+#: .\config\base.py:198
+msgid "German"
+msgstr ""
+
+#: .\config\base.py:199
+msgid "Greek"
 msgstr ""
 
 #: .\core\models.py:17
@@ -905,15 +905,15 @@ msgstr ""
 msgid "Notifications"
 msgstr ""
 
-#: .\notification\models\user.py:18
+#: .\notification\models\user.py:19
 msgid "Seen"
 msgstr ""
 
-#: .\notification\models\user.py:27
+#: .\notification\models\user.py:28
 msgid "Notification User"
 msgstr ""
 
-#: .\notification\models\user.py:28
+#: .\notification\models\user.py:29
 msgid "Notification Users"
 msgstr ""
 
@@ -941,102 +941,102 @@ msgstr ""
 msgid "Pending"
 msgstr ""
 
-#: .\order\models\item.py:22 .\product\models\product.py:109
+#: .\order\models\item.py:23 .\product\models\product.py:109
 #: .\tests\integration\order\test_model_order_item.py:67
 msgid "Price"
 msgstr ""
 
-#: .\order\models\item.py:26
+#: .\order\models\item.py:27
 #: .\tests\integration\order\test_model_order_item.py:75
 msgid "Order Item"
 msgstr ""
 
-#: .\order\models\item.py:27
+#: .\order\models\item.py:28
 #: .\tests\integration\order\test_model_order_item.py:76
 msgid "Order Items"
 msgstr ""
 
-#: .\order\models\order.py:63
+#: .\order\models\order.py:64
 #: .\tests\integration\order\test_model_order_order.py:168
 msgid "Email"
 msgstr ""
 
-#: .\order\models\order.py:64
+#: .\order\models\order.py:65
 #: .\tests\integration\order\test_model_order_order.py:170
-#: .\user\models\account.py:64 .\user\models\address.py:19
+#: .\user\models\account.py:66 .\user\models\address.py:20
 msgid "First Name"
 msgstr ""
 
-#: .\order\models\order.py:65
+#: .\order\models\order.py:66
 #: .\tests\integration\order\test_model_order_order.py:173
-#: .\user\models\account.py:66 .\user\models\address.py:20
+#: .\user\models\account.py:68 .\user\models\address.py:21
 msgid "Last Name"
 msgstr ""
 
-#: .\order\models\order.py:66
+#: .\order\models\order.py:67
 #: .\tests\integration\order\test_model_order_order.py:175
-#: .\user\models\address.py:21
+#: .\user\models\address.py:22
 msgid "Street"
 msgstr ""
 
-#: .\order\models\order.py:67
+#: .\order\models\order.py:68
 #: .\tests\integration\order\test_model_order_order.py:177
-#: .\user\models\address.py:22
+#: .\user\models\address.py:23
 msgid "Street Number"
 msgstr ""
 
-#: .\order\models\order.py:68
+#: .\order\models\order.py:69
 #: .\tests\integration\order\test_model_order_order.py:179
-#: .\user\models\account.py:68 .\user\models\address.py:23
+#: .\user\models\account.py:70 .\user\models\address.py:24
 msgid "City"
 msgstr ""
 
-#: .\order\models\order.py:69
+#: .\order\models\order.py:70
 #: .\tests\integration\order\test_model_order_order.py:181
 msgid "Zipcode"
 msgstr ""
 
-#: .\order\models\order.py:70 .\user\models\account.py:71
+#: .\order\models\order.py:71 .\user\models\account.py:73
 msgid "Place"
 msgstr ""
 
-#: .\order\models\order.py:71
-#: .\tests\integration\order\test_model_order_order.py:183
-#: .\user\models\account.py:67
-msgid "Phone"
+#: .\order\models\order.py:72
+#: .\tests\integration\order\test_model_order_order.py:184
+#: .\user\models\account.py:69 .\user\models\address.py:56
+msgid "Phone Number"
 msgstr ""
 
-#: .\order\models\order.py:73
-msgid "Mobile Phone"
+#: .\order\models\order.py:74 .\user\models\address.py:57
+msgid "Mobile Phone Number"
 msgstr ""
 
-#: .\order\models\order.py:75
+#: .\order\models\order.py:76
 msgid "Customer Notes"
 msgstr ""
 
-#: .\order\models\order.py:83
-#: .\tests\integration\order\test_model_order_order.py:190
+#: .\order\models\order.py:84
+#: .\tests\integration\order\test_model_order_order.py:192
 msgid "Shipping Price"
 msgstr ""
 
-#: .\order\models\order.py:86
+#: .\order\models\order.py:87
 msgid "Document Type"
 msgstr ""
 
-#: .\order\models\order.py:92
-#: .\tests\integration\order\test_model_order_order.py:185
+#: .\order\models\order.py:93
+#: .\tests\integration\order\test_model_order_order.py:187
 msgid "Paid Amount"
 msgstr ""
 
-#: .\order\models\order.py:100
-#: .\tests\integration\order\test_model_order_order.py:195
+#: .\order\models\order.py:101
+#: .\tests\integration\order\test_model_order_order.py:197
 #: .\venv\Lib\site-packages\django\forms\formsets.py:484
 #: .\venv\Lib\site-packages\django\forms\formsets.py:491
 msgid "Order"
 msgstr ""
 
-#: .\order\models\order.py:101
-#: .\tests\integration\order\test_model_order_order.py:196
+#: .\order\models\order.py:102
+#: .\tests\integration\order\test_model_order_order.py:198
 msgid "Orders"
 msgstr ""
 
@@ -1195,7 +1195,7 @@ msgstr ""
 msgid "Thumbnail"
 msgstr ""
 
-#: .\product\models\image.py:28 .\user\models\address.py:64
+#: .\product\models\image.py:28 .\user\models\address.py:61
 msgid "Is Main"
 msgstr ""
 
@@ -1275,31 +1275,19 @@ msgstr ""
 msgid "Regions"
 msgstr ""
 
-#: .\session\views.py:31
+#: .\session\views.py:28
 msgid "Returns the session data."
 msgstr ""
 
-#: .\session\views.py:68
-msgid "Returns all user sessions."
-msgstr ""
-
-#: .\session\views.py:98
-msgid "Refreshes the session."
-msgstr ""
-
-#: .\session\views.py:112
+#: .\session\views.py:56
 msgid "Clears all user sessions."
 msgstr ""
 
-#: .\session\views.py:131
+#: .\session\views.py:75
 msgid "Clears a user session."
 msgstr ""
 
-#: .\session\views.py:150
-msgid "Refreshes the last activity of the user."
-msgstr ""
-
-#: .\session\views.py:176
+#: .\session\views.py:89
 msgid "Returns the number of active users."
 msgstr ""
 
@@ -1407,59 +1395,51 @@ msgstr ""
 msgid "Other"
 msgstr ""
 
-#: .\user\models\account.py:62
+#: .\user\models\account.py:64
 msgid "Email Address"
 msgstr ""
 
-#: .\user\models\account.py:69 .\user\models\address.py:24
+#: .\user\models\account.py:71 .\user\models\address.py:25
 msgid "Zip Code"
 msgstr ""
 
-#: .\user\models\account.py:70
+#: .\user\models\account.py:72
 msgid "Address"
 msgstr ""
 
-#: .\user\models\account.py:92
+#: .\user\models\account.py:94
 msgid "Staff"
 msgstr ""
 
-#: .\user\models\account.py:93
+#: .\user\models\account.py:95
 msgid "Birth Date"
 msgstr ""
 
-#: .\user\models\account.py:101
+#: .\user\models\account.py:103
 msgid "User Account"
 msgstr ""
 
-#: .\user\models\account.py:102
+#: .\user\models\account.py:104
 msgid "User Accounts"
 msgstr ""
 
-#: .\user\models\address.py:42
+#: .\user\models\address.py:43
 msgid "Floor"
 msgstr ""
 
-#: .\user\models\address.py:49
+#: .\user\models\address.py:50
 msgid "Location Type"
 msgstr ""
 
-#: .\user\models\address.py:56
-msgid "Phone Number"
-msgstr ""
-
 #: .\user\models\address.py:59
-msgid "Mobile Phone Number"
-msgstr ""
-
-#: .\user\models\address.py:62
 msgid "Notes"
 msgstr ""
 
-#: .\user\models\address.py:67
+#: .\user\models\address.py:64
 msgid "User Address"
 msgstr ""
 
-#: .\user\models\address.py:68
+#: .\user\models\address.py:65
 msgid "User Addresses"
 msgstr ""
 

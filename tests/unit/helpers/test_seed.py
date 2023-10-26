@@ -23,7 +23,7 @@ class TestGetOrCreateDefaultImage(TestCase):
     non_existing_image: SimpleUploadedFile = None
     non_existing_image_name: str = "non_existing_image.jpg"
     default_image: SimpleUploadedFile = None
-    default_image_path: str = "files/images/no_photo.jpg"
+    default_image_path: str = "static/images/no_photo.jpg"
 
     def setUp(self):
         # Create a test image

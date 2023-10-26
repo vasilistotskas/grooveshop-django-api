@@ -24,7 +24,7 @@ class AuthPasswordResetView(PasswordResetView):
 
 
 class AuthPasswordResetConfirmView(PasswordResetConfirmView):
-    parser_classes = (NoUnderscoreBeforeNumberCamelCaseJSONParser,)
+    parser_classes = [NoUnderscoreBeforeNumberCamelCaseJSONParser]
 
 
 class AuthLoginView(LoginView):
@@ -36,7 +36,7 @@ class AuthLogoutView(LogoutView):
 
 
 class AuthPasswordChangeView(PasswordChangeView):
-    parser_classes = (NoUnderscoreBeforeNumberCamelCaseJSONParser,)
+    parser_classes = [NoUnderscoreBeforeNumberCamelCaseJSONParser]
 
 
 class AuthUserDetailsView(UserDetailsView):

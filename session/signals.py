@@ -12,6 +12,7 @@ from cart.service import ProcessCartOption
 from core import caches
 from core.caches import cache_instance
 from core.caches import generate_user_cache_key
+from user.models import UserAccount
 
 
 @receiver(user_logged_in)
@@ -63,9 +64,9 @@ def update_session_user_log_in(sender, request: Request, user, **kwargs):
 def update_session_user_log_out(sender, request: Request, user, **kwargs):
     try:
         cart_service = CartService(request=request)
-        request.session["user"] = None
-        request.user = None
-        request.session.save()
+
+        UserAccount.remove_session(request.user, request)
+
         cache_instance.delete(
             f"{caches.USER_AUTHENTICATED}{user.id}:" f"{request.session.session_key}"
         )

@@ -6,6 +6,7 @@ from typing import Any
 
 from django.core.cache import BaseCache
 from django.core.cache import caches
+from django.core.cache.backends.locmem import LocMemCache
 from django.core.cache.backends.redis import RedisCache
 
 logger = logging.getLogger(__name__)
@@ -145,11 +146,17 @@ class CustomCache(BaseCache):
                 ]
                 keys_without_prefix.sort()
                 return keys_without_prefix
-            else:
+            elif isinstance(self.cache, LocMemCache):
                 cache_keys = list(self.cache._cache.keys())
-                keys_without_prefix = [key.split(":", 2)[-1] for key in cache_keys]
+                keys_without_prefix = [
+                    key.split(":", 2)[-1] for key in cache_keys if "locmem:1:" in key
+                ]
                 keys_without_prefix.sort()
-                return keys_without_prefix
+                filtered_keys = [
+                    key for key in keys_without_prefix if "user_authenticated" in key
+                ]
+                return filtered_keys
+
         except Exception as exc:
             logger.warning("Error getting cache keys: %s", str(exc))
             return []

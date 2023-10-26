@@ -4,11 +4,7 @@ from djangorestframework_camel_case.parser import CamelCaseMultiPartParser
 
 
 class NoUnderscoreBeforeNumberCamelCaseJSONParser(CamelCaseJSONParser):
-    json_underscoreize = {
-        "no_underscore_before_number": True,
-        "ignore_keys": ("password1", "password2", "new_password1", "new_password2"),
-        "ignore_fields": ("password1", "password2", "new_password1", "new_password2"),
-    }
+    json_underscoreize = {"no_underscore_before_number": True}
 
 
 class NoUnderscoreBeforeNumberCamelCaseFormParser(CamelCaseFormParser):

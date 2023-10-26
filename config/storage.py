@@ -3,22 +3,23 @@ from os import path
 from pathlib import Path
 
 SYSTEM_ENV = getenv("SYSTEM_ENV", "dev")
-DEVELOPMENT_MODE = getenv("DEVELOPMENT_MODE", "False") == "True"
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-if DEVELOPMENT_MODE is True or SYSTEM_ENV == "GITHUB_WORKFLOW":
-    STATIC_URL = "static/"
-    STATIC_ROOT = path.join(BASE_DIR, "static")
-    MEDIA_URL = "media/"
-    MEDIA_ROOT = path.join(BASE_DIR, "media")
-    STATICFILES_DIRS = (BASE_DIR.joinpath("files"),)
+STATIC_URL = "/static/"
+STATIC_ROOT = path.join(BASE_DIR, "staticfiles")
+MEDIA_URL = "/media/"
+MEDIA_ROOT = path.join(BASE_DIR, "mediafiles")
+STATICFILES_DIRS = (path.join(BASE_DIR, "static"),)
+
+if SYSTEM_ENV in ["dev", "GITHUB_WORKFLOW", "docker"]:
     STORAGES = {
         "default": {
             "BACKEND": "django.core.files.storage.FileSystemStorage",
         },
         "staticfiles": {
-            "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+            # "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
         },
     }
 else:

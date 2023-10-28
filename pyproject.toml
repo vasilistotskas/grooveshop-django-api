@@ -16,7 +16,7 @@ build-backend = "poetry.masonry.api"
 
 [tool.poetry.dependencies]
 boto3 = "1.28.73"
-python = ">=3.12,<4.0.0"
+python = ">=3.10.13,<4.0.0"
 charset_normalizer = "3.3.1"
 chardet = "5.2.0"
 django = "4.2.6"

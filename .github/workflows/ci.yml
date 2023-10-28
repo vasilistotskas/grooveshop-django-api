@@ -11,29 +11,39 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v4
-      with:
-        python-version: 3.12.0
-        cache: 'pip'
-    - name: Install Python Poetry
-      uses: abatilo/actions-poetry@v2.3.0
-      with:
-        poetry-version: 1.6.1
-    - name: Configure poetry
-      shell: bash
-      run: python -m poetry config virtualenvs.in-project true
-    - name: View poetry version
-      run: poetry --version
-    - name: Install dependencies
-      run: |
-        python -m poetry install
-    - name: Lint with flake8
-      run: |
-        # stop the build if there are Python syntax errors or undefined names
-        python -m poetry run flake8 . --exclude .venv --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        python -m poetry run flake8 . --exclude .venv --count --exit-zero --max-complexity=31 --max-line-length=140 --statistics
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.12.0
+          cache: 'pip'
+
+      - name: Install latest pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install and configure Poetry
+        uses: abatilo/actions-poetry@v2.3.0
+        with:
+          poetry-version: 1.6.1
+
+      - name: Configure Poetry settings
+        shell: bash
+        run: python -m poetry config virtualenvs.in-project true
+
+      - name: Display Poetry version
+        run: |
+          poetry --version
+
+      - name: Install dependencies
+        run: |
+          python -m poetry install
+
+      - name: Lint with flake8
+        run: |
+          python -m poetry run flake8 . --exclude .venv --count --select=E9,F63,F7,F82 --show-source --statistics
+          python -m poetry run flake8 . --exclude .venv --count --exit-zero --max-complexity=31 --max-line-length=140 --statistics
 
   testing:
     needs: quality
@@ -70,7 +80,8 @@ jobs:
           - 6379:6379
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
@@ -78,7 +89,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
 
-      - name: psycopg prerequisites
+      - name: Install psycopg prerequisites
         run: sudo apt-get install libpq-dev
 
       - name: Install Dependencies
@@ -105,7 +116,7 @@ jobs:
           coverage run --omit=*/migrations/*,*/management/*,*/manage.py,*/setup.py,*/asgi.py,*/wsgi.py --source='.' manage.py test tests/ && coverage report
         timeout-minutes: 5
 
-      - name: Coveralls
+      - name: Upload coverage to Coveralls
         if: matrix.db == 'postgres'
         run: coveralls --service=github
         env:
@@ -115,10 +126,9 @@ jobs:
         uses: actions/upload-artifact@v3
         if: steps.coverage_comment.outputs.COMMENT_FILE_WRITTEN == 'true'
         with:
-          # If you use a different name, update COMMENT_ARTIFACT_NAME accordingly
           name: python-coverage-comment-action
-          # If you use a different name, update COMMENT_FILENAME accordingly
           path: python-coverage-comment-action.txt
+
   release:
     needs: testing
     runs-on: ubuntu-latest

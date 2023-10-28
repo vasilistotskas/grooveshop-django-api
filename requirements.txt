@@ -1,5 +1,5 @@
 black==23.10.1
-boto3==1.28.71
+boto3==1.28.73
 celery==5.3.4
 channels==4.0.0
 channels-redis==4.1.0
@@ -9,7 +9,7 @@ click==8.1.7
 coverage==7.3.2
 django==4.2.6
 django-admin-thumbnails==0.2.8
-django-allauth[mfa]==0.57.0
+django-allauth[mfa]==0.58.0
 django-browser-reload==1.12.0
 django-celery-beat==2.5.0
 django-celery-results==2.5.1

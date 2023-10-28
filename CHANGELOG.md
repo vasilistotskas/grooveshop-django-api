@@ -3,7 +3,31 @@
 
 
 
+## v0.36.0 (2023-10-28)
+
+### Chore
+
+* chore: Move docker files under docker folder. ([`f02fc33`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f02fc336998d52c0e4fcf593fe1f245f035eedd6))
+
+### Feature
+
+* feat(ci.yml): Add redis service ([`0458d56`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0458d56e9382becf18ad8aeab8c6f82ad375d8cb))
+
+* feat: Preparing for docker setup. ([`6e2f142`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6e2f1426bf0af4b59b5815da282ccc645419a3bc))
+
+### Fix
+
+* fix: ci.yml cleanup ([`50dbaf9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/50dbaf97c5419ef316d377ba01c3153533f7135f))
+
+* fix: Ci release step setup python added. ([`84b7f27`](https://github.com/vasilistotskas/grooveshop-django-api/commit/84b7f2739a3cf239b546be783e52d09df6844c53))
+
+* fix: Update poetry lock ([`fd62504`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fd62504d4cc3482b4da58c7ba5fc84314c0db6c9))
+
 ## v0.35.0 (2023-10-20)
+
+### Chore
+
+* chore(release): release version 0.35.0 [skip ci] ([`10532da`](https://github.com/vasilistotskas/grooveshop-django-api/commit/10532da8b23366858163a25c0794d133265d7f8b))
 
 ### Feature
 

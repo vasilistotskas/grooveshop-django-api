@@ -94,7 +94,7 @@ class CustomCacheTestCase(TestCase):
         }
         self.cache_instance.set_many(new_keys)
 
-        keys = self.cache_instance.keys("search")
+        keys = self.cache_instance.keys("search_key*")
         self.assertEqual(keys, ["search_key1", "search_key2", "search_key3"])
 
     def test_cache_keys_redis(self):

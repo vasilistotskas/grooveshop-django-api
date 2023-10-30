@@ -3,9 +3,27 @@
 
 
 
+## v0.36.1 (2023-10-30)
+
+### Fix
+
+* fix(cache.py): change redis host in github actions. ([`446e105`](https://github.com/vasilistotskas/grooveshop-django-api/commit/446e1058d0e5ede29c749f92519cfb6a59a930e9))
+
+* fix: `cache.py` fixed. ([`240c3b3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/240c3b3c07efd697dce6065d9eacea8616d8fe66))
+
+* fix: Update staticfiles and mediafiles ([`ba83b89`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ba83b890ec3f76a7fa333cec3f682f33d746404e))
+
+* fix: More at `Description`
+
+- celery improvements , `celery_setup.py` rename to `celery.py`.
+- cache and session improvements.
+- locales generate, API `schema.yml` generate,. ([`16e0f6d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/16e0f6d43157ed5bdec82553594bd3ada27d8049))
+
 ## v0.36.0 (2023-10-28)
 
 ### Chore
+
+* chore(release): release version 0.36.0 [skip ci] ([`2a81126`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2a81126c05d88e09aae05e0741299879f451743d))
 
 * chore: Move docker files under docker folder. ([`f02fc33`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f02fc336998d52c0e4fcf593fe1f245f035eedd6))
 

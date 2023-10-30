@@ -3,7 +3,21 @@
 
 
 
+## v0.36.2 (2023-10-30)
+
+### Fix
+
+* fix(docker.yml): Update dockerfile path. ([`b856bb1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b856bb1b771d1d8bcad4594038f3fb17fe852c28))
+
+### Unknown
+
+* Merge branch &#39;main&#39; of github.com:vasilistotskas/grooveshop-django-api ([`fc5bb9c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc5bb9c1d9b83166b1af97719abd0c273bc1010d))
+
 ## v0.36.1 (2023-10-30)
+
+### Chore
+
+* chore(release): release version 0.36.1 [skip ci] ([`b306c32`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b306c32f55e9b8b7697eab10e5526aeb99c24511))
 
 ### Fix
 

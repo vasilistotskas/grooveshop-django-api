@@ -2,18 +2,6 @@ from os import getenv
 
 SYSTEM_ENV = getenv("SYSTEM_ENV", "dev")
 
-if SYSTEM_ENV != "GITHUB_WORKFLOW" or SYSTEM_ENV != "dev":
-    CACHES = {
-        "default": {
-            "BACKEND": "django.core.cache.backends.redis.RedisCache",
-            "LOCATION": "redis://redis:6379/1",
-            "KEY_PREFIX": "redis",
-        },
-        "fallback": {
-            "BACKEND": "django.core.cache.backends.dummy.DummyCache",
-        },
-    }
-
 if SYSTEM_ENV == "dev":
     CACHES = {
         "default": {
@@ -22,18 +10,22 @@ if SYSTEM_ENV == "dev":
             "KEY_PREFIX": "redis",
         },
         "fallback": {
-            "BACKEND": "django.core.cache.backends.dummy.DummyCache",
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "unique-snowflake",
+            "KEY_PREFIX": "locmem",
         },
     }
 
 if SYSTEM_ENV == "GITHUB_WORKFLOW":
     CACHES = {
         "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": "redis://redis:6379/1",
+            "KEY_PREFIX": "redis",
+        },
+        "fallback": {
             "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
             "LOCATION": "unique-snowflake",
             "KEY_PREFIX": "locmem",
-        },
-        "fallback": {
-            "BACKEND": "django.core.cache.backends.dummy.DummyCache",
         },
     }

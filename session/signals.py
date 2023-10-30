@@ -16,10 +16,8 @@ from user.models import UserAccount
 
 
 @receiver(user_logged_in)
-def update_session_user_log_in(sender, request: Request, user, **kwargs):
+def update_session_user_log_in(sender, request: Request, **kwargs):
     try:
-        request.session["user"] = user
-
         try:
             pre_log_in_cart_id = request.session["pre_log_in_cart_id"]
         except KeyError:
@@ -53,7 +51,8 @@ def update_session_user_log_in(sender, request: Request, user, **kwargs):
         )
 
         # update last login for session
-        request.session["last_login"] = now()
+        now_str = now().isoformat()
+        request.session["last_login"] = now_str
         request.session.save()
 
     except AttributeError:

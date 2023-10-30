@@ -10,7 +10,6 @@ from celery.schedules import crontab
 from celery.signals import setup_logging
 from channels.layers import get_channel_layer
 
-
 CELERY_LOGGER_NAME = "celery"
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "app.settings")
 
@@ -45,14 +44,15 @@ app = create_celery_app()
 
 @app.task(bind=True, name="Debug Task")
 def debug_task(self):
-    debug = bool(int(os.getenv("DEBUG", 0)))
+    debug = os.getenv("DEBUG", "True") == "True"
     if debug:
+        print(f"Request: {self.request!r}")
         logging.debug(f"Request: {self.request!r}")
 
 
 @app.task(bind=True, name="Debug Task Notification")
 def debug_task_notification(self):
-    debug = bool(int(os.getenv("DEBUG", 0)))
+    debug = os.getenv("DEBUG", "True") == "True"
     if debug:
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
@@ -72,4 +72,5 @@ def debug_task_notification(self):
                 ],
             },
         )
+        print(f"Request: {self.request!r}, Notification sent.")
         logging.debug(f"Request: {self.request!r}, Notification sent.")

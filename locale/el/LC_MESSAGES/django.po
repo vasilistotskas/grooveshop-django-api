@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-26 19:51+0300\n"
+"POT-Creation-Date: 2023-10-30 20:39+0200\n"
 "PO-Revision-Date: 2023-07-12 12:32+0300\n"
 "Last-Translator:   <bill@bill.gr>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -92,7 +92,7 @@ msgid "Blog Authors"
 msgstr ""
 
 #: .\blog\models\category.py:19 .\blog\models\post.py:24
-#: .\product\models\image.py:24 .\slider\models.py:21 .\slider\models.py:94
+#: .\product\models\image.py:24 .\slider\models.py:21 .\slider\models.py:98
 #: .\tests\integration\slider\test_model_slider.py:48
 #: .\user\models\account.py:91
 #: .\venv\Lib\site-packages\django\db\models\fields\files.py:393
@@ -102,12 +102,12 @@ msgstr ""
 #: .\blog\models\category.py:22 .\blog\models\tag.py:16 .\country\models.py:36
 #: .\pay_way\models.py:30 .\product\models\category.py:62
 #: .\product\models\product.py:156 .\region\models.py:18 .\slider\models.py:30
-#: .\slider\models.py:100
+#: .\slider\models.py:104
 msgid "Name"
 msgstr ""
 
 #: .\blog\models\category.py:23 .\product\models\category.py:63
-#: .\product\models\product.py:158 .\slider\models.py:34 .\slider\models.py:105
+#: .\product\models\product.py:158 .\slider\models.py:34 .\slider\models.py:109
 msgid "Description"
 msgstr ""
 
@@ -150,11 +150,11 @@ msgid "View Count"
 msgstr ""
 
 #: .\blog\models\post.py:53 .\product\models\image.py:30 .\slider\models.py:32
-#: .\slider\models.py:102 .\tip\models.py:31 .\user\models\address.py:19
+#: .\slider\models.py:106 .\tip\models.py:31 .\user\models\address.py:19
 msgid "Title"
 msgstr ""
 
-#: .\blog\models\post.py:54 .\slider\models.py:103
+#: .\blog\models\post.py:54 .\slider\models.py:107
 msgid "Subtitle"
 msgstr ""
 
@@ -1191,7 +1191,7 @@ msgstr ""
 msgid "Product Favourites"
 msgstr ""
 
-#: .\product\models\image.py:26 .\slider\models.py:24 .\slider\models.py:97
+#: .\product\models\image.py:26 .\slider\models.py:24 .\slider\models.py:101
 msgid "Thumbnail"
 msgstr ""
 
@@ -1295,7 +1295,7 @@ msgstr ""
 msgid "Video"
 msgstr ""
 
-#: .\slider\models.py:31 .\slider\models.py:101 .\tip\models.py:33
+#: .\slider\models.py:31 .\slider\models.py:105 .\tip\models.py:33
 msgid "Url"
 msgstr ""
 
@@ -1307,31 +1307,31 @@ msgstr ""
 msgid "Sliders"
 msgstr ""
 
-#: .\slider\models.py:83
+#: .\slider\models.py:87
 msgid "Discount"
 msgstr ""
 
-#: .\slider\models.py:89
+#: .\slider\models.py:93
 msgid "Show Button"
 msgstr ""
 
-#: .\slider\models.py:91
+#: .\slider\models.py:95
 msgid "Date Start"
 msgstr ""
 
-#: .\slider\models.py:92
+#: .\slider\models.py:96
 msgid "Date End"
 msgstr ""
 
-#: .\slider\models.py:108
+#: .\slider\models.py:112
 msgid "Button Label"
 msgstr ""
 
-#: .\slider\models.py:113
+#: .\slider\models.py:117
 msgid "Slide"
 msgstr ""
 
-#: .\slider\models.py:114
+#: .\slider\models.py:118
 msgid "Slides"
 msgstr ""
 
@@ -3008,11 +3008,6 @@ msgstr ""
 #: .\venv\Lib\site-packages\kombu\transport\qpid.py:1334
 #, python-format
 msgid "Unable to connect to qpid with SASL mechanism %s"
-msgstr ""
-
-#: .\venv\Lib\site-packages\mypy\main.py:392
-#, python-format
-msgid "%(prog)s: error: %(message)s\n"
 msgstr ""
 
 #: .\venv\Lib\site-packages\timezone_field\rest_framework.py:10

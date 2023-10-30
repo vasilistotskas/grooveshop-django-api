@@ -671,148 +671,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ActiveUsersCount'
           description: ''
-  /api/v1/auth/session/all/:
-    get:
-      operationId: api_v1_auth_session_all_retrieve
-      description: Returns all user sessions.
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AllSessions'
-          description: ''
-  /api/v1/auth/session/all{format}:
-    get:
-      operationId: api_v1_auth_session_all_formatted_retrieve
-      description: Returns all user sessions.
-      parameters:
-      - in: path
-        name: format
-        schema:
-          type: string
-          enum:
-          - .json
-        required: true
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AllSessions'
-          description: ''
-  /api/v1/auth/session/refresh/:
-    post:
-      operationId: api_v1_auth_session_refresh_create
-      description: Refreshes the session.
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RefreshSession'
-          description: ''
-  /api/v1/auth/session/refresh{format}:
-    post:
-      operationId: api_v1_auth_session_refresh_formatted_create
-      description: Refreshes the session.
-      parameters:
-      - in: path
-        name: format
-        schema:
-          type: string
-          enum:
-          - .json
-        required: true
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RefreshSession'
-          description: ''
-  /api/v1/auth/session/refresh_last_activity/:
-    post:
-      operationId: api_v1_auth_session_refresh_last_activity_create
-      description: Refreshes the last activity of the user.
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RefreshLastActivity'
-          description: ''
-  /api/v1/auth/session/refresh_last_activity{format}:
-    post:
-      operationId: api_v1_auth_session_refresh_last_activity_formatted_create
-      description: Refreshes the last activity of the user.
-      parameters:
-      - in: path
-        name: format
-        schema:
-          type: string
-          enum:
-          - .json
-        required: true
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RefreshLastActivity'
-          description: ''
-  /api/v1/auth/session/revoke/{session_key}/:
+  /api/v1/auth/session/revoke/:
     delete:
       operationId: api_v1_auth_session_revoke_destroy
       description: Clears a user session.
-      parameters:
-      - in: path
-        name: sessionKey
-        schema:
-          type: string
-        required: true
       tags:
       - api
       security:
@@ -823,7 +685,7 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/auth/session/revoke/{session_key}{format}:
+  /api/v1/auth/session/revoke{format}:
     delete:
       operationId: api_v1_auth_session_revoke_formatted_destroy
       description: Clears a user session.
@@ -834,11 +696,6 @@ paths:
           type: string
           enum:
           - .json
-        required: true
-      - in: path
-        name: sessionKey
-        schema:
-          type: string
         required: true
       tags:
       - api
@@ -10737,15 +10594,6 @@ components:
           type: integer
       required:
       - activeUsers
-    AllSessions:
-      type: object
-      properties:
-        sessions:
-          type: array
-          items:
-            $ref: '#/components/schemas/Session'
-      required:
-      - sessions
     AuthToken:
       type: object
       properties:
@@ -11251,6 +11099,17 @@ components:
           items:
             $ref: '#/components/schemas/CartItem'
           readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
       required:
       - cartItems
       - id
@@ -11259,6 +11118,8 @@ components:
       - totalItemsUnique
       - totalPrice
       - totalVatValue
+      - updatedAt
+      - uuid
     CartItem:
       type: object
       properties:
@@ -11276,6 +11137,52 @@ components:
           type: integer
           maximum: 2147483647
           minimum: 0
+        price:
+          type: number
+          format: double
+          maximum: 1000000000000000
+          minimum: -1000000000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        finalPrice:
+          type: number
+          format: double
+          maximum: 1000000000000000
+          minimum: -1000000000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        discountValue:
+          type: number
+          format: double
+          maximum: 1000000000000000
+          minimum: -1000000000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        priceSavePercent:
+          type: number
+          format: double
+          readOnly: true
+        discountPercent:
+          type: number
+          format: double
+          readOnly: true
+        vatPercent:
+          oneOf:
+          - type: number
+            format: double
+          - type: integer
+          readOnly: true
+        vatValue:
+          type: number
+          format: double
+          maximum: 1000000000000000
+          minimum: -1000000000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
         totalPrice:
           type: number
           format: double
@@ -11292,17 +11199,32 @@ components:
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
-        productDiscountPercent:
-          type: number
-          format: double
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
           readOnly: true
       required:
       - cart
+      - discountPercent
+      - discountValue
+      - finalPrice
       - id
+      - price
+      - priceSavePercent
       - product
-      - productDiscountPercent
       - totalDiscountValue
       - totalPrice
+      - updatedAt
+      - uuid
+      - vatPercent
+      - vatValue
     Checkout:
       type: object
       properties:
@@ -12765,6 +12687,17 @@ components:
           items:
             $ref: '#/components/schemas/CartItem'
           readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
     PatchedCartItem:
       type: object
       properties:
@@ -12782,6 +12715,52 @@ components:
           type: integer
           maximum: 2147483647
           minimum: 0
+        price:
+          type: number
+          format: double
+          maximum: 1000000000000000
+          minimum: -1000000000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        finalPrice:
+          type: number
+          format: double
+          maximum: 1000000000000000
+          minimum: -1000000000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        discountValue:
+          type: number
+          format: double
+          maximum: 1000000000000000
+          minimum: -1000000000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        priceSavePercent:
+          type: number
+          format: double
+          readOnly: true
+        discountPercent:
+          type: number
+          format: double
+          readOnly: true
+        vatPercent:
+          oneOf:
+          - type: number
+            format: double
+          - type: integer
+          readOnly: true
+        vatValue:
+          type: number
+          format: double
+          maximum: 1000000000000000
+          minimum: -1000000000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
         totalPrice:
           type: number
           format: double
@@ -12798,9 +12777,16 @@ components:
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
-        productDiscountPercent:
-          type: number
-          format: double
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
           readOnly: true
     PatchedCountry:
       type: object
@@ -14394,20 +14380,6 @@ components:
         * `8` - Eight
         * `9` - Nine
         * `10` - Ten
-    RefreshLastActivity:
-      type: object
-      properties:
-        success:
-          type: boolean
-      required:
-      - success
-    RefreshSession:
-      type: object
-      properties:
-        success:
-          type: boolean
-      required:
-      - success
     Region:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.

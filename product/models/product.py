@@ -253,8 +253,6 @@ class Product(TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel):
                 '<img src="{}" width="100" height="100" />'.format(img.image.url)
             )
 
-        return no_img_markup
-
     @property
     def colored_stock(self) -> SafeString | SafeString:
         if self.stock > 0:

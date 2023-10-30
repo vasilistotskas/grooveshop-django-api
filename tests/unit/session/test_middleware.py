@@ -35,15 +35,16 @@ class SessionTraceMiddlewareTest(TestCase):
         user_cache_key = generate_user_cache_key(request)
         self.middleware.update_session(request)
 
+        cache = cache_instance.get(user_cache_key)
+
         expected_cache = {
             "session_key": request.session.session_key,
             "last_activity": request.session["last_activity"],
-            "user": request.session["user"],
+            "user": cache["user"],
             "referer": request.META["HTTP_REFERER"],
             "user_agent": request.META["HTTP_USER_AGENT"],
             "cart_id": request.session["cart_id"],
         }
-        cache = cache_instance.get(user_cache_key)
 
         self.assertEqual(cache, expected_cache)
 
@@ -60,15 +61,16 @@ class SessionTraceMiddlewareTest(TestCase):
         non_user_cache_key = generate_user_cache_key(request)
         self.middleware.update_session(request)
 
+        cache = cache_instance.get(non_user_cache_key)
+
         expected_cache = {
             "session_key": request.session.session_key,
             "last_activity": request.session["last_activity"],
-            "user": request.session["user"],
+            "user": cache["user"],
             "referer": request.META["HTTP_REFERER"],
             "user_agent": request.META["HTTP_USER_AGENT"],
             "cart_id": request.session["cart_id"],
         }
-        cache = cache_instance.get(non_user_cache_key)
 
         self.assertEqual(
             cache,

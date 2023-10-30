@@ -1,6 +1,8 @@
+import json
 import logging
 import os
 
+from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
 
 from core import caches
@@ -28,14 +30,14 @@ class SessionTraceMiddleware:
         user_cache_key = generate_user_cache_key(request)
 
         now = timezone.now()
+        now_str = now.isoformat()
         user = request.session.get("user", None)
         http_referer = request.META.get("HTTP_REFERER", None)
         user_agent = request.META.get("HTTP_USER_AGENT", None)
         session_key = request.session.session_key
         cart_id = request.session.get("cart_id", None)
 
-        request.session["last_activity"] = now
-        request.session["user"] = user
+        request.session["last_activity"] = now_str
         request.META["HTTP_REFERER"] = http_referer
         request.META["HTTP_USER_AGENT"] = user_agent
         request.session["session_key"] = session_key
@@ -43,9 +45,17 @@ class SessionTraceMiddleware:
         request.session.modified = True
         request.session.save()
 
+        if user is not None:
+            json_user = json.dumps(
+                {"id": request.user.id, "email": request.user.email},
+                cls=DjangoJSONEncoder,
+            )
+        else:
+            json_user = None
+
         cache_data = {
-            "last_activity": now,
-            "user": user,
+            "last_activity": now_str,
+            "user": json_user,
             "referer": http_referer,
             "user_agent": user_agent,
             "session_key": session_key,

@@ -3,7 +3,17 @@
 
 
 
+## v0.37.4 (2023-10-31)
+
+### Fix
+
+* fix: celery settings update, caches.py update, Dockerfile remove lint step. ([`208471a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/208471a2b8fb2fcbb8976db383839db182585576))
+
 ## v0.37.3 (2023-10-31)
+
+### Chore
+
+* chore(release): release version 0.37.3 [skip ci] ([`f5301f9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f5301f9e9102a2ed93522453cbc631f8c36e9fec))
 
 ### Fix
 

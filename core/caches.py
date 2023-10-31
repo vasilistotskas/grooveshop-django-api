@@ -4,6 +4,7 @@ import logging
 import os
 from typing import Any
 
+import redis
 from django.core.cache import BaseCache
 from django.core.cache import caches
 from django.core.cache.backends.locmem import LocMemCache
@@ -38,10 +39,11 @@ class CustomCache(BaseCache):
         super().__init__(params)
         try:
             self.cache = caches[DEFAULT_CACHE_ALIAS]
-        except Exception as exc:
+            if isinstance(self.cache, RedisCache):
+                self.cache._cache.get_client().ping()
+        except (redis.exceptions.ConnectionError, Exception) as exc:
             logger.warning("Error connecting to cache: %s", str(exc))
-            if os.getenv("SYSTEM_ENV", "development") != "GITHUB_WORKFLOW":
-                self.cache = caches[FALLBACK_CACHE_ALIAS]
+            self.cache = caches[FALLBACK_CACHE_ALIAS]
 
     def get(
         self, key: Any, default: Any | None = None, version: int | None = None

@@ -3,7 +3,17 @@
 
 
 
+## v0.37.0 (2023-10-31)
+
+### Feature
+
+* feat(docker.yml): add requirements for github actions cache. ([`4cbbc89`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4cbbc898674d26704fd501c6e42b54839629dbe2))
+
 ## v0.36.3 (2023-10-31)
+
+### Chore
+
+* chore(release): release version 0.36.3 [skip ci] ([`baecc20`](https://github.com/vasilistotskas/grooveshop-django-api/commit/baecc20ab98beff83313dfe9a0f0eba7da358ccd))
 
 ### Fix
 

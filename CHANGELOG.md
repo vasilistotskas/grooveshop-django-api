@@ -3,7 +3,21 @@
 
 
 
+## v0.38.0 (2023-10-31)
+
+### Feature
+
+* feat: Versions bump, `asgi.py` router improved. ([`9090c28`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9090c28ec3babf9a60cd3845b3364d6d16e3fc45))
+
+### Fix
+
+* fix: update `poetry.lock` ([`98e509a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/98e509a1098758efe30ef1077c8225682fbe687d))
+
 ## v0.37.4 (2023-10-31)
+
+### Chore
+
+* chore(release): release version 0.37.4 [skip ci] ([`b7293b2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b7293b2dd9056602e10691c15fcac4b615f02608))
 
 ### Fix
 

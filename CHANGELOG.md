@@ -3,7 +3,17 @@
 
 
 
+## v0.37.2 (2023-10-31)
+
+### Fix
+
+* fix(Dockerfile): replace apt-get with apk ([`6d53af1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6d53af12374f8521a63b332168cf4ec2179b6dba))
+
 ## v0.37.1 (2023-10-31)
+
+### Chore
+
+* chore(release): release version 0.37.1 [skip ci] ([`8b94596`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8b94596c35c9925defc8c630a6114deeef2f0717))
 
 ### Fix
 

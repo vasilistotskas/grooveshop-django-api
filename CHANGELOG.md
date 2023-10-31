@@ -3,7 +3,17 @@
 
 
 
+## v0.36.3 (2023-10-31)
+
+### Fix
+
+* fix(docker.yml): Update dockerfile path and add cache. ([`349cc26`](https://github.com/vasilistotskas/grooveshop-django-api/commit/349cc26b2c6b4a9e61af5f333fe0f8f00e9d1da1))
+
 ## v0.36.2 (2023-10-30)
+
+### Chore
+
+* chore(release): release version 0.36.2 [skip ci] ([`00917b7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/00917b76248f6b7fbd104f03a5533b6245d6210c))
 
 ### Fix
 

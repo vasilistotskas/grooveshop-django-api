@@ -37,7 +37,7 @@ FROM python:3.12-alpine
 RUN mkdir -p /home/app
 
 # create the app user
-RUN addgroup --system app && adduser --system --group app
+RUN addgroup -S app && adduser -S -G app app
 
 # create the appropriate directories
 ENV HOME=/home/app

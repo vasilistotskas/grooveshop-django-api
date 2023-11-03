@@ -14,7 +14,6 @@ ENV PYTHONUNBUFFERED 1
 
 # install system dependencies
 RUN apk update && \
-    apk add --update --no-cache libpq5 && \
     apk add --update --no-cache gcc && \
     apk add --update --no-cache musl-dev && \
     apk add --update --no-cache postgresql-dev

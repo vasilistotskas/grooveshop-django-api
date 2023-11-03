@@ -1,8 +1,8 @@
 from os import getenv
 
 SPECTACULAR_SETTINGS = {
-    "TITLE": getenv("DJANG0_SPECTACULAR_SETTINGS_TITLE", "Django"),
-    "DESCRIPTION": getenv("DJANG0_SPECTACULAR_SETTINGS_DESCRIPTION", "Django"),
+    "TITLE": getenv("DJANGO_SPECTACULAR_SETTINGS_TITLE", "Django"),
+    "DESCRIPTION": getenv("DJANGO_SPECTACULAR_SETTINGS_DESCRIPTION", "Django"),
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAuthenticated"],

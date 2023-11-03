@@ -14,7 +14,9 @@ ENV PYTHONUNBUFFERED 1
 
 # install system dependencies
 RUN apk update && \
-    apk add --no-cache gcc musl-dev
+    apk add --update --no-cache gcc && \
+    apk add --update --no-cache musl-dev && \
+    apk add --update --no-cache postgresql-dev
 
 # install python dependencies
 COPY ./requirements.txt .

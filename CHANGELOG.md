@@ -3,7 +3,17 @@
 
 
 
+## v0.39.2 (2023-11-03)
+
+### Fix
+
+* fix: Dockerfile fix, djang0 fix to django ([`dedb407`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dedb40732aaf5e49180646d8f106a23f480685cf))
+
 ## v0.39.1 (2023-11-03)
+
+### Chore
+
+* chore(release): release version 0.39.1 [skip ci] ([`d1aa819`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d1aa819ea112dfa0b6bcaa417e2505ea77c1f701))
 
 ### Fix
 

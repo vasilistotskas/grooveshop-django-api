@@ -58,6 +58,8 @@ python-semantic-release = "8.3.0"
 pydantic = "2.4.2"
 rich = "13.6.0"
 urllib3 = "2.0.7"
+uvicorn = "0.23.2"
+uvloop = "0.19.0"
 whitenoise = "6.6.0"
 
 [tool.poetry.dev-dependencies]
@@ -88,7 +90,6 @@ python-gitlab = "3.15.0"
 sentry-sdk = "*"
 shortuuid = "*"
 unittest-xml-reporting = "*"
-uvicorn = "0.23.2"
 werkzeug = "*"
 
 [tool.poetry.dependencies.celery]

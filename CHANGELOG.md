@@ -3,7 +3,17 @@
 
 
 
+## v0.39.1 (2023-11-03)
+
+### Fix
+
+* fix(Dockerfile): Add empty logs file. ([`7893a7b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7893a7b19e868108c509cadaf1fa20fdc752a407))
+
 ## v0.39.0 (2023-11-03)
+
+### Chore
+
+* chore(release): release version 0.39.0 [skip ci] ([`03e5366`](https://github.com/vasilistotskas/grooveshop-django-api/commit/03e5366c42c2f2fabb94ec410a0c984ee9cca954))
 
 ### Feature
 

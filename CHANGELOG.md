@@ -3,7 +3,17 @@
 
 
 
+## v0.39.5 (2023-11-03)
+
+### Fix
+
+* fix(Dockerfile): trying to work with psycopg ([`b4c353d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b4c353d314e3743242762806f35d7523f5512de6))
+
 ## v0.39.4 (2023-11-03)
+
+### Chore
+
+* chore(release): release version 0.39.4 [skip ci] ([`709a7b1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/709a7b1fd873fabef905fb38a1c14f8a396195e0))
 
 ### Fix
 

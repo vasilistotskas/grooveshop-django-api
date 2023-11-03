@@ -3,7 +3,17 @@
 
 
 
+## v0.39.7 (2023-11-03)
+
+### Fix
+
+* fix: Include `uvloop` library. ([`45290ff`](https://github.com/vasilistotskas/grooveshop-django-api/commit/45290ffa6b0e81d5125fcd82b63581a9af559a8b))
+
 ## v0.39.6 (2023-11-03)
+
+### Chore
+
+* chore(release): release version 0.39.6 [skip ci] ([`bccc15c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bccc15c650c7e7f91943524baccfedb9a260612c))
 
 ### Fix
 

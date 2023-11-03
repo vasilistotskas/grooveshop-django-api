@@ -3,7 +3,17 @@
 
 
 
+## v0.39.9 (2023-11-03)
+
+### Fix
+
+* fix: Include `qrcode` library. ([`53750e0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/53750e03ad24aeb112a6f629954de73450505e52))
+
 ## v0.39.8 (2023-11-03)
+
+### Chore
+
+* chore(release): release version 0.39.8 [skip ci] ([`25fc409`](https://github.com/vasilistotskas/grooveshop-django-api/commit/25fc409c43027655aea3bcd2dd4e8c5788ed19d9))
 
 ### Fix
 

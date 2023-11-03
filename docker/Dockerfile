@@ -49,6 +49,7 @@ COPY --from=builder /usr/src/app/wheels /wheels
 COPY --from=builder /usr/src/app/requirements.txt .
 RUN pip install --upgrade pip
 RUN pip install --no-cache /wheels/*
+RUN pip install "psycopg[binary,pool]"
 
 # copy entrypoint.prod.sh
 COPY ./docker/entrypoint.prod.sh .

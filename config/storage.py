@@ -33,9 +33,10 @@ else:
     AWS_LOCATION = "static"
     AWS_MEDIA_LOCATION = "media"
     AWS_S3_CUSTOM_DOMAIN = getenv("AWS_S3_CUSTOM_DOMAIN", "changeme")
+    DEFAULT_FILE_STORAGE = "core.storages.MediaRootS3BotoStorage"
     STORAGES = {
         "default": {
-            "BACKEND": "core.storages.CustomS3Boto3Storage",
+            "BACKEND": "core.storages.StaticRootS3BotoStorage",
         },
         "staticfiles": {
             "BACKEND": "storages.backends.s3boto3.S3StaticStorage",

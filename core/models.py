@@ -1,9 +1,13 @@
 import uuid
 from typing import Any
+from typing import TypeVar
 
+from django.contrib.postgres.indexes import GinIndex
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db import transaction
 from django.db.models import F
+from django.db.models import JSONField
 from django.db.models import Max
 from django.db.models import Q
 from django.db.models import QuerySet
@@ -63,7 +67,10 @@ class UUIDModel(models.Model):
         abstract = True
 
 
-class PublishedQuerySet(models.QuerySet):
+T = TypeVar("T", bound="PublishableModel")
+
+
+class PublishedQuerySet(models.QuerySet[T]):
     def published(self):
         today = now()
         return self.filter(
@@ -72,11 +79,14 @@ class PublishedQuerySet(models.QuerySet):
         )
 
 
+PublishableManager = models.Manager.from_queryset(PublishedQuerySet)
+
+
 class PublishableModel(models.Model):
     published_at = models.DateTimeField(_("Published At"), null=True, blank=True)
     is_published = models.BooleanField(_("Is Published"), default=False)
 
-    objects = models.Manager.from_queryset(PublishedQuerySet)()
+    objects: Any = PublishableManager()
 
     class Meta:
         abstract = True
@@ -86,3 +96,47 @@ class PublishableModel(models.Model):
         return self.is_published and (
             self.published_at is None or self.published_at <= now()
         )
+
+
+class ModelWithMetadata(models.Model):
+    private_metadata = JSONField(
+        blank=True, null=True, default=dict, encoder=DjangoJSONEncoder
+    )
+    metadata = JSONField(blank=True, null=True, default=dict, encoder=DjangoJSONEncoder)
+
+    class Meta:
+        indexes = [
+            GinIndex(fields=["private_metadata"], name="%(class)s_p_meta_idx"),
+            GinIndex(fields=["metadata"], name="%(class)s_meta_idx"),
+        ]
+        abstract = True
+
+    def get_value_from_private_metadata(self, key: str, default: Any = None) -> Any:
+        return self.private_metadata.get(key, default)
+
+    def store_value_in_private_metadata(self, items: dict):
+        if not self.private_metadata:
+            self.private_metadata = {}
+        self.private_metadata.update(items)
+
+    def clear_private_metadata(self):
+        self.private_metadata = {}
+
+    def delete_value_from_private_metadata(self, key: str):
+        if key in self.private_metadata:
+            del self.private_metadata[key]
+
+    def get_value_from_metadata(self, key: str, default: Any = None) -> Any:
+        return self.metadata.get(key, default)
+
+    def store_value_in_metadata(self, items: dict):
+        if not self.metadata:
+            self.metadata = {}
+        self.metadata.update(items)
+
+    def clear_metadata(self):
+        self.metadata = {}
+
+    def delete_value_from_metadata(self, key: str):
+        if key in self.metadata:
+            del self.metadata[key]

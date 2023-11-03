@@ -98,20 +98,22 @@ class ProductAdmin(TranslatableAdmin, ExportModelAdmin):
         "boolean_status",
         "image_tag",
         "likes_counter",
+        "metadata",
+        "private_metadata",
     ]
     search_fields = ["id", "category__name", "translations__name", "product_code"]
     list_filter = ["category"]
     inlines = [ProductImageInline]
-    readonly_fields = ("image_tag",)
+    readonly_fields = ("image_tag", "likes_counter")
 
-    def get_prepopulated_fields(self, request, obj=None):
+    def get_prepopulated_fields(self, request, obj=None) -> dict:
         # can't use `prepopulated_fields = ..` because it breaks the admin validation
         # for translated fields. This is the official django-parler workaround.
         return {
             "slug": ("name",),
         }
 
-    def boolean_status(self, obj):
+    def boolean_status(self, obj) -> bool:
         return True if obj.active else False
 
     setattr(

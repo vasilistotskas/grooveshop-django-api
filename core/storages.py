@@ -1,6 +1,9 @@
-from django.conf import settings
 from storages.backends.s3boto3 import S3Boto3Storage
 
 
-class CustomS3Boto3Storage(S3Boto3Storage):
-    location = settings.AWS_MEDIA_LOCATION
+class StaticRootS3BotoStorage(S3Boto3Storage):
+    location = "static"
+
+
+class MediaRootS3BotoStorage(S3Boto3Storage):
+    location = "media"

@@ -26,6 +26,7 @@ from parler.models import TranslatableModel
 from parler.models import TranslatedFields
 from tinymce.models import HTMLField
 
+from core.models import ModelWithMetadata
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
 from product.models.favourite import ProductFavourite
@@ -92,7 +93,9 @@ class ProductManager(models.Manager):
         return self.get_queryset().update_calculated_fields()
 
 
-class Product(TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel):
+class Product(
+    TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel, ModelWithMetadata
+):
     id = models.BigAutoField(primary_key=True)
     product_code = models.CharField(
         _("Product Code"), unique=True, max_length=100, default=uuid.uuid4
@@ -161,11 +164,12 @@ class Product(TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel):
 
     objects = ProductManager()
 
-    class Meta(TypedModelMeta):
+    class Meta(ModelWithMetadata.Meta, TypedModelMeta):
         verbose_name = _("Product")
         verbose_name_plural = _("Products")
         ordering = ["-created_at"]
         indexes = [
+            *ModelWithMetadata.Meta.indexes,
             GinIndex(fields=["search_vector"], name="product_search_vector_idx"),
         ]
 

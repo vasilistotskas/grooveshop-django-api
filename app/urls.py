@@ -7,6 +7,7 @@ from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.http import HttpResponse
 from django.urls import include
 from django.urls import path
+from django.urls import re_path
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_GET
 from django_otp.admin import OTPAdminSite
@@ -18,7 +19,6 @@ from drf_spectacular.views import SpectacularSwaggerView
 from rest_framework import routers
 
 from core.view import HomeView
-from notification.consumers import NotificationConsumer
 from user.views.account import ObtainAuthTokenView
 
 app_name = "app"
@@ -97,10 +97,24 @@ urlpatterns = i18n_patterns(
     prefix_default_language=False,
 )
 
-websocket_urlpatterns = [path("ws/notifications/", NotificationConsumer.as_asgi())]
+if bool(settings.DEBUG):
+    import warnings
 
-urlpatterns += static(
-    settings.MEDIA_URL,
-    document_root=settings.MEDIA_ROOT,
-)
-urlpatterns += staticfiles_urlpatterns()
+    try:
+        import debug_toolbar
+    except ImportError:
+        warnings.warn(
+            "The debug toolbar was not installed. Ignore the error. \
+            settings.py should already have warned the user about it."
+        )
+    else:
+        urlpatterns += [
+            re_path(r"^__debug__/", include(debug_toolbar.urls))  # type: ignore
+        ]
+
+    urlpatterns += static(
+        settings.MEDIA_URL,
+        document_root=settings.MEDIA_ROOT,
+    )
+
+    urlpatterns += staticfiles_urlpatterns()

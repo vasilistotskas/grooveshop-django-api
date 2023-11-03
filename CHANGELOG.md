@@ -3,7 +3,17 @@
 
 
 
+## v0.39.6 (2023-11-03)
+
+### Fix
+
+* fix: Added `phonenumbers` package. ([`e6eeb8e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e6eeb8eee0c682efaf5039c45aaa931cbf00e565))
+
 ## v0.39.5 (2023-11-03)
+
+### Chore
+
+* chore(release): release version 0.39.5 [skip ci] ([`6785c8e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6785c8effe29c8475015548143f32c392afb0f8c))
 
 ### Fix
 

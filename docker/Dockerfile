@@ -14,6 +14,7 @@ ENV PYTHONUNBUFFERED 1
 
 # install system dependencies
 RUN apk update && \
+    apk add --update --no-cache libpq5 && \
     apk add --update --no-cache gcc && \
     apk add --update --no-cache musl-dev && \
     apk add --update --no-cache postgresql-dev
@@ -69,3 +70,6 @@ USER app
 
 # run entrypoint.prod.sh
 ENTRYPOINT ["/home/app/web/entrypoint.prod.sh"]
+
+# run gunicorn
+CMD ["gunicorn", "--bind", ":8000", "--workers", "4", "--worker-class", "asgi.gunicorn_worker.UvicornWorker", "asgi:application"]

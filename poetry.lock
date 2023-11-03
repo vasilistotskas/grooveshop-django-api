@@ -2583,6 +2583,20 @@ files = [
 ]
 
 [[package]]
+name = "psycopg-pool"
+version = "3.1.8"
+description = "Connection Pool for Psycopg"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "psycopg-pool-3.1.8.tar.gz", hash = "sha256:53d9691503b538d419bf147359028633780294976743b1654dbf5f3a85b675db"},
+    {file = "psycopg_pool-3.1.8-py3-none-any.whl", hash = "sha256:dc9b177e749aae4ad155d22f9d02ccb14fe2bf30792227fb02317361b446ee39"},
+]
+
+[package.dependencies]
+typing-extensions = ">=3.10"
+
+[[package]]
 name = "ptyprocess"
 version = "0.7.0"
 description = "Run a subprocess in a pseudo terminal"
@@ -3843,4 +3857,4 @@ brotli = ["Brotli"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10.13,<4.0.0"
-content-hash = "f9c8cb5b60392ff98bf60b612008f3941fc6b636394f04b5aa1bf15017b5184c"
+content-hash = "3a0cf243d0b43453fef32df439de313a94f7836c186b22c928b45c3274a5fdc9"

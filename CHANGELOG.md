@@ -3,7 +3,21 @@
 
 
 
+## v0.39.0 (2023-11-03)
+
+### Feature
+
+* feat: More at `Description`
+
+- ci github actions test using pytest.
+- asgi and wsgi refactor and improved.
+- versions bump. ([`a761994`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a7619946e1487c6218fe285c1a876f08ff5c8512))
+
 ## v0.38.0 (2023-10-31)
+
+### Chore
+
+* chore(release): release version 0.38.0 [skip ci] ([`79ff201`](https://github.com/vasilistotskas/grooveshop-django-api/commit/79ff201a6ecc8608ac1f546aa370ea39158b803f))
 
 ### Feature
 

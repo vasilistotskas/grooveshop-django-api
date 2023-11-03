@@ -3,7 +3,17 @@
 
 
 
+## v0.40.0 (2023-11-03)
+
+### Feature
+
+* feat(config): Added `NGINX_BASE_URL` . ([`cde1bcc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cde1bccc15ad5e814c02ac7f1f42a54629e8be85))
+
 ## v0.39.9 (2023-11-03)
+
+### Chore
+
+* chore(release): release version 0.39.9 [skip ci] ([`b17470f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b17470f902783aa616252c279e46e8f11b29c791))
 
 ### Fix
 

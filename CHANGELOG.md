@@ -3,7 +3,17 @@
 
 
 
+## v0.39.8 (2023-11-03)
+
+### Fix
+
+* fix: Include `httptools` library. ([`addff50`](https://github.com/vasilistotskas/grooveshop-django-api/commit/addff5023825e3ee00b187954f0ddc7f3b9b5e44))
+
 ## v0.39.7 (2023-11-03)
+
+### Chore
+
+* chore(release): release version 0.39.7 [skip ci] ([`f9bdcf1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f9bdcf1b9c8f124e3cdd435e07609cbbdcf6847c))
 
 ### Fix
 

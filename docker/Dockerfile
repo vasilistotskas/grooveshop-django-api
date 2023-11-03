@@ -56,6 +56,9 @@ RUN chmod +x  $APP_HOME/entrypoint.prod.sh
 # copy project
 COPY . $APP_HOME
 
+# create empty logs folder
+RUN mkdir $APP_HOME/logs
+
 # chown all the files to the app user
 RUN chown -R app:app $APP_HOME
 

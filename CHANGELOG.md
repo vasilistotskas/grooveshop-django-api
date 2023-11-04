@@ -3,7 +3,23 @@
 
 
 
+## v0.40.1 (2023-11-04)
+
+### Chore
+
+* chore: remove env files. ([`fdccd2e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fdccd2ee1cc5cf7e45d4826fb78620ad90effffe))
+
+### Fix
+
+* fix: `.env.example` revert, `.gitignore` fix. ([`2a5200a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2a5200a763b0c46812130087999a578b0e26fd5b))
+
+* fix(.gitignore): Only include `.env.example` ([`f80ac08`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f80ac0871f9418d9f907a75717dd0cc12d79c647))
+
 ## v0.40.0 (2023-11-03)
+
+### Chore
+
+* chore(release): release version 0.40.0 [skip ci] ([`fe03553`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fe035536a3eccb98ba173c30d7137d4bbaae5fc1))
 
 ### Feature
 

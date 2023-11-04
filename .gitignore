@@ -111,8 +111,8 @@ env.bak/
 venv.bak/
 
 # ignore all env files except .env.example
+.env*
 !*.env.example
-
 # mkdocs documentation
 /site
 

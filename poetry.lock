@@ -213,17 +213,17 @@ wcwidth = ">=0.1.4"
 
 [[package]]
 name = "boto3"
-version = "1.28.77"
+version = "1.28.78"
 description = "The AWS SDK for Python"
 optional = false
 python-versions = ">= 3.7"
 files = [
-    {file = "boto3-1.28.77-py3-none-any.whl", hash = "sha256:c0899e54df362bea0ae329da59b0a00e4be5e220e99dc764802ed83cdfc4285c"},
-    {file = "boto3-1.28.77.tar.gz", hash = "sha256:1a47e5b8faea527bb2a40d0cf58faf0d09b5a46cf5658e2c5729479af20c96b8"},
+    {file = "boto3-1.28.78-py3-none-any.whl", hash = "sha256:ff8df4bb5aeb69acc64959a74b31042bfc52d64ca77dbe845a72c8062c48d179"},
+    {file = "boto3-1.28.78.tar.gz", hash = "sha256:aa970b1571321846543a6e615848352fe7621f1cb96b4454e919421924af95f7"},
 ]
 
 [package.dependencies]
-botocore = ">=1.31.77,<1.32.0"
+botocore = ">=1.31.78,<1.32.0"
 jmespath = ">=0.7.1,<2.0.0"
 s3transfer = ">=0.7.0,<0.8.0"
 
@@ -3857,13 +3857,13 @@ dev = ["black", "pytest"]
 
 [[package]]
 name = "uvicorn"
-version = "0.23.2"
+version = "0.24.0"
 description = "The lightning-fast ASGI server."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "uvicorn-0.23.2-py3-none-any.whl", hash = "sha256:1f9be6558f01239d4fdf22ef8126c39cb1ad0addf76c40e760549d2c2f43ab53"},
-    {file = "uvicorn-0.23.2.tar.gz", hash = "sha256:4d3cc12d7727ba72b64d12d3cc7743124074c0a69f7b201512fc50c3e3f1569a"},
+    {file = "uvicorn-0.24.0-py3-none-any.whl", hash = "sha256:3d19f13dfd2c2af1bfe34dd0f7155118ce689425fdf931177abe832ca44b8a04"},
+    {file = "uvicorn-0.24.0.tar.gz", hash = "sha256:368d5d81520a51be96431845169c225d771c9dd22a58613e1a181e6c4512ac33"},
 ]
 
 [package.dependencies]
@@ -3920,13 +3920,13 @@ test = ["Cython (>=0.29.36,<0.30.0)", "aiohttp (==3.9.0b0)", "aiohttp (>=3.8.1)"
 
 [[package]]
 name = "vine"
-version = "5.0.0"
-description = "Promises, promises, promises."
+version = "5.1.0"
+description = "Python promises."
 optional = false
 python-versions = ">=3.6"
 files = [
-    {file = "vine-5.0.0-py2.py3-none-any.whl", hash = "sha256:4c9dceab6f76ed92105027c49c823800dd33cacce13bdedc5b914e3514b7fb30"},
-    {file = "vine-5.0.0.tar.gz", hash = "sha256:7d3b1624a953da82ef63462013bbd271d3eb75751489f9807598e8f340bd637e"},
+    {file = "vine-5.1.0-py3-none-any.whl", hash = "sha256:40fdf3c48b2cfe1c38a49e9ae2da6fda88e4794c810050a728bd7413811fb1dc"},
+    {file = "vine-5.1.0.tar.gz", hash = "sha256:8b62e981d35c41049211cf62a0a1242d8c1ee9bd15bb196ce38aefd6799e61e0"},
 ]
 
 [[package]]
@@ -3994,4 +3994,4 @@ brotli = ["Brotli"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10.13,<4.0.0"
-content-hash = "f945634f4b85ed5878a821ee58422a69b4789a2d3c6a5bd086b525b53f55806b"
+content-hash = "5c305b8aacae359b5931558cb5dbea8b7b7c54aaac42bbf87e71f932a09f2983"

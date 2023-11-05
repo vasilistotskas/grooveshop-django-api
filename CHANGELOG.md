@@ -3,9 +3,17 @@
 
 
 
+## v0.40.2 (2023-11-05)
+
+### Fix
+
+* fix: session middleware `update_session` wrap with try catch and versions bump. ([`21d798e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/21d798eab75db750906debf59a6b099ed4f29e39))
+
 ## v0.40.1 (2023-11-04)
 
 ### Chore
+
+* chore(release): release version 0.40.1 [skip ci] ([`97acff2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/97acff2486b5c5cc1cb6fc455bfdfbee0b460f1c))
 
 * chore: remove env files. ([`fdccd2e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fdccd2ee1cc5cf7e45d4826fb78620ad90effffe))
 

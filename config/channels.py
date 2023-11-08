@@ -1,12 +1,13 @@
 from os import getenv
 
+REDIS_HOST = getenv("REDIS_HOST", "localhost")
+REDIS_PORT = getenv("REDIS_PORT", "6379")
+
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("localhost", 6379)]
-            if getenv("SYSTEM_ENV", "development") != "docker"
-            else [("redis", 6379)],
+            "hosts": [(REDIS_HOST, int(REDIS_PORT))]
         },
     },
 }

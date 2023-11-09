@@ -1,6 +1,6 @@
 from os import getenv
 
-CELERY_BROKER_URL = getenv("CELERY_BROKER_URL", "redis://localhost:6379/1")
+CELERY_BROKER_URL = getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = getenv("CELERY_RESULT_BACKEND", "django-db")
 CELERY_CACHE_BACKEND = getenv("CELERY_CACHE_BACKEND", "django-cache")
 CELERY_TASK_TRACK_STARTED = True

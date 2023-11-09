@@ -3,7 +3,17 @@
 
 
 
+## v0.40.4 (2023-11-09)
+
+### Fix
+
+* fix: redis url remove from env, versions bump, add new `ALLOWED_HOSTS`. ([`01aa977`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01aa977284dea55cac8f9949f67bb0ece49dc0e3))
+
 ## v0.40.3 (2023-11-08)
+
+### Chore
+
+* chore(release): release version 0.40.3 [skip ci] ([`3369f45`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3369f455ff6b78d0dde1d3644dd8824eb96c0193))
 
 ### Fix
 

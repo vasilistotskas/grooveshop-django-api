@@ -20,6 +20,9 @@ CSRF_TRUSTED_ORIGINS = [
     NGINX_BASE_URL,
     NUXT_BASE_URL,
     MEDIA_STREAM_BASE_URL,
+    "api.grooveshop.localhost",
+    "grooveshop.localhost",
+    "assets.grooveshop.localhost",
     "http://localhost:1337",
 ]
 CSRF_USE_SESSIONS = False

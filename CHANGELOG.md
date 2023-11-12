@@ -3,7 +3,25 @@
 
 
 
+## v0.40.5 (2023-11-12)
+
+### Chore
+
+* chore: Delete .idea directory ([`a29459b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a29459b5a0f42f87df6b09c6431e6b23cea7753b))
+
+### Fix
+
+* fix: `cors.py` config origins ([`4320cda`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4320cda1ba45674b2d586562f421971852bcbc9f))
+
+* fix: `csrf.py` config origins ([`98a1751`](https://github.com/vasilistotskas/grooveshop-django-api/commit/98a1751995818eb9489f3697cb4cb2885eac4bf2))
+
+* fix: update config ([`2cb190f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2cb190fb17b4316574868fb1a60fe3aab0d562ba))
+
 ## v0.40.4 (2023-11-09)
+
+### Chore
+
+* chore(release): release version 0.40.4 [skip ci] ([`8e23f13`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8e23f13c17e18d0dda3766ec7a383eebf6022933))
 
 ### Fix
 

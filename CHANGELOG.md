@@ -3,9 +3,17 @@
 
 
 
+## v0.41.0 (2023-11-13)
+
+### Feature
+
+* feat: Versions bump ([`26b2332`](https://github.com/vasilistotskas/grooveshop-django-api/commit/26b23323e4223645229d33ca7f5df0445640be2c))
+
 ## v0.40.5 (2023-11-12)
 
 ### Chore
+
+* chore(release): release version 0.40.5 [skip ci] ([`7683f4d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7683f4d60467308db7366a8ea4d1f72c3eb41fb7))
 
 * chore: Delete .idea directory ([`a29459b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a29459b5a0f42f87df6b09c6431e6b23cea7753b))
 

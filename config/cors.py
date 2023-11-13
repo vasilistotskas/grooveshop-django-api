@@ -11,9 +11,12 @@ CORS_ALLOWED_ORIGINS = [
     NGINX_BASE_URL,
     NUXT_BASE_URL,
     MEDIA_STREAM_BASE_URL,
-    "http://api.grooveshop.localhost",
-    "http://grooveshop.localhost",
-    "http://assets.grooveshop.localhost",
+    "http://api.grooveshop.site",
+    "http://grooveshop.site",
+    "http://assets.grooveshop.site",
+    "https://api.grooveshop.site",
+    "https://grooveshop.site",
+    "https://assets.grooveshop.site",
     "http://localhost:1337",
 ]
 CORS_ORIGIN_ALLOW_ALL = getenv("CORS_ORIGIN_ALLOW_ALL", "True") == "True"
@@ -23,9 +26,12 @@ CORS_ORIGIN_WHITELIST = [
     NGINX_BASE_URL,
     NUXT_BASE_URL,
     MEDIA_STREAM_BASE_URL,
-    "http://api.grooveshop.localhost",
-    "http://grooveshop.localhost",
-    "http://assets.grooveshop.localhost",
+    "http://api.grooveshop.site",
+    "http://grooveshop.site",
+    "http://assets.grooveshop.site",
+    "https://api.grooveshop.site",
+    "https://grooveshop.site",
+    "https://assets.grooveshop.site",
     "http://localhost:1337",
 ]
 CORS_ALLOW_METHODS = [

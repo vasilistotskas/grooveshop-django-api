@@ -58,9 +58,9 @@ else:
         "localhost",
         "127.0.0.1",
         "backend",
-        "api.grooveshop.localhost",
-        "grooveshop.localhost",
-        "assets.grooveshop.localhost",
+        "api.grooveshop.site",
+        "grooveshop.site",
+        "assets.grooveshop.site",
         "[::1]",
     ]
     additional_hosts = getenv('ALLOWED_HOSTS', '').split(',')

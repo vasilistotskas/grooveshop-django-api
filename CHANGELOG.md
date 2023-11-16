@@ -3,7 +3,21 @@
 
 
 
+## v0.43.0 (2023-11-16)
+
+### Feature
+
+* feat: Versions bump and new tests ([`c075648`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c0756486d6cdba902045451582d10c0e86cd80fb))
+
+### Fix
+
+* fix: remove useless test ([`7ffd294`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7ffd294d8002182e8f83ca3fe9e97e26c1d3c95d))
+
 ## v0.42.0 (2023-11-14)
+
+### Chore
+
+* chore(release): release version 0.42.0 [skip ci] ([`8995f02`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8995f02a2701717e110f09c493092185b1436bc5))
 
 ### Feature
 

@@ -3,7 +3,17 @@
 
 
 
+## v0.43.2 (2023-11-16)
+
+### Fix
+
+* fix: move settings to db ([`bd3f6a8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bd3f6a89c603840d7d5c6fe6b68e4cfec00eb5ea))
+
 ## v0.43.1 (2023-11-16)
+
+### Chore
+
+* chore(release): release version 0.43.1 [skip ci] ([`19f21d5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/19f21d5c380cadde6542d8cbc376bdda2acc33e7))
 
 ### Fix
 

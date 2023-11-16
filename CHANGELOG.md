@@ -3,7 +3,21 @@
 
 
 
+## v0.43.1 (2023-11-16)
+
+### Fix
+
+* fix: default debug `True` revert for now ([`e4f0953`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e4f0953cba2605c4b4beeb207142dde4e590e5c5))
+
+* fix: enable `ATOMIC_REQUESTS` and added `CONN_MAX_AGE` to 60 sec ([`da825ef`](https://github.com/vasilistotskas/grooveshop-django-api/commit/da825ef0309e210c573ed0b2eb904b11a0e6eb6b))
+
+* fix: debug default false ([`61a9aad`](https://github.com/vasilistotskas/grooveshop-django-api/commit/61a9aaddc66b08347519a1cccddd785dc3506c8e))
+
 ## v0.43.0 (2023-11-16)
+
+### Chore
+
+* chore(release): release version 0.43.0 [skip ci] ([`9f835b8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9f835b81a10a3a8d5f812a234faf9c279e1c70c7))
 
 ### Feature
 

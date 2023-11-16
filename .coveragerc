@@ -6,8 +6,7 @@
      */management/*
      */manage.py
      */setup.py
-     */asgi.py
-     */wsgi.py
+     asgi/gunicorn_worker.py
 
 [report]
 # Regexes for lines to exclude from consideration

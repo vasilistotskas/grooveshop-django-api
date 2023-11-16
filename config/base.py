@@ -47,8 +47,8 @@ NUXT_BASE_URL = getenv("NUXT_BASE_URL", "http://localhost:3000")
 NUXT_BASE_DOMAIN = getenv("NUXT_BASE_DOMAIN", "localhost:3000")
 MEDIA_STREAM_BASE_URL = getenv("MEDIA_STREAM_BASE_URL", "http://localhost:3003")
 
-if getenv('ALLOWED_HOSTS') == '[*]':
-    ALLOWED_HOSTS = ['*']
+if getenv("ALLOWED_HOSTS") == "[*]":
+    ALLOWED_HOSTS = ["*"]
 else:
     ALLOWED_HOSTS = [
         APP_MAIN_HOST_NAME,
@@ -63,7 +63,7 @@ else:
         "assets.grooveshop.site",
         "[::1]",
     ]
-    additional_hosts = getenv('ALLOWED_HOSTS', '').split(',')
+    additional_hosts = getenv("ALLOWED_HOSTS", "").split(",")
     ALLOWED_HOSTS.extend(additional_hosts)
 
 # Django built-in apps
@@ -294,4 +294,4 @@ if ENABLE_DEBUG_TOOLBAR:
         "debug_toolbar.panels.redirects.RedirectsPanel",
         "debug_toolbar.panels.profiling.ProfilingPanel",
     ]
-    DEBUG_TOOLBAR_CONFIG = {"RESULTS_CACHE_SIZE": 100}
+    DEBUG_TOOLBAR_CONFIG = {"INTERCEPT_REDIRECTS": False, "RESULTS_CACHE_SIZE": 100}

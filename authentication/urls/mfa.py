@@ -11,7 +11,7 @@ urlpatterns = [
     path(
         "mfa/totp/authenticate/",
         AuthenticateTotpAPIView.as_view(),
-        name="mfa_totp_activate",
+        name="mfa_totp_authenticate",
     ),
     path("mfa/totp/activate/", ActivateTotpAPIView.as_view(), name="mfa_totp_activate"),
     path("mfa/totp/active/", totp_active, name="mfa_totp_active"),

@@ -52,12 +52,10 @@ def gzip_compression(
                         message["type"] == "http.response.body" and content_encoding_set
                     ):
                         if not started:
-                            assert start_message is not None
                             started = True
                             await send(start_message)
                         await send(message)
                     elif message["type"] == "http.response.body" and not started:
-                        assert start_message is not None
                         started = True
                         body = message.get("body", b"")
                         more_body = message.get("more_body", False)

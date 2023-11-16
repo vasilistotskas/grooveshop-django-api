@@ -146,3 +146,24 @@ async def test_access_control_disallowed_origins(
     assert (b"access-control-allow-origin", origin.encode("latin1")) not in events[0][
         "headers"
     ]
+
+
+@pytest.mark.asyncio
+async def test_non_http_scope(asgi_app: ASGI3Application):
+    non_http_scope = {"type": "websocket", "path": "/ws"}
+    events = []
+
+    async def send(event) -> None:
+        events.append(event)
+
+    async def receive() -> ASGIReceiveEvent:
+        raise NotImplementedError()
+
+    cors_app = cors_handler(asgi_app)
+    await cors_app(non_http_scope, receive, send)
+    # Assert that the application was called without any CORS headers added
+    assert not any(
+        header[0].startswith(b"access-control-")
+        for event in events
+        for header in event.get("headers", [])
+    )

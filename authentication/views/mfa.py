@@ -244,6 +244,9 @@ class ViewRecoveryCodesAPIView(APIView):
 )
 @api_view(["GET"])
 def totp_active(request):
+    if not request.user.is_authenticated:
+        return Response({"active": False}, status=status.HTTP_403_FORBIDDEN)
+
     if is_mfa_enabled(request.user, [Authenticator.Type.TOTP]):
         return Response({"active": True}, status=status.HTTP_200_OK)
     else:

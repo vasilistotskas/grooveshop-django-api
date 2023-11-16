@@ -4,12 +4,10 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.auth.models import User
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
-from django.http import HttpResponse
 from django.urls import include
 from django.urls import path
 from django.urls import re_path
 from django.utils.translation import gettext_lazy as _
-from django.views.decorators.http import require_GET
 from django_otp.admin import OTPAdminSite
 from django_otp.plugins.otp_totp.admin import TOTPDeviceAdmin
 from django_otp.plugins.otp_totp.models import TOTPDevice
@@ -22,21 +20,6 @@ from core.view import HomeView
 from user.views.account import ObtainAuthTokenView
 
 app_name = "app"
-
-
-@require_GET
-def robots_txt(request):
-    lines = [
-        "User-Agent: *",
-        "Disallow: /private/",
-        "Disallow: /junk/",
-    ]
-    return HttpResponse("\n".join(lines), content_type="text/plain")
-
-
-front_urls = [
-    path("robots.txt", robots_txt),
-]
 
 router = routers.SimpleRouter()
 
@@ -52,7 +35,6 @@ admin_site_otp.register(TOTPDevice, TOTPDeviceAdmin)
 urlpatterns = i18n_patterns(
     path("__reload__/", include("django_browser_reload.urls")),
     path("", HomeView.as_view(), name="home"),
-    path("", include(front_urls)),
     path("auth/", include("authentication.urls.auth")),
     path(_("admin/"), admin_site_otp.urls),
     path(_("admin_no_otp/"), admin.site.urls),

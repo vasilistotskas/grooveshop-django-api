@@ -1,6 +1,6 @@
 from os import getenv
 
-DEBUG = getenv("DEBUG", "True") == "True"
+DEBUG = getenv("DEBUG", "False") == "True"
 
 APP_BASE_URL = getenv("APP_BASE_URL", "http://localhost:8000")
 NUXT_BASE_URL = getenv("NUXT_BASE_URL", "http://localhost:3000")

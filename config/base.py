@@ -18,7 +18,7 @@ SYSTEM_ENV = getenv("SYSTEM_ENV", "dev")
 
 SECRET_KEY = getenv("DJANGO_SECRET_KEY", get_random_secret_key())
 
-DEBUG = getenv("DEBUG", "True") == "True"
+DEBUG = getenv("DEBUG", "False") == "True"
 
 if SYSTEM_ENV != "docker" and "celery" in sys.argv[0]:
     dotenv.set_key(dotenv_file, "DEBUG", "False")

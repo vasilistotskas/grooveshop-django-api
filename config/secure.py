@@ -1,6 +1,6 @@
 from os import getenv
 
-DEBUG = getenv("DEBUG", "True") == "True"
+DEBUG = getenv("DEBUG", "False") == "True"
 
 SECURE_SSL_REDIRECT = False if DEBUG else True
 SECURE_PROXY_SSL_HEADER = None if DEBUG else ("HTTP_X_FORWARDED_PROTO", "https")

@@ -1,6 +1,6 @@
 from os import getenv
 
-DEBUG = getenv("DEBUG", "True") == "True"
+DEBUG = getenv("DEBUG", "False") == "True"
 
 SESSION_CACHE_ALIAS = "default"
 SESSION_COOKIE_NAME = "sessionid"

@@ -27,9 +27,6 @@ INTERNAL_IPS = [
     "127.0.0.1",
 ]
 
-ATOMIC_REQUESTS = True
-CONN_MAX_AGE = 60
-
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 22500
 
 SERIALIZATION_MODULES = {"json": "djmoney.serializers"}

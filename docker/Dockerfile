@@ -73,5 +73,5 @@ USER app
 # run entrypoint.prod.sh
 ENTRYPOINT ["/home/app/web/entrypoint.prod.sh"]
 
-# run gunicorn
-CMD ["gunicorn", "--bind", ":8000", "--workers", "4", "--worker-class", "asgi.gunicorn_worker.UvicornWorker", "asgi:application"]
+# run uvicorn
+CMD ["uvicorn", "asgi:application", "--host", "0.0.0.0", "--port", "8000", "--workers", "3"]

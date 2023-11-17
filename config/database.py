@@ -3,7 +3,7 @@ from os import getenv
 SYSTEM_ENV = getenv("SYSTEM_ENV", "dev")
 
 CONN_HEALTH_CHECKS = True
-ATOMIC_REQUESTS = False
+ATOMIC_REQUESTS = True
 CONN_MAX_AGE = 0
 
 DATABASES = {

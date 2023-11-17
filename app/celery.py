@@ -5,7 +5,7 @@ import logging
 import os
 
 from asgiref.sync import async_to_sync
-from celery import Celery
+from celery import Celery, shared_task
 from celery.schedules import crontab
 from celery.signals import setup_logging
 from channels.layers import get_channel_layer
@@ -42,7 +42,7 @@ def create_celery_app():
 app = create_celery_app()
 
 
-@app.task(bind=True, name="Debug Task")
+@shared_task(bind=True, name="Debug Task")
 def debug_task(self):
     debug = os.getenv("DEBUG", "True") == "True"
     if debug:
@@ -50,7 +50,7 @@ def debug_task(self):
         logging.debug(f"Request: {self.request!r}")
 
 
-@app.task(bind=True, name="Debug Task Notification")
+@shared_task(bind=True, name="Debug Task Notification")
 def debug_task_notification(self):
     debug = os.getenv("DEBUG", "True") == "True"
     if debug:

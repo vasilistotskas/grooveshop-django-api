@@ -20,6 +20,15 @@ def clear_expired_sessions_task():
         return f"error: {e}"
 
 
+@shared_task(bind=True, name="Clear All Cache Task")
+def clear_all_cache_task():
+    try:
+        management.call_command("clear_cache", verbosity=0)
+        return "All cache deleted."
+    except Exception as e:
+        return f"error: {e}"
+
+
 @shared_task(bind=True, name="Clear Sessions For None Users Task")
 def clear_sessions_for_none_users_task():
     session_store = import_module(settings.SESSION_ENGINE).SessionStore

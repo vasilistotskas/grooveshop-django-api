@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action
@@ -34,6 +36,7 @@ class ProductViewSet(BaseExpandView, ModelViewSet):
     ordering = ["-created_at"]
     search_fields = ["id"]
 
+    @method_decorator(cache_page(60 * 60 * 2))
     def list(self, request, *args, **kwargs) -> Response:
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
@@ -85,3 +88,4 @@ class ProductViewSet(BaseExpandView, ModelViewSet):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+

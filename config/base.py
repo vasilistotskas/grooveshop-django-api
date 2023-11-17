@@ -45,24 +45,21 @@ NUXT_BASE_URL = getenv("NUXT_BASE_URL", "http://localhost:3000")
 NUXT_BASE_DOMAIN = getenv("NUXT_BASE_DOMAIN", "localhost:3000")
 MEDIA_STREAM_BASE_URL = getenv("MEDIA_STREAM_BASE_URL", "http://localhost:3003")
 
-if getenv("ALLOWED_HOSTS") == "[*]":
-    ALLOWED_HOSTS = ["*"]
-else:
-    ALLOWED_HOSTS = [
+ALLOWED_HOSTS = []  # Start with an empty list
+
+# Add the main domain and any subdomains required
+ALLOWED_HOSTS.extend(
+    [
         APP_MAIN_HOST_NAME,
         NUXT_BASE_URL,
         MEDIA_STREAM_BASE_URL,
-        "http://localhost:1337",
-        "localhost",
-        "127.0.0.1",
-        "backend",
-        "api.grooveshop.site",
-        "grooveshop.site",
-        "assets.grooveshop.site",
-        "[::1]",
+        ".grooveshop.site",  # Covers all subdomains for grooveshop.site
     ]
-    additional_hosts = getenv("ALLOWED_HOSTS", "").split(",")
-    ALLOWED_HOSTS.extend(additional_hosts)
+)
+
+# Add any additional hosts from the environment variable
+additional_hosts = getenv("DJANGO_ALLOWED_HOSTS", "").split(",")
+ALLOWED_HOSTS.extend(filter(None, additional_hosts))  # Filter out empty strings
 
 # Django built-in apps
 DJANGO_APPS = [
@@ -264,7 +261,7 @@ REST_FRAMEWORK = {
 }
 
 # Other general settings
-APPEND_SLASH = getenv("APPEND_SLASH", "False") == "True"
+APPEND_SLASH = getenv("APPEND_SLASH", "True") == "True"
 
 DEEPL_AUTH_KEY = getenv("DEEPL_AUTH_KEY", "changeme")
 

@@ -3,7 +3,21 @@
 
 
 
+## v0.44.1 (2023-11-17)
+
+### Chore
+
+* chore: lint ([`456b35a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/456b35afd4c92fd263fa1166f355f9ae27accdab))
+
+### Fix
+
+* fix: add `websockets` lib ([`8f7064c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8f7064c42e5fa97b9a990679bc4071f64416905a))
+
 ## v0.44.0 (2023-11-17)
+
+### Chore
+
+* chore(release): release version 0.44.0 [skip ci] ([`1610844`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1610844b55e4ac5a799d53bc3ae22eef784a27d2))
 
 ### Feature
 

@@ -5,7 +5,8 @@ import logging
 import os
 
 from asgiref.sync import async_to_sync
-from celery import Celery, shared_task
+from celery import Celery
+from celery import shared_task
 from celery.schedules import crontab
 from celery.signals import setup_logging
 from channels.layers import get_channel_layer

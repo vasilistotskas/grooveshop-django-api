@@ -3,7 +3,17 @@
 
 
 
+## v0.44.3 (2023-11-17)
+
+### Fix
+
+* fix: config security fixes ([`fe64d98`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fe64d9814f90cc86ea1a52656d689512d4e60a31))
+
 ## v0.44.2 (2023-11-17)
+
+### Chore
+
+* chore(release): release version 0.44.2 [skip ci] ([`be4c92b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/be4c92b6de9ed66d60d2ef89a7a40723f5a2171c))
 
 ### Fix
 

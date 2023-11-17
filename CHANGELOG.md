@@ -3,7 +3,17 @@
 
 
 
+## v0.44.0 (2023-11-17)
+
+### Feature
+
+* feat: clear all cache task and command, `ATOMIC_REQUESTS` set True, and run app with uvicorn. ([`becd1b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/becd1b58630d58d586488dbea8e244e43aada4b8))
+
 ## v0.43.2 (2023-11-16)
+
+### Chore
+
+* chore(release): release version 0.43.2 [skip ci] ([`0c62394`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0c623940d4d006bb956f1db2179c8509d3bd81e4))
 
 ### Fix
 

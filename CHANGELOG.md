@@ -3,9 +3,17 @@
 
 
 
+## v0.44.2 (2023-11-17)
+
+### Fix
+
+* fix: remove `SessionTraceMiddleware` ([`476e9a3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/476e9a3c3c60269f80a37dd507bcd7d218ab7b04))
+
 ## v0.44.1 (2023-11-17)
 
 ### Chore
+
+* chore(release): release version 0.44.1 [skip ci] ([`99f987f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/99f987fdd158fa892c87552318a32f3101c014cd))
 
 * chore: lint ([`456b35a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/456b35afd4c92fd263fa1166f355f9ae27accdab))
 

@@ -3,7 +3,17 @@
 
 
 
+## v0.45.1 (2023-11-19)
+
+### Fix
+
+* fix: config fix ([`c6cb058`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c6cb058b1e88de001d5bd204e3a7d9ee6db70d85))
+
 ## v0.45.0 (2023-11-19)
+
+### Chore
+
+* chore(release): release version 0.45.0 [skip ci] ([`870ddb5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/870ddb51fa289f14f3629d576ce588733e1f5c9e))
 
 ### Feature
 

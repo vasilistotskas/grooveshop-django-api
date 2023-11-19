@@ -20,7 +20,7 @@ SECRET_KEY = getenv("DJANGO_SECRET_KEY", get_random_secret_key())
 
 DEBUG = getenv("DEBUG", "True") == "True"
 
-if SYSTEM_ENV != "docker" and "celery" in sys.argv[0]:
+if SYSTEM_ENV not in ["docker", "production"] and "celery" in sys.argv[0]:
     dotenv.set_key(dotenv_file, "DEBUG", "False")
 
 INTERNAL_IPS = [
@@ -53,6 +53,7 @@ ALLOWED_HOSTS.extend(
         APP_MAIN_HOST_NAME,
         NUXT_BASE_URL,
         MEDIA_STREAM_BASE_URL,
+        "https://grooveshop-static.s3.eu-north-1.amazonaws.com",
         ".grooveshop.site",  # Covers all subdomains for grooveshop.site
     ]
 )

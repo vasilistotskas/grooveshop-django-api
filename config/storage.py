@@ -6,13 +6,13 @@ SYSTEM_ENV = getenv("SYSTEM_ENV", "dev")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-STATIC_URL = "/static/"
-STATIC_ROOT = path.join(BASE_DIR, "staticfiles")
-MEDIA_URL = "/media/"
-MEDIA_ROOT = path.join(BASE_DIR, "mediafiles")
 STATICFILES_DIRS = (path.join(BASE_DIR, "static"),)
 
 if SYSTEM_ENV in ["dev", "GITHUB_WORKFLOW", "docker"]:
+    STATIC_URL = "/static/"
+    STATIC_ROOT = path.join(BASE_DIR, "staticfiles")
+    MEDIA_URL = "/media/"
+    MEDIA_ROOT = path.join(BASE_DIR, "mediafiles")
     STORAGES = {
         "default": {
             "BACKEND": "django.core.files.storage.FileSystemStorage",
@@ -23,20 +23,26 @@ if SYSTEM_ENV in ["dev", "GITHUB_WORKFLOW", "docker"]:
         },
     }
 else:
-    AWS_S3_ACCESS_KEY_ID = getenv("AWS_S3_ACCESS_KEY_ID", "changeme")
-    AWS_S3_SECRET_ACCESS_KEY = getenv("AWS_S3_SECRET_ACCESS_KEY", "changeme")
-    AWS_STORAGE_BUCKET_NAME = getenv("AWS_STORAGE_BUCKET_NAME", "changeme")
-    AWS_S3_REGION_NAME = getenv("AWS_S3_REGION_NAME", "changeme")
-    AWS_S3_ENDPOINT_URL = f"https://{AWS_S3_REGION_NAME}.digitaloceanspaces.com"
+    # aws settings
+    AWS_ACCESS_KEY_ID = getenv("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = getenv("AWS_SECRET_ACCESS_KEY")
+    AWS_STORAGE_BUCKET_NAME = getenv("AWS_STORAGE_BUCKET_NAME")
+    AWS_DEFAULT_ACL = None
+    AWS_QUERYSTRING_AUTH = False
+    AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
     AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
-    AWS_DEFAULT_ACL = "public-read"
-    AWS_LOCATION = "static"
-    AWS_MEDIA_LOCATION = "media"
-    AWS_S3_CUSTOM_DOMAIN = getenv("AWS_S3_CUSTOM_DOMAIN", "changeme")
-    DEFAULT_FILE_STORAGE = "core.storages.MediaRootS3BotoStorage"
+    # s3 static settings
+    STATIC_LOCATION = "static"
+    STATIC_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{STATIC_LOCATION}/"
+    # s3 public media settings
+    PUBLIC_MEDIA_LOCATION = "media"
+    MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{PUBLIC_MEDIA_LOCATION}/"
+    # s3 private media settings
+    PRIVATE_MEDIA_LOCATION = "private"
+    PRIVATE_FILE_STORAGE = "core.storages.PrivateMediaStorage"
     STORAGES = {
         "default": {
-            "BACKEND": "core.storages.StaticRootS3BotoStorage",
+            "BACKEND": "core.storages.PublicMediaStorage",
         },
         "staticfiles": {
             "BACKEND": "storages.backends.s3boto3.S3StaticStorage",

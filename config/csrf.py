@@ -22,6 +22,7 @@ CSRF_TRUSTED_ORIGINS = [
     APP_BASE_URL.replace("http://", "https://"),  # Force HTTPS
     NUXT_BASE_URL.replace("http://", "https://"),  # Force HTTPS
     MEDIA_STREAM_BASE_URL.replace("http://", "https://"),  # Force HTTPS
+    "https://grooveshop-static.s3.eu-north-1.amazonaws.com",
     "https://api.grooveshop.site",
     "https://grooveshop.site",
     "https://assets.grooveshop.site",

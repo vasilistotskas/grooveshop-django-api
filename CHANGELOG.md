@@ -3,7 +3,21 @@
 
 
 
+## v0.45.0 (2023-11-19)
+
+### Feature
+
+* feat: versions bump and update bucket ([`dea38a3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dea38a3eab011b78e5b1de5a0ca4c94e3a4476d5))
+
+### Fix
+
+* fix: poetry update ([`629a97b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/629a97bf828138caa641b80d1c42c97f001bd156))
+
 ## v0.44.3 (2023-11-17)
+
+### Chore
+
+* chore(release): release version 0.44.3 [skip ci] ([`320e039`](https://github.com/vasilistotskas/grooveshop-django-api/commit/320e03948b17fed36818786b2c2c600838694b96))
 
 ### Fix
 

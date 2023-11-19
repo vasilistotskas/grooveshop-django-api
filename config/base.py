@@ -59,7 +59,7 @@ ALLOWED_HOSTS.extend(
 )
 
 # Add any additional hosts from the environment variable
-additional_hosts = getenv("DJANGO_ALLOWED_HOSTS", "").split(",")
+additional_hosts = getenv("ALLOWED_HOSTS", "").split(",")
 ALLOWED_HOSTS.extend(filter(None, additional_hosts))  # Filter out empty strings
 
 # Django built-in apps

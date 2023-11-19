@@ -13,6 +13,9 @@ CORS_ALLOWED_ORIGINS = [
     "https://api.grooveshop.site",
     "https://grooveshop.site",
     "https://assets.grooveshop.site",
+    "http://backend-service:80",
+    "http://frontend-nuxt-service:80",
+    "http://media-stream-service:80",
     "http://localhost:1337",
 ]
 CORS_ORIGIN_ALLOW_ALL = getenv("CORS_ORIGIN_ALLOW_ALL", "True") == "True"
@@ -25,6 +28,9 @@ CORS_ORIGIN_WHITELIST = [
     "https://api.grooveshop.site",
     "https://grooveshop.site",
     "https://assets.grooveshop.site",
+    "http://backend-service:80",
+    "http://frontend-nuxt-service:80",
+    "http://media-stream-service:80",
     "http://localhost:1337",
 ]
 CORS_ALLOW_METHODS = [

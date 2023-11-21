@@ -3,7 +3,17 @@
 
 
 
+## v0.46.4 (2023-11-21)
+
+### Fix
+
+* fix: increase DEFAULT_THROTTLE_RATES for production ([`e7ad5fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e7ad5fd70eea439b5771785877354407e146e4ed))
+
 ## v0.46.3 (2023-11-21)
+
+### Chore
+
+* chore(release): release version 0.46.3 [skip ci] ([`f151e97`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f151e9706a58166c4c84706f9d7a9b10a84905f1))
 
 ### Fix
 

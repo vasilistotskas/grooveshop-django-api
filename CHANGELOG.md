@@ -3,7 +3,17 @@
 
 
 
+## v0.45.4 (2023-11-21)
+
+### Fix
+
+* fix: fix `ALLOWED_HOSTS` missing coma ([`2339a29`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2339a29d786bd84e58ad11e880d2eddf36be5a94))
+
 ## v0.45.3 (2023-11-21)
+
+### Chore
+
+* chore(release): release version 0.45.3 [skip ci] ([`2fcfe83`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2fcfe83d012d2bd11f4164fdc554f0dd15a024cd))
 
 ### Fix
 

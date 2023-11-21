@@ -79,7 +79,7 @@ urlpatterns = i18n_patterns(
     prefix_default_language=False,
 )
 
-if bool(settings.DEBUG):
+if bool(settings.ENABLE_DEBUG_TOOLBAR):
     import warnings
 
     try:
@@ -94,6 +94,7 @@ if bool(settings.DEBUG):
             re_path(r"^__debug__/", include(debug_toolbar.urls))  # type: ignore
         ]
 
+if bool(settings.DEBUG):
     urlpatterns += static(
         settings.MEDIA_URL,
         document_root=settings.MEDIA_ROOT,

@@ -51,7 +51,8 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "[::1]",
     "api.grooveshop.site",
-    "grooveshop.site" "grooveshop-static.s3.eu-north-1.amazonaws.com",
+    "grooveshop.site",
+    "grooveshop-static.s3.eu-north-1.amazonaws.com",
 ]
 
 if DEBUG:

@@ -3,7 +3,17 @@
 
 
 
+## v0.46.0 (2023-11-21)
+
+### Feature
+
+* feat: Remove trailing slash from all api end point urls ([`22d72de`](https://github.com/vasilistotskas/grooveshop-django-api/commit/22d72de95c353249633e300d4da6eceac98f99dd))
+
 ## v0.45.5 (2023-11-21)
+
+### Chore
+
+* chore(release): release version 0.45.5 [skip ci] ([`b8885e2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b8885e2dbb4611d53a564c23b1f09570b006f32e))
 
 ### Fix
 

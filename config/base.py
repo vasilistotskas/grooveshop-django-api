@@ -47,6 +47,9 @@ MEDIA_STREAM_BASE_URL = getenv("MEDIA_STREAM_BASE_URL", "http://localhost:3003")
 
 ALLOWED_HOSTS = [
     ".grooveshop.site",
+    ".localhost",
+    "127.0.0.1",
+    "[::1]",
     "api.grooveshop.site",
     "grooveshop.site" "grooveshop-static.s3.eu-north-1.amazonaws.com",
 ]

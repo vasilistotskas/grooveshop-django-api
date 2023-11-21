@@ -222,8 +222,8 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.UserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon": None if DEBUG else "1000/day",
-        "user": None if DEBUG else "3000/day",
+        "anon": None if DEBUG else "10000/day",
+        "user": None if DEBUG else "30000/day",
     },
     # Filtering
     "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],

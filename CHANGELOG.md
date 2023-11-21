@@ -3,7 +3,17 @@
 
 
 
+## v0.46.1 (2023-11-21)
+
+### Fix
+
+* fix: `APPEND_SLASH` default to false ([`bcfb5e8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bcfb5e81284232aba1c1963873a0651f50aa201b))
+
 ## v0.46.0 (2023-11-21)
+
+### Chore
+
+* chore(release): release version 0.46.0 [skip ci] ([`37e268b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/37e268b0c614bbc30dcfaed493cfd162772d302d))
 
 ### Feature
 

@@ -45,22 +45,14 @@ NUXT_BASE_URL = getenv("NUXT_BASE_URL", "http://localhost:3000")
 NUXT_BASE_DOMAIN = getenv("NUXT_BASE_DOMAIN", "localhost:3000")
 MEDIA_STREAM_BASE_URL = getenv("MEDIA_STREAM_BASE_URL", "http://localhost:3003")
 
-ALLOWED_HOSTS = []  # Start with an empty list
+ALLOWED_HOSTS = [
+    ".grooveshop.site",
+    "api.grooveshop.site",
+    "grooveshop.site" "grooveshop-static.s3.eu-north-1.amazonaws.com",
+]
 
-# Add the main domain and any subdomains required
-ALLOWED_HOSTS.extend(
-    [
-        APP_MAIN_HOST_NAME,
-        NUXT_BASE_URL,
-        MEDIA_STREAM_BASE_URL,
-        "https://grooveshop-static.s3.eu-north-1.amazonaws.com",
-        ".grooveshop.site",  # Covers all subdomains for grooveshop.site
-    ]
-)
-
-# Add any additional hosts from the environment variable
-additional_hosts = getenv("ALLOWED_HOSTS", "").split(",")
-ALLOWED_HOSTS.extend(filter(None, additional_hosts))  # Filter out empty strings
+if DEBUG:
+    ALLOWED_HOSTS += [".localhost", "127.0.0.1", "[::1]"]
 
 # Django built-in apps
 DJANGO_APPS = [
@@ -131,7 +123,6 @@ INSTALLED_APPS = DJANGO_APPS + PROJECT_APPS + THIRD_PARTY_APPS
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "corsheaders.middleware.CorsMiddleware",

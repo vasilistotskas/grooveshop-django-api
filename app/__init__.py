@@ -6,7 +6,7 @@ from threading import RLock
 
 import kombu.utils
 
-from .celery import app as celery_app
+from app.celery import celery_app
 
 if not getattr(kombu.utils.cached_property, "lock", None):
     setattr(

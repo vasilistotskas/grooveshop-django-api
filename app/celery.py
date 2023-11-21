@@ -40,7 +40,7 @@ def create_celery_app():
     return tasker
 
 
-app = create_celery_app()
+celery_app = create_celery_app()
 
 
 @shared_task(bind=True, name="Debug Task")

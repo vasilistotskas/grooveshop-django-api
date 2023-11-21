@@ -5,12 +5,12 @@ from tip.views import TipViewSet
 
 urlpatterns = [
     path(
-        "tip/",
+        "tip",
         TipViewSet.as_view({"get": "list", "post": "create"}),
         name="tip-list",
     ),
     path(
-        "tip/<str:pk>/",
+        "tip/<str:pk>",
         TipViewSet.as_view(
             {
                 "get": "retrieve",

@@ -10,12 +10,12 @@ from product.views.review import ProductReviewViewSet
 urlpatterns = [
     # Product
     path(
-        "product/",
+        "product",
         ProductViewSet.as_view({"get": "list", "post": "create"}),
         name="product-list",
     ),
     path(
-        "product/<int:pk>/",
+        "product/<int:pk>",
         ProductViewSet.as_view(
             {
                 "get": "retrieve",
@@ -27,18 +27,18 @@ urlpatterns = [
         name="product-detail",
     ),
     path(
-        "product/<int:pk>/update_product_hits/",
+        "product/<int:pk>/update_product_hits",
         ProductViewSet.as_view({"post": "update_product_hits"}),
         name="product-update-product-hits",
     ),
     # Category
     path(
-        "product/category/",
+        "product/category",
         ProductCategoryViewSet.as_view({"get": "list", "post": "create"}),
         name="product-category-list",
     ),
     path(
-        "product/category/<int:pk>/",
+        "product/category/<int:pk>",
         ProductCategoryViewSet.as_view(
             {
                 "get": "retrieve",
@@ -51,12 +51,12 @@ urlpatterns = [
     ),
     # Favourite
     path(
-        "product/favourite/",
+        "product/favourite",
         ProductFavouriteViewSet.as_view({"get": "list", "post": "create"}),
         name="product-favourite-list",
     ),
     path(
-        "product/favourite/<str:pk>/",
+        "product/favourite/<str:pk>",
         ProductFavouriteViewSet.as_view(
             {
                 "get": "retrieve",
@@ -69,12 +69,12 @@ urlpatterns = [
     ),
     # Review
     path(
-        "product/review/",
+        "product/review",
         ProductReviewViewSet.as_view({"get": "list", "post": "create"}),
         name="product-review-list",
     ),
     path(
-        "product/review/<int:pk>/",
+        "product/review/<int:pk>",
         ProductReviewViewSet.as_view(
             {
                 "get": "retrieve",
@@ -86,18 +86,18 @@ urlpatterns = [
         name="product-review-detail",
     ),
     path(
-        "product/review/user_had_reviewed/",
+        "product/review/user_had_reviewed",
         ProductReviewViewSet.as_view({"post": "user_had_reviewed"}),
         name="product-review-user-had-reviewed",
     ),
     # Images
     path(
-        "product/image/",
+        "product/image",
         ProductImageViewSet.as_view({"get": "list", "post": "create"}),
         name="product-image-list",
     ),
     path(
-        "product/image/<int:pk>/",
+        "product/image/<int:pk>",
         ProductImageViewSet.as_view(
             {
                 "get": "retrieve",

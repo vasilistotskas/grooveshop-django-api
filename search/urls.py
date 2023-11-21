@@ -5,7 +5,7 @@ from search.views import SearchProduct
 
 urlpatterns = [
     path(
-        "search/product/",
+        "search/product",
         SearchProduct.as_view({"get": "list"}),
         name="search-product",
     ),

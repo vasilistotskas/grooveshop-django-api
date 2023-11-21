@@ -9,9 +9,9 @@ from authentication.views.registration import AuthVerifyEmailView
 
 urlpatterns = [
     path("", AuthRegisterView.as_view(), name="rest_register"),
-    path("verify-email/", AuthVerifyEmailView.as_view(), name="rest_verify_email"),
+    path("verify-email", AuthVerifyEmailView.as_view(), name="rest_verify_email"),
     path(
-        "resend-email/",
+        "resend-email",
         AuthResendEmailVerificationView.as_view(),
         name="rest_resend_email",
     ),
@@ -21,7 +21,7 @@ urlpatterns = [
         name="account_confirm_email",
     ),
     path(
-        "account-email-verification-sent/",
+        "account-email-verification-sent",
         AuthEmailVerificationSentView.as_view(),
         name="account_email_verification_sent",
     ),

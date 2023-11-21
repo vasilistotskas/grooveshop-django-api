@@ -7,12 +7,12 @@ from user.views.address import UserAddressViewSet
 
 urlpatterns = [
     path(
-        "user/account/",
+        "user/account",
         UserAccountViewSet.as_view({"get": "list", "post": "create"}),
         name="user-account-list",
     ),
     path(
-        "user/account/<int:pk>/",
+        "user/account/<int:pk>",
         UserAccountViewSet.as_view(
             {
                 "get": "retrieve",
@@ -24,18 +24,18 @@ urlpatterns = [
         name="user-account-detail",
     ),
     path(
-        "user/account/session/",
+        "user/account/session",
         UserAccountSessionView.as_view(),
         name="user-account-session",
     ),
     # Address
     path(
-        "user/address/",
+        "user/address",
         UserAddressViewSet.as_view({"get": "list", "post": "create"}),
         name="user-address-list",
     ),
     path(
-        "user/address/<int:pk>/",
+        "user/address/<int:pk>",
         UserAddressViewSet.as_view(
             {
                 "get": "retrieve",
@@ -47,7 +47,7 @@ urlpatterns = [
         name="user-address-detail",
     ),
     path(
-        "user/address/<int:pk>/set_main/",
+        "user/address/<int:pk>/set_main",
         UserAddressViewSet.as_view({"post": "set_main"}),
         name="user-address-set-main",
     ),

@@ -6,12 +6,12 @@ from slider.views import SlideViewSet
 
 urlpatterns = [
     path(
-        "slider/",
+        "slider",
         SliderViewSet.as_view({"get": "list", "post": "create"}),
         name="slider-list",
     ),
     path(
-        "slider/<str:pk>/",
+        "slider/<str:pk>",
         SliderViewSet.as_view(
             {
                 "get": "retrieve",
@@ -23,12 +23,12 @@ urlpatterns = [
         name="slider-detail",
     ),
     path(
-        "slide/",
+        "slide",
         SlideViewSet.as_view({"get": "list", "post": "create"}),
         name="slide-list",
     ),
     path(
-        "slide/<str:pk>/",
+        "slide/<str:pk>",
         SlideViewSet.as_view(
             {
                 "get": "retrieve",

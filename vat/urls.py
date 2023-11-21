@@ -5,12 +5,12 @@ from vat.views import VatViewSet
 
 urlpatterns = [
     path(
-        "vat/",
+        "vat",
         VatViewSet.as_view({"get": "list", "post": "create"}),
         name="vat-list",
     ),
     path(
-        "vat/<int:pk>/",
+        "vat/<int:pk>",
         VatViewSet.as_view(
             {
                 "get": "retrieve",

@@ -5,12 +5,12 @@ from country.views import CountryViewSet
 
 urlpatterns = [
     path(
-        "country/",
+        "country",
         CountryViewSet.as_view({"get": "list", "post": "create"}),
         name="country-list",
     ),
     path(
-        "country/<str:pk>/",
+        "country/<str:pk>",
         CountryViewSet.as_view(
             {
                 "get": "retrieve",

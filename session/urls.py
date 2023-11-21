@@ -7,19 +7,19 @@ from session.views import revoke_session
 from session.views import session_view
 
 urlpatterns = [
-    path("auth/session/", session_view, name="session"),
+    path("auth/session", session_view, name="session"),
     path(
-        "auth/session/revoke/",
+        "auth/session/revoke",
         revoke_session,
         name="session-revoke",
     ),
     path(
-        "auth/session/revoke/all/",
+        "auth/session/revoke/all",
         revoke_all_user_sessions,
         name="session-revoke-all",
     ),
     path(
-        "auth/session/active_users_count/",
+        "auth/session/active_users_count",
         active_users_count,
         name="session-active-users-count",
     ),

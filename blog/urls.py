@@ -9,12 +9,12 @@ from blog.views.tag import BlogTagViewSet
 
 urlpatterns = [
     path(
-        "blog/post/",
+        "blog/post",
         BlogPostViewSet.as_view({"get": "list", "post": "create"}),
         name="blog-post-list",
     ),
     path(
-        "blog/post/<int:pk>/",
+        "blog/post/<int:pk>",
         BlogPostViewSet.as_view(
             {
                 "get": "retrieve",
@@ -26,22 +26,22 @@ urlpatterns = [
         name="blog-post-detail",
     ),
     path(
-        "blog/post/<int:pk>/update_likes/",
+        "blog/post/<int:pk>/update_likes",
         BlogPostViewSet.as_view({"post": "update_likes"}),
         name="blog-post-update_likes",
     ),
     path(
-        "blog/post/<int:pk>/update_view_count/",
+        "blog/post/<int:pk>/update_view_count",
         BlogPostViewSet.as_view({"post": "update_view_count"}),
         name="blog-post-update_view_count",
     ),
     path(
-        "blog/category/",
+        "blog/category",
         BlogCategoryViewSet.as_view({"get": "list", "post": "create"}),
         name="blog-category-list",
     ),
     path(
-        "blog/category/<int:pk>/",
+        "blog/category/<int:pk>",
         BlogCategoryViewSet.as_view(
             {
                 "get": "retrieve",
@@ -53,12 +53,12 @@ urlpatterns = [
         name="blog-category-detail",
     ),
     path(
-        "blog/author/",
+        "blog/author",
         BlogAuthorViewSet.as_view({"get": "list", "post": "create"}),
         name="blog-author-list",
     ),
     path(
-        "blog/author/<int:pk>/",
+        "blog/author/<int:pk>",
         BlogAuthorViewSet.as_view(
             {
                 "get": "retrieve",
@@ -70,12 +70,12 @@ urlpatterns = [
         name="blog-author-detail",
     ),
     path(
-        "blog/comment/",
+        "blog/comment",
         BlogCommentViewSet.as_view({"get": "list", "post": "create"}),
         name="blog-comment-list",
     ),
     path(
-        "blog/comment/<int:pk>/",
+        "blog/comment/<int:pk>",
         BlogCommentViewSet.as_view(
             {
                 "get": "retrieve",
@@ -87,12 +87,12 @@ urlpatterns = [
         name="blog-comment-detail",
     ),
     path(
-        "blog/tag/",
+        "blog/tag",
         BlogTagViewSet.as_view({"get": "list", "post": "create"}),
         name="blog-tag-list",
     ),
     path(
-        "blog/tag/<int:pk>/",
+        "blog/tag/<int:pk>",
         BlogTagViewSet.as_view(
             {
                 "get": "retrieve",

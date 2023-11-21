@@ -55,7 +55,7 @@ ALLOWED_HOSTS = [
     "grooveshop-static.s3.eu-north-1.amazonaws.com",
     "65.21.150.133",
     "79.130.19.205",
-    "65.109.229.111"
+    "65.109.229.111",
 ]
 
 if DEBUG:

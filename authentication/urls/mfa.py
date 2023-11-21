@@ -9,24 +9,24 @@ from authentication.views.mfa import ViewRecoveryCodesAPIView
 
 urlpatterns = [
     path(
-        "mfa/totp/authenticate/",
+        "mfa/totp/authenticate",
         AuthenticateTotpAPIView.as_view(),
         name="mfa_totp_authenticate",
     ),
-    path("mfa/totp/activate/", ActivateTotpAPIView.as_view(), name="mfa_totp_activate"),
-    path("mfa/totp/active/", totp_active, name="mfa_totp_active"),
+    path("mfa/totp/activate", ActivateTotpAPIView.as_view(), name="mfa_totp_activate"),
+    path("mfa/totp/active", totp_active, name="mfa_totp_active"),
     path(
-        "mfa/totp/deactivate/",
+        "mfa/totp/deactivate",
         DeactivateTotpAPIView.as_view(),
         name="mfa_totp_deactivate",
     ),
     path(
-        "mfa/recovery-codes/generate/",
+        "mfa/recovery-codes/generate",
         GenerateRecoveryCodesAPIView.as_view(),
         name="mfa_recovery_codes_generate",
     ),
     path(
-        "mfa/recovery-codes/list/",
+        "mfa/recovery-codes/list",
         ViewRecoveryCodesAPIView.as_view(),
         name="mfa_recovery_codes_list",
     ),

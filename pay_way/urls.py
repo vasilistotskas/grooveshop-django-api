@@ -4,12 +4,12 @@ from pay_way.views import PayWayViewSet
 
 urlpatterns = [
     path(
-        "pay_way/",
+        "pay_way",
         PayWayViewSet.as_view({"get": "list", "post": "create"}),
         name="payway-list",
     ),
     path(
-        "pay_way/<str:pk>/",
+        "pay_way/<str:pk>",
         PayWayViewSet.as_view(
             {
                 "get": "retrieve",

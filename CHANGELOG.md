@@ -3,7 +3,17 @@
 
 
 
+## v0.46.2 (2023-11-21)
+
+### Fix
+
+* fix: ALLOWED_HOSTS fix ([`8fb3a7b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8fb3a7b51d4eb2c579a80d6cf8c6635364c3bcc0))
+
 ## v0.46.1 (2023-11-21)
+
+### Chore
+
+* chore(release): release version 0.46.1 [skip ci] ([`40e66ae`](https://github.com/vasilistotskas/grooveshop-django-api/commit/40e66aedac7f14822554fcf3db00bd33582118dd))
 
 ### Fix
 

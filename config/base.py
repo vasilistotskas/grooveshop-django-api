@@ -260,7 +260,7 @@ REST_FRAMEWORK = {
 }
 
 # Other general settings
-APPEND_SLASH = getenv("APPEND_SLASH", "True") == "True"
+APPEND_SLASH = getenv("APPEND_SLASH", "False") == "True"
 
 DEEPL_AUTH_KEY = getenv("DEEPL_AUTH_KEY", "changeme")
 

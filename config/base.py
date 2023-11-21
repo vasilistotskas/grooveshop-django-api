@@ -45,21 +45,11 @@ NUXT_BASE_URL = getenv("NUXT_BASE_URL", "http://localhost:3000")
 NUXT_BASE_DOMAIN = getenv("NUXT_BASE_DOMAIN", "localhost:3000")
 MEDIA_STREAM_BASE_URL = getenv("MEDIA_STREAM_BASE_URL", "http://localhost:3003")
 
-ALLOWED_HOSTS = [
-    ".grooveshop.site",
-    ".localhost",
-    "127.0.0.1",
-    "[::1]",
-    "api.grooveshop.site",
-    "grooveshop.site",
-    "grooveshop-static.s3.eu-north-1.amazonaws.com",
-    "65.21.150.133",
-    "79.130.19.205",
-    "65.109.229.111",
-]
+ALLOWED_HOSTS = []  # Start with an empty list
 
-if DEBUG:
-    ALLOWED_HOSTS += [".localhost", "127.0.0.1", "[::1]"]
+# Add any additional hosts from the environment variable
+additional_hosts = getenv("ALLOWED_HOSTS", "*").split(",")
+ALLOWED_HOSTS.extend(filter(None, additional_hosts))  # Filter out empty strings
 
 # Django built-in apps
 DJANGO_APPS = [

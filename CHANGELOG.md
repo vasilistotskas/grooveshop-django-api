@@ -3,7 +3,17 @@
 
 
 
+## v0.45.2 (2023-11-21)
+
+### Fix
+
+* fix: celery import fix, ALLOWED_HOSTS fix. ([`91d6216`](https://github.com/vasilistotskas/grooveshop-django-api/commit/91d62169da19a6808d72e7c23e392f51b54a259c))
+
 ## v0.45.1 (2023-11-19)
+
+### Chore
+
+* chore(release): release version 0.45.1 [skip ci] ([`6fe8373`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6fe83731d5a5e1b77b00b072a52c3657222dd640))
 
 ### Fix
 

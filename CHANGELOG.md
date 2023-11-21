@@ -3,7 +3,17 @@
 
 
 
+## v0.45.5 (2023-11-21)
+
+### Fix
+
+* fix: add`ALLOWED_HOSTS` ips ([`00611bb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/00611bbb053cc3fbb9d9371da2cae12379154a17))
+
 ## v0.45.4 (2023-11-21)
+
+### Chore
+
+* chore(release): release version 0.45.4 [skip ci] ([`d4f99e4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d4f99e4e36911077da13b79d4955bb8fee71c438))
 
 ### Fix
 

@@ -3,7 +3,17 @@
 
 
 
+## v0.46.3 (2023-11-21)
+
+### Fix
+
+* fix: debug toolbar check ([`6585a76`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6585a761dfeff6fc09e4c0442f2d948aaeae587b))
+
 ## v0.46.2 (2023-11-21)
+
+### Chore
+
+* chore(release): release version 0.46.2 [skip ci] ([`794390d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/794390ddcd031f1ee5a61b7232c079cd51d5d3a9))
 
 ### Fix
 

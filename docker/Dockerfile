@@ -74,4 +74,4 @@ USER app
 ENTRYPOINT ["/home/app/web/entrypoint.prod.sh"]
 
 # run uvicorn
-CMD ["uvicorn", "asgi:application", "--host", "0.0.0.0", "--port", "8000", "--workers", "3"]
+CMD ["uvicorn", "asgi:application", "--host", "0.0.0.0", "--port", "8000"]

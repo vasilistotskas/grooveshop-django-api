@@ -3,7 +3,17 @@
 
 
 
+## v0.47.3 (2023-11-24)
+
+### Fix
+
+* fix: tinyMCE url fix. ([`e30b08a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e30b08ab32fd564a2e10a92a57b3c843a93dc455))
+
 ## v0.47.2 (2023-11-24)
+
+### Chore
+
+* chore(release): release version 0.47.2 [skip ci] ([`f9a3d97`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f9a3d97d49b18dcc7f644e9c26c1002f3140a9d5))
 
 ### Fix
 

@@ -48,5 +48,5 @@ else:
             "BACKEND": "storages.backends.s3boto3.S3StaticStorage",
         },
     }
-    TINYMCE_JS_URL = STATIC_URL + "tinymce/tinymce.min.js"
-    TINYMCE_JS_ROOT = STATIC_URL + "tinymce"
+    TINYMCE_JS_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/tinymce/tinymce.min.js"
+    TINYMCE_JS_ROOT = f"https://{AWS_S3_CUSTOM_DOMAIN}/tinymce/"

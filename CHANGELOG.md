@@ -3,7 +3,17 @@
 
 
 
+## v0.47.1 (2023-11-24)
+
+### Fix
+
+* fix: Bump tailwind version and add `--minify` flag ([`b8d4f49`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b8d4f49a0ba39cd9911c25cbac32775a645e5397))
+
 ## v0.47.0 (2023-11-23)
+
+### Chore
+
+* chore(release): release version 0.47.0 [skip ci] ([`b62260c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b62260c0f24323cc8b0657a6ef53e9abf3f007b4))
 
 ### Feature
 

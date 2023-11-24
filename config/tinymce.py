@@ -11,3 +11,6 @@ TINYMCE_DEFAULT_CONFIG = {
     "alignright alignjustify | bullist numlist outdent indent | "
     "removeformat | code | help",
 }
+
+TINYMCE_COMPRESSOR = True
+TINYMCE_SPELLCHECKER = True

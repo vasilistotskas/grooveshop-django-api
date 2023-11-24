@@ -48,4 +48,5 @@ else:
             "BACKEND": "storages.backends.s3boto3.S3StaticStorage",
         },
     }
-    TINYMCE_JS_ROOT = path.join(STATIC_URL, "tinymce/tinymce.min.js")
+    TINYMCE_JS_URL = path.join(STATIC_URL, "tinymce/tinymce.min.js")
+    TINYMCE_JS_ROOT = path.join(STATIC_URL, "tinymce")

@@ -3,7 +3,17 @@
 
 
 
+## v0.47.4 (2023-11-24)
+
+### Fix
+
+* fix: set TINYMCE_COMPRESSOR to false ([`79fdfa3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/79fdfa3231c3cc6a93d38f72cbf19f6d8187e437))
+
 ## v0.47.3 (2023-11-24)
+
+### Chore
+
+* chore(release): release version 0.47.3 [skip ci] ([`3a67457`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a674575e4e5f12d4abf05df1e828e69705a169b))
 
 ### Fix
 

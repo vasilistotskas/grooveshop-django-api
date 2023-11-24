@@ -12,5 +12,5 @@ TINYMCE_DEFAULT_CONFIG = {
     "removeformat | code | help",
 }
 
-TINYMCE_COMPRESSOR = True
+TINYMCE_COMPRESSOR = False
 TINYMCE_SPELLCHECKER = True

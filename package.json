@@ -1,9 +1,9 @@
 {
  "scripts": {
-  "build": "npx tailwindcss -i ./files/css/input.css -o ./files/css/styles.css",
-  "dev": "npx tailwindcss -i ./files/css/input.css -o ./files/css/styles.css --watch"
+  "build": "npx tailwindcss -i ./static/css/input.css -o ./static/css/styles.css --minify",
+  "dev": "npx tailwindcss -i ./static/css/input.css -o ./static/css/styles.css --watch"
  },
  "devDependencies": {
-  "tailwindcss": "^3.3.3"
+  "tailwindcss": "^3.3.5"
  }
 }

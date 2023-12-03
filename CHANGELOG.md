@@ -3,7 +3,17 @@
 
 
 
+## v0.48.0 (2023-12-03)
+
+### Feature
+
+* feat: `GITHUB_WORKFLOW` env `SYSTEM_ENV ` var rename to `ci`, remove session endpoints and versions bump ([`fb24b1b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fb24b1bcc0b16d92ec33e680d373c2e61429ae7d))
+
 ## v0.47.6 (2023-11-24)
+
+### Chore
+
+* chore(release): release version 0.47.6 [skip ci] ([`145febe`](https://github.com/vasilistotskas/grooveshop-django-api/commit/145febe492607b248705c5cdd85c19b0bf342e91))
 
 ### Fix
 
@@ -675,7 +685,7 @@ More fixes and improvements. ([`8d4ff27`](https://github.com/vasilistotskas/groo
 
 * fix(settings.py): add defaults at env vars. ([`4bab314`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4bab314c9c4c346185168423060be3d8765e2900))
 
-* fix(settings.py): local static path for `ci` system env ([`b113b14`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b113b14bda905889bcba113c186f1f214a7c3a90))
+* fix(settings.py): local static path for `GITHUB_WORKFLOW` system env ([`b113b14`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b113b14bda905889bcba113c186f1f214a7c3a90))
 
 * fix(settings.py): `ALLOWED_HOSTS` env variable default set. ([`d0b0d4a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d0b0d4a5fae05ba7fece9d1b275dc22439ef8c95))
 

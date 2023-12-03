@@ -94,7 +94,7 @@ if bool(settings.ENABLE_DEBUG_TOOLBAR):
             re_path(r"^__debug__/", include(debug_toolbar.urls))  # type: ignore
         ]
 
-if bool(settings.DEBUG):
+if bool(settings.DEBUG) or settings.SYSTEM_ENV in ["dev", "ci", "docker"]:
     urlpatterns += static(
         settings.MEDIA_URL,
         document_root=settings.MEDIA_ROOT,

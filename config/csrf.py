@@ -8,7 +8,7 @@ MEDIA_STREAM_BASE_URL = getenv("MEDIA_STREAM_BASE_URL", "http://localhost:3003")
 
 CSRF_COOKIE_NAME = "csrftoken"
 CSRF_COOKIE_AGE = 60 * 60 * 24 * 7 * 52  # 1 year
-CSRF_COOKIE_DOMAIN = getenv("CSRF_COOKIE_DOMAIN", ".grooveshop.site")
+CSRF_COOKIE_DOMAIN = getenv("CSRF_COOKIE_DOMAIN", ".localhost")
 CSRF_COOKIE_PATH = "/"
 CSRF_COOKIE_SECURE = not DEBUG  # Only send CSRF cookie over HTTPS when DEBUG is False
 CSRF_COOKIE_HTTPONLY = True  # Helps mitigate XSS attacks

@@ -24,49 +24,8 @@ class SessionAPITestCase(TestCase):
         cache_instance.clear()
 
     @staticmethod
-    def get_session_url():
-        return reverse("session")
-
-    @staticmethod
-    def get_session_revoke_all_url():
-        return reverse("session-revoke-all")
-
-    @staticmethod
     def get_session_active_users_count_url():
         return reverse("session-active-users-count")
-
-    def test_session_view_authenticated(self):
-        user = User.objects.create_user(
-            email="testuser@example.com", password="testpassword"
-        )
-        self.client.force_login(user)
-
-        response = self.client.get(self.get_session_url())
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["is_session_authenticated"], True)
-        self.assertTrue("CSRF_token" in response.data)
-        self.assertTrue("sessionid" in response.data)
-
-    def test_session_view_unauthenticated(self):
-        response = self.client.get(self.get_session_url())
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["is_session_authenticated"], False)
-        self.assertTrue("CSRF_token" in response.data)
-        self.assertTrue("sessionid" in response.data)
-
-    def test_revoke_all_user_sessions_authenticated(self):
-        user = User.objects.create_user(
-            email="testuser2@example.com", password="testpassword"
-        )
-        self.client.force_login(user)
-
-        response = self.client.delete(self.get_session_revoke_all_url())
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data, {"success": True})
-
-    def test_revoke_all_user_sessions_unauthenticated(self):
-        response = self.client.delete(self.get_session_revoke_all_url())
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_active_users_count(self):
         cache_data_1 = {

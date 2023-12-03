@@ -32,7 +32,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/AuthToken'
           description: ''
-  /api/v1/auth/facebook/connect/:
+  /api/v1/auth/facebook/connect:
     post:
       operationId: api_v1_auth_facebook_connect_create
       description: |-
@@ -65,7 +65,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SocialConnect'
           description: ''
-  /api/v1/auth/facebook/login/:
+  /api/v1/auth/facebook/login:
     post:
       operationId: api_v1_auth_facebook_login_create
       description: |-
@@ -111,7 +111,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SocialLogin'
           description: ''
-  /api/v1/auth/google/connect/:
+  /api/v1/auth/google/connect:
     post:
       operationId: api_v1_auth_google_connect_create
       description: |-
@@ -144,7 +144,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SocialConnect'
           description: ''
-  /api/v1/auth/google/login/:
+  /api/v1/auth/google/login:
     post:
       operationId: api_v1_auth_google_login_create
       description: |-
@@ -190,7 +190,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SocialLogin'
           description: ''
-  /api/v1/auth/is_user_registered/:
+  /api/v1/auth/is_user_registered:
     post:
       operationId: api_v1_auth_is_user_registered_create
       description: Returns if the user is already registered or not.
@@ -208,7 +208,7 @@ paths:
               schema:
                 type: boolean
           description: ''
-  /api/v1/auth/login/:
+  /api/v1/auth/login:
     post:
       operationId: api_v1_auth_login_create
       description: |-
@@ -245,7 +245,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/AuthenticationLogin'
           description: ''
-  /api/v1/auth/logout/:
+  /api/v1/auth/logout:
     get:
       operationId: api_v1_auth_logout_retrieve
       description: |-
@@ -280,7 +280,7 @@ paths:
       responses:
         '200':
           description: No response body
-  /api/v1/auth/mfa/recovery-codes/generate/:
+  /api/v1/auth/mfa/recovery-codes/generate:
     post:
       operationId: api_v1_auth_mfa_recovery_codes_generate_create
       tags:
@@ -293,7 +293,7 @@ paths:
       responses:
         '200':
           description: No response body
-  /api/v1/auth/mfa/recovery-codes/list/:
+  /api/v1/auth/mfa/recovery-codes/list:
     get:
       operationId: api_v1_auth_mfa_recovery_codes_list_retrieve
       tags:
@@ -306,7 +306,7 @@ paths:
       responses:
         '200':
           description: No response body
-  /api/v1/auth/mfa/totp/activate/:
+  /api/v1/auth/mfa/totp/activate:
     get:
       operationId: api_v1_auth_mfa_totp_activate_retrieve
       tags:
@@ -351,7 +351,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ActivateTOTP'
           description: ''
-  /api/v1/auth/mfa/totp/active/:
+  /api/v1/auth/mfa/totp/active:
     get:
       operationId: api_v1_auth_mfa_totp_active_retrieve
       description: Check if TOTP is enabled for the current user
@@ -369,7 +369,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/TOTPEnabled'
           description: ''
-  /api/v1/auth/mfa/totp/authenticate/:
+  /api/v1/auth/mfa/totp/authenticate:
     post:
       operationId: api_v1_auth_mfa_totp_authenticate_create
       tags:
@@ -398,7 +398,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/AuthenticateTOTP'
           description: ''
-  /api/v1/auth/mfa/totp/deactivate/:
+  /api/v1/auth/mfa/totp/deactivate:
     post:
       operationId: api_v1_auth_mfa_totp_deactivate_create
       tags:
@@ -411,7 +411,7 @@ paths:
       responses:
         '200':
           description: No response body
-  /api/v1/auth/password/change/:
+  /api/v1/auth/password/change:
     post:
       operationId: api_v1_auth_password_change_create
       description: |-
@@ -438,7 +438,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/AuthenticationPasswordChange'
           description: ''
-  /api/v1/auth/password/reset/:
+  /api/v1/auth/password/reset:
     post:
       operationId: api_v1_auth_password_reset_create
       description: |-
@@ -472,7 +472,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/AuthenticationPasswordReset'
           description: ''
-  /api/v1/auth/password/reset/confirm/:
+  /api/v1/auth/password/reset/confirm:
     post:
       operationId: api_v1_auth_password_reset_confirm_create
       description: |-
@@ -525,7 +525,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/AuthenticationRegister'
           description: ''
-  /api/v1/auth/registration/resend-email/:
+  /api/v1/auth/registration/resend-email:
     post:
       operationId: api_v1_auth_registration_resend_email_create
       tags:
@@ -554,7 +554,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ResendEmailVerification'
           description: ''
-  /api/v1/auth/registration/verify-email/:
+  /api/v1/auth/registration/verify-email:
     post:
       operationId: api_v1_auth_registration_verify_email_create
       tags:
@@ -583,51 +583,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/VerifyEmail'
           description: ''
-  /api/v1/auth/session/:
-    get:
-      operationId: api_v1_auth_session_retrieve
-      description: Returns the session data.
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Session'
-          description: ''
-  /api/v1/auth/session{format}:
-    get:
-      operationId: api_v1_auth_session_formatted_retrieve
-      description: Returns the session data.
-      parameters:
-      - in: path
-        name: format
-        schema:
-          type: string
-          enum:
-          - .json
-        required: true
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Session'
-          description: ''
-  /api/v1/auth/session/active_users_count/:
+  /api/v1/auth/session/active_users_count:
     get:
       operationId: api_v1_auth_session_active_users_count_retrieve
       description: Returns the number of active users.
@@ -671,79 +627,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ActiveUsersCount'
           description: ''
-  /api/v1/auth/session/revoke/:
-    delete:
-      operationId: api_v1_auth_session_revoke_destroy
-      description: Clears a user session.
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '204':
-          description: No response body
-  /api/v1/auth/session/revoke{format}:
-    delete:
-      operationId: api_v1_auth_session_revoke_formatted_destroy
-      description: Clears a user session.
-      parameters:
-      - in: path
-        name: format
-        schema:
-          type: string
-          enum:
-          - .json
-        required: true
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '204':
-          description: No response body
-  /api/v1/auth/session/revoke/all/:
-    delete:
-      operationId: api_v1_auth_session_revoke_all_destroy
-      description: Clears all user sessions.
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '204':
-          description: No response body
-  /api/v1/auth/session/revoke/all{format}:
-    delete:
-      operationId: api_v1_auth_session_revoke_all_formatted_destroy
-      description: Clears all user sessions.
-      parameters:
-      - in: path
-        name: format
-        schema:
-          type: string
-          enum:
-          - .json
-        required: true
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - cookieAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '204':
-          description: No response body
-  /api/v1/auth/socialaccounts/:
+  /api/v1/auth/socialaccounts:
     get:
       operationId: api_v1_auth_socialaccounts_list
       description: List SocialAccounts for the currently logged in user
@@ -762,7 +646,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/SocialAccount'
           description: ''
-  /api/v1/auth/socialaccounts/{id}/disconnect/:
+  /api/v1/auth/socialaccounts/{id}/disconnect:
     post:
       operationId: api_v1_auth_socialaccounts_disconnect_create
       description: |-
@@ -798,7 +682,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SocialConnect'
           description: ''
-  /api/v1/auth/token/refresh/:
+  /api/v1/auth/token/refresh:
     post:
       operationId: api_v1_auth_token_refresh_create
       description: |-
@@ -825,7 +709,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/TokenRefresh'
           description: ''
-  /api/v1/auth/token/verify/:
+  /api/v1/auth/token/verify:
     post:
       operationId: api_v1_auth_token_verify_create
       description: |-
@@ -852,7 +736,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/TokenVerify'
           description: ''
-  /api/v1/auth/user/:
+  /api/v1/auth/user:
     get:
       operationId: api_v1_auth_user_retrieve
       description: |-
@@ -947,7 +831,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Authentication'
           description: ''
-  /api/v1/blog/author/:
+  /api/v1/blog/author:
     get:
       operationId: api_v1_blog_author_list
       parameters:
@@ -1118,7 +1002,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BlogAuthor'
           description: ''
-  /api/v1/blog/author/{id}/:
+  /api/v1/blog/author/{id}:
     get:
       operationId: api_v1_blog_author_retrieve
       parameters:
@@ -1362,7 +1246,7 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/blog/category/:
+  /api/v1/blog/category:
     get:
       operationId: api_v1_blog_category_list
       parameters:
@@ -1525,7 +1409,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BlogCategory'
           description: ''
-  /api/v1/blog/category/{id}/:
+  /api/v1/blog/category/{id}:
     get:
       operationId: api_v1_blog_category_retrieve
       parameters:
@@ -1769,7 +1653,7 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/blog/comment/:
+  /api/v1/blog/comment:
     get:
       operationId: api_v1_blog_comment_list
       parameters:
@@ -1948,7 +1832,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BlogComment'
           description: ''
-  /api/v1/blog/comment/{id}/:
+  /api/v1/blog/comment/{id}:
     get:
       operationId: api_v1_blog_comment_retrieve
       parameters:
@@ -2192,7 +2076,7 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/blog/post/:
+  /api/v1/blog/post:
     get:
       operationId: api_v1_blog_post_list
       parameters:
@@ -2387,7 +2271,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BlogPost'
           description: ''
-  /api/v1/blog/post/{id}/:
+  /api/v1/blog/post/{id}:
     get:
       operationId: api_v1_blog_post_retrieve
       parameters:
@@ -2631,7 +2515,7 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/blog/post/{id}/update_likes/:
+  /api/v1/blog/post/{id}/update_likes:
     post:
       operationId: api_v1_blog_post_update_likes_create
       parameters:
@@ -2708,7 +2592,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BlogPost'
           description: ''
-  /api/v1/blog/post/{id}/update_view_count/:
+  /api/v1/blog/post/{id}/update_view_count:
     post:
       operationId: api_v1_blog_post_update_view_count_create
       parameters:
@@ -2785,7 +2669,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BlogPost'
           description: ''
-  /api/v1/blog/tag/:
+  /api/v1/blog/tag:
     get:
       operationId: api_v1_blog_tag_list
       parameters:
@@ -2956,7 +2840,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BlogTag'
           description: ''
-  /api/v1/blog/tag/{id}/:
+  /api/v1/blog/tag/{id}:
     get:
       operationId: api_v1_blog_tag_retrieve
       parameters:
@@ -3200,7 +3084,7 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/cart/:
+  /api/v1/cart:
     get:
       operationId: api_v1_cart_retrieve
       tags:
@@ -3398,7 +3282,7 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/cart/item/:
+  /api/v1/cart/item:
     get:
       operationId: api_v1_cart_item_list
       parameters:
@@ -3801,7 +3685,7 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/checkout/:
+  /api/v1/checkout:
     post:
       operationId: api_v1_checkout_create
       tags:
@@ -3830,7 +3714,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Checkout'
           description: ''
-  /api/v1/country/:
+  /api/v1/country:
     get:
       operationId: api_v1_country_list
       parameters:
@@ -4025,7 +3909,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Country'
           description: ''
-  /api/v1/country/{alpha_2}/:
+  /api/v1/country/{alpha_2}:
     get:
       operationId: api_v1_country_retrieve
       parameters:
@@ -4285,7 +4169,7 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/notification/user/:
+  /api/v1/notification/user:
     get:
       operationId: api_v1_notification_user_list
       parameters:
@@ -4376,7 +4260,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedNotificationUserList'
           description: ''
-  /api/v1/notification/user/mark_all_as_seen/:
+  /api/v1/notification/user/mark_all_as_seen:
     post:
       operationId: api_v1_notification_user_mark_all_as_seen_create
       tags:
@@ -4442,7 +4326,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NotificationUser'
           description: ''
-  /api/v1/notification/user/mark_all_as_unseen/:
+  /api/v1/notification/user/mark_all_as_unseen:
     post:
       operationId: api_v1_notification_user_mark_all_as_unseen_create
       tags:
@@ -4508,7 +4392,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NotificationUser'
           description: ''
-  /api/v1/notification/user/mark_as_seen/:
+  /api/v1/notification/user/mark_as_seen:
     post:
       operationId: api_v1_notification_user_mark_as_seen_create
       tags:
@@ -4574,7 +4458,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NotificationUserAction'
           description: ''
-  /api/v1/notification/user/mark_as_unseen/:
+  /api/v1/notification/user/mark_as_unseen:
     post:
       operationId: api_v1_notification_user_mark_as_unseen_create
       tags:
@@ -4640,7 +4524,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NotificationUserAction'
           description: ''
-  /api/v1/notification/user/unseen_count/:
+  /api/v1/notification/user/unseen_count:
     get:
       operationId: api_v1_notification_user_unseen_count_retrieve
       tags:
@@ -4682,7 +4566,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NotificationUser'
           description: ''
-  /api/v1/order/:
+  /api/v1/order:
     get:
       operationId: api_v1_order_list
       parameters:
@@ -4771,7 +4655,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrderCreateUpdate'
           description: ''
-  /api/v1/order/{id}/:
+  /api/v1/order/{id}:
     get:
       operationId: api_v1_order_retrieve
       parameters:
@@ -4879,7 +4763,7 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/order/uuid/{uuid}/:
+  /api/v1/order/uuid/{uuid}:
     get:
       operationId: api_v1_order_uuid_retrieve
       parameters:
@@ -4903,7 +4787,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Order'
           description: ''
-  /api/v1/pay_way/:
+  /api/v1/pay_way:
     get:
       operationId: api_v1_pay_way_list
       parameters:
@@ -4985,7 +4869,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PayWay'
           description: ''
-  /api/v1/pay_way/{id}/:
+  /api/v1/pay_way/{id}:
     get:
       operationId: api_v1_pay_way_retrieve
       parameters:
@@ -5093,7 +4977,7 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/product/:
+  /api/v1/product:
     get:
       operationId: api_v1_product_list
       parameters:
@@ -5272,7 +5156,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Product'
           description: ''
-  /api/v1/product/{id}/:
+  /api/v1/product/{id}:
     get:
       operationId: api_v1_product_retrieve
       parameters:
@@ -5516,7 +5400,7 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/product/{id}/update_product_hits/:
+  /api/v1/product/{id}/update_product_hits:
     post:
       operationId: api_v1_product_update_product_hits_create
       parameters:
@@ -5593,7 +5477,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Product'
           description: ''
-  /api/v1/product/category/:
+  /api/v1/product/category:
     get:
       operationId: api_v1_product_category_list
       parameters:
@@ -5756,7 +5640,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProductCategory'
           description: ''
-  /api/v1/product/category/{id}/:
+  /api/v1/product/category/{id}:
     get:
       operationId: api_v1_product_category_retrieve
       parameters:
@@ -6000,7 +5884,7 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/product/favourite/:
+  /api/v1/product/favourite:
     get:
       operationId: api_v1_product_favourite_list
       parameters:
@@ -6179,7 +6063,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProductFavourite'
           description: ''
-  /api/v1/product/favourite/{id}/:
+  /api/v1/product/favourite/{id}:
     get:
       operationId: api_v1_product_favourite_retrieve
       parameters:
@@ -6423,7 +6307,7 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/product/image/:
+  /api/v1/product/image:
     get:
       operationId: api_v1_product_image_list
       parameters:
@@ -6602,7 +6486,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProductImage'
           description: ''
-  /api/v1/product/image/{id}/:
+  /api/v1/product/image/{id}:
     get:
       operationId: api_v1_product_image_retrieve
       parameters:
@@ -6846,7 +6730,7 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/product/review/:
+  /api/v1/product/review:
     get:
       operationId: api_v1_product_review_list
       parameters:
@@ -7023,7 +6907,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProductReview'
           description: ''
-  /api/v1/product/review/{id}/:
+  /api/v1/product/review/{id}:
     get:
       operationId: api_v1_product_review_retrieve
       parameters:
@@ -7261,7 +7145,7 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/product/review/user_had_reviewed/:
+  /api/v1/product/review/user_had_reviewed:
     post:
       operationId: api_v1_product_review_user_had_reviewed_create
       tags:
@@ -7327,7 +7211,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProductReview'
           description: ''
-  /api/v1/region/:
+  /api/v1/region:
     get:
       operationId: api_v1_region_list
       parameters:
@@ -7500,7 +7384,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Region'
           description: ''
-  /api/v1/region/{alpha}/:
+  /api/v1/region/{alpha}:
     get:
       operationId: api_v1_region_retrieve
       parameters:
@@ -7752,7 +7636,7 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/region/{alpha}/get_regions_by_country_alpha_2/:
+  /api/v1/region/{alpha}/get_regions_by_country_alpha_2:
     get:
       operationId: api_v1_region_get_regions_by_country_alpha_2_retrieve
       parameters:
@@ -7807,7 +7691,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Region'
           description: ''
-  /api/v1/search/product/:
+  /api/v1/search/product:
     get:
       operationId: api_v1_search_product_list
       parameters:
@@ -7862,7 +7746,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedSearchProductList'
           description: ''
-  /api/v1/slide/:
+  /api/v1/slide:
     get:
       operationId: api_v1_slide_list
       parameters:
@@ -8033,7 +7917,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Slide'
           description: ''
-  /api/v1/slide/{id}/:
+  /api/v1/slide/{id}:
     get:
       operationId: api_v1_slide_retrieve
       parameters:
@@ -8277,7 +8161,7 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/slider/:
+  /api/v1/slider:
     get:
       operationId: api_v1_slider_list
       parameters:
@@ -8440,7 +8324,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Slider'
           description: ''
-  /api/v1/slider/{id}/:
+  /api/v1/slider/{id}:
     get:
       operationId: api_v1_slider_retrieve
       parameters:
@@ -8684,7 +8568,7 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/tip/:
+  /api/v1/tip:
     get:
       operationId: api_v1_tip_list
       parameters:
@@ -8883,7 +8767,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Tip'
           description: ''
-  /api/v1/tip/{id}/:
+  /api/v1/tip/{id}:
     get:
       operationId: api_v1_tip_retrieve
       parameters:
@@ -9127,7 +9011,7 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/user/account/:
+  /api/v1/user/account:
     get:
       operationId: api_v1_user_account_list
       parameters:
@@ -9294,7 +9178,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/UserAccount'
           description: ''
-  /api/v1/user/account/{id}/:
+  /api/v1/user/account/{id}:
     get:
       operationId: api_v1_user_account_retrieve
       parameters:
@@ -9530,7 +9414,7 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/user/account/session/:
+  /api/v1/user/account/session:
     get:
       operationId: api_v1_user_account_session_retrieve
       tags:
@@ -9570,7 +9454,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/UserAccount'
           description: ''
-  /api/v1/user/address/:
+  /api/v1/user/address:
     get:
       operationId: api_v1_user_address_list
       parameters:
@@ -9851,7 +9735,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/UserAddress'
           description: ''
-  /api/v1/user/address/{id}/:
+  /api/v1/user/address/{id}:
     get:
       operationId: api_v1_user_address_retrieve
       parameters:
@@ -10087,7 +9971,7 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/user/address/{id}/set_main/:
+  /api/v1/user/address/{id}/set_main:
     post:
       operationId: api_v1_user_address_set_main_create
       parameters:
@@ -10162,7 +10046,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/UserAddress'
           description: ''
-  /api/v1/vat/:
+  /api/v1/vat:
     get:
       operationId: api_v1_vat_list
       parameters:
@@ -10333,7 +10217,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Vat'
           description: ''
-  /api/v1/vat/{id}/:
+  /api/v1/vat/{id}:
     get:
       operationId: api_v1_vat_retrieve
       parameters:
@@ -14523,36 +14407,6 @@ components:
       - similarity
       - slug
       - translations
-    Session:
-      type: object
-      properties:
-        isSessionAuthenticated:
-          type: boolean
-        CSRFToken:
-          type: string
-        referer:
-          type: string
-          nullable: true
-        userAgent:
-          type: string
-          nullable: true
-        sessionid:
-          type: string
-          nullable: true
-        role:
-          type: string
-        lastActivity:
-          type: string
-          format: date-time
-          nullable: true
-      required:
-      - CSRFToken
-      - isSessionAuthenticated
-      - lastActivity
-      - referer
-      - role
-      - sessionid
-      - userAgent
     Slide:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.

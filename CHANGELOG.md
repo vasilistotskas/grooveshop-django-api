@@ -675,7 +675,7 @@ More fixes and improvements. ([`8d4ff27`](https://github.com/vasilistotskas/groo
 
 * fix(settings.py): add defaults at env vars. ([`4bab314`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4bab314c9c4c346185168423060be3d8765e2900))
 
-* fix(settings.py): local static path for `GITHUB_WORKFLOW` system env ([`b113b14`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b113b14bda905889bcba113c186f1f214a7c3a90))
+* fix(settings.py): local static path for `ci` system env ([`b113b14`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b113b14bda905889bcba113c186f1f214a7c3a90))
 
 * fix(settings.py): `ALLOWED_HOSTS` env variable default set. ([`d0b0d4a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d0b0d4a5fae05ba7fece9d1b275dc22439ef8c95))
 

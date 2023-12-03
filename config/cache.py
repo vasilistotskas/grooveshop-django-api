@@ -18,7 +18,7 @@ CACHES = {
     },
 }
 
-if SYSTEM_ENV == "GITHUB_WORKFLOW":
+if SYSTEM_ENV == "ci":
     CACHES = {
         "default": {
             "BACKEND": "django.core.cache.backends.redis.RedisCache",

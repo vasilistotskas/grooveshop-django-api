@@ -8,7 +8,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 STATICFILES_DIRS = (path.join(BASE_DIR, "static"),)
 
-if SYSTEM_ENV in ["dev", "GITHUB_WORKFLOW", "docker"]:
+if SYSTEM_ENV in ["dev", "ci", "docker"]:
     STATIC_URL = "/static/"
     STATIC_ROOT = path.join(BASE_DIR, "staticfiles")
     MEDIA_URL = "/media/"

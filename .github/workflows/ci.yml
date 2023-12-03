@@ -7,6 +7,9 @@ on:
   pull_request:
     branches: [ "main" ]
 
+env:
+  SYSTEM_ENV: ci
+
 jobs:
   quality:
     runs-on: ubuntu-latest
@@ -102,12 +105,9 @@ jobs:
         run: |
           python manage.py makemigrations
           python manage.py migrate
-        env:
-          SYSTEM_ENV: GITHUB_WORKFLOW
 
       - name: Run Tests
         env:
-          SYSTEM_ENV: GITHUB_WORKFLOW
           DB: ${{ matrix.db }}
           DB_PORT: ${{ matrix.db_port }}
           DB_USER: ${{ matrix.db_user }}

@@ -25,7 +25,7 @@ DATABASES = {
     },
 }
 
-if SYSTEM_ENV == "GITHUB_WORKFLOW":
+if SYSTEM_ENV == "ci":
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",

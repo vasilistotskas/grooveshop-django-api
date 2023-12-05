@@ -202,17 +202,17 @@ wcwidth = ">=0.1.4"
 
 [[package]]
 name = "boto3"
-version = "1.33.6"
+version = "1.33.7"
 description = "The AWS SDK for Python"
 optional = false
 python-versions = ">= 3.7"
 files = [
-    {file = "boto3-1.33.6-py3-none-any.whl", hash = "sha256:b88f0f305186c5fd41f168e006baa45b7002a33029aec8e5bef373237a172fca"},
-    {file = "boto3-1.33.6.tar.gz", hash = "sha256:4f62fc1c7f3ea2d22917aa0aa07b86f119abd90bed3d815e4b52fb3d84773e15"},
+    {file = "boto3-1.33.7-py3-none-any.whl", hash = "sha256:d12467fb3a64d359b0bda0570a8163a5859fcac13e786f2a3db0392523178556"},
+    {file = "boto3-1.33.7.tar.gz", hash = "sha256:eed0f7df91066b6ac63a53d16459ac082458d57061bedf766135d9e1c2b75a6b"},
 ]
 
 [package.dependencies]
-botocore = ">=1.33.6,<1.34.0"
+botocore = ">=1.33.7,<1.34.0"
 jmespath = ">=0.7.1,<2.0.0"
 s3transfer = ">=0.8.2,<0.9.0"
 
@@ -221,13 +221,13 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.33.6"
+version = "1.33.7"
 description = "Low-level, data-driven core of boto 3."
 optional = false
 python-versions = ">= 3.7"
 files = [
-    {file = "botocore-1.33.6-py3-none-any.whl", hash = "sha256:14282cd432c0683770eee932c43c12bb9ad5730e23755204ad102897c996693a"},
-    {file = "botocore-1.33.6.tar.gz", hash = "sha256:938056bab831829f90e09ecd70dd6b295afd52b1482f5582ee7a11d8243d9661"},
+    {file = "botocore-1.33.7-py3-none-any.whl", hash = "sha256:71ec0e85b996cf9def3dd8f4ca6cb4a9fd3a614aa4c9c7cbf33f2f68e1d0649a"},
+    {file = "botocore-1.33.7.tar.gz", hash = "sha256:b2299bc13bb8c0928edc98bf4594deb14cba2357536120f63772027a16ce7374"},
 ]
 
 [package.dependencies]
@@ -880,13 +880,13 @@ with-social = ["django-allauth (>=0.56.0,<0.58.0)"]
 
 [[package]]
 name = "django"
-version = "4.2.7"
+version = "4.2.8"
 description = "A high-level Python web framework that encourages rapid development and clean, pragmatic design."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "Django-4.2.7-py3-none-any.whl", hash = "sha256:e1d37c51ad26186de355cbcec16613ebdabfa9689bbade9c538835205a8abbe9"},
-    {file = "Django-4.2.7.tar.gz", hash = "sha256:8e0f1c2c2786b5c0e39fe1afce24c926040fad47c8ea8ad30aaf1188df29fc41"},
+    {file = "Django-4.2.8-py3-none-any.whl", hash = "sha256:6cb5dcea9e3d12c47834d32156b8841f533a4493c688e2718cafd51aa430ba6d"},
+    {file = "Django-4.2.8.tar.gz", hash = "sha256:d69d5e36cc5d9f4eb4872be36c622878afcdce94062716cf3e25bcedcb168b62"},
 ]
 
 [package.dependencies]
@@ -1031,13 +1031,13 @@ Django = ">=3.2"
 
 [[package]]
 name = "django-filter"
-version = "23.4"
+version = "23.5"
 description = "Django-filter is a reusable Django application for allowing users to filter querysets dynamically."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "django-filter-23.4.tar.gz", hash = "sha256:bed070b38359dce7d2dbe057b165d59773057986356cb809ded983b36c77a976"},
-    {file = "django_filter-23.4-py3-none-any.whl", hash = "sha256:526954f18bd7d6423f232a9a7974f58fbc6863908b9fc160de075e01adcc2a5f"},
+    {file = "django-filter-23.5.tar.gz", hash = "sha256:67583aa43b91fe8c49f74a832d95f4d8442be628fd4c6d65e9f811f5153a4e5c"},
+    {file = "django_filter-23.5-py3-none-any.whl", hash = "sha256:99122a201d83860aef4fe77758b69dda913e874cc5e0eaa50a86b0b18d708400"},
 ]
 
 [package.dependencies]
@@ -1164,19 +1164,19 @@ phonenumberslite = ["phonenumberslite (>=7.0.2)"]
 
 [[package]]
 name = "django-rosetta"
-version = "0.9.9"
+version = "0.10.0"
 description = "A Django application that eases the translation of Django projects"
 optional = false
 python-versions = "*"
 files = [
-    {file = "django-rosetta-0.9.9.tar.gz", hash = "sha256:776ac03f43974ea780ca25e7d805862b06c8ede4698f999c771a5ed78da4b87f"},
-    {file = "django_rosetta-0.9.9-py3-none-any.whl", hash = "sha256:269d9ce7e9972002ac216e7bca33b4d9f578bd38b6043d98e28c9b69c04c1f59"},
+    {file = "django-rosetta-0.10.0.tar.gz", hash = "sha256:e0380c456e807b5954afaa54ed43c1dbaf29a2af8dd773ec332c8c2fe5465418"},
+    {file = "django_rosetta-0.10.0-py3-none-any.whl", hash = "sha256:a42ed265a976a8e5e907f20bad56239e701084a4b9936810e85ffb27bf9a1f15"},
 ]
 
 [package.dependencies]
-Django = ">=2.2"
+Django = ">=4.2"
 polib = ">=1.1.0"
-requests = ">=2.1.0"
+requests = ">=2.30.0"
 
 [[package]]
 name = "django-storages"
@@ -1303,27 +1303,27 @@ files = [
 
 [[package]]
 name = "djangorestframework-simplejwt"
-version = "5.3.0"
+version = "5.3.1"
 description = "A minimal JSON Web Token authentication plugin for Django REST Framework"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "djangorestframework_simplejwt-5.3.0-py3-none-any.whl", hash = "sha256:631d7ae2ed4365d7196a35d3cc0f6d382f7bd3361fb24c894f8f92b4da5db27d"},
-    {file = "djangorestframework_simplejwt-5.3.0.tar.gz", hash = "sha256:8e4c5dfca8d11c0b8a66dfd8a4e3fc1c6aa7ea188d10907ff91c942f4b52ed66"},
+    {file = "djangorestframework_simplejwt-5.3.1-py3-none-any.whl", hash = "sha256:381bc966aa46913905629d472cd72ad45faa265509764e20ffd440164c88d220"},
+    {file = "djangorestframework_simplejwt-5.3.1.tar.gz", hash = "sha256:6c4bd37537440bc439564ebf7d6085e74c5411485197073f508ebdfa34bc9fae"},
 ]
 
 [package.dependencies]
 django = ">=3.2"
-djangorestframework = ">=3.10"
+djangorestframework = ">=3.12"
 pyjwt = ">=1.7.1,<3"
 
 [package.extras]
 crypto = ["cryptography (>=3.3.1)"]
-dev = ["Sphinx (>=1.6.5,<2)", "cryptography", "flake8", "ipython", "isort", "pep8", "pytest", "pytest-cov", "pytest-django", "pytest-watch", "pytest-xdist", "python-jose (==3.3.0)", "sphinx-rtd-theme (>=0.1.9)", "tox", "twine", "wheel"]
-doc = ["Sphinx (>=1.6.5,<2)", "sphinx-rtd-theme (>=0.1.9)"]
+dev = ["Sphinx (>=1.6.5,<2)", "cryptography", "flake8", "freezegun", "ipython", "isort", "pep8", "pytest", "pytest-cov", "pytest-django", "pytest-watch", "pytest-xdist", "python-jose (==3.3.0)", "sphinx_rtd_theme (>=0.1.9)", "tox", "twine", "wheel"]
+doc = ["Sphinx (>=1.6.5,<2)", "sphinx_rtd_theme (>=0.1.9)"]
 lint = ["flake8", "isort", "pep8"]
 python-jose = ["python-jose (==3.3.0)"]
-test = ["cryptography", "pytest", "pytest-cov", "pytest-django", "pytest-xdist", "tox"]
+test = ["cryptography", "freezegun", "pytest", "pytest-cov", "pytest-django", "pytest-xdist", "tox"]
 
 [[package]]
 name = "dotty-dict"
@@ -1896,13 +1896,13 @@ i18n = ["Babel (>=2.7)"]
 
 [[package]]
 name = "jinxed"
-version = "1.2.0"
+version = "1.2.1"
 description = "Jinxed Terminal Library"
 optional = false
 python-versions = "*"
 files = [
-    {file = "jinxed-1.2.0-py2.py3-none-any.whl", hash = "sha256:cfc2b2e4e3b4326954d546ba6d6b9a7a796ddcb0aef8d03161d005177eb0d48b"},
-    {file = "jinxed-1.2.0.tar.gz", hash = "sha256:032acda92d5c57cd216033cbbd53de731e6ed50deb63eb4781336ca55f72cda5"},
+    {file = "jinxed-1.2.1-py2.py3-none-any.whl", hash = "sha256:37422659c4925969c66148c5e64979f553386a4226b9484d910d3094ced37d30"},
+    {file = "jinxed-1.2.1.tar.gz", hash = "sha256:30c3f861b73279fea1ed928cfd4dfb1f273e16cd62c8a32acfac362da0f78f3f"},
 ]
 
 [package.dependencies]
@@ -2438,13 +2438,13 @@ tests = ["check-manifest", "coverage", "defusedxml", "markdown2", "olefile", "pa
 
 [[package]]
 name = "platformdirs"
-version = "4.0.0"
+version = "4.1.0"
 description = "A small Python package for determining appropriate platform-specific dirs, e.g. a \"user data dir\"."
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "platformdirs-4.0.0-py3-none-any.whl", hash = "sha256:118c954d7e949b35437270383a3f2531e99dd93cf7ce4dc8340d3356d30f173b"},
-    {file = "platformdirs-4.0.0.tar.gz", hash = "sha256:cb633b2bcf10c51af60beb0ab06d2f1d69064b43abf4c185ca6b28865f3f9731"},
+    {file = "platformdirs-4.1.0-py3-none-any.whl", hash = "sha256:11c8f37bcca40db96d8144522d925583bdb7a31f7b0e37e3ed4318400a8e2380"},
+    {file = "platformdirs-4.1.0.tar.gz", hash = "sha256:906d548203468492d432bcb294d4bc2fff751bf84971fbb2c10918cc206ee420"},
 ]
 
 [package.extras]
@@ -2994,13 +2994,13 @@ testing = ["argcomplete", "attrs (>=19.2.0)", "hypothesis (>=3.56)", "mock", "no
 
 [[package]]
 name = "pytest-asyncio"
-version = "0.23.0"
+version = "0.23.2"
 description = "Pytest support for asyncio"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "pytest-asyncio-0.23.0.tar.gz", hash = "sha256:236e89745b8be43b3b473640b523f26fe3c62a2afa7548e38532e9f201d22fc3"},
-    {file = "pytest_asyncio-0.23.0-py3-none-any.whl", hash = "sha256:91ef405536331eb9971511aeb08225869985d800cf491015f7407044e7d1d7f8"},
+    {file = "pytest-asyncio-0.23.2.tar.gz", hash = "sha256:c16052382554c7b22d48782ab3438d5b10f8cf7a4bdcae7f0f67f097d95beecc"},
+    {file = "pytest_asyncio-0.23.2-py3-none-any.whl", hash = "sha256:ea9021364e32d58f0be43b91c6233fb8d2224ccef2398d6837559e587682808f"},
 ]
 
 [package.dependencies]
@@ -3778,46 +3778,46 @@ zstd = ["zstandard (>=0.18.0)"]
 
 [[package]]
 name = "urwid"
-version = "2.2.3"
+version = "2.3.4"
 description = "A full-featured console (xterm et al.) user interface library"
 optional = false
 python-versions = ">=3.7.0"
 files = [
-    {file = "urwid-2.2.3-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:7bbc35b54546975df692ab198a272eb459f883dc9b20a19d56eb19ff50838e9a"},
-    {file = "urwid-2.2.3-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:64a3d49f5a8d083198a6bd80ea4c93f45ab1e0cc0735433217925b5df7c32c86"},
-    {file = "urwid-2.2.3-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:c1c9c088dc9aff393489c61edd35e3a16930f9b62da3c78e419fc0880aa1291f"},
-    {file = "urwid-2.2.3-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:746dfc58c745360705d004f75c8799fa6782ebb635666ad36f6e0e3e5fada8fe"},
-    {file = "urwid-2.2.3-cp310-cp310-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:604facd127f7d9b535885291154144611fa0aad52f144e88e92e676e4fa09792"},
-    {file = "urwid-2.2.3-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4e241ea0cc3b9f62e74749a143118877cc04a49c00688acd0ecd97cfc907027b"},
-    {file = "urwid-2.2.3-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:0607961f0ce4a60fd4701138bcd198579caafdc020c11fff2db8c7d295786817"},
-    {file = "urwid-2.2.3-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:b17dd1dd21926ca1dfbb7b0cfd43f18afe087fba2f488d29795d05a1fe763449"},
-    {file = "urwid-2.2.3-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:deb48828224cdc8a70269973ebe2830de5ab05d9837651af529418ec0de06355"},
-    {file = "urwid-2.2.3-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:7264f82f765339218297b09441d35f5bf90e3bb800a413b5116949729f91ba04"},
-    {file = "urwid-2.2.3-cp311-cp311-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:1bbb1a2b8beecdaea4b2f6657efb6ca62c53e4156cfae156cb96bab90c738147"},
-    {file = "urwid-2.2.3-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:cc1b894918813f170dff2a3f0127e972cfb7c6def3f1fb819a09d903d1383d15"},
-    {file = "urwid-2.2.3-cp312-cp312-macosx_10_9_universal2.whl", hash = "sha256:b3aab4fedbb2fa1b7c0d8fb1c537285c16a46e6c72b54ca4423b779306662f7f"},
-    {file = "urwid-2.2.3-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:8f73bb89aa79fd4604d24d59c3093adc6d472a22f604fad4df140b124ee9edcd"},
-    {file = "urwid-2.2.3-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:f7a9fb6d13595fa2f51a2c9927559c9d3706e1a788cbaf2d661631c65b5162bd"},
-    {file = "urwid-2.2.3-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:efcff1822c71d4f9980c75bbfd91f9b45739c629b0b881646f9fa9dcf8bac27c"},
-    {file = "urwid-2.2.3-cp312-cp312-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:0719114584eeda539e4dd649e8e434a64d0a38ba9769fe4f80d1286e19850713"},
-    {file = "urwid-2.2.3-cp312-cp312-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:5706994d3197124ffc57762e8d088b492b2e89f4d1b21cf51a9199d67355c4f3"},
-    {file = "urwid-2.2.3-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:b0f9f62a82df0cfb15e8a23ae1f6e6fa856c3415677d98724bc2b8a5702477d1"},
-    {file = "urwid-2.2.3-cp37-cp37m-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:36a856fd0cb38c05fda2ee785f395684ea4f682b1f830ccdab7d0784543f9d13"},
-    {file = "urwid-2.2.3-cp37-cp37m-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:f55eb74095dcbeb0f53dc32b7d809d5c34792c7b9b372c3d24fe1ffaaef1863b"},
-    {file = "urwid-2.2.3-cp37-cp37m-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:59dac9f19020f53a9400f8a0ba2b18b4389fd1deeab88c8319736fd108244d72"},
-    {file = "urwid-2.2.3-cp38-cp38-macosx_10_9_universal2.whl", hash = "sha256:5a4ee4072e64b414075f32373fc5f63967a4686708ada3e8f8df52d4a2ada8a7"},
-    {file = "urwid-2.2.3-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:bd036997b600c84b33c7bc49b98f029990f49a70d4b21d3399ae7aeba73f0c4e"},
-    {file = "urwid-2.2.3-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:c094b9d00aeb95496372bc27d5c3a2127546f2efc75cafcad019a99c4ab98d9b"},
-    {file = "urwid-2.2.3-cp38-cp38-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:42224c6aca61459b992c30b6740cbe9f4f0f420e8770a9345b7f3f09f19b2409"},
-    {file = "urwid-2.2.3-cp38-cp38-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:efc234c8d74bf839896eeae9333be91e0fa832dee552f2c764e300080d06d2e2"},
-    {file = "urwid-2.2.3-cp38-cp38-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:bf7819bd19ceaa9c1baa5bd50d304b5d4d759591e6a2a7edb1727d1a9f16782d"},
-    {file = "urwid-2.2.3-cp39-cp39-macosx_10_9_universal2.whl", hash = "sha256:cd8c5f617807f2a8bb5750f851edd3305fb0417230c04b84f4782c51c58c19ea"},
-    {file = "urwid-2.2.3-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:b50c7a06a620320b5c124fb3af7d339f7720fec29bf49d5486ec4115ec3df8ff"},
-    {file = "urwid-2.2.3-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:58950a17f3917b4a4a44e167d2ed1d59931f71a1be927c4d0204a035c51ebfd2"},
-    {file = "urwid-2.2.3-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:c4352f2a971c7b9dc236d5fce7c4492858441344ead85ce4b1cb1dd513098bbe"},
-    {file = "urwid-2.2.3-cp39-cp39-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:80260cf2bd4be3eca611e978ee2926fc0338e9550702c77932efc80ca6b0b09d"},
-    {file = "urwid-2.2.3-cp39-cp39-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:238ec0be47cbca99320f12864143638e4ebd1722a509f8037ff92ef66b0e9394"},
-    {file = "urwid-2.2.3.tar.gz", hash = "sha256:e4516d55dcee6bd012b3e72a10c75f2866c63a740f0ec4e1ada05c1e1cc02e34"},
+    {file = "urwid-2.3.4-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:232b64678248c489e0dddadccfc2483a54567b74fcf74d140f3f4b4e9d15ddba"},
+    {file = "urwid-2.3.4-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:ce538f0e5c8ee2341f3e38239a1c65a5a042ee993577093067a4419c10615030"},
+    {file = "urwid-2.3.4-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:81a17afedc1f0ec7ee6af9ebae0c21f5caddf050831ffc5dfbd7e61a4966388a"},
+    {file = "urwid-2.3.4-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:bbbb8c21920be76630d1ae03eb67dced3d362a56eabf05d619a0ce3f0488cb0d"},
+    {file = "urwid-2.3.4-cp310-cp310-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:d1a0e6bbd4e70805519e843fa982ba322d819939eb7049e6ece5ed6aa132c96b"},
+    {file = "urwid-2.3.4-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:8b0802494b1baaf691313cd24aaf5e4ec00bf8a6f4ba664bdf088119517db0d4"},
+    {file = "urwid-2.3.4-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:0be1a86fa279850bd167a031dd71aa401b26f7e9fdcc99360785f1a292938c10"},
+    {file = "urwid-2.3.4-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:de28459d08020a07fe4d918a9ca5ff069102fa5455356cc5a1695b55ebb5bafe"},
+    {file = "urwid-2.3.4-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:4dbeb404751341f354f7d7bf5857cacb7ba415335427c78ee00991cdcc1b5bb0"},
+    {file = "urwid-2.3.4-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:45e61a5be847ab36a5188aacd96554e0f354367dcae2f6cbc284de7fbbb3f075"},
+    {file = "urwid-2.3.4-cp311-cp311-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:0d518d3cb428c9e0c03076dc6b83996bbfe0595d4612c3c2f572d8edbc260e9c"},
+    {file = "urwid-2.3.4-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:67bdc9c3f8a834b848e4400d91b5ab82620e1f963e4736600a304930433ea8fe"},
+    {file = "urwid-2.3.4-cp312-cp312-macosx_10_9_universal2.whl", hash = "sha256:32d91a4f2abaa022d6bcd8f4d7b179a1bb03afcb83be4707e5599131f322dbce"},
+    {file = "urwid-2.3.4-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:278ffe0c8366c03da533a983eb85ac80e325eec09f78988fd37fc830dc563eb2"},
+    {file = "urwid-2.3.4-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:0080ad86d37792faeda2ddaf7eaab711861c34f19996876dde649e28139a741d"},
+    {file = "urwid-2.3.4-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:3c141f5e6a32e03e78ef28083691588d37f60fb5ffb2d96aecba3cda7fa38bb1"},
+    {file = "urwid-2.3.4-cp312-cp312-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:085b4b1ff4c0df96e2e82331a2353a56abbd5b7456e838baa995be4f12644347"},
+    {file = "urwid-2.3.4-cp312-cp312-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:3ca3e5fbdddc3b4394cc93835a79358c56a54b05538edc7e8b66d2ff13c4689f"},
+    {file = "urwid-2.3.4-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:c79f55558dc50f8c19d1e1468e63942fc7577cbdb2ff948768931ef28548a5af"},
+    {file = "urwid-2.3.4-cp37-cp37m-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:c692bb9a314216c0cfe1fdd8787858e2e916e25f97c95e8411ba5933c0fe3c39"},
+    {file = "urwid-2.3.4-cp37-cp37m-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:90440ef37b50ad5e947a095bfec7a048dfae938daa0d2355274accd886474932"},
+    {file = "urwid-2.3.4-cp37-cp37m-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:205c7aa020c92797f65465e1a226fbf2122159b1565b936a5fd6ed6bd34b4440"},
+    {file = "urwid-2.3.4-cp38-cp38-macosx_10_9_universal2.whl", hash = "sha256:0a263d8a90450166e0a195cf751b46d5081a48a3c00afa45a4ae582a34a6785e"},
+    {file = "urwid-2.3.4-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:5a6fc3651d5aff40d53b52cae1951d17c62126ffcc11c7f0d53583d28198b0a4"},
+    {file = "urwid-2.3.4-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:4e4a3500b7166f27ca830df8bcfb9969d97a98f340cd4b0f0299557dee8c39b3"},
+    {file = "urwid-2.3.4-cp38-cp38-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:963e89099b0438416b550161750a1e2fb52a328008732197d29e3675baacb150"},
+    {file = "urwid-2.3.4-cp38-cp38-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:448d248bd3cbe34f0422108db0cecb7d24336703677bce06b7ed67dc4892d925"},
+    {file = "urwid-2.3.4-cp38-cp38-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:bae83944dc78bd178b0ad8cab9ff7d72b03ac01dcd0e1e01725142e241196f04"},
+    {file = "urwid-2.3.4-cp39-cp39-macosx_10_9_universal2.whl", hash = "sha256:6cc8db27989f6166602a45f6382357827cba966e3bd607a9e409cf867f7b0ec6"},
+    {file = "urwid-2.3.4-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:0c7e3f21b4427ecfffd6588fe5119eab7e12abd03576e8ba111fdfe2a78e3fdc"},
+    {file = "urwid-2.3.4-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:9dae4dbccae166ee9ff03bda58c36369a566d03274c1fbf559cff11117539bc7"},
+    {file = "urwid-2.3.4-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:2c4a213be475ae81b250e401e670d74d5d4ffb3b034ff6fc52e721759788eb05"},
+    {file = "urwid-2.3.4-cp39-cp39-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:7d38afb5bbcbca365fbd86746990c22167fbeb7f85d756bad33892f364028975"},
+    {file = "urwid-2.3.4-cp39-cp39-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:5fbb765783120d5dc835424f6870190b6d73c020b44ab650b682fd9ffbc41a85"},
+    {file = "urwid-2.3.4.tar.gz", hash = "sha256:18b9f84cc80a4fcda55ea29f0ea260d31f8c1c721ff6a0396a396020e6667738"},
 ]
 
 [package.extras]
@@ -3825,7 +3825,7 @@ glib = ["PyGObject"]
 lcd = ["pyserial"]
 serial = ["pyserial"]
 tornado = ["tornado"]
-trio = ["trio"]
+trio = ["exceptiongroup", "trio (>=0.22.0)"]
 twisted = ["twisted"]
 zmq = ["zmq"]
 
@@ -4065,4 +4065,4 @@ brotli = ["Brotli"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10.13,<4.0.0"
-content-hash = "e04c3ab43148c77f752e05adfa9df3d9821b119022b66c60fe24adb9ff8bcd93"
+content-hash = "a05b72854bcac3b7af988a3a2d3e47b7f3e9fff8133cbd3a401ada9d16847401"

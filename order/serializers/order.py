@@ -20,10 +20,10 @@ class OrderSerializer(serializers.ModelSerializer):
     country = serializers.SerializerMethodField("get_country")
     region = serializers.SerializerMethodField("get_region")
     pay_way = serializers.SerializerMethodField("get_pay_way")
-    paid_amount = MoneyField(max_digits=19, decimal_places=4, required=False)
-    shipping_price = MoneyField(max_digits=19, decimal_places=4)
-    total_price_items = MoneyField(max_digits=19, decimal_places=4, read_only=True)
-    total_price_extra = MoneyField(max_digits=19, decimal_places=4, read_only=True)
+    paid_amount = MoneyField(max_digits=11, decimal_places=2, required=False)
+    shipping_price = MoneyField(max_digits=11, decimal_places=2)
+    total_price_items = MoneyField(max_digits=11, decimal_places=2, read_only=True)
+    total_price_extra = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     phone = PhoneNumberField()
     mobile_phone = PhoneNumberField(required=False)
 
@@ -76,10 +76,10 @@ class OrderSerializer(serializers.ModelSerializer):
 
 class OrderCreateUpdateSerializer(serializers.ModelSerializer):
     order_item_order = OrderItemCreateUpdateSerializer(many=True)
-    paid_amount = MoneyField(max_digits=19, decimal_places=4, required=False)
-    shipping_price = MoneyField(max_digits=19, decimal_places=4)
-    total_price_items = MoneyField(max_digits=19, decimal_places=4, read_only=True)
-    total_price_extra = MoneyField(max_digits=19, decimal_places=4, read_only=True)
+    paid_amount = MoneyField(max_digits=11, decimal_places=2, required=False)
+    shipping_price = MoneyField(max_digits=11, decimal_places=2)
+    total_price_items = MoneyField(max_digits=11, decimal_places=2, read_only=True)
+    total_price_extra = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     phone = PhoneNumberField()
     mobile_phone = PhoneNumberField(required=False)
 
@@ -142,10 +142,10 @@ class OrderCreateUpdateSerializer(serializers.ModelSerializer):
 
 class CheckoutSerializer(serializers.ModelSerializer):
     order_item_order = CheckoutItemSerializer(many=True)
-    paid_amount = MoneyField(max_digits=19, decimal_places=4, required=False)
-    shipping_price = MoneyField(max_digits=19, decimal_places=4)
-    total_price_items = MoneyField(max_digits=19, decimal_places=4, read_only=True)
-    total_price_extra = MoneyField(max_digits=19, decimal_places=4, read_only=True)
+    paid_amount = MoneyField(max_digits=11, decimal_places=2, required=False)
+    shipping_price = MoneyField(max_digits=11, decimal_places=2)
+    total_price_items = MoneyField(max_digits=11, decimal_places=2, read_only=True)
+    total_price_extra = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     phone = PhoneNumberField()
     mobile_phone = PhoneNumberField(required=False)
 

@@ -23,6 +23,7 @@ class CartItemViewSetTest(APITestCase):
             email="testuser@example.com", password="testpassword"
         )
         self.client.login(email="testuser@example.com", password="testpassword")
+        self.client.force_authenticate(user=self.user)
         self.cart = Cart.objects.create(user=self.user)
         self.product = Product.objects.create(
             name="Test Product",

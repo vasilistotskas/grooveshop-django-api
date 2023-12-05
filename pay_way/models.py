@@ -18,9 +18,9 @@ from pay_way.enum.pay_way_enum import PayWayEnum
 class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
     active = models.BooleanField(_("Active"), default=True)
-    cost = MoneyField(_("Cost"), max_digits=19, decimal_places=4, default=0)
+    cost = MoneyField(_("Cost"), max_digits=11, decimal_places=2, default=0)
     free_for_order_amount = MoneyField(
-        _("Free For Order Amount"), max_digits=19, decimal_places=4, default=0
+        _("Free For Order Amount"), max_digits=11, decimal_places=2, default=0
     )
     icon = models.ImageField(
         _("Icon"), upload_to="uploads/pay_way/", blank=True, null=True

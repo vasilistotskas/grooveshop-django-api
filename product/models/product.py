@@ -57,21 +57,21 @@ class ProductQuerySet(TranslatableQuerySet):
         annotated_queryset = self.annotate(
             vat_value_annotation=models.ExpressionWrapper(
                 (models.F("price") * Coalesce(vat_subquery, 0)) / 100,
-                output_field=MoneyField(max_digits=19, decimal_places=4),
+                output_field=MoneyField(max_digits=11, decimal_places=2),
             ),
             discount_value_annotation=models.ExpressionWrapper(
                 (models.F("price") * models.F("discount_percent")) / 100,
-                output_field=MoneyField(max_digits=19, decimal_places=4),
+                output_field=MoneyField(max_digits=11, decimal_places=2),
             ),
             final_price_annotation=models.ExpressionWrapper(
                 models.F("price")
                 + models.F("vat_value_annotation")
                 - models.F("discount_value_annotation"),
-                output_field=MoneyField(max_digits=19, decimal_places=4),
+                output_field=MoneyField(max_digits=11, decimal_places=2),
             ),
             price_save_percent_annotation=models.ExpressionWrapper(
                 (models.F("discount_value_annotation") / models.F("price")) * 100,
-                output_field=MoneyField(max_digits=19, decimal_places=4),
+                output_field=MoneyField(max_digits=11, decimal_places=2),
             ),
         )
 
@@ -110,8 +110,8 @@ class Product(
     slug = models.SlugField(_("Slug"), max_length=255, unique=True)
     price = MoneyField(
         _("Price"),
-        max_digits=19,
-        decimal_places=4,
+        max_digits=11,
+        decimal_places=2,
         default=0,
     )
     active = models.BooleanField(_("Active"), default=True)
@@ -134,15 +134,15 @@ class Product(
     # final_price, discount_value, price_save_percent are calculated fields on save method
     final_price = MoneyField(
         _("Final Price"),
-        max_digits=19,
-        decimal_places=4,
+        max_digits=11,
+        decimal_places=2,
         default=0,
         editable=False,
     )
     discount_value = MoneyField(
         _("Discount Value"),
-        max_digits=19,
-        decimal_places=4,
+        max_digits=11,
+        decimal_places=2,
         default=0,
         editable=False,
     )

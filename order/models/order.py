@@ -81,7 +81,7 @@ class Order(TimeStampMixinModel, UUIDModel):
         default=OrderStatusEnum.PENDING,
     )
     shipping_price = MoneyField(
-        _("Shipping Price"), max_digits=19, decimal_places=4, default=0
+        _("Shipping Price"), max_digits=11, decimal_places=2, default=0
     )
     document_type = models.CharField(
         _("Document Type"),
@@ -91,8 +91,8 @@ class Order(TimeStampMixinModel, UUIDModel):
     )
     paid_amount = MoneyField(
         _("Paid Amount"),
-        max_digits=19,
-        decimal_places=4,
+        max_digits=11,
+        decimal_places=2,
         null=True,
         default=0,
     )
@@ -113,7 +113,7 @@ class Order(TimeStampMixinModel, UUIDModel):
         total_items_price = self.order_item_order.aggregate(
             total_price=ExpressionWrapper(
                 Sum(F("price") * F("quantity")),
-                output_field=MoneyField(max_digits=19, decimal_places=4),
+                output_field=MoneyField(max_digits=11, decimal_places=2),
             )
         )["total_price"]
 

@@ -4,6 +4,7 @@ from allauth.mfa.totp import hotp_counter_from_time
 from allauth.mfa.totp import hotp_value
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 from rest_framework.test import APITestCase
 
@@ -18,6 +19,8 @@ class AuthenticateTotpAPIViewTestCase(APITestCase):
         self.user = User.objects.create_user(
             email="testuser@example.com", password="testpassword"
         )
+        token, created = Token.objects.get_or_create(user=self.user)
+        self.token = token.key
         totp_secret = generate_totp_secret()
         self.authenticator = Authenticator.objects.create(
             user=self.user,
@@ -32,6 +35,7 @@ class AuthenticateTotpAPIViewTestCase(APITestCase):
 
     def test_authenticated_user_without_totp(self):
         self.client.login(email="testuser@example.com", password="testpassword")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token}")
         self.authenticator.delete()
         url = reverse("mfa_totp_authenticate")
         response = self.client.post(url, {"code": "123456"})
@@ -45,6 +49,7 @@ class AuthenticateTotpAPIViewTestCase(APITestCase):
 
     def test_authenticated_user_with_valid_code(self):
         self.client.login(email="testuser@example.com", password="testpassword")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token}")
         counter = hotp_counter_from_time()
         valid_code = hotp_value(
             self.authenticator.wrap().instance.data["secret"], counter
@@ -66,6 +71,8 @@ class ActivateTotpAPIViewTestCase(APITestCase):
         self.user = User.objects.create_user(
             email="testuser@example.com", password="testpassword"
         )
+        token, created = Token.objects.get_or_create(user=self.user)
+        self.token = token.key
         totp_secret = generate_totp_secret()
         self.authenticator = Authenticator.objects.create(
             user=self.user, type=Authenticator.Type.TOTP, data={"secret": totp_secret}
@@ -80,6 +87,7 @@ class ActivateTotpAPIViewTestCase(APITestCase):
 
     def test_authenticated_user_with_totp(self):
         self.client.login(email="testuser@example.com", password="testpassword")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token}")
         url = reverse("mfa_totp_activate")
         response = self.client.get(url)
         self.assertEqual(response.status_code, 400)
@@ -88,6 +96,7 @@ class ActivateTotpAPIViewTestCase(APITestCase):
 
     def test_authenticated_user_without_totp_get(self):
         self.client.login(email="testuser@example.com", password="testpassword")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token}")
         self.authenticator.delete()
         url = reverse("mfa_totp_activate")
         response = self.client.get(url)
@@ -95,6 +104,7 @@ class ActivateTotpAPIViewTestCase(APITestCase):
 
     def test_authenticated_user_without_totp_post_valid_data(self):
         self.client.login(email="testuser@example.com", password="testpassword")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token}")
         self.authenticator.delete()
         url = reverse("mfa_totp_activate")
         response = self.client.post(url, {"code": "123456"})
@@ -102,6 +112,7 @@ class ActivateTotpAPIViewTestCase(APITestCase):
 
     def test_authenticated_user_without_totp_post_invalid_data(self):
         self.client.login(email="testuser@example.com", password="testpassword")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token}")
         self.authenticator.delete()
         url = reverse("mfa_totp_activate")
         response = self.client.post(url, {"invalid_key": "invalid_value"})
@@ -114,6 +125,8 @@ class DeactivateTotpAPIViewTestCase(APITestCase):
         self.user = User.objects.create_user(
             email="testuser@example.com", password="testpassword"
         )
+        token, created = Token.objects.get_or_create(user=self.user)
+        self.token = token.key
         totp_secret = generate_totp_secret()
         self.authenticator = Authenticator.objects.create(
             user=self.user, type=Authenticator.Type.TOTP, data={"secret": totp_secret}
@@ -126,6 +139,7 @@ class DeactivateTotpAPIViewTestCase(APITestCase):
 
     def test_authenticated_user_without_totp(self):
         self.client.login(email="testuser@example.com", password="testpassword")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token}")
         self.authenticator.delete()
         url = reverse("mfa_totp_deactivate")
         response = self.client.post(url)
@@ -133,6 +147,7 @@ class DeactivateTotpAPIViewTestCase(APITestCase):
 
     def test_authenticated_user_with_totp(self):
         self.client.login(email="testuser@example.com", password="testpassword")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token}")
         url = reverse("mfa_totp_deactivate")
         response = self.client.post(url)
         self.assertEqual(response.status_code, 200)
@@ -144,6 +159,8 @@ class GenerateRecoveryCodesAPIViewTestCase(APITestCase):
         self.user = User.objects.create_user(
             email="testuser@example.com", password="testpassword"
         )
+        token, created = Token.objects.get_or_create(user=self.user)
+        self.token = token.key
 
     def test_unauthenticated_user(self):
         url = reverse("mfa_recovery_codes_generate")
@@ -152,6 +169,7 @@ class GenerateRecoveryCodesAPIViewTestCase(APITestCase):
 
     def test_authenticated_user(self):
         self.client.login(email="testuser@example.com", password="testpassword")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token}")
         url = reverse("mfa_recovery_codes_generate")
         response = self.client.post(url)
         self.assertEqual(response.status_code, 200)
@@ -163,6 +181,8 @@ class ViewRecoveryCodesAPIViewTestCase(APITestCase):
         self.user = User.objects.create_user(
             email="testuser@example.com", password="testpassword"
         )
+        token, created = Token.objects.get_or_create(user=self.user)
+        self.token = token.key
         totp_secret = generate_totp_secret()
         self.authenticator = Authenticator.objects.create(
             user=self.user,
@@ -177,6 +197,7 @@ class ViewRecoveryCodesAPIViewTestCase(APITestCase):
 
     def test_authenticated_user_without_recovery_codes(self):
         self.client.login(email="testuser@example.com", password="testpassword")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token}")
         self.authenticator.delete()
         url = reverse("mfa_recovery_codes_list")
         response = self.client.get(url)
@@ -184,6 +205,7 @@ class ViewRecoveryCodesAPIViewTestCase(APITestCase):
 
     def test_authenticated_user_with_recovery_codes(self):
         self.client.login(email="testuser@example.com", password="testpassword")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token}")
         url = reverse("mfa_recovery_codes_list")
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
@@ -196,6 +218,8 @@ class TotpActiveAPIViewTestCase(APITestCase):
             email="testuser@example.com", password="testpassword"
         )
         totp_secret = generate_totp_secret()
+        token, created = Token.objects.get_or_create(user=self.user)
+        self.token = token.key
         self.authenticator = Authenticator.objects.create(
             user=self.user, type=Authenticator.Type.TOTP, data={"secret": totp_secret}
         )
@@ -207,6 +231,7 @@ class TotpActiveAPIViewTestCase(APITestCase):
 
     def test_authenticated_user_with_totp(self):
         self.client.login(email="testuser@example.com", password="testpassword")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token}")
         url = reverse("mfa_totp_active")
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
@@ -214,6 +239,7 @@ class TotpActiveAPIViewTestCase(APITestCase):
 
     def test_authenticated_user_without_totp(self):
         self.client.login(email="testuser@example.com", password="testpassword")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token}")
         self.authenticator.delete()
         url = reverse("mfa_totp_active")
         response = self.client.get(url)

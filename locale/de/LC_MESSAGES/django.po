@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-30 20:39+0200\n"
+"POT-Creation-Date: 2023-12-05 23:29+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,11 +18,11 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: .\app\urls.py:57
+#: .\app\urls.py:39
 msgid "admin/"
 msgstr ""
 
-#: .\app\urls.py:58
+#: .\app\urls.py:40
 msgid "admin_no_otp/"
 msgstr ""
 
@@ -100,13 +100,13 @@ msgstr ""
 
 #: .\blog\models\category.py:22 .\blog\models\tag.py:16 .\country\models.py:36
 #: .\pay_way\models.py:30 .\product\models\category.py:62
-#: .\product\models\product.py:156 .\region\models.py:18 .\slider\models.py:30
+#: .\product\models\product.py:159 .\region\models.py:18 .\slider\models.py:30
 #: .\slider\models.py:104
 msgid "Name"
 msgstr ""
 
 #: .\blog\models\category.py:23 .\product\models\category.py:63
-#: .\product\models\product.py:158 .\slider\models.py:34 .\slider\models.py:109
+#: .\product\models\product.py:161 .\slider\models.py:34 .\slider\models.py:109
 msgid "Description"
 msgstr ""
 
@@ -170,7 +170,7 @@ msgid "Blog Posts"
 msgstr ""
 
 #: .\blog\models\tag.py:14 .\pay_way\models.py:20
-#: .\product\models\product.py:114 .\tip\models.py:29
+#: .\product\models\product.py:117 .\tip\models.py:29
 #: .\user\models\account.py:93
 msgid "Active"
 msgstr ""
@@ -208,31 +208,31 @@ msgstr ""
 msgid "Cart Items"
 msgstr ""
 
-#: .\config\base.py:197
+#: .\config\base.py:182
 msgid "English"
 msgstr ""
 
-#: .\config\base.py:198
+#: .\config\base.py:183
 msgid "German"
 msgstr ""
 
-#: .\config\base.py:199
+#: .\config\base.py:184
 msgid "Greek"
 msgstr ""
 
-#: .\core\models.py:17
+#: .\core\models.py:21
 msgid "Sort Order"
 msgstr ""
 
-#: .\core\models.py:51
+#: .\core\models.py:55
 msgid "Created At"
 msgstr ""
 
-#: .\core\models.py:76
+#: .\core\models.py:86
 msgid "Published At"
 msgstr ""
 
-#: .\core\models.py:77
+#: .\core\models.py:87
 msgid "Is Published"
 msgstr ""
 
@@ -936,7 +936,7 @@ msgstr ""
 msgid "Pending"
 msgstr ""
 
-#: .\order\models\item.py:23 .\product\models\product.py:109
+#: .\order\models\item.py:23 .\product\models\product.py:112
 #: .\tests\integration\order\test_model_order_item.py:67
 msgid "Price"
 msgstr ""
@@ -1084,21 +1084,21 @@ msgstr ""
 msgid "Related products (in tree)"
 msgstr ""
 
-#: .\product\admin.py:142 .\product\admin.py:159
+#: .\product\admin.py:144 .\product\admin.py:161
 #, python-format
 msgid "%d comment was successfully marked as published."
 msgstr ""
 
-#: .\product\admin.py:145 .\product\admin.py:162
+#: .\product\admin.py:147 .\product\admin.py:164
 #, python-format
 msgid "%d comments were successfully marked as published."
 msgstr ""
 
-#: .\product\admin.py:173
+#: .\product\admin.py:175
 msgid "Mark selected comments as published"
 msgstr ""
 
-#: .\product\admin.py:179
+#: .\product\admin.py:181
 msgid "Mark selected comments as unpublished"
 msgstr ""
 
@@ -1154,7 +1154,7 @@ msgstr ""
 msgid "Ten"
 msgstr ""
 
-#: .\product\models\category.py:48 .\product\models\product.py:107
+#: .\product\models\category.py:48 .\product\models\product.py:110
 msgid "Slug"
 msgstr ""
 
@@ -1202,43 +1202,43 @@ msgstr ""
 msgid "Product Image"
 msgstr ""
 
-#: .\product\models\product.py:98
+#: .\product\models\product.py:101
 msgid "Product Code"
 msgstr ""
 
-#: .\product\models\product.py:115
+#: .\product\models\product.py:118
 msgid "Stock"
 msgstr ""
 
-#: .\product\models\product.py:117
+#: .\product\models\product.py:120
 msgid "Discount Percent"
 msgstr ""
 
-#: .\product\models\product.py:126
+#: .\product\models\product.py:129
 msgid "Hits"
 msgstr ""
 
-#: .\product\models\product.py:128
+#: .\product\models\product.py:131
 msgid "Weight (kg)"
 msgstr ""
 
-#: .\product\models\product.py:133
+#: .\product\models\product.py:136
 msgid "Final Price"
 msgstr ""
 
-#: .\product\models\product.py:140
+#: .\product\models\product.py:143
 msgid "Discount Value"
 msgstr ""
 
-#: .\product\models\product.py:147
+#: .\product\models\product.py:150
 msgid "Price Save Percent"
 msgstr ""
 
-#: .\product\models\product.py:165
+#: .\product\models\product.py:168
 msgid "Product"
 msgstr ""
 
-#: .\product\models\product.py:166
+#: .\product\models\product.py:169
 msgid "Products"
 msgstr ""
 
@@ -1270,19 +1270,7 @@ msgstr ""
 msgid "Regions"
 msgstr ""
 
-#: .\session\views.py:28
-msgid "Returns the session data."
-msgstr ""
-
-#: .\session\views.py:56
-msgid "Clears all user sessions."
-msgstr ""
-
-#: .\session\views.py:75
-msgid "Clears a user session."
-msgstr ""
-
-#: .\session\views.py:89
+#: .\session\views.py:20
 msgid "Returns the number of active users."
 msgstr ""
 

@@ -85,8 +85,8 @@ class Slide(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     )
     discount = MoneyField(
         _("Discount"),
-        max_digits=19,
-        decimal_places=4,
+        max_digits=11,
+        decimal_places=2,
         default=0,
     )
     show_button = models.BooleanField(

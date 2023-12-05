@@ -54,6 +54,7 @@ class UserAddressViewSetTestCase(APITestCase):
 
         # Login to authenticate
         self.client.login(email="test@test.com", password="test12345@!")
+        self.client.force_authenticate(user=self.user)
 
         self.address = UserAddress.objects.create(
             user=self.user,

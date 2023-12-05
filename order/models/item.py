@@ -20,7 +20,7 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
     product = models.ForeignKey(
         "product.Product", related_name="order_item_product", on_delete=models.CASCADE
     )
-    price = MoneyField(_("Price"), max_digits=19, decimal_places=4)
+    price = MoneyField(_("Price"), max_digits=11, decimal_places=2)
     quantity = models.IntegerField(_("Quantity"), default=1)
 
     class Meta(TypedModelMeta):

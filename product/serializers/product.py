@@ -26,10 +26,10 @@ class ProductSerializer(TranslatableModelSerializer, BaseExpandSerializer):
     translations = TranslatedFieldsFieldExtend(shared_model=Product)
     category = PrimaryKeyRelatedField(queryset=ProductCategory.objects.all())
     vat = PrimaryKeyRelatedField(queryset=Vat.objects.all())
-    price = MoneyField(max_digits=19, decimal_places=4)
-    final_price = MoneyField(max_digits=19, decimal_places=4, read_only=True)
-    discount_value = MoneyField(max_digits=19, decimal_places=4, read_only=True)
-    vat_value = MoneyField(max_digits=19, decimal_places=4, read_only=True)
+    price = MoneyField(max_digits=11, decimal_places=2)
+    final_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
+    discount_value = MoneyField(max_digits=11, decimal_places=2, read_only=True)
+    vat_value = MoneyField(max_digits=11, decimal_places=2, read_only=True)
 
     class Meta:
         model = Product

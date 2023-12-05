@@ -22,6 +22,7 @@ class CartViewSetTest(APITestCase):
             email="testuser@example.com", password="testpassword"
         )
         self.client.login(email="testuser@example.com", password="testpassword")
+        self.client.force_authenticate(user=self.user)
         self.cart = Cart.objects.create(user=self.user)
         self.detail_url = reverse("cart-detail")
         self.update_data = {

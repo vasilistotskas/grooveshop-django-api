@@ -23,6 +23,7 @@ class UserAccountViewSetTestCase(APITestCase):
         )
 
         self.client.login(email="test@test.com", password="test12345@!")
+        self.client.force_authenticate(user=self.user)
 
     @staticmethod
     def get_user_account_detail_url(pk):

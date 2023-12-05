@@ -14,8 +14,8 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
 
 class PayWaySerializer(TranslatableModelSerializer):
     translations = TranslatedFieldsFieldExtend(shared_model=PayWay)
-    cost = MoneyField(max_digits=19, decimal_places=4)
-    free_for_order_amount = MoneyField(max_digits=19, decimal_places=4)
+    cost = MoneyField(max_digits=11, decimal_places=2)
+    free_for_order_amount = MoneyField(max_digits=11, decimal_places=2)
 
     class Meta:
         model = PayWay

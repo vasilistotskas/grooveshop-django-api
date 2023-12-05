@@ -7,8 +7,8 @@ from product.serializers.product import ProductSerializer
 
 class OrderItemSerializer(serializers.ModelSerializer):
     product = ProductSerializer()
-    price = MoneyField(max_digits=19, decimal_places=4)
-    total_price = MoneyField(max_digits=19, decimal_places=4, read_only=True)
+    price = MoneyField(max_digits=11, decimal_places=2)
+    total_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
 
     class Meta:
         model = OrderItem

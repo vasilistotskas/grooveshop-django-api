@@ -24,6 +24,7 @@ class ProductReviewViewSetTestCase(APITestCase):
         )
         # Login to authenticate
         self.client.login(email="test@test.com", password="test12345@!")
+        self.client.force_authenticate(user=self.user)
         self.product = Product.objects.create(
             slug="sample-product",
             name="Sample Product",

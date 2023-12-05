@@ -3,7 +3,19 @@
 
 
 
+## v0.49.0 (2023-12-05)
+
+### Feature
+
+* feat: reduce `MoneyField` max_digits and decimal_places and tests fix ([`2ef6ef4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2ef6ef41bf61828be5ace62e547097940efec50b))
+
+* feat: Bump Versions and remove `SessionAuthentication` from `DEFAULT_AUTHENTICATION_CLASSES` config. ([`5a579a0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5a579a0db717381c54b8ebaa9e3ed5bca2a544b5))
+
 ## v0.48.0 (2023-12-03)
+
+### Chore
+
+* chore(release): release version 0.48.0 [skip ci] ([`d9ce030`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d9ce0308b98303e9b7107229a497a985db86d414))
 
 ### Feature
 

@@ -3,7 +3,25 @@
 
 
 
+## v0.50.0 (2023-12-06)
+
+### Chore
+
+* chore: Delete logs/celery.log ([`edab86e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/edab86e014733dc5f1b495d1678732babf310628))
+
+### Feature
+
+* feat: Logger improve and task to remove old logs ([`b7db338`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b7db338c052da4700178e8c9514b0b96195fcb9e))
+
+### Fix
+
+* fix(config/logging.py): Create the directory if it does not exist ([`4c486bf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4c486bfbfe82de665e3571aa4f7eedd9ddb02cf7))
+
 ## v0.49.1 (2023-12-06)
+
+### Chore
+
+* chore(release): release version 0.49.1 [skip ci] ([`6c4ef6d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6c4ef6d94dad5ff3e528066cd370f18df6a45741))
 
 ### Fix
 

@@ -5,11 +5,12 @@
 __pycache__
 db.sqlite3
 staticfiles/*
-!staticfiles/.gitkeep
 mediafiles/*
-!mediafiles/.gitkeep
 cache/*
 logs/*
+
+# Not all .gitkeep files
+!.gitkeep
 
 # Backup files #
 *.bak

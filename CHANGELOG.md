@@ -3,7 +3,17 @@
 
 
 
+## v0.49.1 (2023-12-06)
+
+### Fix
+
+* fix: Reduce product pagination `default_limit` ([`04b1e9e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/04b1e9e2cb883edbd93d56aeba853853fba1599b))
+
 ## v0.49.0 (2023-12-05)
+
+### Chore
+
+* chore(release): release version 0.49.0 [skip ci] ([`2159fd3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2159fd3a4746dda6c8e6b1aa18f84b4ffc61c3f8))
 
 ### Feature
 

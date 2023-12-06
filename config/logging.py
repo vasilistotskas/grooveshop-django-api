@@ -3,6 +3,7 @@ import sys
 from logging.config import dictConfig
 from os import getenv
 from os import path
+from os import makedirs
 from pathlib import Path
 
 from django.utils.datetime_safe import datetime
@@ -15,8 +16,10 @@ def config_logging():
     timestamp = datetime.now().strftime("%d-%m-%Y")
     celery_log_filename = f"celery_logs_{timestamp}.log"
     django_log_filename = f"django_logs_{timestamp}.log"
-    celery_log_file_path = path.join(BASE_DIR, "logs", celery_log_filename)
-    django_log_file_path = path.join(BASE_DIR, "logs", django_log_filename)
+    log_dir = path.join(BASE_DIR, "logs")
+    makedirs(log_dir, exist_ok=True)  # Create the directory if it does not exist
+    celery_log_file_path = path.join(log_dir, celery_log_filename)
+    django_log_file_path = path.join(log_dir, django_log_filename)
     logging_level = "DEBUG" if DEBUG else "INFO"
     logging_config = {
         "version": 1,

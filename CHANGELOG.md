@@ -3,9 +3,17 @@
 
 
 
+## v0.51.0 (2023-12-07)
+
+### Feature
+
+* feat: New tests and some config fixes ([`74fb54f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/74fb54f0d79e4b68043e88078118515c9cecb624))
+
 ## v0.50.0 (2023-12-06)
 
 ### Chore
+
+* chore(release): release version 0.50.0 [skip ci] ([`01baa2e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01baa2e0904cedeab022ab800a6559997056836e))
 
 * chore: Delete logs/celery.log ([`edab86e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/edab86e014733dc5f1b495d1678732babf310628))
 

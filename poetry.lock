@@ -221,13 +221,13 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.33.8"
+version = "1.33.9"
 description = "Low-level, data-driven core of boto 3."
 optional = false
 python-versions = ">= 3.7"
 files = [
-    {file = "botocore-1.33.8-py3-none-any.whl", hash = "sha256:90236e6e69d7e80875d7f9d39383630706edbc1298026698c6c70d9b6a65576e"},
-    {file = "botocore-1.33.8.tar.gz", hash = "sha256:e6970bf89cbe2624399aeffce52c253917d8e5a1c671de4054557603ab56c922"},
+    {file = "botocore-1.33.9-py3-none-any.whl", hash = "sha256:07ff4eea62f546da540310887000c81fca802c788eb374fef06eda28009dcafd"},
+    {file = "botocore-1.33.9.tar.gz", hash = "sha256:1b90be11dd9a9a25290c995a6b713e76b9e2bf7bf86ba9036e0d28f2ceb2edfc"},
 ]
 
 [package.dependencies]
@@ -1745,13 +1745,13 @@ tests = ["freezegun", "pytest", "pytest-cov"]
 
 [[package]]
 name = "identify"
-version = "2.5.32"
+version = "2.5.33"
 description = "File identification library for Python"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "identify-2.5.32-py2.py3-none-any.whl", hash = "sha256:0b7656ef6cba81664b783352c73f8c24b39cf82f926f78f4550eda928e5e0545"},
-    {file = "identify-2.5.32.tar.gz", hash = "sha256:5d9979348ec1a21c768ae07e0a652924538e8bce67313a73cb0f681cf08ba407"},
+    {file = "identify-2.5.33-py2.py3-none-any.whl", hash = "sha256:d40ce5fcd762817627670da8a7d8d8e65f24342d14539c59488dc603bf662e34"},
+    {file = "identify-2.5.33.tar.gz", hash = "sha256:161558f9fe4559e1557e1bff323e8631f6a0e4837f7497767c1782832f16b62d"},
 ]
 
 [package.extras]

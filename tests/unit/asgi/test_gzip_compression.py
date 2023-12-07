@@ -87,3 +87,35 @@ async def test_with_supported_compression(large_asgi_app: ASGI3Application, sett
             type="http.response.body", body=expected_payload, more_body=False
         ),
     ]
+
+
+class TestApp(ASGI3Application):
+    async def __call__(self, scope, receive, send):
+        pass
+
+
+@pytest.mark.asyncio
+async def test_gzip_compression():
+    # test data
+    test_app = TestApp()
+
+    test_scope = {"type": "http", "headers": [(b"accept-encoding", b"gzip")]}
+
+    test_minimum_size = 500
+    test_compresslevel = 9
+
+    wrapper_app = gzip_compression(test_app, test_minimum_size, test_compresslevel)
+
+    assert callable(wrapper_app)
+
+    async def receive():
+        pass
+
+    async def send(message):
+        if message["type"] == "http.response.start":
+            assert message["status"] == 200
+        elif message["type"] == "http.response.body":
+            assert isinstance(message.get("body"), bytes)
+
+    # Run tested function
+    await wrapper_app(test_scope, receive, send)

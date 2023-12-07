@@ -1,12 +1,11 @@
 import logging
 import sys
+from datetime import datetime
 from logging.config import dictConfig
 from os import getenv
-from os import path
 from os import makedirs
+from os import path
 from pathlib import Path
-
-from django.utils.datetime_safe import datetime
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DEBUG = getenv("DEBUG", "True") == "True"

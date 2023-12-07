@@ -50,7 +50,7 @@ def debug_task(self):
     debug = os.getenv("DEBUG", "True") == "True"
     if debug:
         print(f"Request: {self.request!r}")
-        logging.debug(f"Request: {self.request!r}")
+        logger.debug(f"Request: {self.request!r}")
 
 
 @shared_task(bind=True, name="Debug Task Notification")
@@ -76,5 +76,4 @@ def debug_task_notification(self):
             },
         )
         print(f"Request: {self.request!r}, Notification sent.")
-        logging.debug(f"Request: {self.request!r}, Notification sent.")
         logger.debug(f"Logger Request: {self.request!r}, Notification sent.")

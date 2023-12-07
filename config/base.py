@@ -11,8 +11,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 dotenv_file = BASE_DIR / ".env"
 
-if path.isfile(dotenv_file):
-    dotenv.load_dotenv(dotenv_file)
+
+def load_dotenv_file():
+    if path.isfile(dotenv_file):
+        dotenv.load_dotenv(dotenv_file)
+
+
+load_dotenv_file()
 
 SYSTEM_ENV = getenv("SYSTEM_ENV", "dev")
 
@@ -113,6 +118,8 @@ THIRD_PARTY_APPS = [
     "django_celery_beat",
     "django_celery_results",
     "django_browser_reload",
+    "pytest",
+    "pytest_django",
 ]
 
 # Combine all apps together for the INSTALLED_APPS setting

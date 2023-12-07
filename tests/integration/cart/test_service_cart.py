@@ -6,6 +6,7 @@ from django.test import TestCase
 from cart.models import Cart
 from cart.models import CartItem
 from cart.service import CartService
+from cart.service import CartServiceInitException
 from cart.service import InvalidProcessCartOptionException
 from cart.service import ProcessCartOption
 from core.caches import cache_instance
@@ -80,6 +81,34 @@ class CartServiceTest(TestCase):
         # Check that the cart items are now associated with the user's cart
         self.assertEqual(self.cart.cart_item_cart.count(), 1)
         self.assertEqual(self.cart.cart_item_cart.first().quantity, 2)
+
+    def test_process_cart_merge_with_pre_login_cart_in_session(self):
+        cart_service = CartService(cart_id=self.cart.pk)
+        # Create a cart for the pre-login user and add a cart item
+        pre_login_cart = Cart.objects.create()
+        cart_service.create_cart_item(self.product, 2)
+        self.request.session = {"pre_log_in_cart_id": pre_login_cart.id}
+
+        # Merge carts with "merge" option
+        cart_service.process_cart(self.request, option=ProcessCartOption.MERGE)
+
+        # Check that the cart items are now associated with the user's cart
+        self.assertEqual(self.cart.cart_item_cart.count(), 1)
+        self.assertEqual(self.cart.cart_item_cart.first().quantity, 2)
+
+    def test_process_cart_keep(self):
+        cart_service = CartService(cart_id=self.cart.pk)
+        # Create a cart for the pre-login user and add a cart item
+        pre_login_cart = Cart.objects.create()
+        cart_service.create_cart_item(self.product, 3)
+        cache_instance.set(str(self.user.id), pre_login_cart.id, 3600)
+
+        # Merge carts with "merge" option
+        cart_service.process_cart(self.request, option=ProcessCartOption.KEEP)
+
+        # Check that the cart items are now associated with the user's cart
+        self.assertEqual(self.cart.cart_item_cart.count(), 1)
+        self.assertEqual(self.cart.cart_item_cart.first().quantity, 3)
 
     def test_process_cart_clean(self):
         cart_service = CartService(cart_id=self.cart.pk)
@@ -163,6 +192,42 @@ class CartServiceTest(TestCase):
 
         self.assertEqual(len(cart_service), 0)
         self.assertEqual(self.cart.cart_item_cart.count(), 0)
+
+    def test_init_without_cart_id_and_request(self):
+        with self.assertRaises(CartServiceInitException):
+            CartService(cart_id=None, request=None)
+
+    def test_merge_carts_with_items_in_both_carts(self):
+        cart_service = CartService(cart_id=self.cart.pk)
+
+        # Create a cart for the pre-login user and add a cart item
+        pre_login_cart = Cart.objects.create()
+        pre_login_product = Product.objects.create(
+            name="Prelogin Product",
+            slug="prelogin-product",
+            price=20.00,
+            active=True,
+            stock=10,
+            discount_percent=0.00,
+            hits=0,
+            weight=0.00,
+        )
+        CartItem.objects.create(
+            cart=pre_login_cart, product=pre_login_product, quantity=1
+        )
+        cart_service.create_cart_item(self.product, 2)
+
+        self.request.session = {"pre_log_in_cart_id": pre_login_cart.id}
+
+        # Merge carts with "merge" option
+        cart_service.process_cart(self.request, option=ProcessCartOption.MERGE)
+
+        # Check that the cart items are now associated with the user's cart
+        self.assertEqual(self.cart.cart_item_cart.count(), 2)
+        self.assertCountEqual(
+            [item.product for item in self.cart.cart_item_cart.all()],
+            [self.product, pre_login_product],
+        )
 
     def tearDown(self) -> None:
         super().tearDown()

@@ -3,7 +3,17 @@
 
 
 
+## v0.53.0 (2023-12-08)
+
+### Feature
+
+* feat: Django 5 ([`ce3827a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ce3827ac91e491750f0a2a99857ab477576888e1))
+
 ## v0.52.1 (2023-12-08)
+
+### Chore
+
+* chore(release): release version 0.52.1 [skip ci] ([`f8e0b19`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f8e0b19dc10c18c3fd6dce60b17a2b831cf220a9))
 
 ### Fix
 

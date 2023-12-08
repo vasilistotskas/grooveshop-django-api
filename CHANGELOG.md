@@ -3,7 +3,17 @@
 
 
 
+## v0.52.1 (2023-12-08)
+
+### Fix
+
+* fix(ci.yml): Remove hardcoded omit and pass the `.coveragerc` file ([`a67886b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a67886b4fd8db15f8f5c700c4f6bfd64817b2afd))
+
 ## v0.52.0 (2023-12-08)
+
+### Chore
+
+* chore(release): release version 0.52.0 [skip ci] ([`69ecf5e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/69ecf5e4f6ed39f3a1c0d243847c8475211cfe41))
 
 ### Feature
 

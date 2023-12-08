@@ -8,11 +8,11 @@ chardet==5.2.0
 charset_normalizer==3.3.2
 click==8.1.7
 coverage==7.3.2
-django==4.2.8
+django==5.0
 django-admin-thumbnails==0.2.8
 django-allauth[mfa]==0.58.2
 django-browser-reload==1.12.1
-django-celery-beat==2.5.0
+django-celery-beat==2.1.0
 django-celery-results==2.5.1
 django-cors-headers==4.3.1
 django-debug-toolbar==4.2.0

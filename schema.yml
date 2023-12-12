@@ -10648,24 +10648,24 @@ components:
         totalPrice:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
         totalDiscountValue:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
         totalVatValue:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
@@ -10721,24 +10721,24 @@ components:
         price:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
         finalPrice:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
         discountValue:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
@@ -10759,24 +10759,24 @@ components:
         vatValue:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
         totalPrice:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
         totalDiscountValue:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
@@ -10871,8 +10871,8 @@ components:
         paidAmount:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
         customerNotes:
@@ -10885,8 +10885,8 @@ components:
         shippingPrice:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
         documentType:
@@ -10905,16 +10905,16 @@ components:
         totalPriceItems:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
         totalPriceExtra:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
@@ -11170,8 +11170,8 @@ components:
         paidAmount:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
         orderItemOrder:
@@ -11181,8 +11181,8 @@ components:
         shippingPrice:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
         documentType:
@@ -11201,16 +11201,16 @@ components:
         totalPriceItems:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
         totalPriceExtra:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
@@ -11302,8 +11302,8 @@ components:
         paidAmount:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
         customerNotes:
@@ -11316,8 +11316,8 @@ components:
         shippingPrice:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
         documentType:
@@ -11336,16 +11336,16 @@ components:
         totalPriceItems:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
         totalPriceExtra:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
@@ -11378,8 +11378,8 @@ components:
         price:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
         product:
@@ -11406,8 +11406,8 @@ components:
         totalPrice:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
@@ -11430,8 +11430,8 @@ components:
         price:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
         quantity:
@@ -12236,24 +12236,24 @@ components:
         totalPrice:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
         totalDiscountValue:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
         totalVatValue:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
@@ -12299,24 +12299,24 @@ components:
         price:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
         finalPrice:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
         discountValue:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
@@ -12337,24 +12337,24 @@ components:
         vatValue:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
         totalPrice:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
         totalDiscountValue:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
@@ -12496,8 +12496,8 @@ components:
         paidAmount:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
         customerNotes:
@@ -12510,8 +12510,8 @@ components:
         shippingPrice:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
         documentType:
@@ -12530,16 +12530,16 @@ components:
         totalPriceItems:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
         totalPriceExtra:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
@@ -12576,15 +12576,15 @@ components:
         cost:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
         freeForOrderAmount:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
         icon:
@@ -12655,8 +12655,8 @@ components:
         price:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
         vat:
@@ -12670,16 +12670,16 @@ components:
         vatValue:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
         finalPrice:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
@@ -12730,8 +12730,8 @@ components:
         discountValue:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
@@ -13088,8 +13088,8 @@ components:
         discount:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
         showButton:
@@ -13448,15 +13448,15 @@ components:
         cost:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
         freeForOrderAmount:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
         icon:
@@ -13537,8 +13537,8 @@ components:
         price:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
         vat:
@@ -13552,16 +13552,16 @@ components:
         vatValue:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
         finalPrice:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
@@ -13612,8 +13612,8 @@ components:
         discountValue:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
@@ -14164,8 +14164,8 @@ components:
         discount:
           type: number
           format: double
-          maximum: 1000000000000000
-          minimum: -1000000000000000
+          maximum: 1000000000
+          minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
         showButton:

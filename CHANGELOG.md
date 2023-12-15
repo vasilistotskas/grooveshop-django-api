@@ -3,7 +3,17 @@
 
 
 
+## v0.55.4 (2023-12-15)
+
+### Fix
+
+* fix(Dockerfile): Remove ` libmusl-dev` ([`f419494`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f4194944f7da88270c85cb3f9297e41af577c038))
+
 ## v0.55.3 (2023-12-15)
+
+### Chore
+
+* chore(release): release version 0.55.3 [skip ci] ([`3f7bdef`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3f7bdef33b6e9122c1eb3441d941f7623486000c))
 
 ### Fix
 

@@ -3,7 +3,17 @@
 
 
 
+## v0.55.2 (2023-12-15)
+
+### Fix
+
+* fix(Dockerfile): `groupadd` fix ([`f0d52f4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f0d52f48776211917a84df780f9cb5045720dfaa))
+
 ## v0.55.1 (2023-12-15)
+
+### Chore
+
+* chore(release): release version 0.55.1 [skip ci] ([`cf6017f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cf6017fce0b38210bd7de912cad0c489bbc5f733))
 
 ### Fix
 

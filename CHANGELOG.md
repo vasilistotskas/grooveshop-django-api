@@ -3,7 +3,17 @@
 
 
 
+## v0.56.0 (2023-12-15)
+
+### Feature
+
+* feat: Add `multidict` ([`2dcd119`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2dcd11913f42fb9d00d0e5f68b763adeea3c21bc))
+
 ## v0.55.5 (2023-12-15)
+
+### Chore
+
+* chore(release): release version 0.55.5 [skip ci] ([`eefc0e0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eefc0e06b6a69f49e48e3408c2fb64df053c3f50))
 
 ### Fix
 

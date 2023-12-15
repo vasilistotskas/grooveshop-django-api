@@ -3,7 +3,21 @@
 
 
 
+## v0.55.0 (2023-12-15)
+
+### Feature
+
+* feat: Bump Versions ([`90f3c97`](https://github.com/vasilistotskas/grooveshop-django-api/commit/90f3c97b6fbc3324331cb5e92332a0dbad754ba9))
+
+### Fix
+
+* fix(Dockerfile): Use `python:3.12.1-slim` ([`4dd97ac`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4dd97accbe0937c11a7dd9d7b52e3b4b3dfa423e))
+
 ## v0.54.0 (2023-12-12)
+
+### Chore
+
+* chore(release): release version 0.54.0 [skip ci] ([`095b811`](https://github.com/vasilistotskas/grooveshop-django-api/commit/095b811a808d5d134e320bd66d221ef78c13b9fd))
 
 ### Feature
 

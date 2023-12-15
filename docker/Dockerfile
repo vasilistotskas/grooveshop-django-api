@@ -36,7 +36,7 @@ FROM python:3.12.1-slim
 RUN mkdir -p /home/app
 
 # create the app user
-RUN addgroup -S app && adduser -S -G app app
+RUN groupadd app && useradd -g app app
 
 # create the appropriate directories
 ENV HOME=/home/app

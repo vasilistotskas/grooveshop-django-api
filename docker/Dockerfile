@@ -13,13 +13,13 @@ ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
 # install system dependencies
-RUN apk add --update --no-cache \
-    gcc \
-    musl-dev \
-    postgresql-dev \
+RUN apt-get update && \
+    apt-get install -y gcc \
+    libmusl-dev \
+    libpq-dev \
     python3-dev \
     libc-dev \
-    linux-headers
+    linux-headers-amd64
 
 # install python dependencies
 COPY ./requirements.txt .

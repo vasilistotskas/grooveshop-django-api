@@ -18,7 +18,8 @@ RUN apt-get update && \
     libpq-dev \
     python3-dev \
     libc-dev \
-    linux-headers-amd64
+    linux-headers-amd64 \
+    build-essential
 
 # install python dependencies
 COPY ./requirements.txt .

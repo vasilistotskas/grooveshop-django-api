@@ -3,7 +3,7 @@
 ###########
 
 # pull official base image
-FROM python:3.12-alpine as builder
+FROM python:3.12.1-slim as builder
 
 # set work directory
 WORKDIR /usr/src/app
@@ -13,10 +13,13 @@ ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
 # install system dependencies
-RUN apk update && \
-    apk add --update --no-cache gcc && \
-    apk add --update --no-cache musl-dev && \
-    apk add --update --no-cache postgresql-dev
+RUN apk add --update --no-cache \
+    gcc \
+    musl-dev \
+    postgresql-dev \
+    python3-dev \
+    libc-dev \
+    linux-headers
 
 # install python dependencies
 COPY ./requirements.txt .
@@ -27,7 +30,7 @@ RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/app/wheels -r requir
 #########
 
 # pull official base image
-FROM python:3.12-alpine
+FROM python:3.12.1-slim
 
 # create directory for the app user
 RUN mkdir -p /home/app

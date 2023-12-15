@@ -15,7 +15,6 @@ ENV PYTHONUNBUFFERED 1
 # install system dependencies
 RUN apt-get update && \
     apt-get install -y gcc \
-    libmusl-dev \
     libpq-dev \
     python3-dev \
     libc-dev \

@@ -3,7 +3,17 @@
 
 
 
+## v0.55.5 (2023-12-15)
+
+### Fix
+
+* fix(Dockerfile): Add `build-essential` ([`a1fb346`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a1fb3466aacdaeb3d951aed0f002cb9142287e2d))
+
 ## v0.55.4 (2023-12-15)
+
+### Chore
+
+* chore(release): release version 0.55.4 [skip ci] ([`cb5dc8a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cb5dc8aa480497106ef37c565943b307a79dec64))
 
 ### Fix
 

@@ -3,7 +3,17 @@
 
 
 
+## v0.55.3 (2023-12-15)
+
+### Fix
+
+* fix(Dockerfile): use `apt-get` ([`6a82c76`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6a82c76c51d1d0a64bb179e27d0454c18bb65d11))
+
 ## v0.55.2 (2023-12-15)
+
+### Chore
+
+* chore(release): release version 0.55.2 [skip ci] ([`81a3841`](https://github.com/vasilistotskas/grooveshop-django-api/commit/81a3841fae2258ab48fad44cef3770232ccd3669))
 
 ### Fix
 

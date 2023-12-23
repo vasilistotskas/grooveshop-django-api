@@ -117,12 +117,40 @@ class OrderCreateUpdateSerializer(serializers.ModelSerializer):
             "full_address",
         )
 
-    def create(self, validated_data):
-        items_data = validated_data.pop("order_item_order")
-        order = Order.objects.create(**validated_data)
+    def validate(self, data):
+        super().validate(data)
+
+        items_data = data.get("order_item_order", [])
 
         for item_data in items_data:
-            OrderItem.objects.create(order=order, **item_data)
+            product = item_data["product"]
+            quantity = item_data["quantity"]
+
+            if product.stock < quantity:
+                raise serializers.ValidationError(
+                    f"Product {product.name} does not have enough stock."
+                )
+
+        return data
+
+    def create(self, validated_data):
+        items_data = validated_data.pop("order_item_order")
+
+        try:
+            order = Order.objects.create(**validated_data)
+
+            for item_data in items_data:
+                product = item_data.get("product")
+
+                # Set the price of the product to the final price
+                item_data["price"] = product.final_price
+
+                OrderItem.objects.create(order=order, **item_data)
+
+            order_created.send(sender=Order, order=order)
+
+        except Product.DoesNotExist:
+            raise serializers.ValidationError("One or more products do not exist.")
 
         return order
 

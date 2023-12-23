@@ -3,7 +3,17 @@
 
 
 
+## v0.57.1 (2023-12-23)
+
+### Fix
+
+* fix(OrderCreateUpdateSerializer): validate and create methods ([`b11aa31`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b11aa3170476e0d512769476cf8861a5a7926efb))
+
 ## v0.57.0 (2023-12-19)
+
+### Chore
+
+* chore(release): release version 0.57.0 [skip ci] ([`fe12ebb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fe12ebb235a1bc71fbca39147c91954b4da44607))
 
 ### Feature
 

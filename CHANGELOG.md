@@ -3,7 +3,17 @@
 
 
 
+## v0.58.0 (2023-12-24)
+
+### Feature
+
+* feat: improve `BaseExpandSerializer` and versions bump ([`7b4f13e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b4f13e9e6f465115af677284707a7b408496222))
+
 ## v0.57.1 (2023-12-23)
+
+### Chore
+
+* chore(release): release version 0.57.1 [skip ci] ([`2431f50`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2431f5042e146df9c85fdcbde0aef71134296cc9))
 
 ### Fix
 

@@ -5,6 +5,7 @@ from typing import Any
 from typing import Dict
 from typing import Type
 
+from django.db.models import Manager
 from rest_framework import serializers
 
 
@@ -25,14 +26,18 @@ class BaseExpandSerializer(serializers.ModelSerializer):
         if expand:
             expand_fields = self.get_expand_fields()
             for field_name, field_serializer_class in expand_fields.items():
-                if isinstance(data[field_name], list):
-                    data[field_name] = []
-                    for item in getattr(instance, field_name).all():
-                        data[field_name].append(field_serializer_class(item).data)
-                else:
-                    data[field_name] = field_serializer_class(
-                        getattr(instance, field_name)
-                    ).data
+                field_value = getattr(instance, field_name)
+                if isinstance(field_value, Manager):  # for many-to-many or reverse FK
+                    data[field_name] = [
+                        field_serializer_class(item, context=self.context).data
+                        for item in field_value.all()
+                    ]
+                else:  # for FK and one-to-one
+                    data[field_name] = (
+                        field_serializer_class(field_value, context=self.context).data
+                        if field_value
+                        else None
+                    )
         return data
 
     def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:

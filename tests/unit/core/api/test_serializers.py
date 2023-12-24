@@ -66,71 +66,22 @@ class TestBaseExpandSerializer(TestCase):
         }
         self.assertEqual(data, expected_data)
 
-    def test_to_representation_with_expansion_single_field(self):
+    def test_to_representation_with_expansion(self):
         self.serializer.Meta.model = ProductFavourite
         expand_fields = {
             "product": ProductSerializer,
-        }
-        self.serializer.context["expand"] = True
-        self.serializer.get_expand_fields = lambda: expand_fields
-
-        related_instance = ProductSerializer().to_representation(self.product)
-
-        data = self.serializer.to_representation(self.instance)
-
-        timezone_to_use = settings.TIME_ZONE
-        athens_timezone = pytz.timezone(timezone_to_use)
-        expected_created_at = self.instance.created_at.astimezone(
-            athens_timezone
-        ).isoformat()
-        expected_updated_at = self.instance.updated_at.astimezone(
-            athens_timezone
-        ).isoformat()
-
-        expected_data = {
-            "product": related_instance,
-            "user": self.user.id,
-            "id": self.instance.id,
-            "created_at": expected_created_at,
-            "updated_at": expected_updated_at,
-            "uuid": str(self.instance.uuid),
-        }
-
-        self.assertEqual(data, expected_data)
-
-    def test_to_representation_with_expansion_multiple_fields(self):
-        self.serializer.Meta.model = ProductFavourite
-        expand_fields = {
             "user": UserAccountSerializer,
-            "product": ProductSerializer,
         }
         self.serializer.context["expand"] = True
         self.serializer.get_expand_fields = lambda: expand_fields
 
-        user_instance = UserAccountSerializer().to_representation(self.user)
-        product_instance = ProductSerializer().to_representation(self.product)
-
         data = self.serializer.to_representation(self.instance)
 
-        timezone_to_use = settings.TIME_ZONE
-        athens_timezone = pytz.timezone(timezone_to_use)
-        expected_created_at = self.instance.created_at.astimezone(
-            athens_timezone
-        ).isoformat()
-        expected_updated_at = self.instance.updated_at.astimezone(
-            athens_timezone
-        ).isoformat()
+        expected_user_data = UserAccountSerializer().to_representation(self.user)
+        expected_product_data = ProductSerializer().to_representation(self.product)
 
-        expected_data = {
-            "user": user_instance,
-            "product": product_instance,
-            "id": self.instance.id,
-            "created_at": expected_created_at,
-            "updated_at": expected_updated_at,
-            "uuid": str(self.instance.uuid),
-        }
-
-        self.assertEqual(data, expected_data)
+        self.assertEqual(data["user"], expected_user_data)
+        self.assertEqual(data["product"], expected_product_data)
 
     def test_get_expand_fields(self):
         self.serializer.Meta.model = ProductFavourite

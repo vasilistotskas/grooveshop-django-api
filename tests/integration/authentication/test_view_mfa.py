@@ -1,13 +1,13 @@
+from unittest.mock import patch
+
 from allauth.mfa.models import Authenticator
 from allauth.mfa.totp import generate_totp_secret
-from allauth.mfa.totp import hotp_counter_from_time
 from allauth.mfa.totp import hotp_value
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 from rest_framework.test import APITestCase
-
 
 User = get_user_model()
 
@@ -47,13 +47,17 @@ class AuthenticateTotpAPIViewTestCase(APITestCase):
         response = self.client.post(url, {"secret": "invalid_code"})
         self.assertEqual(response.status_code, 400)
 
-    def test_authenticated_user_with_valid_code(self):
+    @patch("allauth.mfa.totp.hotp_counter_from_time")
+    def test_authenticated_user_with_valid_code(self, mock_hotp_counter):
+        mock_hotp_counter.return_value = 12345
+
         self.client.login(email="testuser@example.com", password="testpassword")
         self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token}")
-        counter = hotp_counter_from_time()
+
         valid_code = hotp_value(
-            self.authenticator.wrap().instance.data["secret"], counter
+            self.authenticator.wrap().instance.data["secret"], 12345
         )
+
         url = reverse("mfa_totp_authenticate")
         response = self.client.post(url, {"code": valid_code})
         self.assertEqual(response.status_code, 200)

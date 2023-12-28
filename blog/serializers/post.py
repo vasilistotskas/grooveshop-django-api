@@ -57,6 +57,7 @@ class BlogPostSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "number_of_likes",
             "number_of_comments",
             "post_tags_count",
+            "absolute_url",
         )
 
     def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:

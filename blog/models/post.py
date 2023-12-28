@@ -91,3 +91,7 @@ class BlogPost(
     @property
     def post_tags_count(self) -> int:
         return self.tags.count()
+
+    @property
+    def absolute_url(self) -> str:
+        return f"/{self.id}/{self.slug}"

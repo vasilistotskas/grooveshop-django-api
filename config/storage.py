@@ -45,7 +45,7 @@ else:
             "BACKEND": "core.storages.PublicMediaStorage",
         },
         "staticfiles": {
-            "BACKEND": "storages.backends.s3boto3.S3StaticStorage",
+            "BACKEND": "core.storages.StaticStorage",
         },
     }
     TINYMCE_JS_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/tinymce/tinymce.min.js"

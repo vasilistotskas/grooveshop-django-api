@@ -3,7 +3,17 @@
 
 
 
+## v0.59.0 (2023-12-28)
+
+### Feature
+
+* feat: Bump Versions and add `absolute_url` in blog post ([`50bf02a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/50bf02a69e01c5e7c25ab98bfc6bbc2ee62f07c1))
+
 ## v0.58.0 (2023-12-24)
+
+### Chore
+
+* chore(release): release version 0.58.0 [skip ci] ([`51f2c4b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51f2c4bc052a09046bfebd9efd17f6a37f3664a9))
 
 ### Feature
 

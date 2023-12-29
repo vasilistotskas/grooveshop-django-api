@@ -48,6 +48,6 @@ class TestStorage(unittest.TestCase):
             STORAGES,
             {
                 "default": {"BACKEND": "core.storages.PublicMediaStorage"},
-                "staticfiles": {"BACKEND": "storages.backends.s3boto3.S3StaticStorage"},
+                "staticfiles": {"BACKEND": "core.storages.StaticStorage"},
             },
         )

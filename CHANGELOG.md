@@ -3,7 +3,19 @@
 
 
 
+## v0.59.1 (2023-12-29)
+
+### Fix
+
+* fix: `test_storage` fix to pass previous commit ([`c0cea9e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c0cea9e85bd965264dfdc4b6ded4a8d1f9f90ab2))
+
+* fix(storage.py): change staticfiles class ([`152974e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/152974eb385c1e932d0e54204c23d2c31f1f8128))
+
 ## v0.59.0 (2023-12-28)
+
+### Chore
+
+* chore(release): release version 0.59.0 [skip ci] ([`93f26b4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/93f26b4c6d6ad45cb2fd6846a761a3af79aff83f))
 
 ### Feature
 

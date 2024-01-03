@@ -10547,7 +10547,11 @@ components:
         postTagsCount:
           type: integer
           readOnly: true
+        absoluteUrl:
+          type: string
+          readOnly: true
       required:
+      - absoluteUrl
       - author
       - category
       - id
@@ -12166,6 +12170,9 @@ components:
           readOnly: true
         postTagsCount:
           type: integer
+          readOnly: true
+        absoluteUrl:
+          type: string
           readOnly: true
     PatchedBlogTag:
       type: object

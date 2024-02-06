@@ -10,6 +10,7 @@ from django.utils.html import format_html
 from djmoney.money import Money
 
 from helpers.seed import get_or_create_default_image
+from product.enum.review import ReviewStatusEnum
 from product.models.category import ProductCategory
 from product.models.favourite import ProductFavourite
 from product.models.image import ProductImage
@@ -125,7 +126,7 @@ class ProductModelTestCase(TestCase):
             product=self.product,
             user=self.user,
             rate=5,
-            status="True",
+            status=ReviewStatusEnum.TRUE,
             comment="Sample Product Review Comment",
         )
         self.product_reviews.append(product_review_status_true)
@@ -135,7 +136,7 @@ class ProductModelTestCase(TestCase):
             product=self.product,
             user=user_2,
             rate=5,
-            status="False",
+            status=ReviewStatusEnum.FALSE,
             comment="Sample Product Review Comment",
         )
         self.product_reviews.append(product_review_status_false)

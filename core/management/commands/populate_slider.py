@@ -4,7 +4,6 @@ import time
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from django.utils import timezone
 from faker import Faker
 
 from helpers.seed import get_or_create_default_image
@@ -83,12 +82,8 @@ class Command(BaseCommand):
             for _ in range(slides_per_slider):
                 discount = faker.pydecimal(left_digits=2, right_digits=2, positive=True)
                 show_button = faker.boolean()
-                date_start = faker.date_time_this_year(
-                    before_now=True, after_now=False, tzinfo=timezone.utc
-                )
-                date_end = faker.date_time_this_year(
-                    before_now=False, after_now=True, tzinfo=timezone.utc
-                )
+                date_start = faker.date_time_this_year(before_now=True, after_now=False)
+                date_end = faker.date_time_this_year(before_now=False, after_now=True)
 
                 slide = Slide(
                     slider=slider,

@@ -14,8 +14,7 @@ def handle_order_created(sender, **kwargs):
     items = order.order_item_order.all()
     for item in items:
         product = item.product
-        product.stock -= item.quantity
-        product.save(update_fields=["stock"])
+        product.decrement_stock(item.quantity)
 
     order.paid_amount = order.calculate_order_total_amount()
     order.save(update_fields=["paid_amount"])

@@ -1,3 +1,4 @@
+from django.core.validators import MinLengthValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -9,12 +10,25 @@ from core.models import TimeStampMixinModel
 from core.models import UUIDModel
 
 
+class ActiveBlogTagManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(active=True)
+
+
 class BlogTag(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
     active = models.BooleanField(_("Active"), default=True)
     translations = TranslatedFields(
-        name=models.CharField(_("Name"), max_length=50, blank=True, null=True)
+        name=models.CharField(
+            _("Name"),
+            max_length=50,
+            blank=True,
+            null=True,
+            validators=[MinLengthValidator(1)],
+        )
     )
+
+    active_tags = ActiveBlogTagManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Blog Tag")
@@ -22,10 +36,16 @@ class BlogTag(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         ordering = ["sort_order"]
 
     def __unicode__(self):
-        return self.safe_translation_getter("name", any_language=True) or ""
+        tag_name = (
+            self.safe_translation_getter("name", any_language=True) or "Unnamed Tag"
+        )
+        return f"{tag_name} ({'Active' if self.active else 'Inactive'})"
 
     def __str__(self):
-        return self.safe_translation_getter("name", any_language=True) or ""
+        tag_name = (
+            self.safe_translation_getter("name", any_language=True) or "Unnamed Tag"
+        )
+        return f"{tag_name} ({'Active' if self.active else 'Inactive'})"
 
     def get_ordering_queryset(self):
         return BlogTag.objects.all()

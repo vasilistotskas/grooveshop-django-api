@@ -10,9 +10,11 @@ from core.models import UUIDModel
 
 
 class Region(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
-    alpha = models.CharField(_("Alpha"), max_length=10, primary_key=True, unique=True)
-    alpha_2 = models.ForeignKey(
-        "country.Country", related_name="region_country", on_delete=models.CASCADE
+    alpha = models.CharField(
+        _("Region Code"), max_length=10, primary_key=True, unique=True
+    )
+    country = models.ForeignKey(
+        "country.Country", related_name="regions", on_delete=models.CASCADE
     )
     translations = TranslatedFields(
         name=models.CharField(_("Name"), max_length=100, blank=True, null=True)
@@ -24,10 +26,14 @@ class Region(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         ordering = ["sort_order"]
 
     def __unicode__(self):
-        return self.safe_translation_getter("name", any_language=True) or ""
+        country_name = self.country.safe_translation_getter("name", any_language=True)
+        region_name = self.safe_translation_getter("name", any_language=True)
+        return f"{region_name}, {country_name}"
 
     def __str__(self):
-        return self.safe_translation_getter("name", any_language=True) or ""
+        country_name = self.country.safe_translation_getter("name", any_language=True)
+        region_name = self.safe_translation_getter("name", any_language=True)
+        return f"{region_name}, {country_name}"
 
     def get_ordering_queryset(self):
         return Region.objects.all()

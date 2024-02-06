@@ -36,8 +36,7 @@ class GenerateSchemaMultiLangTest(TestCase):
     def test_generate_schema_with_translations(self):
         # Create an instance of YourModel with translated fields
         instance = BlogPost()
-        instance.title_en = "Title in English"
-        instance.title_fr = "Titre en français"
+        instance.title = "Title"
         instance.save()
 
         schema = generate_schema_multi_lang(instance)
@@ -66,8 +65,7 @@ class GenerateSchemaMultiLangTest(TestCase):
 
         # Create an instance of YourModel with translated fields
         instance = BlogPost()
-        instance.title_en = "Title in English"
-        instance.title_fr = "Titre en français"
+        instance.title = "Title"
         instance.save()
 
         schema = generate_schema_multi_lang(instance)

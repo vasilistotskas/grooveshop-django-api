@@ -48,7 +48,7 @@ class ProductCategoryViewSet(TranslationsProcessingMixin, ModelViewSet):
     def retrieve(self, request, pk=None, *args, **kwargs) -> Response:
         category = get_object_or_404(ProductCategory, id=pk)
         serializer = self.get_serializer(category)
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     def update(self, request, pk=None, *args, **kwargs) -> Response:
         category = get_object_or_404(ProductCategory, id=pk)

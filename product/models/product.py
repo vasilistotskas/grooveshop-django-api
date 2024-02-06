@@ -8,11 +8,15 @@ from django.conf import settings
 from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVector
 from django.contrib.postgres.search import SearchVectorField
+from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import Avg
-from django.db.models import Count
+from django.db.models import F
 from django.db.models import Subquery
 from django.db.models.functions import Coalesce
+from django.templatetags.static import static
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.safestring import SafeString
@@ -27,15 +31,20 @@ from parler.models import TranslatedFields
 from tinymce.models import HTMLField
 
 from core.models import ModelWithMetadata
+from core.models import SoftDeleteModel
+from core.models import SoftDeleteQuerySet
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
+from core.utils.generators import SlugifyConfig
+from core.utils.generators import unique_slugify
+from product.enum.review import ReviewStatusEnum
 from product.models.favourite import ProductFavourite
 from product.models.image import ProductImage
 from product.models.review import ProductReview
 from seo.models import SeoModel
 
 
-class ProductQuerySet(TranslatableQuerySet):
+class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
     def update_search_vector(self):
         search_vector = (
             SearchVector("translations__name", weight="A")
@@ -84,7 +93,7 @@ class ProductQuerySet(TranslatableQuerySet):
 
 class ProductManager(models.Manager):
     def get_queryset(self) -> ProductQuerySet:
-        return ProductQuerySet(self.model, using=self._db)
+        return ProductQuerySet(self.model, using=self._db).exclude(is_deleted=True)
 
     def update_search_vector(self):
         return self.get_queryset().update_search_vector()
@@ -94,7 +103,12 @@ class ProductManager(models.Manager):
 
 
 class Product(
-    TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel, ModelWithMetadata
+    SoftDeleteModel,
+    TranslatableModel,
+    TimeStampMixinModel,
+    SeoModel,
+    UUIDModel,
+    ModelWithMetadata,
 ):
     id = models.BigAutoField(primary_key=True)
     product_code = models.CharField(
@@ -117,7 +131,11 @@ class Product(
     active = models.BooleanField(_("Active"), default=True)
     stock = models.PositiveIntegerField(_("Stock"), default=0)
     discount_percent = models.DecimalField(
-        _("Discount Percent"), max_digits=11, decimal_places=2, default=0.0
+        _("Discount Percent"),
+        max_digits=11,
+        decimal_places=2,
+        default=0.0,
+        validators=[MinValueValidator(0.0), MaxValueValidator(100.0)],
     )
     vat = models.ForeignKey(
         "vat.Vat",
@@ -171,6 +189,9 @@ class Product(
         indexes = [
             *ModelWithMetadata.Meta.indexes,
             GinIndex(fields=["search_vector"], name="product_search_vector_idx"),
+            models.Index(fields=["product_code"], name="product_product_code_idx"),
+            models.Index(fields=["slug"], name="product_slug_idx"),
+            models.Index(fields=["price", "stock"], name="product_price_stock_idx"),
         ]
 
     def __unicode__(self):
@@ -179,35 +200,78 @@ class Product(
     def __str__(self):
         return self.safe_translation_getter("name", any_language=True) or ""
 
+    def __repr__(self):
+        return f"<Product {self.name} ({self.product_code})>"
+
+    def save(self, *args, **kwargs):
+        if not self.product_code:
+            self.product_code = self.generate_unique_product_code()
+
+        if not self.slug:
+            config = SlugifyConfig(
+                instance=self,
+                title_field="name",
+            )
+            self.slug = unique_slugify(config)
+        super(Product, self).save(*args, **kwargs)
+
+    def clean(self):
+        super().clean()
+        if self.discount_percent > 0 >= self.price.amount:
+            raise ValidationError(
+                {
+                    "discount_percent": _(
+                        "Discount percent cannot be greater than 0 if price is 0."
+                    )
+                }
+            )
+
+        if not 0.0 <= self.discount_percent <= 100.0:
+            raise ValidationError(
+                {"discount_percent": _("Discount percent must be between 0 and 100.")}
+            )
+
+        if self.stock < 0:
+            raise ValidationError({"stock": _("Stock cannot be negative.")})
+
+    def generate_unique_product_code(self) -> uuid.UUID:
+        while True:
+            unique_code = uuid.uuid4()
+            if not Product.objects.filter(product_code=unique_code).exists():
+                return unique_code
+
+    def increment_stock(self, quantity: int):
+        if quantity < 0:
+            raise ValueError("Quantity to increment must be non-negative")
+        Product.objects.filter(id=self.id).update(stock=F("stock") + quantity)
+        self.refresh_from_db()
+
+    def decrement_stock(self, quantity: int):
+        if quantity < 0:
+            raise ValueError("Invalid quantity to decrement")
+        updated_rows = Product.objects.filter(id=self.id, stock__gte=quantity).update(
+            stock=F("stock") - quantity
+        )
+        if not updated_rows:
+            raise ValueError("Not enough stock to decrement")
+        self.refresh_from_db()
+
     @property
     def likes_counter(self) -> int:
-        favourites = ProductFavourite.objects.filter(product=self).aggregate(
-            count=Count("id")
-        )
-        cnt: int = 0
-        if favourites["count"] is not None:
-            cnt = int(favourites["count"])
-        return cnt
+        return ProductFavourite.objects.filter(product=self).count()
 
     @property
     def review_average(self) -> float:
-        reviews = ProductReview.objects.filter(product=self, status="True").aggregate(
-            average=Avg("rate")
-        )
-        avg: float = 0.0
-        if reviews["average"] is not None:
-            avg = float(reviews["average"])
-        return avg
+        average = ProductReview.objects.filter(
+            product=self, status=ReviewStatusEnum.TRUE
+        ).aggregate(avg=Avg("rate"))["avg"]
+        return float(average) if average is not None else 0.0
 
     @property
     def review_counter(self) -> int:
-        reviews = ProductReview.objects.filter(product=self, status="True").aggregate(
-            count=Count("id")
-        )
-        cnt: int = 0
-        if reviews["count"] is not None:
-            return int(reviews["count"])
-        return cnt
+        return ProductReview.objects.filter(
+            product=self, status=ReviewStatusEnum.TRUE
+        ).count()
 
     @property
     def vat_percent(self) -> Decimal | int:
@@ -241,7 +305,7 @@ class Product(
 
     @property
     def image_tag(self) -> str:
-        no_img_url = "/static/images/no_photo.jpg"
+        no_img_url = static("images/no_photo.jpg")
         no_img_markup = f'<img src="{no_img_url}" width="100" height="100" />'
         try:
             img = ProductImage.objects.get(product_id=self.id, is_main=True)

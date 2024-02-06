@@ -1,3 +1,4 @@
+from django.core.validators import MinLengthValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -27,7 +28,13 @@ class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel):
         null=True,
     )
     translations = TranslatedFields(
-        content=models.TextField(_("Content"), max_length=1000, blank=True, null=True)
+        content=models.TextField(
+            _("Content"),
+            max_length=1000,
+            blank=True,
+            null=True,
+            validators=[MinLengthValidator(1)],
+        )
     )
 
     class Meta(TypedModelMeta):
@@ -39,10 +46,16 @@ class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel):
         ]
 
     def __unicode__(self):
-        return self.safe_translation_getter("content", any_language=True) or ""
+        content_snippet = (
+            self.safe_translation_getter("content", any_language=True)[:50] + "..."
+        )
+        return f"Comment by {self.user.full_name}: {content_snippet}"
 
     def __str__(self):
-        return self.safe_translation_getter("content", any_language=True) or ""
+        content_snippet = (
+            self.safe_translation_getter("content", any_language=True)[:50] + "..."
+        )
+        return f"Comment by {self.user.full_name}: {content_snippet}"
 
     @property
     def number_of_likes(self) -> int:

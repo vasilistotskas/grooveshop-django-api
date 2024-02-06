@@ -36,7 +36,7 @@ class VatModelTestCase(TestCase):
 
     def test_str_representation(self):
         # Test the __str__ method returns the vat value
-        self.assertEqual(str(self.vat), str(self.vat.value))
+        self.assertEqual(str(self.vat), f"{self.vat.value}% VAT")
 
     def test_get_highest_vat_value(self):
         Vat.objects.create(value=10.0)

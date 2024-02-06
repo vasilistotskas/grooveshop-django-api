@@ -4,7 +4,6 @@ import os
 
 from django.conf import settings
 from django.db import models
-from django.db.models.fields.files import ImageFieldFile
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel
@@ -14,6 +13,11 @@ from core.models import SortableModel
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
 from helpers.image_resize import make_thumbnail
+
+
+class ProductImageManager(models.Manager):
+    def main_image(self, product):
+        return self.get_queryset().filter(product=product, is_main=True).first()
 
 
 class ProductImage(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
@@ -30,29 +34,44 @@ class ProductImage(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDMo
         title=models.CharField(_("Title"), max_length=50, blank=True, null=True)
     )
 
+    objects = ProductImageManager()
+
     class Meta(TypedModelMeta):
         verbose_name_plural = _("Product Images")
         verbose_name = _("Product Image")
         ordering = ["sort_order"]
 
     def __unicode__(self):
-        return self.safe_translation_getter("title", any_language=True) or ""
+        product_name = self.product.safe_translation_getter("name", any_language=True)
+        main_status = "Main" if self.is_main else "Secondary"
+        return f"{product_name} Image ({main_status})"
 
     def __str__(self):
-        return self.safe_translation_getter("title", any_language=True) or ""
+        product_name = self.product.safe_translation_getter("name", any_language=True)
+        main_status = "Main" if self.is_main else "Secondary"
+        return f"{product_name} Image ({main_status})"
 
     def get_ordering_queryset(self):
         return self.product.product_images.all()
 
     def save(self, *args, **kwargs):
-        image: ImageFieldFile = self.image
+        if not self.thumbnail:
+            self.thumbnail = self.create_thumbnail()
+        super().save(*args, **kwargs)
+
+    def clean(self):
+        if self.is_main:
+            ProductImage.objects.filter(product=self.product, is_main=True).update(
+                is_main=False
+            )
+        super().clean()
+
+    def create_thumbnail(self):
         try:
-            self.thumbnail = make_thumbnail(image, (100, 100))
+            return make_thumbnail(self.image, (100, 100))
         except Exception as e:
             print("Error while creating thumbnail: ", e)
-            self.thumbnail = image
-
-        super().save(*args, **kwargs)
+            return None
 
     @property
     def main_image_absolute_url(self) -> str:

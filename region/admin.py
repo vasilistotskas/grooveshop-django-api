@@ -11,4 +11,4 @@ class RegionInline(admin.TabularInline):
 
 @admin.register(Region)
 class RegionAdmin(TranslatableAdmin):
-    search_fields = ["alpha", "alpha_2", "translations__name"]
+    search_fields = ["alpha", "country", "translations__name"]

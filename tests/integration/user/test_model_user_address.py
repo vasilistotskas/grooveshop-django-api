@@ -95,7 +95,11 @@ class UserAddressModelTestCase(TestCase):
 
     def test_str_representation(self):
         # Test the __str__ method returns the address title
-        self.assertEqual(str(self.address), self.address.title)
+        self.assertEqual(
+            str(self.address),
+            f"{self.address.title} - {self.address.first_name}"
+            f" {self.address.last_name}, {self.address.city}",
+        )
 
     def test_get_user_addresses(self):
         address_1 = UserAddress.objects.create(

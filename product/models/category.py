@@ -17,6 +17,8 @@ from tinymce.models import HTMLField
 from core.models import SortableModel
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
+from core.utils.generators import SlugifyConfig
+from core.utils.generators import unique_slugify
 from product.models.product import Product
 from seo.models import SeoModel
 
@@ -81,12 +83,20 @@ class ProductCategory(
         return self.safe_translation_getter("name", any_language=True) or ""
 
     def __str__(self):
-        full_path: list[str] = [self.safe_translation_getter("name", any_language=True)]
-        k = self.parent
-        while k is not None:
-            full_path.append(k.name)
-            k = k.parent
-        return " / ".join(full_path[::-1])
+        if not hasattr(self, "_full_path"):
+            self._full_path = " / ".join(
+                [
+                    k.safe_translation_getter("name", any_language=True)
+                    for k in self.get_ancestors(include_self=True)
+                ]
+            )
+        return self._full_path
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            config = SlugifyConfig(instance=self, title_field="name")
+            self.slug = unique_slugify(config)
+        super(ProductCategory, self).save(*args, **kwargs)
 
     def get_ordering_queryset(self):
         return ProductCategory.objects.filter(parent=self.parent).get_descendants(

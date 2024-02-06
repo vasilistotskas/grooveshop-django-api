@@ -21,7 +21,7 @@ class ProductReviewViewSet(BaseExpandView, ModelViewSet):
     serializer_class = ProductReviewSerializer
     pagination_class = ProductReviewPagination
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
-    filterset_fields = ["id", "user_id", "product_id"]
+    filterset_fields = ["id", "user_id", "product_id", "status"]
     ordering_fields = [
         "id",
         "user_id",

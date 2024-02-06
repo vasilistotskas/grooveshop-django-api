@@ -67,9 +67,13 @@ class BlogCommentModelTestCase(TestCase):
 
     def test_unicode_representation(self):
         # Test the __unicode__ method returns the translated name
+        content_snippet = (
+            self.comment.safe_translation_getter("content", any_language=True)[:50]
+            + "..."
+        )
         self.assertEqual(
             self.comment.__unicode__(),
-            self.comment.safe_translation_getter("content"),
+            f"Comment by {self.user.full_name}: {content_snippet}",
         )
 
     def test_translations(self):
@@ -83,8 +87,12 @@ class BlogCommentModelTestCase(TestCase):
 
     def test_str_representation(self):
         # Test the __str__ method returns the translated content
+        content_snippet = (
+            self.comment.safe_translation_getter("content", any_language=True)[:50]
+            + "..."
+        )
         self.assertEqual(
-            str(self.comment), self.comment.safe_translation_getter("content")
+            str(self.comment), f"Comment by {self.user.full_name}: {content_snippet}"
         )
 
     def test_number_of_likes(self):

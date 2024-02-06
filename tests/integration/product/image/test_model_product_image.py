@@ -76,8 +76,12 @@ class ProductImageModelTestCase(TestCase):
 
     def test_unicode_representation(self):
         # Test unicode representation
+        product_name = self.product.safe_translation_getter("name", any_language=True)
+        main_status = "Main" if self.product_image.is_main else "Secondary"
+
         self.assertEqual(
-            str(self.product_image), f"Sample Main Product Image ({default_language})"
+            self.product_image.__unicode__(),
+            f"{product_name} Image ({main_status})",
         )
 
     def test_translations(self):
@@ -91,9 +95,12 @@ class ProductImageModelTestCase(TestCase):
 
     def test_str_representation(self):
         # Test the __str__ method returns the translated title
+        product_name = self.product.safe_translation_getter("name", any_language=True)
+        main_status = "Main" if self.product_image.is_main else "Secondary"
+
         self.assertEqual(
-            self.product_image.__str__(),
-            self.product_image.safe_translation_getter("title"),
+            str(self.product_image),
+            f"{product_name} Image ({main_status})",
         )
 
     def test_get_ordering_queryset(self):

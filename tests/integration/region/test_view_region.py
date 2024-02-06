@@ -35,7 +35,7 @@ class RegionViewSetTestCase(APITestCase):
         )
         self.region = Region.objects.create(
             alpha="GRC",
-            alpha_2=self.country,
+            country=self.country,
         )
         for language in languages:
             self.region.set_current_language(language)
@@ -63,7 +63,7 @@ class RegionViewSetTestCase(APITestCase):
     def test_create_valid(self):
         payload = {
             "alpha": "GRD",
-            "alpha_2": self.region.alpha_2.pk,
+            "country": self.region.country.pk,
             "translations": {},
         }
         for language in languages:
@@ -84,7 +84,7 @@ class RegionViewSetTestCase(APITestCase):
     def test_create_invalid(self):
         payload = {
             "alpha": "invalid_alpha",
-            "alpha_2": "invalid_alpha_2",
+            "country": "invalid_country",
             "translations": {
                 "invalid_lang_code": {
                     "name": "Translation for invalid language code",
@@ -115,7 +115,7 @@ class RegionViewSetTestCase(APITestCase):
     def test_update_valid(self):
         payload = {
             "alpha": "GRC",
-            "alpha_2": self.region.alpha_2.pk,
+            "country": self.region.country.pk,
             "translations": {},
         }
         for language in languages:
@@ -136,7 +136,7 @@ class RegionViewSetTestCase(APITestCase):
     def test_update_invalid(self):
         payload = {
             "alpha": "invalid_alpha",
-            "alpha_2": "invalid_alpha_2",
+            "country": "invalid_country",
             "translations": {
                 "invalid_lang_code": {
                     "name": "Translation for invalid language code",

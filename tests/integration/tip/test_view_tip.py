@@ -38,7 +38,7 @@ class TipViewSetTestCase(APITestCase):
             self.tip.set_current_language(language)
             self.tip.title = f"Info_{language}"
             self.tip.content = f"Info content_{language}"
-            self.tip.url = f"https://www.google.com_{language}"
+            self.tip.url = "https://www.google.com"
             self.tip.save()
         self.tip.set_current_language(default_language)
 
@@ -75,7 +75,7 @@ class TipViewSetTestCase(APITestCase):
             translation_payload = {
                 "title": f"New Tip in {language_name}",
                 "content": f"New Tip content in {language_name}",
-                "url": f"https://www.google.com_{language}",
+                "url": "https://www.google.com",
             }
 
             payload["translations"][language_code] = translation_payload
@@ -132,7 +132,7 @@ class TipViewSetTestCase(APITestCase):
             translation_payload = {
                 "title": f"Updated Tip in {language_name}",
                 "content": f"Updated Tip content in {language_name}",
-                "url": f"https://www.google.com_{language}",
+                "url": "https://www.google.com",
             }
 
             payload["translations"][language_code] = translation_payload
@@ -173,7 +173,7 @@ class TipViewSetTestCase(APITestCase):
             translation_payload = {
                 "title": f"Updated Tip in {language_name}",
                 "content": f"Updated Tip content in {language_name}",
-                "url": f"https://www.google.com_{language}",
+                "url": "https://www.google.com",
             }
 
             payload["translations"][language_code] = translation_payload

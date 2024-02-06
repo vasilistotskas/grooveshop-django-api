@@ -1,6 +1,7 @@
 import os
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
@@ -47,14 +48,16 @@ class Slider(TranslatableModel, TimeStampMixinModel, UUIDModel):
         return self.safe_translation_getter("name", any_language=True) or ""
 
     def save(self, *args, **kwargs):
-        if self.image:
-            try:
-                self.thumbnail = make_thumbnail(self.image, (200, 200))
-            except Exception as e:
-                self.thumbnail = self.image
-                print("Error while creating thumbnail: ", e)
-
+        if self.image and not self.thumbnail:
+            self.thumbnail = self.create_thumbnail()
         super().save(*args, **kwargs)
+
+    def create_thumbnail(self):
+        try:
+            return make_thumbnail(self.image, (200, 200))
+        except Exception as e:
+            print("Error while creating thumbnail: ", e)
+            return None
 
     @property
     def main_image_absolute_url(self) -> str:
@@ -102,7 +105,7 @@ class Slide(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     )
     translations = TranslatedFields(
         name=models.CharField(_("Name"), max_length=50, blank=True, null=True),
-        url=models.CharField(_("Url"), max_length=255, blank=True, null=True),
+        url=models.URLField(_("Url"), max_length=255, blank=True, null=True),
         title=models.CharField(_("Title"), max_length=40, blank=True, null=True),
         subtitle=models.CharField(_("Subtitle"), max_length=40, blank=True, null=True),
         description=models.CharField(
@@ -119,23 +122,30 @@ class Slide(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         ordering = ["sort_order"]
 
     def __unicode__(self):
-        return self.safe_translation_getter("name", any_language=True) or ""
+        return f"{self.safe_translation_getter('title', any_language=True)} in {self.slider}"
 
     def __str__(self):
-        return self.safe_translation_getter("name", any_language=True) or ""
+        return f"{self.safe_translation_getter('title', any_language=True)} in {self.slider}"
 
     def get_ordering_queryset(self):
         return Slide.objects.all()
 
     def save(self, *args, **kwargs):
-        if self.image:
-            try:
-                self.thumbnail = make_thumbnail(self.image, (100, 100))
-            except Exception as e:
-                print("Error while creating thumbnail: ", e)
-                self.thumbnail = self.image
-
+        if self.image and not self.thumbnail:
+            self.thumbnail = self.create_thumbnail()
         super().save(*args, **kwargs)
+
+    def clean(self):
+        if self.date_start and self.date_end and self.date_start > self.date_end:
+            raise ValidationError(_("'Date Start' must be before 'Date End'."))
+        super().clean()
+
+    def create_thumbnail(self):
+        try:
+            return make_thumbnail(self.image, (100, 100))
+        except Exception as e:
+            print("Error while creating thumbnail: ", e)
+            return None
 
     @property
     def main_image_absolute_url(self) -> str:

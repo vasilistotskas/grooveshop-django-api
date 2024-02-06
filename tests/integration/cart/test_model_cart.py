@@ -62,7 +62,10 @@ class CartModelTestCase(TestCase):
 
     def test_str_representation(self):
         # Test the __str__ method returns the cart user - cart id
-        expected_str = f"Cart {self.user} - {self.cart.id}"
+        expected_str = (
+            f"Cart {self.user} - Items: {self.cart.total_items} - Total:"
+            f" {self.cart.total_price}"
+        )
         self.assertEqual(str(self.cart), expected_str)
 
     def test_get_items(self):

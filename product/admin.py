@@ -98,8 +98,6 @@ class ProductAdmin(TranslatableAdmin, ExportModelAdmin):
         "boolean_status",
         "image_tag",
         "likes_counter",
-        "metadata",
-        "private_metadata",
     ]
     search_fields = ["id", "category__name", "translations__name", "product_code"]
     list_filter = ["category"]

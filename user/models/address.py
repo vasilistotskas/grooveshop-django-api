@@ -1,5 +1,6 @@
 from typing import List
 
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -73,7 +74,24 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
         ]
 
     def __str__(self):
-        return self.title
+        return f"{self.title} - {self.first_name} {self.last_name}, {self.city}"
+
+    def save(self, *args, **kwargs):
+        if self.is_main:
+            UserAddress.objects.filter(user=self.user, is_main=True).exclude(
+                pk=self.id
+            ).update(is_main=False)
+        super().save(*args, **kwargs)
+
+    def clean(self):
+        if self.is_main:
+            main_count = (
+                UserAddress.objects.filter(user=self.user, is_main=True)
+                .exclude(pk=self.pk)
+                .count()
+            )
+            if main_count > 0:
+                raise ValidationError(_("There can only be one main address per user."))
 
     @classmethod
     # Return type is a list of UserAddress

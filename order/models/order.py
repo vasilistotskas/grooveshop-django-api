@@ -1,4 +1,6 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.db import models
 from django.db.models import ExpressionWrapper
 from django.db.models import F
@@ -9,6 +11,7 @@ from djmoney.models.fields import MoneyField
 from djmoney.money import Money
 from phonenumber_field.modelfields import PhoneNumberField
 
+from core.models import SoftDeleteModel
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
 from order.enum.document_type_enum import OrderDocumentTypeEnum
@@ -17,7 +20,17 @@ from user.enum.address import FloorChoicesEnum
 from user.enum.address import LocationChoicesEnum
 
 
-class Order(TimeStampMixinModel, UUIDModel):
+class OrderManager(models.Manager):
+    def get_queryset(self):
+        return (
+            super()
+            .get_queryset()
+            .select_related("user", "pay_way", "country", "region")
+            .exclude(is_deleted=True)
+        )
+
+
+class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
     user = models.ForeignKey(
         "user.UserAccount",
@@ -61,7 +74,7 @@ class Order(TimeStampMixinModel, UUIDModel):
         blank=True,
         default=None,
     )
-    email = models.CharField(_("Email"), max_length=255)
+    email = models.EmailField(_("Email"), max_length=255)
     first_name = models.CharField(_("First Name"), max_length=255)
     last_name = models.CharField(_("Last Name"), max_length=255)
     street = models.CharField(_("Street"), max_length=255)
@@ -97,42 +110,54 @@ class Order(TimeStampMixinModel, UUIDModel):
         default=0,
     )
 
+    objects = OrderManager()
+
     class Meta(TypedModelMeta):
         verbose_name = _("Order")
         verbose_name_plural = _("Orders")
         ordering = ["-created_at"]
 
+    def __unicode__(self):
+        return f"Order {self.id} - {self.first_name} {self.last_name}"
+
     def __str__(self):
-        return self.first_name
+        return f"Order {self.id} - {self.first_name} {self.last_name}"
+
+    def clean(self):
+        try:
+            validate_email(self.email)
+        except ValidationError:
+            raise ValidationError({"email": _("Invalid email address.")})
+
+        if self.mobile_phone and self.mobile_phone == self.phone:
+            raise ValidationError(
+                {
+                    "mobile_phone": _(
+                        "Mobile phone number cannot be the same as phone number."
+                    )
+                }
+            )
 
     @property
     def total_price_items(self) -> Money:
-        if not hasattr(self, "order_item_order") or not self.order_item_order:
-            return Money(0, settings.DEFAULT_CURRENCY)
-
-        total_items_price = self.order_item_order.aggregate(
-            total_price=ExpressionWrapper(
-                Sum(F("price") * F("quantity")),
+        total = self.order_item_order.annotate(
+            total_price_per_item=ExpressionWrapper(
+                F("price") * F("quantity"),
                 output_field=MoneyField(max_digits=11, decimal_places=2),
             )
-        )["total_price"]
+        ).aggregate(total_price=Sum("total_price_per_item"))["total_price"]
 
-        if not total_items_price:
-            return Money(0, settings.DEFAULT_CURRENCY)
-
-        return Money(total_items_price, settings.DEFAULT_CURRENCY)
+        return Money(total or 0, settings.DEFAULT_CURRENCY)
 
     @property
     def total_price_extra(self) -> Money:
-        pay_way = self.pay_way
-
-        if not pay_way:
-            return self.shipping_price
-
-        if self.total_price_items.amount > pay_way.free_for_order_amount.amount:
-            payment_cost = Money(0, settings.DEFAULT_CURRENCY)
-        else:
-            payment_cost = pay_way.cost
+        payment_cost = Money(0, settings.DEFAULT_CURRENCY)
+        if (
+            self.pay_way
+            and self.total_price_items.amount
+            <= self.pay_way.free_for_order_amount.amount
+        ):
+            payment_cost = self.pay_way.cost
 
         return self.shipping_price + payment_cost
 

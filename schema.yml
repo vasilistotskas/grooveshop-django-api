@@ -487,7 +487,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/AuthenticationPasswordResetConfirm'
           description: ''
-  /api/v1/auth/registration/:
+  /api/v1/auth/registration:
     post:
       operationId: api_v1_auth_registration_create
       tags:
@@ -6570,6 +6570,18 @@ paths:
         schema:
           type: string
       - in: query
+        name: status
+        schema:
+          type: string
+          enum:
+          - 'FALSE'
+          - NEW
+          - 'TRUE'
+        description: |-
+          * `NEW` - New
+          * `TRUE` - True
+          * `FALSE` - False
+      - in: query
         name: userId
         schema:
           type: integer
@@ -6655,6 +6667,18 @@ paths:
         description: A search term.
         schema:
           type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum:
+          - 'FALSE'
+          - NEW
+          - 'TRUE'
+        description: |-
+          * `NEW` - New
+          * `TRUE` - True
+          * `FALSE` - False
       - in: query
         name: userId
         schema:
@@ -7009,7 +7033,7 @@ paths:
         schema:
           type: string
       - in: query
-        name: alpha2
+        name: country
         schema:
           type: string
           title: Country Code Alpha 2
@@ -7086,7 +7110,7 @@ paths:
         schema:
           type: string
       - in: query
-        name: alpha2
+        name: country
         schema:
           type: string
           title: Country Code Alpha 2
@@ -7177,6 +7201,7 @@ paths:
         name: alpha
         schema:
           type: string
+          title: Region Code
         description: A unique value identifying this Region.
         required: true
       tags:
@@ -7199,6 +7224,7 @@ paths:
         name: alpha
         schema:
           type: string
+          title: Region Code
         description: A unique value identifying this Region.
         required: true
       tags:
@@ -7233,6 +7259,7 @@ paths:
         name: alpha
         schema:
           type: string
+          title: Region Code
         description: A unique value identifying this Region.
         required: true
       tags:
@@ -7266,6 +7293,7 @@ paths:
         name: alpha
         schema:
           type: string
+          title: Region Code
         description: A unique value identifying this Region.
         required: true
       tags:
@@ -7285,6 +7313,7 @@ paths:
         name: alpha
         schema:
           type: string
+          title: Region Code
         description: A unique value identifying this Region.
         required: true
       - in: path
@@ -7314,6 +7343,7 @@ paths:
         name: alpha
         schema:
           type: string
+          title: Region Code
         description: A unique value identifying this Region.
         required: true
       - in: path
@@ -7355,6 +7385,7 @@ paths:
         name: alpha
         schema:
           type: string
+          title: Region Code
         description: A unique value identifying this Region.
         required: true
       - in: path
@@ -7395,6 +7426,7 @@ paths:
         name: alpha
         schema:
           type: string
+          title: Region Code
         description: A unique value identifying this Region.
         required: true
       - in: path
@@ -7421,6 +7453,7 @@ paths:
         name: alpha
         schema:
           type: string
+          title: Region Code
         description: A unique value identifying this Region.
         required: true
       tags:
@@ -7444,6 +7477,7 @@ paths:
         name: alpha
         schema:
           type: string
+          title: Region Code
         description: A unique value identifying this Region.
         required: true
       - in: path
@@ -9755,6 +9789,44 @@ paths:
               schema:
                 $ref: '#/components/schemas/UserAddress'
           description: ''
+  /api/v1/user/address/get_user_addresses:
+    get:
+      operationId: api_v1_user_address_get_user_addresses_retrieve
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAddress'
+          description: ''
+  /api/v1/user/address/get_user_addresses{format}:
+    get:
+      operationId: api_v1_user_address_get_user_addresses_formatted_retrieve
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAddress'
+          description: ''
   /api/v1/vat:
     get:
       operationId: api_v1_vat_list
@@ -10314,9 +10386,16 @@ components:
           format: uri
           nullable: true
           maxLength: 200
+        numberOfPosts:
+          type: integer
+          readOnly: true
+        totalLikesReceived:
+          type: integer
+          readOnly: true
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -10326,7 +10405,10 @@ components:
           format: uuid
           readOnly: true
       required:
+      - createdAt
       - id
+      - numberOfPosts
+      - totalLikesReceived
       - translations
       - updatedAt
       - user
@@ -10366,9 +10448,25 @@ components:
           type: string
           maxLength: 50
           pattern: ^[-a-zA-Z0-9_]+$
+        parent:
+          type: integer
+          nullable: true
+        level:
+          type: integer
+          readOnly: true
+        treeId:
+          type: integer
+          readOnly: true
+        absoluteUrl:
+          type: string
+          readOnly: true
+        recursivePostCount:
+          type: integer
+          readOnly: true
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -10388,12 +10486,17 @@ components:
           type: string
           readOnly: true
       required:
+      - absoluteUrl
+      - createdAt
       - id
+      - level
       - mainImageAbsoluteUrl
       - mainImageFilename
+      - recursivePostCount
       - slug
       - sortOrder
       - translations
+      - treeId
       - updatedAt
       - uuid
     BlogComment:
@@ -10434,6 +10537,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -10446,6 +10550,7 @@ components:
           type: integer
           readOnly: true
       required:
+      - createdAt
       - id
       - likes
       - numberOfLikes
@@ -10518,6 +10623,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -10554,6 +10660,7 @@ components:
       - absoluteUrl
       - author
       - category
+      - createdAt
       - id
       - likes
       - mainImageAbsoluteUrl
@@ -10618,6 +10725,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -10634,6 +10742,7 @@ components:
           type: integer
           readOnly: true
       required:
+      - createdAt
       - getTagPostsCount
       - id
       - sortOrder
@@ -10687,6 +10796,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -10697,6 +10807,7 @@ components:
           readOnly: true
       required:
       - cartItems
+      - createdAt
       - id
       - totalDiscountValue
       - totalItems
@@ -10787,6 +10898,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -10797,6 +10909,7 @@ components:
           readOnly: true
       required:
       - cart
+      - createdAt
       - discountPercent
       - discountValue
       - finalPrice
@@ -10825,6 +10938,7 @@ components:
           nullable: true
         region:
           type: string
+          title: Region Code
           nullable: true
         floor:
           nullable: true
@@ -10857,6 +10971,7 @@ components:
           maxLength: 255
         email:
           type: string
+          format: email
           maxLength: 255
         zipcode:
           type: string
@@ -10898,6 +11013,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -10927,6 +11043,7 @@ components:
           readOnly: true
       required:
       - city
+      - createdAt
       - email
       - firstName
       - fullAddress
@@ -10982,10 +11099,12 @@ components:
         alpha2:
           type: string
           title: Country Code Alpha 2
+          pattern: ^[A-Z]{2}$
           maxLength: 2
         alpha3:
           type: string
           title: Country Code Alpha 3
+          pattern: ^[A-Z]{3}$
           maxLength: 3
         isoCc:
           type: integer
@@ -11001,6 +11120,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -11022,6 +11142,7 @@ components:
       required:
       - alpha2
       - alpha3
+      - createdAt
       - mainImageAbsoluteUrl
       - mainImageFilename
       - sortOrder
@@ -11153,6 +11274,7 @@ components:
           maxLength: 255
         email:
           type: string
+          format: email
           maxLength: 255
         zipcode:
           type: string
@@ -11194,6 +11316,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -11224,6 +11347,7 @@ components:
       required:
       - city
       - country
+      - createdAt
       - email
       - firstName
       - fullAddress
@@ -11256,6 +11380,7 @@ components:
           nullable: true
         region:
           type: string
+          title: Region Code
           nullable: true
         floor:
           nullable: true
@@ -11288,6 +11413,7 @@ components:
           maxLength: 255
         email:
           type: string
+          format: email
           maxLength: 255
         zipcode:
           type: string
@@ -11329,6 +11455,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -11358,6 +11485,7 @@ components:
           readOnly: true
       required:
       - city
+      - createdAt
       - email
       - firstName
       - fullAddress
@@ -11395,6 +11523,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -11416,6 +11545,7 @@ components:
           exclusiveMinimum: true
           readOnly: true
       required:
+      - createdAt
       - id
       - price
       - product
@@ -11962,9 +12092,16 @@ components:
           format: uri
           nullable: true
           maxLength: 200
+        numberOfPosts:
+          type: integer
+          readOnly: true
+        totalLikesReceived:
+          type: integer
+          readOnly: true
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -12008,9 +12145,25 @@ components:
           type: string
           maxLength: 50
           pattern: ^[-a-zA-Z0-9_]+$
+        parent:
+          type: integer
+          nullable: true
+        level:
+          type: integer
+          readOnly: true
+        treeId:
+          type: integer
+          readOnly: true
+        absoluteUrl:
+          type: string
+          readOnly: true
+        recursivePostCount:
+          type: integer
+          readOnly: true
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -12067,6 +12220,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -12142,6 +12296,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -12216,6 +12371,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -12278,6 +12434,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -12368,6 +12525,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -12401,10 +12559,12 @@ components:
         alpha2:
           type: string
           title: Country Code Alpha 2
+          pattern: ^[A-Z]{2}$
           maxLength: 2
         alpha3:
           type: string
           title: Country Code Alpha 3
+          pattern: ^[A-Z]{3}$
           maxLength: 3
         isoCc:
           type: integer
@@ -12420,6 +12580,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -12453,6 +12614,7 @@ components:
           nullable: true
         region:
           type: string
+          title: Region Code
           nullable: true
         floor:
           nullable: true
@@ -12485,6 +12647,7 @@ components:
           maxLength: 255
         email:
           type: string
+          format: email
           maxLength: 255
         zipcode:
           type: string
@@ -12526,6 +12689,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -12601,6 +12765,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -12730,10 +12895,8 @@ components:
         discountPercent:
           type: number
           format: double
-          maximum: 1000000000
-          minimum: -1000000000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
+          maximum: 100.0
+          minimum: 0.0
         discountValue:
           type: number
           format: double
@@ -12753,6 +12916,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -12853,6 +13017,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -12874,6 +13039,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -12927,6 +13093,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -12978,6 +13145,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -13016,13 +13184,15 @@ components:
                   type: string
         alpha:
           type: string
+          title: Region Code
           maxLength: 10
-        alpha2:
+        country:
           type: string
           title: Country Code Alpha 2
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -13120,6 +13290,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -13234,6 +13405,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -13294,6 +13466,7 @@ components:
           nullable: true
         region:
           type: string
+          title: Region Code
           nullable: true
         isActive:
           type: boolean
@@ -13305,9 +13478,50 @@ components:
           type: string
           format: date
           nullable: true
-        mainImageAbsoluteUrl:
+        twitter:
           type: string
-          readOnly: true
+          format: uri
+          nullable: true
+          title: Twitter Profile
+          maxLength: 200
+        linkedin:
+          type: string
+          format: uri
+          nullable: true
+          title: LinkedIn Profile
+          maxLength: 200
+        facebook:
+          type: string
+          format: uri
+          nullable: true
+          title: Facebook Profile
+          maxLength: 200
+        instagram:
+          type: string
+          format: uri
+          nullable: true
+          title: Instagram Profile
+          maxLength: 200
+        website:
+          type: string
+          format: uri
+          nullable: true
+          maxLength: 200
+        youtube:
+          type: string
+          format: uri
+          nullable: true
+          title: Youtube Profile
+          maxLength: 200
+        github:
+          type: string
+          format: uri
+          nullable: true
+          title: Github Profile
+          maxLength: 200
+        bio:
+          type: string
+          nullable: true
         mainImageFilename:
           type: string
           readOnly: true
@@ -13323,6 +13537,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -13340,6 +13555,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -13401,6 +13617,7 @@ components:
           title: Country Code Alpha 2
         region:
           type: string
+          title: Region Code
     PatchedVat:
       type: object
       properties:
@@ -13417,6 +13634,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -13473,6 +13691,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -13493,6 +13712,7 @@ components:
           readOnly: true
       required:
       - cost
+      - createdAt
       - freeForOrderAmount
       - iconAbsoluteUrl
       - iconFilename
@@ -13612,10 +13832,8 @@ components:
         discountPercent:
           type: number
           format: double
-          maximum: 1000000000
-          minimum: -1000000000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
+          maximum: 100.0
+          minimum: 0.0
         discountValue:
           type: number
           format: double
@@ -13635,6 +13853,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -13655,6 +13874,7 @@ components:
       required:
       - absoluteUrl
       - category
+      - createdAt
       - discountValue
       - finalPrice
       - id
@@ -13755,6 +13975,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -13771,6 +13992,7 @@ components:
       - categoryMenuImageTwoFilename
       - categoryMenuMainBannerAbsoluteUrl
       - categoryMenuMainBannerFilename
+      - createdAt
       - id
       - level
       - recursiveProductCount
@@ -13792,6 +14014,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -13801,6 +14024,7 @@ components:
           format: uuid
           readOnly: true
       required:
+      - createdAt
       - id
       - product
       - updatedAt
@@ -13851,6 +14075,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -13864,6 +14089,7 @@ components:
           readOnly: true
           nullable: true
       required:
+      - createdAt
       - id
       - image
       - mainImageAbsoluteUrl
@@ -13912,6 +14138,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -13927,6 +14154,7 @@ components:
           format: uuid
           readOnly: true
       required:
+      - createdAt
       - id
       - product
       - rate
@@ -13992,13 +14220,15 @@ components:
                   type: string
         alpha:
           type: string
+          title: Region Code
           maxLength: 10
-        alpha2:
+        country:
           type: string
           title: Country Code Alpha 2
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -14013,7 +14243,8 @@ components:
           readOnly: true
       required:
       - alpha
-      - alpha2
+      - country
+      - createdAt
       - sortOrder
       - translations
       - updatedAt
@@ -14196,6 +14427,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -14209,6 +14441,7 @@ components:
           format: uuid
           readOnly: true
       required:
+      - createdAt
       - dateEnd
       - dateStart
       - id
@@ -14379,6 +14612,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -14392,6 +14626,7 @@ components:
           format: uuid
           readOnly: true
       required:
+      - createdAt
       - kind
       - sortOrder
       - translations
@@ -14465,6 +14700,7 @@ components:
           nullable: true
         region:
           type: string
+          title: Region Code
           nullable: true
         isActive:
           type: boolean
@@ -14476,9 +14712,50 @@ components:
           type: string
           format: date
           nullable: true
-        mainImageAbsoluteUrl:
+        twitter:
           type: string
-          readOnly: true
+          format: uri
+          nullable: true
+          title: Twitter Profile
+          maxLength: 200
+        linkedin:
+          type: string
+          format: uri
+          nullable: true
+          title: LinkedIn Profile
+          maxLength: 200
+        facebook:
+          type: string
+          format: uri
+          nullable: true
+          title: Facebook Profile
+          maxLength: 200
+        instagram:
+          type: string
+          format: uri
+          nullable: true
+          title: Instagram Profile
+          maxLength: 200
+        website:
+          type: string
+          format: uri
+          nullable: true
+          maxLength: 200
+        youtube:
+          type: string
+          format: uri
+          nullable: true
+          title: Youtube Profile
+          maxLength: 200
+        github:
+          type: string
+          format: uri
+          nullable: true
+          title: Github Profile
+          maxLength: 200
+        bio:
+          type: string
+          nullable: true
         mainImageFilename:
           type: string
           readOnly: true
@@ -14494,6 +14771,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -14503,10 +14781,10 @@ components:
           format: uuid
           readOnly: true
       required:
+      - createdAt
       - email
       - id
       - lastLogin
-      - mainImageAbsoluteUrl
       - mainImageFilename
       - updatedAt
       - uuid
@@ -14519,6 +14797,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -14580,9 +14859,11 @@ components:
           title: Country Code Alpha 2
         region:
           type: string
+          title: Region Code
       required:
       - city
       - country
+      - createdAt
       - firstName
       - id
       - lastName
@@ -14611,6 +14892,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          readOnly: true
         updatedAt:
           type: string
           format: date-time
@@ -14620,6 +14902,7 @@ components:
           format: uuid
           readOnly: true
       required:
+      - createdAt
       - id
       - updatedAt
       - uuid

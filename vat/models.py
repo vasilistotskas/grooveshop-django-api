@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -15,9 +16,17 @@ class Vat(TimeStampMixinModel, UUIDModel):
         verbose_name_plural = _("Vats")
         ordering = ["-created_at"]
 
+    def __unicode__(self):
+        return f"{self.value}% VAT"
+
     def __str__(self):
-        return "%s" % self.value
+        return f"{self.value}% VAT"
+
+    def clean(self):
+        if not 0 <= self.value <= 100:
+            raise ValidationError(_("VAT value must be between 0 and 100."))
 
     @staticmethod
     def get_highest_vat_value() -> float:
-        return Vat.objects.all().order_by("-value").first().value
+        highest_vat = Vat.objects.all().order_by("-value").first()
+        return highest_vat.value if highest_vat else 0.0

@@ -48,6 +48,7 @@ class BlogPostViewSetTestCase(APITestCase):
 
         image_post = get_or_create_default_image("uploads/blog/no_photo.jpg")
         self.post = BlogPost.objects.create(
+            title="Test Post",
             author=self.author,
             status="draft",  # Set the status to "draft" for the test
             image=image_post,

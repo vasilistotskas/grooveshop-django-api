@@ -89,10 +89,10 @@ class BlogCategoryModelTestCase(TestCase):
             self.category.safe_translation_getter("name"),
         )
 
-    def test_get_category_posts_count(self):
+    def test_post_count(self):
         # Test if get_category_posts_count returns the correct count
         self.assertEqual(
-            self.category.get_category_posts_count, 0
+            self.category.post_count, 0
         )  # Assuming no posts related to this category
 
     def test_main_image_absolute_url(self):

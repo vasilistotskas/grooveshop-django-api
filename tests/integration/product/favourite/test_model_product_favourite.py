@@ -45,7 +45,7 @@ class ProductFavouriteModelTestCase(TestCase):
         favourite = ProductFavourite.objects.create(
             user=self.user, product=self.product
         )
-        self.assertEqual(str(favourite), self.user.email)
+        self.assertEqual(str(favourite), f"{self.user.email} - {self.product.name}")
 
     def tearDown(self) -> None:
         super().tearDown()

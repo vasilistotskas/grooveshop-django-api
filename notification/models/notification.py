@@ -18,14 +18,21 @@ class Notification(TranslatableModel, TimeStampMixinModel, UUIDModel):
         default=NotificationKindEnum.INFO,
     )
     translations = TranslatedFields(
+        title=models.CharField(_("Title"), max_length=250),
         message=models.TextField(_("Message")),
     )
 
     def __unicode__(self):
-        return self.safe_translation_getter("message", any_language=True) or ""
+        message_snippet = (
+            self.safe_translation_getter("title", any_language=True)[:50] + "..."
+        )
+        return f"{self.get_kind_display()}: {message_snippet}"
 
     def __str__(self):
-        return self.safe_translation_getter("message", any_language=True) or ""
+        message_snippet = (
+            self.safe_translation_getter("title", any_language=True)[:50] + "..."
+        )
+        return f"{self.get_kind_display()}: {message_snippet}"
 
     class Meta(TypedModelMeta):
         verbose_name = _("Notification")

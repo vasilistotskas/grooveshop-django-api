@@ -20,10 +20,10 @@ class RegionViewSet(BaseExpandView, ModelViewSet):
     serializer_class = RegionSerializer
     pagination_class = RegionPagination
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
-    filterset_fields = ["alpha", "alpha_2"]
+    filterset_fields = ["alpha", "country"]
     ordering_fields = ["created_at"]
     ordering = ["-created_at"]
-    search_fields = ["alpha", "alpha_2"]
+    search_fields = ["alpha", "country"]
 
     def list(self, request, *args, **kwargs) -> Response:
         queryset = self.filter_queryset(self.get_queryset())

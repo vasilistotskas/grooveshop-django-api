@@ -21,7 +21,7 @@ class Command(BaseCommand):
             "total_images",
             type=int,
             help="Indicates the number of images to be seeded per product.",
-            default=5,
+            default=3,
             nargs="?",
         )
 

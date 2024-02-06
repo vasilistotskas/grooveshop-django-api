@@ -93,6 +93,14 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
     is_active = models.BooleanField(_("Active"), default=True)
     is_staff = models.BooleanField(_("Staff"), default=False)
     birth_date = models.DateField(_("Birth Date"), blank=True, null=True)
+    twitter = models.URLField(_("Twitter Profile"), blank=True, null=True)
+    linkedin = models.URLField(_("LinkedIn Profile"), blank=True, null=True)
+    facebook = models.URLField(_("Facebook Profile"), blank=True, null=True)
+    instagram = models.URLField(_("Instagram Profile"), blank=True, null=True)
+    website = models.URLField(_("Website"), blank=True, null=True)
+    youtube = models.URLField(_("Youtube Profile"), blank=True, null=True)
+    github = models.URLField(_("Github Profile"), blank=True, null=True)
+    bio = models.TextField(_("Bio"), blank=True, null=True)
 
     objects: UserAccountManager = UserAccountManager()
 
@@ -103,6 +111,9 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
         verbose_name = _("User Account")
         verbose_name_plural = _("User Accounts")
         ordering = ["-created_at"]
+
+    def __unicode__(self):
+        return self.email
 
     def __str__(self):
         return self.email
@@ -167,6 +178,10 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
     def get_cache(self) -> dict:
         user_cache_keys = cache_instance.keys(f"{caches.USER_AUTHENTICATED}{self.pk}:*")
         return cache_instance.get_many(keys=user_cache_keys)
+
+    @property
+    def full_name(self) -> str:
+        return f"{self.first_name} {self.last_name}".strip()
 
     @property
     def role(self) -> str:

@@ -199,7 +199,7 @@ class OrderModelTestCase(TestCase):
 
     def test_str_representation(self):
         # Test the __str__ method returns the first_name
-        self.assertEqual(str(self.order), self.order.first_name)
+        self.assertEqual(str(self.order), f"Order {self.order.id} - John Doe")
 
     def tearDown(self) -> None:
         super().tearDown()

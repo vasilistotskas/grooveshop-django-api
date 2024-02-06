@@ -1,6 +1,7 @@
 import os
 
 from django.conf import settings
+from django.core.validators import RegexValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -19,9 +20,22 @@ class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         unique=True,
         db_index=True,
         max_length=2,
+        validators=[
+            RegexValidator(
+                regex="^[A-Z]{2}$", message=_("Enter a valid 2-letter country code.")
+            )
+        ],
     )
     alpha_3 = models.CharField(
-        _("Country Code Alpha 3"), unique=True, db_index=True, max_length=3
+        _("Country Code Alpha 3"),
+        unique=True,
+        db_index=True,
+        max_length=3,
+        validators=[
+            RegexValidator(
+                regex="^[A-Z]{3}$", message=_("Enter a valid 3-letter country code.")
+            )
+        ],
     )
     iso_cc = models.PositiveSmallIntegerField(
         _("ISO Country Code"), blank=True, null=True, unique=True
@@ -46,6 +60,11 @@ class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
 
     def __str__(self):
         return self.safe_translation_getter("name", any_language=True) or ""
+
+    def save(self, *args, **kwargs):
+        self.alpha_2 = self.alpha_2.upper()
+        self.alpha_3 = self.alpha_3.upper()
+        super().save(*args, **kwargs)
 
     def get_ordering_queryset(self):
         return Country.objects.all()

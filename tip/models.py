@@ -30,7 +30,7 @@ class Tip(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     translations = TranslatedFields(
         title=models.CharField(_("Title"), max_length=200, blank=True, null=True),
         content=HTMLField(_("Content"), blank=True, null=True),
-        url=models.CharField(_("Url"), max_length=255, blank=True, null=True),
+        url=models.URLField(_("Url"), max_length=255, blank=True, null=True),
     )
 
     class Meta(TypedModelMeta):
@@ -39,10 +39,10 @@ class Tip(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         ordering = ["sort_order"]
 
     def __unicode__(self):
-        return self.safe_translation_getter("title", any_language=True) or ""
+        return f"{self.get_kind_display()}: {self.safe_translation_getter('title', any_language=True)}"
 
     def __str__(self):
-        return self.safe_translation_getter("title", any_language=True) or ""
+        return f"{self.get_kind_display()}: {self.safe_translation_getter('title', any_language=True)}"
 
     def get_ordering_queryset(self):
         return Tip.objects.all()

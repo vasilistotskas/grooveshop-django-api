@@ -101,6 +101,28 @@ class UserAddressViewSet(BaseExpandView, ModelViewSet):
         address.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @action(detail=True, methods=["GET"])
+    def get_user_addresses(self, request, *args, **kwargs) -> Response:
+        if not request.user.is_authenticated:
+            return Response(status=status.HTTP_401_UNAUTHORIZED)
+
+        pagination_param = request.query_params.get("pagination", "true")
+        user_addresses = UserAddress.get_user_addresses(request.user)
+
+        print("pagination_param", pagination_param)
+
+        if pagination_param.lower() == "false":
+            serializer = self.get_serializer(user_addresses, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        page = self.paginate_queryset(user_addresses)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(user_addresses, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
     @action(detail=True, methods=["POST"])
     def set_main(self, request, pk=None, *args, **kwargs) -> Response:
         main_address = UserAddress.objects.filter(user=request.user, is_main=True)

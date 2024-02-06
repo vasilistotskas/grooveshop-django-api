@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import QuerySet
 from django.utils.translation import gettext_lazy as _
@@ -28,13 +29,33 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
         verbose_name_plural = _("Order Items")
         ordering = ["sort_order"]
 
+    def __unicode__(self):
+        product_name = self.product.safe_translation_getter("name", any_language=True)
+        return "Order %s - %s x %s" % (self.order.id, product_name, self.quantity)
+
     def __str__(self):
-        return "%s" % self.id
+        product_name = self.product.safe_translation_getter("name", any_language=True)
+        return f"Order {self.order.id} - {product_name} x {self.quantity}"
+
+    def clean(self):
+        if self.quantity <= 0:
+            raise ValidationError(_("Quantity must be greater than 0."))
+
+        if hasattr(self.product, "stock") and self.quantity > self.product.stock:
+            raise ValidationError(_("The quantity exceeds the available stock."))
+
+    @property
+    def subtotal(self) -> Money:
+        return Money(
+            amount=self.price.amount * self.quantity, currency=self.price.currency
+        )
 
     @property
     def total_price(self) -> Money:
-        price = self.price.amount * self.quantity
-        return Money(amount=Decimal(price), currency=self.price.currency)
+        return Money(
+            amount=self.price.amount * Decimal(self.quantity),
+            currency=self.price.currency,
+        )
 
     def get_ordering_queryset(self) -> QuerySet:
         return self.order.order_item_order.all()

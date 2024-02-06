@@ -35,9 +35,12 @@ class BlogTagModelTestCase(TestCase):
 
     def test_unicode_representation(self):
         # Test the __unicode__ method returns the translated name
+        tag_name = (
+            self.tag.safe_translation_getter("name", any_language=True) or "Unnamed Tag"
+        )
         self.assertEqual(
             self.tag.__unicode__(),
-            self.tag.safe_translation_getter("name"),
+            f"{tag_name} ({'Active' if self.tag.active else 'Inactive'})",
         )
 
     def test_translations(self):
@@ -48,9 +51,12 @@ class BlogTagModelTestCase(TestCase):
 
     def test_str_representation(self):
         # Test the __str__ method returns the translated name
+        tag_name = (
+            self.tag.safe_translation_getter("name", any_language=True) or "Unnamed Tag"
+        )
         self.assertEqual(
             str(self.tag),
-            self.tag.safe_translation_getter("name"),
+            f"{tag_name} ({'Active' if self.tag.active else 'Inactive'})",
         )
 
     def test_get_ordering_queryset(self):
@@ -86,6 +92,7 @@ class BlogTagModelTestCase(TestCase):
     def test_get_tag_posts_count(self):
         # Test if the get_tag_posts_count property returns the correct count of related blog posts
         post = BlogPost.objects.create(
+            title="Test Post",
             status="draft",  # Set the status to "draft" for the test
             category=None,
             featured=False,

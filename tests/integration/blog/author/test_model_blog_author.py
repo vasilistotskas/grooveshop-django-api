@@ -56,7 +56,10 @@ class BlogAuthorModelTestCase(TestCase):
 
     def test_unicode_representation(self):
         # Test the __unicode__ method returns the translated name
-        self.assertEqual(str(self.author), self.author.user.email)
+        author_name = self.user.full_name
+        self.assertEqual(
+            self.author.__unicode__(), f"{author_name} ({self.user.email})"
+        )
 
     def test_translations(self):
         # Test if translations are saved correctly
@@ -69,7 +72,8 @@ class BlogAuthorModelTestCase(TestCase):
 
     def test_str_representation(self):
         # Test the __str__ method returns the user's email
-        self.assertEqual(str(self.author), self.user.email)
+        author_name = self.user.full_name
+        self.assertEqual(str(self.author), f"{author_name} ({self.user.email})")
 
     def tearDown(self) -> None:
         super().tearDown()

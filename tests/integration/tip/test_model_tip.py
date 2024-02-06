@@ -76,7 +76,7 @@ class TipModelTestCase(TestCase):
         # Test the __unicode__ method returns the translated name
         self.assertEqual(
             self.tip.__unicode__(),
-            self.tip.safe_translation_getter("title"),
+            f"{self.tip.get_kind_display()}: {self.tip.safe_translation_getter('title')}",
         )
 
     def test_translations(self):
@@ -89,7 +89,10 @@ class TipModelTestCase(TestCase):
 
     def test_str_representation(self):
         # Test the __str__ method returns the translated name
-        self.assertEqual(str(self.tip), self.tip.safe_translation_getter("title"))
+        self.assertEqual(
+            str(self.tip),
+            f"{self.tip.get_kind_display()}: {self.tip.safe_translation_getter('title')}",
+        )
 
     def test_get_ordering_queryset(self):
         # Test if get_ordering_queryset returns Tip queryset

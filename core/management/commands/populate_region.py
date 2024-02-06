@@ -58,7 +58,7 @@ class Command(BaseCommand):
 
                 region = Region(
                     alpha=alpha,
-                    alpha_2=country,
+                    country=country,
                 )
                 objects_to_insert.append(region)
             Region.objects.bulk_create(objects_to_insert)

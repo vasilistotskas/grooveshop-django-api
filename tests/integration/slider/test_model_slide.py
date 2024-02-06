@@ -85,7 +85,7 @@ class SlideModelTestCase(TestCase):
         # Test the __unicode__ method returns the translated name
         self.assertEqual(
             self.slide.__unicode__(),
-            self.slide.safe_translation_getter("name"),
+            f"{self.slide.safe_translation_getter('title', any_language=True)} in {self.slider}",
         )
 
     def test_translations(self):
@@ -101,7 +101,7 @@ class SlideModelTestCase(TestCase):
         # Test the __str__ method returns the translated name
         self.assertEqual(
             str(self.slide),
-            self.slide.safe_translation_getter("name"),
+            f"{self.slide.safe_translation_getter('title', any_language=True)} in {self.slider}",
         )
 
     def test_save(self):

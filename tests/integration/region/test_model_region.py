@@ -33,7 +33,7 @@ class RegionModelTestCase(TestCase):
         )
         self.region = Region.objects.create(
             alpha="GRC",
-            alpha_2=self.country,
+            country=self.country,
         )
         for language in languages:
             self.region.set_current_language(language)
@@ -44,17 +44,17 @@ class RegionModelTestCase(TestCase):
     def test_fields(self):
         # Test if the fields are saved correctly
         self.assertEqual(self.region.alpha, "GRC")
-        self.assertEqual(self.region.alpha_2, self.country)
+        self.assertEqual(self.region.country, self.country)
 
     def test_verbose_names(self):
         # Test verbose names for fields
         self.assertEqual(
             Region._meta.get_field("alpha").verbose_name,
-            "Alpha",
+            "Region Code",
         )
         self.assertEqual(
-            Region._meta.get_field("alpha_2").verbose_name,
-            "alpha 2",
+            Region._meta.get_field("country").verbose_name,
+            "country",
         )
 
     def test_meta_verbose_names(self):
@@ -70,10 +70,9 @@ class RegionModelTestCase(TestCase):
 
     def test_unicode_representation(self):
         # Test the __unicode__ method returns the translated name
-        self.assertEqual(
-            self.region.__unicode__(),
-            self.region.safe_translation_getter("name"),
-        )
+        country_name = self.country.safe_translation_getter("name", any_language=True)
+        region_name = self.region.safe_translation_getter("name", any_language=True)
+        self.assertEqual(self.region.__unicode__(), f"{region_name}, {country_name}")
 
     def test_translations(self):
         # Test if translations are saved correctly
@@ -83,7 +82,9 @@ class RegionModelTestCase(TestCase):
 
     def test_str_representation(self):
         # Test the __str__ method returns the translated name
-        self.assertEqual(str(self.region), self.region.safe_translation_getter("name"))
+        country_name = self.country.safe_translation_getter("name", any_language=True)
+        region_name = self.region.safe_translation_getter("name", any_language=True)
+        self.assertEqual(str(self.region), f"{region_name}, {country_name}")
 
     def test_get_ordering_queryset(self):
         # Test if get_ordering_queryset returns Region queryset

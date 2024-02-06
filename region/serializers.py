@@ -21,14 +21,14 @@ class TranslatedFieldsFieldExtend(TranslatedFieldsField):
 
 class RegionSerializer(TranslatableModelSerializer, BaseExpandSerializer):
     translations = TranslatedFieldsFieldExtend(shared_model=Region)
-    alpha_2 = PrimaryKeyRelatedField(queryset=Country.objects.all())
+    country = PrimaryKeyRelatedField(queryset=Country.objects.all())
 
     class Meta:
         model = Region
         fields = (
             "translations",
             "alpha",
-            "alpha_2",
+            "country",
             "created_at",
             "updated_at",
             "sort_order",
@@ -37,5 +37,5 @@ class RegionSerializer(TranslatableModelSerializer, BaseExpandSerializer):
 
     def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:
         return {
-            "alpha_2": CountrySerializer,
+            "country": CountrySerializer,
         }

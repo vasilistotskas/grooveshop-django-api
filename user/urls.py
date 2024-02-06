@@ -51,6 +51,11 @@ urlpatterns = [
         UserAddressViewSet.as_view({"post": "set_main"}),
         name="user-address-set-main",
     ),
+    path(
+        "user/address/get_user_addresses",
+        UserAddressViewSet.as_view({"get": "get_user_addresses"}),
+        name="user-address-get-user-addresses",
+    ),
 ]
 
 urlpatterns = format_suffix_patterns(urlpatterns)

@@ -58,11 +58,38 @@ class ProductReviewModelTestCase(TestCase):
         self.assertEqual(ProductReview._meta.verbose_name, "Product Review")
         self.assertEqual(ProductReview._meta.verbose_name_plural, "Product Reviews")
 
+    def test_str_representation(self):
+        # Test the __str__ method returns the translated name
+        comment_snippet = (
+            (
+                self.product_review.safe_translation_getter(
+                    "comment", any_language=True
+                )[:50]
+                + "..."
+            )
+            if self.product_review.comment
+            else "No Comment"
+        )
+        self.assertEqual(
+            str(self.product_review),
+            f"Review by {self.user.email} on {self.product}: {comment_snippet}",
+        )
+
     def test_unicode_representation(self):
         # Test the __unicode__ method returns the translated name
+        comment_snippet = (
+            (
+                self.product_review.safe_translation_getter(
+                    "comment", any_language=True
+                )[:50]
+                + "..."
+            )
+            if self.product_review.comment
+            else "No Comment"
+        )
         self.assertEqual(
             self.product_review.__unicode__(),
-            self.product_review.safe_translation_getter("comment"),
+            f"Review by {self.user.email} on {self.product}: {comment_snippet}",
         )
 
     def test_translations(self):

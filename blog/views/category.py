@@ -11,9 +11,10 @@ from blog.models.category import BlogCategory
 from blog.paginators.category import BlogCategoryPagination
 from blog.serializers.category import BlogCategorySerializer
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+from core.utils.views import TranslationsProcessingMixin
 
 
-class BlogCategoryViewSet(ModelViewSet):
+class BlogCategoryViewSet(TranslationsProcessingMixin, ModelViewSet):
     queryset = BlogCategory.objects.all()
     serializer_class = BlogCategorySerializer
     pagination_class = BlogCategoryPagination
@@ -24,15 +25,17 @@ class BlogCategoryViewSet(ModelViewSet):
     search_fields = ["id"]
 
     def list(self, request, *args, **kwargs) -> Response:
-        queryset = self.filter_queryset(self.get_queryset())
+        queryset = self.get_queryset().get_cached_trees()
         page = self.paginate_queryset(queryset)
+        data = []
+        for n in queryset:
+            data.append(self.recursive_node_to_dict(n))
         if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+            return self.get_paginated_response(data)
+        return Response(data, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs) -> Response:
+        request = self.process_translations_data(request)
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -46,6 +49,7 @@ class BlogCategoryViewSet(ModelViewSet):
 
     def update(self, request, pk=None, *args, **kwargs) -> Response:
         category = get_object_or_404(BlogCategory, pk=pk)
+        request = self.process_translations_data(request)
         serializer = self.get_serializer(category, data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -64,3 +68,10 @@ class BlogCategoryViewSet(ModelViewSet):
         category = get_object_or_404(BlogCategory, pk=pk)
         category.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def recursive_node_to_dict(self, node):
+        result = self.get_serializer(instance=node).data
+        children = [self.recursive_node_to_dict(c) for c in node.get_children()]
+        if children:
+            result["children"] = children
+        return result

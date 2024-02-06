@@ -32,6 +32,8 @@ class BlogAuthorSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "id",
             "user",
             "website",
+            "number_of_posts",
+            "total_likes_received",
             "created_at",
             "updated_at",
             "uuid",

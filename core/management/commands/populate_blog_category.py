@@ -7,7 +7,6 @@ from django.db import transaction
 from faker import Faker
 
 from blog.models.category import BlogCategory
-from helpers.seed import get_or_create_default_image
 
 faker = Faker()
 
@@ -25,9 +24,9 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        total_categories = options["total_categories"]
         total_time = 0
         start_time = time.time()
-        total_categories = options["total_categories"]
         available_languages = [
             lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
         ]
@@ -38,8 +37,6 @@ class Command(BaseCommand):
             )
             return
 
-        img = get_or_create_default_image("uploads/blog/no_photo.jpg")
-
         if not available_languages:
             self.stdout.write(self.style.ERROR("No languages found."))
             return
@@ -47,31 +44,30 @@ class Command(BaseCommand):
         objects_to_insert = []
         with transaction.atomic():
             for _ in range(total_categories):
-                slug = faker.unique.slug()
-                category = BlogCategory(
-                    slug=slug,
-                    image=img,
-                )
-                objects_to_insert.append(category)
-            BlogCategory.objects.bulk_create(objects_to_insert)
+                slug = faker.slug()
 
-            for category in objects_to_insert:
-                for lang in available_languages:
-                    lang_seed = hash(f"{slug}{lang}")
-                    faker.seed_instance(lang_seed)
-                    name = faker.word()
-                    description = faker.text()
-                    category.set_current_language(lang)
-                    category.name = name
-                    category.description = description
-                    category.save()
+                category, created = BlogCategory.objects.get_or_create(
+                    slug=slug,
+                )
+
+                if created:
+                    for lang in available_languages:
+                        lang_seed = hash(f"{slug}{lang}")
+                        faker.seed_instance(lang_seed)
+                        name = faker.word()
+                        description = faker.text()
+                        category.set_current_language(lang)
+                        category.name = name
+                        category.description = description
+                        category.save()
+                    objects_to_insert.append(category)
 
         end_time = time.time()
         execution_time = end_time - start_time
         total_time += execution_time
         self.stdout.write(
             self.style.SUCCESS(
-                f"{len(objects_to_insert)} BlogCategory instances created successfully "
-                f"in {execution_time:.2f} seconds."
+                f"{len(objects_to_insert)} BlogCategory instances created "
+                f"successfully in {execution_time:.2f} seconds."
             )
         )

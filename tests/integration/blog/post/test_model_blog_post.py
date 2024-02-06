@@ -49,6 +49,7 @@ class BlogPostModelTestCase(TestCase):
         self.category.set_current_language(default_language)
 
         self.post = BlogPost.objects.create(
+            title="Test Post",
             slug="test-post",
             author=self.author,
             category=self.category,
@@ -110,9 +111,13 @@ class BlogPostModelTestCase(TestCase):
 
     def test_unicode_representation(self):
         # Test the __unicode__ method returns the translated name
+        title = (
+            self.post.safe_translation_getter("title", any_language=True) or "Untitled"
+        )
+        author_name = self.post.author.user.email if self.author else "Unknown"
         self.assertEqual(
             self.post.__unicode__(),
-            self.post.safe_translation_getter("title"),
+            f"{title} by {author_name}",
         )
 
     def test_translations(self):
@@ -134,9 +139,13 @@ class BlogPostModelTestCase(TestCase):
 
     def test_str_representation(self):
         # Test the __str__ method returns the translated title
+        title = (
+            self.post.safe_translation_getter("title", any_language=True) or "Untitled"
+        )
+        author_name = self.post.author.user.email if self.author else "Unknown"
         self.assertEqual(
             str(self.post),
-            self.post.safe_translation_getter("title"),
+            f"{title} by {author_name}",
         )
 
     def test_main_image_absolute_url(self):

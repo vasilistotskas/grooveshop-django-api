@@ -47,7 +47,7 @@ urlpatterns = i18n_patterns(
     # api
     path("api/v1/api-token-auth/", ObtainAuthTokenView.as_view()),
     path("api/v1/auth/", include("authentication.urls.base")),
-    path("api/v1/auth/registration/", include("authentication.urls.registration")),
+    path("api/v1/auth/", include("authentication.urls.registration")),
     path("api/v1/auth/", include("authentication.urls.social")),
     path("api/v1/auth/", include("authentication.urls.mfa")),
     path("api/v1/", include(router.urls)),

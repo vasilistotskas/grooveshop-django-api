@@ -49,7 +49,8 @@ class CartItemModelTestCase(TestCase):
 
     def test_str_representation(self):
         # Test the __str__ method returns the translated name - cart item quantity
-        expected_str = f"{self.product.safe_translation_getter('name')} - {self.cart_item.quantity}"
+        product_name = self.product.safe_translation_getter("name", any_language=True)
+        expected_str = f"CartItem {self.cart_item.id} in Cart {self.cart_item.cart.id}: {product_name} x {self.cart_item.quantity}"
         self.assertEqual(str(self.cart_item), expected_str)
 
     def test_price(self):

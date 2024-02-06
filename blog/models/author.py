@@ -22,7 +22,17 @@ class BlogAuthor(TranslatableModel, TimeStampMixinModel, UUIDModel):
         ordering = ["-created_at"]
 
     def __unicode__(self):
-        return self.user.email
+        author_name = self.user.full_name
+        return f"{author_name} ({self.user.email})"
 
     def __str__(self):
-        return self.user.email
+        author_name = self.user.full_name
+        return f"{author_name} ({self.user.email})"
+
+    @property
+    def number_of_posts(self) -> int:
+        return self.blog_post_author.count()
+
+    @property
+    def total_likes_received(self) -> int:
+        return sum([post.likes.count() for post in self.blog_post_author.all()])

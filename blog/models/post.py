@@ -12,6 +12,8 @@ from blog.enum.blog_post_enum import PostStatusEnum
 from core.models import PublishableModel
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
+from core.utils.generators import SlugifyConfig
+from core.utils.generators import unique_slugify
 from seo.models import SeoModel
 
 
@@ -61,10 +63,22 @@ class BlogPost(
         ordering = ["-published_at"]
 
     def __unicode__(self):
-        return self.safe_translation_getter("title", any_language=True) or ""
+        title = self.safe_translation_getter("title", any_language=True) or "Untitled"
+        author_name = self.author.user.email if self.author else "Unknown"
+        return f"{title} by {author_name}"
 
     def __str__(self):
-        return self.safe_translation_getter("title", any_language=True) or ""
+        title = self.safe_translation_getter("title", any_language=True) or "Untitled"
+        author_name = self.author.user.email if self.author else "Unknown"
+        return f"{title} by {author_name}"
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            config = SlugifyConfig(
+                instance=self,
+            )
+            self.slug = unique_slugify(config)
+        super(BlogPost, self).save(*args, **kwargs)
 
     @property
     def main_image_absolute_url(self) -> str:

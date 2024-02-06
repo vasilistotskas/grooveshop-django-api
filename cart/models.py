@@ -31,8 +31,15 @@ class Cart(TimeStampMixinModel, UUIDModel):
             models.UniqueConstraint(fields=["user"], name="unique_user_cart"),
         ]
 
+    def __unicode__(self):
+        return (
+            f"Cart {self.user} - Items: {self.total_items} - Total: {self.total_price}"
+        )
+
     def __str__(self):
-        return f"Cart {self.user} - {self.id}"
+        return (
+            f"Cart {self.user} - Items: {self.total_items} - Total: {self.total_price}"
+        )
 
     def get_items(self) -> models.QuerySet:
         return self.cart_item_cart.prefetch_related("product").all()
@@ -83,8 +90,13 @@ class CartItem(TimeStampMixinModel, UUIDModel):
             models.UniqueConstraint(fields=["cart", "product"], name="unique_cart_item")
         ]
 
+    def __unicode__(self):
+        product_name = self.product.safe_translation_getter("name", any_language=True)
+        return f"CartItem {self.id} in Cart {self.cart.id}: {product_name} x {self.quantity}"
+
     def __str__(self):
-        return f"{self.product.safe_translation_getter('name', any_language=True)} - {self.quantity}"
+        product_name = self.product.safe_translation_getter("name", any_language=True)
+        return f"CartItem {self.id} in Cart {self.cart.id}: {product_name} x {self.quantity}"
 
     @property
     def price(self) -> Money:

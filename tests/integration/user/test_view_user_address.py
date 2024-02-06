@@ -44,7 +44,7 @@ class UserAddressViewSetTestCase(APITestCase):
         )
         self.region = Region.objects.create(
             alpha="GRC",
-            alpha_2=self.country,
+            country=self.country,
         )
         for language in languages:
             self.region.set_current_language(language)

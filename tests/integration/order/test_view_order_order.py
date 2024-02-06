@@ -59,7 +59,7 @@ class OrderViewSetTestCase(APITestCase):
         # Create a sample Region instance for testing
         self.region = Region.objects.create(
             alpha="GRC",
-            alpha_2=self.country,
+            country=self.country,
         )
 
         # Create a sample Order instance for testing

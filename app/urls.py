@@ -51,6 +51,7 @@ urlpatterns = i18n_patterns(
     path("api/v1/auth/", include("authentication.urls.social")),
     path("api/v1/auth/", include("authentication.urls.mfa")),
     path("api/v1/", include(router.urls)),
+    path("api/v1/", include("core.urls")),
     path("api/v1/", include("product.urls")),
     path("api/v1/", include("order.urls")),
     path("api/v1/", include("user.urls")),

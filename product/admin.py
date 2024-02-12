@@ -131,7 +131,11 @@ class ReviewAdmin(TranslatableAdmin):
     list_display = ["comment", "status", "created_at"]
     list_filter = ["status"]
     actions = ["make_published", "make_unpublished"]
-    search_fields = ["translations__comment"]
+    search_fields = [
+        "translations__comment",
+        "user__email",
+        "product__translations__name",
+    ]
 
     def make_published(self, request, queryset):
         updated = queryset.update(status="True")

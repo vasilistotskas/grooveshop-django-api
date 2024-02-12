@@ -40,7 +40,6 @@ class CheckoutItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrderItem
         fields = (
-            "id",
             "product",
             "quantity",
         )

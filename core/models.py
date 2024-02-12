@@ -1,8 +1,11 @@
+import json
 import uuid
 from typing import Any
 from typing import TypeVar
 
 from django.contrib.postgres.indexes import GinIndex
+from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db import transaction
@@ -13,6 +16,134 @@ from django.db.models import Q
 from django.db.models import QuerySet
 from django.utils import timezone as tz
 from django.utils.translation import gettext_lazy as _
+from django_stubs_ext.db.models import TypedModelMeta
+
+from core.enum import SettingsValueTypeEnum
+
+
+class Settings(models.Model):
+    key = models.CharField(_("Key"), max_length=255, unique=True)
+    value = models.TextField(_("Value"))
+    value_type = models.CharField(
+        _("Value Type"),
+        max_length=50,
+        choices=SettingsValueTypeEnum.choices,
+        default=SettingsValueTypeEnum.STRING,
+    )
+    description = models.TextField(_("Description"), blank=True, null=True)
+    is_public = models.BooleanField(_("Is Public"), default=True)
+
+    class Meta(TypedModelMeta):
+        verbose_name = _("Setting")
+        verbose_name_plural = _("Settings")
+
+    def __str__(self):
+        return f"{self.key}: {self.value} ({self.value_type})"
+
+    def save(self, *args, **kwargs):
+        if not self.pk and not self.key.startswith("APP_"):
+            raise ValidationError(
+                _("Setting key must start with 'APP_'."), code="invalid_key"
+            )
+        self.validate_value(self.value, self.value_type)
+        super(Settings, self).save(*args, **kwargs)
+        cache.delete(self.key)
+
+    def set_value(self, value) -> None:
+        self.value = json.dumps(value, cls=DjangoJSONEncoder)
+        self.value_type = self.python_type_to_enum(type(value).__name__)
+
+    def get_value(self) -> Any:
+        value = json.loads(self.value)
+        if self.value_type == SettingsValueTypeEnum.INTEGER:
+            return int(value)
+        elif self.value_type == SettingsValueTypeEnum.BOOLEAN:
+            if isinstance(value, bool):
+                return value
+            return value.lower() in ("true", "1")
+        elif self.value_type in [
+            SettingsValueTypeEnum.DICTIONARY,
+            SettingsValueTypeEnum.LIST,
+        ]:
+            return value
+        elif self.value_type == SettingsValueTypeEnum.FLOAT:
+            return float(value)
+        else:
+            return value
+
+    @staticmethod
+    def python_type_to_enum(python_type: str) -> str:
+        type_mapping = {
+            "str": SettingsValueTypeEnum.STRING,
+            "int": SettingsValueTypeEnum.INTEGER,
+            "bool": SettingsValueTypeEnum.BOOLEAN,
+            "dict": SettingsValueTypeEnum.DICTIONARY,
+            "list": SettingsValueTypeEnum.LIST,
+            "float": SettingsValueTypeEnum.FLOAT,
+        }
+        return type_mapping.get(python_type, SettingsValueTypeEnum.STRING)
+
+    @staticmethod
+    def validate_value(value: str, value_type: str) -> None:
+        if value_type == SettingsValueTypeEnum.BOOLEAN:
+            if isinstance(value, bool):
+                value = str(value).lower()
+            if value.lower() not in ("true", "false", "1", "0"):
+                raise ValidationError(_("Value is not a valid boolean."))
+
+        if value_type == SettingsValueTypeEnum.STRING:
+            return
+
+        try:
+            loaded_value = json.loads(value)
+            if value_type == SettingsValueTypeEnum.STRING and not isinstance(
+                loaded_value, str
+            ):
+                raise ValidationError(_("Value does not match String type."))
+            elif value_type == SettingsValueTypeEnum.INTEGER and not isinstance(
+                loaded_value, int
+            ):
+                raise ValidationError(_("Value does not match Integer type."))
+            elif value_type == SettingsValueTypeEnum.FLOAT and not isinstance(
+                loaded_value, float
+            ):
+                raise ValidationError(_("Value does not match Float type."))
+            elif value_type == SettingsValueTypeEnum.BOOLEAN and not isinstance(
+                loaded_value, bool
+            ):
+                raise ValidationError(_("Value does not match Boolean type."))
+            elif value_type == SettingsValueTypeEnum.DICTIONARY and not isinstance(
+                loaded_value, dict
+            ):
+                raise ValidationError(_("Value does not match Dictionary type."))
+            elif value_type == SettingsValueTypeEnum.LIST and not isinstance(
+                loaded_value, list
+            ):
+                raise ValidationError(_("Value does not match List type."))
+        except json.JSONDecodeError:
+            raise ValidationError(_("Value is not valid JSON."))
+
+    @classmethod
+    def get_setting(cls, key: str, default=None) -> Any:
+        cached_value = cache.get(key)
+        if cached_value is not None:
+            return json.loads(cached_value)["value"]
+
+        try:
+            setting = cls.objects.get(key=key)
+            cache_value = json.dumps(
+                {"value": setting.get_value(), "type": setting.value_type}
+            )
+            cache.set(key, cache_value)
+            return setting.get_value()
+        except cls.DoesNotExist:
+            return default
+
+    @classmethod
+    def set_setting(cls, key: str, value) -> None:
+        setting, created = cls.objects.get_or_create(key=key)
+        setting.set_value(value)
+        setting.save()
 
 
 class SortableModel(models.Model):
@@ -20,7 +151,7 @@ class SortableModel(models.Model):
         _("Sort Order"), editable=False, db_index=True, null=True
     )
 
-    class Meta:
+    class Meta(TypedModelMeta):
         abstract = True
 
     def get_ordering_queryset(self) -> QuerySet[Any]:
@@ -74,7 +205,7 @@ class TimeStampMixinModel(models.Model):
     created_at = models.DateTimeField(_("Created At"), auto_now_add=True)
     updated_at = models.DateTimeField(_("Updated At"), auto_now=True)
 
-    class Meta:
+    class Meta(TypedModelMeta):
         abstract = True
 
     def get_duration_since_created(self):
@@ -87,7 +218,7 @@ class TimeStampMixinModel(models.Model):
 class UUIDModel(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
 
-    class Meta:
+    class Meta(TypedModelMeta):
         abstract = True
 
 
@@ -112,7 +243,7 @@ class PublishableModel(models.Model):
 
     objects: Any = PublishableManager()
 
-    class Meta:
+    class Meta(TypedModelMeta):
         abstract = True
 
     @property
@@ -126,7 +257,7 @@ class ModelWithMetadata(models.Model):
     private_metadata = JSONField(blank=True, default=dict, encoder=DjangoJSONEncoder)
     metadata = JSONField(blank=True, default=dict, encoder=DjangoJSONEncoder)
 
-    class Meta:
+    class Meta(TypedModelMeta):
         indexes = [
             GinIndex(fields=["private_metadata"], name="%(class)s_p_meta_idx"),
             GinIndex(fields=["metadata"], name="%(class)s_meta_idx"),
@@ -179,7 +310,7 @@ class SoftDeleteMixin(models.Model):
     deleted_at = models.DateTimeField(null=True, blank=True)
     is_deleted = models.BooleanField(default=False)
 
-    class Meta:
+    class Meta(TypedModelMeta):
         abstract = True
 
     def delete(self, using=None, keep_parents=False):
@@ -216,5 +347,5 @@ class SoftDeleteManager(models.Manager):
 
 
 class SoftDeleteModel(SoftDeleteMixin, models.Model):
-    class Meta:
+    class Meta(TypedModelMeta):
         abstract = True

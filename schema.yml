@@ -7553,6 +7553,154 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedSearchProductList'
           description: ''
+  /api/v1/settings/:
+    get:
+      operationId: api_v1_settings_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSettingsList'
+          description: ''
+    post:
+      operationId: api_v1_settings_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Settings'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Settings'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Settings'
+        required: true
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+          description: ''
+  /api/v1/settings/{key}/:
+    get:
+      operationId: api_v1_settings_retrieve
+      parameters:
+      - in: path
+        name: key
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+          description: ''
+    put:
+      operationId: api_v1_settings_update
+      parameters:
+      - in: path
+        name: key
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Settings'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Settings'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Settings'
+        required: true
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+          description: ''
+    patch:
+      operationId: api_v1_settings_partial_update
+      parameters:
+      - in: path
+        name: key
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSettings'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSettings'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSettings'
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+          description: ''
+    delete:
+      operationId: api_v1_settings_destroy
+      parameters:
+      - in: path
+        name: key
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: No response body
   /api/v1/slide:
     get:
       operationId: api_v1_slide_list
@@ -11062,9 +11210,6 @@ components:
     CheckoutItem:
       type: object
       properties:
-        id:
-          type: integer
-          readOnly: true
         product:
           type: integer
         quantity:
@@ -11072,7 +11217,6 @@ components:
           maximum: 2147483647
           minimum: -2147483648
       required:
-      - id
       - product
     Country:
       type: object
@@ -11928,6 +12072,26 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SearchProduct'
+    PaginatedSettingsList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Settings'
     PaginatedSlideList:
       type: object
       properties:
@@ -13205,6 +13369,21 @@ components:
           type: string
           format: uuid
           readOnly: true
+    PatchedSettings:
+      type: object
+      properties:
+        key:
+          type: string
+          maxLength: 255
+        value:
+          type: string
+        valueType:
+          $ref: '#/components/schemas/ValueTypeEnum'
+        description:
+          type: string
+          nullable: true
+        isPublic:
+          type: boolean
     PatchedSlide:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -14342,6 +14521,24 @@ components:
       - similarity
       - slug
       - translations
+    Settings:
+      type: object
+      properties:
+        key:
+          type: string
+          maxLength: 255
+        value:
+          type: string
+        valueType:
+          $ref: '#/components/schemas/ValueTypeEnum'
+        description:
+          type: string
+          nullable: true
+        isPublic:
+          type: boolean
+      required:
+      - key
+      - value
     Slide:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -14876,6 +15073,22 @@ components:
       - user
       - uuid
       - zipcode
+    ValueTypeEnum:
+      enum:
+      - str
+      - int
+      - bool
+      - dict
+      - list
+      - float
+      type: string
+      description: |-
+        * `str` - String
+        * `int` - Integer
+        * `bool` - Boolean
+        * `dict` - Dictionary
+        * `list` - List
+        * `float` - Float
     Vat:
       type: object
       properties:

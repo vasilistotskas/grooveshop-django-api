@@ -1,8 +1,56 @@
 import csv
+import json
 import xml.etree.ElementTree as ET
 
+from django import forms
 from django.contrib import admin
+from django.core.serializers.json import DjangoJSONEncoder
 from django.http import HttpResponse
+from django.utils.html import format_html
+
+from core.models import Settings
+
+
+class SettingsAdminForm(forms.ModelForm):
+    class Meta:
+        model = Settings
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super(SettingsAdminForm, self).__init__(*args, **kwargs)
+        if not self.instance.pk:
+            self.fields["key"].initial = "APP_"
+
+    def clean(self):
+        cleaned_data = super().clean()
+        key = cleaned_data.get("key")
+        if not key.startswith("APP_"):
+            self.add_error("key", "Setting key must start with 'APP_'.")
+        return cleaned_data
+
+
+@admin.register(Settings)
+class SettingsAdmin(admin.ModelAdmin):
+    form = SettingsAdminForm
+    list_display = ("key", "value_display", "value_type", "is_public", "description")
+    list_filter = ("is_public", "value_type")
+    search_fields = ("key",)
+    readonly_fields = ("value_display",)
+
+    def value_display(self, obj):
+        try:
+            value = json.loads(obj.value)
+            pretty_value = json.dumps(value, indent=4, cls=DjangoJSONEncoder)
+            return format_html("<pre>{}</pre>", pretty_value)
+        except json.JSONDecodeError:
+            return format_html("<pre>{}</pre>", obj.value)
+
+    value_display.short_description = "Value"
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj:
+            return self.readonly_fields + ("value_type", "is_public")
+        return self.readonly_fields
 
 
 class ExportActionMixin:

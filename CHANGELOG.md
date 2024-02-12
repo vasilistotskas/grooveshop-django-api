@@ -3,7 +3,21 @@
 
 
 
+## v0.66.0 (2024-02-12)
+
+### Feature
+
+* feat: Settings application and Bump Versions
+
+- New Settings application to set single key value setting for the application.
+- Tests for new settings app implemented.
+- Bump Versions ([`4501e8d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4501e8d7bd4d49afbb8ada133ad5b13be5ce57ab))
+
 ## v0.65.0 (2024-02-09)
+
+### Chore
+
+* chore(release): release version 0.65.0 [skip ci] ([`0ebdf06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0ebdf064da2b64896c8a9a76d9fc90c112fcf685))
 
 ### Feature
 

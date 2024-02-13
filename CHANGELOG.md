@@ -3,7 +3,17 @@
 
 
 
+## v0.67.0 (2024-02-13)
+
+### Feature
+
+* feat: Django tinymce be able to upload image in `HTMLField` tinymce ([`e2ed8d0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e2ed8d07ef86210e63f5f37d8f0e0385719db616))
+
 ## v0.66.0 (2024-02-12)
+
+### Chore
+
+* chore(release): release version 0.66.0 [skip ci] ([`6b62bba`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6b62bba625f2fb307381038562b718f40b6ddd33))
 
 ### Feature
 

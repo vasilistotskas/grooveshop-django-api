@@ -17,6 +17,7 @@ from drf_spectacular.views import SpectacularSwaggerView
 from rest_framework import routers
 
 from core.view import HomeView
+from core.view import upload_image
 from user.views.account import ObtainAuthTokenView
 
 app_name = "app"
@@ -44,6 +45,7 @@ urlpatterns = i18n_patterns(
     path("rosetta/", include("rosetta.urls")),
     # admin html editor
     path("tinymce/", include("tinymce.urls")),
+    path("upload_image", upload_image, name="upload_image"),
     # api
     path("api/v1/api-token-auth/", ObtainAuthTokenView.as_view()),
     path("api/v1/auth/", include("authentication.urls.base")),

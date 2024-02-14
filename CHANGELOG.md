@@ -3,7 +3,23 @@
 
 
 
+## v0.68.0 (2024-02-14)
+
+### Feature
+
+* feat: `ProductFilter` method `filter_category` include descendants , `ProductCategory` absolute url fix ([`bb90d4f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bb90d4f4e1558ab3ab273352d6009621a9ca484c))
+
+### Fix
+
+* fix: `test_model_product_category` absolute url test ([`af99e61`](https://github.com/vasilistotskas/grooveshop-django-api/commit/af99e611ae7a36751b4c20d0d104b87f8a7bc8c3))
+
+* fix: `test_model_product_category` absolute url tests ([`664dcca`](https://github.com/vasilistotskas/grooveshop-django-api/commit/664dcca700a589f04d740554a8895740382f6a11))
+
 ## v0.67.0 (2024-02-13)
+
+### Chore
+
+* chore(release): release version 0.67.0 [skip ci] ([`7c6fe5a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7c6fe5af221192b7e8d7133c2046bfd944f07f72))
 
 ### Feature
 

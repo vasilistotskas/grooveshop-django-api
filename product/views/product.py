@@ -36,7 +36,6 @@ class ProductViewSet(BaseExpandView, ModelViewSet):
     ordering = ["-created_at"]
     search_fields = ["id"]
 
-    @method_decorator(cache_page(60 * 60 * 2))
     def list(self, request, *args, **kwargs) -> Response:
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)

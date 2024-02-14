@@ -111,7 +111,7 @@ class ProductCategory(
 
     @property
     def absolute_url(self) -> str:
-        return "/" + "/".join(
+        return f"/product/category/{self.id}/" + "/".join(
             [x["slug"] for x in self.get_ancestors(include_self=True).values()]
         )
 

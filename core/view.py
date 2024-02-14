@@ -14,6 +14,7 @@ from rest_framework.permissions import IsAuthenticated
 
 from core.models import Settings
 from core.serializers import SettingsSerializer
+from core.storages import TinymceS3Storage
 
 
 class HomeView(View):
@@ -77,9 +78,6 @@ def upload_image(request):
     if request.method != "POST":
         return JsonResponse({"Error Message": "Wrong request"})
 
-    if not os.path.exists(os.path.join(settings.MEDIA_ROOT, "uploads/tinymce")):
-        os.makedirs(os.path.join(settings.MEDIA_ROOT, "uploads/tinymce"))
-
     file_obj = request.FILES["file"]
     file_name_suffix = file_obj.name.split(".")[-1]
     if file_name_suffix not in ["jpg", "png", "gif", "jpeg"]:
@@ -88,6 +86,18 @@ def upload_image(request):
                 "Error Message": f"Wrong file suffix ({file_name_suffix}), supported are .jpg, .png, .gif, .jpeg"
             }
         )
+
+    debug = os.getenv("DEBUG", "True") == "True"
+    if not debug:
+        storage = TinymceS3Storage()
+        image_path = storage.save(file_obj.name, file_obj)
+        image_url = storage.url(image_path)
+        return JsonResponse(
+            {"message": "Image uploaded successfully", "location": image_url}
+        )
+
+    if not os.path.exists(os.path.join(settings.MEDIA_ROOT, "uploads/tinymce")):
+        os.makedirs(os.path.join(settings.MEDIA_ROOT, "uploads/tinymce"))
 
     file_path = os.path.join(settings.MEDIA_ROOT, "uploads/tinymce", f"{file_obj.name}")
     if os.path.exists(file_path):

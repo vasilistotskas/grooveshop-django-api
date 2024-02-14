@@ -240,12 +240,12 @@ class CategoryModelTestCase(TestCase):
 
     def test_absolute_url_no_parent(self):
         url = self.category.absolute_url
-        expected_url = f"/{self.category.slug}"
+        expected_url = f"/product/category/{self.id}/{self.category.slug}"
         self.assertEqual(url, expected_url)
 
     def test_absolute_url_with_parent(self):
         url = self.sub_category.absolute_url
-        expected_url = f"/{self.category.slug}/{self.sub_category.slug}"
+        expected_url = f"/product/category/{self.sub_category.id}/" f"{self.category.slug}/{self.sub_category.slug}"
         self.assertEqual(url, expected_url)
 
     def test_category_menu_image_one_absolute_url(self):

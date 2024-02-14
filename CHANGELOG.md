@@ -3,7 +3,17 @@
 
 
 
+## v0.69.0 (2024-02-14)
+
+### Feature
+
+* feat(upload_image): save img to S3 storage on production ([`d7a5207`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d7a520703c2ad535e3a6dacb0aeabac6e63a68ed))
+
 ## v0.68.0 (2024-02-14)
+
+### Chore
+
+* chore(release): release version 0.68.0 [skip ci] ([`8b8e143`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8b8e143278b240358523ebfd5ef8f249f6dcc60c))
 
 ### Feature
 

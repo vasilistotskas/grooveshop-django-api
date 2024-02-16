@@ -3,7 +3,17 @@
 
 
 
+## v0.70.0 (2024-02-16)
+
+### Feature
+
+* feat: API serializers with `get_expand_fields` imports using `importlib`,  BaseExpandSerializer logic improvement, BlogComment model use `MPTTModel`. ([`62d9591`](https://github.com/vasilistotskas/grooveshop-django-api/commit/62d9591600a1fe22dfe41e21ded1c96ecfc00a6a))
+
 ## v0.69.0 (2024-02-14)
+
+### Chore
+
+* chore(release): release version 0.69.0 [skip ci] ([`7e16dc7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7e16dc799a13ba6e912d96b599ae2af012d0bf43))
 
 ### Feature
 

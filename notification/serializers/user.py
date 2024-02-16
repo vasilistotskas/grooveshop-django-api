@@ -1,3 +1,4 @@
+import importlib
 from typing import Dict
 from typing import Type
 
@@ -7,8 +8,6 @@ from rest_framework.relations import PrimaryKeyRelatedField
 
 from core.api.serializers import BaseExpandSerializer
 from notification.models.user import NotificationUser
-from notification.serializers.notification import NotificationSerializer
-from user.serializers.account import UserAccountSerializer
 
 User = get_user_model()
 
@@ -27,9 +26,15 @@ class NotificationUserSerializer(BaseExpandSerializer):
         )
 
     def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:
+        user_account_serializer = importlib.import_module(
+            "user.serializers.account"
+        ).UserAccountSerializer
+        notification_serializer = importlib.import_module(
+            "notification.serializers.notification"
+        ).NotificationSerializer
         return {
-            "user": UserAccountSerializer,
-            "notification": NotificationSerializer,
+            "user": user_account_serializer,
+            "notification": notification_serializer,
         }
 
 

@@ -1,3 +1,4 @@
+import importlib
 from typing import Dict
 from typing import Type
 
@@ -62,6 +63,9 @@ class SlideSerializer(TranslatableModelSerializer, BaseExpandSerializer):
         )
 
     def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:
+        slider_serializer = importlib.import_module(
+            "slider.serializers"
+        ).SliderSerializer
         return {
-            "slider": SliderSerializer,
+            "slider": slider_serializer,
         }

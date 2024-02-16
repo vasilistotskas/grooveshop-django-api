@@ -57,6 +57,7 @@ class ProductImageViewSet(TranslationsProcessingMixin, BaseExpandView, ModelView
 
     def partial_update(self, request, pk=None, *args, **kwargs) -> Response:
         product_images = get_object_or_404(ProductImage, pk=pk)
+        request = self.process_translations_data(request)
         serializer = self.get_serializer(
             product_images, data=request.data, partial=True
         )

@@ -10596,6 +10596,13 @@ components:
           type: string
           maxLength: 50
           pattern: ^[-a-zA-Z0-9_]+$
+        children:
+          oneOf:
+          - type: object
+            additionalProperties: {}
+          - type: array
+            items: {}
+          readOnly: true
         parent:
           type: integer
           nullable: true
@@ -10635,6 +10642,7 @@ components:
           readOnly: true
       required:
       - absoluteUrl
+      - children
       - createdAt
       - id
       - level
@@ -10682,6 +10690,22 @@ components:
           type: integer
         post:
           type: integer
+        children:
+          oneOf:
+          - type: object
+            additionalProperties: {}
+          - type: array
+            items: {}
+          readOnly: true
+        parent:
+          type: integer
+          nullable: true
+        level:
+          type: integer
+          readOnly: true
+        treeId:
+          type: integer
+          readOnly: true
         createdAt:
           type: string
           format: date-time
@@ -10698,12 +10722,15 @@ components:
           type: integer
           readOnly: true
       required:
+      - children
       - createdAt
       - id
+      - level
       - likes
       - numberOfLikes
       - post
       - translations
+      - treeId
       - updatedAt
       - user
       - uuid
@@ -12309,6 +12336,13 @@ components:
           type: string
           maxLength: 50
           pattern: ^[-a-zA-Z0-9_]+$
+        children:
+          oneOf:
+          - type: object
+            additionalProperties: {}
+          - type: array
+            items: {}
+          readOnly: true
         parent:
           type: integer
           nullable: true
@@ -12381,6 +12415,22 @@ components:
           type: integer
         post:
           type: integer
+        children:
+          oneOf:
+          - type: object
+            additionalProperties: {}
+          - type: array
+            items: {}
+          readOnly: true
+        parent:
+          type: integer
+          nullable: true
+        level:
+          type: integer
+          readOnly: true
+        treeId:
+          type: integer
+          readOnly: true
         createdAt:
           type: string
           format: date-time
@@ -13150,6 +13200,13 @@ components:
           readOnly: true
         categoryMenuMainBannerFilename:
           type: string
+          readOnly: true
+        children:
+          oneOf:
+          - type: object
+            additionalProperties: {}
+          - type: array
+            items: {}
           readOnly: true
         parent:
           type: integer
@@ -14124,6 +14181,13 @@ components:
         categoryMenuMainBannerFilename:
           type: string
           readOnly: true
+        children:
+          oneOf:
+          - type: object
+            additionalProperties: {}
+          - type: array
+            items: {}
+          readOnly: true
         parent:
           type: integer
           nullable: true
@@ -14171,6 +14235,7 @@ components:
       - categoryMenuImageTwoFilename
       - categoryMenuMainBannerAbsoluteUrl
       - categoryMenuMainBannerFilename
+      - children
       - createdAt
       - id
       - level

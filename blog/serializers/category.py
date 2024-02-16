@@ -1,6 +1,8 @@
 from drf_spectacular.utils import extend_schema_field
 from parler_rest.fields import TranslatedFieldsField
 from parler_rest.serializers import TranslatableModelSerializer
+from rest_framework import serializers
+from rest_framework.utils.serializer_helpers import ReturnDict
 
 from blog.models.category import BlogCategory
 from core.api.schema import generate_schema_multi_lang
@@ -12,7 +14,15 @@ class TranslatedFieldsFieldExtend(TranslatedFieldsField):
 
 
 class BlogCategorySerializer(TranslatableModelSerializer):
+    children = serializers.SerializerMethodField()
     translations = TranslatedFieldsFieldExtend(shared_model=BlogCategory)
+
+    def get_children(self, obj: BlogCategory) -> ReturnDict | list:
+        if obj.get_children().exists():
+            return BlogCategorySerializer(
+                obj.get_children(), many=True, context=self.context
+            ).data
+        return []
 
     class Meta:
         model = BlogCategory
@@ -20,6 +30,7 @@ class BlogCategorySerializer(TranslatableModelSerializer):
             "translations",
             "id",
             "slug",
+            "children",
             "parent",
             "level",
             "tree_id",

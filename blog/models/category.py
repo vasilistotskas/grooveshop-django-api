@@ -23,7 +23,6 @@ from core.utils.generators import unique_slugify
 
 class BlogCategoryQuerySet(TranslatableQuerySet, TreeQuerySet):
     def as_manager(cls):
-        # make sure creating managers from querysets works.
         manager = BlogCategoryManager.from_queryset(cls)()
         manager._built_with_as_manager = True
         return manager

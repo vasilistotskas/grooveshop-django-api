@@ -1,3 +1,4 @@
+import importlib
 from typing import Dict
 from typing import Type
 
@@ -12,9 +13,7 @@ from core.api.schema import generate_schema_multi_lang
 from core.api.serializers import BaseExpandSerializer
 from product.models.category import ProductCategory
 from product.models.product import Product
-from product.serializers.category import ProductCategorySerializer
 from vat.models import Vat
-from vat.serializers import VatSerializer
 
 
 @extend_schema_field(generate_schema_multi_lang(Product))
@@ -65,4 +64,8 @@ class ProductSerializer(TranslatableModelSerializer, BaseExpandSerializer):
         )
 
     def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:
-        return {"category": ProductCategorySerializer, "vat": VatSerializer}
+        product_category_serializer = importlib.import_module(
+            "product.serializers.category"
+        ).ProductCategorySerializer
+        vat_serializer = importlib.import_module("vat.serializers").VatSerializer
+        return {"category": product_category_serializer, "vat": vat_serializer}

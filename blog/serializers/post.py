@@ -1,3 +1,4 @@
+import importlib
 from typing import Dict
 from typing import Type
 
@@ -12,12 +13,8 @@ from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
 from blog.models.post import BlogPost
 from blog.models.tag import BlogTag
-from blog.serializers.author import BlogAuthorSerializer
-from blog.serializers.category import BlogCategorySerializer
-from blog.serializers.tag import BlogTagSerializer
 from core.api.schema import generate_schema_multi_lang
 from core.api.serializers import BaseExpandSerializer
-from user.serializers.account import UserAccountSerializer
 
 User = get_user_model()
 
@@ -61,9 +58,21 @@ class BlogPostSerializer(TranslatableModelSerializer, BaseExpandSerializer):
         )
 
     def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:
+        user_account_serializer = importlib.import_module(
+            "user.serializers.account"
+        ).UserAccountSerializer
+        blog_category_serializer = importlib.import_module(
+            "blog.serializers.category"
+        ).BlogCategorySerializer
+        blog_tag_serializer = importlib.import_module(
+            "blog.serializers.tag"
+        ).BlogTagSerializer
+        blog_author_serializer = importlib.import_module(
+            "blog.serializers.author"
+        ).BlogAuthorSerializer
         return {
-            "likes": UserAccountSerializer,
-            "category": BlogCategorySerializer,
-            "tags": BlogTagSerializer,
-            "author": BlogAuthorSerializer,
+            "likes": user_account_serializer,
+            "category": blog_category_serializer,
+            "tags": blog_tag_serializer,
+            "author": blog_author_serializer,
         }

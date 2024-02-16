@@ -1,3 +1,4 @@
+import importlib
 from typing import Dict
 from typing import Type
 
@@ -10,7 +11,6 @@ from rest_framework.relations import PrimaryKeyRelatedField
 from core.api.schema import generate_schema_multi_lang
 from core.api.serializers import BaseExpandSerializer
 from country.models import Country
-from country.serializers import CountrySerializer
 from region.models import Region
 
 
@@ -36,6 +36,9 @@ class RegionSerializer(TranslatableModelSerializer, BaseExpandSerializer):
         )
 
     def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:
+        country_serializer = importlib.import_module(
+            "country.serializers"
+        ).CountrySerializer
         return {
-            "country": CountrySerializer,
+            "country": country_serializer,
         }

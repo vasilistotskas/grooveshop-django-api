@@ -1,3 +1,4 @@
+import importlib
 from typing import Dict
 from typing import Type
 
@@ -12,8 +13,6 @@ from core.api.schema import generate_schema_multi_lang
 from core.api.serializers import BaseExpandSerializer
 from product.models.product import Product
 from product.models.review import ProductReview
-from product.serializers.product import ProductSerializer
-from user.serializers.account import UserAccountSerializer
 
 User = get_user_model()
 
@@ -45,7 +44,13 @@ class ProductReviewSerializer(TranslatableModelSerializer, BaseExpandSerializer)
         )
 
     def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:
+        user_account_serializer = importlib.import_module(
+            "user.serializers.account"
+        ).UserAccountSerializer
+        product_serializer = importlib.import_module(
+            "product.serializers.product"
+        ).ProductSerializer
         return {
-            "product": ProductSerializer,
-            "user": UserAccountSerializer,
+            "user": user_account_serializer,
+            "product": product_serializer,
         }

@@ -24,15 +24,16 @@ class BlogCategoryViewSet(TranslationsProcessingMixin, ModelViewSet):
     ordering = ["id"]
     search_fields = ["id"]
 
-    def list(self, request, *args, **kwargs) -> Response:
-        queryset = self.get_queryset().get_cached_trees()
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+
         page = self.paginate_queryset(queryset)
-        data = []
-        for n in queryset:
-            data.append(self.recursive_node_to_dict(n))
         if page is not None:
-            return self.get_paginated_response(data)
-        return Response(data, status=status.HTTP_200_OK)
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     def create(self, request, *args, **kwargs) -> Response:
         request = self.process_translations_data(request)
@@ -58,6 +59,7 @@ class BlogCategoryViewSet(TranslationsProcessingMixin, ModelViewSet):
 
     def partial_update(self, request, pk=None, *args, **kwargs) -> Response:
         category = get_object_or_404(BlogCategory, pk=pk)
+        request = self.process_translations_data(request)
         serializer = self.get_serializer(category, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
@@ -68,10 +70,3 @@ class BlogCategoryViewSet(TranslationsProcessingMixin, ModelViewSet):
         category = get_object_or_404(BlogCategory, pk=pk)
         category.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-    def recursive_node_to_dict(self, node):
-        result = self.get_serializer(instance=node).data
-        children = [self.recursive_node_to_dict(c) for c in node.get_children()]
-        if children:
-            result["children"] = children
-        return result

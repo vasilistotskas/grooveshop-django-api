@@ -12,9 +12,10 @@ from blog.paginators.comment import BlogCommentPagination
 from blog.serializers.comment import BlogCommentSerializer
 from core.api.views import BaseExpandView
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+from core.utils.views import TranslationsProcessingMixin
 
 
-class BlogCommentViewSet(BaseExpandView, ModelViewSet):
+class BlogCommentViewSet(TranslationsProcessingMixin, BaseExpandView, ModelViewSet):
     queryset = BlogComment.objects.all()
     serializer_class = BlogCommentSerializer
     pagination_class = BlogCommentPagination
@@ -24,16 +25,19 @@ class BlogCommentViewSet(BaseExpandView, ModelViewSet):
     ordering = ["id"]
     search_fields = ["id", "user", "post"]
 
-    def list(self, request, *args, **kwargs) -> Response:
+    def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
+
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             return self.get_paginated_response(serializer.data)
+
         serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.data)
 
     def create(self, request, *args, **kwargs) -> Response:
+        request = self.process_translations_data(request)
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -47,6 +51,7 @@ class BlogCommentViewSet(BaseExpandView, ModelViewSet):
 
     def update(self, request, pk=None, *args, **kwargs) -> Response:
         comment = get_object_or_404(BlogComment, pk=pk)
+        request = self.process_translations_data(request)
         serializer = self.get_serializer(comment, data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -55,6 +60,7 @@ class BlogCommentViewSet(BaseExpandView, ModelViewSet):
 
     def partial_update(self, request, pk=None, *args, **kwargs) -> Response:
         comment = get_object_or_404(BlogComment, pk=pk)
+        request = self.process_translations_data(request)
         serializer = self.get_serializer(comment, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()

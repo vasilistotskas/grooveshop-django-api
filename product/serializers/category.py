@@ -1,5 +1,7 @@
 from drf_spectacular.utils import extend_schema_field
 from parler_rest.serializers import TranslatableModelSerializer
+from rest_framework import serializers
+from rest_framework.utils.serializer_helpers import ReturnDict
 
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
@@ -12,7 +14,15 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
 
 
 class ProductCategorySerializer(TranslatableModelSerializer):
+    children = serializers.SerializerMethodField()
     translations = TranslatedFieldsFieldExtend(shared_model=ProductCategory)
+
+    def get_children(self, obj: ProductCategory) -> ReturnDict | list:
+        if obj.get_children().exists():
+            return ProductCategorySerializer(
+                obj.get_children(), many=True, context=self.context
+            ).data
+        return []
 
     class Meta:
         model = ProductCategory
@@ -26,6 +36,7 @@ class ProductCategorySerializer(TranslatableModelSerializer):
             "category_menu_image_two_filename",
             "category_menu_main_banner_absolute_url",
             "category_menu_main_banner_filename",
+            "children",
             "parent",
             "level",
             "tree_id",

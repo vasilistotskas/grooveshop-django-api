@@ -1,3 +1,4 @@
+import importlib
 from typing import Dict
 from typing import Type
 
@@ -8,8 +9,6 @@ from rest_framework.relations import PrimaryKeyRelatedField
 from core.api.serializers import BaseExpandSerializer
 from product.models.favourite import ProductFavourite
 from product.models.product import Product
-from product.serializers.product import ProductSerializer
-from user.serializers.account import UserAccountSerializer
 
 User = get_user_model()
 
@@ -23,7 +22,13 @@ class ProductFavouriteSerializer(BaseExpandSerializer):
         fields = ("id", "user", "product", "created_at", "updated_at", "uuid")
 
     def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:
+        user_account_serializer = importlib.import_module(
+            "user.serializers.account"
+        ).UserAccountSerializer
+        product_serializer = importlib.import_module(
+            "product.serializers.product"
+        ).ProductSerializer
         return {
-            "user": UserAccountSerializer,
-            "product": ProductSerializer,
+            "user": user_account_serializer,
+            "product": product_serializer,
         }

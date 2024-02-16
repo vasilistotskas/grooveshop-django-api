@@ -37,21 +37,15 @@ class CategoryAdmin(TranslatableAdmin, DraggableMPTTAdmin):
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-
-        # Add cumulative product count
         qs = ProductCategory.objects.add_related_count(
             qs, Product, "category", "products_cumulative_count", cumulative=True
         )
-
-        # Add non cumulative product count
         qs = ProductCategory.objects.add_related_count(
             qs, Product, "category", "products_count", cumulative=False
         )
         return qs
 
     def get_prepopulated_fields(self, request, obj=None):
-        # can't use `prepopulated_fields = ..` because it breaks the admin validation
-        # for translated fields. This is the official django-parler workaround.
         return {
             "slug": ("name",),
         }

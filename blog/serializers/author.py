@@ -1,3 +1,4 @@
+import importlib
 from typing import Dict
 from typing import Type
 
@@ -11,7 +12,6 @@ from rest_framework.relations import PrimaryKeyRelatedField
 from blog.models.author import BlogAuthor
 from core.api.schema import generate_schema_multi_lang
 from core.api.serializers import BaseExpandSerializer
-from user.serializers.account import UserAccountSerializer
 
 User = get_user_model()
 
@@ -40,6 +40,9 @@ class BlogAuthorSerializer(TranslatableModelSerializer, BaseExpandSerializer):
         )
 
     def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:
+        user_account_serializer = importlib.import_module(
+            "user.serializers.account"
+        ).UserAccountSerializer
         return {
-            "user": UserAccountSerializer,
+            "user": user_account_serializer,
         }

@@ -61,6 +61,7 @@ class PayWayViewSet(TranslationsProcessingMixin, ModelViewSet):
 
     def partial_update(self, request, pk=None, *args, **kwargs) -> Response:
         pay_way = get_object_or_404(PayWay, pk=pk)
+        request = self.process_translations_data(request)
         serializer = self.get_serializer(pay_way, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()

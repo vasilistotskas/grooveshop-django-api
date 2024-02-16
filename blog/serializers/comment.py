@@ -1,3 +1,4 @@
+import importlib
 from typing import Dict
 from typing import Type
 
@@ -7,13 +8,12 @@ from parler_rest.fields import TranslatedFieldsField
 from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
+from rest_framework.utils.serializer_helpers import ReturnDict
 
 from blog.models.comment import BlogComment
 from blog.models.post import BlogPost
-from blog.serializers.post import BlogPostSerializer
 from core.api.schema import generate_schema_multi_lang
 from core.api.serializers import BaseExpandSerializer
-from user.serializers.account import UserAccountSerializer
 
 User = get_user_model()
 
@@ -24,10 +24,18 @@ class TranslatedFieldsFieldExtend(TranslatedFieldsField):
 
 
 class BlogCommentSerializer(TranslatableModelSerializer, BaseExpandSerializer):
+    children = serializers.SerializerMethodField()
     user = PrimaryKeyRelatedField(queryset=User.objects.all())
     post = PrimaryKeyRelatedField(queryset=BlogPost.objects.all())
     likes = PrimaryKeyRelatedField(queryset=User.objects.all(), many=True)
     translations = TranslatedFieldsFieldExtend(shared_model=BlogComment)
+
+    def get_children(self, obj: BlogComment) -> ReturnDict | list:
+        if obj.get_children().exists():
+            return BlogCommentSerializer(
+                obj.get_children(), many=True, context=self.context
+            ).data
+        return []
 
     class Meta:
         model = BlogComment
@@ -38,6 +46,10 @@ class BlogCommentSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "likes",
             "user",
             "post",
+            "children",
+            "parent",
+            "level",
+            "tree_id",
             "created_at",
             "updated_at",
             "uuid",
@@ -45,8 +57,14 @@ class BlogCommentSerializer(TranslatableModelSerializer, BaseExpandSerializer):
         )
 
     def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:
+        user_account_serializer = importlib.import_module(
+            "user.serializers.account"
+        ).UserAccountSerializer
+        blog_post_serializer = importlib.import_module(
+            "blog.serializers.post"
+        ).BlogPostSerializer
         return {
-            "user": UserAccountSerializer,
-            "post": BlogPostSerializer,
-            "likes": UserAccountSerializer,
+            "user": user_account_serializer,
+            "post": blog_post_serializer,
+            "likes": user_account_serializer,
         }

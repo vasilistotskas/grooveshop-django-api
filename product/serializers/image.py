@@ -1,3 +1,4 @@
+import importlib
 from typing import Dict
 from typing import Type
 
@@ -11,7 +12,6 @@ from core.api.serializers import BaseExpandSerializer
 from core.utils.serializers import TranslatedFieldExtended
 from product.models.image import ProductImage
 from product.models.product import Product
-from product.serializers.product import ProductSerializer
 
 
 @extend_schema_field(generate_schema_multi_lang(ProductImage))
@@ -41,6 +41,9 @@ class ProductImageSerializer(TranslatableModelSerializer, BaseExpandSerializer):
         )
 
     def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:
+        product_serializer = importlib.import_module(
+            "product.serializers.product"
+        ).ProductSerializer
         return {
-            "product": ProductSerializer,
+            "product": product_serializer,
         }

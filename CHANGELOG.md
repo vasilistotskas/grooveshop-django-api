@@ -3,7 +3,17 @@
 
 
 
+## v0.72.0 (2024-02-24)
+
+### Feature
+
+* feat: Auth user account API improved ([`faf8712`](https://github.com/vasilistotskas/grooveshop-django-api/commit/faf87122d228e72fe3e503da3d02bb2b46beff1a))
+
 ## v0.71.0 (2024-02-17)
+
+### Chore
+
+* chore(release): release version 0.71.0 [skip ci] ([`e84ef34`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e84ef34eb2693d3b8b4dbbfc2f03bd624857426e))
 
 ### Feature
 

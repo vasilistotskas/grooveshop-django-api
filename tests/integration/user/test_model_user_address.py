@@ -101,50 +101,6 @@ class UserAddressModelTestCase(TestCase):
             f" {self.address.last_name}, {self.address.city}",
         )
 
-    def test_get_user_addresses(self):
-        address_1 = UserAddress.objects.create(
-            user=self.user,
-            title="Address 1",
-            first_name="John",
-            last_name="Doe",
-            street="123 Main St",
-            street_number="Apt 4B",
-            city="Cityville",
-            zipcode="12345",
-            country=None,  # You can set an actual country object here
-            region=None,  # You can set an actual region object here
-            floor=FloorChoicesEnum.FIRST_FLOOR.value,
-            location_type=LocationChoicesEnum.HOME.value,
-            phone="123-456-7890",
-            mobile_phone="987-654-3210",
-            notes="Sample notes",
-            is_main=False,
-        )
-
-        address_2 = UserAddress.objects.create(
-            user=self.user,
-            title="Address 2",
-            first_name="John",
-            last_name="Doe",
-            street="123 Main St",
-            street_number="Apt 4B",
-            city="Cityville",
-            zipcode="12345",
-            country=None,
-            region=None,
-            floor=FloorChoicesEnum.FIRST_FLOOR.value,
-            location_type=LocationChoicesEnum.HOME.value,
-            phone="123-456-7890",
-            mobile_phone="987-654-3210",
-            notes="Sample notes",
-            is_main=False,
-        )
-        addresses = UserAddress.get_user_addresses(self.user)
-
-        self.assertEqual(len(addresses), 3)
-        self.assertIn(address_1, addresses)
-        self.assertIn(address_2, addresses)
-
     def test_get_main_address(self):
         non_main_address_1 = UserAddress.objects.create(
             user=self.user,

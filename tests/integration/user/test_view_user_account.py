@@ -5,8 +5,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from user.serializers.account import UserAccountSerializer
-
+from authentication.serializers import AuthenticationSerializer
 
 User = get_user_model()
 
@@ -37,7 +36,7 @@ class UserAccountViewSetTestCase(APITestCase):
         url = self.get_user_account_list_url()
         response = self.client.get(url)
         user_accounts = User.objects.all()
-        serializer = UserAccountSerializer(user_accounts, many=True)
+        serializer = AuthenticationSerializer(user_accounts, many=True)
 
         self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -66,7 +65,7 @@ class UserAccountViewSetTestCase(APITestCase):
         url = self.get_user_account_detail_url(self.user.id)
         response = self.client.get(url)
         user_accounts = User.objects.get(id=self.user.id)
-        serializer = UserAccountSerializer(user_accounts)
+        serializer = AuthenticationSerializer(user_accounts)
 
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -134,7 +133,6 @@ class UserAccountViewSetTestCase(APITestCase):
 
         url = self.get_user_account_detail_url(self.user.pk)
         response = self.client.patch(url, data=payload, format="json")
-
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_destroy_valid(self):

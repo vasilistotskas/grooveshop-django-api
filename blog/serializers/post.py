@@ -59,8 +59,8 @@ class BlogPostSerializer(TranslatableModelSerializer, BaseExpandSerializer):
 
     def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:
         user_account_serializer = importlib.import_module(
-            "user.serializers.account"
-        ).UserAccountSerializer
+            "authentication.serializers"
+        ).AuthenticationSerializer
         blog_category_serializer = importlib.import_module(
             "blog.serializers.category"
         ).BlogCategorySerializer

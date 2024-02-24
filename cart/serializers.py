@@ -18,7 +18,7 @@ class CartItemSerializer(serializers.ModelSerializer):
     total_discount_value = MoneyField(max_digits=11, decimal_places=2, read_only=True)
 
     @extend_schema_field(ProductSerializer)
-    def get_product(self, cart_item) -> ProductSerializer:
+    def get_product(self, cart_item):
         return ProductSerializer(cart_item.product).data
 
     @extend_schema_field(serializers.IntegerField)
@@ -81,7 +81,7 @@ class CartSerializer(serializers.ModelSerializer):
     total_vat_value = MoneyField(max_digits=11, decimal_places=2, read_only=True)
 
     @extend_schema_field(serializers.ListSerializer(child=CartItemSerializer()))
-    def get_cart_items(self, cart: Cart) -> CartItemSerializer:
+    def get_cart_items(self, cart: Cart):
         qs = CartItem.objects.filter(cart=cart)
         serializer = CartItemSerializer(qs, many=True, context=self.context)
         return serializer.data

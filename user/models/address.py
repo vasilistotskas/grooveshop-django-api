@@ -94,7 +94,6 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
                 raise ValidationError(_("There can only be one main address per user."))
 
     @classmethod
-    # Return type is a list of UserAddress
     def get_user_addresses(cls, user) -> List["UserAddress"]:
         return cls.objects.filter(user=user)
 

@@ -762,6 +762,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/Authentication'
+        required: true
       security:
       - basicAuth: []
       - tokenAuth: []
@@ -8976,7 +8977,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedUserAccountList'
+                $ref: '#/components/schemas/PaginatedAuthenticationList'
           description: ''
     post:
       operationId: api_v1_user_account_create
@@ -8986,13 +8987,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/UserAccount'
+              $ref: '#/components/schemas/Authentication'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/UserAccount'
+              $ref: '#/components/schemas/Authentication'
           application/json:
             schema:
-              $ref: '#/components/schemas/UserAccount'
+              $ref: '#/components/schemas/Authentication'
         required: true
       security:
       - basicAuth: []
@@ -9002,7 +9003,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserAccount'
+                $ref: '#/components/schemas/Authentication'
           description: ''
   /api/v1/user/account{format}:
     get:
@@ -9057,7 +9058,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedUserAccountList'
+                $ref: '#/components/schemas/PaginatedAuthenticationList'
           description: ''
     post:
       operationId: api_v1_user_account_formatted_create
@@ -9075,13 +9076,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/UserAccount'
+              $ref: '#/components/schemas/Authentication'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/UserAccount'
+              $ref: '#/components/schemas/Authentication'
           application/json:
             schema:
-              $ref: '#/components/schemas/UserAccount'
+              $ref: '#/components/schemas/Authentication'
         required: true
       security:
       - basicAuth: []
@@ -9091,7 +9092,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserAccount'
+                $ref: '#/components/schemas/Authentication'
           description: ''
   /api/v1/user/account/{id}:
     get:
@@ -9112,7 +9113,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserAccount'
+                $ref: '#/components/schemas/Authentication'
           description: ''
     put:
       operationId: api_v1_user_account_update
@@ -9128,13 +9129,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/UserAccount'
+              $ref: '#/components/schemas/Authentication'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/UserAccount'
+              $ref: '#/components/schemas/Authentication'
           application/json:
             schema:
-              $ref: '#/components/schemas/UserAccount'
+              $ref: '#/components/schemas/Authentication'
         required: true
       security:
       - basicAuth: []
@@ -9144,7 +9145,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserAccount'
+                $ref: '#/components/schemas/Authentication'
           description: ''
     patch:
       operationId: api_v1_user_account_partial_update
@@ -9160,13 +9161,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedUserAccount'
+              $ref: '#/components/schemas/PatchedAuthentication'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedUserAccount'
+              $ref: '#/components/schemas/PatchedAuthentication'
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedUserAccount'
+              $ref: '#/components/schemas/PatchedAuthentication'
       security:
       - basicAuth: []
       - tokenAuth: []
@@ -9175,7 +9176,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserAccount'
+                $ref: '#/components/schemas/Authentication'
           description: ''
     delete:
       operationId: api_v1_user_account_destroy
@@ -9219,7 +9220,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserAccount'
+                $ref: '#/components/schemas/Authentication'
           description: ''
     put:
       operationId: api_v1_user_account_formatted_update
@@ -9242,13 +9243,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/UserAccount'
+              $ref: '#/components/schemas/Authentication'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/UserAccount'
+              $ref: '#/components/schemas/Authentication'
           application/json:
             schema:
-              $ref: '#/components/schemas/UserAccount'
+              $ref: '#/components/schemas/Authentication'
         required: true
       security:
       - basicAuth: []
@@ -9258,7 +9259,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserAccount'
+                $ref: '#/components/schemas/Authentication'
           description: ''
     patch:
       operationId: api_v1_user_account_formatted_partial_update
@@ -9281,13 +9282,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedUserAccount'
+              $ref: '#/components/schemas/PatchedAuthentication'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedUserAccount'
+              $ref: '#/components/schemas/PatchedAuthentication'
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedUserAccount'
+              $ref: '#/components/schemas/PatchedAuthentication'
       security:
       - basicAuth: []
       - tokenAuth: []
@@ -9296,7 +9297,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserAccount'
+                $ref: '#/components/schemas/Authentication'
           description: ''
     delete:
       operationId: api_v1_user_account_formatted_destroy
@@ -9321,31 +9322,14 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/user/account/session:
+  /api/v1/user/account/{id}/details:
     get:
-      operationId: api_v1_user_account_session_retrieve
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserAccount'
-          description: ''
-  /api/v1/user/account/session{format}:
-    get:
-      operationId: api_v1_user_account_session_formatted_retrieve
+      operationId: api_v1_user_account_details_retrieve
       parameters:
       - in: path
-        name: format
+        name: id
         schema:
-          type: string
-          enum:
-          - .json
+          type: integer
         required: true
       tags:
       - api
@@ -9357,7 +9341,35 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserAccount'
+                $ref: '#/components/schemas/Authentication'
+          description: ''
+  /api/v1/user/account/{id}/details{format}:
+    get:
+      operationId: api_v1_user_account_details_formatted_retrieve
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Authentication'
           description: ''
   /api/v1/user/address:
     get:
@@ -9937,44 +9949,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/UserAddress'
           description: ''
-  /api/v1/user/address/get_user_addresses:
-    get:
-      operationId: api_v1_user_address_get_user_addresses_retrieve
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserAddress'
-          description: ''
-  /api/v1/user/address/get_user_addresses{format}:
-    get:
-      operationId: api_v1_user_address_get_user_addresses_formatted_retrieve
-      parameters:
-      - in: path
-        name: format
-        schema:
-          type: string
-          enum:
-          - .json
-        required: true
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserAddress'
-          description: ''
   /api/v1/vat:
     get:
       operationId: api_v1_vat_list
@@ -10422,17 +10396,139 @@ components:
       type: object
       description: User model w/o password
       properties:
-        id:
+        pk:
           type: integer
           readOnly: true
+          title: Id
         email:
           type: string
           format: email
-          readOnly: true
           title: Email Address
+          maxLength: 254
+        firstName:
+          type: string
+          nullable: true
+          maxLength: 255
+        lastName:
+          type: string
+          nullable: true
+          maxLength: 255
+        id:
+          type: integer
+          readOnly: true
+        image:
+          type: string
+          format: uri
+          nullable: true
+        phone:
+          type: string
+        city:
+          type: string
+          nullable: true
+          maxLength: 255
+        zipcode:
+          type: string
+          nullable: true
+          title: Zip Code
+          maxLength: 255
+        address:
+          type: string
+          nullable: true
+          maxLength: 255
+        place:
+          type: string
+          nullable: true
+          maxLength: 255
+        country:
+          type: string
+          title: Country Code Alpha 2
+          nullable: true
+        region:
+          type: string
+          title: Region Code
+          nullable: true
+        isActive:
+          type: boolean
+          title: Active
+        isStaff:
+          type: boolean
+          title: Staff
+        birthDate:
+          type: string
+          format: date
+          nullable: true
+        twitter:
+          type: string
+          format: uri
+          nullable: true
+          title: Twitter Profile
+          maxLength: 200
+        linkedin:
+          type: string
+          format: uri
+          nullable: true
+          title: LinkedIn Profile
+          maxLength: 200
+        facebook:
+          type: string
+          format: uri
+          nullable: true
+          title: Facebook Profile
+          maxLength: 200
+        instagram:
+          type: string
+          format: uri
+          nullable: true
+          title: Instagram Profile
+          maxLength: 200
+        website:
+          type: string
+          format: uri
+          nullable: true
+          maxLength: 200
+        youtube:
+          type: string
+          format: uri
+          nullable: true
+          title: Youtube Profile
+          maxLength: 200
+        github:
+          type: string
+          format: uri
+          nullable: true
+          title: Github Profile
+          maxLength: 200
+        bio:
+          type: string
+          nullable: true
+        mainImageFilename:
+          type: string
+          readOnly: true
+        isSuperuser:
+          type: boolean
+          title: Superuser status
+          description: Designates that this user has all permissions without explicitly
+            assigning them.
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
       required:
+      - createdAt
       - email
       - id
+      - mainImageFilename
+      - pk
+      - updatedAt
+      - uuid
     AuthenticationLogin:
       type: object
       properties:
@@ -11759,6 +11855,26 @@ components:
         * `PAID_AND_SENT` - Paid and Sent
         * `CANCELED` - Canceled
         * `PENDING` - Pending
+    PaginatedAuthenticationList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Authentication'
     PaginatedBlogAuthorList:
       type: object
       properties:
@@ -12179,26 +12295,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Tip'
-    PaginatedUserAccountList:
-      type: object
-      properties:
-        count:
-          type: integer
-          example: 123
-        next:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=4
-        previous:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=2
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/UserAccount'
     PaginatedUserAddressList:
       type: object
       properties:
@@ -12243,14 +12339,131 @@ components:
       type: object
       description: User model w/o password
       properties:
-        id:
+        pk:
           type: integer
           readOnly: true
+          title: Id
         email:
           type: string
           format: email
-          readOnly: true
           title: Email Address
+          maxLength: 254
+        firstName:
+          type: string
+          nullable: true
+          maxLength: 255
+        lastName:
+          type: string
+          nullable: true
+          maxLength: 255
+        id:
+          type: integer
+          readOnly: true
+        image:
+          type: string
+          format: uri
+          nullable: true
+        phone:
+          type: string
+        city:
+          type: string
+          nullable: true
+          maxLength: 255
+        zipcode:
+          type: string
+          nullable: true
+          title: Zip Code
+          maxLength: 255
+        address:
+          type: string
+          nullable: true
+          maxLength: 255
+        place:
+          type: string
+          nullable: true
+          maxLength: 255
+        country:
+          type: string
+          title: Country Code Alpha 2
+          nullable: true
+        region:
+          type: string
+          title: Region Code
+          nullable: true
+        isActive:
+          type: boolean
+          title: Active
+        isStaff:
+          type: boolean
+          title: Staff
+        birthDate:
+          type: string
+          format: date
+          nullable: true
+        twitter:
+          type: string
+          format: uri
+          nullable: true
+          title: Twitter Profile
+          maxLength: 200
+        linkedin:
+          type: string
+          format: uri
+          nullable: true
+          title: LinkedIn Profile
+          maxLength: 200
+        facebook:
+          type: string
+          format: uri
+          nullable: true
+          title: Facebook Profile
+          maxLength: 200
+        instagram:
+          type: string
+          format: uri
+          nullable: true
+          title: Instagram Profile
+          maxLength: 200
+        website:
+          type: string
+          format: uri
+          nullable: true
+          maxLength: 200
+        youtube:
+          type: string
+          format: uri
+          nullable: true
+          title: Youtube Profile
+          maxLength: 200
+        github:
+          type: string
+          format: uri
+          nullable: true
+          title: Github Profile
+          maxLength: 200
+        bio:
+          type: string
+          nullable: true
+        mainImageFilename:
+          type: string
+          readOnly: true
+        isSuperuser:
+          type: boolean
+          title: Superuser status
+          description: Designates that this user has all permissions without explicitly
+            assigning them.
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
     PatchedBlogAuthor:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -13654,134 +13867,6 @@ components:
           type: string
           format: uuid
           readOnly: true
-    PatchedUserAccount:
-      type: object
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        email:
-          type: string
-          format: email
-          title: Email Address
-          maxLength: 254
-        image:
-          type: string
-          format: uri
-          nullable: true
-        firstName:
-          type: string
-          nullable: true
-          maxLength: 255
-        lastName:
-          type: string
-          nullable: true
-          maxLength: 255
-        phone:
-          type: string
-        city:
-          type: string
-          nullable: true
-          maxLength: 255
-        zipcode:
-          type: string
-          nullable: true
-          title: Zip Code
-          maxLength: 255
-        address:
-          type: string
-          nullable: true
-          maxLength: 255
-        place:
-          type: string
-          nullable: true
-          maxLength: 255
-        country:
-          type: string
-          title: Country Code Alpha 2
-          nullable: true
-        region:
-          type: string
-          title: Region Code
-          nullable: true
-        isActive:
-          type: boolean
-          title: Active
-        isStaff:
-          type: boolean
-          title: Staff
-        birthDate:
-          type: string
-          format: date
-          nullable: true
-        twitter:
-          type: string
-          format: uri
-          nullable: true
-          title: Twitter Profile
-          maxLength: 200
-        linkedin:
-          type: string
-          format: uri
-          nullable: true
-          title: LinkedIn Profile
-          maxLength: 200
-        facebook:
-          type: string
-          format: uri
-          nullable: true
-          title: Facebook Profile
-          maxLength: 200
-        instagram:
-          type: string
-          format: uri
-          nullable: true
-          title: Instagram Profile
-          maxLength: 200
-        website:
-          type: string
-          format: uri
-          nullable: true
-          maxLength: 200
-        youtube:
-          type: string
-          format: uri
-          nullable: true
-          title: Youtube Profile
-          maxLength: 200
-        github:
-          type: string
-          format: uri
-          nullable: true
-          title: Github Profile
-          maxLength: 200
-        bio:
-          type: string
-          nullable: true
-        mainImageFilename:
-          type: string
-          readOnly: true
-        isSuperuser:
-          type: boolean
-          title: Superuser status
-          description: Designates that this user has all permissions without explicitly
-            assigning them.
-        lastLogin:
-          type: string
-          format: date-time
-          readOnly: true
-        createdAt:
-          type: string
-          format: date-time
-          readOnly: true
-        updatedAt:
-          type: string
-          format: date-time
-          readOnly: true
-        uuid:
-          type: string
-          format: uuid
-          readOnly: true
     PatchedUserAddress:
       type: object
       properties:
@@ -14914,142 +14999,6 @@ components:
           writeOnly: true
       required:
       - token
-    UserAccount:
-      type: object
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        email:
-          type: string
-          format: email
-          title: Email Address
-          maxLength: 254
-        image:
-          type: string
-          format: uri
-          nullable: true
-        firstName:
-          type: string
-          nullable: true
-          maxLength: 255
-        lastName:
-          type: string
-          nullable: true
-          maxLength: 255
-        phone:
-          type: string
-        city:
-          type: string
-          nullable: true
-          maxLength: 255
-        zipcode:
-          type: string
-          nullable: true
-          title: Zip Code
-          maxLength: 255
-        address:
-          type: string
-          nullable: true
-          maxLength: 255
-        place:
-          type: string
-          nullable: true
-          maxLength: 255
-        country:
-          type: string
-          title: Country Code Alpha 2
-          nullable: true
-        region:
-          type: string
-          title: Region Code
-          nullable: true
-        isActive:
-          type: boolean
-          title: Active
-        isStaff:
-          type: boolean
-          title: Staff
-        birthDate:
-          type: string
-          format: date
-          nullable: true
-        twitter:
-          type: string
-          format: uri
-          nullable: true
-          title: Twitter Profile
-          maxLength: 200
-        linkedin:
-          type: string
-          format: uri
-          nullable: true
-          title: LinkedIn Profile
-          maxLength: 200
-        facebook:
-          type: string
-          format: uri
-          nullable: true
-          title: Facebook Profile
-          maxLength: 200
-        instagram:
-          type: string
-          format: uri
-          nullable: true
-          title: Instagram Profile
-          maxLength: 200
-        website:
-          type: string
-          format: uri
-          nullable: true
-          maxLength: 200
-        youtube:
-          type: string
-          format: uri
-          nullable: true
-          title: Youtube Profile
-          maxLength: 200
-        github:
-          type: string
-          format: uri
-          nullable: true
-          title: Github Profile
-          maxLength: 200
-        bio:
-          type: string
-          nullable: true
-        mainImageFilename:
-          type: string
-          readOnly: true
-        isSuperuser:
-          type: boolean
-          title: Superuser status
-          description: Designates that this user has all permissions without explicitly
-            assigning them.
-        lastLogin:
-          type: string
-          format: date-time
-          readOnly: true
-        createdAt:
-          type: string
-          format: date-time
-          readOnly: true
-        updatedAt:
-          type: string
-          format: date-time
-          readOnly: true
-        uuid:
-          type: string
-          format: uuid
-          readOnly: true
-      required:
-      - createdAt
-      - email
-      - id
-      - lastLogin
-      - mainImageFilename
-      - updatedAt
-      - uuid
     UserAddress:
       type: object
       properties:

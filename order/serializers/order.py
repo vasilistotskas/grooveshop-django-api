@@ -28,15 +28,15 @@ class OrderSerializer(serializers.ModelSerializer):
     mobile_phone = PhoneNumberField(required=False)
 
     @extend_schema_field(CountrySerializer)
-    def get_country(self, order) -> CountrySerializer:
+    def get_country(self, order):
         return CountrySerializer(order.country).data
 
     @extend_schema_field(RegionSerializer)
-    def get_region(self, order) -> RegionSerializer:
+    def get_region(self, order):
         return RegionSerializer(order.region).data
 
     @extend_schema_field(PayWaySerializer)
-    def get_pay_way(self, order) -> PayWaySerializer:
+    def get_pay_way(self, order):
         return PayWaySerializer(order.pay_way).data
 
     class Meta:

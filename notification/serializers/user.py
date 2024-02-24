@@ -27,8 +27,8 @@ class NotificationUserSerializer(BaseExpandSerializer):
 
     def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:
         user_account_serializer = importlib.import_module(
-            "user.serializers.account"
-        ).UserAccountSerializer
+            "authentication.serializers"
+        ).AuthenticationSerializer
         notification_serializer = importlib.import_module(
             "notification.serializers.notification"
         ).NotificationSerializer

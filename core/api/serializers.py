@@ -7,46 +7,44 @@ from rest_framework import serializers
 
 
 class BaseExpandSerializer(serializers.ModelSerializer):
-    expand = False
-
     class Meta:
         model = None
         fields = "__all__"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.expand = self.context.get("expand", False)
+        expand_context = self.context.get("expand", "false")
+        if isinstance(expand_context, str):
+            self.expand = expand_context.lower() == "true"
+        else:
+            self.expand = bool(expand_context)
+        self.expansion_path = self.context.get("expansion_path", [])
 
-    def to_representation(self, instance):
-        if self.context.get("is_expanding", False):
+    def to_representation(self, instance) -> Dict[str, any]:
+        if self.Meta.model.__name__ in self.expansion_path:
             return super().to_representation(instance)
 
         data = super().to_representation(instance)
-        self.context["is_expanding"] = True
+        if self.expand:
+            self.expansion_path.append(self.Meta.model.__name__)
+            data = self._expand_fields(instance, data)
+            self.expansion_path.pop()
 
-        expand_context = self.context.get("expand", "false")
-        if isinstance(expand_context, str):
-            expand = expand_context.lower() == "true"
-        else:
-            expand = bool(expand_context)
+        return data
 
-        if expand:
-            expand_fields = self.get_expand_fields()
-            for field_name, field_serializer_class in expand_fields.items():
-                field_value = getattr(instance, field_name, None)
+    def _expand_fields(self, instance, data: Dict[str, any]) -> Dict[str, any]:
+        for field_name, serializer_class in self.get_expand_fields().items():
+            if field_name in self.expansion_path:
+                continue
 
-                if hasattr(field_value, "all"):
-                    data[field_name] = field_serializer_class(
-                        field_value.all(), many=True, context=self.context
-                    ).data
-
-                elif field_value is not None:
-                    data[field_name] = field_serializer_class(
-                        field_value, context=self.context
-                    ).data
-
-        self.context.pop("is_expanding", None)
-
+            field_value = getattr(instance, field_name, None)
+            if field_value is not None:
+                is_many = hasattr(field_value, "all")
+                data[field_name] = serializer_class(
+                    field_value.all() if is_many else field_value,
+                    many=is_many,
+                    context=self.context,
+                ).data
         return data
 
     def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:

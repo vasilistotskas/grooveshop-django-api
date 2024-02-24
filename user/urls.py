@@ -1,7 +1,6 @@
 from django.urls import path
 from rest_framework.urlpatterns import format_suffix_patterns
 
-from user.views.account import UserAccountSessionView
 from user.views.account import UserAccountViewSet
 from user.views.address import UserAddressViewSet
 
@@ -24,9 +23,9 @@ urlpatterns = [
         name="user-account-detail",
     ),
     path(
-        "user/account/session",
-        UserAccountSessionView.as_view(),
-        name="user-account-session",
+        "user/account/<int:pk>/details",
+        UserAccountViewSet.as_view({"get": "details"}),
+        name="user-account-details",
     ),
     # Address
     path(
@@ -50,11 +49,6 @@ urlpatterns = [
         "user/address/<int:pk>/set_main",
         UserAddressViewSet.as_view({"post": "set_main"}),
         name="user-address-set-main",
-    ),
-    path(
-        "user/address/get_user_addresses",
-        UserAddressViewSet.as_view({"get": "get_user_addresses"}),
-        name="user-address-get-user-addresses",
     ),
 ]
 

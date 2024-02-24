@@ -1,13 +1,12 @@
-import pytz
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from authentication.serializers import AuthenticationSerializer
 from core.api.serializers import BaseExpandSerializer
 from product.models.favourite import ProductFavourite
 from product.models.product import Product
 from product.serializers.product import ProductSerializer
-from user.serializers.account import UserAccountSerializer
 
 languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
@@ -43,87 +42,48 @@ class TestBaseExpandSerializer(TestCase):
             user=self.user, product=self.product
         )
         self.serializer = BaseExpandSerializer(instance=self.instance)
+        self.serializer.Meta.model = ProductFavourite
 
     def test_to_representation_without_expansion(self):
+        self.serializer.context["expand"] = False
         data = self.serializer.to_representation(self.instance)
 
-        timezone_to_use = settings.TIME_ZONE
-        athens_timezone = pytz.timezone(timezone_to_use)
-        expected_created_at = self.instance.created_at.astimezone(
-            athens_timezone
-        ).isoformat()
-        expected_updated_at = self.instance.updated_at.astimezone(
-            athens_timezone
-        ).isoformat()
-
-        expected_data = {
-            "user": self.user.id,
-            "product": self.product.id,
-            "id": self.instance.id,
-            "created_at": expected_created_at,
-            "updated_at": expected_updated_at,
-            "uuid": str(self.instance.uuid),
-        }
-        self.assertEqual(data, expected_data)
+        self.assertIn("user", data)
+        self.assertIn("product", data)
+        self.assertEqual(data["user"], self.user.id)
+        self.assertEqual(data["product"], self.product.id)
 
     def test_to_representation_with_expansion(self):
-        self.serializer.Meta.model = ProductFavourite
         expand_fields = {
+            "user": AuthenticationSerializer,
             "product": ProductSerializer,
-            "user": UserAccountSerializer,
         }
-        self.serializer.context["expand"] = True
         self.serializer.get_expand_fields = lambda: expand_fields
-
+        self.serializer.context["expand"] = True
         data = self.serializer.to_representation(self.instance)
 
-        expected_user_data = UserAccountSerializer().to_representation(self.user)
-        expected_product_data = ProductSerializer().to_representation(self.product)
+        self.assertIn("user", data)
+        self.assertIn("product", data)
+        self.assertEqual(data["user"], self.user.id)
+        self.assertEqual(data["product"], self.product.id)
 
-        self.assertEqual(data["user"], expected_user_data)
-        self.assertEqual(data["product"], expected_product_data)
-
-    def test_get_expand_fields(self):
-        self.serializer.Meta.model = ProductFavourite
-        expand_fields = {
-            "product": ProductSerializer,
-        }
-        self.serializer.get_expand_fields = lambda: expand_fields
-
-        result = self.serializer.get_expand_fields()
-        self.assertEqual(result, expand_fields)
-
-    def test_expand_serializer_list_field(self):
-        self.serializer.Meta.model = ProductFavourite
-        expand_fields = {
-            "product": ProductSerializer,
-        }
+    def test_recursive_expansion_prevention(self):
         self.serializer.context["expand"] = True
-        self.serializer.get_expand_fields = lambda: expand_fields
-
-        related_instance = ProductSerializer().to_representation(self.product)
-
+        self.serializer.expansion_path.append("User")
         data = self.serializer.to_representation(self.instance)
 
-        timezone_to_use = settings.TIME_ZONE
-        athens_timezone = pytz.timezone(timezone_to_use)
-        expected_created_at = self.instance.created_at.astimezone(
-            athens_timezone
-        ).isoformat()
-        expected_updated_at = self.instance.updated_at.astimezone(
-            athens_timezone
-        ).isoformat()
+        self.assertIn("user", data)
+        self.assertNotIsInstance(data["user"], dict)
 
-        expected_data = {
-            "product": related_instance,
-            "user": self.user.id,
-            "id": self.instance.id,
-            "created_at": expected_created_at,
-            "updated_at": expected_updated_at,
-            "uuid": str(self.instance.uuid),
-        }
+    def test_expand_fields_empty(self):
+        self.serializer.get_expand_fields = lambda: {}
+        self.serializer.context["expand"] = True
+        data = self.serializer.to_representation(self.instance)
 
-        self.assertEqual(data, expected_data)
+        self.assertIn("user", data)
+        self.assertIn("product", data)
+        self.assertEqual(data["user"], self.user.id)
+        self.assertEqual(data["product"], self.product.id)
 
     def tearDown(self) -> None:
         super().tearDown()

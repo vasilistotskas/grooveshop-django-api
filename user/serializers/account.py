@@ -1,55 +1,57 @@
-from django.http import HttpRequest
 from drf_spectacular.utils import extend_schema_field
-from phonenumber_field.serializerfields import PhoneNumberField
 from rest_framework import serializers
 
+from blog.serializers.comment import BlogCommentSerializer
+from order.serializers.order import OrderSerializer
+from product.serializers.favourite import ProductFavouriteSerializer
+from product.serializers.review import ProductReviewSerializer
 from user.models import UserAccount
+from user.serializers.address import UserAddressSerializer
 
 
-class UserAccountSerializer(serializers.ModelSerializer):
-    last_login = serializers.SerializerMethodField("get_last_login")
-    phone = PhoneNumberField(required=False)
+class UserAccountDetailsSerializer(serializers.ModelSerializer):
+    favourite_products = serializers.SerializerMethodField("get_favourite_products")
+    orders = serializers.SerializerMethodField("get_orders")
+    product_reviews = serializers.SerializerMethodField("get_product_reviews")
+    user_addresses = serializers.SerializerMethodField("get_user_addresses")
+    blog_comments = serializers.SerializerMethodField("get_blog_comments")
 
-    @extend_schema_field(serializers.DateTimeField)
-    def get_last_login(self, user_account) -> str or None:
-        request: HttpRequest = self.context.get("request")
-        try:
-            last_login = request.session.get("last_login", None)
-        except AttributeError:
-            last_login = None
-        return last_login
+    @extend_schema_field(ProductFavouriteSerializer)
+    def get_favourite_products(self, user_account: UserAccount):
+        return ProductFavouriteSerializer(
+            user_account.user_product_favourite, many=True, context=self.context
+        ).data
+
+    @extend_schema_field(OrderSerializer)
+    def get_orders(self, user_account: UserAccount):
+        return OrderSerializer(
+            user_account.user_order, many=True, context=self.context
+        ).data
+
+    @extend_schema_field(ProductReviewSerializer)
+    def get_product_reviews(self, user_account: UserAccount):
+        return ProductReviewSerializer(
+            user_account.product_review_user, many=True, context=self.context
+        ).data
+
+    @extend_schema_field(UserAddressSerializer)
+    def get_user_addresses(self, user_account: UserAccount):
+        return UserAddressSerializer(
+            user_account.user_address, many=True, context=self.context
+        ).data
+
+    @extend_schema_field(BlogCommentSerializer)
+    def get_blog_comments(self, user_account: UserAccount):
+        return BlogCommentSerializer(
+            user_account.blog_comment_user, many=True, context=self.context
+        ).data
 
     class Meta:
         model = UserAccount
         fields = (
-            "id",
-            "email",
-            "image",
-            "first_name",
-            "last_name",
-            "phone",
-            "city",
-            "zipcode",
-            "address",
-            "place",
-            "country",
-            "region",
-            "is_active",
-            "is_staff",
-            "birth_date",
-            "twitter",
-            "linkedin",
-            "facebook",
-            "instagram",
-            "website",
-            "youtube",
-            "github",
-            "bio",
-            "main_image_filename",
-            "is_superuser",
-            "last_login",
-            "is_active",
-            "created_at",
-            "updated_at",
-            "uuid",
+            "favourite_products",
+            "orders",
+            "product_reviews",
+            "user_addresses",
+            "blog_comments",
         )

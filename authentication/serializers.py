@@ -16,6 +16,7 @@ from django.conf import settings
 from django.contrib.auth.forms import PasswordResetForm
 from django.contrib.sites.shortcuts import get_current_site
 from django.utils.translation import gettext_lazy as _
+from phonenumber_field.serializerfields import PhoneNumberField
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
@@ -41,11 +42,41 @@ class AuthenticationTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 
 class AuthenticationSerializer(UserDetailsSerializer):
+    phone = PhoneNumberField(required=False)
+
     class Meta(UserDetailsSerializer.Meta):
-        fields = (
+        fields = UserDetailsSerializer.Meta.fields + (
             "id",
             "email",
+            "image",
+            "first_name",
+            "last_name",
+            "phone",
+            "city",
+            "zipcode",
+            "address",
+            "place",
+            "country",
+            "region",
+            "is_active",
+            "is_staff",
+            "birth_date",
+            "twitter",
+            "linkedin",
+            "facebook",
+            "instagram",
+            "website",
+            "youtube",
+            "github",
+            "bio",
+            "main_image_filename",
+            "is_superuser",
+            "is_active",
+            "created_at",
+            "updated_at",
+            "uuid",
         )
+        read_only_fields = ()
 
 
 class AuthenticationAllAuthPasswordResetForm(AllAuthPasswordResetForm):

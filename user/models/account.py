@@ -119,17 +119,14 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
         return self.email
 
     def remove_all_sessions(self, request: HttpRequest) -> None:
-        # Get the user's primary key
         user_id = self.pk
 
-        # Delete all sessions associated with the user's primary key
         sessions = Session.objects.filter(
             expire_date__gte=timezone.now(),
             session_data__contains=f'"_auth_user_id":{user_id}',
         )
         sessions.delete()
 
-        # Session Cache
         user_cache_keys = cache_instance.keys(f"{caches.USER_AUTHENTICATED}{user_id}:*")
         django_cache_keys = cache_instance.keys("django.contrib.sessions.cache*")
 
@@ -158,7 +155,6 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
         except Session.DoesNotExist:
             pass
 
-        # Session Cache
         if request.user.is_authenticated:
             cache_instance.delete(
                 f"{caches.USER_AUTHENTICATED}{user.pk}:"

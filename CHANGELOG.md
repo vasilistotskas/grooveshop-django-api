@@ -3,7 +3,17 @@
 
 
 
+## v0.75.0 (2024-03-01)
+
+### Feature
+
+* feat: introduce `rest_framework_simplejwt.token_blacklist` ([`7653430`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7653430c95beced7d8875f35003b0ee87cb0715a))
+
 ## v0.74.0 (2024-03-01)
+
+### Chore
+
+* chore(release): release version 0.74.0 [skip ci] ([`3c17a8f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3c17a8fde481db47aa8d6a1512b985894011defe))
 
 ### Feature
 

@@ -86,9 +86,9 @@ urlpatterns = [
         name="product-review-detail",
     ),
     path(
-        "product/review/user_had_reviewed",
-        ProductReviewViewSet.as_view({"post": "user_had_reviewed"}),
-        name="product-review-user-had-reviewed",
+        "product/review/user_to_product_review",
+        ProductReviewViewSet.as_view({"post": "user_to_product_review"}),
+        name="product-review-user-to-product-review",
     ),
     # Images
     path(

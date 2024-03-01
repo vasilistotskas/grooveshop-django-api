@@ -84,12 +84,18 @@ class ProductReviewViewSet(BaseExpandView, ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def get_permissions(self):
-        if self.action in ["create", "update", "partial_update", "destroy"]:
+        if self.action in [
+            "create",
+            "update",
+            "partial_update",
+            "destroy",
+            "user_to_product_review",
+        ]:
             self.permission_classes = [IsAuthenticated]
         return super().get_permissions()
 
     @action(detail=False, methods=["POST"])
-    def user_had_reviewed(self, request, *args, **kwargs) -> Response:
+    def user_to_product_review(self, request, *args, **kwargs) -> Response:
         user_id = request.data.get("user")
         product_id = request.data.get("product")
 
@@ -100,11 +106,15 @@ class ProductReviewViewSet(BaseExpandView, ModelViewSet):
             )
 
         try:
-            user_had_reviewed = ProductReview.objects.filter(
-                user_id=user_id, product_id=product_id
-            ).exists()
+            review = ProductReview.objects.get(user_id=user_id, product_id=product_id)
+            serializer = self.get_serializer(review)
+            return Response(serializer.data, status=status.HTTP_200_OK)
 
-            return Response(user_had_reviewed, status=status.HTTP_200_OK)
+        except ProductReview.DoesNotExist:
+            return Response(
+                {"detail": "User has not reviewed this product"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         except ValueError:
             return Response(

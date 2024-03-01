@@ -64,7 +64,7 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
     class Meta(TypedModelMeta):
         verbose_name = _("User Address")
         verbose_name_plural = _("User Addresses")
-        ordering = ["-created_at"]
+        ordering = ["-is_main", "-created_at"]
         constraints = [
             models.UniqueConstraint(
                 fields=["user", "is_main"],

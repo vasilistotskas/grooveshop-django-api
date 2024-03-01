@@ -6961,9 +6961,9 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/product/review/user_had_reviewed:
+  /api/v1/product/review/user_to_product_review:
     post:
-      operationId: api_v1_product_review_user_had_reviewed_create
+      operationId: api_v1_product_review_user_to_product_review_create
       tags:
       - api
       requestBody:
@@ -6981,7 +6981,6 @@ paths:
       security:
       - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '200':
           content:
@@ -6989,9 +6988,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProductReview'
           description: ''
-  /api/v1/product/review/user_had_reviewed{format}:
+  /api/v1/product/review/user_to_product_review{format}:
     post:
-      operationId: api_v1_product_review_user_had_reviewed_formatted_create
+      operationId: api_v1_product_review_user_to_product_review_formatted_create
       parameters:
       - in: path
         name: format
@@ -7017,7 +7016,6 @@ paths:
       security:
       - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '200':
           content:

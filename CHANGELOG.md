@@ -3,7 +3,17 @@
 
 
 
+## v0.74.0 (2024-03-01)
+
+### Feature
+
+* feat: `user_had_reviewed` method change to `user_to_product_review` and change user addresses model ordering Meta field ([`a5ebf0e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a5ebf0eb77ed330f1d66a7cac2ad0e91b757de79))
+
 ## v0.73.0 (2024-02-26)
+
+### Chore
+
+* chore(release): release version 0.73.0 [skip ci] ([`7afaddd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7afaddd3c9e7aa3d905ec99bd2680a14f663927e))
 
 ### Feature
 

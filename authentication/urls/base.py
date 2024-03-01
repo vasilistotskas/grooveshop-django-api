@@ -36,10 +36,12 @@ urlpatterns = [
 
 if api_settings.USE_JWT:
     from rest_framework_simplejwt.views import TokenVerifyView
+    from rest_framework_simplejwt.views import TokenBlacklistView
 
     from dj_rest_auth.jwt_auth import get_refresh_view
 
     urlpatterns += [
         path("token/verify", TokenVerifyView.as_view(), name="token_verify"),
         path("token/refresh", get_refresh_view().as_view(), name="token_refresh"),
+        path("token/blacklist", TokenBlacklistView.as_view(), name="token_blacklist"),
     ]

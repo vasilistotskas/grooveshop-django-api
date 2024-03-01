@@ -660,6 +660,33 @@ paths:
               schema:
                 $ref: '#/components/schemas/SocialConnect'
           description: ''
+  /api/v1/auth/token/blacklist:
+    post:
+      operationId: api_v1_auth_token_blacklist_create
+      description: |-
+        Takes a token and blacklists it. Must be used with the
+        `rest_framework_simplejwt.token_blacklist` app installed.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenBlacklist'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenBlacklist'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenBlacklist'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenBlacklist'
+          description: ''
   /api/v1/auth/token/refresh:
     post:
       operationId: api_v1_auth_token_refresh_create
@@ -14977,6 +15004,14 @@ components:
       - translations
       - updatedAt
       - uuid
+    TokenBlacklist:
+      type: object
+      properties:
+        refresh:
+          type: string
+          writeOnly: true
+      required:
+      - refresh
     TokenRefresh:
       type: object
       properties:
@@ -14985,7 +15020,6 @@ components:
           readOnly: true
         refresh:
           type: string
-          writeOnly: true
       required:
       - access
       - refresh

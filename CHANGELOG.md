@@ -3,7 +3,19 @@
 
 
 
+## v0.76.0 (2024-03-03)
+
+### Feature
+
+* feat: Bump Versions
+
+- Django 5.0 and django-celery-beat 2.6.0 ([`069b838`](https://github.com/vasilistotskas/grooveshop-django-api/commit/069b8384376da556fea256f2adcad15921a4dc90))
+
 ## v0.75.0 (2024-03-01)
+
+### Chore
+
+* chore(release): release version 0.75.0 [skip ci] ([`3116f4f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3116f4f62e5152e785da35aa6fc6a1a289885b10))
 
 ### Feature
 

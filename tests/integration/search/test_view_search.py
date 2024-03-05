@@ -19,7 +19,6 @@ class SearchProductAPITest(APITestCase):
     product5: Product = None
 
     def setUp(self):
-        # Create some test products
         self.product1 = Product.objects.create(
             product_code="P123456",
             slug="Samsung-Galaxy-Z-Fold5-5G-Dual-SIM-12GB-512GB-Phantom-Black",

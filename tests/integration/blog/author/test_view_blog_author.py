@@ -71,7 +71,7 @@ class BlogAuthorViewSetTestCase(APITestCase):
 
     def test_create_invalid(self):
         payload = {
-            "user": "invalid_user_id",  # An invalid user ID, should raise validation error
+            "user": "invalid_user_id",
             "translations": {
                 "invalid_lang_code": {
                     "bio": "Translation for invalid language code",
@@ -94,7 +94,7 @@ class BlogAuthorViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_retrieve_invalid(self):
-        invalid_author_id = 9999  # An ID that doesn't exist in the database
+        invalid_author_id = 9999
         url = self.get_author_detail_url(invalid_author_id)
         response = self.client.get(url)
 
@@ -126,7 +126,7 @@ class BlogAuthorViewSetTestCase(APITestCase):
 
     def test_update_invalid(self):
         payload = {
-            "user": "invalid_user_id",  # An invalid user ID, should raise validation error
+            "user": "invalid_user_id",
             "translations": {
                 "invalid_lang_code": {
                     "bio": "Translation for invalid language code",
@@ -155,7 +155,7 @@ class BlogAuthorViewSetTestCase(APITestCase):
 
     def test_partial_update_invalid(self):
         payload = {
-            "user": "invalid_user_id",  # An invalid user ID, should raise validation error
+            "user": "invalid_user_id",
             "translations": {
                 "invalid_lang_code": {
                     "bio": "Translation for invalid language code",
@@ -176,7 +176,7 @@ class BlogAuthorViewSetTestCase(APITestCase):
         self.assertFalse(BlogAuthor.objects.filter(pk=self.author.pk).exists())
 
     def test_destroy_invalid(self):
-        invalid_author_id = 9999  # An ID that doesn't exist in the database
+        invalid_author_id = 9999
         url = self.get_author_detail_url(invalid_author_id)
         response = self.client.delete(url)
 

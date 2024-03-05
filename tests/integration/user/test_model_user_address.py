@@ -14,7 +14,6 @@ class UserAddressModelTestCase(TestCase):
     address: UserAddress = None
 
     def setUp(self):
-        # Create a sample user for testing
         self.user = User.objects.create_user(
             email="test@test.com", password="test12345@!"
         )
@@ -27,8 +26,8 @@ class UserAddressModelTestCase(TestCase):
             street_number="Apt 4B",
             city="Cityville",
             zipcode="12345",
-            country=None,  # You can set an actual country object here
-            region=None,  # You can set an actual region object here
+            country=None,
+            region=None,
             floor=FloorChoicesEnum.FIRST_FLOOR.value,
             location_type=LocationChoicesEnum.HOME.value,
             phone="123-456-7890",
@@ -38,7 +37,6 @@ class UserAddressModelTestCase(TestCase):
         )
 
     def test_fields(self):
-        # Test if the fields are saved correctly
         self.assertEqual(UserAddress.objects.count(), 1)
         self.assertEqual(self.address.user, self.user)
         self.assertEqual(self.address.title, "Home")
@@ -55,7 +53,6 @@ class UserAddressModelTestCase(TestCase):
         self.assertEqual(self.address.phone, "123-456-7890")
 
     def test_verbose_names(self):
-        # Test verbose names for fields
         self.assertEqual(UserAddress._meta.get_field("user").verbose_name, "user")
         self.assertEqual(UserAddress._meta.get_field("title").verbose_name, "Title")
         self.assertEqual(
@@ -89,12 +86,10 @@ class UserAddressModelTestCase(TestCase):
         self.assertEqual(UserAddress._meta.get_field("is_main").verbose_name, "Is Main")
 
     def test_meta_verbose_names(self):
-        # Test verbose names for model
         self.assertEqual(UserAddress._meta.verbose_name, "User Address")
         self.assertEqual(UserAddress._meta.verbose_name_plural, "User Addresses")
 
     def test_str_representation(self):
-        # Test the __str__ method returns the address title
         self.assertEqual(
             str(self.address),
             f"{self.address.title} - {self.address.first_name}"
@@ -140,7 +135,6 @@ class UserAddressModelTestCase(TestCase):
         )
         address = UserAddress.get_main_address(self.user)
 
-        # Ensure address is main is True and non_main_address_1 and non_main_address_2 are False
         self.assertTrue(address.is_main)
         self.assertFalse(non_main_address_1.is_main)
         self.assertFalse(non_main_address_2.is_main)

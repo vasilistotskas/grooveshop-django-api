@@ -47,7 +47,6 @@ class OrderItemModelTestCase(TestCase):
         self.assertEqual(self.order_item.total_price, expected_total_price)
 
     def test_fields(self):
-        # Test if the fields are saved correctly
         self.assertEqual(self.order_item.order, self.order)
         self.assertEqual(self.order_item.product, self.product)
         self.assertEqual(
@@ -56,7 +55,6 @@ class OrderItemModelTestCase(TestCase):
         self.assertEqual(self.order_item.quantity, 3)
 
     def test_verbose_names(self):
-        # Test verbose names for fields
         self.assertEqual(
             self.order_item._meta.get_field("order").verbose_name, _("order")
         )
@@ -71,7 +69,6 @@ class OrderItemModelTestCase(TestCase):
         )
 
     def test_meta_verbose_names(self):
-        # Test verbose names from the Meta class
         self.assertEqual(OrderItem._meta.verbose_name, _("Order Item"))
         self.assertEqual(OrderItem._meta.verbose_name_plural, _("Order Items"))
 

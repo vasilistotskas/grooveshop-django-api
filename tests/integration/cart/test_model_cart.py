@@ -46,22 +46,18 @@ class CartModelTestCase(TestCase):
         )
 
     def test_fields(self):
-        # Test if the fields are saved correctly
         self.assertEqual(self.cart.user, self.user)
         self.assertEqual(self.cart.last_activity.date(), timezone.now().date())
 
     def test_verbose_names(self):
-        # Test verbose names for fields
         self.assertEqual(Cart._meta.verbose_name, "Cart")
         self.assertEqual(Cart._meta.verbose_name_plural, "Carts")
 
     def test_meta_verbose_names(self):
-        # Test verbose names from the Meta class
         self.assertEqual(Cart._meta.verbose_name, "Cart")
         self.assertEqual(Cart._meta.verbose_name_plural, "Carts")
 
     def test_str_representation(self):
-        # Test the __str__ method returns the cart user - cart id
         expected_str = (
             f"Cart {self.user} - Items: {self.cart.total_items} - Total:"
             f" {self.cart.total_price}"

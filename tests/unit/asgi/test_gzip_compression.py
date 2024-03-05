@@ -96,7 +96,6 @@ class TestApp(ASGI3Application):
 
 @pytest.mark.asyncio
 async def test_gzip_compression():
-    # test data
     test_app = TestApp()
 
     test_scope = {"type": "http", "headers": [(b"accept-encoding", b"gzip")]}
@@ -117,5 +116,4 @@ async def test_gzip_compression():
         elif message["type"] == "http.response.body":
             assert isinstance(message.get("body"), bytes)
 
-    # Run tested function
     await wrapper_app(test_scope, receive, send)

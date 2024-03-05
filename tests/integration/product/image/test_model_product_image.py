@@ -51,13 +51,11 @@ class ProductImageModelTestCase(TestCase):
         self.product_image.set_current_language(default_language)
 
     def test_fields(self):
-        # Test if the fields are saved correctly
         self.assertEqual(self.product_image.product, self.product)
         self.assertTrue(self.product_image.is_main)
         self.assertTrue(default_storage.exists(self.product_image.image.path))
 
     def test_verbose_names(self):
-        # Test verbose names for fields
         self.assertEqual(
             ProductImage._meta.get_field("product").verbose_name, "product"
         )
@@ -70,12 +68,10 @@ class ProductImageModelTestCase(TestCase):
         )
 
     def test_meta_verbose_names(self):
-        # Test verbose names from the Meta class
         self.assertEqual(ProductImage._meta.verbose_name, "Product Image")
         self.assertEqual(ProductImage._meta.verbose_name_plural, "Product Images")
 
     def test_unicode_representation(self):
-        # Test unicode representation
         product_name = self.product.safe_translation_getter("name", any_language=True)
         main_status = "Main" if self.product_image.is_main else "Secondary"
 
@@ -85,7 +81,6 @@ class ProductImageModelTestCase(TestCase):
         )
 
     def test_translations(self):
-        # Test if translations are saved correctly
         for language in languages:
             self.product_image.set_current_language(language)
             self.assertEqual(
@@ -94,7 +89,6 @@ class ProductImageModelTestCase(TestCase):
             )
 
     def test_str_representation(self):
-        # Test the __str__ method returns the translated title
         product_name = self.product.safe_translation_getter("name", any_language=True)
         main_status = "Main" if self.product_image.is_main else "Secondary"
 
@@ -110,16 +104,13 @@ class ProductImageModelTestCase(TestCase):
         self.assertEqual(queryset.first(), self.product_image)
 
     def test_save(self):
-        # Check that thumbnail is created and set after saving
         self.assertTrue(default_storage.exists(self.product_image.thumbnail.path))
 
     def test_main_image_absolute_url(self):
-        # Test if main_image_absolute_url returns the correct URL
         expected_url = settings.APP_BASE_URL + self.product_image.image.url
         self.assertEqual(self.product_image.main_image_absolute_url, expected_url)
 
     def test_main_image_filename(self):
-        # Test if main_image_filename returns the correct filename
         expected_filename = os.path.basename(self.product_image.image.url)
         self.assertEqual(self.product_image.main_image_filename, expected_filename)
 

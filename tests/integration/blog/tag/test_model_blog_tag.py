@@ -21,20 +21,16 @@ class BlogTagModelTestCase(TestCase):
         self.tag.set_current_language(default_language)
 
     def test_fields(self):
-        # Test if the fields are saved correctly
         self.assertTrue(self.tag.active)
 
     def test_verbose_names(self):
-        # Test verbose names for fields
         self.assertEqual(BlogTag._meta.get_field("active").verbose_name, "Active")
 
     def test_meta_verbose_names(self):
-        # Test verbose names from the Meta class
         self.assertEqual(BlogTag._meta.verbose_name, "Blog Tag")
         self.assertEqual(BlogTag._meta.verbose_name_plural, "Blog Tags")
 
     def test_unicode_representation(self):
-        # Test the __unicode__ method returns the translated name
         tag_name = (
             self.tag.safe_translation_getter("name", any_language=True) or "Unnamed Tag"
         )
@@ -44,13 +40,11 @@ class BlogTagModelTestCase(TestCase):
         )
 
     def test_translations(self):
-        # Test if translations are saved correctly
         for language in languages:
             self.tag.set_current_language(language)
             self.assertEqual(self.tag.name, f"Tag name in {language}")
 
     def test_str_representation(self):
-        # Test the __str__ method returns the translated name
         tag_name = (
             self.tag.safe_translation_getter("name", any_language=True) or "Unnamed Tag"
         )
@@ -60,7 +54,6 @@ class BlogTagModelTestCase(TestCase):
         )
 
     def test_get_ordering_queryset(self):
-        # Test if the get_ordering_queryset method returns the correct queryset
         tag_2 = BlogTag.objects.create()
         tag_2.sort_order = 1
         tag_2.save()
@@ -70,7 +63,6 @@ class BlogTagModelTestCase(TestCase):
         tag_4 = BlogTag.objects.create()
         tag_4.sort_order = 3
         for language in languages:
-            # Set the name for each tag in each language
             tag_2.set_current_language(language)
             tag_2.name = f"Tag name in {language}"
             tag_2.save()
@@ -90,10 +82,9 @@ class BlogTagModelTestCase(TestCase):
         )
 
     def test_get_tag_posts_count(self):
-        # Test if the get_tag_posts_count property returns the correct count of related blog posts
         post = BlogPost.objects.create(
             title="Test Post",
-            status="draft",  # Set the status to "draft" for the test
+            status="draft",
             category=None,
             featured=False,
             view_count=0,

@@ -26,7 +26,6 @@ class ProductFavouriteModelTestCase(TestCase):
         )
 
     def test_fields(self):
-        # Test if the fields are saved correctly
         favourite = ProductFavourite.objects.create(
             user=self.user, product=self.product
         )
@@ -41,7 +40,6 @@ class ProductFavouriteModelTestCase(TestCase):
         )
 
     def test_str_representation(self):
-        # Test the __str__ method returns the user email
         favourite = ProductFavourite.objects.create(
             user=self.user, product=self.product
         )

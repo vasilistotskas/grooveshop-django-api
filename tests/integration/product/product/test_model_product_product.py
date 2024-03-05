@@ -40,11 +40,9 @@ class ProductModelTestCase(TestCase):
     product_favourite: ProductFavourite = None
 
     def setUp(self):
-        # Create a sample user for testing
         self.user = User.objects.create_user(
             email="test@test.com", password="test12345@!"
         )
-        # Create a sample Category instance for testing
         self.category = ProductCategory.objects.create(
             slug="sample-category",
         )
@@ -57,12 +55,10 @@ class ProductModelTestCase(TestCase):
             self.category.save()
         self.category.set_current_language(default_language)
 
-        # Create a sample VAT instance for testing
         self.vat = Vat.objects.create(
             value=Decimal("24.0"),
         )
 
-        # Create a sample Product instance for testing
         self.product = Product.objects.create(
             product_code="P123456",
             category=self.category,
@@ -84,7 +80,6 @@ class ProductModelTestCase(TestCase):
             self.product.save()
         self.product.set_current_language(default_language)
 
-        # Create a sample main ProductImage instance for testing
         image = get_or_create_default_image("uploads/products/no_photo.jpg")
         main_product_image = ProductImage.objects.create(
             product=self.product,
@@ -98,7 +93,6 @@ class ProductModelTestCase(TestCase):
         main_product_image.set_current_language(default_language)
         self.product_images.append(main_product_image)
 
-        # Create a sample non-main ProductImage instance for testing
         non_main_product_image = ProductImage.objects.create(
             product=self.product,
             image=image,
@@ -111,7 +105,6 @@ class ProductModelTestCase(TestCase):
         non_main_product_image.set_current_language(default_language)
         self.product_images.append(non_main_product_image)
 
-        # Create a sample ProductFavourite instance for testing
         self.product_favourite = ProductFavourite.objects.create(
             product=self.product,
             user=self.user,
@@ -121,7 +114,6 @@ class ProductModelTestCase(TestCase):
             email="test2@test.com", password="test12345@!"
         )
 
-        # Create a sample ProductReview with status "True" instance for testing
         product_review_status_true = ProductReview.objects.create(
             product=self.product,
             user=self.user,
@@ -131,7 +123,6 @@ class ProductModelTestCase(TestCase):
         )
         self.product_reviews.append(product_review_status_true)
 
-        # Create a sample ProductReview with status "False" instance for testing
         product_review_status_false = ProductReview.objects.create(
             product=self.product,
             user=user_2,
@@ -142,13 +133,11 @@ class ProductModelTestCase(TestCase):
         self.product_reviews.append(product_review_status_false)
 
     def test_save_method(self):
-        # Test if the save method calculates fields correctly
         self.product.price = Decimal("100.00")
         self.product.discount_percent = Decimal("50.0")
         self.product.vat = self.vat
 
         self.product.save()
-        # Refresh the product instance from the database
         self.product.refresh_from_db()
 
         expected_discount_value = (
@@ -168,7 +157,6 @@ class ProductModelTestCase(TestCase):
         self.assertEqual(self.product.price_save_percent, expected_price_save_percent)
 
     def test_fields(self):
-        # Test if the fields are saved correctly
         self.assertEqual(self.product.product_code, "P123456")
         self.assertEqual(self.product.slug, "sample-product")
         self.assertEqual(self.product.price, Money("100.00", settings.DEFAULT_CURRENCY))
@@ -180,7 +168,6 @@ class ProductModelTestCase(TestCase):
         self.assertEqual(self.product.weight, Decimal("5.00"))
 
     def test_verbose_names(self):
-        # Test verbose names for fields
         self.assertEqual(
             Product._meta.get_field("product_code").verbose_name,
             "Product Code",
@@ -235,7 +222,6 @@ class ProductModelTestCase(TestCase):
         )
 
     def test_meta_verbose_names(self):
-        # Test verbose names from the Meta class
         self.assertEqual(
             Product._meta.verbose_name,
             "Product",
@@ -246,14 +232,12 @@ class ProductModelTestCase(TestCase):
         )
 
     def test_unicode_representation(self):
-        # Test the __unicode__ method returns the translated name
         self.assertEqual(
             self.product.__unicode__(),
             self.product.safe_translation_getter("name"),
         )
 
     def test_translations(self):
-        # Test if translations are saved correctly
         for language in languages:
             self.product.set_current_language(language)
             self.assertEqual(
@@ -266,41 +250,32 @@ class ProductModelTestCase(TestCase):
             )
 
     def test_str_representation(self):
-        # Test the __str__ method returns the translated name
         self.assertEqual(
             str(self.product), self.product.safe_translation_getter("name")
         )
 
     def test_likes_counter(self):
-        # Test likes counter
         self.assertEqual(self.product.likes_counter, 1)
 
     def test_review_average(self):
-        # Test review average
         self.assertEqual(self.product.review_average, 5)
 
     def test_review_counter(self):
-        # Test review counter, should be 1 because we created a review with status True
-        # and one with status False, we only count the ones with status True
         self.assertEqual(self.product.review_counter, 1)
 
     def test_vat_percent(self):
-        # Test vat percent
         self.assertEqual(self.product.vat_percent, self.vat.value)
 
     def test_vat_value(self):
-        # Test vat value
         expected_vat_value = (self.product.price.amount * self.vat.value) / 100
         self.assertEqual(self.product.vat_value.amount, expected_vat_value)
 
     def test_main_image_absolute_url(self):
-        # Test if main_image_absolute_url returns the correct URL
         main_image = self.product.product_images.filter(is_main=True).first()
         expected_url = settings.APP_BASE_URL + main_image.image.url
         self.assertEqual(self.product.main_image_absolute_url, expected_url)
 
     def test_main_image_filename(self):
-        # Test if main_image_filename returns the correct filename
         main_image = self.product.product_images.filter(is_main=True).first()
         expected_filename = os.path.basename(main_image.image.name)
         self.assertEqual(self.product.main_image_filename, expected_filename)

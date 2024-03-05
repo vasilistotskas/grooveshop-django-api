@@ -50,7 +50,7 @@ class BlogPostViewSetTestCase(APITestCase):
         self.post = BlogPost.objects.create(
             title="Test Post",
             author=self.author,
-            status="draft",  # Set the status to "draft" for the test
+            status="draft",
             image=image_post,
             category=None,
             featured=False,
@@ -150,7 +150,7 @@ class BlogPostViewSetTestCase(APITestCase):
             "category": self.category.id,
             "likes": [],
             "tags": [],
-            "status": "PUBLISHED",  # Change the status to "published" for the test
+            "status": "PUBLISHED",
             "translations": {},
         }
 
@@ -173,8 +173,8 @@ class BlogPostViewSetTestCase(APITestCase):
 
     def test_update_invalid(self):
         payload = {
-            "author": "invalid_author_id",  # Set an invalid author ID for the test
-            "status": "invalid_status",  # Set an invalid status for the test
+            "author": "invalid_author_id",
+            "status": "invalid_status",
             "translations": {
                 "invalid_lang_code": {
                     "content": "Translation for invalid language code",
@@ -203,7 +203,7 @@ class BlogPostViewSetTestCase(APITestCase):
 
     def test_partial_update_invalid(self):
         payload = {
-            "author": "invalid_author_id",  # Set an invalid author ID for the test
+            "author": "invalid_author_id",
             "translations": {
                 "invalid_lang_code": {
                     "title": "Translation for invalid language code",

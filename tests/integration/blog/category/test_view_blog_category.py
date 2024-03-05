@@ -88,7 +88,7 @@ class BlogCategoryViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_retrieve_invalid(self):
-        invalid_category_id = 9999  # An ID that doesn't exist in the database
+        invalid_category_id = 9999
         url = self.get_category_detail_url(invalid_category_id)
         response = self.client.get(url)
 
@@ -171,7 +171,7 @@ class BlogCategoryViewSetTestCase(APITestCase):
         self.assertFalse(BlogCategory.objects.filter(pk=self.category.pk).exists())
 
     def test_destroy_invalid(self):
-        invalid_category_id = 9999  # An ID that doesn't exist in the database
+        invalid_category_id = 9999
         url = self.get_category_detail_url(invalid_category_id)
         response = self.client.delete(url)
 

@@ -34,13 +34,11 @@ class BlogCommentModelTestCase(TestCase):
         self.comment.set_current_language(default_language)
 
     def test_fields(self):
-        # Test if the fields are saved correctly
         self.assertTrue(self.comment.is_approved)
         self.assertEqual(self.comment.user, self.user)
         self.assertEqual(self.comment.post, self.post)
 
     def test_verbose_names(self):
-        # Test verbose names for fields
         self.assertEqual(
             BlogComment._meta.get_field("is_approved").verbose_name,
             "Is Approved",
@@ -55,7 +53,6 @@ class BlogCommentModelTestCase(TestCase):
         )
 
     def test_meta_verbose_names(self):
-        # Test verbose names from the Meta class
         self.assertEqual(
             BlogComment._meta.verbose_name,
             "Blog Comment",
@@ -66,7 +63,6 @@ class BlogCommentModelTestCase(TestCase):
         )
 
     def test_unicode_representation(self):
-        # Test the __unicode__ method returns the translated name
         content_snippet = (
             self.comment.safe_translation_getter("content", any_language=True)[:50]
             + "..."
@@ -77,7 +73,6 @@ class BlogCommentModelTestCase(TestCase):
         )
 
     def test_translations(self):
-        # Test if translations are saved correctly
         for language in languages:
             self.comment.set_current_language(language)
             self.assertEqual(
@@ -86,7 +81,6 @@ class BlogCommentModelTestCase(TestCase):
             )
 
     def test_str_representation(self):
-        # Test the __str__ method returns the translated content
         content_snippet = (
             self.comment.safe_translation_getter("content", any_language=True)[:50]
             + "..."
@@ -96,18 +90,14 @@ class BlogCommentModelTestCase(TestCase):
         )
 
     def test_number_of_likes(self):
-        # Create another user to simulate a "like" action
         other_user = User.objects.create_user(
             email="testuser2@example.com", password="testpassword"
         )
 
-        # Initially, no likes should be present
         self.assertEqual(self.comment.number_of_likes, 0)
 
-        # Simulate a "like" action by the other user
         self.comment.likes.add(other_user)
 
-        # Now, there should be one like
         self.assertEqual(self.comment.number_of_likes, 1)
 
     def tearDown(self) -> None:

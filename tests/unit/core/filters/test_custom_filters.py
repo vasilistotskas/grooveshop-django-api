@@ -46,7 +46,7 @@ class PascalSnakeCaseOrderingFilterTest(APITestCase):
         self.assertEqual(result, ["created_at", "updated_at"])
 
     def test_get_ordering_empty(self):
-        request = self.create_request("")  # No ordering specified
+        request = self.create_request("")
         queryset = BlogPost.objects.all()
         result = self.filter.get_ordering(
             request.renderer_context["request"], queryset, self.view

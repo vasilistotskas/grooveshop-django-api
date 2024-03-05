@@ -70,60 +70,47 @@ class CartServiceTest(TestCase):
 
     def test_process_cart_merge(self):
         cart_service = CartService(cart_id=self.cart.pk)
-        # Create a cart for the pre-login user and add a cart item
         pre_login_cart = Cart.objects.create()
         cart_service.create_cart_item(self.product, 2)
         cache_instance.set(str(self.user.id), pre_login_cart.id, 3600)
 
-        # Merge carts with "merge" option
         cart_service.process_cart(self.request, option=ProcessCartOption.MERGE)
 
-        # Check that the cart items are now associated with the user's cart
         self.assertEqual(self.cart.cart_item_cart.count(), 1)
         self.assertEqual(self.cart.cart_item_cart.first().quantity, 2)
 
     def test_process_cart_merge_with_pre_login_cart_in_session(self):
         cart_service = CartService(cart_id=self.cart.pk)
-        # Create a cart for the pre-login user and add a cart item
         pre_login_cart = Cart.objects.create()
         cart_service.create_cart_item(self.product, 2)
         self.request.session = {"pre_log_in_cart_id": pre_login_cart.id}
 
-        # Merge carts with "merge" option
         cart_service.process_cart(self.request, option=ProcessCartOption.MERGE)
 
-        # Check that the cart items are now associated with the user's cart
         self.assertEqual(self.cart.cart_item_cart.count(), 1)
         self.assertEqual(self.cart.cart_item_cart.first().quantity, 2)
 
     def test_process_cart_keep(self):
         cart_service = CartService(cart_id=self.cart.pk)
-        # Create a cart for the pre-login user and add a cart item
         pre_login_cart = Cart.objects.create()
         cart_service.create_cart_item(self.product, 3)
         cache_instance.set(str(self.user.id), pre_login_cart.id, 3600)
 
-        # Merge carts with "merge" option
         cart_service.process_cart(self.request, option=ProcessCartOption.KEEP)
 
-        # Check that the cart items are now associated with the user's cart
         self.assertEqual(self.cart.cart_item_cart.count(), 1)
         self.assertEqual(self.cart.cart_item_cart.first().quantity, 3)
 
     def test_process_cart_clean(self):
         cart_service = CartService(cart_id=self.cart.pk)
-        # Create a cart item for the user's cart
         cart_service.create_cart_item(self.product, 2)
 
-        # Clean user's cart with "clean" option
         cart_service.process_cart(self.request, option=ProcessCartOption.CLEAN)
 
-        # Check that the cart items in the user's cart are deleted
         self.assertEqual(self.cart.cart_item_cart.count(), 0)
 
     def test_process_cart_invalid_option(self):
         cart_service = CartService(cart_id=self.cart.pk)
-        # Test with an invalid option
         with self.assertRaises(InvalidProcessCartOptionException):
             cart_service.process_cart(self.request, option="invalid_option")
 
@@ -176,7 +163,6 @@ class CartServiceTest(TestCase):
             weight=0.00,
         )
 
-        # Add more items to the cart
         cart_service.create_cart_item(self.product, 3)
         cart_service.create_cart_item(product, 4)
 
@@ -187,7 +173,6 @@ class CartServiceTest(TestCase):
         cart_service = CartService(cart_id=self.cart.pk)
         cart_service.create_cart_item(self.product, 2)
 
-        # Remove the cart item
         cart_service.delete_cart_item(self.product.pk)
 
         self.assertEqual(len(cart_service), 0)
@@ -200,7 +185,6 @@ class CartServiceTest(TestCase):
     def test_merge_carts_with_items_in_both_carts(self):
         cart_service = CartService(cart_id=self.cart.pk)
 
-        # Create a cart for the pre-login user and add a cart item
         pre_login_cart = Cart.objects.create()
         pre_login_product = Product.objects.create(
             name="Prelogin Product",
@@ -219,10 +203,8 @@ class CartServiceTest(TestCase):
 
         self.request.session = {"pre_log_in_cart_id": pre_login_cart.id}
 
-        # Merge carts with "merge" option
         cart_service.process_cart(self.request, option=ProcessCartOption.MERGE)
 
-        # Check that the cart items are now associated with the user's cart
         self.assertEqual(self.cart.cart_item_cart.count(), 2)
         self.assertCountEqual(
             [item.product for item in self.cart.cart_item_cart.all()],

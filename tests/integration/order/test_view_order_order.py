@@ -29,15 +29,10 @@ class OrderViewSetTestCase(APITestCase):
     order_items: List[OrderItem] = None
 
     def setUp(self):
-        # Create a sample user for testing
         self.user = User.objects.create_user(
             email="test@test.com", password="test12345@!"
         )
-
-        # Login to authenticate
         self.client.login(email="test@test.com", password="test12345@!")
-
-        # Create a sample PayWay instance for testing
         image_icon = get_or_create_default_image("uploads/pay_way/no_photo.jpg")
         self.pay_way = PayWay.objects.create(
             active=True,
@@ -46,7 +41,6 @@ class OrderViewSetTestCase(APITestCase):
             icon=image_icon,
         )
 
-        # Create a sample Country instance for testing
         image_flag = get_or_create_default_image("uploads/region/no_photo.jpg")
         self.country = Country.objects.create(
             alpha_2="GR",
@@ -56,13 +50,11 @@ class OrderViewSetTestCase(APITestCase):
             image_flag=image_flag,
         )
 
-        # Create a sample Region instance for testing
         self.region = Region.objects.create(
             alpha="GRC",
             country=self.country,
         )
 
-        # Create a sample Order instance for testing
         self.order = Order.objects.create(
             user=self.user,
             pay_way=self.pay_way,
@@ -84,7 +76,6 @@ class OrderViewSetTestCase(APITestCase):
             shipping_price=Decimal("10.00"),
         )
 
-        # Create related OrderItems
         product_1 = Product.objects.create(
             slug="product_one",
             price=10.00,
@@ -104,7 +95,6 @@ class OrderViewSetTestCase(APITestCase):
             weight=0.00,
         )
 
-        # Create related OrderItems
         order_item1 = self.order.order_item_order.create(
             product_id=product_1.id, price=Decimal("50.00"), quantity=2
         )
@@ -226,7 +216,6 @@ class OrderViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_update_valid(self):
-        # We just update the status field
         payload = {
             "user": self.user.id,
             "pay_way": self.pay_way.id,
@@ -305,7 +294,6 @@ class OrderViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_partial_update_valid(self):
-        # We just update the status field
         payload = {
             "status": OrderStatusEnum.SENT.value,
         }

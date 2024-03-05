@@ -107,7 +107,7 @@ class CountryViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_retrieve_invalid(self):
-        invalid_country_id = 9999  # An ID that doesn't exist in the database
+        invalid_country_id = 9999
         url = self.get_country_detail_url(invalid_country_id)
         response = self.client.get(url)
 
@@ -194,7 +194,7 @@ class CountryViewSetTestCase(APITestCase):
         self.assertFalse(Country.objects.filter(pk=self.country.pk).exists())
 
     def test_destroy_invalid(self):
-        invalid_country_id = 9999  # An ID that doesn't exist in the database
+        invalid_country_id = 9999
         url = self.get_country_detail_url(invalid_country_id)
         response = self.client.delete(url)
 

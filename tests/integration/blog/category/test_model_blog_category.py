@@ -23,7 +23,6 @@ class BlogCategoryModelTestCase(TestCase):
     category: BlogCategory = None
 
     def setUp(self):
-        # Create a sample BlogCategory instance for testing
         image_category = get_or_create_default_image("uploads/blog/no_photo.jpg")
         self.category = BlogCategory.objects.create(
             slug="sample-category", image=image_category
@@ -36,12 +35,10 @@ class BlogCategoryModelTestCase(TestCase):
         self.category.set_current_language(default_language)
 
     def test_fields(self):
-        # Test if the fields are saved correctly
         self.assertEqual(self.category.slug, "sample-category")
         self.assertTrue(default_storage.exists(self.category.image.path))
 
     def test_verbose_names(self):
-        # Test verbose names for fields
         self.assertEqual(
             BlogCategory._meta.get_field("slug").verbose_name,
             "slug",
@@ -52,7 +49,6 @@ class BlogCategoryModelTestCase(TestCase):
         )
 
     def test_meta_verbose_names(self):
-        # Test verbose names from the Meta class
         self.assertEqual(
             BlogCategory._meta.verbose_name,
             "Blog Category",
@@ -63,14 +59,12 @@ class BlogCategoryModelTestCase(TestCase):
         )
 
     def test_unicode_representation(self):
-        # Test the __unicode__ method returns the translated name
         self.assertEqual(
             self.category.__unicode__(),
             self.category.safe_translation_getter("name"),
         )
 
     def test_translations(self):
-        # Test if translations are saved correctly
         for language in languages:
             self.category.set_current_language(language)
             self.assertEqual(
@@ -83,25 +77,19 @@ class BlogCategoryModelTestCase(TestCase):
             )
 
     def test_str_representation(self):
-        # Test the __str__ method returns the translated name
         self.assertEqual(
             str(self.category),
             self.category.safe_translation_getter("name"),
         )
 
     def test_post_count(self):
-        # Test if get_category_posts_count returns the correct count
-        self.assertEqual(
-            self.category.post_count, 0
-        )  # Assuming no posts related to this category
+        self.assertEqual(self.category.post_count, 0)
 
     def test_main_image_absolute_url(self):
-        # Test if main_image_absolute_url returns the correct URL
         expected_url = settings.APP_BASE_URL + self.category.image.url
         self.assertEqual(self.category.main_image_absolute_url, expected_url)
 
     def test_main_image_filename(self):
-        # Test if main_image_filename returns the correct filename
         expected_filename = os.path.basename(self.category.image.name)
         self.assertEqual(self.category.main_image_filename, expected_filename)
 

@@ -1,4 +1,3 @@
-# cart/tests/test_view_cart.py
 import datetime
 
 from django.contrib.auth import get_user_model
@@ -30,7 +29,6 @@ class CartViewSetTest(APITestCase):
             "last_activity": "2023-07-26T12:00:00.000000Z",
         }
 
-        # Set the last_activity of the cart to match the update_data timestamp
         self.cart.last_activity = datetime.datetime(
             2023, 7, 26, 12, 0, tzinfo=datetime.timezone.utc
         )

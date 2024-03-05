@@ -7,24 +7,20 @@ class VatModelTestCase(TestCase):
     vat: Vat = None
 
     def setUp(self):
-        # Create a sample Vat instance for testing
         self.vat = Vat.objects.create(
             value=21.0,
         )
 
     def test_fields(self):
-        # Test if the fields are saved correctly
         self.assertEqual(self.vat.value, 21.0)
 
     def test_verbose_names(self):
-        # Test verbose names for fields
         self.assertEqual(
             Vat._meta.get_field("value").verbose_name,
             "Value",
         )
 
     def test_meta_verbose_names(self):
-        # Test verbose names for model
         self.assertEqual(
             Vat._meta.verbose_name,
             "Vat",
@@ -35,7 +31,6 @@ class VatModelTestCase(TestCase):
         )
 
     def test_str_representation(self):
-        # Test the __str__ method returns the vat value
         self.assertEqual(str(self.vat), f"{self.vat.value}% VAT")
 
     def test_get_highest_vat_value(self):

@@ -8,7 +8,6 @@ from core.utils.serializers import MultiSerializerMixin
 from core.utils.serializers import TranslatedFieldExtended
 
 
-# Define dummy serializer classes for testing
 class DummySerializer(serializers.Serializer):
     field1 = serializers.CharField()
     field2 = serializers.IntegerField()

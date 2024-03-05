@@ -39,7 +39,6 @@ class CategoryModelTestCase(TestCase):
             value=Decimal("24.0"),
         )
 
-        # Create or retrieve the default image instance
         self.default_image = get_or_create_default_image(
             "uploads/categories/no_photo.jpg"
         )
@@ -76,14 +75,12 @@ class CategoryModelTestCase(TestCase):
         self.sub_category.set_current_language(default_language)
 
     def test_fields(self):
-        # Test if the fields are saved correctly
         self.assertEqual(self.category.slug, "sample-category")
         self.assertTrue(default_storage.exists(self.category.menu_image_one.path))
         self.assertTrue(default_storage.exists(self.category.menu_image_two.path))
         self.assertTrue(default_storage.exists(self.category.menu_main_banner.path))
 
     def test_verbose_names(self):
-        # Test verbose names for fields
         self.assertEqual(self.category._meta.get_field("slug").verbose_name, "Slug")
         self.assertEqual(
             self.category._meta.get_field("menu_image_one").verbose_name,
@@ -99,21 +96,18 @@ class CategoryModelTestCase(TestCase):
         )
 
     def test_meta_verbose_names(self):
-        # Test verbose names from the Meta class
         self.assertEqual(ProductCategory._meta.verbose_name, "Product Category")
         self.assertEqual(
             ProductCategory._meta.verbose_name_plural, "Product Categories"
         )
 
     def test_unicode_representation(self):
-        # Test the __unicode__ method returns the translated name
         self.assertEqual(
             self.category.__unicode__(),
             self.category.safe_translation_getter("name"),
         )
 
     def test_translations(self):
-        # Test if translations are saved correctly
         for language in languages:
             self.category.set_current_language(language)
             self.assertEqual(self.category.name, f"Sample Category {language}")
@@ -152,39 +146,28 @@ class CategoryModelTestCase(TestCase):
         self.assertEqual(str(self.sub_category), expected_str)
 
     def test_get_ordering_queryset_with_parent(self):
-        # Verify the order of execution and data setup
-        self.assertEqual(
-            ProductCategory.objects.count(), 2
-        )  # Make sure you have 2 categories
+        self.assertEqual(ProductCategory.objects.count(), 2)
         self.assertIn(self.sub_category, ProductCategory.objects.all())
         self.assertIn(self.category, ProductCategory.objects.all())
 
-        # Retrieve the parent queryset
         parent_queryset = self.category.get_ordering_queryset()
 
-        # Check if the sub-category is present in the parent_queryset
         self.assertIn(self.sub_category, parent_queryset)
 
-        # Check if the parent category is also present in the parent_queryset
         self.assertIn(self.category, parent_queryset)
 
     def test_get_ordering_queryset_without_parent(self):
-        # Create a new category without a parent
         no_parent_category = ProductCategory.objects.create(
             slug="no-parent-category",
         )
 
-        # Retrieve the parent queryset for the category without a parent
         parent_queryset = no_parent_category.get_ordering_queryset()
 
-        # Check if the parent category is present in the parent_queryset
         self.assertIn(no_parent_category, parent_queryset)
 
-        # Check if other categories are present in the parent_queryset
         self.assertIn(self.sub_category, parent_queryset)
         self.assertIn(self.category, parent_queryset)
 
-        # Now test if the descendant categories are also present
         for descendant in self.category.get_descendants(include_self=True):
             self.assertIn(descendant, parent_queryset)
 
@@ -252,42 +235,36 @@ class CategoryModelTestCase(TestCase):
         self.assertEqual(url, expected_url)
 
     def test_category_menu_image_one_absolute_url(self):
-        # Test category menu image absolute URL
         expected_url = settings.APP_BASE_URL + self.category.menu_image_one.url
         self.assertEqual(
             self.category.category_menu_image_one_absolute_url, expected_url
         )
 
     def category_menu_image_one_filename(self):
-        # Test category menu main image filename
         expected_filename = os.path.basename(self.category.menu_image_one.name)
         self.assertEqual(
             self.category.category_menu_image_one_filename, expected_filename
         )
 
     def test_category_menu_image_two_absolute_url(self):
-        # Test category menu image absolute URL
         expected_url = settings.APP_BASE_URL + self.category.menu_image_two.url
         self.assertEqual(
             self.category.category_menu_image_two_absolute_url, expected_url
         )
 
     def category_menu_image_two_filename(self):
-        # Test category menu main image filename
         expected_filename = os.path.basename(self.category.menu_image_two.name)
         self.assertEqual(
             self.category.category_menu_image_two_filename, expected_filename
         )
 
     def test_category_menu_main_banner_absolute_url(self):
-        # Test category menu image absolute URL
         expected_url = settings.APP_BASE_URL + self.category.menu_main_banner.url
         self.assertEqual(
             self.category.category_menu_main_banner_absolute_url, expected_url
         )
 
     def category_menu_main_banner_filename(self):
-        # Test category menu main image filename
         expected_filename = os.path.basename(self.category.menu_main_banner.name)
         self.assertEqual(
             self.category.category_menu_main_banner_filename, expected_filename

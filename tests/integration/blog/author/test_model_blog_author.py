@@ -17,7 +17,6 @@ class BlogAuthorModelTestCase(TestCase):
         self.user = User.objects.create_user(
             email="testuser@example.com", password="testpassword"
         )
-        # Create a sample BlogAuthor instance for testing
         self.author = BlogAuthor.objects.create(
             user=self.user, website="http://example.com"
         )
@@ -28,12 +27,10 @@ class BlogAuthorModelTestCase(TestCase):
         self.author.set_current_language(default_language)
 
     def test_fields(self):
-        # Test if the fields are saved correctly
         self.assertEqual(self.author.user, self.user)
         self.assertEqual(self.author.website, "http://example.com")
 
     def test_verbose_names(self):
-        # Test verbose names for fields
         self.assertEqual(
             BlogAuthor._meta.get_field("user").verbose_name,
             "user",
@@ -44,7 +41,6 @@ class BlogAuthorModelTestCase(TestCase):
         )
 
     def test_meta_verbose_names(self):
-        # Test verbose names from the Meta class
         self.assertEqual(
             BlogAuthor._meta.verbose_name,
             "Blog Author",
@@ -55,14 +51,12 @@ class BlogAuthorModelTestCase(TestCase):
         )
 
     def test_unicode_representation(self):
-        # Test the __unicode__ method returns the translated name
         author_name = self.user.full_name
         self.assertEqual(
             self.author.__unicode__(), f"{author_name} ({self.user.email})"
         )
 
     def test_translations(self):
-        # Test if translations are saved correctly
         for language in languages:
             self.author.set_current_language(language)
             self.assertEqual(
@@ -71,7 +65,6 @@ class BlogAuthorModelTestCase(TestCase):
             )
 
     def test_str_representation(self):
-        # Test the __str__ method returns the user's email
         author_name = self.user.full_name
         self.assertEqual(str(self.author), f"{author_name} ({self.user.email})")
 

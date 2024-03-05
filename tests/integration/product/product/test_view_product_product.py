@@ -41,11 +41,9 @@ class ProductViewSetTestCase(APITestCase):
     product_favourite: ProductFavourite = None
 
     def setUp(self):
-        # Create a sample user for testing
         self.user = User.objects.create_user(
             email="test@test.com", password="test12345@!"
         )
-        # Create a sample Category instance for testing
         self.category = ProductCategory.objects.create(
             slug="sample-category",
         )
@@ -58,12 +56,10 @@ class ProductViewSetTestCase(APITestCase):
             self.category.save()
         self.category.set_current_language(default_language)
 
-        # Create a sample VAT instance for testing
         self.vat = Vat.objects.create(
             value=Decimal("24.0"),
         )
 
-        # Create a sample Product instance for testing
         self.product = Product.objects.create(
             product_code="P123456",
             category=self.category,
@@ -85,7 +81,6 @@ class ProductViewSetTestCase(APITestCase):
             self.product.save()
         self.product.set_current_language(default_language)
 
-        # Create a sample main ProductImage instance for testing
         image = get_or_create_default_image("uploads/products/no_photo.jpg")
         main_product_image = ProductImage.objects.create(
             product=self.product,
@@ -99,7 +94,6 @@ class ProductViewSetTestCase(APITestCase):
         main_product_image.set_current_language(default_language)
         self.product_images.append(main_product_image)
 
-        # Create a sample non-main ProductImage instance for testing
         non_main_product_image = ProductImage.objects.create(
             product=self.product,
             image=image,
@@ -112,7 +106,6 @@ class ProductViewSetTestCase(APITestCase):
         non_main_product_image.set_current_language(default_language)
         self.product_images.append(non_main_product_image)
 
-        # Create a sample ProductFavourite instance for testing
         self.product_favourite = ProductFavourite.objects.create(
             product=self.product,
             user=self.user,
@@ -122,7 +115,6 @@ class ProductViewSetTestCase(APITestCase):
             email="test2@test.com", password="test12345@!"
         )
 
-        # Create a sample ProductReview with status "True" instance for testing
         product_review_status_true = ProductReview.objects.create(
             product=self.product,
             user=self.user,
@@ -132,7 +124,6 @@ class ProductViewSetTestCase(APITestCase):
         )
         self.product_reviews.append(product_review_status_true)
 
-        # Create a sample ProductReview with status "False" instance for testing
         product_review_status_false = ProductReview.objects.create(
             product=self.product,
             user=user_2,

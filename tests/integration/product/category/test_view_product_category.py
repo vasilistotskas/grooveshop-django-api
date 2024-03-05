@@ -32,7 +32,6 @@ class ProductCategoryViewSetTestCase(APITestCase):
     default_image: SimpleUploadedFile = None
 
     def setUp(self):
-        # Create or retrieve the default image instance
         self.default_image = get_or_create_default_image(
             "uploads/categories/no_photo.jpg"
         )

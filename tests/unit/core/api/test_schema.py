@@ -11,7 +11,6 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 class GenerateSchemaMultiLangTest(TestCase):
     def test_generate_schema_empty(self):
-        # Create an instance of YourModel with no translated fields
         instance = BlogPost()
 
         schema = generate_schema_multi_lang(instance)
@@ -34,7 +33,6 @@ class GenerateSchemaMultiLangTest(TestCase):
         self.assertEqual(schema, expected_schema)
 
     def test_generate_schema_with_translations(self):
-        # Create an instance of YourModel with translated fields
         instance = BlogPost()
         instance.title = "Title"
         instance.save()
@@ -59,11 +57,9 @@ class GenerateSchemaMultiLangTest(TestCase):
         self.assertEqual(schema, expected_schema)
 
     def test_generate_schema_no_languages(self):
-        # Save the original languages and clear them for testing
         original_languages = settings.PARLER_LANGUAGES[settings.SITE_ID]
         settings.PARLER_LANGUAGES[settings.SITE_ID] = []
 
-        # Create an instance of YourModel with translated fields
         instance = BlogPost()
         instance.title = "Title"
         instance.save()
@@ -77,7 +73,6 @@ class GenerateSchemaMultiLangTest(TestCase):
 
         self.assertEqual(schema, expected_schema)
 
-        # Restore the original languages
         settings.PARLER_LANGUAGES[settings.SITE_ID] = original_languages
 
     def tearDown(self) -> None:

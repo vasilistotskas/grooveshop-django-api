@@ -39,7 +39,6 @@ class ProductReviewModelTestCase(TestCase):
         self.product_review.set_current_language(default_language)
 
     def test_fields(self):
-        # Test if the fields are saved correctly
         self.assertEqual(self.product_review.product, self.product)
         self.assertEqual(self.product_review.user, self.user)
         self.assertEqual(self.product_review.rate, 5)
@@ -54,12 +53,10 @@ class ProductReviewModelTestCase(TestCase):
         self.assertEqual(ProductReview._meta.get_field("status").verbose_name, "Status")
 
     def test_meta_verbose_names(self):
-        # Test verbose names from the Meta class
         self.assertEqual(ProductReview._meta.verbose_name, "Product Review")
         self.assertEqual(ProductReview._meta.verbose_name_plural, "Product Reviews")
 
     def test_str_representation(self):
-        # Test the __str__ method returns the translated name
         comment_snippet = (
             (
                 self.product_review.safe_translation_getter(
@@ -76,7 +73,6 @@ class ProductReviewModelTestCase(TestCase):
         )
 
     def test_unicode_representation(self):
-        # Test the __unicode__ method returns the translated name
         comment_snippet = (
             (
                 self.product_review.safe_translation_getter(
@@ -93,7 +89,6 @@ class ProductReviewModelTestCase(TestCase):
         )
 
     def test_translations(self):
-        # Test if translations are saved correctly
         for language in languages:
             self.product_review.set_current_language(language)
             self.assertEqual(self.product_review.comment, f"Sample Comment {language}")

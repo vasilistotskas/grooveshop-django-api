@@ -85,7 +85,7 @@ class BlogTagViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_retrieve_invalid(self):
-        invalid_tag_id = 9999  # An ID that doesn't exist in the database
+        invalid_tag_id = 9999
         url = self.get_tag_detail_url(invalid_tag_id)
         response = self.client.get(url)
 
@@ -164,7 +164,7 @@ class BlogTagViewSetTestCase(APITestCase):
         self.assertFalse(BlogTag.objects.filter(pk=self.tag.pk).exists())
 
     def test_destroy_invalid(self):
-        invalid_tag_id = 9999  # An ID that doesn't exist in the database
+        invalid_tag_id = 9999
         url = self.get_tag_detail_url(invalid_tag_id)
         response = self.client.delete(url)
 

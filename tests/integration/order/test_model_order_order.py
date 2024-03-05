@@ -85,7 +85,6 @@ class OrderModelTestCase(TestCase):
         self.assertEqual(order.total_price_items, Money("0", settings.DEFAULT_CURRENCY))
 
     def test_total_price_extra_with_pay_way(self):
-        # Create a related PayWay
         image_icon = get_or_create_default_image("uploads/pay_way/no_photo.jpg")
         pay_way = PayWay.objects.create(
             active=True,
@@ -107,7 +106,6 @@ class OrderModelTestCase(TestCase):
             pay_way=pay_way,
         )
 
-        # Test when total_price_items is less than free_for_order_amount
         order.order_item_order.create(
             product_id=self.product_1.id,
             price=Decimal("50.00"),
@@ -116,7 +114,6 @@ class OrderModelTestCase(TestCase):
         expected_total_price_extra = Money("15.00", settings.DEFAULT_CURRENCY)
         self.assertEqual(order.total_price_extra, expected_total_price_extra)
 
-        # Test when total_price_items is greater than free_for_order_amount
         order.order_item_order.create(
             product_id=self.product_2.id,
             price=Decimal("50.00"),
@@ -148,7 +145,6 @@ class OrderModelTestCase(TestCase):
         self.assertEqual(self.order.full_address, expected_full_address)
 
     def test_fields(self):
-        # Test if the fields are saved correctly
         self.assertEqual(self.order.email, "test@example.com")
         self.assertEqual(self.order.first_name, "John")
         self.assertEqual(self.order.last_name, "Doe")
@@ -164,7 +160,6 @@ class OrderModelTestCase(TestCase):
         self.assertEqual(self.order.paid_amount, Money("0", settings.DEFAULT_CURRENCY))
 
     def test_verbose_names(self):
-        # Test verbose names for fields
         self.assertEqual(self.order._meta.get_field("email").verbose_name, _("Email"))
         self.assertEqual(
             self.order._meta.get_field("first_name").verbose_name, _("First Name")
@@ -193,12 +188,10 @@ class OrderModelTestCase(TestCase):
         )
 
     def test_meta_verbose_names(self):
-        # Test verbose names from the Meta class
         self.assertEqual(Order._meta.verbose_name, _("Order"))
         self.assertEqual(Order._meta.verbose_name_plural, _("Orders"))
 
     def test_str_representation(self):
-        # Test the __str__ method returns the first_name
         self.assertEqual(str(self.order), f"Order {self.order.id} - John Doe")
 
     def tearDown(self) -> None:

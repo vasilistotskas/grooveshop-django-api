@@ -26,7 +26,6 @@ class TestGetOrCreateDefaultImage(TestCase):
     default_image_path: str = "static/images/no_photo.jpg"
 
     def setUp(self):
-        # Create a test image
         default_storage.save(
             self.existing_image_path,
             SimpleUploadedFile(self.existing_image_path, self.existing_image_content),
@@ -39,23 +38,18 @@ class TestGetOrCreateDefaultImage(TestCase):
         self.default_image = get_or_create_default_image(self.default_image_path)
 
     def test_existing_image(self):
-        # Ensure the returned image content matches the test image content
         self.assertEqual(self.existing_image.read(), self.existing_image_content)
 
     def test_non_existing_image(self):
-        # Get the path to the default image
         default_image_full_path = os.path.join(BASE_DIR, self.default_image_path)
 
-        # Read the content of the created image and default image
         image_content = self.non_existing_image.read()
         with open(default_image_full_path, "rb") as f:
             default_image_content = f.read()
 
-        # Compare the image contents
         self.assertEqual(image_content, default_image_content)
 
     def test_default_image_already_exists(self):
-        # Ensure the default image is not overwritten and exists
         self.assertTrue(default_storage.exists(self.default_image_path))
 
     def tearDown(self) -> None:

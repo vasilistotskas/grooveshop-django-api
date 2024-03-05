@@ -27,7 +27,6 @@ class TipViewSetTestCase(APITestCase):
     tip: Tip = None
 
     def setUp(self):
-        # Create a sample Tip instance for testing
         icon = get_or_create_default_image("uploads/tip/no_photo.jpg")
         self.tip = Tip.objects.create(
             kind=TipKindEnum.INFO,
@@ -113,7 +112,7 @@ class TipViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_retrieve_invalid(self):
-        invalid_tip_id = 9999  # An ID that doesn't exist in the database
+        invalid_tip_id = 9999
         url = self.get_tip_detail_url(invalid_tip_id)
         response = self.client.get(url)
 
@@ -209,7 +208,7 @@ class TipViewSetTestCase(APITestCase):
         self.assertFalse(Tip.objects.filter(pk=self.tip.pk).exists())
 
     def test_destroy_invalid(self):
-        invalid_tip_id = 9999  # An ID that doesn't exist in the database
+        invalid_tip_id = 9999
         url = self.get_tip_detail_url(invalid_tip_id)
         response = self.client.delete(url)
 

@@ -68,7 +68,6 @@ class BlogPostModelTestCase(TestCase):
         self.post.set_current_language(default_language)
 
     def test_fields(self):
-        # Test if the fields are saved correctly
         self.assertEqual(self.post.slug, "test-post")
         self.assertEqual(self.post.status, "draft")
         self.assertEqual(self.post.featured, True)
@@ -76,7 +75,6 @@ class BlogPostModelTestCase(TestCase):
         self.assertTrue(default_storage.exists(self.post.image.path))
 
     def test_verbose_names(self):
-        # Test verbose names for fields
         self.assertEqual(
             BlogPost._meta.get_field("slug").verbose_name,
             "slug",
@@ -99,7 +97,6 @@ class BlogPostModelTestCase(TestCase):
         )
 
     def test_meta_verbose_names(self):
-        # Test verbose names from the Meta class
         self.assertEqual(
             BlogPost._meta.verbose_name,
             "Blog Post",
@@ -110,7 +107,6 @@ class BlogPostModelTestCase(TestCase):
         )
 
     def test_unicode_representation(self):
-        # Test the __unicode__ method returns the translated name
         title = (
             self.post.safe_translation_getter("title", any_language=True) or "Untitled"
         )
@@ -121,7 +117,6 @@ class BlogPostModelTestCase(TestCase):
         )
 
     def test_translations(self):
-        # Test if translations are saved correctly
         for language in languages:
             self.post.set_current_language(language)
             self.assertEqual(
@@ -138,7 +133,6 @@ class BlogPostModelTestCase(TestCase):
             )
 
     def test_str_representation(self):
-        # Test the __str__ method returns the translated title
         title = (
             self.post.safe_translation_getter("title", any_language=True) or "Untitled"
         )
@@ -149,12 +143,10 @@ class BlogPostModelTestCase(TestCase):
         )
 
     def test_main_image_absolute_url(self):
-        # Test if main_image_absolute_url returns the correct URL
         expected_url = settings.APP_BASE_URL + self.post.image.url
         self.assertEqual(self.post.main_image_absolute_url, expected_url)
 
     def test_main_image_filename(self):
-        # Test if main_image_filename returns the correct filename
         expected_filename = os.path.basename(self.post.image.name)
         self.assertEqual(self.post.main_image_filename, expected_filename)
 

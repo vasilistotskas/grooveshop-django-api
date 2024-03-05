@@ -104,7 +104,7 @@ class CustomCacheTestCase(TestCase):
             keys = self.cache_instance.keys()
             self.assertEqual(keys, [])
         else:
-            # Mocking RedisCache for testing keys method
+
             class MockRedisCache(RedisCache):
                 def __init__(self, *args, **kwargs):
                     super().__init__(*args, **kwargs)

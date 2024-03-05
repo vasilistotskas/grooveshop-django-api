@@ -23,15 +23,10 @@ class CheckoutViewAPITest(APITestCase):
     region: Region = None
 
     def setUp(self):
-        # Create a sample user for testing
         self.user = User.objects.create_user(
             email="test@test.com", password="test12345@!"
         )
-
-        # Login to authenticate
         self.client.login(email="test@test.com", password="test12345@!")
-
-        # Create a sample PayWay instance for testing
         image_icon = get_or_create_default_image("uploads/pay_way/no_photo.jpg")
         self.pay_way = PayWay.objects.create(
             active=True,
@@ -40,7 +35,6 @@ class CheckoutViewAPITest(APITestCase):
             icon=image_icon,
         )
 
-        # Create a sample Country instance for testing
         image_flag = get_or_create_default_image("uploads/region/no_photo.jpg")
         self.country = Country.objects.create(
             alpha_2="GR",
@@ -50,7 +44,6 @@ class CheckoutViewAPITest(APITestCase):
             image_flag=image_flag,
         )
 
-        # Create a sample Region instance for testing
         self.region = Region.objects.create(
             alpha="GRC",
             country=self.country,
@@ -63,7 +56,6 @@ class CheckoutViewAPITest(APITestCase):
     def test_successful_order_creation(self):
         self.client.login(email=self.user.email, password="test12345@!")
 
-        # Create products for testing
         product_1 = Product.objects.create(
             slug="product_one",
             price=10.00,
@@ -83,7 +75,6 @@ class CheckoutViewAPITest(APITestCase):
             weight=0.00,
         )
 
-        # Prepare data for order creation
         order_data = {
             "user": self.user.id,
             "country": self.country.alpha_2,
@@ -125,7 +116,6 @@ class CheckoutViewAPITest(APITestCase):
     def test_failed_order_creation(self):
         self.client.login(email=self.user.email, password="test12345@!")
 
-        # Create products for testing
         product_3 = Product.objects.create(
             slug="product_three",
             price=10.00,
@@ -145,7 +135,6 @@ class CheckoutViewAPITest(APITestCase):
             weight=0.00,
         )
 
-        # Prepare data for order creation (invalid quantity to trigger a failure)
         order_data = {
             "user_id": self.user.id,
             "order_item_order": [

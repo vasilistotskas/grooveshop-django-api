@@ -52,7 +52,6 @@ class UserAddressViewSetTestCase(APITestCase):
             self.region.save()
         self.region.set_current_language(default_language)
 
-        # Login to authenticate
         self.client.login(email="test@test.com", password="test12345@!")
         self.client.force_authenticate(user=self.user)
 
@@ -212,7 +211,7 @@ class UserAddressViewSetTestCase(APITestCase):
         self.assertFalse(UserAddress.objects.filter(pk=self.address.pk).exists())
 
     def test_destroy_invalid(self):
-        invalid_user_address_id = 9999  # An ID that doesn't exist in the database
+        invalid_user_address_id = 9999
         url = self.get_user_address_detail_url(invalid_user_address_id)
         response = self.client.delete(url)
 

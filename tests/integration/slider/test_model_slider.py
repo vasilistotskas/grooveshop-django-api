@@ -38,18 +38,15 @@ class SliderModelTestCase(TestCase):
         self.slider.set_current_language(default_language)
 
     def test_fields(self):
-        # Test if the fields are saved correctly
         self.assertTrue(default_storage.exists(self.slider.image.path))
 
     def test_verbose_names(self):
-        # Test verbose names for fields
         self.assertEqual(
             Slider._meta.get_field("image").verbose_name,
             _("Image"),
         )
 
     def test_meta_verbose_names(self):
-        # Test verbose names from the Meta class
         self.assertEqual(
             Slider._meta.verbose_name,
             _("Slider"),
@@ -60,14 +57,12 @@ class SliderModelTestCase(TestCase):
         )
 
     def test_unicode_representation(self):
-        # Test the __unicode__ method returns the translated name
         self.assertEqual(
             self.slider.__unicode__(),
             self.slider.safe_translation_getter("name"),
         )
 
     def test_translations(self):
-        # Test if translations are saved correctly
         for language in languages:
             self.slider.set_current_language(language)
             self.assertEqual(self.slider.name, f"Slider 1_{language}")
@@ -75,7 +70,6 @@ class SliderModelTestCase(TestCase):
             self.assertEqual(self.slider.description, f"Slider Description_{language}")
 
     def test_str_representation(self):
-        # Test the __str__ method returns the translated name
         self.assertEqual(
             str(self.slider),
             self.slider.safe_translation_getter("name"),
@@ -88,12 +82,10 @@ class SliderModelTestCase(TestCase):
         self.assertTrue(default_storage.exists(self.slider.image.path))
 
     def test_main_image_absolute_url(self):
-        # Test if main_image_absolute_url returns the correct URL
         expected_url = settings.APP_BASE_URL + self.slider.image.url
         self.assertEqual(self.slider.main_image_absolute_url, expected_url)
 
     def test_main_image_filename(self):
-        # Test if main_image_filename returns the correct filename
         expected_filename = os.path.basename(self.slider.image.name)
         self.assertEqual(self.slider.main_image_filename, expected_filename)
 

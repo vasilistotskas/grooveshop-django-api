@@ -20,9 +20,7 @@ class AuthSocialAccountListViewTest(APITestCase):
         view = AuthSocialAccountListView()
         view.swagger_fake_view = True
         queryset = view.get_queryset()
-        self.assertEqual(
-            queryset.count(), 0
-        )  # Expecting no objects as the queryset should be none
+        self.assertEqual(queryset.count(), 0)
 
 
 class IsUserRegisteredTest(APITestCase):
@@ -34,13 +32,13 @@ class IsUserRegisteredTest(APITestCase):
     def test_is_user_registered(self):
         response = self.client.post(
             reverse("is_user_registered"), data={"email": "testuser@example.com"}
-        )  # replace with your actual url name
+        )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["registered"], True)
 
     def test_is_user_not_registered(self):
         response = self.client.post(
             reverse("is_user_registered"), data={"email": "notregistered@example.com"}
-        )  # replace with your actual url name
+        )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["registered"], False)

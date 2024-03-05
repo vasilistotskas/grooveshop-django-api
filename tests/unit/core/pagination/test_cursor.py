@@ -11,7 +11,6 @@ class CursorPaginatorTest(TestCase):
 
     def setUp(self):
         self.factory = RequestFactory()
-        # Create some test data
         for i in range(1, 101):
             Product.objects.create(
                 slug=f"product-{i}",
@@ -27,7 +26,6 @@ class CursorPaginatorTest(TestCase):
         paginator = CursorPaginator()
         queryset = Product.objects.all()
 
-        # Create a Request instance from Django REST framework
         request = Request(self.factory.get("/api/v1/products/?c=MA==&page_size=10"))
 
         paginated_queryset = paginator.paginate_queryset(queryset, request)
@@ -39,7 +37,7 @@ class CursorPaginatorTest(TestCase):
         paginator.total_items = 105
         total_pages = paginator.get_total_pages()
 
-        self.assertEqual(total_pages, 3)  # 105 items should be split into 3 pages
+        self.assertEqual(total_pages, 3)
 
     def test_get_paginated_response(self):
         paginator = CursorPaginator()

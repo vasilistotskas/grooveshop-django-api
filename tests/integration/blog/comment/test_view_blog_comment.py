@@ -24,6 +24,8 @@ class BlogCommentViewSetTestCase(APITestCase):
         self.user = User.objects.create_user(
             email="testuser@example.com", password="testpassword"
         )
+        self.client.login(email="testuser@example.com", password="testpassword")
+        self.client.force_authenticate(user=self.user)
         self.author = BlogAuthor.objects.create(user=self.user)
         self.post = BlogPost.objects.create(
             slug="test-post",
@@ -117,7 +119,7 @@ class BlogCommentViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_retrieve_invalid(self):
-        invalid_comment_id = 9999  # An ID that doesn't exist in the database
+        invalid_comment_id = 9999
         url = self.get_comment_detail_url(invalid_comment_id)
         response = self.client.get(url)
 

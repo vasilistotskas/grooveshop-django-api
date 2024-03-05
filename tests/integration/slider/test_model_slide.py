@@ -50,13 +50,11 @@ class SlideModelTestCase(TestCase):
         self.slide.set_current_language(default_language)
 
     def test_fields(self):
-        # Test if the fields are saved correctly
         self.assertEqual(self.slide.discount, Money("0.0", settings.DEFAULT_CURRENCY))
         self.assertTrue(self.slide.show_button)
         self.assertTrue(default_storage.exists(self.slide.image.path))
 
     def test_verbose_names(self):
-        # Test verbose names for fields
         self.assertEqual(
             Slide._meta.get_field("image").verbose_name,
             "Image",
@@ -71,7 +69,6 @@ class SlideModelTestCase(TestCase):
         )
 
     def test_meta_verbose_names(self):
-        # Test verbose names from the Meta class
         self.assertEqual(
             Slide._meta.verbose_name,
             "Slide",
@@ -82,14 +79,12 @@ class SlideModelTestCase(TestCase):
         )
 
     def test_unicode_representation(self):
-        # Test the __unicode__ method returns the translated name
         self.assertEqual(
             self.slide.__unicode__(),
             f"{self.slide.safe_translation_getter('title', any_language=True)} in {self.slider}",
         )
 
     def test_translations(self):
-        # Test if translations are saved correctly
         for language in languages:
             self.slide.set_current_language(language)
             self.assertEqual(self.slide.name, f"Slide 1_{language}")
@@ -98,7 +93,6 @@ class SlideModelTestCase(TestCase):
             self.assertEqual(self.slide.button_label, f"Slide Button Label_{language}")
 
     def test_str_representation(self):
-        # Test the __str__ method returns the translated name
         self.assertEqual(
             str(self.slide),
             f"{self.slide.safe_translation_getter('title', any_language=True)} in {self.slider}",
@@ -111,12 +105,10 @@ class SlideModelTestCase(TestCase):
         self.assertTrue(default_storage.exists(self.slide.image.path))
 
     def test_main_image_absolute_url(self):
-        # Test if main_image_absolute_url returns the correct URL
         expected_url = settings.APP_BASE_URL + self.slide.image.url
         self.assertEqual(self.slide.main_image_absolute_url, expected_url)
 
     def test_main_image_filename(self):
-        # Test if main_image_filename returns the correct filename
         expected_filename = os.path.basename(self.slide.image.name)
         self.assertEqual(self.slide.main_image_filename, expected_filename)
 

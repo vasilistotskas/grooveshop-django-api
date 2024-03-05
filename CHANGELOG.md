@@ -3,7 +3,21 @@
 
 
 
+## v0.77.0 (2024-03-05)
+
+### Feature
+
+* feat: `clear_blacklisted_tokens_task` task, `user_to_product_review` rename to `user_product_review` and config package simplify ([`906f845`](https://github.com/vasilistotskas/grooveshop-django-api/commit/906f84537033ebc60e2d118efdafcc9682f4fac6))
+
+### Fix
+
+* fix: remove comments from tests package ([`2da561a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2da561a096f4352a9eae1f80baa2b91c992199ce))
+
 ## v0.76.0 (2024-03-03)
+
+### Chore
+
+* chore(release): release version 0.76.0 [skip ci] ([`ddf6630`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ddf6630984f32a16c290a6aa70015f100a164217))
 
 ### Feature
 

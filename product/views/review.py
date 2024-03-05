@@ -89,19 +89,19 @@ class ProductReviewViewSet(BaseExpandView, ModelViewSet):
             "update",
             "partial_update",
             "destroy",
-            "user_to_product_review",
+            "user_product_review",
         ]:
             self.permission_classes = [IsAuthenticated]
         return super().get_permissions()
 
     @action(detail=False, methods=["POST"])
-    def user_to_product_review(self, request, *args, **kwargs) -> Response:
+    def user_product_review(self, request, *args, **kwargs) -> Response:
         user_id = request.data.get("user")
         product_id = request.data.get("product")
 
-        if user_id is None or product_id is None:
+        if not user_id or not product_id:
             return Response(
-                {"detail": "user_id and product_id must be provided"},
+                {"detail": "User and Product are required fields"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -112,12 +112,12 @@ class ProductReviewViewSet(BaseExpandView, ModelViewSet):
 
         except ProductReview.DoesNotExist:
             return Response(
-                {"detail": "User has not reviewed this product"},
+                {"detail": "Review does not exist"},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
         except ValueError:
             return Response(
-                {"detail": "Invalid user_id or product_id provided"},
+                {"detail": "Invalid data"},
                 status=status.HTTP_400_BAD_REQUEST,
             )

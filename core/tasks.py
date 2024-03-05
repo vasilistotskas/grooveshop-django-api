@@ -85,3 +85,12 @@ def cleanup_log_files_task(self, days=30):
 
     logger.info(message)
     return message
+
+
+@shared_task(bind=True, name="Clear Blacklisted expired tokens Task")
+def clear_blacklisted_tokens_task():
+    try:
+        management.call_command("flushexpiredtokens", verbosity=0)
+        return "All expired blacklisted tokens deleted."
+    except Exception as e:
+        return f"error: {e}"

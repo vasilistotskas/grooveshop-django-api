@@ -1704,7 +1704,6 @@ paths:
       security:
       - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '201':
           content:
@@ -1799,7 +1798,6 @@ paths:
       security:
       - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '201':
           content:
@@ -1854,7 +1852,6 @@ paths:
       security:
       - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '200':
           content:
@@ -1886,7 +1883,6 @@ paths:
       security:
       - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '200':
           content:
@@ -1907,7 +1903,6 @@ paths:
       security:
       - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '204':
           description: No response body
@@ -1972,7 +1967,6 @@ paths:
       security:
       - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '200':
           content:
@@ -2011,7 +2005,6 @@ paths:
       security:
       - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '200':
           content:
@@ -2039,10 +2032,71 @@ paths:
       security:
       - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '204':
           description: No response body
+  /api/v1/blog/comment/user_blog_comment:
+    post:
+      operationId: api_v1_blog_comment_user_blog_comment_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BlogComment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BlogComment'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlogComment'
+        required: true
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogComment'
+          description: ''
+  /api/v1/blog/comment/user_blog_comment{format}:
+    post:
+      operationId: api_v1_blog_comment_user_blog_comment_formatted_create
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BlogComment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BlogComment'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlogComment'
+        required: true
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogComment'
+          description: ''
   /api/v1/blog/post:
     get:
       operationId: api_v1_blog_post_list
@@ -6988,9 +7042,9 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/product/review/user_to_product_review:
+  /api/v1/product/review/user_product_review:
     post:
-      operationId: api_v1_product_review_user_to_product_review_create
+      operationId: api_v1_product_review_user_product_review_create
       tags:
       - api
       requestBody:
@@ -7015,9 +7069,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProductReview'
           description: ''
-  /api/v1/product/review/user_to_product_review{format}:
+  /api/v1/product/review/user_product_review{format}:
     post:
-      operationId: api_v1_product_review_user_to_product_review_formatted_create
+      operationId: api_v1_product_review_user_product_review_formatted_create
       parameters:
       - in: path
         name: format

@@ -223,13 +223,13 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.34.54"
+version = "1.34.55"
 description = "Low-level, data-driven core of boto 3."
 optional = false
 python-versions = ">= 3.8"
 files = [
-    {file = "botocore-1.34.54-py3-none-any.whl", hash = "sha256:bf215d93e9d5544c593962780d194e74c6ee40b883d0b885e62ef35fc0ec01e5"},
-    {file = "botocore-1.34.54.tar.gz", hash = "sha256:4061ff4be3efcf53547ebadf2c94d419dfc8be7beec24e9fa1819599ffd936fa"},
+    {file = "botocore-1.34.55-py3-none-any.whl", hash = "sha256:07044c3cbfb86d0ecb9c56d887b8ad63a72eff0e4f6ab329cf335f1fd867ea0b"},
+    {file = "botocore-1.34.55.tar.gz", hash = "sha256:bb333e3845bfe65600f36bf92d09668306e224fa9f4e4f87b77f6957192ae59f"},
 ]
 
 [package.dependencies]
@@ -1843,13 +1843,13 @@ files = [
 
 [[package]]
 name = "ipython"
-version = "8.22.1"
+version = "8.22.2"
 description = "IPython: Productive Interactive Computing"
 optional = false
 python-versions = ">=3.10"
 files = [
-    {file = "ipython-8.22.1-py3-none-any.whl", hash = "sha256:869335e8cded62ffb6fac8928e5287a05433d6462e3ebaac25f4216474dd6bc4"},
-    {file = "ipython-8.22.1.tar.gz", hash = "sha256:39c6f9efc079fb19bfb0f17eee903978fe9a290b1b82d68196c641cecb76ea22"},
+    {file = "ipython-8.22.2-py3-none-any.whl", hash = "sha256:3c86f284c8f3d8f2b6c662f885c4889a91df7cd52056fd02b7d8d6195d7f56e9"},
+    {file = "ipython-8.22.2.tar.gz", hash = "sha256:2dcaad9049f9056f1fef63514f176c7d41f930daa78d05b82a176202818f2c14"},
 ]
 
 [package.dependencies]
@@ -3909,13 +3909,13 @@ zstd = ["zstandard (>=0.18.0)"]
 
 [[package]]
 name = "urwid"
-version = "2.6.7"
+version = "2.6.8"
 description = "A full-featured console (xterm et al.) user interface library"
 optional = false
 python-versions = ">3.7"
 files = [
-    {file = "urwid-2.6.7-py3-none-any.whl", hash = "sha256:80b922d2051db6abe598b7e1b0b31d8d04fcc56d35bb1ec40b3c128fa0bd23ab"},
-    {file = "urwid-2.6.7.tar.gz", hash = "sha256:597fa2d19ac788e4607d2a48aca32f257342201cb55e5f6a00a8fcd24e62a5ab"},
+    {file = "urwid-2.6.8-py3-none-any.whl", hash = "sha256:c14970e1ad8e149f454a07cce1e75dbe94b2342f509dc1a626fb2e29f2632837"},
+    {file = "urwid-2.6.8.tar.gz", hash = "sha256:51267c7daf86f68b4112e2c9433aa4f19b901c2e78a13d8a1d994881d48f8eca"},
 ]
 
 [package.dependencies]

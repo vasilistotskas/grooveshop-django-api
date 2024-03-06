@@ -3,7 +3,7 @@
 ###########
 
 # pull official base image
-FROM python:3.12.1-slim as builder
+FROM python:3.12.2-slim as builder
 
 # set work directory
 WORKDIR /usr/src/app
@@ -30,7 +30,7 @@ RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/app/wheels -r requir
 #########
 
 # pull official base image
-FROM python:3.12.1-slim
+FROM python:3.12.2-slim
 
 # create directory for the app user
 RUN mkdir -p /home/app

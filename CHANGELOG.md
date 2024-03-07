@@ -3,7 +3,17 @@
 
 
 
+## v0.78.0 (2024-03-07)
+
+### Feature
+
+* feat(Dockerfile): Bump python version to 3.12.2 ([`80d1a5f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/80d1a5f023c9818454a113f9b76a46d701276de2))
+
 ## v0.77.0 (2024-03-05)
+
+### Chore
+
+* chore(release): release version 0.77.0 [skip ci] ([`7937c2b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7937c2b4d394ba5355435fd11d7369a13a41ed40))
 
 ### Feature
 

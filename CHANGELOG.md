@@ -3,7 +3,17 @@
 
 
 
+## v0.79.0 (2024-03-07)
+
+### Feature
+
+* feat: `blog_post_comments`, `blog_liked_posts` and `blog_liked_comments` added in user details API view,  get blog article comments api endpoint and method names correction ([`7feb1d9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7feb1d90bfa69b9f33eefcd9c8d139e33c6fdada))
+
 ## v0.78.0 (2024-03-07)
+
+### Chore
+
+* chore(release): release version 0.78.0 [skip ci] ([`7d9a487`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7d9a487ae1c1a9258cf54f8cc8fcf272a306ab73))
 
 ### Feature
 

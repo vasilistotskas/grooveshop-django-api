@@ -89,16 +89,16 @@ class BlogCommentModelTestCase(TestCase):
             str(self.comment), f"Comment by {self.user.full_name}: {content_snippet}"
         )
 
-    def test_number_of_likes(self):
+    def test_likes_count(self):
         other_user = User.objects.create_user(
             email="testuser2@example.com", password="testpassword"
         )
 
-        self.assertEqual(self.comment.number_of_likes, 0)
+        self.assertEqual(self.comment.likes_count, 0)
 
         self.comment.likes.add(other_user)
 
-        self.assertEqual(self.comment.number_of_likes, 1)
+        self.assertEqual(self.comment.likes_count, 1)
 
     def tearDown(self) -> None:
         super().tearDown()

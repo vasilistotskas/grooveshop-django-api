@@ -44,7 +44,7 @@ class ProductSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "vat_value",
             "final_price",
             "hits",
-            "likes_counter",
+            "likes_count",
             "stock",
             "active",
             "weight",
@@ -60,7 +60,7 @@ class ProductSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "main_image_absolute_url",
             "main_image_filename",
             "review_average",
-            "review_counter",
+            "review_count",
         )
 
     def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:

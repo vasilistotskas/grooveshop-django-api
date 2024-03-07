@@ -95,16 +95,16 @@ class BlogPost(
             return ""
 
     @property
-    def number_of_likes(self) -> int:
+    def likes_count(self) -> int:
         return self.likes.count()
 
     @property
-    def number_of_comments(self) -> int:
-        return self.blog_comment_post.count()
+    def comments_count(self) -> int:
+        return self.blog_comment_post.filter(is_approved=True).count()
 
     @property
-    def post_tags_count(self) -> int:
-        return self.tags.count()
+    def tags_count(self) -> int:
+        return self.tags.filter(active=True).count()
 
     @property
     def absolute_url(self) -> str:

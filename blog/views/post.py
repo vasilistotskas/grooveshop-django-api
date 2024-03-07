@@ -11,6 +11,7 @@ from rest_framework.viewsets import ModelViewSet
 
 from blog.models.post import BlogPost
 from blog.paginators.post import BlogPostPagination
+from blog.serializers.comment import BlogCommentSerializer
 from blog.serializers.post import BlogPostSerializer
 from core.api.views import BaseExpandView
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
@@ -103,4 +104,16 @@ class BlogPostViewSet(BaseExpandView, ModelViewSet):
         post.view_count += 1
         post.save()
         serializer = self.get_serializer(post)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["GET"],
+    )
+    def comments(self, request, pk=None) -> Response:
+        post = get_object_or_404(BlogPost, pk=pk)
+        comments = post.blog_comment_post.filter(is_approved=True)
+        serializer = BlogCommentSerializer(
+            comments, many=True, context=self.get_serializer_context()
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)

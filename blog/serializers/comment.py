@@ -53,7 +53,8 @@ class BlogCommentSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "created_at",
             "updated_at",
             "uuid",
-            "number_of_likes",
+            "likes_count",
+            "replies_count",
         )
 
     def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:

@@ -2524,6 +2524,57 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/blog/post/{id}/comments:
+    get:
+      operationId: api_v1_blog_post_comments_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogPost'
+          description: ''
+  /api/v1/blog/post/{id}/comments{format}:
+    get:
+      operationId: api_v1_blog_post_comments_formatted_retrieve
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogPost'
+          description: ''
   /api/v1/blog/post/{id}/update_likes:
     post:
       operationId: api_v1_blog_post_update_likes_create
@@ -10893,7 +10944,10 @@ components:
           type: string
           format: uuid
           readOnly: true
-        numberOfLikes:
+        likesCount:
+          type: integer
+          readOnly: true
+        repliesCount:
           type: integer
           readOnly: true
       required:
@@ -10902,8 +10956,9 @@ components:
       - id
       - level
       - likes
-      - numberOfLikes
+      - likesCount
       - post
+      - repliesCount
       - translations
       - treeId
       - updatedAt
@@ -10994,13 +11049,13 @@ components:
         mainImageFilename:
           type: string
           readOnly: true
-        numberOfLikes:
+        likesCount:
           type: integer
           readOnly: true
-        numberOfComments:
+        commentsCount:
           type: integer
           readOnly: true
-        postTagsCount:
+        tagsCount:
           type: integer
           readOnly: true
         absoluteUrl:
@@ -11010,16 +11065,16 @@ components:
       - absoluteUrl
       - author
       - category
+      - commentsCount
       - createdAt
       - id
       - likes
+      - likesCount
       - mainImageAbsoluteUrl
       - mainImageFilename
-      - numberOfComments
-      - numberOfLikes
-      - postTagsCount
       - slug
       - tags
+      - tagsCount
       - translations
       - updatedAt
       - uuid
@@ -12735,7 +12790,10 @@ components:
           type: string
           format: uuid
           readOnly: true
-        numberOfLikes:
+        likesCount:
+          type: integer
+          readOnly: true
+        repliesCount:
           type: integer
           readOnly: true
     PatchedBlogPost:
@@ -12823,13 +12881,13 @@ components:
         mainImageFilename:
           type: string
           readOnly: true
-        numberOfLikes:
+        likesCount:
           type: integer
           readOnly: true
-        numberOfComments:
+        commentsCount:
           type: integer
           readOnly: true
-        postTagsCount:
+        tagsCount:
           type: integer
           readOnly: true
         absoluteUrl:
@@ -13365,7 +13423,7 @@ components:
           type: integer
           maximum: 2147483647
           minimum: 0
-        likesCounter:
+        likesCount:
           type: integer
           readOnly: true
         stock:
@@ -13437,7 +13495,7 @@ components:
           type: number
           format: double
           readOnly: true
-        reviewCounter:
+        reviewCount:
           type: integer
           readOnly: true
     PatchedProductCategory:
@@ -14196,7 +14254,7 @@ components:
           type: integer
           maximum: 2147483647
           minimum: 0
-        likesCounter:
+        likesCount:
           type: integer
           readOnly: true
         stock:
@@ -14268,7 +14326,7 @@ components:
           type: number
           format: double
           readOnly: true
-        reviewCounter:
+        reviewCount:
           type: integer
           readOnly: true
       required:
@@ -14278,13 +14336,13 @@ components:
       - discountValue
       - finalPrice
       - id
-      - likesCounter
+      - likesCount
       - mainImageAbsoluteUrl
       - mainImageFilename
       - price
       - priceSavePercent
       - reviewAverage
-      - reviewCounter
+      - reviewCount
       - slug
       - translations
       - updatedAt

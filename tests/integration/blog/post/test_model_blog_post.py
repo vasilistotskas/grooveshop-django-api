@@ -150,14 +150,14 @@ class BlogPostModelTestCase(TestCase):
         expected_filename = os.path.basename(self.post.image.name)
         self.assertEqual(self.post.main_image_filename, expected_filename)
 
-    def test_number_of_likes(self):
-        self.assertEqual(self.post.number_of_likes, 0)
+    def test_likes_count(self):
+        self.assertEqual(self.post.likes_count, 0)
 
-    def test_number_of_comments(self):
-        self.assertEqual(self.post.number_of_comments, 0)
+    def test_comments_count(self):
+        self.assertEqual(self.post.comments_count, 0)
 
-    def test_post_tags_count(self):
-        self.assertEqual(self.post.post_tags_count, 0)
+    def test_tags_count(self):
+        self.assertEqual(self.post.tags_count, 0)
 
     def tearDown(self) -> None:
         super().tearDown()

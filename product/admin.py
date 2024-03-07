@@ -91,12 +91,12 @@ class ProductAdmin(TranslatableAdmin, ExportModelAdmin):
         "colored_stock",
         "boolean_status",
         "image_tag",
-        "likes_counter",
+        "likes_count",
     ]
     search_fields = ["id", "category__name", "translations__name", "product_code"]
     list_filter = ["category"]
     inlines = [ProductImageInline]
-    readonly_fields = ("image_tag", "likes_counter")
+    readonly_fields = ("image_tag", "likes_count")
 
     def get_prepopulated_fields(self, request, obj=None) -> dict:
         # can't use `prepopulated_fields = ..` because it breaks the admin validation

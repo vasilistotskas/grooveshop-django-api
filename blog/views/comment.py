@@ -29,6 +29,11 @@ class BlogCommentViewSet(TranslationsProcessingMixin, BaseExpandView, ModelViewS
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
+        pagination_param = request.query_params.get("pagination", "true")
+
+        if pagination_param.lower() == "false":
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
 
         page = self.paginate_queryset(queryset)
         if page is not None:
@@ -36,7 +41,7 @@ class BlogCommentViewSet(TranslationsProcessingMixin, BaseExpandView, ModelViewS
             return self.get_paginated_response(serializer.data)
 
         serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs) -> Response:
         request = self.process_translations_data(request)

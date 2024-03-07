@@ -51,9 +51,9 @@ class BlogPostSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "uuid",
             "main_image_absolute_url",
             "main_image_filename",
-            "number_of_likes",
-            "number_of_comments",
-            "post_tags_count",
+            "likes_count",
+            "comments_count",
+            "tags_count",
             "absolute_url",
         )
 

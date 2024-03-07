@@ -257,7 +257,7 @@ class Product(
         self.refresh_from_db()
 
     @property
-    def likes_counter(self) -> int:
+    def likes_count(self) -> int:
         return ProductFavourite.objects.filter(product=self).count()
 
     @property
@@ -268,7 +268,7 @@ class Product(
         return float(average) if average is not None else 0.0
 
     @property
-    def review_counter(self) -> int:
+    def review_count(self) -> int:
         return ProductReview.objects.filter(
             product=self, status=ReviewStatusEnum.TRUE
         ).count()

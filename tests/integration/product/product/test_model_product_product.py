@@ -254,14 +254,14 @@ class ProductModelTestCase(TestCase):
             str(self.product), self.product.safe_translation_getter("name")
         )
 
-    def test_likes_counter(self):
-        self.assertEqual(self.product.likes_counter, 1)
+    def test_likes_count(self):
+        self.assertEqual(self.product.likes_count, 1)
 
     def test_review_average(self):
         self.assertEqual(self.product.review_average, 5)
 
-    def test_review_counter(self):
-        self.assertEqual(self.product.review_counter, 1)
+    def test_review_count(self):
+        self.assertEqual(self.product.review_count, 1)
 
     def test_vat_percent(self):
         self.assertEqual(self.product.vat_percent, self.vat.value)

@@ -29,7 +29,7 @@ class ProductViewSet(BaseExpandView, ModelViewSet):
         "final_price",
         "price_save_percent",
         "review_average",
-        "likes_counter",
+        "likes_count",
     ]
     ordering = ["-created_at"]
     search_fields = ["id"]

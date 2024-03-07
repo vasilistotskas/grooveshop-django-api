@@ -60,7 +60,6 @@ class OrderViewSet(MultiSerializerMixin, ModelViewSet):
         pagination_param = request.query_params.get("pagination", "true")
 
         if pagination_param.lower() == "false":
-            # Return non-paginated response
             serializer = self.get_serializer(queryset, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
 

@@ -91,5 +91,9 @@ class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel, MPTTModel):
         return f"Comment by {self.user.full_name if self.user else 'Anonymous'}: {content_snippet}"
 
     @property
-    def number_of_likes(self) -> int:
+    def likes_count(self) -> int:
         return self.likes.count()
+
+    @property
+    def replies_count(self) -> int:
+        return self.get_descendant_count()

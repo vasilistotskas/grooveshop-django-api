@@ -13,6 +13,7 @@ from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from product.filters.product import ProductFilter
 from product.models.product import Product
 from product.paginators.product import ProductPagination
+from product.serializers.image import ProductImageSerializer
 from product.serializers.product import ProductSerializer
 from product.serializers.review import ProductReviewSerializer
 
@@ -96,5 +97,17 @@ class ProductViewSet(BaseExpandView, ModelViewSet):
         reviews = product.product_review_product.all()
         serializer = ProductReviewSerializer(
             reviews, many=True, context=self.get_serializer_context()
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["GET"],
+    )
+    def images(self, request, pk=None) -> Response:
+        product = get_object_or_404(Product, pk=pk)
+        images = product.product_images.all()
+        serializer = ProductImageSerializer(
+            images, many=True, context=self.get_serializer_context()
         )
         return Response(serializer.data, status=status.HTTP_200_OK)

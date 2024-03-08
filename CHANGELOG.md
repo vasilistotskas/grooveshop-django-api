@@ -3,7 +3,17 @@
 
 
 
+## v0.80.0 (2024-03-08)
+
+### Feature
+
+* feat: New api endpoint to get product review and Bump Versions ([`78fc042`](https://github.com/vasilistotskas/grooveshop-django-api/commit/78fc042953ce86a5ec321c89d10f6d07b8f0b3ad))
+
 ## v0.79.0 (2024-03-07)
+
+### Chore
+
+* chore(release): release version 0.79.0 [skip ci] ([`cef36cf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cef36cf9f8d08ff4c82406833997306b907215c6))
 
 ### Feature
 

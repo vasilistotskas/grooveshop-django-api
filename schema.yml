@@ -5374,6 +5374,57 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/product/{id}/reviews:
+    get:
+      operationId: api_v1_product_reviews_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+  /api/v1/product/{id}/reviews{format}:
+    get:
+      operationId: api_v1_product_reviews_formatted_retrieve
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
   /api/v1/product/{id}/update_product_hits:
     post:
       operationId: api_v1_product_update_product_hits_create

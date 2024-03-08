@@ -14,6 +14,7 @@ from product.filters.product import ProductFilter
 from product.models.product import Product
 from product.paginators.product import ProductPagination
 from product.serializers.product import ProductSerializer
+from product.serializers.review import ProductReviewSerializer
 
 
 class ProductViewSet(BaseExpandView, ModelViewSet):
@@ -85,3 +86,15 @@ class ProductViewSet(BaseExpandView, ModelViewSet):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(
+        detail=True,
+        methods=["GET"],
+    )
+    def reviews(self, request, pk=None) -> Response:
+        product = get_object_or_404(Product, pk=pk)
+        reviews = product.product_review_product.all()
+        serializer = ProductReviewSerializer(
+            reviews, many=True, context=self.get_serializer_context()
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)

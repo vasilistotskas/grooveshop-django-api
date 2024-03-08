@@ -3,7 +3,17 @@
 
 
 
+## v0.81.0 (2024-03-08)
+
+### Feature
+
+* feat: New api endpoint to get product images ([`aa87bcf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/aa87bcf78dd8b578fdd0e8414a317f002eb83d49))
+
 ## v0.80.0 (2024-03-08)
+
+### Chore
+
+* chore(release): release version 0.80.0 [skip ci] ([`9cf3860`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9cf38608dd3e17f792c20aa0375a2bb9ac8f4560))
 
 ### Feature
 

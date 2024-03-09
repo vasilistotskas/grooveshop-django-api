@@ -10,9 +10,10 @@ from core.models import Settings
 
 
 class SettingsModelTests(TestCase):
-    site = Site.objects.get_current()
+    site = None
 
     def setUp(self):
+        self.site = Site.objects.get_current()
         cache.clear()
 
     def test_create_setting_with_valid_key(self):

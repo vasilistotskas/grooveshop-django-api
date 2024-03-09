@@ -13535,13 +13535,16 @@ components:
         active:
           type: boolean
         weight:
-          type: number
-          format: double
-          maximum: 1000000000
-          minimum: -1000000000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
-          title: Weight (kg)
+          type: object
+          properties:
+            unit:
+              type: string
+            value:
+              type: number
+          example:
+            unit: kg
+            value: 1.0
+          nullable: true
         seoTitle:
           type: string
           nullable: true
@@ -13881,6 +13884,8 @@ components:
     PatchedSettings:
       type: object
       properties:
+        site:
+          type: integer
         key:
           type: string
           maxLength: 255
@@ -14366,13 +14371,16 @@ components:
         active:
           type: boolean
         weight:
-          type: number
-          format: double
-          maximum: 1000000000
-          minimum: -1000000000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
-          title: Weight (kg)
+          type: object
+          properties:
+            unit:
+              type: string
+            value:
+              type: number
+          example:
+            unit: kg
+            value: 1.0
+          nullable: true
         seoTitle:
           type: string
           nullable: true
@@ -14913,6 +14921,8 @@ components:
     Settings:
       type: object
       properties:
+        site:
+          type: integer
         key:
           type: string
           maxLength: 255
@@ -14927,6 +14937,7 @@ components:
           type: boolean
       required:
       - key
+      - site
       - value
     Slide:
       type: object

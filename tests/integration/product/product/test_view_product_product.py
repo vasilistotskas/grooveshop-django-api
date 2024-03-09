@@ -164,7 +164,10 @@ class ProductViewSetTestCase(APITestCase):
             "discount_percent": "50.0",
             "vat": self.vat.pk,
             "hits": 10,
-            "weight": "5.00",
+            "weight": {
+                "value": "5.00",
+                "unit": "kg",
+            },
         }
 
         for language in languages:
@@ -235,7 +238,10 @@ class ProductViewSetTestCase(APITestCase):
             "discount_percent": "50.0",
             "vat": self.vat.pk,
             "hits": 10,
-            "weight": "5.00",
+            "weight": {
+                "value": "5.00",
+                "unit": "kg",
+            },
         }
 
         for language in languages:
@@ -270,7 +276,10 @@ class ProductViewSetTestCase(APITestCase):
             "discount_percent": "invalid_discount_percent",
             "vat": "invalid_vat",
             "hits": "invalid_hits",
-            "weight": "invalid_weight",
+            "weight": {
+                "value": "5.00",
+                "unit": "kg",
+            },
         }
 
         url = self.get_product_detail_url(self.product.pk)

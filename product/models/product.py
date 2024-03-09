@@ -24,19 +24,23 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
 from djmoney.money import Money
+from measurement.measures import Weight
 from mptt.fields import TreeForeignKey
 from parler.managers import TranslatableQuerySet
 from parler.models import TranslatableModel
 from parler.models import TranslatedFields
 from tinymce.models import HTMLField
 
+from core.fields.measurement import MeasurementField
 from core.models import ModelWithMetadata
 from core.models import SoftDeleteModel
 from core.models import SoftDeleteQuerySet
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
+from core.units import WeightUnits
 from core.utils.generators import SlugifyConfig
 from core.utils.generators import unique_slugify
+from core.weight import zero_weight
 from product.enum.review import ReviewStatusEnum
 from product.models.favourite import ProductFavourite
 from product.models.image import ProductImage
@@ -145,8 +149,11 @@ class Product(
         on_delete=models.SET_NULL,
     )
     hits = models.PositiveIntegerField(_("Hits"), default=0)
-    weight = models.DecimalField(
-        _("Weight (kg)"), max_digits=11, decimal_places=2, default=0.0
+    weight = MeasurementField(
+        _("Weight"),
+        measurement=Weight,
+        unit_choices=WeightUnits.CHOICES,
+        default=zero_weight,
     )
 
     # final_price, discount_value, price_save_percent are calculated fields on save method

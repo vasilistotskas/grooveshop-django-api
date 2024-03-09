@@ -206,7 +206,7 @@ class ProductModelTestCase(TestCase):
         )
         self.assertEqual(
             Product._meta.get_field("weight").verbose_name,
-            "Weight (kg)",
+            "Weight",
         )
         self.assertEqual(
             Product._meta.get_field("final_price").verbose_name,

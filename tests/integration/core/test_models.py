@@ -1,5 +1,6 @@
 import json
 
+from django.contrib.sites.models import Site
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.test import TestCase
@@ -9,11 +10,14 @@ from core.models import Settings
 
 
 class SettingsModelTests(TestCase):
+    site = Site.objects.get_current()
+
     def setUp(self):
         cache.clear()
 
     def test_create_setting_with_valid_key(self):
         setting = Settings.objects.create(
+            site=self.site,
             key="APP_VALID_KEY",
             value="Test value",
             value_type=SettingsValueTypeEnum.STRING,
@@ -30,7 +34,7 @@ class SettingsModelTests(TestCase):
             ("float", 3.14),
         ]
         for python_type, val in types_and_values:
-            setting = Settings(key=f"APP_{python_type.upper()}_KEY")
+            setting = Settings(site=self.site, key=f"APP_{python_type.upper()}_KEY")
             setting.set_value(val)
             setting.save()
 
@@ -47,6 +51,7 @@ class SettingsModelTests(TestCase):
 
     def test_setting_value_type_integrity(self):
         setting = Settings.objects.create(
+            site=self.site,
             key="APP_INTEGER",
             value=json.dumps(10),
             value_type=SettingsValueTypeEnum.INTEGER,
@@ -54,7 +59,9 @@ class SettingsModelTests(TestCase):
         self.assertEqual(setting.get_value(), 10)
 
     def test_boolean_value_setting_and_retrieval(self):
-        setting = Settings(key="APP_BOOLEAN", value_type=SettingsValueTypeEnum.BOOLEAN)
+        setting = Settings(
+            site=self.site, key="APP_BOOLEAN", value_type=SettingsValueTypeEnum.BOOLEAN
+        )
         setting.set_value(True)
         setting.save()
 
@@ -63,6 +70,7 @@ class SettingsModelTests(TestCase):
 
     def test_setting_validation_for_incorrect_type(self):
         setting = Settings(
+            site=self.site,
             key="APP_INVALID_TYPE",
             value=json.dumps("not an integer"),
             value_type=SettingsValueTypeEnum.INTEGER,
@@ -71,27 +79,33 @@ class SettingsModelTests(TestCase):
             setting.save()
 
     def test_get_and_set_class_methods(self):
-        Settings.set_setting("APP_TEST_SETTING", "test value")
-        value = Settings.get_setting("APP_TEST_SETTING")
+        Settings.set_setting(
+            key="APP_TEST_SETTING", value="test value", site_id=self.site.id
+        )
+        value = Settings.get_setting(key="APP_TEST_SETTING", site_id=self.site.id)
         self.assertEqual(value, "test value")
 
     def test_get_setting_with_default(self):
         default_value = "default"
-        value = Settings.get_setting("APP_NON_EXISTENT", default=default_value)
+        value = Settings.get_setting(
+            key="APP_NON_EXISTENT", site_id=self.site.id, default=default_value
+        )
         self.assertEqual(value, default_value)
 
     def test_caching_logic(self):
         setting = Settings(
+            site=self.site,
             key="APP_TEST_CACHING",
             value=json.dumps("cached value"),
             value_type=SettingsValueTypeEnum.STRING,
         )
         setting.save()
-
         cached_value = cache.get("APP_TEST_CACHING")
         self.assertIsNone(cached_value)
 
-        value_from_method = Settings.get_setting("APP_TEST_CACHING")
+        value_from_method = Settings.get_setting(
+            key="APP_TEST_CACHING", site_id=self.site.id
+        )
         self.assertEqual(value_from_method, "cached value")
 
         cached_value = cache.get("APP_TEST_CACHING")
@@ -99,7 +113,9 @@ class SettingsModelTests(TestCase):
 
     def test_setting_not_found_returns_default(self):
         default_val = "default"
-        value = Settings.get_setting("NON_EXISTENT_KEY", default=default_val)
+        value = Settings.get_setting(
+            key="NON_EXISTENT_KEY", site_id=self.site.id, default=default_val
+        )
         self.assertEqual(value, default_val)
 
     def tearDown(self):

@@ -4,6 +4,7 @@ from typing import Any
 from typing import TypeVar
 
 from django.contrib.postgres.indexes import GinIndex
+from django.contrib.sites.models import Site
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
@@ -22,6 +23,9 @@ from core.enum import SettingsValueTypeEnum
 
 
 class Settings(models.Model):
+    site = models.ForeignKey(
+        Site, on_delete=models.CASCADE, verbose_name=_("Site"), related_name="settings"
+    )
     key = models.CharField(_("Key"), max_length=255, unique=True)
     value = models.TextField(_("Value"))
     value_type = models.CharField(
@@ -36,9 +40,10 @@ class Settings(models.Model):
     class Meta(TypedModelMeta):
         verbose_name = _("Setting")
         verbose_name_plural = _("Settings")
+        unique_together = ("site", "key")
 
     def __str__(self):
-        return f"{self.key}: {self.value} ({self.value_type})"
+        return f"{self.site} - {self.key}: {self.value} - {self.value_type}"
 
     def save(self, *args, **kwargs):
         if not self.pk and not self.key.startswith("APP_"):
@@ -47,7 +52,7 @@ class Settings(models.Model):
             )
         self.validate_value(self.value, self.value_type)
         super(Settings, self).save(*args, **kwargs)
-        cache.delete(self.key)
+        cache.delete(f"{self.site.id}_{self.key}")
 
     def set_value(self, value) -> None:
         self.value = json.dumps(value, cls=DjangoJSONEncoder)
@@ -124,8 +129,8 @@ class Settings(models.Model):
             raise ValidationError(_("Value is not valid JSON."))
 
     @classmethod
-    def get_setting(cls, key: str, default=None) -> Any:
-        cached_value = cache.get(key)
+    def get_setting(cls, key: str, site_id: int, default=None) -> Any:
+        cached_value = cache.get(f"{site_id}_{key}")
         if cached_value is not None:
             return json.loads(cached_value)["value"]
 
@@ -140,8 +145,8 @@ class Settings(models.Model):
             return default
 
     @classmethod
-    def set_setting(cls, key: str, value) -> None:
-        setting, created = cls.objects.get_or_create(key=key)
+    def set_setting(cls, key: str, value, site_id: int) -> None:
+        setting, created = cls.objects.get_or_create(key=key, site_id=site_id)
         setting.set_value(value)
         setting.save()
 

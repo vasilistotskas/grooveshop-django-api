@@ -3,7 +3,21 @@
 
 
 
+## v0.82.0 (2024-03-09)
+
+### Feature
+
+* feat: Measurement implemented and Bump Versions ([`e1c7d79`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e1c7d79919c25b09ff0fc36d75660f9cb8aa40a3))
+
+### Fix
+
+* fix: `test_models` Database access not allowed fix ([`1db493b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1db493b1a2a15a06b83595687451a4f52860f32b))
+
 ## v0.81.0 (2024-03-08)
+
+### Chore
+
+* chore(release): release version 0.81.0 [skip ci] ([`68d0a7a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/68d0a7a2510bfff2619a7025bf73754d10795c73))
 
 ### Feature
 

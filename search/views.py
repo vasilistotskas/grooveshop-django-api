@@ -3,8 +3,11 @@ from django.contrib.postgres.search import SearchHeadline
 from django.contrib.postgres.search import SearchQuery
 from django.contrib.postgres.search import SearchRank
 from django.contrib.postgres.search import TrigramSimilarity
+from django.db.models import Case
 from django.db.models import F
+from django.db.models import FloatField
 from django.db.models import Q
+from django.db.models import When
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -21,34 +24,33 @@ class SearchProduct(ModelViewSet):
 
     def get_queryset(self):
         query = self.request.query_params.get("query", None)
-        language = self.request.query_params.get("language", default_language)
-
         if query:
             search_query = SearchQuery(query, search_type="websearch", config="simple")
 
-            lookup = (
-                Q(search_vector=search_query)
-                | Q(translations__name__search=search_query)
-                | Q(translations__description__search=search_query)
-                | Q(slug__search=search_query)
-            ) & Q(translations__language_code=language)
+            lookup = Q(search_vector=search_query) | Q(search_document__icontains=query)
 
             queryset = (
                 Product.objects.only("id", "slug")
-                .prefetch_related("translations")
                 .filter(lookup)
                 .annotate(
                     search_rank=SearchRank(F("search_vector"), search_query),
+                    similarity=TrigramSimilarity("search_document", query),
+                    boosted_rank=Case(
+                        When(search_vector=search_query, then=F("search_rank") * 1.5),
+                        default=F("search_rank"),
+                        output_field=FloatField(),
+                    ),
                     headline=SearchHeadline(
                         "translations__name",
                         search_query,
                         start_sel="<span>",
                         stop_sel="</span>",
+                        max_words=30,
                     ),
-                    similarity=TrigramSimilarity("translations__name", query),
                 )
-                .filter(similarity__gt=0.3)
-                .order_by("-similarity")
+                .filter(Q(search_rank__gte=0.1) | Q(similarity__gte=0.1))
+                .order_by("-boosted_rank", "-similarity")
+                .distinct()
             )
             return queryset
 
@@ -68,7 +70,7 @@ class SearchProduct(ModelViewSet):
             similarities_data = {
                 result.id: result.similarity for result in limited_queryset
             }
-            result_count_data = queryset.count()
+            result_count_data = min(queryset.count(), self.limit)
 
             serializer = self.get_serializer(
                 {

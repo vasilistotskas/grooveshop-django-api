@@ -7,7 +7,6 @@ import os
 from asgiref.sync import async_to_sync
 from celery import Celery
 from celery import shared_task
-from celery.schedules import crontab
 from celery.signals import setup_logging
 from channels.layers import get_channel_layer
 
@@ -28,15 +27,6 @@ def create_celery_app():
     tasker.conf.enable_utc = False
     tasker.conf.update(timezone=os.getenv("TIME_ZONE", "UTC"))
     tasker.config_from_object("django.conf:settings", namespace="CELERY")
-
-    # Celery Beat Settings
-    tasker.conf.beat_schedule = {
-        "clear_sessions_for_none_users_task-every-week": {
-            "task": "core.tasks.clear_sessions_for_none_users_task",
-            "schedule": crontab(minute=0, hour=0, day_of_week="mon"),
-        }
-    }
-
     tasker.autodiscover_tasks()
 
     return tasker

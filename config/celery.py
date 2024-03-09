@@ -1,3 +1,4 @@
+from datetime import timedelta
 from os import getenv
 
 CELERY_BROKER_URL = getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
@@ -27,3 +28,46 @@ CELERY_TASK_ALWAYS_EAGER = False
 CELERY_TASK_EAGER_PROPAGATES = False
 
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+
+# Internal settings
+BEAT_UPDATE_SEARCH_SEC = getenv("BEAT_UPDATE_SEARCH_EXPIRE_AFTER_SEC", 20)
+BEAT_UPDATE_SEARCH_EXPIRE_AFTER_SEC = BEAT_UPDATE_SEARCH_SEC
+UPDATE_SEARCH_VECTOR_INDEX_QUEUE_NAME = getenv(
+    "UPDATE_SEARCH_VECTOR_INDEX_QUEUE_NAME", "update_search_vector_index"
+)
+UPDATE_SEARCH_DOCUMENT_INDEX_QUEUE_NAME = getenv(
+    "UPDATE_SEARCH_DOCUMENT_INDEX_QUEUE_NAME", "update_search_document_index"
+)
+
+CELERY_BEAT_SCHEDULE = {
+    "update-products-search-vectors": {
+        "task": "core.tasks.update_products_search_vector_task",
+        "schedule": timedelta(seconds=BEAT_UPDATE_SEARCH_SEC),
+        "options": {"expires": BEAT_UPDATE_SEARCH_EXPIRE_AFTER_SEC},
+    },
+    "update-products-search-documents": {
+        "task": "core.tasks.update_products_search_document_task",
+        "schedule": timedelta(seconds=BEAT_UPDATE_SEARCH_SEC),
+        "options": {"expires": BEAT_UPDATE_SEARCH_EXPIRE_AFTER_SEC},
+    },
+    "clear-blacklisted-tokens": {
+        "task": "core.tasks.tasks.clear_blacklisted_tokens_task",
+        "schedule": timedelta(hours=24),
+    },
+    "cleanup-log-files": {
+        "task": "core.tasks.cleanup_log_files_task",
+        "schedule": timedelta(hours=24),
+    },
+    "clear-carts-for-none-users": {
+        "task": "core.tasks.clear_carts_for_none_users_task",
+        "schedule": timedelta(hours=24),
+    },
+    "clear-expired-sessions": {
+        "task": "core.tasks.clear_expired_sessions_task",
+        "schedule": timedelta(hours=24),
+    },
+    "clear-all-cache": {
+        "task": "core.tasks.clear_all_cache_task",
+        "schedule": timedelta(days=30),
+    },
+}

@@ -25,15 +25,6 @@ class CeleryConfigTestCase(TestCase):
         self.assertTrue(mock_celery.called)
         self.assertEqual(app.conf.enable_utc, False)
         self.assertEqual(app.conf.timezone, mock_celery_instance.conf.timezone)
-        self.assertEqual(
-            app.conf.beat_schedule,
-            {
-                "clear_sessions_for_none_users_task-every-week": {
-                    "task": "core.tasks.clear_sessions_for_none_users_task",
-                    "schedule": celery.crontab(minute=0, hour=0, day_of_week="mon"),
-                },
-            },
-        )
         self.assertTrue(app.autodiscover_tasks.called)
 
     @patch.dict(os.environ, {"DEBUG": "True"})

@@ -1,9 +1,15 @@
 import logging
-from typing import Optional, Type, Sequence, Any
-from django.db.models import FloatField, Model
+from typing import Any
+from typing import Optional
+from typing import Sequence
+from typing import Type
+
+from django.db.models import FloatField
+from django.db.models import Model
 from django.forms.fields import Field
 from django.utils.translation import gettext_lazy as _
-from measurement.base import BidimensionalMeasure, MeasureBase
+from measurement.base import BidimensionalMeasure
+from measurement.base import MeasureBase
 
 from core.forms.measurement import MeasurementFormField
 from core.utils.measurement import get_measurement
@@ -35,12 +41,12 @@ class MeasurementField(FloatField):
         measurement: Type[MeasureBase | BidimensionalMeasure] = None,
         unit_choices: Optional[list[tuple[str, str]]] = None,
         *args,
-        **kwargs
+        **kwargs,
     ):
-
         if measurement is None or not issubclass(measurement, self.MEASURE_BASES):
             raise MeasurementTypeError(
-                "MeasurementField requires a measurement subclass of MeasureBase.")
+                "MeasurementField requires a measurement subclass of MeasureBase."
+            )
 
         self.measurement = measurement
         self.widget_args = {
@@ -71,7 +77,9 @@ class MeasurementField(FloatField):
             return unit_choices[0][0]
         return self.measurement.STANDARD_UNIT
 
-    def from_db_value(self, value: Optional[float], *args, **kwargs) -> Optional[BidimensionalMeasure]:
+    def from_db_value(
+        self, value: Optional[float], *args, **kwargs
+    ) -> Optional[BidimensionalMeasure]:
         if value is None:
             return None
 
@@ -87,7 +95,9 @@ class MeasurementField(FloatField):
             return value
         return "%s:%s" % (value.value, value.unit)
 
-    def deserialize_value_from_string(self, value_str: str) -> Optional[MeasureBase | BidimensionalMeasure]:
+    def deserialize_value_from_string(
+        self, value_str: str
+    ) -> Optional[MeasureBase | BidimensionalMeasure]:
         try:
             value, unit = value_str.split(":", 1)
             value = float(value)

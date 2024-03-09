@@ -82,6 +82,7 @@ class Command(BaseCommand):
                     user=user,
                     post=blog_post,
                     is_approved=is_approved,
+                    parent=None,
                 )
 
                 objects_to_insert.append(comment)

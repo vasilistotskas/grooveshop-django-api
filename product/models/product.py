@@ -185,7 +185,10 @@ class Product(
         ),
         description=HTMLField(_("Description"), blank=True, null=True, db_index=True),
     )
+    search_document = models.TextField(blank=True, default="")
     search_vector = SearchVectorField(blank=True, null=True)
+    search_index_dirty = models.BooleanField(default=False, db_index=True)
+    search_document_dirty = models.BooleanField(default=False, db_index=True)
 
     objects = ProductManager()
 
@@ -195,6 +198,11 @@ class Product(
         ordering = ["-created_at"]
         indexes = [
             *ModelWithMetadata.Meta.indexes,
+            GinIndex(
+                name="product_search_gin",
+                fields=["search_document"],
+                opclasses=["gin_trgm_ops"],
+            ),
             GinIndex(fields=["search_vector"], name="product_search_vector_idx"),
             models.Index(fields=["product_code"], name="product_product_code_idx"),
             models.Index(fields=["slug"], name="product_slug_idx"),
@@ -220,7 +228,7 @@ class Product(
                 title_field="name",
             )
             self.slug = unique_slugify(config)
-        super(Product, self).save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
     def clean(self):
         super().clean()

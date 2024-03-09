@@ -3,7 +3,17 @@
 
 
 
+## v0.83.0 (2024-03-09)
+
+### Feature
+
+* feat: Search and Celery Task improvements ([`13f2fb3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/13f2fb35df9dfff0ab285896054f9cff7059d10e))
+
 ## v0.82.0 (2024-03-09)
+
+### Chore
+
+* chore(release): release version 0.82.0 [skip ci] ([`de142ce`](https://github.com/vasilistotskas/grooveshop-django-api/commit/de142ce29adcb18cf908bee045d631600ab4a0a6))
 
 ### Feature
 

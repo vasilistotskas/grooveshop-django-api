@@ -31,7 +31,6 @@ class SearchProduct(ReadOnlyModelViewSet):
             return Product.objects.none()
 
         query = self.request.query_params.get("query")
-        decoded_query = unquote(query)
 
         language = self.request.query_params.get(
             "language", settings.PARLER_DEFAULT_LANGUAGE_CODE
@@ -40,6 +39,8 @@ class SearchProduct(ReadOnlyModelViewSet):
         self.validate_language(language)
         if not query:
             raise ValidationError({"error": "A search query is required."})
+
+        decoded_query = unquote(query)
 
         config = self.get_postgres_search_config(language)
         return self.get_filtered_queryset(decoded_query, language, config)

@@ -40,13 +40,13 @@ UPDATE_SEARCH_DOCUMENT_INDEX_QUEUE_NAME = getenv(
 )
 
 CELERY_BEAT_SCHEDULE = {
-    "update-products-search-vectors": {
-        "task": "core.tasks.update_products_search_vector_task",
+    "update-product-translation-search-vectors": {
+        "task": "core.tasks.update_product_translation_search_vectors",
         "schedule": timedelta(seconds=BEAT_UPDATE_SEARCH_SEC),
         "options": {"expires": BEAT_UPDATE_SEARCH_EXPIRE_AFTER_SEC},
     },
-    "update-products-search-documents": {
-        "task": "core.tasks.update_products_search_document_task",
+    "update-product-translation-search-documents": {
+        "task": "core.tasks.update_product_translation_search_documents",
         "schedule": timedelta(seconds=BEAT_UPDATE_SEARCH_SEC),
         "options": {"expires": BEAT_UPDATE_SEARCH_EXPIRE_AFTER_SEC},
     },

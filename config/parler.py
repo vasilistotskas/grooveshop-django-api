@@ -7,17 +7,20 @@ PARLER_LANGUAGES = {
     SITE_ID: (
         {
             "code": "en",
+            "name": "english",
         },
         {
             "code": "de",
+            "name": "german",
         },
         {
             "code": "el",
+            "name": "greek",
         },
     ),
     "default": {
-        "fallbacks": ["en"],  # defaults to PARLER_DEFAULT_LANGUAGE_CODE
-        "hide_untranslated": False,  # the default; let .active_translations() return fallbacks too.
+        "fallbacks": ["en"],
+        "hide_untranslated": False,
     },
 }
 PARLER_ENABLE_CACHING = True

@@ -5,11 +5,8 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from core.tasks import prepare_product_search_document
-from core.tasks import prepare_product_search_vector_value
-from core.tasks import set_search_document_values
-from core.tasks import set_search_vector_values
-from core.tasks import update_products_search_vector
+from core.tasks import update_product_translation_search_documents
+from core.tasks import update_product_translation_search_vectors
 from product.models.product import Product
 
 languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
@@ -38,7 +35,7 @@ class SearchProductAPITest(APITestCase):
             "the new Flex Hinge for a balanced design and professional camera "
             "capabilities with the unique FlexCam, the Galaxy Z series offers "
             "unrivaled foldable device experiences.",
-            search_index_dirty=True,
+            search_vector_dirty=True,
             search_document_dirty=True,
         )
         self.product2 = Product.objects.create(
@@ -55,7 +52,7 @@ class SearchProductAPITest(APITestCase):
             " This type of tire is suitable for use in high temperatures."
             " This particular one is suitable for passenger vehicles with"
             " tire dimensions 225/45R17 and load index 94 and speed index Y.",
-            search_index_dirty=True,
+            search_vector_dirty=True,
             search_document_dirty=True,
         )
         self.product3 = Product.objects.create(
@@ -72,7 +69,7 @@ class SearchProductAPITest(APITestCase):
             " your workout with this t-shirt from Nike.Users who have bought it"
             " stand out mainly because the product is comfortable and looks "
             "like the photo shows.",
-            search_index_dirty=True,
+            search_vector_dirty=True,
             search_document_dirty=True,
         )
         self.product4 = Product.objects.create(
@@ -90,7 +87,7 @@ class SearchProductAPITest(APITestCase):
             " The contoured footbed cradles your foot in comfort,"
             " while the durable rubber outsole provides "
             "traction on a variety of surfaces.",
-            search_index_dirty=True,
+            search_vector_dirty=True,
             search_document_dirty=True,
         )
         self.product5 = Product.objects.create(
@@ -108,25 +105,132 @@ class SearchProductAPITest(APITestCase):
             " The contoured footbed cradles your foot in comfort,"
             " while the durable rubber outsole provides "
             "traction on a variety of surfaces.",
-            search_index_dirty=True,
+            search_vector_dirty=True,
             search_document_dirty=True,
         )
 
-        products = list(Product.objects.all())
-
-        set_search_vector_values(
-            products,
-            prepare_product_search_vector_value,
+        self.product1.set_current_language("de")
+        self.product1.name = (
+            "Samsung Galaxy Z Fold5 5G Dual SIM (12 GB/512 GB) Phantomschwarz"
         )
-
-        set_search_document_values(
-            products,
-            prepare_product_search_document,
+        self.product1.description = (
+            "Mit einem innovativen Formfaktor, der durch das "
+            "neue Flex-Scharnier durch ein ausgewogenes Design "
+            "und professionelle Kamerafunktionen mit der einzigartigen "
+            "FlexCam verbessert wird, bietet die Galaxy Z-Serie "
+            "unübertroffene faltbare Geräteerlebnisse."
         )
+        self.product1.save()
 
-        update_products_search_vector(
-            Product.objects.all(),
+        self.product1.set_current_language("el")
+        self.product1.name = (
+            "Samsung Galaxy Z Fold5 5G Dual SIM (12 GB/512 GB) Φανταστικό Μαύρο"
         )
+        self.product1.description = (
+            "Με μια καινοτόμο μορφή που βελτιώνεται από το "
+            "νέο Flex Hinge για ένα ισορροπημένο σχεδιασμό και "
+            "επαγγελματικές δυνατότητες φωτογραφικής μηχανής με την "
+            "μοναδική FlexCam, η σειρά Galaxy Z προσφέρει ασυναγώνιστες "
+            "εμπειρίες συσκευών που διπλώνονται."
+        )
+        self.product1.save()
+
+        self.product2.set_current_language("de")
+        self.product2.name = "Michelin Pilot Sport 5 225/45 R17 94Y XL Sommerreifen"
+        self.product2.description = (
+            "Pilot Sport 5 Michelin Sommerreifen."
+            " Dieser Reifentyp ist für den Einsatz bei hohen Temperaturen geeignet."
+            " Dieser spezielle ist für Personenkraftwagen mit Reifendimensionen 225/45R17"
+            " und Tragfähigkeitsindex 94 und Geschwindigkeitsindex Y geeignet."
+        )
+        self.product2.save()
+
+        self.product2.set_current_language("el")
+
+        self.product2.name = (
+            "Michelin Pilot Sport 5 225/45 R17 94Y XL Ελαστικό Καλοκαιρινό"
+        )
+        self.product2.description = (
+            "Pilot Sport 5 Michelin ελαστικό αυτοκινήτου καλοκαιρινό."
+            " Αυτός ο τύπος ελαστικού είναι κατάλληλος για χρήση σε υψηλές θερμοκρασίες."
+            " Αυτός ο συγκεκριμένος είναι κατάλληλος για επιβατικά οχήματα με διαστάσεις ελαστικού 225/45R17"
+            " και δείκτη φορτίου 94 και δείκτη ταχύτητας Y."
+        )
+        self.product2.save()
+
+        self.product3.set_current_language("de")
+        self.product3.name = (
+            "Nike Park VII Herren Sport T-Shirt Kurzarm Dri-Fit Schwarz"
+        )
+        self.product3.description = (
+            "Fügen Sie Ihrem Training Komfort und Bewegungsfreiheit hinzu"
+            " mit diesem T-Shirt von Nike. Benutzer, die es gekauft haben,"
+            " heben hauptsächlich hervor, dass das Produkt bequem ist und"
+            " so aussieht, wie das Foto zeigt."
+        )
+        self.product3.save()
+
+        self.product3.set_current_language("el")
+        self.product3.name = (
+            "Nike Park VII Ανδρικό Αθλητικό T-shirt Κοντομάνικο Dri-Fit Μαύρο"
+        )
+        self.product3.description = (
+            "Προσθέστε άνεση και ελευθερία κινήσεων στην προπόνησή σας"
+            " με αυτό το μπλουζάκι από τη Nike. Οι χρήστες που το έχουν αγοράσει"
+            " ξεχωρίζουν κυρίως επειδή το προϊόν είναι άνετο και μοιάζει με τη φωτογραφία."
+        )
+        self.product3.save()
+
+        self.product4.set_current_language("de")
+        self.product4.name = "Nike Victori One Slides Schwarz"
+        self.product4.description = (
+            "Der Nike Victori One ist für Komfort und Unterstützung"
+            " konzipiert, mit einem weichen Riemen und einer Schaumstoff-Zwischensohle."
+            " Das konturierte Fußbett umschließt Ihren Fuß bequem, während die"
+            " strapazierfähige Gummilaufsohle auf einer Vielzahl von Oberflächen"
+            " Halt bietet."
+        )
+        self.product4.save()
+
+        self.product4.set_current_language("el")
+        self.product4.name = "Nike Victori One Slides Μαύρο Χρώμα"
+        self.product4.description = (
+            "Το Nike Victori One είναι ένα παπούτσι σχεδιασμένο για άνεση και υποστήριξη,"
+            " με μαλακή ταινία και αφρώδη μεσόσολα. Το καμπυλωτό πέλμα"
+            " αγκαλιάζει το πόδι σας με άνεση, ενώ η ανθεκτική εξωτερική σόλα"
+            " παρέχει πρόσφυση σε ποικίλες επιφάνειες."
+        )
+        self.product4.save()
+
+        self.product5.set_current_language("de")
+        self.product5.name = "Nike Victori One Slides Rotes Farbe"
+        self.product5.description = (
+            "Der Nike Victori One ist für Komfort und Unterstützung"
+            " konzipiert, mit einem weichen Riemen und einer Schaumstoff-Zwischensohle."
+            " Das konturierte Fußbett umschließt Ihren Fuß bequem, während die"
+            " strapazierfähige Gummilaufsohle auf einer Vielzahl von Oberflächen"
+            " Halt bietet."
+        )
+        self.product5.save()
+
+        self.product5.set_current_language("el")
+        self.product5.name = "Nike Victori One Slides Κόκκινο Χρώμα"
+        self.product5.description = (
+            "Το Nike Victori One είναι ένα παπούτσι σχεδιασμένο για άνεση και υποστήριξη,"
+            " με μαλακή ταινία και αφρώδη μεσόσολα. Το καμπυλωτό πέλμα"
+            " αγκαλιάζει το πόδι σας με άνεση, ενώ η ανθεκτική εξωτερική σόλα"
+            " παρέχει πρόσφυση σε ποικίλες επιφάνειες."
+        )
+        self.product5.save()
+
+        update_product_translation_search_vectors()
+        update_product_translation_search_documents()
+
+        self.product1.set_current_language(default_language)
+        self.product2.set_current_language(default_language)
+        self.product3.set_current_language(default_language)
+        self.product4.set_current_language(default_language)
+        self.product5.set_current_language(default_language)
 
         self.product1.refresh_from_db()
         self.product2.refresh_from_db()
@@ -170,7 +274,38 @@ class SearchProductAPITest(APITestCase):
         url = self.get_search_product_url()
 
         response = self.client.get(url, {"query": ""})
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_search_product_by_language(self):
+        url = self.get_search_product_url()
+
+        response_el_1 = self.client.get(url, {"query": "Ελαστικό", "language": "el"})
+        response_el_2 = self.client.get(url, {"query": "Μαύρο", "language": "el"})
+        response_el_3 = self.client.get(url, {"query": "παπούτσι", "language": "el"})
+
+        response_de_1 = self.client.get(
+            url, {"query": "Sommerreifen", "language": "de"}
+        )
+        response_de_2 = self.client.get(url, {"query": "Schwarz", "language": "de"})
+        response_de_3 = self.client.get(url, {"query": "Herren", "language": "de"})
+
+        self.assertEqual(response_el_1.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response_el_1.data["results"]), 1)
+
+        self.assertEqual(response_el_2.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response_el_2.data["results"]), 3)
+
+        self.assertEqual(response_el_3.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response_el_3.data["results"]), 2)
+
+        self.assertEqual(response_de_1.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response_de_1.data["results"]), 1)
+
+        self.assertEqual(response_de_2.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response_de_2.data["results"]), 2)
+
+        self.assertEqual(response_de_3.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response_de_3.data["results"]), 1)
 
     def tearDown(self) -> None:
         super().tearDown()

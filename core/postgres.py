@@ -1,12 +1,11 @@
 import logging
-from typing import Optional, Union
+from typing import Optional
+from typing import Union
 
 from django.conf import settings
-from django.contrib.postgres.search import (
-    CombinedSearchVector,
-    SearchVector,
-    SearchVectorCombinable,
-)
+from django.contrib.postgres.search import CombinedSearchVector
+from django.contrib.postgres.search import SearchVector
+from django.contrib.postgres.search import SearchVectorCombinable
 from django.db.models import Expression
 
 logger = logging.getLogger(__name__)

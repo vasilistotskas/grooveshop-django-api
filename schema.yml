@@ -13464,6 +13464,14 @@ components:
                   type: string
                 description:
                   type: string
+                searchDocument:
+                  type: string
+                searchVector:
+                  type: string
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
+                  type: string
             de:
               type: object
               properties:
@@ -13471,12 +13479,28 @@ components:
                   type: string
                 description:
                   type: string
+                searchDocument:
+                  type: string
+                searchVector:
+                  type: string
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
+                  type: string
             el:
               type: object
               properties:
                 name:
                   type: string
                 description:
+                  type: string
+                searchDocument:
+                  type: string
+                searchVector:
+                  type: string
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
                   type: string
         id:
           type: integer
@@ -14300,6 +14324,14 @@ components:
                   type: string
                 description:
                   type: string
+                searchDocument:
+                  type: string
+                searchVector:
+                  type: string
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
+                  type: string
             de:
               type: object
               properties:
@@ -14307,12 +14339,28 @@ components:
                   type: string
                 description:
                   type: string
+                searchDocument:
+                  type: string
+                searchVector:
+                  type: string
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
+                  type: string
             el:
               type: object
               properties:
                 name:
                   type: string
                 description:
+                  type: string
+                searchDocument:
+                  type: string
+                searchVector:
+                  type: string
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
                   type: string
         id:
           type: integer
@@ -14884,6 +14932,14 @@ components:
                   type: string
                 description:
                   type: string
+                searchDocument:
+                  type: string
+                searchVector:
+                  type: string
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
+                  type: string
             de:
               type: object
               properties:
@@ -14891,12 +14947,28 @@ components:
                   type: string
                 description:
                   type: string
+                searchDocument:
+                  type: string
+                searchVector:
+                  type: string
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
+                  type: string
             el:
               type: object
               properties:
                 name:
                   type: string
                 description:
+                  type: string
+                searchDocument:
+                  type: string
+                searchVector:
+                  type: string
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
                   type: string
         searchRank:
           type: number

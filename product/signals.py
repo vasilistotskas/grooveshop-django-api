@@ -17,15 +17,19 @@ def update_search_fields_on_slug_change(sender, instance, **kwargs):
         try:
             original = sender.objects.get(pk=instance.pk)
             if original.slug != instance.slug:
-                instance.search_index_dirty = True
-                instance.search_document_dirty = True
+                translations = instance.translations.all()
+                for translation in translations:
+                    translation.search_vector_dirty = True
+                    translation.search_document_dirty = True
+                    translation.save(
+                        update_fields=["search_vector_dirty", "search_document_dirty"]
+                    )
         except sender.DoesNotExist:
             pass
 
 
 @receiver(pre_translation_save, sender=Product.translations)
 def update_search_fields_on_translation_change(sender, instance, **kwargs):
-    if instance.master:
-        instance.master.search_index_dirty = True
-        instance.master.search_document_dirty = True
-        instance.master.save()
+    instance.search_vector_dirty = True
+    instance.search_document_dirty = True
+    instance.save()

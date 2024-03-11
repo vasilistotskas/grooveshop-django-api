@@ -5,8 +5,6 @@ import uuid
 from decimal import Decimal
 
 from django.conf import settings
-from django.contrib.postgres.indexes import GinIndex
-from django.contrib.postgres.search import SearchVector
 from django.contrib.postgres.search import SearchVectorField
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator
@@ -14,7 +12,6 @@ from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import Avg
 from django.db.models import F
-from django.db.models import Subquery
 from django.db.models.functions import Coalesce
 from django.templatetags.static import static
 from django.utils.html import format_html
@@ -49,19 +46,6 @@ from seo.models import SeoModel
 
 
 class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
-    def update_search_vector(self):
-        search_vector = (
-            SearchVector("translations__name", weight="A")
-            + SearchVector("slug", weight="B")
-            + SearchVector("translations__description", weight="C")
-        )
-
-        subquery = self.annotate(updated_vector=search_vector).values("updated_vector")[
-            :1
-        ]
-
-        return self.update(search_vector=Subquery(subquery))
-
     def update_calculated_fields(self) -> ProductQuerySet:
         vat_subquery = models.Subquery(
             Product.objects.filter(vat__isnull=False).values("vat__value")[:1]
@@ -98,9 +82,6 @@ class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
 class ProductManager(models.Manager):
     def get_queryset(self) -> ProductQuerySet:
         return ProductQuerySet(self.model, using=self._db).exclude(is_deleted=True)
-
-    def update_search_vector(self):
-        return self.get_queryset().update_search_vector()
 
     def update_calculated_fields(self) -> ProductQuerySet:
         return self.get_queryset().update_calculated_fields()
@@ -184,11 +165,19 @@ class Product(
             _("Name"), max_length=255, blank=True, null=True, db_index=True
         ),
         description=HTMLField(_("Description"), blank=True, null=True, db_index=True),
+        search_document=models.TextField(
+            _("Search Document"), blank=True, default="", db_index=True
+        ),
+        search_vector=SearchVectorField(
+            _("Search Vector"), blank=True, null=True, db_index=True
+        ),
+        search_document_dirty=models.BooleanField(
+            _("Search Document Dirty"), default=False, db_index=True
+        ),
+        search_vector_dirty=models.BooleanField(
+            _("Search Vector Dirty"), default=False, db_index=True
+        ),
     )
-    search_document = models.TextField(blank=True, default="")
-    search_vector = SearchVectorField(blank=True, null=True)
-    search_index_dirty = models.BooleanField(default=False, db_index=True)
-    search_document_dirty = models.BooleanField(default=False, db_index=True)
 
     objects = ProductManager()
 
@@ -198,12 +187,6 @@ class Product(
         ordering = ["-created_at"]
         indexes = [
             *ModelWithMetadata.Meta.indexes,
-            GinIndex(
-                name="product_search_gin",
-                fields=["search_document"],
-                opclasses=["gin_trgm_ops"],
-            ),
-            GinIndex(fields=["search_vector"], name="product_search_vector_idx"),
             models.Index(fields=["product_code"], name="product_product_code_idx"),
             models.Index(fields=["slug"], name="product_slug_idx"),
             models.Index(fields=["price", "stock"], name="product_price_stock_idx"),

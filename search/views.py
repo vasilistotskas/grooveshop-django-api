@@ -1,3 +1,5 @@
+from urllib.parse import unquote
+
 from django.conf import settings
 from django.contrib.postgres.search import SearchHeadline
 from django.contrib.postgres.search import SearchQuery
@@ -9,8 +11,9 @@ from django.db.models import FloatField
 from django.db.models import Q
 from django.db.models import When
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet
+from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from product.models.product import Product
 from search.serializers import SearchProductSerializer
@@ -18,46 +21,88 @@ from search.serializers import SearchProductSerializer
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
-class SearchProduct(ModelViewSet):
+class SearchProduct(ReadOnlyModelViewSet):
     serializer_class = SearchProductSerializer
     limit = 20
+    http_method_names = ["get"]
 
     def get_queryset(self):
-        query = self.request.query_params.get("query", None)
-        if query:
-            search_query = SearchQuery(query, search_type="websearch", config="simple")
+        if getattr(self, "swagger_fake_view", False):
+            return Product.objects.none()
 
-            lookup = Q(search_vector=search_query) | Q(search_document__icontains=query)
+        query = self.request.query_params.get("query")
+        decoded_query = unquote(query)
 
-            queryset = (
-                Product.objects.only("id", "slug")
-                .filter(lookup)
-                .annotate(
-                    search_rank=SearchRank(F("search_vector"), search_query),
-                    similarity=TrigramSimilarity("search_document", query),
-                    boosted_rank=Case(
-                        When(search_vector=search_query, then=F("search_rank") * 1.5),
-                        default=F("search_rank"),
-                        output_field=FloatField(),
-                    ),
-                    headline=SearchHeadline(
-                        "translations__name",
-                        search_query,
-                        start_sel="<span>",
-                        stop_sel="</span>",
-                        max_words=30,
-                    ),
-                )
-                .filter(Q(search_rank__gte=0.1) | Q(similarity__gte=0.1))
-                .order_by("-boosted_rank", "-similarity")
-                .distinct()
+        language = self.request.query_params.get(
+            "language", settings.PARLER_DEFAULT_LANGUAGE_CODE
+        )
+
+        self.validate_language(language)
+        if not query:
+            raise ValidationError({"error": "A search query is required."})
+
+        config = self.get_postgres_search_config(language)
+        return self.get_filtered_queryset(decoded_query, language, config)
+
+    def validate_language(self, language: str):
+        supported_languages = [
+            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+        ]
+        if language not in supported_languages:
+            raise ValidationError({"error": "Unsupported language."})
+
+    def get_postgres_search_config(self, language_code: str) -> str:
+        language_configs = settings.PARLER_LANGUAGES.get(settings.SITE_ID, ())
+        for lang_config in language_configs:
+            if lang_config.get("code") != "en":
+                continue
+            if lang_config.get("code") == language_code:
+                return lang_config.get("name", "").lower()
+        return "simple"
+
+    def get_filtered_queryset(self, query: str, language: str, config: str):
+        search_query = SearchQuery(query, search_type="websearch", config=config)
+
+        lookup = (
+            Q(translations__search_vector=search_query)
+            | Q(translations__search_document__icontains=query)
+        ) & Q(translations__language_code=language)
+
+        queryset = (
+            Product.objects.filter(lookup)
+            .prefetch_related("translations")
+            .annotate(
+                search_rank=SearchRank(F("translations__search_vector"), search_query),
+                similarity=TrigramSimilarity(F("translations__search_document"), query),
+                headline=SearchHeadline(
+                    "translations__name",
+                    search_query,
+                    start_sel="<span>",
+                    stop_sel="</span>",
+                    max_words=30,
+                    config=config,
+                ),
             )
-            return queryset
-
-        return Product.objects.none()
+            .filter(
+                Q(search_rank__gte=0.1) | Q(similarity__gte=0.05),
+                translations__language_code=language,
+            )
+            .order_by(
+                Case(
+                    When(search_rank__gte=0.1, then=F("search_rank")),
+                    When(similarity__gte=0.05, then=F("similarity")),
+                    default=F("search_rank"),
+                    output_field=FloatField(),
+                ).desc()
+            )
+        )
+        return queryset
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
+
+        if isinstance(queryset, Response):
+            return queryset
 
         if queryset.exists():
             limited_queryset = queryset[: self.limit]

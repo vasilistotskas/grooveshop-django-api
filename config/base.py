@@ -4,7 +4,6 @@ from os import path
 from pathlib import Path
 
 import dotenv
-from django.core.management.utils import get_random_secret_key
 from django.utils.translation import gettext_lazy as _
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -21,7 +20,7 @@ load_dotenv_file()
 
 SYSTEM_ENV = getenv("SYSTEM_ENV", "dev")
 
-SECRET_KEY = getenv("DJANGO_SECRET_KEY", get_random_secret_key())
+SECRET_KEY = getenv("DJANGO_SECRET_KEY", "changeme")
 
 DEBUG = getenv("DEBUG", "True") == "True"
 

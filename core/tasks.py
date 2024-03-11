@@ -4,12 +4,11 @@ from __future__ import unicode_literals
 import logging
 
 from celery import shared_task
+from django.apps import apps
 from django.conf import settings
 from django.core import management
-from django.db.models import prefetch_related_objects
-from django.db.models import QuerySet
+from django.db.models import Q
 from django.db.models import Value
-from django.utils.translation import override
 
 from app import celery_app
 from core.postgres import FlatConcatSearchVector
@@ -17,6 +16,7 @@ from core.postgres import NoValidationSearchVector
 from product.models.product import Product
 
 logger = logging.getLogger("celery")
+languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 
 
 @shared_task(bind=True, name="Clear Expired Sessions Task")
@@ -88,191 +88,70 @@ PRODUCT_FIELDS_TO_PREFETCH = [
 ]
 
 
-def _prep_product_search_vector_index(products):
-    prefetch_related_objects(products, *PRODUCT_FIELDS_TO_PREFETCH)
-    for product in products:
-        product.search_vector = FlatConcatSearchVector(
-            *prepare_product_search_vector_value(product, already_prefetched=True)
-        )
-        product.search_index_dirty = False
-
-    Product.objects.bulk_update(
-        products, ["search_vector", "updated_at", "search_index_dirty"]
-    )
-
-
-def update_products_search_vector(products: "QuerySet", use_batches=True):
-    if use_batches:
-        last_id = 0
-        while True:
-            products_batch = list(products.filter(id__gt=last_id)[:PRODUCTS_BATCH_SIZE])
-            if not products_batch:
-                break
-            last_id = products_batch[-1].id
-            _prep_product_search_vector_index(products_batch)
-    else:
-        _prep_product_search_vector_index(products)
-
-
-def prepare_product_search_vector_value(
-    product: "Product", *, already_prefetched=False
-) -> list[NoValidationSearchVector]:
-    if not already_prefetched:
-        prefetch_related_objects([product], *PRODUCT_FIELDS_TO_PREFETCH)
-
-    search_vectors = []
-
-    for language in product.get_available_languages():
-        with override(language):
-            product_trans = product.translations.get(language_code=language)
-
-            search_vectors.extend(
-                [
-                    NoValidationSearchVector(
-                        Value(product_trans.name), config="simple", weight="A"
-                    ),
-                    NoValidationSearchVector(
-                        Value(product_trans.description), config="simple", weight="C"
-                    ),
-                ]
-            )
-
-    search_vectors.append(
-        NoValidationSearchVector(Value(product.slug), config="simple", weight="B")
-    )
-
-    return search_vectors
-
-
-def prepare_product_search_document(
-    product: "Product", *, already_prefetched=False
-) -> str:
-    if not already_prefetched:
-        prefetch_related_objects([product], *PRODUCT_FIELDS_TO_PREFETCH)
-
-    document_parts = [product.slug]
-
-    for language in product.get_available_languages():
-        with override(language):
-            product_trans = product.translations.get(language_code=language)
-            if product_trans.name:
-                document_parts.append(product_trans.name)
-            if product_trans.description:
-                document_parts.append(product_trans.description)
-
-    search_document = " ".join(document_parts)
-
-    return search_document
-
-
-def set_search_document_values(
-    instances: list, prepare_search_document_func: callable
-) -> int:
-    if not instances:
-        return 0
-    Model = instances[0]._meta.model
-    for instance in instances:
-        instance.search_document = prepare_search_document_func(
-            instance, already_prefetched=True
-        )
-    Model.objects.bulk_update(instances, ["search_document"])
-
-    return len(instances)
-
-
-def set_search_vector_values(
-    instances: list,
-    prepare_search_vector_func: callable,
-) -> int:
-    Model = instances[0]._meta.model
-    for instance in instances:
-        instance.search_vector = FlatConcatSearchVector(
-            *prepare_search_vector_func(instance, already_prefetched=True)
-        )
-    Model.objects.bulk_update(instances, ["search_vector"])
-
-    return len(instances)
-
-
-@celery_app.task
-def set_product_search_vector_values(updated_count: int = 0) -> None:
-    products = list(
-        Product.objects.filter(search_vector=None)
-        .prefetch_related(*PRODUCT_FIELDS_TO_PREFETCH)
-        .order_by("-id")[:BATCH_SIZE]
-    )
-
-    if not products:
-        logger.info("No products to update.")
-        return
-
-    updated_count += set_search_vector_values(
-        products,
-        prepare_product_search_vector_value,
-    )
-
-    logger.info("Updated %d products", updated_count)
-
-    if len(products) < BATCH_SIZE:
-        logger.info("Setting product search document values finished.")
-        return
-
-    del products
-
-    set_product_search_vector_values.delay(updated_count)
-
-
-@celery_app.task(
-    queue=settings.UPDATE_SEARCH_VECTOR_INDEX_QUEUE_NAME,
-    expires=settings.BEAT_UPDATE_SEARCH_EXPIRE_AFTER_SEC,
-)
-def update_products_search_vector_task():
-    products = Product.objects.filter(search_index_dirty=True).order_by()[
-        :PRODUCTS_BATCH_SIZE
+def prepare_product_translation_search_vector_value(
+    product: "Product", language_code: str, config="simple"
+) -> FlatConcatSearchVector:
+    translation = product.translations.get(language_code=language_code)
+    search_vectors = [
+        NoValidationSearchVector(Value(translation.name), config=config, weight="A"),
+        NoValidationSearchVector(
+            Value(translation.description), config=config, weight="C"
+        ),
+        NoValidationSearchVector(Value(product.slug), config="simple", weight="B"),
     ]
-    update_products_search_vector(products, use_batches=False)
+
+    return FlatConcatSearchVector(*search_vectors)
 
 
-@celery_app.task(
-    queue=settings.UPDATE_SEARCH_DOCUMENT_INDEX_QUEUE_NAME,
-    expires=settings.BEAT_UPDATE_SEARCH_EXPIRE_AFTER_SEC,
-)
-def set_product_search_document_values(
-    updated_count: int = 0,
-) -> None:
-    products = list(
-        Product.objects.filter(search_document="")
-        .prefetch_related(*PRODUCT_FIELDS_TO_PREFETCH)
-        .order_by("-id")[:BATCH_SIZE]
-    )
-
-    if not products:
-        logger.info("No products to update.")
-        return
-
-    updated_count += set_search_document_values(
-        products, prepare_product_search_document
-    )
-
-    logger.info("Updated %d products", updated_count)
-
-    if len(products) < BATCH_SIZE:
-        logger.info("Setting product search document values finished.")
-        return
-
-    del products
-
-    set_product_search_document_values.delay(updated_count)
+def prepare_product_translation_search_document(
+    product: "Product", language_code: str
+) -> str:
+    translation = product.translations.get(language_code=language_code)
+    document_parts = [product.slug, translation.name, translation.description]
+    return " ".join(filter(None, document_parts))
 
 
 @celery_app.task
-def update_products_search_document_task():
-    product_pks = (
-        Product.objects.filter(search_document_dirty=True)
-        .order_by("id")
-        .values_list("id", flat=True)[:PRODUCTS_BATCH_SIZE]
-    )
-    products = Product.objects.filter(pk__in=product_pks)
-    set_search_document_values(products, prepare_product_search_document)
-    logger.info("Updated %d products", len(product_pks))
-    return len(product_pks)
+def update_product_translation_search_vectors():
+    ProductTranslation = apps.get_model("product", "ProductTranslation")
+    active_languages = languages
+    updated_count = 0
+
+    for language_code in active_languages:
+        translations = ProductTranslation.objects.filter(
+            Q(language_code=language_code)
+            & (Q(search_vector_dirty=True) | Q(search_vector=None)),
+        )
+
+        for translation in translations.iterator():
+            translation.search_vector = prepare_product_translation_search_vector_value(
+                translation.master, language_code
+            )
+            translation.search_vector_dirty = False
+            translation.save(update_fields=["search_vector", "search_vector_dirty"])
+            updated_count += 1
+
+    logger.info(f"Updated search vectors for {updated_count} product translations.")
+
+
+@celery_app.task
+def update_product_translation_search_documents():
+    ProductTranslation = apps.get_model("product", "ProductTranslation")
+    active_languages = languages
+    updated_count = 0
+
+    for language_code in active_languages:
+        translations = ProductTranslation.objects.filter(
+            Q(language_code=language_code)
+            & (Q(search_document_dirty=True) | Q(search_document="")),
+        )
+
+        for translation in translations.iterator():
+            translation.search_document = prepare_product_translation_search_document(
+                translation.master, language_code
+            )
+            translation.search_document_dirty = False
+            translation.save(update_fields=["search_document", "search_document_dirty"])
+            updated_count += 1
+
+    logger.info(f"Updated search documents for {updated_count} product translations.")

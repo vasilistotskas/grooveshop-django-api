@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 
-from core.tasks import set_product_search_document_values
-from core.tasks import set_product_search_vector_values
+from core.tasks import update_product_translation_search_documents
+from core.tasks import update_product_translation_search_vectors
 
 
 class Command(BaseCommand):
@@ -9,5 +9,5 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.stdout.write("Updating products")
-        set_product_search_vector_values.delay()
-        set_product_search_document_values.delay()
+        update_product_translation_search_vectors.delay()
+        update_product_translation_search_documents.delay()

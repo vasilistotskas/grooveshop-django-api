@@ -3,7 +3,21 @@
 
 
 
+## v0.84.0 (2024-03-11)
+
+### Feature
+
+* feat: search improvements ([`f98d033`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f98d03391342a1fcde1a016680d7b56f50b07387))
+
+### Fix
+
+* fix: decode query for search after validation ([`b783bbb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b783bbb41b808517bc90c2bfbea795c5250279fb))
+
 ## v0.83.0 (2024-03-09)
+
+### Chore
+
+* chore(release): release version 0.83.0 [skip ci] ([`943b5f9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/943b5f93b5bcffea6c485eed2361d9a05f5bd875))
 
 ### Feature
 

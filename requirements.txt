@@ -11,6 +11,7 @@ coverage==7.4.3
 django==5.0.3
 django-admin-thumbnails==0.2.8
 django-allauth[mfa]==0.61.1
+django-dbbackup==4.1.0
 django-browser-reload==1.12.1
 django-celery-beat==2.6.0
 django-celery-results==2.5.1

@@ -6,7 +6,7 @@ from celery import shared_task
 from channels.layers import get_channel_layer
 
 
-@shared_task
+@shared_task(bind=True, name="Send Notification Task")
 def send_notification_task(
     user: int, seen: bool, link: str, kind: str, translations: list
 ):

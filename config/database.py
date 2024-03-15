@@ -9,6 +9,9 @@ INDEX_MAXIMUM_EXPR_COUNT = 4000
 
 DATABASES = {
     "default": {
+        "ATOMIC_REQUESTS": True,
+        "CONN_HEALTH_CHECKS": True,
+        "TIME_ZONE": getenv("TIME_ZONE", "Europe/Athens"),
         "ENGINE": "django.db.backends.postgresql",
         "HOST": getenv("DB_HOST", "db"),
         "NAME": getenv("DB_NAME", "devdb"),
@@ -17,6 +20,7 @@ DATABASES = {
         "PORT": getenv("DB_PORT", "5432"),
     },
     "replica": {
+        "TIME_ZONE": getenv("TIME_ZONE", "Europe/Athens"),
         "ENGINE": "django.db.backends.postgresql",
         "HOST": getenv("DB_HOST_TEST", "db_replica"),
         "NAME": getenv("DB_NAME_TEST", "devdb_replica"),
@@ -37,3 +41,6 @@ if SYSTEM_ENV == "ci":
             "PORT": "5432",
         }
     }
+
+DBBACKUP_STORAGE = "django.core.files.storage.FileSystemStorage"
+DBBACKUP_STORAGE_OPTIONS = {"location": "/backups"}

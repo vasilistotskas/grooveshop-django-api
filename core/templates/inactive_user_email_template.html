@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta http-equiv="Content-Type" content="text/html charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>We Miss You!</title>
+</head>
+<body style="font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333;">
+    <div class="container" style="max-width: 600px; margin: auto; background: #ffffff; border-radius: 8px; overflow: hidden;">
+        <header style="background-color: #4CAF50; color: #ffffff; text-align: center; padding: 20px;">
+            <h1>We Miss You!</h1>
+        </header>
+        <div class="content" style="padding: 20px; text-align: center;">
+            <p>Hello {{ user.first_name }},</p>
+            <p>We've noticed you haven't logged in for a while. We've been up to a lot of exciting things and we wouldn't want you to miss out!</p>
+            <p>Click the button below to see what's new:</p>
+            <table style="margin: 20px auto;">
+                <tr>
+                    <td style="border-radius: 5px;">
+                        <a href="{{ app_base_url }}/auth/login" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #008CBA; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Revisit Us</a>
+                    </td>
+                </tr>
+            </table>
+            <p>If you have any questions or need assistance, feel free to contact us anytime.</p>
+            <p>Warm regards,<br>Your Team</p>
+        </div>
+        <footer style="background-color: #f4f4f4; text-align: center; padding: 10px; font-size: 12px;">
+            You're receiving this email because you have an account on OurWebsite. If you believe this has been sent to you in error, please ignore it.
+        </footer>
+    </div>
+</body>
+</html>

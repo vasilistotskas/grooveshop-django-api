@@ -11,7 +11,12 @@ ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
 # install system dependencies
-RUN apk --no-cache add netcat-openbsd gcc musl-dev
+RUN apk add --no-cache  \
+    netcat-openbsd  \
+    gcc  \
+    musl-dev  \
+    postgresql-client \
+    postgresql-dev
 
 # install dependencies
 RUN pip install --upgrade pip

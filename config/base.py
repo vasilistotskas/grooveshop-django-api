@@ -120,6 +120,7 @@ THIRD_PARTY_APPS = [
     "django_browser_reload",
     "pytest",
     "pytest_django",
+    "dbbackup",
 ]
 
 # Combine all apps together for the INSTALLED_APPS setting

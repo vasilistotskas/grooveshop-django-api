@@ -1,6 +1,8 @@
 from datetime import timedelta
 from os import getenv
 
+from celery.schedules import crontab
+
 CELERY_BROKER_URL = getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = getenv("CELERY_RESULT_BACKEND", "django-db")
 CELERY_CACHE_BACKEND = getenv("CELERY_CACHE_BACKEND", "django-cache")
@@ -52,22 +54,38 @@ CELERY_BEAT_SCHEDULE = {
     },
     "clear-blacklisted-tokens": {
         "task": "core.tasks.tasks.clear_blacklisted_tokens_task",
-        "schedule": timedelta(hours=24),
+        "schedule": crontab(hour="2", minute="0"),
     },
     "cleanup-log-files": {
         "task": "core.tasks.cleanup_log_files_task",
-        "schedule": timedelta(hours=24),
+        "schedule": crontab(hour="3", minute="0"),
     },
     "clear-carts-for-none-users": {
         "task": "core.tasks.clear_carts_for_none_users_task",
-        "schedule": timedelta(hours=24),
+        "schedule": crontab(hour="4", minute="0", day_of_month="*/2"),
     },
     "clear-expired-sessions": {
         "task": "core.tasks.clear_expired_sessions_task",
-        "schedule": timedelta(hours=24),
+        "schedule": crontab(hour="5", minute="0", day_of_week="sunday"),
     },
     "clear-all-cache": {
         "task": "core.tasks.clear_all_cache_task",
         "schedule": timedelta(days=30),
+    },
+    "send-inactive-user-notifications": {
+        "task": "core.tasks.send_inactive_user_notifications",
+        "schedule": crontab(hour="6", minute="0", day_of_month="1"),
+    },
+    "monitor-system-health": {
+        "task": "core.tasks.monitor_system_health",
+        "schedule": crontab(minute="*/30"),
+    },
+    "backup-database": {
+        "task": "core.tasks.backup_database",
+        "schedule": crontab(hour="7", minute="0"),
+    },
+    "optimize-images": {
+        "task": "core.tasks.optimize_images",
+        "schedule": crontab(hour="3", minute="30", day_of_week="sunday"),
     },
 }

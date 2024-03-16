@@ -16,7 +16,6 @@ ENV PYTHONUNBUFFERED 1
 RUN apt-get update && \
     apt-get install -y gcc \
     postgresql-client \
-    postgresql-dev \
     libpq-dev \
     python3-dev \
     libc-dev \

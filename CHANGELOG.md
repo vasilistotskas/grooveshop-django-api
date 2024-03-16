@@ -3,7 +3,21 @@
 
 
 
+## v0.85.0 (2024-03-16)
+
+### Feature
+
+* feat: New celery tasks ([`f8df788`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f8df788e43b2cc92c9cee357df8ad04d0e9cbb19))
+
+### Fix
+
+* fix(test_view_search): fix ([`cbb7ef7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cbb7ef7bad71b28aea3ce969f1e5d995f2b76880))
+
 ## v0.84.0 (2024-03-11)
+
+### Chore
+
+* chore(release): release version 0.84.0 [skip ci] ([`a111c48`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a111c48f9363b371c54de1f29dc7e5c5de137d12))
 
 ### Feature
 

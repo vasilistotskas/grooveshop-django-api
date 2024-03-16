@@ -3,7 +3,17 @@
 
 
 
+## v0.85.1 (2024-03-16)
+
+### Fix
+
+* fix(Dockerfile): remove ` postgresql-dev` lib ([`ce7c3e8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ce7c3e8454106c4a9b757348e9780f851eda5bf9))
+
 ## v0.85.0 (2024-03-16)
+
+### Chore
+
+* chore(release): release version 0.85.0 [skip ci] ([`abbb088`](https://github.com/vasilistotskas/grooveshop-django-api/commit/abbb08891e6a0016b22c2d75d16ad341ac8141fe))
 
 ### Feature
 

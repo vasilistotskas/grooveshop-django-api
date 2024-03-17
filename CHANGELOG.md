@@ -3,7 +3,21 @@
 
 
 
+## v0.86.0 (2024-03-17)
+
+### Feature
+
+* feat: Cache some api views ([`81daec1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/81daec1ce5807bdc051357cbb1fe19fcc941e26b))
+
+### Unknown
+
+* fix:(registration.py): Not verified email case ([`76960cf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/76960cf22b1403454a126a3c36a0b0664fec9a4f))
+
 ## v0.85.1 (2024-03-16)
+
+### Chore
+
+* chore(release): release version 0.85.1 [skip ci] ([`db297d4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/db297d4c648aff620794ade3290253f96edc8555))
 
 ### Fix
 

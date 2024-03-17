@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action
@@ -25,6 +27,7 @@ class RegionViewSet(BaseExpandView, ModelViewSet):
     ordering = ["-created_at"]
     search_fields = ["alpha", "country"]
 
+    @method_decorator(cache_page(60 * 60 * 2))
     def list(self, request, *args, **kwargs) -> Response:
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
@@ -41,6 +44,7 @@ class RegionViewSet(BaseExpandView, ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @method_decorator(cache_page(60 * 60 * 2))
     def retrieve(self, request, pk=None, *args, **kwargs) -> Response:
         region = get_object_or_404(Region, pk=pk)
         serializer = self.get_serializer(region)

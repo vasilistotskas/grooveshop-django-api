@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.filters import SearchFilter
@@ -34,6 +36,7 @@ class CountryViewSet(ModelViewSet):
         "phone_code",
     ]
 
+    @method_decorator(cache_page(60 * 60 * 2))
     def list(self, request, *args, **kwargs) -> Response:
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
@@ -50,6 +53,7 @@ class CountryViewSet(ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @method_decorator(cache_page(60 * 60 * 2))
     def retrieve(self, request, pk=None, *args, **kwargs) -> Response:
         country = get_object_or_404(Country, pk=pk)
         serializer = self.get_serializer(country)

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.filters import SearchFilter
@@ -23,6 +25,7 @@ class BlogTagViewSet(ModelViewSet):
     ordering = ["id"]
     search_fields = ["id", "translations__name"]
 
+    @method_decorator(cache_page(60 * 60 * 2))
     def list(self, request, *args, **kwargs) -> Response:
         queryset = self.filter_queryset(self.get_queryset())
         pagination_param = request.query_params.get("pagination", "true")
@@ -46,6 +49,7 @@ class BlogTagViewSet(ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @method_decorator(cache_page(60 * 60 * 2))
     def retrieve(self, request, pk=None, *args, **kwargs) -> Response:
         tag = get_object_or_404(BlogTag, pk=pk)
         serializer = self.get_serializer(tag)

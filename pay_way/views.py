@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.filters import SearchFilter
@@ -28,6 +30,7 @@ class PayWayViewSet(TranslationsProcessingMixin, ModelViewSet):
     ordering = ["-created_at"]
     search_fields = []
 
+    @method_decorator(cache_page(60 * 60 * 2))
     def list(self, request, *args, **kwargs) -> Response:
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)

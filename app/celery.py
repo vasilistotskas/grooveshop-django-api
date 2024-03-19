@@ -25,7 +25,7 @@ def config_loggers(*args, **kwags):
 def create_celery_app():
     tasker = Celery("app")
     tasker.conf.enable_utc = False
-    tasker.conf.update(timezone=os.getenv("TIME_ZONE", "UTC"))
+    tasker.conf.update(timezone=os.getenv("TIME_ZONE", "Europe/Athens"))
     tasker.config_from_object("django.conf:settings", namespace="CELERY")
     tasker.autodiscover_tasks()
 

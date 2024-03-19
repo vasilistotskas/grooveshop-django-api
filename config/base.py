@@ -143,7 +143,6 @@ MIDDLEWARE = [
     "allauth.account.middleware.AccountMiddleware",
     "djangorestframework_camel_case.middleware.CamelCaseMiddleWare",
     "django_browser_reload.middleware.BrowserReloadMiddleware",
-    "core.middleware.timezone.TimezoneMiddleware",
 ]
 
 ROOT_URLCONF = "app.urls"

@@ -4597,6 +4597,7 @@ paths:
         name: status
         schema:
           type: string
+          default: PENDING
           enum:
           - CANCELED
           - PAID_AND_SENT
@@ -6808,6 +6809,7 @@ paths:
         name: status
         schema:
           type: string
+          default: NEW
           enum:
           - 'FALSE'
           - NEW
@@ -6906,6 +6908,7 @@ paths:
         name: status
         schema:
           type: string
+          default: NEW
           enum:
           - 'FALSE'
           - NEW
@@ -10681,9 +10684,11 @@ components:
           nullable: true
         isActive:
           type: boolean
+          default: true
           title: Active
         isStaff:
           type: boolean
+          default: false
           title: Staff
         birthDate:
           type: string
@@ -10738,6 +10743,7 @@ components:
           readOnly: true
         isSuperuser:
           type: boolean
+          default: false
           title: Superuser status
           description: Designates that this user has all permissions without explicitly
             assigning them.
@@ -11010,6 +11016,7 @@ components:
           readOnly: true
         isApproved:
           type: boolean
+          default: false
         likes:
           type: array
           items:
@@ -11120,13 +11127,17 @@ components:
         author:
           type: integer
         status:
-          $ref: '#/components/schemas/BlogPostStatusEnum'
+          allOf:
+          - $ref: '#/components/schemas/BlogPostStatusEnum'
+          default: DRAFT
         featured:
           type: boolean
+          default: false
         viewCount:
           type: integer
           maximum: 2147483647
           minimum: -2147483648
+          default: 0
         createdAt:
           type: string
           format: date-time
@@ -11141,6 +11152,7 @@ components:
           nullable: true
         isPublished:
           type: boolean
+          default: false
         uuid:
           type: string
           format: uuid
@@ -11229,6 +11241,7 @@ components:
           readOnly: true
         active:
           type: boolean
+          default: true
         createdAt:
           type: string
           format: date-time
@@ -11340,6 +11353,7 @@ components:
           type: integer
           maximum: 2147483647
           minimum: 0
+          default: 1
         price:
           type: number
           format: double
@@ -11469,7 +11483,9 @@ components:
           type: integer
           nullable: true
         status:
-          $ref: '#/components/schemas/OrderStatusEnum'
+          allOf:
+          - $ref: '#/components/schemas/OrderStatusEnum'
+          default: PENDING
         firstName:
           type: string
           maxLength: 255
@@ -11516,7 +11532,9 @@ components:
           exclusiveMaximum: true
           exclusiveMinimum: true
         documentType:
-          $ref: '#/components/schemas/DocumentTypeEnum'
+          allOf:
+          - $ref: '#/components/schemas/DocumentTypeEnum'
+          default: RECEIPT
         createdAt:
           type: string
           format: date-time
@@ -11575,6 +11593,7 @@ components:
           type: integer
           maximum: 2147483647
           minimum: -2147483648
+          default: 1
       required:
       - product
     Country:
@@ -11714,6 +11733,7 @@ components:
           type: integer
         seen:
           type: boolean
+          default: false
       required:
       - id
       - notification
@@ -11768,7 +11788,9 @@ components:
           - $ref: '#/components/schemas/PayWay'
           readOnly: true
         status:
-          $ref: '#/components/schemas/OrderStatusEnum'
+          allOf:
+          - $ref: '#/components/schemas/OrderStatusEnum'
+          default: PENDING
         firstName:
           type: string
           maxLength: 255
@@ -11815,7 +11837,9 @@ components:
           exclusiveMaximum: true
           exclusiveMinimum: true
         documentType:
-          $ref: '#/components/schemas/DocumentTypeEnum'
+          allOf:
+          - $ref: '#/components/schemas/DocumentTypeEnum'
+          default: RECEIPT
         createdAt:
           type: string
           format: date-time
@@ -11907,7 +11931,9 @@ components:
           type: integer
           nullable: true
         status:
-          $ref: '#/components/schemas/OrderStatusEnum'
+          allOf:
+          - $ref: '#/components/schemas/OrderStatusEnum'
+          default: PENDING
         firstName:
           type: string
           maxLength: 255
@@ -11954,7 +11980,9 @@ components:
           exclusiveMaximum: true
           exclusiveMinimum: true
         documentType:
-          $ref: '#/components/schemas/DocumentTypeEnum'
+          allOf:
+          - $ref: '#/components/schemas/DocumentTypeEnum'
+          default: RECEIPT
         createdAt:
           type: string
           format: date-time
@@ -12023,6 +12051,7 @@ components:
           type: integer
           maximum: 2147483647
           minimum: -2147483648
+          default: 1
         createdAt:
           type: string
           format: date-time
@@ -12075,6 +12104,7 @@ components:
           type: integer
           maximum: 2147483647
           minimum: -2147483648
+          default: 1
       required:
       - id
       - price
@@ -12093,6 +12123,9 @@ components:
         * `PENDING` - Pending
     PaginatedAuthenticationList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -12113,6 +12146,9 @@ components:
             $ref: '#/components/schemas/Authentication'
     PaginatedBlogAuthorList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -12133,6 +12169,9 @@ components:
             $ref: '#/components/schemas/BlogAuthor'
     PaginatedBlogCategoryList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -12153,6 +12192,9 @@ components:
             $ref: '#/components/schemas/BlogCategory'
     PaginatedBlogCommentList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -12173,6 +12215,9 @@ components:
             $ref: '#/components/schemas/BlogComment'
     PaginatedBlogPostList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -12193,6 +12238,9 @@ components:
             $ref: '#/components/schemas/BlogPost'
     PaginatedBlogTagList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -12213,6 +12261,9 @@ components:
             $ref: '#/components/schemas/BlogTag'
     PaginatedCartItemList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -12233,6 +12284,9 @@ components:
             $ref: '#/components/schemas/CartItem'
     PaginatedCountryList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -12253,6 +12307,9 @@ components:
             $ref: '#/components/schemas/Country'
     PaginatedNotificationUserList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -12273,6 +12330,9 @@ components:
             $ref: '#/components/schemas/NotificationUser'
     PaginatedOrderList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -12293,6 +12353,9 @@ components:
             $ref: '#/components/schemas/Order'
     PaginatedPayWayList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -12313,6 +12376,9 @@ components:
             $ref: '#/components/schemas/PayWay'
     PaginatedProductCategoryList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -12333,6 +12399,9 @@ components:
             $ref: '#/components/schemas/ProductCategory'
     PaginatedProductFavouriteList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -12353,6 +12422,9 @@ components:
             $ref: '#/components/schemas/ProductFavourite'
     PaginatedProductImageList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -12373,6 +12445,9 @@ components:
             $ref: '#/components/schemas/ProductImage'
     PaginatedProductList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -12393,6 +12468,9 @@ components:
             $ref: '#/components/schemas/Product'
     PaginatedProductReviewList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -12413,6 +12491,9 @@ components:
             $ref: '#/components/schemas/ProductReview'
     PaginatedRegionList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -12433,6 +12514,9 @@ components:
             $ref: '#/components/schemas/Region'
     PaginatedSearchProductList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -12453,6 +12537,9 @@ components:
             $ref: '#/components/schemas/SearchProduct'
     PaginatedSettingsList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -12473,6 +12560,9 @@ components:
             $ref: '#/components/schemas/Settings'
     PaginatedSlideList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -12493,6 +12583,9 @@ components:
             $ref: '#/components/schemas/Slide'
     PaginatedSliderList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -12513,6 +12606,9 @@ components:
             $ref: '#/components/schemas/Slider'
     PaginatedTipList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -12533,6 +12629,9 @@ components:
             $ref: '#/components/schemas/Tip'
     PaginatedUserAddressList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -12553,6 +12652,9 @@ components:
             $ref: '#/components/schemas/UserAddress'
     PaginatedVatList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -12628,9 +12730,11 @@ components:
           nullable: true
         isActive:
           type: boolean
+          default: true
           title: Active
         isStaff:
           type: boolean
+          default: false
           title: Staff
         birthDate:
           type: string
@@ -12685,6 +12789,7 @@ components:
           readOnly: true
         isSuperuser:
           type: boolean
+          default: false
           title: Superuser status
           description: Designates that this user has all permissions without explicitly
             assigning them.
@@ -12856,6 +12961,7 @@ components:
           readOnly: true
         isApproved:
           type: boolean
+          default: false
         likes:
           type: array
           items:
@@ -12952,13 +13058,17 @@ components:
         author:
           type: integer
         status:
-          $ref: '#/components/schemas/BlogPostStatusEnum'
+          allOf:
+          - $ref: '#/components/schemas/BlogPostStatusEnum'
+          default: DRAFT
         featured:
           type: boolean
+          default: false
         viewCount:
           type: integer
           maximum: 2147483647
           minimum: -2147483648
+          default: 0
         createdAt:
           type: string
           format: date-time
@@ -12973,6 +13083,7 @@ components:
           nullable: true
         isPublished:
           type: boolean
+          default: false
         uuid:
           type: string
           format: uuid
@@ -13034,6 +13145,7 @@ components:
           readOnly: true
         active:
           type: boolean
+          default: true
         createdAt:
           type: string
           format: date-time
@@ -13126,6 +13238,7 @@ components:
           type: integer
           maximum: 2147483647
           minimum: 0
+          default: 1
         price:
           type: number
           format: double
@@ -13304,7 +13417,9 @@ components:
           type: integer
           nullable: true
         status:
-          $ref: '#/components/schemas/OrderStatusEnum'
+          allOf:
+          - $ref: '#/components/schemas/OrderStatusEnum'
+          default: PENDING
         firstName:
           type: string
           maxLength: 255
@@ -13351,7 +13466,9 @@ components:
           exclusiveMaximum: true
           exclusiveMinimum: true
         documentType:
-          $ref: '#/components/schemas/DocumentTypeEnum'
+          allOf:
+          - $ref: '#/components/schemas/DocumentTypeEnum'
+          default: RECEIPT
         createdAt:
           type: string
           format: date-time
@@ -13410,6 +13527,7 @@ components:
           readOnly: true
         active:
           type: boolean
+          default: true
         cost:
           type: number
           format: double
@@ -13549,6 +13667,7 @@ components:
           type: integer
           maximum: 2147483647
           minimum: 0
+          default: 0
         likesCount:
           type: integer
           readOnly: true
@@ -13556,8 +13675,10 @@ components:
           type: integer
           maximum: 2147483647
           minimum: 0
+          default: 0
         active:
           type: boolean
+          default: true
         weight:
           type: object
           properties:
@@ -13590,6 +13711,7 @@ components:
           format: double
           maximum: 100.0
           minimum: 0.0
+          default: 0.00
         discountValue:
           type: number
           format: double
@@ -13784,6 +13906,7 @@ components:
           nullable: true
         isMain:
           type: boolean
+          default: false
         mainImageAbsoluteUrl:
           type: string
           readOnly: true
@@ -13841,7 +13964,9 @@ components:
           minimum: 0
           maximum: 32767
         status:
-          $ref: '#/components/schemas/ProductReviewStatusEnum'
+          allOf:
+          - $ref: '#/components/schemas/ProductReviewStatusEnum'
+          default: NEW
         createdAt:
           type: string
           format: date-time
@@ -13856,6 +13981,7 @@ components:
           nullable: true
         isPublished:
           type: boolean
+          default: false
         uuid:
           type: string
           format: uuid
@@ -13916,12 +14042,15 @@ components:
         value:
           type: string
         valueType:
-          $ref: '#/components/schemas/ValueTypeEnum'
+          allOf:
+          - $ref: '#/components/schemas/ValueTypeEnum'
+          default: str
         description:
           type: string
           nullable: true
         isPublic:
           type: boolean
+          default: true
     PatchedSlide:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -13986,8 +14115,10 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          default: 0.00
         showButton:
           type: boolean
+          default: false
         dateStart:
           type: string
           format: date-time
@@ -14119,6 +14250,7 @@ components:
           nullable: true
         active:
           type: boolean
+          default: true
         createdAt:
           type: string
           format: date-time
@@ -14199,6 +14331,7 @@ components:
           maxLength: 255
         isMain:
           type: boolean
+          default: false
         user:
           type: integer
         country:
@@ -14259,6 +14392,7 @@ components:
           readOnly: true
         active:
           type: boolean
+          default: true
         cost:
           type: number
           format: double
@@ -14409,6 +14543,7 @@ components:
           type: integer
           maximum: 2147483647
           minimum: 0
+          default: 0
         likesCount:
           type: integer
           readOnly: true
@@ -14416,8 +14551,10 @@ components:
           type: integer
           maximum: 2147483647
           minimum: 0
+          default: 0
         active:
           type: boolean
+          default: true
         weight:
           type: object
           properties:
@@ -14450,6 +14587,7 @@ components:
           format: double
           maximum: 100.0
           minimum: 0.0
+          default: 0.00
         discountValue:
           type: number
           format: double
@@ -14690,6 +14828,7 @@ components:
           nullable: true
         isMain:
           type: boolean
+          default: false
         mainImageAbsoluteUrl:
           type: string
           readOnly: true
@@ -14758,7 +14897,9 @@ components:
           minimum: 0
           maximum: 32767
         status:
-          $ref: '#/components/schemas/ProductReviewStatusEnum'
+          allOf:
+          - $ref: '#/components/schemas/ProductReviewStatusEnum'
+          default: NEW
         createdAt:
           type: string
           format: date-time
@@ -14773,6 +14914,7 @@ components:
           nullable: true
         isPublished:
           type: boolean
+          default: false
         uuid:
           type: string
           format: uuid
@@ -15001,12 +15143,15 @@ components:
         value:
           type: string
         valueType:
-          $ref: '#/components/schemas/ValueTypeEnum'
+          allOf:
+          - $ref: '#/components/schemas/ValueTypeEnum'
+          default: str
         description:
           type: string
           nullable: true
         isPublic:
           type: boolean
+          default: true
       required:
       - key
       - site
@@ -15075,8 +15220,10 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          default: 0.00
         showButton:
           type: boolean
+          default: false
         dateStart:
           type: string
           format: date-time
@@ -15278,6 +15425,7 @@ components:
           nullable: true
         active:
           type: boolean
+          default: true
         createdAt:
           type: string
           format: date-time
@@ -15392,6 +15540,7 @@ components:
           maxLength: 255
         isMain:
           type: boolean
+          default: false
         user:
           type: integer
         country:

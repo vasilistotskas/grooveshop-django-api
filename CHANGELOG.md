@@ -3,7 +3,17 @@
 
 
 
+## v0.87.0 (2024-03-19)
+
+### Feature
+
+* feat: Bump Versions and remove timezone middleware ([`d44c9de`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d44c9defb5b03f48607a02f0a82aad214d4fc31c))
+
 ## v0.86.0 (2024-03-17)
+
+### Chore
+
+* chore(release): release version 0.86.0 [skip ci] ([`88f9f38`](https://github.com/vasilistotskas/grooveshop-django-api/commit/88f9f38bd2d066ff61e7e9c163933fb1884512b5))
 
 ### Feature
 

@@ -38,13 +38,13 @@ files = [
 
 [[package]]
 name = "asgiref"
-version = "3.7.2"
+version = "3.8.0"
 description = "ASGI specs, helper code, and adapters"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "asgiref-3.7.2-py3-none-any.whl", hash = "sha256:89b2ef2247e3b562a16eef663bc0e2e703ec6468e2fa8a5cd61cd449786d4f6e"},
-    {file = "asgiref-3.7.2.tar.gz", hash = "sha256:9e0ce3aa93a819ba5b45120216b23878cf6e8525eb3848653452b4192b92afed"},
+    {file = "asgiref-3.8.0-py3-none-any.whl", hash = "sha256:30fc07797ad71a0abb8fe34aa03c8043308a8389abc7942d797ea9911540bc28"},
+    {file = "asgiref-3.8.0.tar.gz", hash = "sha256:ec75d9d0f04e2dbfedef1f20ee73a6594af80c333df47cdd31f37e6701f7c53a"},
 ]
 
 [package.dependencies]
@@ -204,17 +204,17 @@ wcwidth = ">=0.1.4"
 
 [[package]]
 name = "boto3"
-version = "1.34.65"
+version = "1.34.67"
 description = "The AWS SDK for Python"
 optional = false
-python-versions = ">= 3.8"
+python-versions = ">=3.8"
 files = [
-    {file = "boto3-1.34.65-py3-none-any.whl", hash = "sha256:b611de58ab28940a36c77d7ef9823427ebf25d5ee8277b802f9979b14e780534"},
-    {file = "boto3-1.34.65.tar.gz", hash = "sha256:db97f9c29f1806cf9020679be0dd5ffa2aff2670e28e0e2046f98b979be498a4"},
+    {file = "boto3-1.34.67-py3-none-any.whl", hash = "sha256:473febdf2606cf36f14c470dc3ff1b986efac15f69e37eb0fd728d42749065dd"},
+    {file = "boto3-1.34.67.tar.gz", hash = "sha256:950161d438ae1bf31374f04175e5f2624a5de8109674ff80f4de5d962313072a"},
 ]
 
 [package.dependencies]
-botocore = ">=1.34.65,<1.35.0"
+botocore = ">=1.34.67,<1.35.0"
 jmespath = ">=0.7.1,<2.0.0"
 s3transfer = ">=0.10.0,<0.11.0"
 
@@ -223,13 +223,13 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.34.65"
+version = "1.34.67"
 description = "Low-level, data-driven core of boto 3."
 optional = false
-python-versions = ">= 3.8"
+python-versions = ">=3.8"
 files = [
-    {file = "botocore-1.34.65-py3-none-any.whl", hash = "sha256:3b0012d7293880c0a4883883047e93f2888d7317b5e9e8a982a991b90d951f3e"},
-    {file = "botocore-1.34.65.tar.gz", hash = "sha256:399a1b1937f7957f0ee2e0df351462b86d44986b795ced980c11eb768b0e61c5"},
+    {file = "botocore-1.34.67-py3-none-any.whl", hash = "sha256:56002d7c046ec134811dd079469692ab82919c9840ea4e1c1c373a1d228e37ae"},
+    {file = "botocore-1.34.67.tar.gz", hash = "sha256:fc094c055a6ac151820a4d8e28f7b30d03e02695ce180527520a5e219b14e8a1"},
 ]
 
 [package.dependencies]
@@ -1839,13 +1839,13 @@ files = [
 
 [[package]]
 name = "importlib-resources"
-version = "6.3.1"
+version = "6.3.2"
 description = "Read resources from Python packages"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "importlib_resources-6.3.1-py3-none-any.whl", hash = "sha256:4811639ca7fa830abdb8e9ca0a104dc6ad13de691d9fe0d3173a71304f068159"},
-    {file = "importlib_resources-6.3.1.tar.gz", hash = "sha256:29a3d16556e330c3c8fb8202118c5ff41241cc34cbfb25989bbad226d99b7995"},
+    {file = "importlib_resources-6.3.2-py3-none-any.whl", hash = "sha256:f41f4098b16cd140a97d256137cfd943d958219007990b2afb00439fc623f580"},
+    {file = "importlib_resources-6.3.2.tar.gz", hash = "sha256:963eb79649252b0160c1afcfe5a1d3fe3ad66edd0a8b114beacffb70c0674223"},
 ]
 
 [package.extras]
@@ -3312,13 +3312,13 @@ yaml = ["PyYaml (>=6.0.1)"]
 
 [[package]]
 name = "python-semantic-release"
-version = "9.2.2"
+version = "9.3.0"
 description = "Automatic Semantic Versioning for Python projects"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "python-semantic-release-9.2.2.tar.gz", hash = "sha256:e5a9f4e7aa9b3eb099e7b9d37b16d967c0e7498397af32c627aa295bd188105c"},
-    {file = "python_semantic_release-9.2.2-py3-none-any.whl", hash = "sha256:7b20b63f4a29e0b0d4c5c83a2992a48b3507aec3730138ce18980e56cbae9afd"},
+    {file = "python-semantic-release-9.3.0.tar.gz", hash = "sha256:254e1fab88e406637cb430121c0931bcd7a40e08942ea332ff1544f90ac0ee38"},
+    {file = "python_semantic_release-9.3.0-py3-none-any.whl", hash = "sha256:e4312cbfc3a28aca7d8101e03f528352eb942881b608e998db7798dfc6ebae38"},
 ]
 
 [package.dependencies]
@@ -3684,13 +3684,13 @@ crt = ["botocore[crt] (>=1.33.2,<2.0a.0)"]
 
 [[package]]
 name = "sentry-sdk"
-version = "1.42.0"
+version = "1.43.0"
 description = "Python client for Sentry (https://sentry.io)"
 optional = false
 python-versions = "*"
 files = [
-    {file = "sentry-sdk-1.42.0.tar.gz", hash = "sha256:4a8364b8f7edbf47f95f7163e48334c96100d9c098f0ae6606e2e18183c223e6"},
-    {file = "sentry_sdk-1.42.0-py2.py3-none-any.whl", hash = "sha256:a654ee7e497a3f5f6368b36d4f04baeab1fe92b3105f7f6965d6ef0de35a9ba4"},
+    {file = "sentry-sdk-1.43.0.tar.gz", hash = "sha256:41df73af89d22921d8733714fb0fc5586c3461907e06688e6537d01a27e0e0f6"},
+    {file = "sentry_sdk-1.43.0-py2.py3-none-any.whl", hash = "sha256:8d768724839ca18d7b4c7463ef7528c40b7aa2bfbf7fe554d5f9a7c044acfd36"},
 ]
 
 [package.dependencies]
@@ -3704,6 +3704,7 @@ asyncpg = ["asyncpg (>=0.23)"]
 beam = ["apache-beam (>=2.12)"]
 bottle = ["bottle (>=0.12.13)"]
 celery = ["celery (>=3)"]
+celery-redbeat = ["celery-redbeat (>=2)"]
 chalice = ["chalice (>=1.16.0)"]
 clickhouse-driver = ["clickhouse-driver (>=0.2.0)"]
 django = ["django (>=1.8)"]
@@ -4034,13 +4035,13 @@ dev = ["black", "pytest"]
 
 [[package]]
 name = "uvicorn"
-version = "0.28.1"
+version = "0.29.0"
 description = "The lightning-fast ASGI server."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "uvicorn-0.28.1-py3-none-any.whl", hash = "sha256:5162f6d652f545be91b1feeaee8180774af143965ca9dc8a47ff1dc6bafa4ad5"},
-    {file = "uvicorn-0.28.1.tar.gz", hash = "sha256:08103e79d546b6cf20f67c7e5e434d2cf500a6e29b28773e407250c54fc4fa3c"},
+    {file = "uvicorn-0.29.0-py3-none-any.whl", hash = "sha256:2c2aac7ff4f4365c206fd773a39bf4ebd1047c238f8b8268ad996829323473de"},
+    {file = "uvicorn-0.29.0.tar.gz", hash = "sha256:6a69214c0b6a087462412670b3ef21224fa48cae0e452b5883e8e8bdfdd11dd0"},
 ]
 
 [package.dependencies]
@@ -4252,4 +4253,4 @@ brotli = ["Brotli"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10.13,<4.0.0"
-content-hash = "2cb4410d31ffe84eceae9a564cbfef1aae57f68c49a24b80d59069ef63971407"
+content-hash = "c301426f0673bee4655fa1c947a9a3bdca443495e223d615a207376ce16d063e"

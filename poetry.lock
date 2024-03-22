@@ -204,17 +204,17 @@ wcwidth = ">=0.1.4"
 
 [[package]]
 name = "boto3"
-version = "1.34.67"
+version = "1.34.68"
 description = "The AWS SDK for Python"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "boto3-1.34.67-py3-none-any.whl", hash = "sha256:473febdf2606cf36f14c470dc3ff1b986efac15f69e37eb0fd728d42749065dd"},
-    {file = "boto3-1.34.67.tar.gz", hash = "sha256:950161d438ae1bf31374f04175e5f2624a5de8109674ff80f4de5d962313072a"},
+    {file = "boto3-1.34.68-py3-none-any.whl", hash = "sha256:14f1e23b3f83ec365628a6ef849f1038b4c7338c4fabff159007c711b8147efc"},
+    {file = "boto3-1.34.68.tar.gz", hash = "sha256:00a7cff4887e8a46c8b2ce438f33d5f87cf7812f303227adc0266f28338af6d5"},
 ]
 
 [package.dependencies]
-botocore = ">=1.34.67,<1.35.0"
+botocore = ">=1.34.68,<1.35.0"
 jmespath = ">=0.7.1,<2.0.0"
 s3transfer = ">=0.10.0,<0.11.0"
 
@@ -223,13 +223,13 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.34.67"
+version = "1.34.68"
 description = "Low-level, data-driven core of boto 3."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "botocore-1.34.67-py3-none-any.whl", hash = "sha256:56002d7c046ec134811dd079469692ab82919c9840ea4e1c1c373a1d228e37ae"},
-    {file = "botocore-1.34.67.tar.gz", hash = "sha256:fc094c055a6ac151820a4d8e28f7b30d03e02695ce180527520a5e219b14e8a1"},
+    {file = "botocore-1.34.68-py3-none-any.whl", hash = "sha256:3ad0ec67f78beecc039c3c31c93a83181e30b6f789261bdbb9f5c8e8dc551812"},
+    {file = "botocore-1.34.68.tar.gz", hash = "sha256:e7ae9d69cc3e7b31d926e6a1a9ae673ba02da263e35cf12ff2bae35a21755cc6"},
 ]
 
 [package.dependencies]
@@ -1839,18 +1839,18 @@ files = [
 
 [[package]]
 name = "importlib-resources"
-version = "6.3.2"
+version = "6.4.0"
 description = "Read resources from Python packages"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "importlib_resources-6.3.2-py3-none-any.whl", hash = "sha256:f41f4098b16cd140a97d256137cfd943d958219007990b2afb00439fc623f580"},
-    {file = "importlib_resources-6.3.2.tar.gz", hash = "sha256:963eb79649252b0160c1afcfe5a1d3fe3ad66edd0a8b114beacffb70c0674223"},
+    {file = "importlib_resources-6.4.0-py3-none-any.whl", hash = "sha256:50d10f043df931902d4194ea07ec57960f66a80449ff867bfe782b4c486ba78c"},
+    {file = "importlib_resources-6.4.0.tar.gz", hash = "sha256:cdb2b453b8046ca4e3798eb1d84f3cce1446a0e8e7b5ef4efb600f19fc398145"},
 ]
 
 [package.extras]
 docs = ["furo", "jaraco.packaging (>=9.3)", "jaraco.tidelift (>=1.4)", "rst.linker (>=1.9)", "sphinx (<7.2.5)", "sphinx (>=3.5)", "sphinx-lint"]
-testing = ["jaraco.collections", "pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=2.2)", "pytest-mypy", "pytest-ruff (>=0.2.1)", "zipp (>=3.17)"]
+testing = ["jaraco.test (>=5.4)", "pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=2.2)", "pytest-mypy", "pytest-ruff (>=0.2.1)", "zipp (>=3.17)"]
 
 [[package]]
 name = "inflection"
@@ -3977,18 +3977,18 @@ files = [
 
 [[package]]
 name = "urllib3"
-version = "2.0.7"
+version = "2.2.1"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "urllib3-2.0.7-py3-none-any.whl", hash = "sha256:fdb6d215c776278489906c2f8916e6e7d4f5a9b602ccbcfdf7f016fc8da0596e"},
-    {file = "urllib3-2.0.7.tar.gz", hash = "sha256:c97dfde1f7bd43a71c8d2a58e369e9b2bf692d1334ea9f9cae55add7d0dd0f84"},
+    {file = "urllib3-2.2.1-py3-none-any.whl", hash = "sha256:450b20ec296a467077128bff42b73080516e71b56ff59a60a02bef2232c4fa9d"},
+    {file = "urllib3-2.2.1.tar.gz", hash = "sha256:d0570876c61ab9e520d776c38acbbb5b05a776d3f9ff98a5c8fd5162a444cf19"},
 ]
 
 [package.extras]
 brotli = ["brotli (>=1.0.9)", "brotlicffi (>=0.8.0)"]
-secure = ["certifi", "cryptography (>=1.9)", "idna (>=2.0.0)", "pyopenssl (>=17.1.0)", "urllib3-secure-extra"]
+h2 = ["h2 (>=4,<5)"]
 socks = ["pysocks (>=1.5.6,!=1.5.7,<2.0)"]
 zstd = ["zstandard (>=0.18.0)"]
 
@@ -4253,4 +4253,4 @@ brotli = ["Brotli"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10.13,<4.0.0"
-content-hash = "c301426f0673bee4655fa1c947a9a3bdca443495e223d615a207376ce16d063e"
+content-hash = "f2617bc72fa3452c70cbe5216461fb51797de04667b675099c78c6a95941ee4d"

@@ -3,7 +3,17 @@
 
 
 
+## v0.89.0 (2024-03-22)
+
+### Feature
+
+* feat: Bump Versions ([`1058369`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1058369bd91b671a9e719fb75cff65dc6b2a9c89))
+
 ## v0.88.0 (2024-03-21)
+
+### Chore
+
+* chore(release): release version 0.88.0 [skip ci] ([`cf614a3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cf614a3f9a98022e7c514160413e2421b5bcf75e))
 
 ### Feature
 

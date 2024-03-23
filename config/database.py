@@ -1,4 +1,8 @@
 from os import getenv
+from os import path
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 SYSTEM_ENV = getenv("SYSTEM_ENV", "dev")
 
@@ -43,4 +47,4 @@ if SYSTEM_ENV == "ci":
     }
 
 DBBACKUP_STORAGE = "django.core.files.storage.FileSystemStorage"
-DBBACKUP_STORAGE_OPTIONS = {"location": "/backups"}
+DBBACKUP_STORAGE_OPTIONS = {"location": path.join(BASE_DIR, "backups")}

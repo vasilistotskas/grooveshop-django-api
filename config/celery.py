@@ -88,4 +88,8 @@ CELERY_BEAT_SCHEDULE = {
         "task": "core.tasks.optimize_images",
         "schedule": crontab(hour="3", minute="30", day_of_week="sunday"),
     },
+    "cleanup-old-database-backups": {
+        "task": "core.tasks.cleanup_old_database_backups",
+        "schedule": crontab(hour="12", minute="0"),
+    },
 }

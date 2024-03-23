@@ -223,20 +223,45 @@ def monitor_system_health():
 @celery_app.task
 def backup_database():
     start_time = time.time()
-
-    backup_dir = os.path.abspath(
-        getattr(settings, "DBBACKUP_STORAGE_OPTIONS", {}).get("location", "/backups")
-    )
-    backup_filename = f"db_backup_{datetime.now().strftime('%Y%m%d%H%M%S')}.backup"
-    backup_path = os.path.join(backup_dir, backup_filename)
-
     try:
-        management.call_command("dbbackup", verbosity=0, output_filename=backup_path)
+        management.call_command("dbbackup", verbosity=3)
         end_time = time.time()
         execution_time = end_time - start_time
-        return f"Database backup completed successfully in {execution_time:.2f} seconds. Backup saved to {backup_path}"
+        return (
+            f"Database backup completed successfully in {execution_time:.2f} seconds."
+        )
     except Exception as e:
         return f"error: {e}"
+
+
+@celery_app.task
+def cleanup_old_database_backups(days=30):
+    backups_path = os.path.join(settings.BASE_DIR, "backups")
+    if not os.path.exists(backups_path):
+        return "Backups directory does not exist."
+
+    deleted_files_count = 0
+    folder = os.listdir(backups_path)
+
+    for filename in folder:
+        if not filename.endswith(".psql.bin"):
+            continue
+
+        try:
+            date_str = "-".join(filename.split("-")[2:5])
+            file_date = datetime.strptime(date_str, "%Y-%m-%d")
+        except ValueError:
+            continue
+
+        if datetime.now() - file_date > timedelta(days=days):
+            file_path = os.path.join(backups_path, filename)
+            os.remove(file_path)
+            deleted_files_count += 1
+
+    message = (
+        f"Deleted {deleted_files_count} database backup files older than {days} days."
+    )
+    return message
 
 
 @celery_app.task
@@ -248,9 +273,14 @@ def optimize_images():
     for subdir, dirs, files in os.walk(images_path):
         for file in files:
             filepath = os.path.join(subdir, file)
-            if filepath.endswith((".png", ".jpg", ".jpeg")):
-                image = Image.open(filepath)
-                webp_filepath = filepath.rsplit(".", 1)[0] + ".webp"
-                image.save(webp_filepath, format="webp", optimize=True, quality=85)
+            allowed_extensions = [".jpg", ".jpeg", ".png", ".webp"]
+            if not any(filepath.endswith(ext) for ext in allowed_extensions):
+                continue
 
-    return "Images optimized and converted to WebP format."
+            try:
+                with Image.open(filepath) as img:
+                    img.save(filepath, optimize=True, quality=85)
+            except Exception as e:
+                logger.error(f"Error optimizing image: {e}")
+
+    return "Images optimized successfully."

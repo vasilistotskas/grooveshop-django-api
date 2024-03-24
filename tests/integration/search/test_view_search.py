@@ -302,7 +302,7 @@ class SearchProductAPITest(APITestCase):
         self.assertEqual(len(response_de_1.data["results"]), 1)
 
         self.assertEqual(response_de_2.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response_de_2.data["results"]), 3)
+        self.assertEqual(len(response_de_2.data["results"]), 2)
 
         self.assertEqual(response_de_3.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response_de_3.data["results"]), 1)

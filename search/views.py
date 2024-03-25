@@ -62,7 +62,7 @@ class SearchProduct(ReadOnlyModelViewSet):
         return "simple"
 
     def get_filtered_queryset(self, query: str, language: str, config: str):
-        search_query = SearchQuery(query, search_type="websearch", config=config)
+        search_query = ~SearchQuery(query, search_type="websearch", config=config)
 
         lookup = (
             Q(translations__search_vector=search_query)
@@ -85,13 +85,13 @@ class SearchProduct(ReadOnlyModelViewSet):
                 ),
             )
             .filter(
-                Q(search_rank__gte=0.1) | Q(similarity__gte=0.04),
+                Q(search_rank__gte=0.1) | Q(similarity__gte=0.035),
                 translations__language_code=language,
             )
             .order_by(
                 Case(
                     When(search_rank__gte=0.1, then=F("search_rank")),
-                    When(similarity__gte=0.04, then=F("similarity")),
+                    When(similarity__gte=0.035, then=F("similarity")),
                     default=F("search_rank"),
                     output_field=FloatField(),
                 ).desc()

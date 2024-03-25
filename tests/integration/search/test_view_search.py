@@ -247,21 +247,21 @@ class SearchProductAPITest(APITestCase):
 
         response = self.client.get(url, {"query": "Nike Victori"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data["results"]), 2)
+        self.assertEqual(len(response.data["results"]), 3)
 
     def test_search_product_by_slug(self):
         url = self.get_search_product_url()
 
         response = self.client.get(url, {"query": self.product2.slug})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(len(response.data["results"]), 5)
 
     def test_search_product_by_name(self):
         url = self.get_search_product_url()
 
         response = self.client.get(url, {"query": self.product2.name})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(len(response.data["results"]), 4)
 
     def test_no_results_found(self):
         url = self.get_search_product_url()

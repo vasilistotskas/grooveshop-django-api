@@ -85,13 +85,13 @@ class SearchProduct(ReadOnlyModelViewSet):
                 ),
             )
             .filter(
-                Q(search_rank__gte=0.1) | Q(similarity__gte=0.035),
+                Q(search_rank__gte=0.1) | Q(similarity__gte=0.05),
                 translations__language_code=language,
             )
             .order_by(
                 Case(
                     When(search_rank__gte=0.1, then=F("search_rank")),
-                    When(similarity__gte=0.035, then=F("similarity")),
+                    When(similarity__gte=0.05, then=F("similarity")),
                     default=F("search_rank"),
                     output_field=FloatField(),
                 ).desc()

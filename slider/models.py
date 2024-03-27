@@ -3,6 +3,7 @@ import os
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.templatetags.static import static
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -13,7 +14,6 @@ from parler.models import TranslatedFields
 from core.models import SortableModel
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
-from helpers.image_resize import make_thumbnail
 
 
 class Slider(TranslatableModel, TimeStampMixinModel, UUIDModel):
@@ -47,18 +47,6 @@ class Slider(TranslatableModel, TimeStampMixinModel, UUIDModel):
     def __str__(self):
         return self.safe_translation_getter("name", any_language=True) or ""
 
-    def save(self, *args, **kwargs):
-        if self.image and not self.thumbnail:
-            self.thumbnail = self.create_thumbnail()
-        super().save(*args, **kwargs)
-
-    def create_thumbnail(self):
-        try:
-            return make_thumbnail(self.image, (200, 200))
-        except Exception as e:
-            print("Error while creating thumbnail: ", e)
-            return None
-
     @property
     def main_image_absolute_url(self) -> str:
         image: str = ""
@@ -75,10 +63,19 @@ class Slider(TranslatableModel, TimeStampMixinModel, UUIDModel):
 
     @property
     def image_tag(self):
-        thumbnail = self.thumbnail
-        if thumbnail:
-            return mark_safe('<img src="{}"/>'.format(thumbnail.url))
-        return ""
+        no_img_url = static("images/no_photo.jpg")
+        no_img_markup = mark_safe(
+            f'<img src="{no_img_url}" width="100" height="100" />'
+        )
+        if self.thumbnail:
+            return mark_safe(
+                '<img src="{}" width="100" height="100" />'.format(self.thumbnail.url)
+            )
+        elif self.image:
+            return mark_safe(
+                '<img src="{}" width="100" height="100" />'.format(self.image.url)
+            )
+        return no_img_markup
 
 
 class Slide(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
@@ -130,22 +127,10 @@ class Slide(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     def get_ordering_queryset(self):
         return Slide.objects.all()
 
-    def save(self, *args, **kwargs):
-        if self.image and not self.thumbnail:
-            self.thumbnail = self.create_thumbnail()
-        super().save(*args, **kwargs)
-
     def clean(self):
         if self.date_start and self.date_end and self.date_start > self.date_end:
             raise ValidationError(_("'Date Start' must be before 'Date End'."))
         super().clean()
-
-    def create_thumbnail(self):
-        try:
-            return make_thumbnail(self.image, (100, 100))
-        except Exception as e:
-            print("Error while creating thumbnail: ", e)
-            return None
 
     @property
     def main_image_absolute_url(self) -> str:
@@ -163,7 +148,16 @@ class Slide(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
 
     @property
     def image_tag(self):
-        thumbnail = self.thumbnail
-        if thumbnail:
-            return mark_safe('<img src="{}"/>'.format(thumbnail.url))
-        return ""
+        no_img_url = static("images/no_photo.jpg")
+        no_img_markup = mark_safe(
+            f'<img src="{no_img_url}" width="100" height="100" />'
+        )
+        if self.thumbnail:
+            return mark_safe(
+                '<img src="{}" width="100" height="100" />'.format(self.thumbnail.url)
+            )
+        elif self.image:
+            return mark_safe(
+                '<img src="{}" width="100" height="100" />'.format(self.image.url)
+            )
+        return no_img_markup

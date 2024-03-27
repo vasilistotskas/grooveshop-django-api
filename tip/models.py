@@ -2,6 +2,7 @@ import os
 
 from django.conf import settings
 from django.db import models
+from django.templatetags.static import static
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -49,10 +50,15 @@ class Tip(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
 
     @property
     def image_tag(self):
-        icon = self.icon
-        if icon:
-            return mark_safe('<img src="{}" height="50"/>'.format(icon.url))
-        return ""
+        no_img_url = static("images/no_photo.jpg")
+        no_img_markup = mark_safe(
+            f'<img src="{no_img_url}" width="100" height="100" />'
+        )
+        if self.icon:
+            return mark_safe(
+                '<img src="{}" width="100" height="100" />'.format(self.icon.url)
+            )
+        return no_img_markup
 
     @property
     def main_image_absolute_url(self) -> str:

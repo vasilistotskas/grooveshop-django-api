@@ -4,6 +4,7 @@ import time
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.utils import timezone
 from faker import Faker
 
 from helpers.seed import get_or_create_default_image
@@ -84,6 +85,8 @@ class Command(BaseCommand):
                 show_button = faker.boolean()
                 date_start = faker.date_time_this_year(before_now=True, after_now=False)
                 date_end = faker.date_time_this_year(before_now=False, after_now=True)
+                date_start = timezone.make_aware(date_start)
+                date_end = timezone.make_aware(date_end)
 
                 slide = Slide(
                     slider=slider,

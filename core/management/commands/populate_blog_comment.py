@@ -55,9 +55,9 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR("No languages found."))
             return
 
-        objects_to_insert = []
         picked_users = []
         picked_posts = []
+        objects_to_insert = []
         with transaction.atomic():
             for _ in range(total_comments):
                 user = faker.random_element(users)
@@ -78,29 +78,26 @@ class Command(BaseCommand):
                 ):
                     continue
 
-                comment = BlogComment(
+                comment, created = BlogComment.objects.get_or_create(
                     user=user,
                     post=blog_post,
                     is_approved=is_approved,
-                    parent=None,
                 )
 
-                objects_to_insert.append(comment)
-                picked_users.append(user)
-                picked_posts.append(blog_post)
-            BlogComment.objects.bulk_create(objects_to_insert)
-
-            for comment in objects_to_insert:
-                comment.likes.add(*likes)
-                for lang in available_languages:
-                    lang_seed = hash(
-                        f"{comment.user.id}{comment.post.id}{lang}{comment.id}"
-                    )
-                    faker.seed_instance(lang_seed)
-                    content = faker.text(max_nb_chars=1000)
-                    comment.set_current_language(lang)
-                    comment.content = content
-                    comment.save()
+                if created:
+                    picked_users.append(user)
+                    picked_posts.append(blog_post)
+                    comment.likes.add(*likes)
+                    for lang in available_languages:
+                        lang_seed = hash(
+                            f"{comment.user.id}{comment.post.id}{lang}{comment.id}"
+                        )
+                        faker.seed_instance(lang_seed)
+                        content = faker.text(max_nb_chars=1000)
+                        comment.set_current_language(lang)
+                        comment.content = content
+                        comment.save()
+                    objects_to_insert.append(comment)
 
         end_time = time.time()
         execution_time = end_time - start_time

@@ -51,3 +51,4 @@ class SearchProductSerializer(serializers.Serializer):
     search_ranks = serializers.DictField(child=serializers.FloatField())
     result_count = serializers.IntegerField()
     similarities = serializers.DictField(child=serializers.FloatField())
+    distances = serializers.DictField(child=serializers.FloatField())

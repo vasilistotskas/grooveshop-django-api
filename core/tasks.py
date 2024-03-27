@@ -100,6 +100,14 @@ PRODUCT_FIELDS_TO_PREFETCH = [
 ]
 
 
+def get_postgres_search_config(language_code: str) -> str:
+    language_configs = settings.PARLER_LANGUAGES.get(settings.SITE_ID, ())
+    for lang_config in language_configs:
+        if lang_config.get("code") == language_code:
+            return lang_config.get("name", "").lower()
+    return "simple"
+
+
 def prepare_product_translation_search_vector_value(
     product: "Product", language_code: str, config="simple"
 ) -> FlatConcatSearchVector:
@@ -109,7 +117,6 @@ def prepare_product_translation_search_vector_value(
         NoValidationSearchVector(
             Value(translation.description), config=config, weight="C"
         ),
-        NoValidationSearchVector(Value(product.slug), config="simple", weight="B"),
     ]
 
     return FlatConcatSearchVector(*search_vectors)
@@ -119,7 +126,7 @@ def prepare_product_translation_search_document(
     product: "Product", language_code: str
 ) -> str:
     translation = product.translations.get(language_code=language_code)
-    document_parts = [product.slug, translation.name, translation.description]
+    document_parts = [translation.name, translation.description]
     return " ".join(filter(None, document_parts))
 
 
@@ -134,10 +141,11 @@ def update_product_translation_search_vectors():
             Q(language_code=language_code)
             & (Q(search_vector_dirty=True) | Q(search_vector=None)),
         )
+        config = get_postgres_search_config(language_code)
 
         for translation in translations.iterator():
             translation.search_vector = prepare_product_translation_search_vector_value(
-                translation.master, language_code
+                translation.master, language_code, config
             )
             translation.search_vector_dirty = False
             translation.save(update_fields=["search_vector", "search_vector_dirty"])

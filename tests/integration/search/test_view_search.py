@@ -19,6 +19,8 @@ class SearchProductAPITest(APITestCase):
     product3: Product = None
     product4: Product = None
     product5: Product = None
+    product6: Product = None
+    product7: Product = None
 
     def setUp(self):
         self.product1 = Product.objects.create(
@@ -103,8 +105,47 @@ class SearchProductAPITest(APITestCase):
             description="The Nike Victori One is designed for comfort"
             " and support, with a soft strap and a foam midsole."
             " The contoured footbed cradles your foot in comfort,"
-            " while the durable rubber outsole provides "
-            "traction on a variety of surfaces.",
+            " while the durable rubber outsole provides"
+            " traction on a variety of surfaces.",
+            search_vector_dirty=True,
+            search_document_dirty=True,
+        )
+        self.product6 = Product.objects.create(
+            product_code="P123461",
+            slug="Apple-iPhone-14-Pro-Max-5G-6GB-512GB-Deep-Purple",
+            price=Decimal("1220.00"),
+            active=True,
+            stock=60,
+            discount_percent=Decimal("0.0"),
+            hits=60,
+            weight=Decimal("30.00"),
+            name="Apple iPhone 14 Pro Max 5G (6GB/512GB) Deep Purple",
+            description="Capture every detail with the 48MP main camera. "
+            "Enjoy iPhone with Dynamic Island and Always-On Display. "
+            "Collision Detection is a vital safety feature that can detect a serious"
+            " road accident and call for help."
+            "Brand new 48MP main camera for up to 4x resolution and four zoom options. "
+            "Cinema mode now shoots in 4K HDR at 24 fps—the film industry standard..",
+            search_vector_dirty=True,
+            search_document_dirty=True,
+        )
+        self.product7 = Product.objects.create(
+            product_code="P123462",
+            slug="Apple-iPhone-15-Pro-Max-5G-8GB-256GB-White-Titanium",
+            price=Decimal("1350.00"),
+            active=True,
+            stock=60,
+            discount_percent=Decimal("0.0"),
+            hits=60,
+            weight=Decimal("30.00"),
+            name="Apple iPhone 15 Pro Max 5G (8GB/256GB) White Titanium",
+            description="It's cast in titanium and features the groundbreaking"
+            " A17 Pro chip, a customizable Action key and the most powerful iPhone"
+            " camera system ever."
+            " iPhone 15 Pro Max features a strong and lightweight aircraft-grade"
+            " titanium design, while the back has a matte glass texture. It also has a"
+            " Ceramic Shield front that is more durable than any glass on a smartphone."
+            " And it's splash, water and dust resistant.",
             search_vector_dirty=True,
             search_document_dirty=True,
         )
@@ -223,6 +264,56 @@ class SearchProductAPITest(APITestCase):
         )
         self.product5.save()
 
+        self.product6.set_current_language("de")
+        self.product6.name = "Apple iPhone 14 Pro Max 5G (6GB/512GB) Tiefviolett"
+        self.product6.description = (
+            "Erfassen Sie jedes Detail mit der 48-MP-Hauptkamera. Genießen Sie iPhone"
+            " mit Dynamic Island und Always-On-Display. Die Kollisionsdetektion ist"
+            " eine wichtige Sicherheitsfunktion, die einen schweren Verkehrsunfall"
+            " erkennen und Hilfe rufen kann."
+            "Brandneue 48-MP-Hauptkamera für bis zu 4-fache Auflösung und vier Zoomoptionen."
+            " Der Kinomodus nimmt jetzt in 4K HDR mit 24 fps auf – dem Branchenstandard."
+        )
+        self.product6.save()
+
+        self.product6.set_current_language("el")
+        self.product6.name = "Apple iPhone 14 Pro Max 5G (6GB/512GB) Βαθύ Μωβ"
+        self.product6.description = (
+            "Καταγράψτε κάθε λεπτομέρεια με την κύρια κάμερα 48MP. Απολαύστε το iPhone"
+            " με Dynamic Island και Always-On Display. Η ανίχνευση σύγκρουσης είναι"
+            " ένα σημαντικό χαρακτηριστικό ασφαλείας που μπορεί να ανιχνεύσει ένα σοβαρό"
+            " τροχαίο ατύχημα και να καλέσει βοήθεια."
+            "Καινούργια κύρια κάμερα 48MP για έως και 4x ανάλυση και τέσσερις επιλογές ζουμ."
+            " Η λειτουργία κινηματογράφου τώρα τραβά σε 4K HDR στα 24 fps - το πρότυπο της βιομηχανίας."
+        )
+        self.product6.save()
+
+        self.product7.set_current_language("de")
+        self.product7.name = "Apple iPhone 15 Pro Max 5G (8GB/256GB) Weißes Titan"
+        self.product7.description = (
+            "Es ist aus Titan gegossen und verfügt über den bahnbrechenden"
+            " A17 Pro-Chip, eine anpassbare Action-Taste und das leistungsstärkste"
+            " iPhone-Kamerasystem aller Zeiten. iPhone 15 Pro Max verfügt über ein"
+            " starkes und leichtes Design aus Flugzeugtitan, während die Rückseite"
+            " eine matte Glasstruktur aufweist. Es hat auch eine Ceramic Shield-Front,"
+            " die haltbarer ist als jedes Glas auf einem Smartphone. Und es ist"
+            " spritzwasser-, wasser- und staubdicht."
+        )
+        self.product7.save()
+
+        self.product7.set_current_language("el")
+        self.product7.name = "Apple iPhone 15 Pro Max 5G (8GB/256GB) Λευκό Τιτάνιο"
+        self.product7.description = (
+            "Είναι χυτό από τιτάνιο και διαθέτει τον καινοτόμο"
+            " A17 Pro chip, μια προσαρμόσιμη Action key και το πιο ισχυρό"
+            " σύστημα κάμερας iPhone που υπήρξε ποτέ. Το iPhone 15 Pro Max"
+            " διαθέτει ένα ισχυρό και ελαφρύ σχεδιασμό από τιτάνιο αεροπλάνου,"
+            " ενώ η πίσω πλευρά έχει ματ υφή γυαλιού. Διαθέτει επίσης μια"
+            " Ceramic Shield μπροστινή που είναι πιο ανθεκτική από οποιοδήποτε"
+            " γυαλί σε ένα smartphone. Και είναι ανθεκτικό στις σταγόνες,"
+            " το νερό και τη σκόνη."
+        )
+
         update_product_translation_search_vectors()
         update_product_translation_search_documents()
 
@@ -245,9 +336,26 @@ class SearchProductAPITest(APITestCase):
     def test_search_products(self):
         url = self.get_search_product_url()
 
-        response = self.client.get(url, {"query": "Nike Victori"})
+        response = self.client.get(url, {"query": "Nike"})
+        response2 = self.client.get(url, {"query": "Nike Victori"})
+        response3 = self.client.get(url, {"query": "Apple iPhone"})
+        response4 = self.client.get(url, {"query": "iPhone 14"})
+        response5 = self.client.get(url, {"query": "Dynamic Island"})
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 3)
+
+        self.assertEqual(response2.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response2.data["results"]), 2)
+
+        self.assertEqual(response3.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response3.data["results"]), 2)
+
+        self.assertEqual(response4.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response4.data["results"]), 1)
+
+        self.assertEqual(response5.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response5.data["results"]), 1)
 
     def test_search_product_by_name(self):
         url = self.get_search_product_url()
@@ -295,7 +403,7 @@ class SearchProductAPITest(APITestCase):
         self.assertEqual(len(response_de_1.data["results"]), 1)
 
         self.assertEqual(response_de_2.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response_de_2.data["results"]), 2)
+        self.assertEqual(len(response_de_2.data["results"]), 3)
 
         self.assertEqual(response_de_3.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response_de_3.data["results"]), 1)

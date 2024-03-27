@@ -4,12 +4,10 @@ from django.conf import settings
 from django.contrib.postgres.search import SearchHeadline
 from django.contrib.postgres.search import SearchQuery
 from django.contrib.postgres.search import SearchRank
-from django.contrib.postgres.search import TrigramSimilarity
-from django.db.models import Case
+from django.contrib.postgres.search import TrigramWordDistance
+from django.contrib.postgres.search import TrigramWordSimilarity
 from django.db.models import F
-from django.db.models import FloatField
 from django.db.models import Q
-from django.db.models import When
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -55,14 +53,12 @@ class SearchProduct(ReadOnlyModelViewSet):
     def get_postgres_search_config(self, language_code: str) -> str:
         language_configs = settings.PARLER_LANGUAGES.get(settings.SITE_ID, ())
         for lang_config in language_configs:
-            if lang_config.get("code") != "en":
-                continue
             if lang_config.get("code") == language_code:
                 return lang_config.get("name", "").lower()
         return "simple"
 
     def get_filtered_queryset(self, query: str, language: str, config: str):
-        search_query = ~SearchQuery(query, search_type="websearch", config=config)
+        search_query = SearchQuery(query, search_type="websearch", config=config)
 
         lookup = (
             Q(translations__search_vector=search_query)
@@ -74,28 +70,25 @@ class SearchProduct(ReadOnlyModelViewSet):
             .prefetch_related("translations")
             .annotate(
                 search_rank=SearchRank(F("translations__search_vector"), search_query),
-                similarity=TrigramSimilarity(F("translations__search_document"), query),
+                similarity=TrigramWordSimilarity(
+                    query, F("translations__search_document")
+                ),
                 headline=SearchHeadline(
                     "translations__name",
                     search_query,
-                    start_sel="<span>",
-                    stop_sel="</span>",
+                    start_sel="<mark>",
+                    stop_sel="</mark>",
                     max_words=30,
                     config=config,
                 ),
+                distance=TrigramWordDistance(query, F("translations__search_document")),
             )
             .filter(
-                Q(search_rank__gte=0.1) | Q(similarity__gte=0.05),
+                Q(search_rank__gte=0.1) | Q(similarity__gte=0.1),
+                distance__lte=0.5,
                 translations__language_code=language,
             )
-            .order_by(
-                Case(
-                    When(search_rank__gte=0.1, then=F("search_rank")),
-                    When(similarity__gte=0.05, then=F("similarity")),
-                    default=F("search_rank"),
-                    output_field=FloatField(),
-                ).desc()
-            )
+            .order_by("-search_rank", "-similarity")
         )
         return queryset
 
@@ -116,6 +109,7 @@ class SearchProduct(ReadOnlyModelViewSet):
             similarities_data = {
                 result.id: result.similarity for result in limited_queryset
             }
+            distances_data = {result.id: result.distance for result in limited_queryset}
             result_count_data = min(queryset.count(), self.limit)
 
             serializer = self.get_serializer(
@@ -125,6 +119,7 @@ class SearchProduct(ReadOnlyModelViewSet):
                     "search_ranks": search_ranks_data,
                     "result_count": result_count_data,
                     "similarities": similarities_data,
+                    "distances": distances_data,
                 }
             )
             return Response(serializer.data, status=status.HTTP_200_OK)

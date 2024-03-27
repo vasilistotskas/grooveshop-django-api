@@ -14977,7 +14977,13 @@ components:
           additionalProperties:
             type: number
             format: double
+        distances:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
       required:
+      - distances
       - headlines
       - resultCount
       - results

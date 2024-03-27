@@ -42,9 +42,7 @@ def read_default_image():
 def create_uploaded_image(content, image_path):
     mime_type, _ = mimetypes.guess_type(image_path)
     if mime_type is None:
-        mime_type = (
-            "application/octet-stream"  # Default to a binary type if not recognized
-        )
+        mime_type = "application/octet-stream"
 
     return SimpleUploadedFile(
         name=os.path.basename(image_path),

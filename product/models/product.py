@@ -302,9 +302,11 @@ class Product(
         return os.path.basename(product_image.image.name)
 
     @property
-    def image_tag(self) -> str:
+    def image_tag(self):
         no_img_url = static("images/no_photo.jpg")
-        no_img_markup = f'<img src="{no_img_url}" width="100" height="100" />'
+        no_img_markup = mark_safe(
+            f'<img src="{no_img_url}" width="100" height="100" />'
+        )
         try:
             img = ProductImage.objects.get(product_id=self.id, is_main=True)
         except ProductImage.DoesNotExist:
@@ -314,10 +316,12 @@ class Product(
             return mark_safe(
                 '<img src="{}" width="100" height="100" />'.format(img.thumbnail.url)
             )
-        else:
+        elif img.image:
             return mark_safe(
                 '<img src="{}" width="100" height="100" />'.format(img.image.url)
             )
+        else:
+            return no_img_markup
 
     @property
     def colored_stock(self) -> SafeString | SafeString:

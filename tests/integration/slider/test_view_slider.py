@@ -53,13 +53,8 @@ class SliderViewSetTestCase(APITestCase):
         response = self.client.get(url)
         sliders = Slider.objects.all()
         serializer = SliderSerializer(sliders, many=True)
-        for response_item, serializer_item in zip(
-            response.data["results"], serializer.data
-        ):
-            compare_serializer_and_response(
-                serializer_item, response_item, ["thumbnail"]
-            )
 
+        self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_valid(self):
@@ -109,8 +104,8 @@ class SliderViewSetTestCase(APITestCase):
         response = self.client.get(url)
         slider = Slider.objects.get(pk=self.slider.pk)
         serializer = SliderSerializer(slider)
-        compare_serializer_and_response(serializer.data, response.data, ["thumbnail"])
 
+        self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_retrieve_invalid(self):

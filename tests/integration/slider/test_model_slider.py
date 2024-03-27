@@ -78,7 +78,6 @@ class SliderModelTestCase(TestCase):
     def test_save(self):
         self.slider.image = get_or_create_default_image("uploads/sliders/no_photo.jpg")
         self.slider.save()
-        self.assertTrue(default_storage.exists(self.slider.thumbnail.path))
         self.assertTrue(default_storage.exists(self.slider.image.path))
 
     def test_main_image_absolute_url(self):

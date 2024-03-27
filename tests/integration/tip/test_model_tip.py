@@ -95,7 +95,7 @@ class TipModelTestCase(TestCase):
     def test_image_tag(self):
         self.assertEqual(
             self.tip.image_tag,
-            f'<img src="{self.tip.icon.url}" height="50"/>',
+            f'<img src="{self.tip.icon.url}" width="100" height="100" />',
         )
 
     def test_main_image_absolute_url(self):

@@ -3,7 +3,19 @@
 
 
 
+## v0.93.1 (2024-03-27)
+
+### Fix
+
+* fix: tests fixed ([`850b0ff`](https://github.com/vasilistotskas/grooveshop-django-api/commit/850b0ffdb296993c861f17757f47bb78bd5cc658))
+
+* fix: Fix populate commands, search improve and fix model image_tag methods ([`b2ebfa7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b2ebfa70536420efc974ae59efe2b26e909b9afc))
+
 ## v0.93.0 (2024-03-25)
+
+### Chore
+
+* chore(release): release version 0.93.0 [skip ci] ([`a91138f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a91138f7049bc625705926bd0f4b75ea2c6f8c16))
 
 ### Feature
 

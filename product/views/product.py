@@ -7,8 +7,7 @@ from rest_framework.filters import SearchFilter
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 
-from core.api.views import ExpandModelViewSet
-from core.api.views import PaginationModelViewSet
+from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from product.filters.product import ProductFilter
 from product.models.product import Product
@@ -17,7 +16,7 @@ from product.serializers.product import ProductSerializer
 from product.serializers.review import ProductReviewSerializer
 
 
-class ProductViewSet(ExpandModelViewSet, PaginationModelViewSet):
+class ProductViewSet(BaseModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
@@ -33,39 +32,6 @@ class ProductViewSet(ExpandModelViewSet, PaginationModelViewSet):
     ]
     ordering = ["-created_at"]
     search_fields = ["id"]
-
-    def create(self, request, *args, **kwargs) -> Response:
-        serializer = self.get_serializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def retrieve(self, request, pk=None, *args, **kwargs) -> Response:
-        product = get_object_or_404(Product, pk=pk)
-        serializer = self.get_serializer(product)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    def update(self, request, pk=None, *args, **kwargs) -> Response:
-        product = get_object_or_404(Product, pk=pk)
-        serializer = self.get_serializer(product, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def partial_update(self, request, pk=None, *args, **kwargs) -> Response:
-        product = get_object_or_404(Product, pk=pk)
-        serializer = self.get_serializer(product, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def destroy(self, request, pk=None, *args, **kwargs) -> Response:
-        product = get_object_or_404(Product, pk=pk)
-        product.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["POST"])
     def update_product_hits(self, request, pk=None, *args, **kwargs) -> Response:

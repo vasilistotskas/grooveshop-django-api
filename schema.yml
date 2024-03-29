@@ -3371,13 +3371,14 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/CartItem'
+              $ref: '#/components/schemas/CartItemCreate'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/CartItem'
+              $ref: '#/components/schemas/CartItemCreate'
           application/json:
             schema:
-              $ref: '#/components/schemas/CartItem'
+              $ref: '#/components/schemas/CartItemCreate'
+        required: true
       security:
       - basicAuth: []
       - tokenAuth: []
@@ -3387,7 +3388,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CartItem'
+                $ref: '#/components/schemas/CartItemCreate'
           description: ''
   /api/v1/cart/item{format}:
     get:
@@ -3457,13 +3458,14 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/CartItem'
+              $ref: '#/components/schemas/CartItemCreate'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/CartItem'
+              $ref: '#/components/schemas/CartItemCreate'
           application/json:
             schema:
-              $ref: '#/components/schemas/CartItem'
+              $ref: '#/components/schemas/CartItemCreate'
+        required: true
       security:
       - basicAuth: []
       - tokenAuth: []
@@ -3473,7 +3475,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CartItem'
+                $ref: '#/components/schemas/CartItemCreate'
           description: ''
   /api/v1/cart/item/{id}:
     get:
@@ -4971,12 +4973,6 @@ paths:
         name: category
         schema:
           type: string
-      - name: limit
-        required: false
-        in: query
-        description: Number of results to return per page.
-        schema:
-          type: integer
       - in: query
         name: maxFinalPrice
         schema:
@@ -4985,18 +4981,24 @@ paths:
         name: minFinalPrice
         schema:
           type: number
-      - name: offset
-        required: false
-        in: query
-        description: The initial index from which to return the results.
-        schema:
-          type: integer
       - name: ordering
         required: false
         in: query
         description: Which field to use when ordering the results.
         schema:
           type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: pageSize
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       - name: search
         required: false
         in: query
@@ -5058,12 +5060,6 @@ paths:
           enum:
           - .json
         required: true
-      - name: limit
-        required: false
-        in: query
-        description: Number of results to return per page.
-        schema:
-          type: integer
       - in: query
         name: maxFinalPrice
         schema:
@@ -5072,18 +5068,24 @@ paths:
         name: minFinalPrice
         schema:
           type: number
-      - name: offset
-        required: false
-        in: query
-        description: The initial index from which to return the results.
-        schema:
-          type: integer
       - name: ordering
         required: false
         in: query
         description: Which field to use when ordering the results.
         schema:
           type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: pageSize
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       - name: search
         required: false
         in: query
@@ -6369,24 +6371,24 @@ paths:
         name: isMain
         schema:
           type: boolean
-      - name: limit
-        required: false
-        in: query
-        description: Number of results to return per page.
-        schema:
-          type: integer
-      - name: offset
-        required: false
-        in: query
-        description: The initial index from which to return the results.
-        schema:
-          type: integer
       - name: ordering
         required: false
         in: query
         description: Which field to use when ordering the results.
         schema:
           type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: pageSize
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       - in: query
         name: product
         schema:
@@ -6456,24 +6458,24 @@ paths:
         name: isMain
         schema:
           type: boolean
-      - name: limit
-        required: false
-        in: query
-        description: Number of results to return per page.
-        schema:
-          type: integer
-      - name: offset
-        required: false
-        in: query
-        description: The initial index from which to return the results.
-        schema:
-          type: integer
       - name: ordering
         required: false
         in: query
         description: Which field to use when ordering the results.
         schema:
           type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: pageSize
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       - in: query
         name: product
         schema:
@@ -7743,6 +7745,12 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: pageSize
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       tags:
       - api
       security:
@@ -7773,6 +7781,12 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: pageSize
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       tags:
       - api
       security:
@@ -7794,6 +7808,12 @@ paths:
         required: false
         in: query
         description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: pageSize
+        required: false
+        in: query
+        description: Number of results to return per page.
         schema:
           type: integer
       tags:
@@ -11430,6 +11450,25 @@ components:
       - uuid
       - vatPercent
       - vatValue
+    CartItemCreate:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        cart:
+          type: integer
+          readOnly: true
+        product:
+          type: integer
+        quantity:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+      required:
+      - cart
+      - id
+      - product
     Checkout:
       type: object
       properties:
@@ -12403,12 +12442,12 @@ components:
           type: string
           nullable: true
           format: uri
-          example: http://api.example.org/accounts/?offset=400&limit=100
+          example: http://api.example.org/accounts/?page=4
         previous:
           type: string
           nullable: true
           format: uri
-          example: http://api.example.org/accounts/?offset=200&limit=100
+          example: http://api.example.org/accounts/?page=2
         results:
           type: array
           items:
@@ -12426,12 +12465,12 @@ components:
           type: string
           nullable: true
           format: uri
-          example: http://api.example.org/accounts/?offset=400&limit=100
+          example: http://api.example.org/accounts/?page=4
         previous:
           type: string
           nullable: true
           format: uri
-          example: http://api.example.org/accounts/?offset=200&limit=100
+          example: http://api.example.org/accounts/?page=2
         results:
           type: array
           items:

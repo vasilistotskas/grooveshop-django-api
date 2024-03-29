@@ -3,7 +3,17 @@
 
 
 
+## v0.94.1 (2024-03-29)
+
+### Fix
+
+* fix: Product API view fix ([`fac6862`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fac6862e3753a847ed46b49cbf5034927caa8dd3))
+
 ## v0.94.0 (2024-03-29)
+
+### Chore
+
+* chore(release): release version 0.94.0 [skip ci] ([`91a926f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/91a926f6b3e9338a7dad890213b820c978e04bcb))
 
 ### Feature
 

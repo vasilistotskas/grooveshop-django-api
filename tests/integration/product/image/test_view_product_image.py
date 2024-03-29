@@ -91,15 +91,12 @@ class ProductImageViewSetTestCase(APITestCase):
             "product": self.product.id,
             "image": self._create_mock_image(),
             "is_main": False,
-            "translations": {},
+            "translations": {
+                default_language: {
+                    "title": "Product Image",
+                },
+            },
         }
-
-        for language in languages:
-            translation_payload = {
-                "title": f"Product Image in {language}",
-            }
-
-            payload["translations"][language] = translation_payload
 
         payload = flatten_dict_for_form_data(payload)
         url = self.get_product_image_list_url()
@@ -147,15 +144,12 @@ class ProductImageViewSetTestCase(APITestCase):
             "product": self.product.id,
             "image": self._create_mock_image(),
             "is_main": False,
-            "translations": {},
+            "translations": {
+                default_language: {
+                    "title": "Product Image",
+                },
+            },
         }
-
-        for language in languages:
-            translation_payload = {
-                "title": f"Product Image in {language}",
-            }
-
-            payload["translations"][language] = translation_payload
 
         payload = flatten_dict_for_form_data(payload)
         url = self.get_product_image_detail_url(self.product_image.id)

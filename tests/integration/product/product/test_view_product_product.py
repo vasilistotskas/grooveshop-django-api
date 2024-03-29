@@ -8,13 +8,13 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from core.pagination.limit_offset import LimitOffsetPaginator
 from helpers.seed import get_or_create_default_image
 from product.models.category import ProductCategory
 from product.models.favourite import ProductFavourite
 from product.models.image import ProductImage
 from product.models.product import Product
 from product.models.review import ProductReview
-from product.paginators.product import ProductPagination
 from product.serializers.product import ProductSerializer
 from vat.models import Vat
 
@@ -144,7 +144,7 @@ class ProductViewSetTestCase(APITestCase):
     def test_list(self):
         url = self.get_product_list_url()
         response = self.client.get(url)
-        pagination = ProductPagination()
+        pagination = LimitOffsetPaginator()
         limit = pagination.default_limit
         products = Product.objects.all()[0:limit]
         serializer = ProductSerializer(products, many=True)

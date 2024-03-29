@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-03-19 10:57+0200\n"
+"POT-Creation-Date: 2024-03-29 12:22+0200\n"
 "PO-Revision-Date: 2023-07-12 12:32+0300\n"
 "Last-Translator:   <bill@bill.gr>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -100,7 +100,7 @@ msgid "Blog Authors"
 msgstr ""
 
 #: .\blog\models\category.py:44 .\blog\models\post.py:26
-#: .\product\models\image.py:28 .\slider\models.py:22 .\slider\models.py:101
+#: .\product\models\image.py:28 .\slider\models.py:22 .\slider\models.py:98
 #: .\tests\integration\slider\test_model_slider.py:46
 #: .\user\models\account.py:91
 #: .\venv\Lib\site-packages\django\db\models\fields\files.py:393
@@ -110,13 +110,13 @@ msgstr ""
 #: .\blog\models\category.py:50 .\blog\models\tag.py:23 .\country\models.py:50
 #: .\pay_way\models.py:41 .\product\models\category.py:64
 #: .\product\models\product.py:165 .\region\models.py:20 .\slider\models.py:31
-#: .\slider\models.py:107
+#: .\slider\models.py:104
 msgid "Name"
 msgstr ""
 
 #: .\blog\models\category.py:51 .\core\models.py:37
 #: .\product\models\category.py:65 .\product\models\product.py:167
-#: .\slider\models.py:35 .\slider\models.py:112
+#: .\slider\models.py:35 .\slider\models.py:109
 msgid "Description"
 msgstr ""
 
@@ -132,7 +132,7 @@ msgstr ""
 msgid "Is Approved"
 msgstr ""
 
-#: .\blog\models\comment.py:60 .\tip\models.py:32
+#: .\blog\models\comment.py:60 .\tip\models.py:33
 msgid "Content"
 msgstr ""
 
@@ -159,12 +159,12 @@ msgid "View Count"
 msgstr ""
 
 #: .\blog\models\post.py:55 .\notification\models\notification.py:21
-#: .\product\models\image.py:34 .\slider\models.py:33 .\slider\models.py:109
-#: .\tip\models.py:31 .\user\models\address.py:20
+#: .\product\models\image.py:34 .\slider\models.py:33 .\slider\models.py:106
+#: .\tip\models.py:32 .\user\models\address.py:20
 msgid "Title"
 msgstr ""
 
-#: .\blog\models\post.py:56 .\slider\models.py:110
+#: .\blog\models\post.py:56 .\slider\models.py:107
 msgid "Subtitle"
 msgstr ""
 
@@ -181,7 +181,7 @@ msgid "Blog Posts"
 msgstr ""
 
 #: .\blog\models\tag.py:20 .\pay_way\models.py:21
-#: .\product\models\product.py:116 .\tip\models.py:29
+#: .\product\models\product.py:116 .\tip\models.py:30
 #: .\user\models\account.py:93
 msgid "Active"
 msgstr ""
@@ -1005,7 +1005,7 @@ msgstr ""
 msgid "Link"
 msgstr ""
 
-#: .\notification\models\notification.py:15 .\tip\models.py:21
+#: .\notification\models\notification.py:15 .\tip\models.py:22
 msgid "Kind"
 msgstr ""
 
@@ -1200,7 +1200,7 @@ msgstr ""
 msgid "Free For Order Amount"
 msgstr ""
 
-#: .\pay_way\models.py:37 .\tip\models.py:23
+#: .\pay_way\models.py:37 .\tip\models.py:24
 msgid "Icon"
 msgstr ""
 
@@ -1331,7 +1331,7 @@ msgstr ""
 msgid "This product is already in the user's favorites."
 msgstr ""
 
-#: .\product\models\image.py:30 .\slider\models.py:25 .\slider\models.py:104
+#: .\product\models\image.py:30 .\slider\models.py:25 .\slider\models.py:101
 msgid "Thumbnail"
 msgstr ""
 
@@ -1467,7 +1467,7 @@ msgstr ""
 msgid "Video"
 msgstr ""
 
-#: .\slider\models.py:32 .\slider\models.py:108 .\tip\models.py:33
+#: .\slider\models.py:32 .\slider\models.py:105 .\tip\models.py:34
 msgid "Url"
 msgstr ""
 
@@ -1479,35 +1479,35 @@ msgstr ""
 msgid "Sliders"
 msgstr ""
 
-#: .\slider\models.py:90
+#: .\slider\models.py:87
 msgid "Discount"
 msgstr ""
 
-#: .\slider\models.py:96
+#: .\slider\models.py:93
 msgid "Show Button"
 msgstr ""
 
-#: .\slider\models.py:98
+#: .\slider\models.py:95
 msgid "Date Start"
 msgstr ""
 
-#: .\slider\models.py:99
+#: .\slider\models.py:96
 msgid "Date End"
 msgstr ""
 
-#: .\slider\models.py:115
+#: .\slider\models.py:112
 msgid "Button Label"
 msgstr ""
 
-#: .\slider\models.py:120
+#: .\slider\models.py:117
 msgid "Slide"
 msgstr ""
 
-#: .\slider\models.py:121
+#: .\slider\models.py:118
 msgid "Slides"
 msgstr ""
 
-#: .\slider\models.py:140
+#: .\slider\models.py:132
 msgid "'Date Start' must be before 'Date End'."
 msgstr ""
 
@@ -1519,11 +1519,11 @@ msgstr ""
 msgid "product"
 msgstr ""
 
-#: .\tip\models.py:37
+#: .\tip\models.py:38
 msgid "Tip"
 msgstr ""
 
-#: .\tip\models.py:38
+#: .\tip\models.py:39
 msgid "Tips"
 msgstr ""
 

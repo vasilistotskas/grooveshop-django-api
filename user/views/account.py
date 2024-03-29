@@ -10,13 +10,12 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAdminUser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet
 
 from authentication.serializers import AuthenticationSerializer
 from core.api.permissions import IsStaffOrOwner
-from core.api.views import BaseExpandView
+from core.api.views import ExpandModelViewSet
+from core.api.views import PaginationModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
-from user.paginators.account import UserAccountPagination
 from user.serializers.account import UserAccountDetailsSerializer
 
 User = get_user_model()
@@ -26,11 +25,10 @@ class ObtainAuthTokenView(ObtainAuthToken):
     permission_classes = [IsAdminUser]
 
 
-class UserAccountViewSet(BaseExpandView, ModelViewSet):
+class UserAccountViewSet(ExpandModelViewSet, PaginationModelViewSet):
     permission_classes = [IsAuthenticated, IsStaffOrOwner]
     queryset = User.objects.all()
     serializer_class = AuthenticationSerializer
-    pagination_class = UserAccountPagination
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
     filterset_fields = ["id", "email"]
     ordering_fields = ["id", "email"]
@@ -42,15 +40,6 @@ class UserAccountViewSet(BaseExpandView, ModelViewSet):
             return User.objects.all()
         else:
             return User.objects.filter(id=self.request.user.id)
-
-    def list(self, request, *args, **kwargs) -> Response:
-        queryset = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
 
     def create(self, request, *args, **kwargs) -> Response:
         serializer = self.get_serializer(data=request.data)

@@ -9,7 +9,6 @@ from django.utils.timezone import now
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from core.utils.tests import compare_serializer_and_response
 from helpers.seed import get_or_create_default_image
 from slider.models import Slide
 from slider.models import Slider

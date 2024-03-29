@@ -5,6 +5,8 @@ from rest_framework.response import Response
 
 
 class LimitOffsetPaginator(pagination.LimitOffsetPagination):
+    max_limit = 100
+
     def get_paginated_response(self, data) -> Response:
         return Response(
             {

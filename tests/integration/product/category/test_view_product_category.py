@@ -96,16 +96,13 @@ class ProductCategoryViewSetTestCase(APITestCase):
             "menu_image_one": self._create_mock_image(),
             "menu_image_two": self._create_mock_image(),
             "menu_main_banner": self._create_mock_image(),
-            "translations": {},
+            "translations": {
+                default_language: {
+                    "name": "New Category",
+                    "description": "New Category Description",
+                },
+            },
         }
-
-        for language in languages:
-            translation_payload = {
-                "name": f"New Category in {language}",
-                "description": f"New Category Description in {language}",
-            }
-
-            payload["translations"][language] = translation_payload
 
         payload = flatten_dict_for_form_data(payload)
 
@@ -161,16 +158,13 @@ class ProductCategoryViewSetTestCase(APITestCase):
             "menu_image_one": self._create_mock_image(),
             "menu_image_two": self._create_mock_image(),
             "menu_main_banner": self._create_mock_image(),
-            "translations": {},
+            "translations": {
+                default_language: {
+                    "name": "Updated Category",
+                    "description": "Updated Category Description",
+                },
+            },
         }
-
-        for language in languages:
-            translation_payload = {
-                "name": f"Updated Category in {language}",
-                "description": f"Updated Category Description in {language}",
-            }
-
-            payload["translations"][language] = translation_payload
 
         payload = flatten_dict_for_form_data(payload)
 
@@ -210,16 +204,13 @@ class ProductCategoryViewSetTestCase(APITestCase):
             "menu_image_one": self._create_mock_image(),
             "menu_image_two": self._create_mock_image(),
             "menu_main_banner": self._create_mock_image(),
-            "translations": {},
+            "translations": {
+                default_language: {
+                    "name": "Updated Category",
+                    "description": "Updated Category Description",
+                },
+            },
         }
-
-        for language in languages:
-            translation_payload = {
-                "name": f"Updated Category in {language}",
-                "description": f"Updated Category Description in {language}",
-            }
-
-            payload["translations"][language] = translation_payload
 
         payload = flatten_dict_for_form_data(payload)
 

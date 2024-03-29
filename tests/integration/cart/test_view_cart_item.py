@@ -47,7 +47,7 @@ class CartItemViewSetTest(APITestCase):
         response = self.client.get(self.list_url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data["results"]), 1)
 
     def test_create_cart_item(self):
         response = self.client.post(self.list_url, data=self.create_data, format="json")

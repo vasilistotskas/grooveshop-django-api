@@ -1,75 +1,37 @@
 from __future__ import annotations
 
 from django.utils.decorators import method_decorator
-from django.views.decorators.cache import cache_page
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
-from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet
 
-from core.api.views import BaseExpandView
+from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+from core.utils.views import conditional_cache_page
 from region.models import Region
-from region.paginators import RegionPagination
 from region.serializers import RegionSerializer
 
+DEFAULT_REGION_CACHE_TTL = 60 * 60 * 2
 
-class RegionViewSet(BaseExpandView, ModelViewSet):
+
+class RegionViewSet(BaseModelViewSet):
     queryset = Region.objects.all()
     serializer_class = RegionSerializer
-    pagination_class = RegionPagination
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
     filterset_fields = ["alpha", "country"]
     ordering_fields = ["created_at"]
     ordering = ["-created_at"]
     search_fields = ["alpha", "country"]
 
-    @method_decorator(cache_page(60 * 60 * 2))
+    @method_decorator(conditional_cache_page(DEFAULT_REGION_CACHE_TTL))
     def list(self, request, *args, **kwargs) -> Response:
-        queryset = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return super().list(request, *args, **kwargs)
 
-    def create(self, request, *args, **kwargs) -> Response:
-        serializer = self.get_serializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    @method_decorator(cache_page(60 * 60 * 2))
+    @method_decorator(conditional_cache_page(DEFAULT_REGION_CACHE_TTL))
     def retrieve(self, request, pk=None, *args, **kwargs) -> Response:
-        region = get_object_or_404(Region, pk=pk)
-        serializer = self.get_serializer(region)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    def update(self, request, pk=None, *args, **kwargs) -> Response:
-        region = get_object_or_404(Region, pk=pk)
-        serializer = self.get_serializer(region, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def partial_update(self, request, pk=None, *args, **kwargs) -> Response:
-        region = get_object_or_404(Region, pk=pk)
-        serializer = self.get_serializer(region, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def destroy(self, request, pk=None, *args, **kwargs) -> Response:
-        region = get_object_or_404(Region, pk=pk)
-        region.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return super().retrieve(request, pk=pk)
 
     @action(
         detail=True,

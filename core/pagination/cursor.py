@@ -6,8 +6,9 @@ from rest_framework.response import Response
 
 class CursorPaginator(pagination.CursorPagination):
     page_size = 100
+    max_page_size = 100
     page_size_query_param = "page_size"
-    cursor_query_param = "c"
+    cursor_query_param = "cursor"
     total_items = 0
     total_pages = 0
     ordering = "-created_at"

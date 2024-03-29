@@ -236,7 +236,7 @@ REST_FRAMEWORK = {
     # Schema
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     # Pagination
-    "DEFAULT_PAGINATION_CLASS": "core.pagination.count.CountPaginator",
+    "DEFAULT_PAGINATION_CLASS": "core.pagination.page_number.PageNumberPaginator",
     "PAGE_SIZE": 100,
     # Renderers and parsers
     "DEFAULT_RENDERER_CLASSES": (

@@ -3,7 +3,17 @@
 
 
 
+## v0.94.0 (2024-03-29)
+
+### Feature
+
+* feat: Paginators remove, now have option to ask for a pagination type from query string,  useless extented api view methods removed ([`49bf512`](https://github.com/vasilistotskas/grooveshop-django-api/commit/49bf512825d8d1066a11cd7c6a4669961f84e38a))
+
 ## v0.93.1 (2024-03-27)
+
+### Chore
+
+* chore(release): release version 0.93.1 [skip ci] ([`23aaccd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/23aaccd2837dafef324e74ff75cbb1c78ca92217))
 
 ### Fix
 

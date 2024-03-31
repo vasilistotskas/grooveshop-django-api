@@ -5,6 +5,7 @@ import uuid
 from decimal import Decimal
 
 from django.conf import settings
+from django.contrib.postgres.indexes import BTreeIndex
 from django.contrib.postgres.search import SearchVectorField
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator
@@ -187,9 +188,18 @@ class Product(
         ordering = ["-created_at"]
         indexes = [
             *ModelWithMetadata.Meta.indexes,
+            *TimeStampMixinModel.Meta.indexes,
             models.Index(fields=["product_code"], name="product_product_code_idx"),
             models.Index(fields=["slug"], name="product_slug_idx"),
             models.Index(fields=["price", "stock"], name="product_price_stock_idx"),
+            BTreeIndex(fields=["price"]),
+            BTreeIndex(fields=["stock"]),
+            BTreeIndex(fields=["discount_percent"]),
+            BTreeIndex(fields=["hits"]),
+            BTreeIndex(fields=["weight"]),
+            BTreeIndex(fields=["final_price"]),
+            BTreeIndex(fields=["discount_value"]),
+            BTreeIndex(fields=["price_save_percent"]),
         ]
 
     def __unicode__(self):

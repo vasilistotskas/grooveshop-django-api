@@ -1,6 +1,7 @@
 import os
 
 from django.conf import settings
+from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -59,6 +60,13 @@ class BlogPost(
         verbose_name = _("Blog Post")
         verbose_name_plural = _("Blog Posts")
         ordering = ["-published_at"]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+            *PublishableModel.Meta.indexes,
+            BTreeIndex(fields=["view_count"]),
+            BTreeIndex(fields=["status"]),
+            BTreeIndex(fields=["featured"]),
+        ]
 
     def __unicode__(self):
         title = self.safe_translation_getter("title", any_language=True) or "Untitled"

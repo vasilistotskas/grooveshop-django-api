@@ -74,6 +74,9 @@ class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel, MPTTModel):
         constraints = [
             models.UniqueConstraint(fields=["user", "post"], name="unique_blog_comment")
         ]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+        ]
 
     class MPTTMeta:
         order_insertion_by = ["-created_at"]

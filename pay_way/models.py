@@ -1,6 +1,7 @@
 import os
 
 from django.conf import settings
+from django.contrib.postgres.indexes import BTreeIndex
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models.query import QuerySet
@@ -50,6 +51,11 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         verbose_name = _("Pay Way")
         verbose_name_plural = _("Pay Ways")
         ordering = ["sort_order"]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+            *SortableModel.Meta.indexes,
+            BTreeIndex(fields=["active"]),
+        ]
 
     def __unicode__(self):
         return self.safe_translation_getter("name", any_language=True) or ""

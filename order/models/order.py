@@ -1,4 +1,6 @@
 from django.conf import settings
+from django.contrib.postgres.indexes import BTreeIndex
+from django.contrib.postgres.indexes import GinIndex
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import models
@@ -116,6 +118,26 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
         verbose_name = _("Order")
         verbose_name_plural = _("Orders")
         ordering = ["-created_at"]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+            BTreeIndex(fields=["status"]),
+            BTreeIndex(fields=["document_type"]),
+            GinIndex(
+                name="order_search_gin",
+                fields=[
+                    "first_name",
+                    "last_name",
+                    "email",
+                    "phone",
+                    "mobile_phone",
+                    "street",
+                    "city",
+                    "zipcode",
+                    "place",
+                ],
+                opclasses=["gin_trgm_ops"] * 9,
+            ),
+        ]
 
     def __unicode__(self):
         return f"Order {self.id} - {self.first_name} {self.last_name}"

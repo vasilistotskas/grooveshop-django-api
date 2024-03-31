@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 
 from django.conf import settings
+from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -40,6 +41,11 @@ class ProductImage(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDMo
         verbose_name_plural = _("Product Images")
         verbose_name = _("Product Image")
         ordering = ["sort_order"]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+            *SortableModel.Meta.indexes,
+            BTreeIndex(fields=["product", "is_main"]),
+        ]
 
     def __unicode__(self):
         product_name = self.product.safe_translation_getter("name", any_language=True)

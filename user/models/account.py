@@ -8,6 +8,7 @@ from django.contrib.auth.models import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.auth.models import BaseUserManager
 from django.contrib.auth.models import PermissionsMixin
+from django.contrib.postgres.indexes import GinIndex
 from django.contrib.sessions.models import Session
 from django.db import models
 from django.http import HttpRequest
@@ -111,6 +112,23 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
         verbose_name = _("User Account")
         verbose_name_plural = _("User Accounts")
         ordering = ["-created_at"]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+            GinIndex(
+                name="user_account_trgm_idx",
+                fields=[
+                    "email",
+                    "first_name",
+                    "last_name",
+                    "phone",
+                    "city",
+                    "zipcode",
+                    "address",
+                    "place",
+                ],
+                opclasses=["gin_trgm_ops"] * 8,
+            ),
+        ]
 
     def __unicode__(self):
         return self.email

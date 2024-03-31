@@ -1,6 +1,7 @@
 import os
 
 from django.conf import settings
+from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.templatetags.static import static
@@ -40,6 +41,9 @@ class Slider(TranslatableModel, TimeStampMixinModel, UUIDModel):
         verbose_name = _("Slider")
         verbose_name_plural = _("Sliders")
         ordering = ["-created_at"]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+        ]
 
     def __unicode__(self):
         return self.safe_translation_getter("name", any_language=True) or ""
@@ -117,6 +121,12 @@ class Slide(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         verbose_name = _("Slide")
         verbose_name_plural = _("Slides")
         ordering = ["sort_order"]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+            *SortableModel.Meta.indexes,
+            BTreeIndex(fields=["date_start"]),
+            BTreeIndex(fields=["date_end"]),
+        ]
 
     def __unicode__(self):
         return f"{self.safe_translation_getter('title', any_language=True)} in {self.slider}"

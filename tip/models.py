@@ -38,6 +38,10 @@ class Tip(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         verbose_name = _("Tip")
         verbose_name_plural = _("Tips")
         ordering = ["sort_order"]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+            *SortableModel.Meta.indexes,
+        ]
 
     def __unicode__(self):
         return f"{self.get_kind_display()}: {self.safe_translation_getter('title', any_language=True)}"

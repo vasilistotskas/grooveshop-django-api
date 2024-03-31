@@ -1,3 +1,4 @@
+from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -43,6 +44,12 @@ class ProductReview(
             models.UniqueConstraint(
                 fields=["product", "user"], name="unique_product_review"
             )
+        ]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+            *PublishableModel.Meta.indexes,
+            BTreeIndex(fields=["status"]),
+            BTreeIndex(fields=["rate"]),
         ]
 
     def __unicode__(self):

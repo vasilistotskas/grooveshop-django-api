@@ -3,6 +3,7 @@ import uuid
 from typing import Any
 from typing import TypeVar
 
+from django.contrib.postgres.indexes import BTreeIndex
 from django.contrib.postgres.indexes import GinIndex
 from django.contrib.sites.models import Site
 from django.core.cache import cache
@@ -41,6 +42,7 @@ class Settings(models.Model):
         verbose_name = _("Setting")
         verbose_name_plural = _("Settings")
         unique_together = ("site", "key")
+        indexes = [models.Index(fields=["value_type"], name="settings_value_type_idx")]
 
     def __str__(self):
         return f"{self.site} - {self.key}: {self.value} - {self.value_type}"
@@ -158,6 +160,9 @@ class SortableModel(models.Model):
 
     class Meta(TypedModelMeta):
         abstract = True
+        indexes = [
+            BTreeIndex(fields=["sort_order"], name="%(class)s_sort_order_idx"),
+        ]
 
     def get_ordering_queryset(self) -> QuerySet[Any]:
         model_class = self.__class__
@@ -212,6 +217,10 @@ class TimeStampMixinModel(models.Model):
 
     class Meta(TypedModelMeta):
         abstract = True
+        indexes = [
+            BTreeIndex(fields=["created_at"], name="%(class)s_created_at_idx"),
+            BTreeIndex(fields=["updated_at"], name="%(class)s_updated_at_idx"),
+        ]
 
     def get_duration_since_created(self):
         return tz.now() - self.created_at
@@ -250,6 +259,10 @@ class PublishableModel(models.Model):
 
     class Meta(TypedModelMeta):
         abstract = True
+        indexes = [
+            BTreeIndex(fields=["published_at"], name="%(class)s_published_at_idx"),
+            BTreeIndex(fields=["is_published"], name="%(class)s_is_published_idx"),
+        ]
 
     @property
     def is_visible(self):

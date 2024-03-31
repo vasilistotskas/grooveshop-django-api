@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.conf import settings
+from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
@@ -29,6 +30,10 @@ class Cart(TimeStampMixinModel, UUIDModel):
         ordering = ["-created_at"]
         constraints = [
             models.UniqueConstraint(fields=["user"], name="unique_user_cart"),
+        ]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+            BTreeIndex(fields=["user"]),
         ]
 
     def __unicode__(self):
@@ -88,6 +93,10 @@ class CartItem(TimeStampMixinModel, UUIDModel):
         ordering = ["id"]
         constraints = [
             models.UniqueConstraint(fields=["cart", "product"], name="unique_cart_item")
+        ]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+            BTreeIndex(fields=["cart", "product"]),
         ]
 
     def __unicode__(self):

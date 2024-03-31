@@ -46,6 +46,9 @@ class NotificationUser(TimeStampMixinModel, UUIDModel):
                 fields=["user", "notification"], name="unique_notification_user"
             )
         ]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+        ]
 
     def save(self, *args, **kwargs):
         if self.seen and self.seen_at is None:

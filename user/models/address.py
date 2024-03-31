@@ -1,5 +1,6 @@
 from typing import List
 
+from django.contrib.postgres.indexes import GinIndex
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -71,6 +72,14 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
                 condition=models.Q(is_main=True),
                 name="unique_main_address",
             )
+        ]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+            GinIndex(
+                name="address_search_gin",
+                fields=["title", "first_name", "last_name", "city"],
+                opclasses=["gin_trgm_ops"] * 4,
+            ),
         ]
 
     def __str__(self):

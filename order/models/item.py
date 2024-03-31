@@ -28,6 +28,10 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
         verbose_name = _("Order Item")
         verbose_name_plural = _("Order Items")
         ordering = ["sort_order"]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+            *SortableModel.Meta.indexes,
+        ]
 
     def __unicode__(self):
         product_name = self.product.safe_translation_getter("name", any_language=True)

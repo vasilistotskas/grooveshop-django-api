@@ -20,6 +20,9 @@ class BlogAuthor(TranslatableModel, TimeStampMixinModel, UUIDModel):
         verbose_name = _("Blog Author")
         verbose_name_plural = _("Blog Authors")
         ordering = ["-created_at"]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+        ]
 
     def __unicode__(self):
         author_name = self.user.full_name

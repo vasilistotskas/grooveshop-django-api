@@ -20,7 +20,7 @@ class Command(BaseCommand):
         with connections["default"].cursor() as cursor:
             self.add_index(
                 cursor,
-                "product_translation_search_document_idx",
+                "product_product_translation_search_document_idx",
                 "product_product_translation",
                 ["search_document"],
                 "gin_trgm_ops",
@@ -33,12 +33,25 @@ class Command(BaseCommand):
 
             self.add_index(
                 cursor,
-                "product_translation_search_vector_idx",
+                "product_product_translation_search_vector_idx",
                 "product_product_translation",
                 ["search_vector"],
             )
             self.stdout.write(
                 self.style.SUCCESS(
                     "Successfully added index product_translation_search_vector_idx"
+                )
+            )
+
+            self.add_index(
+                cursor,
+                "product_product_translation_search_gin",
+                "product_product_translation",
+                ["name", "description"],
+                "gin_trgm_ops",
+            )
+            self.stdout.write(
+                self.style.SUCCESS(
+                    "Successfully added index product_translation_search_document_idx"
                 )
             )

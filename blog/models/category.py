@@ -57,6 +57,10 @@ class BlogCategory(
         verbose_name = _("Blog Category")
         verbose_name_plural = _("Blog Categories")
         ordering = ["sort_order"]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+            *SortableModel.Meta.indexes,
+        ]
 
     class MPTTMeta:
         order_insertion_by = ["sort_order"]

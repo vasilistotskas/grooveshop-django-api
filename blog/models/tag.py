@@ -1,3 +1,4 @@
+from django.contrib.postgres.indexes import BTreeIndex
 from django.core.validators import MinLengthValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -34,6 +35,11 @@ class BlogTag(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         verbose_name = _("Blog Tag")
         verbose_name_plural = _("Blog Tags")
         ordering = ["sort_order"]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+            *SortableModel.Meta.indexes,
+            BTreeIndex(fields=["active"]),
+        ]
 
     def __unicode__(self):
         tag_name = (

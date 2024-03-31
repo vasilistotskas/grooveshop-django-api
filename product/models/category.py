@@ -71,6 +71,10 @@ class ProductCategory(
         verbose_name = _("Product Category")
         verbose_name_plural = _("Product Categories")
         ordering = ["sort_order"]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+            *SortableModel.Meta.indexes,
+        ]
 
     class MPTTMeta:
         order_insertion_by = ["sort_order"]

@@ -38,3 +38,6 @@ class Notification(TranslatableModel, TimeStampMixinModel, UUIDModel):
         verbose_name = _("Notification")
         verbose_name_plural = _("Notifications")
         ordering = ["-created_at"]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+        ]

@@ -24,6 +24,10 @@ class Region(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         verbose_name = _("Region")
         verbose_name_plural = _("Regions")
         ordering = ["sort_order"]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+            *SortableModel.Meta.indexes,
+        ]
 
     def __unicode__(self):
         country_name = self.country.safe_translation_getter("name", any_language=True)

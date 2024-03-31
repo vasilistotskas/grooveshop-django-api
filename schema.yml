@@ -1632,6 +1632,57 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/blog/category/{id}/posts:
+    get:
+      operationId: api_v1_blog_category_posts_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogCategory'
+          description: ''
+  /api/v1/blog/category/{id}/posts{format}:
+    get:
+      operationId: api_v1_blog_category_posts_formatted_retrieve
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogCategory'
+          description: ''
   /api/v1/blog/comment:
     get:
       operationId: api_v1_blog_comment_list

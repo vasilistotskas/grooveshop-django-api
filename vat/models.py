@@ -1,3 +1,4 @@
+from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -15,6 +16,10 @@ class Vat(TimeStampMixinModel, UUIDModel):
         verbose_name = _("Vat")
         verbose_name_plural = _("Vats")
         ordering = ["-created_at"]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+            BTreeIndex(fields=["value"]),
+        ]
 
     def __unicode__(self):
         return f"{self.value}% VAT"

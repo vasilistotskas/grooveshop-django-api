@@ -37,6 +37,9 @@ class ProductFavourite(TimeStampMixinModel, UUIDModel):
                 fields=["user", "product"], name="unique_product_favourite"
             )
         ]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+        ]
 
     def __unicode__(self):
         product_name = self.product.safe_translation_getter("name", any_language=True)

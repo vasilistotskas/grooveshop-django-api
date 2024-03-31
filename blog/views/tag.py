@@ -4,7 +4,6 @@ from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.filters import SearchFilter
-from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 
 from blog.models.tag import BlogTag
@@ -31,6 +30,6 @@ class BlogTagViewSet(BaseModelViewSet):
 
     @method_decorator(conditional_cache_page(DEFAULT_BLOG_TAG_CACHE_TTL))
     def retrieve(self, request, pk=None, *args, **kwargs) -> Response:
-        tag = get_object_or_404(BlogTag, pk=pk)
+        tag = self.get_object()
         serializer = self.get_serializer(tag)
         return Response(serializer.data, status=status.HTTP_200_OK)

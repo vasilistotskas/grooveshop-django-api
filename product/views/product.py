@@ -4,7 +4,6 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
-from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 
 from core.api.views import BaseModelViewSet
@@ -35,7 +34,7 @@ class ProductViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["POST"])
     def update_product_hits(self, request, pk=None, *args, **kwargs) -> Response:
-        product = get_object_or_404(Product, pk=pk)
+        product = self.get_object()
         data = {"hits": product.hits + 1}
         serializer = self.get_serializer(product, data=data, partial=True)
         if serializer.is_valid():
@@ -48,8 +47,8 @@ class ProductViewSet(BaseModelViewSet):
         methods=["GET"],
     )
     def reviews(self, request, pk=None) -> Response:
-        product = get_object_or_404(Product, pk=pk)
-        reviews = product.product_review_product.all()
+        product = self.get_object()
+        reviews = product.reviews.all()
         serializer = ProductReviewSerializer(
             reviews, many=True, context=self.get_serializer_context()
         )
@@ -60,7 +59,7 @@ class ProductViewSet(BaseModelViewSet):
         methods=["GET"],
     )
     def images(self, request, pk=None) -> Response:
-        product = get_object_or_404(Product, pk=pk)
+        product = self.get_object()
         images = product.product_images.all()
         serializer = ProductImageSerializer(
             images, many=True, context=self.get_serializer_context()

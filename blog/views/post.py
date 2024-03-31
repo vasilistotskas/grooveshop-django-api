@@ -5,7 +5,6 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
-from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -51,7 +50,7 @@ class BlogPostViewSet(BaseModelViewSet):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        post = get_object_or_404(BlogPost, pk=pk)
+        post = self.get_object()
         user = request.user
 
         if post.likes.contains(user):
@@ -67,7 +66,7 @@ class BlogPostViewSet(BaseModelViewSet):
         methods=["POST"],
     )
     def update_view_count(self, request, pk=None) -> Response:
-        post = get_object_or_404(BlogPost, pk=pk)
+        post = self.get_object()
         post.view_count += 1
         post.save()
         serializer = self.get_serializer(post)
@@ -78,7 +77,7 @@ class BlogPostViewSet(BaseModelViewSet):
         methods=["GET"],
     )
     def comments(self, request, pk=None) -> Response:
-        post = get_object_or_404(BlogPost, pk=pk)
+        post = self.get_object()
         comments = post.blog_comment_post.filter(is_approved=True)
         serializer = BlogCommentSerializer(
             comments, many=True, context=self.get_serializer_context()

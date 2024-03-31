@@ -3,7 +3,6 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
-from rest_framework.generics import get_object_or_404
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -55,6 +54,6 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
 
     @action(detail=True, methods=["GET"])
     def retrieve_by_uuid(self, request, uuid=None, *args, **kwargs) -> Response:
-        product = get_object_or_404(Order, uuid=uuid)
+        product = self.get_object()
         serializer = self.get_serializer(product)
         return Response(serializer.data, status=status.HTTP_200_OK)

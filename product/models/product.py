@@ -102,7 +102,7 @@ class Product(
     category = TreeForeignKey(
         "product.ProductCategory",
         on_delete=models.SET_NULL,
-        related_name="product_category",
+        related_name="products",
         null=True,
         blank=True,
     )
@@ -124,7 +124,7 @@ class Product(
     )
     vat = models.ForeignKey(
         "vat.Vat",
-        related_name="product_vat",
+        related_name="products",
         blank=True,
         null=True,
         on_delete=models.SET_NULL,

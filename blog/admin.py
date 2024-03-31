@@ -31,6 +31,8 @@ class BlogTagAdmin(TranslatableAdmin):
 class BlogCategoryAdmin(TranslatableAdmin, DraggableMPTTAdmin):
     mptt_indent_field = "translations__name"
     list_display = (
+        "id",
+        "sort_order",
         "tree_actions",
         "indented_title",
         "recursive_post_count",

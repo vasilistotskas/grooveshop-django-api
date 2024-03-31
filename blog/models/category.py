@@ -117,4 +117,4 @@ class BlogCategory(
 
     @property
     def post_count(self) -> int:
-        return self.blog_post_category.count()
+        return self.posts.count()

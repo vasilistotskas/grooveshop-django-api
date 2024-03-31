@@ -58,6 +58,11 @@ urlpatterns = [
         name="blog-category-detail",
     ),
     path(
+        "blog/category/<int:pk>/posts",
+        BlogCategoryViewSet.as_view({"get": "posts"}),
+        name="blog-category-posts",
+    ),
+    path(
         "blog/author",
         BlogAuthorViewSet.as_view({"get": "list", "post": "create"}),
         name="blog-author-list",

@@ -15,7 +15,7 @@ class Cart(TimeStampMixinModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
     user = models.ForeignKey(
         "user.UserAccount",
-        related_name="user_cart",
+        related_name="cart",
         null=True,
         blank=True,
         default=None,
@@ -42,7 +42,7 @@ class Cart(TimeStampMixinModel, UUIDModel):
         )
 
     def get_items(self) -> models.QuerySet:
-        return self.cart_item_cart.prefetch_related("product").all()
+        return self.items.prefetch_related("product").all()
 
     def refresh_last_activity(self):
         self.last_activity = now()
@@ -69,16 +69,16 @@ class Cart(TimeStampMixinModel, UUIDModel):
 
     @property
     def total_items_unique(self) -> int:
-        return self.cart_item_cart.count()
+        return self.items.count()
 
 
 class CartItem(TimeStampMixinModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
     cart = models.ForeignKey(
-        "cart.Cart", related_name="cart_item_cart", on_delete=models.CASCADE
+        "cart.Cart", related_name="items", on_delete=models.CASCADE
     )
     product = models.ForeignKey(
-        "product.Product", related_name="cart_item_product", on_delete=models.CASCADE
+        "product.Product", related_name="cart_items", on_delete=models.CASCADE
     )
     quantity = models.PositiveIntegerField(_("Quantity"), default=1)
 

@@ -6,15 +6,13 @@ from rest_framework import status
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
-from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAdminUser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from authentication.serializers import AuthenticationSerializer
 from core.api.permissions import IsStaffOrOwner
-from core.api.views import ExpandModelViewSet
-from core.api.views import PaginationModelViewSet
+from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from user.serializers.account import UserAccountDetailsSerializer
 
@@ -25,7 +23,7 @@ class ObtainAuthTokenView(ObtainAuthToken):
     permission_classes = [IsAdminUser]
 
 
-class UserAccountViewSet(ExpandModelViewSet, PaginationModelViewSet):
+class UserAccountViewSet(BaseModelViewSet):
     permission_classes = [IsAuthenticated, IsStaffOrOwner]
     queryset = User.objects.all()
     serializer_class = AuthenticationSerializer
@@ -41,37 +39,9 @@ class UserAccountViewSet(ExpandModelViewSet, PaginationModelViewSet):
         else:
             return User.objects.filter(id=self.request.user.id)
 
-    def create(self, request, *args, **kwargs) -> Response:
-        serializer = self.get_serializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def update(self, request, pk=None, *args, **kwargs) -> Response:
-        user = get_object_or_404(User, id=pk)
-        serializer = self.get_serializer(user, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def partial_update(self, request, pk=None, *args, **kwargs) -> Response:
-        user = get_object_or_404(User, id=pk)
-        serializer = self.get_serializer(user, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def destroy(self, request, pk=None, *args, **kwargs) -> Response:
-        user = get_object_or_404(User, id=pk)
-        user.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
     @action(detail=True, methods=["GET"])
     def details(self, request, pk=None, *args, **kwargs) -> Response:
-        user_account = get_object_or_404(User, id=pk)
+        user_account = self.get_object()
         self.check_object_permissions(self.request, user_account)
         expand = self.request.query_params.get("expand", "false").lower()
         context = {"expand": expand}

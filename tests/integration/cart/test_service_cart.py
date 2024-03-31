@@ -76,8 +76,8 @@ class CartServiceTest(TestCase):
 
         cart_service.process_cart(self.request, option=ProcessCartOption.MERGE)
 
-        self.assertEqual(self.cart.cart_item_cart.count(), 1)
-        self.assertEqual(self.cart.cart_item_cart.first().quantity, 2)
+        self.assertEqual(self.cart.items.count(), 1)
+        self.assertEqual(self.cart.items.first().quantity, 2)
 
     def test_process_cart_merge_with_pre_login_cart_in_session(self):
         cart_service = CartService(cart_id=self.cart.pk)
@@ -87,8 +87,8 @@ class CartServiceTest(TestCase):
 
         cart_service.process_cart(self.request, option=ProcessCartOption.MERGE)
 
-        self.assertEqual(self.cart.cart_item_cart.count(), 1)
-        self.assertEqual(self.cart.cart_item_cart.first().quantity, 2)
+        self.assertEqual(self.cart.items.count(), 1)
+        self.assertEqual(self.cart.items.first().quantity, 2)
 
     def test_process_cart_keep(self):
         cart_service = CartService(cart_id=self.cart.pk)
@@ -98,8 +98,8 @@ class CartServiceTest(TestCase):
 
         cart_service.process_cart(self.request, option=ProcessCartOption.KEEP)
 
-        self.assertEqual(self.cart.cart_item_cart.count(), 1)
-        self.assertEqual(self.cart.cart_item_cart.first().quantity, 3)
+        self.assertEqual(self.cart.items.count(), 1)
+        self.assertEqual(self.cart.items.first().quantity, 3)
 
     def test_process_cart_clean(self):
         cart_service = CartService(cart_id=self.cart.pk)
@@ -107,7 +107,7 @@ class CartServiceTest(TestCase):
 
         cart_service.process_cart(self.request, option=ProcessCartOption.CLEAN)
 
-        self.assertEqual(self.cart.cart_item_cart.count(), 0)
+        self.assertEqual(self.cart.items.count(), 0)
 
     def test_process_cart_invalid_option(self):
         cart_service = CartService(cart_id=self.cart.pk)
@@ -167,7 +167,7 @@ class CartServiceTest(TestCase):
         cart_service.create_cart_item(product, 4)
 
         self.assertEqual(len(cart_service), 7)
-        self.assertEqual(self.cart.cart_item_cart.count(), 2)
+        self.assertEqual(self.cart.items.count(), 2)
 
     def test_cart_service_remove_item(self):
         cart_service = CartService(cart_id=self.cart.pk)
@@ -176,7 +176,7 @@ class CartServiceTest(TestCase):
         cart_service.delete_cart_item(self.product.pk)
 
         self.assertEqual(len(cart_service), 0)
-        self.assertEqual(self.cart.cart_item_cart.count(), 0)
+        self.assertEqual(self.cart.items.count(), 0)
 
     def test_init_without_cart_id_and_request(self):
         with self.assertRaises(CartServiceInitException):
@@ -205,9 +205,9 @@ class CartServiceTest(TestCase):
 
         cart_service.process_cart(self.request, option=ProcessCartOption.MERGE)
 
-        self.assertEqual(self.cart.cart_item_cart.count(), 2)
+        self.assertEqual(self.cart.items.count(), 2)
         self.assertCountEqual(
-            [item.product for item in self.cart.cart_item_cart.all()],
+            [item.product for item in self.cart.items.all()],
             [self.product, pre_login_product],
         )
 

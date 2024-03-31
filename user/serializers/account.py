@@ -33,7 +33,7 @@ class UserAccountDetailsSerializer(serializers.ModelSerializer):
     @extend_schema_field(ProductReviewSerializer)
     def get_product_reviews(self, user_account: UserAccount):
         return ProductReviewSerializer(
-            user_account.product_review_user, many=True, context=self.context
+            user_account.product_reviews, many=True, context=self.context
         ).data
 
     @extend_schema_field(UserAddressSerializer)

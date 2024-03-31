@@ -30,16 +30,14 @@ class BlogPost(
     )
     category = models.ForeignKey(
         "blog.BlogCategory",
-        related_name="blog_post_category",
+        related_name="posts",
         on_delete=models.SET_NULL,
         null=True,
     )
-    tags = models.ManyToManyField(
-        "blog.BlogTag", related_name="blog_post_tags", blank=True
-    )
+    tags = models.ManyToManyField("blog.BlogTag", related_name="tags", blank=True)
     author = models.ForeignKey(
         "blog.BlogAuthor",
-        related_name="blog_post_author",
+        related_name="posts",
         on_delete=models.SET_NULL,
         null=True,
     )

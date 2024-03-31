@@ -52,4 +52,4 @@ class BlogTag(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
 
     @property
     def get_tag_posts_count(self) -> int:
-        return self.blog_post_tags.count()
+        return self.tags.count()

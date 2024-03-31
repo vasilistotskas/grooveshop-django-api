@@ -52,8 +52,8 @@ def clear_carts_for_none_users_task(self):
     from cart.models import Cart
 
     with transaction.atomic():
-        null_carts = Cart.objects.filter(user=None).prefetch_related("cart_item_cart")
-        cart_items_count = sum(cart.cart_item_cart.count() for cart in null_carts)
+        null_carts = Cart.objects.filter(user=None).prefetch_related("items")
+        cart_items_count = sum(cart.items.count() for cart in null_carts)
         carts_count = null_carts.count()
         null_carts.delete()
 

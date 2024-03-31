@@ -111,21 +111,19 @@ class CartService:
     @staticmethod
     def merge_carts(
         request: Request | HttpRequest | None,
-        user_cart: Cart,
+        cart: Cart,
         pre_login_cart: Cart,
     ) -> None:
-        for item in pre_login_cart.cart_item_cart.all():
-            if not CartItem.objects.filter(
-                cart=user_cart, product=item.product
-            ).exists():
-                item.cart = user_cart
+        for item in pre_login_cart.items.all():
+            if not CartItem.objects.filter(cart=cart, product=item.product).exists():
+                item.cart = cart
                 item.save()
         pre_login_cart.delete()
         request.session["pre_log_in_cart_id"] = None
 
     @staticmethod
-    def clean_cart(user_cart: Cart) -> None:
-        user_cart.cart_item_cart.all().delete()
+    def clean_cart(cart: Cart) -> None:
+        cart.items.all().delete()
 
     @staticmethod
     def get_cart_by_id(cart_id: int) -> Cart | None:
@@ -136,7 +134,7 @@ class CartService:
 
     def get_cart_item(self, product_id: int | None) -> CartItem | None:
         try:
-            cart_item = self.cart.cart_item_cart.get(product_id=product_id)
+            cart_item = self.cart.items.get(product_id=product_id)
             return cart_item
         except CartItem.DoesNotExist:
             return None
@@ -152,7 +150,7 @@ class CartService:
     def update_cart_item(self, product_id: int, quantity: int) -> CartItem:
         if self.cart is None:
             raise CartNotSetException()
-        cart_item = self.cart.cart_item_cart.get(product_id=product_id)
+        cart_item = self.cart.items.get(product_id=product_id)
         cart_item.quantity = quantity
         cart_item.save()
         self.cart_items = self.cart.get_items()
@@ -161,5 +159,5 @@ class CartService:
     def delete_cart_item(self, product_id: int) -> None:
         if self.cart is None:
             raise CartNotSetException()
-        self.cart.cart_item_cart.get(product_id=product_id).delete()
+        self.cart.items.get(product_id=product_id).delete()
         self.cart_items = self.cart.get_items()

@@ -18,11 +18,11 @@ class ProductReview(
     id = models.BigAutoField(primary_key=True)
     product = models.ForeignKey(
         "product.Product",
-        related_name="product_review_product",
+        related_name="reviews",
         on_delete=models.CASCADE,
     )
     user = models.ForeignKey(
-        "user.UserAccount", related_name="product_review_user", on_delete=models.CASCADE
+        "user.UserAccount", related_name="product_reviews", on_delete=models.CASCADE
     )
     rate = models.PositiveSmallIntegerField(_("Rate"), choices=RateEnum.choices)
     status = models.CharField(

@@ -3,7 +3,19 @@
 
 
 
+## v0.95.0 (2024-03-31)
+
+### Feature
+
+* feat: Index fields to improve performance ([`3eb3ea1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3eb3ea1c36eb59e1b337ef3e6ad12f3a6624a096))
+
+* feat: blog category posts API endpoint and code cleanup ([`c28727e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c28727e0f60ecc5a809cd1a6b5430fe495061f52))
+
 ## v0.94.1 (2024-03-29)
+
+### Chore
+
+* chore(release): release version 0.94.1 [skip ci] ([`588c8ea`](https://github.com/vasilistotskas/grooveshop-django-api/commit/588c8eaffbde469429d769c1bf38f7569f7f13b2))
 
 ### Fix
 

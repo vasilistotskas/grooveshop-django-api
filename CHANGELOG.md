@@ -3,7 +3,17 @@
 
 
 
+## v0.96.0 (2024-04-04)
+
+### Feature
+
+* feat: Blog post comments / replies and likes ([`7ed0be3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7ed0be33fd1fba35442c5eeaeeeede920b59b79f))
+
 ## v0.95.0 (2024-03-31)
+
+### Chore
+
+* chore(release): release version 0.95.0 [skip ci] ([`5743d1d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5743d1daf0c5d54dd804fbf9163e5e3da730757a))
 
 ### Feature
 

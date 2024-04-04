@@ -32,15 +32,16 @@ class ProductViewSet(BaseModelViewSet):
     ordering = ["-created_at"]
     search_fields = ["id"]
 
-    @action(detail=True, methods=["POST"])
-    def update_product_hits(self, request, pk=None, *args, **kwargs) -> Response:
-        product = self.get_object()
-        data = {"hits": product.hits + 1}
-        serializer = self.get_serializer(product, data=data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    @action(
+        detail=True,
+        methods=["POST"],
+    )
+    def update_view_count(self, request, pk=None) -> Response:
+        post = self.get_object()
+        post.view_count += 1
+        post.save()
+        serializer = self.get_serializer(post)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(
         detail=True,

@@ -49,7 +49,7 @@ class BlogPost(
         default=PostStatusEnum.DRAFT,
     )
     featured = models.BooleanField(_("Featured"), default=False)
-    view_count = models.IntegerField(_("View Count"), default=0)
+    view_count = models.PositiveBigIntegerField(_("View Count"), default=0)
     translations = TranslatedFields(
         title=models.CharField(_("Title"), max_length=255, blank=True, null=True),
         subtitle=models.CharField(_("Subtitle"), max_length=255, blank=True, null=True),
@@ -106,7 +106,7 @@ class BlogPost(
 
     @property
     def comments_count(self) -> int:
-        return self.blog_comment_post.filter(is_approved=True).count()
+        return self.blog_comment_post.count()
 
     @property
     def tags_count(self) -> int:

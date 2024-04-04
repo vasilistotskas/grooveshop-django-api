@@ -130,7 +130,7 @@ class Product(
         null=True,
         on_delete=models.SET_NULL,
     )
-    hits = models.PositiveIntegerField(_("Hits"), default=0)
+    view_count = models.PositiveBigIntegerField(_("View Count"), default=0)
     weight = MeasurementField(
         _("Weight"),
         measurement=Weight,
@@ -195,7 +195,7 @@ class Product(
             BTreeIndex(fields=["price"]),
             BTreeIndex(fields=["stock"]),
             BTreeIndex(fields=["discount_percent"]),
-            BTreeIndex(fields=["hits"]),
+            BTreeIndex(fields=["view_count"]),
             BTreeIndex(fields=["weight"]),
             BTreeIndex(fields=["final_price"]),
             BTreeIndex(fields=["discount_value"]),

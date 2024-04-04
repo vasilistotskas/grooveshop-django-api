@@ -71,9 +71,6 @@ class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel, MPTTModel):
         verbose_name = _("Blog Comment")
         verbose_name_plural = _("Blog Comments")
         ordering = ["-created_at"]
-        constraints = [
-            models.UniqueConstraint(fields=["user", "post"], name="unique_blog_comment")
-        ]
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
         ]

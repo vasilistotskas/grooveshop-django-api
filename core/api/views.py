@@ -12,6 +12,7 @@ class ExpandModelViewSet(ModelViewSet):
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context["expand"] = self.request.query_params.get("expand", "false").lower()
+        context["expand_fields"] = self.request.query_params.get("expand_fields", "")
         return context
 
 

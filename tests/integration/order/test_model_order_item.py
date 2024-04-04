@@ -35,7 +35,7 @@ class OrderItemModelTestCase(TestCase):
             active=True,
             stock=10,
             discount_percent=Decimal("5.00"),
-            hits=0,
+            view_count=0,
             weight=0.00,
         )
         self.order_item = self.order.order_item_order.create(

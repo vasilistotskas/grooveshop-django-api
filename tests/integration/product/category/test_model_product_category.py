@@ -185,7 +185,7 @@ class CategoryModelTestCase(TestCase):
             stock=10,
             discount_percent=Decimal("0.0"),
             vat=Vat.objects.create(value=Decimal("18.0")),
-            hits=10,
+            view_count=10,
             weight=Decimal("1.0"),
         )
 
@@ -202,7 +202,7 @@ class CategoryModelTestCase(TestCase):
             stock=10,
             discount_percent=Decimal("0.0"),
             vat=Vat.objects.create(value=Decimal("18.0")),
-            hits=10,
+            view_count=10,
             weight=Decimal("1.0"),
         )
         Product.objects.create(
@@ -214,7 +214,7 @@ class CategoryModelTestCase(TestCase):
             stock=8,
             discount_percent=Decimal("0.0"),
             vat=Vat.objects.create(value=Decimal("18.0")),
-            hits=8,
+            view_count=8,
             weight=Decimal("1.5"),
         )
 

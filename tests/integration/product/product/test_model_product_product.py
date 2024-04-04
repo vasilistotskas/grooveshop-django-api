@@ -68,7 +68,7 @@ class ProductModelTestCase(TestCase):
             stock=10,
             discount_percent=Decimal("50.0"),
             vat=self.vat,
-            hits=10,
+            view_count=10,
             weight=Decimal("5.00"),
         )
         for language in languages:
@@ -164,7 +164,7 @@ class ProductModelTestCase(TestCase):
         self.assertEqual(self.product.stock, 10)
         self.assertEqual(self.product.discount_percent, Decimal("50.0"))
         self.assertEqual(self.product.vat, self.vat)
-        self.assertEqual(self.product.hits, 10)
+        self.assertEqual(self.product.view_count, 10)
         self.assertEqual(self.product.weight, Decimal("5.00"))
 
     def test_verbose_names(self):
@@ -201,8 +201,8 @@ class ProductModelTestCase(TestCase):
             "vat",
         )
         self.assertEqual(
-            Product._meta.get_field("hits").verbose_name,
-            "Hits",
+            Product._meta.get_field("view_count").verbose_name,
+            "View Count",
         )
         self.assertEqual(
             Product._meta.get_field("weight").verbose_name,

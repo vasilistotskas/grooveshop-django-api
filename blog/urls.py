@@ -102,6 +102,16 @@ urlpatterns = [
         name="blog-comment-user-blog-comment",
     ),
     path(
+        "blog/comment/<int:pk>/update_likes",
+        BlogCommentViewSet.as_view({"post": "update_likes"}),
+        name="blog-comment-update_likes",
+    ),
+    path(
+        "blog/comment/<int:pk>/replies",
+        BlogCommentViewSet.as_view({"get": "replies"}),
+        name="blog-comment-replies",
+    ),
+    path(
         "blog/tag",
         BlogTagViewSet.as_view({"get": "list", "post": "create"}),
         name="blog-tag-list",

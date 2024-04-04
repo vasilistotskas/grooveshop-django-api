@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Dict
 from typing import Type
 
@@ -18,6 +16,12 @@ class BaseExpandSerializer(serializers.ModelSerializer):
             self.expand = expand_context.lower() == "true"
         else:
             self.expand = bool(expand_context)
+
+        expand_fields_context = self.context.get("expand_fields", "")
+        self.expand_fields = (
+            set(expand_fields_context.split(",")) if expand_fields_context else set()
+        )
+
         self.expansion_path = self.context.get("expansion_path", [])
 
     def to_representation(self, instance) -> Dict[str, any]:
@@ -34,7 +38,9 @@ class BaseExpandSerializer(serializers.ModelSerializer):
 
     def _expand_fields(self, instance, data: Dict[str, any]) -> Dict[str, any]:
         for field_name, serializer_class in self.get_expand_fields().items():
-            if field_name in self.expansion_path:
+            if field_name in self.expansion_path or (
+                self.expand_fields and field_name not in self.expand_fields
+            ):
                 continue
 
             field_value = getattr(instance, field_name, None)

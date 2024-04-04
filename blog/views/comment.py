@@ -17,7 +17,7 @@ class BlogCommentViewSet(BaseModelViewSet):
     queryset = BlogComment.objects.all()
     serializer_class = BlogCommentSerializer
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
-    filterset_fields = ["id", "user", "post"]
+    filterset_fields = ["id", "user", "post", "parent", "is_approved"]
     ordering_fields = ["id", "user", "post", "created_at"]
     ordering = ["id"]
     search_fields = ["id", "user", "post"]
@@ -60,3 +60,51 @@ class BlogCommentViewSet(BaseModelViewSet):
                 {"detail": "Invalid data"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+    @action(detail=True, methods=["POST"], permission_classes=[IsAuthenticated])
+    def update_likes(self, request, pk=None) -> Response:
+        if not request.user.is_authenticated:
+            return Response(
+                {"detail": "Authentication credentials were not provided."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        comment = self.get_object()
+        user = request.user
+
+        if comment.likes.contains(user):
+            comment.likes.remove(user)
+        else:
+            comment.likes.add(user)
+        comment.save()
+        serializer = self.get_serializer(comment, context=self.get_serializer_context())
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["GET"])
+    def replies(self, request, pk=None) -> Response:
+        comment = self.get_object()
+        if not comment.get_children().exists():
+            return Response(
+                {"detail": "No replies found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        replies_queryset = comment.get_children()
+        pagination_param = request.query_params.get("pagination", "true").lower()
+
+        if pagination_param == "false":
+            serializer = BlogCommentSerializer(
+                replies_queryset, many=True, context=self.get_serializer_context()
+            )
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        page = self.paginate_queryset(replies_queryset)
+        if page is not None:
+            serializer = BlogCommentSerializer(
+                page, many=True, context=self.get_serializer_context()
+            )
+            return self.get_paginated_response(serializer.data)
+
+        serializer = BlogCommentSerializer(
+            replies_queryset, many=True, context=self.get_serializer_context()
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)

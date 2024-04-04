@@ -37,7 +37,7 @@ class OrderModelTestCase(TestCase):
             active=True,
             stock=10,
             discount_percent=5.00,
-            hits=0,
+            view_count=0,
             weight=0.00,
         )
         self.product_2 = Product.objects.create(
@@ -46,7 +46,7 @@ class OrderModelTestCase(TestCase):
             active=True,
             stock=10,
             discount_percent=10.00,
-            hits=0,
+            view_count=0,
             weight=0.00,
         )
 

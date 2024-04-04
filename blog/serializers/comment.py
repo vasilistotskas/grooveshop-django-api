@@ -8,7 +8,6 @@ from parler_rest.fields import TranslatedFieldsField
 from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
-from rest_framework.utils.serializer_helpers import ReturnDict
 
 from blog.models.comment import BlogComment
 from blog.models.post import BlogPost
@@ -27,14 +26,14 @@ class BlogCommentSerializer(TranslatableModelSerializer, BaseExpandSerializer):
     children = serializers.SerializerMethodField()
     user = PrimaryKeyRelatedField(queryset=User.objects.all())
     post = PrimaryKeyRelatedField(queryset=BlogPost.objects.all())
-    likes = PrimaryKeyRelatedField(queryset=User.objects.all(), many=True)
+    likes = PrimaryKeyRelatedField(
+        queryset=User.objects.all(), many=True, required=False
+    )
     translations = TranslatedFieldsFieldExtend(shared_model=BlogComment)
 
-    def get_children(self, obj: BlogComment) -> ReturnDict | list:
+    def get_children(self, obj: BlogComment) -> list[int]:
         if obj.get_children().exists():
-            return BlogCommentSerializer(
-                obj.get_children(), many=True, context=self.context
-            ).data
+            return list(obj.get_children().values_list("id", flat=True))
         return []
 
     class Meta:

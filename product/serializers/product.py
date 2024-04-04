@@ -48,7 +48,7 @@ class ProductSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "vat_percent",
             "vat_value",
             "final_price",
-            "hits",
+            "view_count",
             "likes_count",
             "stock",
             "active",

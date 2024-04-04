@@ -30,7 +30,7 @@ class SearchProductAPITest(APITestCase):
             active=True,
             stock=10,
             discount_percent=Decimal("50.0"),
-            hits=10,
+            view_count=10,
             weight=Decimal("5.00"),
             name="Samsung Galaxy Z Fold5 5G Dual SIM (12GB/512GB) Phantom Black",
             description="With an innovative form factor enhanced by "
@@ -47,7 +47,7 @@ class SearchProductAPITest(APITestCase):
             active=True,
             stock=20,
             discount_percent=Decimal("25.0"),
-            hits=20,
+            view_count=20,
             weight=Decimal("10.00"),
             name="Michelin Pilot Sport 5 225/45 R17 94Y XL Summer Passenger Car Tire",
             description="Pilot Sport 5 Michelin summer car tyre."
@@ -64,7 +64,7 @@ class SearchProductAPITest(APITestCase):
             active=True,
             stock=30,
             discount_percent=Decimal("10.0"),
-            hits=30,
+            view_count=30,
             weight=Decimal("15.00"),
             name="Nike Park VII Men's Sports T-shirt Short Sleeve Dri-Fit Black",
             description="Add comfort and freedom of movement to"
@@ -81,7 +81,7 @@ class SearchProductAPITest(APITestCase):
             active=True,
             stock=40,
             discount_percent=Decimal("0.0"),
-            hits=40,
+            view_count=40,
             weight=Decimal("20.00"),
             name="Nike Victori One Slides Black Color",
             description="The Nike Victori One is designed for comfort"
@@ -99,7 +99,7 @@ class SearchProductAPITest(APITestCase):
             active=True,
             stock=50,
             discount_percent=Decimal("0.0"),
-            hits=50,
+            view_count=50,
             weight=Decimal("25.00"),
             name="Nike Victori One Slides Red Color",
             description="The Nike Victori One is designed for comfort"
@@ -117,7 +117,7 @@ class SearchProductAPITest(APITestCase):
             active=True,
             stock=60,
             discount_percent=Decimal("0.0"),
-            hits=60,
+            view_count=60,
             weight=Decimal("30.00"),
             name="Apple iPhone 14 Pro Max 5G (6GB/512GB) Deep Purple",
             description="Capture every detail with the 48MP main camera. "
@@ -136,7 +136,7 @@ class SearchProductAPITest(APITestCase):
             active=True,
             stock=60,
             discount_percent=Decimal("0.0"),
-            hits=60,
+            view_count=60,
             weight=Decimal("30.00"),
             name="Apple iPhone 15 Pro Max 5G (8GB/256GB) White Titanium",
             description="It's cast in titanium and features the groundbreaking"

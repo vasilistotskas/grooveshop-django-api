@@ -26,7 +26,7 @@ class CartModelTestCase(TestCase):
             active=True,
             stock=10,
             discount_percent=5.00,
-            hits=0,
+            view_count=0,
             weight=0.00,
         )
         product_2 = Product.objects.create(
@@ -35,7 +35,7 @@ class CartModelTestCase(TestCase):
             active=True,
             stock=10,
             discount_percent=10.00,
-            hits=0,
+            view_count=0,
             weight=0.00,
         )
         self.cart_item_1 = CartItem.objects.create(

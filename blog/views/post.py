@@ -58,7 +58,7 @@ class BlogPostViewSet(BaseModelViewSet):
         else:
             post.likes.add(user)
         post.save()
-        serializer = self.get_serializer(post)
+        serializer = self.get_serializer(post, context=self.get_serializer_context())
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(
@@ -78,8 +78,30 @@ class BlogPostViewSet(BaseModelViewSet):
     )
     def comments(self, request, pk=None) -> Response:
         post = self.get_object()
-        comments = post.blog_comment_post.filter(is_approved=True)
+        comments_queryset = post.blog_comment_post.all()
+        pagination_param = request.query_params.get("pagination", "true").lower()
+        parent_id = request.query_params.get("parent", None)
+
+        if parent_id is not None:
+            if parent_id.lower() == "none":
+                comments_queryset = comments_queryset.filter(parent__isnull=True)
+            else:
+                comments_queryset = comments_queryset.filter(parent_id=parent_id)
+
+        if pagination_param == "false":
+            serializer = BlogCommentSerializer(
+                comments_queryset, many=True, context=self.get_serializer_context()
+            )
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        page = self.paginate_queryset(comments_queryset)
+        if page is not None:
+            serializer = BlogCommentSerializer(
+                page, many=True, context=self.get_serializer_context()
+            )
+            return self.get_paginated_response(serializer.data)
+
         serializer = BlogCommentSerializer(
-            comments, many=True, context=self.get_serializer_context()
+            comments_queryset, many=True, context=self.get_serializer_context()
         )
         return Response(serializer.data, status=status.HTTP_200_OK)

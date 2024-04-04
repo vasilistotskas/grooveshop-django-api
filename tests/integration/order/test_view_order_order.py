@@ -82,7 +82,7 @@ class OrderViewSetTestCase(APITestCase):
             active=True,
             stock=10,
             discount_percent=5.00,
-            hits=0,
+            view_count=0,
             weight=0.00,
         )
         product_2 = Product.objects.create(
@@ -91,7 +91,7 @@ class OrderViewSetTestCase(APITestCase):
             active=True,
             stock=10,
             discount_percent=10.00,
-            hits=0,
+            view_count=0,
             weight=0.00,
         )
 

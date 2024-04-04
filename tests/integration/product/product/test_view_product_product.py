@@ -69,7 +69,7 @@ class ProductViewSetTestCase(APITestCase):
             stock=10,
             discount_percent=Decimal("50.0"),
             vat=self.vat,
-            hits=10,
+            view_count=10,
             weight=Decimal("5.00"),
         )
         for language in languages:
@@ -163,7 +163,7 @@ class ProductViewSetTestCase(APITestCase):
             "stock": 10,
             "discount_percent": "50.0",
             "vat": self.vat.pk,
-            "hits": 10,
+            "view_count": 10,
             "weight": {
                 "value": "5.00",
                 "unit": "kg",
@@ -201,7 +201,7 @@ class ProductViewSetTestCase(APITestCase):
             "stock": "invalid_stock",
             "discount_percent": "invalid_discount_percent",
             "vat": "invalid_vat",
-            "hits": "invalid_hits",
+            "view_count": "invalid_view_count",
             "weight": "invalid_weight",
         }
 
@@ -237,7 +237,7 @@ class ProductViewSetTestCase(APITestCase):
             "stock": 10,
             "discount_percent": "50.0",
             "vat": self.vat.pk,
-            "hits": 10,
+            "view_count": 10,
             "weight": {
                 "value": "5.00",
                 "unit": "kg",
@@ -275,7 +275,7 @@ class ProductViewSetTestCase(APITestCase):
             "stock": "invalid_stock",
             "discount_percent": "invalid_discount_percent",
             "vat": "invalid_vat",
-            "hits": "invalid_hits",
+            "hits": "invalid_view_count",
             "weight": {
                 "value": "5.00",
                 "unit": "kg",

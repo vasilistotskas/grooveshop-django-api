@@ -43,7 +43,7 @@ class UserAccountViewSet(BaseModelViewSet):
     def details(self, request, pk=None, *args, **kwargs) -> Response:
         user_account = self.get_object()
         self.check_object_permissions(self.request, user_account)
-        expand = self.request.query_params.get("expand", "false").lower()
-        context = {"expand": expand}
-        serializer = UserAccountDetailsSerializer(user_account, context=context)
+        serializer = UserAccountDetailsSerializer(
+            user_account, context=self.get_serializer_context()
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)

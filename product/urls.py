@@ -27,9 +27,9 @@ urlpatterns = [
         name="product-detail",
     ),
     path(
-        "product/<int:pk>/update_product_hits",
-        ProductViewSet.as_view({"post": "update_product_hits"}),
-        name="product-update-product-hits",
+        "product/<int:pk>/update_view_count",
+        ProductViewSet.as_view({"post": "update_view_count"}),
+        name="product-update-view-count",
     ),
     path(
         "product/<int:pk>/reviews",

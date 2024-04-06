@@ -3,7 +3,17 @@
 
 
 
+## v0.97.0 (2024-04-06)
+
+### Feature
+
+* feat: serializers expand `BaseExpandSerializer` and filter language ([`e361373`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e36137368b4bee9c6531ea52b0067c6b8ce2bf85))
+
 ## v0.96.0 (2024-04-04)
+
+### Chore
+
+* chore(release): release version 0.96.0 [skip ci] ([`a31976f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a31976f588ae402863cbf4f1e7ca2cf86690639f))
 
 ### Feature
 

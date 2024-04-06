@@ -1,3 +1,4 @@
+from django.conf import settings
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -6,6 +7,8 @@ from core.pagination.cursor import CursorPaginator
 from core.pagination.limit_offset import LimitOffsetPaginator
 from core.pagination.page_number import PageNumberPaginator
 from core.utils.views import TranslationsProcessingMixin
+
+default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
 class ExpandModelViewSet(ModelViewSet):
@@ -55,6 +58,13 @@ class PaginationModelViewSet(ModelViewSet):
 
 
 class TranslationsModelViewSet(TranslationsProcessingMixin, ModelViewSet):
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["language"] = self.request.query_params.get(
+            "language", default_language
+        )
+        return context
+
     def create(self, request, *args, **kwargs):
         request = self.process_translations_data(request)
         return super().create(request, *args, **kwargs)

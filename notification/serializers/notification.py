@@ -3,6 +3,7 @@ from parler_rest.fields import TranslatedFieldsField
 from parler_rest.serializers import TranslatableModelSerializer
 
 from core.api.schema import generate_schema_multi_lang
+from core.api.serializers import BaseExpandSerializer
 from notification.models.notification import Notification
 
 
@@ -11,7 +12,7 @@ class TranslatedFieldsFieldExtend(TranslatedFieldsField):
     pass
 
 
-class NotificationSerializer(TranslatableModelSerializer):
+class NotificationSerializer(TranslatableModelSerializer, BaseExpandSerializer):
     translations = TranslatedFieldsFieldExtend(shared_model=Notification)
 
     class Meta:

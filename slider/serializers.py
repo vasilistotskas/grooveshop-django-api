@@ -24,7 +24,7 @@ class TranslatedFieldsFieldExtendSlide(TranslatedFieldsField):
     pass
 
 
-class SliderSerializer(TranslatableModelSerializer):
+class SliderSerializer(TranslatableModelSerializer, BaseExpandSerializer):
     translations = TranslatedFieldsFieldExtendSlider(shared_model=Slider)
 
     class Meta:

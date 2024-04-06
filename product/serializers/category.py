@@ -4,6 +4,7 @@ from rest_framework import serializers
 from rest_framework.utils.serializer_helpers import ReturnDict
 
 from core.api.schema import generate_schema_multi_lang
+from core.api.serializers import BaseExpandSerializer
 from core.utils.serializers import TranslatedFieldExtended
 from product.models.category import ProductCategory
 
@@ -13,7 +14,7 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
 
 
-class ProductCategorySerializer(TranslatableModelSerializer):
+class ProductCategorySerializer(TranslatableModelSerializer, BaseExpandSerializer):
     children = serializers.SerializerMethodField()
     translations = TranslatedFieldsFieldExtend(shared_model=ProductCategory)
 

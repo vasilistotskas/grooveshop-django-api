@@ -25,16 +25,31 @@ class BaseExpandSerializer(serializers.ModelSerializer):
         self.expansion_path = self.context.get("expansion_path", [])
 
     def to_representation(self, instance) -> Dict[str, any]:
-        if self.Meta.model.__name__ in self.expansion_path:
-            return super().to_representation(instance)
+        ret = super().to_representation(instance)
+        request_language = (
+            self.context.get("request").query_params.get("language")
+            if "request" in self.context
+            else None
+        )
 
-        data = super().to_representation(instance)
+        if (
+            request_language
+            and "translations" in ret
+            and request_language in ret["translations"]
+        ):
+            ret["translations"] = {
+                request_language: ret["translations"][request_language]
+            }
+
+        if self.Meta.model.__name__ in self.expansion_path:
+            return ret
+
         if self.expand:
             self.expansion_path.append(self.Meta.model.__name__)
-            data = self._expand_fields(instance, data)
+            ret = self._expand_fields(instance, ret)
             self.expansion_path.pop()
 
-        return data
+        return ret
 
     def _expand_fields(self, instance, data: Dict[str, any]) -> Dict[str, any]:
         for field_name, serializer_class in self.get_expand_fields().items():

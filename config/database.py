@@ -6,15 +6,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SYSTEM_ENV = getenv("SYSTEM_ENV", "dev")
 
-CONN_HEALTH_CHECKS = True
-ATOMIC_REQUESTS = True
+CONN_HEALTH_CHECKS = SYSTEM_ENV == "production"
+ATOMIC_REQUESTS = SYSTEM_ENV == "production"
 CONN_MAX_AGE = 0
 INDEX_MAXIMUM_EXPR_COUNT = 4000
 
 DATABASES = {
     "default": {
-        "ATOMIC_REQUESTS": True,
-        "CONN_HEALTH_CHECKS": True,
+        "ATOMIC_REQUESTS": SYSTEM_ENV == "production",
+        "CONN_HEALTH_CHECKS": SYSTEM_ENV == "production",
         "TIME_ZONE": getenv("TIME_ZONE", "Europe/Athens"),
         "ENGINE": "django.db.backends.postgresql",
         "HOST": getenv("DB_HOST", "db"),

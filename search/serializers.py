@@ -4,6 +4,7 @@ from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 
 from core.api.schema import generate_schema_multi_lang
+from core.api.serializers import BaseExpandSerializer
 from product.models.product import Product
 
 
@@ -12,7 +13,7 @@ class TranslatedFieldsFieldExtend(TranslatedFieldsField):
     pass
 
 
-class SearchProductResultSerializer(TranslatableModelSerializer):
+class SearchProductResultSerializer(TranslatableModelSerializer, BaseExpandSerializer):
     id = serializers.IntegerField()
     slug = serializers.CharField()
     main_image_filename = serializers.CharField()

@@ -4,10 +4,11 @@ from rest_framework import serializers
 
 from cart.models import Cart
 from cart.models import CartItem
+from core.api.serializers import BaseExpandSerializer
 from product.serializers.product import ProductSerializer
 
 
-class CartItemSerializer(serializers.ModelSerializer):
+class CartItemSerializer(BaseExpandSerializer):
     cart = serializers.SerializerMethodField("get_cart_id")
     product = serializers.SerializerMethodField("get_product")
     price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
@@ -48,7 +49,7 @@ class CartItemSerializer(serializers.ModelSerializer):
         )
 
 
-class CartItemCreateSerializer(serializers.ModelSerializer):
+class CartItemCreateSerializer(BaseExpandSerializer):
     cart = serializers.SerializerMethodField("get_cart_id")
 
     @extend_schema_field(serializers.IntegerField)
@@ -74,7 +75,7 @@ class CartItemCreateSerializer(serializers.ModelSerializer):
             return cart_item
 
 
-class CartSerializer(serializers.ModelSerializer):
+class CartSerializer(BaseExpandSerializer):
     cart_items = serializers.SerializerMethodField("get_cart_items")
     total_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     total_discount_value = MoneyField(max_digits=11, decimal_places=2, read_only=True)

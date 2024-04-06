@@ -6,6 +6,7 @@ from rest_framework.utils.serializer_helpers import ReturnDict
 
 from blog.models.category import BlogCategory
 from core.api.schema import generate_schema_multi_lang
+from core.api.serializers import BaseExpandSerializer
 
 
 @extend_schema_field(generate_schema_multi_lang(BlogCategory))
@@ -13,7 +14,7 @@ class TranslatedFieldsFieldExtend(TranslatedFieldsField):
     pass
 
 
-class BlogCategorySerializer(TranslatableModelSerializer):
+class BlogCategorySerializer(TranslatableModelSerializer, BaseExpandSerializer):
     children = serializers.SerializerMethodField()
     translations = TranslatedFieldsFieldExtend(shared_model=BlogCategory)
 

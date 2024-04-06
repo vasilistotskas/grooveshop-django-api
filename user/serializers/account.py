@@ -2,6 +2,7 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from blog.serializers.comment import BlogCommentSerializer
+from core.api.serializers import BaseExpandSerializer
 from order.serializers.order import OrderSerializer
 from product.serializers.favourite import ProductFavouriteSerializer
 from product.serializers.review import ProductReviewSerializer
@@ -9,7 +10,7 @@ from user.models import UserAccount
 from user.serializers.address import UserAddressSerializer
 
 
-class UserAccountDetailsSerializer(serializers.ModelSerializer):
+class UserAccountDetailsSerializer(BaseExpandSerializer):
     favourite_products = serializers.SerializerMethodField("get_favourite_products")
     orders = serializers.SerializerMethodField("get_orders")
     product_reviews = serializers.SerializerMethodField("get_product_reviews")

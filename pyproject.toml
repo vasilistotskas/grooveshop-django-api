@@ -114,6 +114,8 @@ omit = [
     "*/setup.py",
     "asgi/gunicorn_worker.py",
     "core/storages.py",
+    "wsgi/*",
+    "*/tests/*",
 ]
 source = ["*"]
 relative_files = true

@@ -3,6 +3,7 @@ from parler_rest.fields import TranslatedFieldsField
 from parler_rest.serializers import TranslatableModelSerializer
 
 from core.api.schema import generate_schema_multi_lang
+from core.api.serializers import BaseExpandSerializer
 from tip.models import Tip
 
 
@@ -11,7 +12,7 @@ class TranslatedFieldsFieldExtend(TranslatedFieldsField):
     pass
 
 
-class TipSerializer(TranslatableModelSerializer):
+class TipSerializer(TranslatableModelSerializer, BaseExpandSerializer):
     translations = TranslatedFieldsFieldExtend(shared_model=Tip)
 
     class Meta:

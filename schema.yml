@@ -1691,6 +1691,10 @@ paths:
         name: id
         schema:
           type: integer
+      - in: query
+        name: isApproved
+        schema:
+          type: boolean
       - name: ordering
         required: false
         in: query
@@ -1707,6 +1711,10 @@ paths:
         required: false
         in: query
         description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: parent
         schema:
           type: integer
       - in: query
@@ -1777,6 +1785,10 @@ paths:
         name: id
         schema:
           type: integer
+      - in: query
+        name: isApproved
+        schema:
+          type: boolean
       - name: ordering
         required: false
         in: query
@@ -1793,6 +1805,10 @@ paths:
         required: false
         in: query
         description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: parent
         schema:
           type: integer
       - in: query
@@ -2086,6 +2102,132 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/blog/comment/{id}/replies:
+    get:
+      operationId: api_v1_blog_comment_replies_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogComment'
+          description: ''
+  /api/v1/blog/comment/{id}/replies{format}:
+    get:
+      operationId: api_v1_blog_comment_replies_formatted_retrieve
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogComment'
+          description: ''
+  /api/v1/blog/comment/{id}/update_likes:
+    post:
+      operationId: api_v1_blog_comment_update_likes_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BlogComment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BlogComment'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlogComment'
+        required: true
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogComment'
+          description: ''
+  /api/v1/blog/comment/{id}/update_likes{format}:
+    post:
+      operationId: api_v1_blog_comment_update_likes_formatted_create
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BlogComment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BlogComment'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlogComment'
+        required: true
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogComment'
+          description: ''
   /api/v1/blog/comment/user_blog_comment:
     post:
       operationId: api_v1_blog_comment_user_blog_comment_create
@@ -5529,9 +5671,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/Product'
           description: ''
-  /api/v1/product/{id}/update_product_hits:
+  /api/v1/product/{id}/update_view_count:
     post:
-      operationId: api_v1_product_update_product_hits_create
+      operationId: api_v1_product_update_view_count_create
       parameters:
       - in: path
         name: id
@@ -5563,9 +5705,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/Product'
           description: ''
-  /api/v1/product/{id}/update_product_hits{format}:
+  /api/v1/product/{id}/update_view_count{format}:
     post:
-      operationId: api_v1_product_update_product_hits_formatted_create
+      operationId: api_v1_product_update_view_count_formatted_create
       parameters:
       - in: path
         name: format
@@ -11090,11 +11232,9 @@ components:
         post:
           type: integer
         children:
-          oneOf:
-          - type: object
-            additionalProperties: {}
-          - type: array
-            items: {}
+          type: array
+          items:
+            type: integer
           readOnly: true
         parent:
           type: integer
@@ -11128,7 +11268,6 @@ components:
       - createdAt
       - id
       - level
-      - likes
       - likesCount
       - post
       - repliesCount
@@ -11196,8 +11335,9 @@ components:
           type: boolean
         viewCount:
           type: integer
-          maximum: 2147483647
-          minimum: -2147483648
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
         createdAt:
           type: string
           format: date-time
@@ -13027,11 +13167,9 @@ components:
         post:
           type: integer
         children:
-          oneOf:
-          - type: object
-            additionalProperties: {}
-          - type: array
-            items: {}
+          type: array
+          items:
+            type: integer
           readOnly: true
         parent:
           type: integer
@@ -13119,8 +13257,9 @@ components:
           type: boolean
         viewCount:
           type: integer
-          maximum: 2147483647
-          minimum: -2147483648
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
         createdAt:
           type: string
           format: date-time
@@ -13707,10 +13846,11 @@ components:
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
-        hits:
+        viewCount:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         likesCount:
           type: integer
           readOnly: true
@@ -14568,10 +14708,11 @@ components:
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
-        hits:
+        viewCount:
           type: integer
-          maximum: 2147483647
+          maximum: 9223372036854775807
           minimum: 0
+          format: int64
         likesCount:
           type: integer
           readOnly: true

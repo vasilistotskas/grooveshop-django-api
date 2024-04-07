@@ -1,5 +1,4 @@
 from djmoney.contrib.django_rest_framework import MoneyField
-from rest_framework import serializers
 
 from core.api.serializers import BaseExpandSerializer
 from order.models.item import OrderItem

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-03-29 12:22+0200\n"
+"POT-Creation-Date: 2024-04-08 01:02+0300\n"
 "PO-Revision-Date: 2023-07-12 12:32+0300\n"
 "Last-Translator:   <bill@bill.gr>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -63,11 +63,11 @@ msgstr ""
 msgid "Check if TOTP is enabled for the current user"
 msgstr ""
 
-#: .\blog\admin.py:63
+#: .\blog\admin.py:65
 msgid "Related posts (for this specific category)"
 msgstr ""
 
-#: .\blog\admin.py:72
+#: .\blog\admin.py:74
 msgid "Related posts (in tree)"
 msgstr ""
 
@@ -83,11 +83,11 @@ msgstr ""
 msgid "Archived"
 msgstr ""
 
-#: .\blog\models\author.py:14 .\user\models\account.py:100
+#: .\blog\models\author.py:14 .\user\models\account.py:101
 msgid "Website"
 msgstr ""
 
-#: .\blog\models\author.py:16 .\user\models\account.py:103
+#: .\blog\models\author.py:16 .\user\models\account.py:104
 msgid "Bio"
 msgstr ""
 
@@ -99,24 +99,24 @@ msgstr ""
 msgid "Blog Authors"
 msgstr ""
 
-#: .\blog\models\category.py:44 .\blog\models\post.py:26
-#: .\product\models\image.py:28 .\slider\models.py:22 .\slider\models.py:98
+#: .\blog\models\category.py:44 .\blog\models\post.py:27
+#: .\product\models\image.py:29 .\slider\models.py:23 .\slider\models.py:102
 #: .\tests\integration\slider\test_model_slider.py:46
-#: .\user\models\account.py:91
+#: .\user\models\account.py:92
 #: .\venv\Lib\site-packages\django\db\models\fields\files.py:393
 msgid "Image"
 msgstr ""
 
-#: .\blog\models\category.py:50 .\blog\models\tag.py:23 .\country\models.py:50
-#: .\pay_way\models.py:41 .\product\models\category.py:64
-#: .\product\models\product.py:165 .\region\models.py:20 .\slider\models.py:31
-#: .\slider\models.py:104
+#: .\blog\models\category.py:50 .\blog\models\tag.py:24 .\country\models.py:50
+#: .\pay_way\models.py:42 .\product\models\category.py:64
+#: .\product\models\product.py:166 .\region\models.py:20 .\slider\models.py:32
+#: .\slider\models.py:108
 msgid "Name"
 msgstr ""
 
-#: .\blog\models\category.py:51 .\core\models.py:37
-#: .\product\models\category.py:65 .\product\models\product.py:167
-#: .\slider\models.py:35 .\slider\models.py:109
+#: .\blog\models\category.py:51 .\core\models.py:38
+#: .\product\models\category.py:65 .\product\models\product.py:168
+#: .\slider\models.py:36 .\slider\models.py:113
 msgid "Description"
 msgstr ""
 
@@ -144,78 +144,78 @@ msgstr ""
 msgid "Blog Comments"
 msgstr ""
 
-#: .\blog\models\post.py:47 .\order\models\order.py:91
-#: .\product\models\review.py:29
+#: .\blog\models\post.py:46 .\order\models\order.py:93
+#: .\product\models\review.py:30
 #: .\tests\integration\order\test_model_order_order.py:184
 msgid "Status"
 msgstr ""
 
-#: .\blog\models\post.py:52
+#: .\blog\models\post.py:51
 msgid "Featured"
 msgstr ""
 
-#: .\blog\models\post.py:53
+#: .\blog\models\post.py:52 .\product\models\product.py:133
 msgid "View Count"
 msgstr ""
 
-#: .\blog\models\post.py:55 .\notification\models\notification.py:21
-#: .\product\models\image.py:34 .\slider\models.py:33 .\slider\models.py:106
-#: .\tip\models.py:32 .\user\models\address.py:20
+#: .\blog\models\post.py:54 .\notification\models\notification.py:21
+#: .\product\models\image.py:35 .\slider\models.py:34 .\slider\models.py:110
+#: .\tip\models.py:32 .\user\models\address.py:21
 msgid "Title"
 msgstr ""
 
-#: .\blog\models\post.py:56 .\slider\models.py:107
+#: .\blog\models\post.py:55 .\slider\models.py:111
 msgid "Subtitle"
 msgstr ""
 
-#: .\blog\models\post.py:57
+#: .\blog\models\post.py:56
 msgid "Body"
 msgstr ""
 
-#: .\blog\models\post.py:61
+#: .\blog\models\post.py:60
 msgid "Blog Post"
 msgstr ""
 
-#: .\blog\models\post.py:62
+#: .\blog\models\post.py:61
 msgid "Blog Posts"
 msgstr ""
 
-#: .\blog\models\tag.py:20 .\pay_way\models.py:21
-#: .\product\models\product.py:116 .\tip\models.py:30
-#: .\user\models\account.py:93
+#: .\blog\models\tag.py:21 .\pay_way\models.py:22
+#: .\product\models\product.py:117 .\tip\models.py:30
+#: .\user\models\account.py:94
 msgid "Active"
 msgstr ""
 
-#: .\blog\models\tag.py:34
+#: .\blog\models\tag.py:35
 msgid "Blog Tag"
 msgstr ""
 
-#: .\blog\models\tag.py:35
+#: .\blog\models\tag.py:36
 msgid "Blog Tags"
 msgstr ""
 
-#: .\cart\models.py:24
+#: .\cart\models.py:25
 msgid "Last Activity"
 msgstr ""
 
-#: .\cart\models.py:27
+#: .\cart\models.py:28
 msgid "Cart"
 msgstr ""
 
-#: .\cart\models.py:28
+#: .\cart\models.py:29
 msgid "Carts"
 msgstr ""
 
-#: .\cart\models.py:83 .\order\models\item.py:25
+#: .\cart\models.py:88 .\order\models\item.py:25
 #: .\tests\integration\order\test_model_order_item.py:68
 msgid "Quantity"
 msgstr ""
 
-#: .\cart\models.py:86
+#: .\cart\models.py:91
 msgid "Cart Item"
 msgstr ""
 
-#: .\cart\models.py:87
+#: .\cart\models.py:92
 msgid "Cart Items"
 msgstr ""
 
@@ -261,87 +261,87 @@ msgstr ""
 msgid "'%(value)s' (%(type_given)s) value must be of type %(type_wanted)s."
 msgstr ""
 
-#: .\core\models.py:27
+#: .\core\models.py:28
 msgid "Site"
 msgstr ""
 
-#: .\core\models.py:29
+#: .\core\models.py:30
 msgid "Key"
 msgstr ""
 
-#: .\core\models.py:30 .\vat\models.py:12
+#: .\core\models.py:31 .\vat\models.py:13
 msgid "Value"
 msgstr ""
 
-#: .\core\models.py:32
+#: .\core\models.py:33
 msgid "Value Type"
 msgstr ""
 
-#: .\core\models.py:38
+#: .\core\models.py:39
 msgid "Is Public"
 msgstr ""
 
-#: .\core\models.py:41
+#: .\core\models.py:42
 msgid "Setting"
 msgstr ""
 
-#: .\core\models.py:42
+#: .\core\models.py:43
 msgid "Settings"
 msgstr ""
 
-#: .\core\models.py:51
+#: .\core\models.py:53
 msgid "Setting key must start with 'APP_'."
 msgstr ""
 
-#: .\core\models.py:97
+#: .\core\models.py:99
 msgid "Value is not a valid boolean."
 msgstr ""
 
-#: .\core\models.py:107
+#: .\core\models.py:109
 msgid "Value does not match String type."
 msgstr ""
 
-#: .\core\models.py:111
+#: .\core\models.py:113
 msgid "Value does not match Integer type."
 msgstr ""
 
-#: .\core\models.py:115
+#: .\core\models.py:117
 msgid "Value does not match Float type."
 msgstr ""
 
-#: .\core\models.py:119
+#: .\core\models.py:121
 msgid "Value does not match Boolean type."
 msgstr ""
 
-#: .\core\models.py:123
+#: .\core\models.py:125
 msgid "Value does not match Dictionary type."
 msgstr ""
 
-#: .\core\models.py:127
+#: .\core\models.py:129
 msgid "Value does not match List type."
 msgstr ""
 
-#: .\core\models.py:129
+#: .\core\models.py:131
 msgid "Value is not valid JSON."
 msgstr ""
 
-#: .\core\models.py:156
+#: .\core\models.py:158
 msgid "Sort Order"
 msgstr ""
 
-#: .\core\models.py:210
+#: .\core\models.py:215
 msgid "Created At"
 msgstr ""
 
-#: .\core\models.py:211
+#: .\core\models.py:216
 msgid "Updated At"
 msgstr ""
 
-#: .\core\models.py:246
+#: .\core\models.py:255
 msgid "Published At"
 msgstr ""
 
-#: .\core\models.py:247
+#: .\core\models.py:256
 msgid "Is Published"
 msgstr ""
 
@@ -1061,7 +1061,7 @@ msgstr ""
 msgid "Pending"
 msgstr ""
 
-#: .\order\models\item.py:24 .\product\models\product.py:111
+#: .\order\models\item.py:24 .\product\models\product.py:112
 #: .\tests\integration\order\test_model_order_item.py:65
 msgid "Price"
 msgstr ""
@@ -1076,103 +1076,103 @@ msgstr ""
 msgid "Order Items"
 msgstr ""
 
-#: .\order\models\item.py:42
+#: .\order\models\item.py:46
 msgid "Quantity must be greater than 0."
 msgstr ""
 
-#: .\order\models\item.py:45
+#: .\order\models\item.py:49
 msgid "The quantity exceeds the available stock."
 msgstr ""
 
-#: .\order\models\order.py:77
+#: .\order\models\order.py:79
 #: .\tests\integration\order\test_model_order_order.py:163
 msgid "Email"
 msgstr ""
 
-#: .\order\models\order.py:78
+#: .\order\models\order.py:80
 #: .\tests\integration\order\test_model_order_order.py:165
-#: .\user\models\account.py:66 .\user\models\address.py:21
+#: .\user\models\account.py:67 .\user\models\address.py:22
 msgid "First Name"
 msgstr ""
 
-#: .\order\models\order.py:79
+#: .\order\models\order.py:81
 #: .\tests\integration\order\test_model_order_order.py:168
-#: .\user\models\account.py:68 .\user\models\address.py:22
+#: .\user\models\account.py:69 .\user\models\address.py:23
 msgid "Last Name"
 msgstr ""
 
-#: .\order\models\order.py:80
+#: .\order\models\order.py:82
 #: .\tests\integration\order\test_model_order_order.py:170
-#: .\user\models\address.py:23
+#: .\user\models\address.py:24
 msgid "Street"
 msgstr ""
 
-#: .\order\models\order.py:81
+#: .\order\models\order.py:83
 #: .\tests\integration\order\test_model_order_order.py:172
-#: .\user\models\address.py:24
+#: .\user\models\address.py:25
 msgid "Street Number"
 msgstr ""
 
-#: .\order\models\order.py:82
+#: .\order\models\order.py:84
 #: .\tests\integration\order\test_model_order_order.py:174
-#: .\user\models\account.py:70 .\user\models\address.py:25
+#: .\user\models\account.py:71 .\user\models\address.py:26
 msgid "City"
 msgstr ""
 
-#: .\order\models\order.py:83
+#: .\order\models\order.py:85
 #: .\tests\integration\order\test_model_order_order.py:176
 msgid "Zipcode"
 msgstr ""
 
-#: .\order\models\order.py:84 .\user\models\account.py:73
+#: .\order\models\order.py:86 .\user\models\account.py:74
 msgid "Place"
 msgstr ""
 
-#: .\order\models\order.py:85
+#: .\order\models\order.py:87
 #: .\tests\integration\order\test_model_order_order.py:179
-#: .\user\models\account.py:69 .\user\models\address.py:57
+#: .\user\models\account.py:70 .\user\models\address.py:58
 msgid "Phone Number"
 msgstr ""
 
-#: .\order\models\order.py:87 .\user\models\address.py:58
+#: .\order\models\order.py:89 .\user\models\address.py:59
 msgid "Mobile Phone Number"
 msgstr ""
 
-#: .\order\models\order.py:89
+#: .\order\models\order.py:91
 msgid "Customer Notes"
 msgstr ""
 
-#: .\order\models\order.py:97
+#: .\order\models\order.py:99
 #: .\tests\integration\order\test_model_order_order.py:187
 msgid "Shipping Price"
 msgstr ""
 
-#: .\order\models\order.py:100
+#: .\order\models\order.py:102
 msgid "Document Type"
 msgstr ""
 
-#: .\order\models\order.py:106
+#: .\order\models\order.py:108
 #: .\tests\integration\order\test_model_order_order.py:182
 msgid "Paid Amount"
 msgstr ""
 
-#: .\order\models\order.py:116
+#: .\order\models\order.py:118
 #: .\tests\integration\order\test_model_order_order.py:191
 #: .\venv\Lib\site-packages\django\forms\formsets.py:484
 #: .\venv\Lib\site-packages\django\forms\formsets.py:491
 msgid "Order"
 msgstr ""
 
-#: .\order\models\order.py:117
+#: .\order\models\order.py:119
 #: .\tests\integration\order\test_model_order_order.py:192
 msgid "Orders"
 msgstr ""
 
-#: .\order\models\order.py:130
+#: .\order\models\order.py:152
 msgid "Invalid email address."
 msgstr ""
 
-#: .\order\models\order.py:136
+#: .\order\models\order.py:158
 msgid "Mobile phone number cannot be the same as phone number."
 msgstr ""
 
@@ -1192,23 +1192,23 @@ msgstr ""
 msgid "PayPal"
 msgstr ""
 
-#: .\pay_way\models.py:23
+#: .\pay_way\models.py:24
 msgid "Cost"
 msgstr ""
 
-#: .\pay_way\models.py:30
+#: .\pay_way\models.py:31
 msgid "Free For Order Amount"
 msgstr ""
 
-#: .\pay_way\models.py:37 .\tip\models.py:24
+#: .\pay_way\models.py:38 .\tip\models.py:24
 msgid "Icon"
 msgstr ""
 
-#: .\pay_way\models.py:50
+#: .\pay_way\models.py:51
 msgid "Pay Way"
 msgstr ""
 
-#: .\pay_way\models.py:51
+#: .\pay_way\models.py:52
 msgid "Pay Ways"
 msgstr ""
 
@@ -1295,7 +1295,7 @@ msgstr ""
 msgid "Ten"
 msgstr ""
 
-#: .\product\models\category.py:50 .\product\models\product.py:109
+#: .\product\models\category.py:50 .\product\models\product.py:110
 msgid "Slug"
 msgstr ""
 
@@ -1327,111 +1327,107 @@ msgstr ""
 msgid "Product Favourites"
 msgstr ""
 
-#: .\product\models\favourite.py:56
+#: .\product\models\favourite.py:59
 msgid "This product is already in the user's favorites."
 msgstr ""
 
-#: .\product\models\image.py:30 .\slider\models.py:25 .\slider\models.py:101
+#: .\product\models\image.py:31 .\slider\models.py:26 .\slider\models.py:105
 msgid "Thumbnail"
 msgstr ""
 
-#: .\product\models\image.py:32 .\user\models\address.py:62
+#: .\product\models\image.py:33 .\user\models\address.py:63
 msgid "Is Main"
 msgstr ""
 
-#: .\product\models\image.py:40
+#: .\product\models\image.py:41
 msgid "Product Images"
 msgstr ""
 
-#: .\product\models\image.py:41
+#: .\product\models\image.py:42
 msgid "Product Image"
 msgstr ""
 
-#: .\product\models\product.py:100
+#: .\product\models\product.py:101
 msgid "Product Code"
 msgstr ""
 
-#: .\product\models\product.py:117
+#: .\product\models\product.py:118
 msgid "Stock"
 msgstr ""
 
-#: .\product\models\product.py:119
+#: .\product\models\product.py:120
 msgid "Discount Percent"
 msgstr ""
 
-#: .\product\models\product.py:132
-msgid "Hits"
-msgstr ""
-
-#: .\product\models\product.py:134
+#: .\product\models\product.py:135
 msgid "Weight"
 msgstr ""
 
-#: .\product\models\product.py:142
+#: .\product\models\product.py:143
 msgid "Final Price"
 msgstr ""
 
-#: .\product\models\product.py:149
+#: .\product\models\product.py:150
 msgid "Discount Value"
 msgstr ""
 
-#: .\product\models\product.py:156
+#: .\product\models\product.py:157
 msgid "Price Save Percent"
 msgstr ""
 
-#: .\product\models\product.py:169
+#: .\product\models\product.py:170
 msgid "Search Document"
 msgstr ""
 
-#: .\product\models\product.py:172
+#: .\product\models\product.py:173
 msgid "Search Vector"
 msgstr ""
 
-#: .\product\models\product.py:175
+#: .\product\models\product.py:176
 msgid "Search Document Dirty"
 msgstr ""
 
-#: .\product\models\product.py:178
+#: .\product\models\product.py:179
 msgid "Search Vector Dirty"
 msgstr ""
 
-#: .\product\models\product.py:185
+#: .\product\models\product.py:186
 msgid "Product"
 msgstr ""
 
-#: .\product\models\product.py:186
+#: .\product\models\product.py:187
 msgid "Products"
 msgstr ""
 
-#: .\product\models\product.py:222
+#: .\product\models\product.py:232
 msgid "Discount percent cannot be greater than 0 if price is 0."
 msgstr ""
 
-#: .\product\models\product.py:229
+#: .\product\models\product.py:239
 msgid "Discount percent must be between 0 and 100."
 msgstr ""
 
-#: .\product\models\product.py:233
+#: .\product\models\product.py:243
 msgid "Stock cannot be negative."
 msgstr ""
 
-#: .\product\models\review.py:27
+#: .\product\models\review.py:28
 msgid "Rate"
 msgstr ""
 
-#: .\product\models\review.py:35
+#: .\product\models\review.py:36
 msgid "Comment"
 msgstr ""
 
-#: .\product\models\review.py:39
+#: .\product\models\review.py:40
 msgid "Product Review"
 msgstr ""
 
-#: .\product\models\review.py:40
+#: .\product\models\review.py:41
 msgid "Product Reviews"
 msgstr ""
 
-#: .\product\models\review.py:68
+#: .\product\models\review.py:75
 msgid "Invalid rate value."
 msgstr ""
 
@@ -1463,51 +1459,51 @@ msgstr ""
 msgid "Returns the number of active users."
 msgstr ""
 
-#: .\slider\models.py:28
+#: .\slider\models.py:29
 msgid "Video"
 msgstr ""
 
-#: .\slider\models.py:32 .\slider\models.py:105 .\tip\models.py:34
+#: .\slider\models.py:33 .\slider\models.py:109 .\tip\models.py:34
 msgid "Url"
 msgstr ""
 
-#: .\slider\models.py:40 .\tests\integration\slider\test_model_slider.py:52
+#: .\slider\models.py:41 .\tests\integration\slider\test_model_slider.py:52
 msgid "Slider"
 msgstr ""
 
-#: .\slider\models.py:41 .\tests\integration\slider\test_model_slider.py:56
+#: .\slider\models.py:42 .\tests\integration\slider\test_model_slider.py:56
 msgid "Sliders"
 msgstr ""
 
-#: .\slider\models.py:87
+#: .\slider\models.py:91
 msgid "Discount"
 msgstr ""
 
-#: .\slider\models.py:93
+#: .\slider\models.py:97
 msgid "Show Button"
 msgstr ""
 
-#: .\slider\models.py:95
+#: .\slider\models.py:99
 msgid "Date Start"
 msgstr ""
 
-#: .\slider\models.py:96
+#: .\slider\models.py:100
 msgid "Date End"
 msgstr ""
 
-#: .\slider\models.py:112
+#: .\slider\models.py:116
 msgid "Button Label"
 msgstr ""
 
-#: .\slider\models.py:117
+#: .\slider\models.py:121
 msgid "Slide"
 msgstr ""
 
-#: .\slider\models.py:118
+#: .\slider\models.py:122
 msgid "Slides"
 msgstr ""
 
-#: .\slider\models.py:132
+#: .\slider\models.py:142
 msgid "'Date Start' must be before 'Date End'."
 msgstr ""
 
@@ -1571,91 +1567,91 @@ msgstr ""
 msgid "Other"
 msgstr ""
 
-#: .\user\models\account.py:64
+#: .\user\models\account.py:65
 msgid "Email Address"
 msgstr ""
 
-#: .\user\models\account.py:71 .\user\models\address.py:26
+#: .\user\models\account.py:72 .\user\models\address.py:27
 msgid "Zip Code"
 msgstr ""
 
-#: .\user\models\account.py:72
+#: .\user\models\account.py:73
 msgid "Address"
 msgstr ""
 
-#: .\user\models\account.py:94
+#: .\user\models\account.py:95
 msgid "Staff"
 msgstr ""
 
-#: .\user\models\account.py:95
+#: .\user\models\account.py:96
 msgid "Birth Date"
 msgstr ""
 
-#: .\user\models\account.py:96
+#: .\user\models\account.py:97
 msgid "Twitter Profile"
 msgstr ""
 
-#: .\user\models\account.py:97
+#: .\user\models\account.py:98
 msgid "LinkedIn Profile"
 msgstr ""
 
-#: .\user\models\account.py:98
+#: .\user\models\account.py:99
 msgid "Facebook Profile"
 msgstr ""
 
-#: .\user\models\account.py:99
+#: .\user\models\account.py:100
 msgid "Instagram Profile"
 msgstr ""
 
-#: .\user\models\account.py:101
+#: .\user\models\account.py:102
 msgid "Youtube Profile"
 msgstr ""
 
-#: .\user\models\account.py:102
+#: .\user\models\account.py:103
 msgid "Github Profile"
 msgstr ""
 
-#: .\user\models\account.py:111
+#: .\user\models\account.py:112
 msgid "User Account"
 msgstr ""
 
-#: .\user\models\account.py:112
+#: .\user\models\account.py:113
 msgid "User Accounts"
 msgstr ""
 
-#: .\user\models\address.py:44
+#: .\user\models\address.py:45
 msgid "Floor"
 msgstr ""
 
-#: .\user\models\address.py:51
+#: .\user\models\address.py:52
 msgid "Location Type"
 msgstr ""
 
-#: .\user\models\address.py:60
+#: .\user\models\address.py:61
 msgid "Notes"
 msgstr ""
 
-#: .\user\models\address.py:65
+#: .\user\models\address.py:66
 msgid "User Address"
 msgstr ""
 
-#: .\user\models\address.py:66
+#: .\user\models\address.py:67
 msgid "User Addresses"
 msgstr ""
 
-#: .\user\models\address.py:94
+#: .\user\models\address.py:103
 msgid "There can only be one main address per user."
 msgstr ""
 
-#: .\vat\models.py:15
+#: .\vat\models.py:16
 msgid "Vat"
 msgstr ""
 
-#: .\vat\models.py:16
+#: .\vat\models.py:17
 msgid "Vats"
 msgstr ""
 
-#: .\vat\models.py:27
+#: .\vat\models.py:32
 msgid "VAT value must be between 0 and 100."
 msgstr ""
 
@@ -3174,19 +3170,19 @@ msgstr ""
 msgid "{currency!r} is not a valid currency"
 msgstr ""
 
-#: .\venv\Lib\site-packages\drf_spectacular\openapi.py:1364
-#: .\venv\Lib\site-packages\drf_spectacular\openapi.py:1417
-#: .\venv\Lib\site-packages\drf_spectacular\openapi.py:1421
-#: .\venv\Lib\site-packages\drf_spectacular\openapi.py:1425
+#: .\venv\Lib\site-packages\drf_spectacular\openapi.py:1371
+#: .\venv\Lib\site-packages\drf_spectacular\openapi.py:1424
+#: .\venv\Lib\site-packages\drf_spectacular\openapi.py:1428
+#: .\venv\Lib\site-packages\drf_spectacular\openapi.py:1432
 msgid "No response body"
 msgstr ""
 
-#: .\venv\Lib\site-packages\drf_spectacular\openapi.py:1389
-#: .\venv\Lib\site-packages\drf_spectacular\openapi.py:1441
+#: .\venv\Lib\site-packages\drf_spectacular\openapi.py:1396
+#: .\venv\Lib\site-packages\drf_spectacular\openapi.py:1450
 msgid "Unspecified response body"
 msgstr ""
 
-#: .\venv\Lib\site-packages\drf_spectacular\plumbing.py:475
+#: .\venv\Lib\site-packages\drf_spectacular\plumbing.py:484
 #, python-format
 msgid "Token-based authentication with required prefix \"%s\""
 msgstr ""

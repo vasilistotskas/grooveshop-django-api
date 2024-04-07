@@ -18,7 +18,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: 3.12.0
           cache: 'pip'
@@ -27,7 +27,7 @@ jobs:
         run: python -m pip install --upgrade pip
 
       - name: Install and configure Poetry
-        uses: abatilo/actions-poetry@v2.3.0
+        uses: abatilo/actions-poetry@v3
         with:
           poetry-version: 1.6.1
 
@@ -87,7 +87,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
@@ -123,7 +123,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Store Pull Request comment to be posted
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: steps.coverage_comment.outputs.COMMENT_FILE_WRITTEN == 'true'
         with:
           name: python-coverage-comment-action
@@ -146,7 +146,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Python 3.12.0
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: 3.12.0
           cache: 'pip'
@@ -169,12 +169,12 @@ jobs:
       - name: Build a binary wheel and a source tarball
         run: python3 -m build --sdist --wheel --outdir dist_build/
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: dist_build
           path: dist_build/
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: dist_build
           path: dist_build/

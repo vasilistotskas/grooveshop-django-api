@@ -3,7 +3,27 @@
 
 
 
+## v0.98.0 (2024-04-07)
+
+### Feature
+
+* feat: Update schema.yml, make locales and fix `Echo` in ci.yml ([`801d787`](https://github.com/vasilistotskas/grooveshop-django-api/commit/801d787e49287b6d768b8af2315e807390feb1f6))
+
+* feat: Bump github workflow ci.yml versions and poetry version bump ([`2d6ce52`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2d6ce5216902cdde8246fab21c3ab11c73fffc69))
+
+### Fix
+
+* fix: remove echo from ci.yml ([`e87f90d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e87f90d10ae06751b3133385ae3b6410835170ee))
+
+* fix: Use pipx in ci.yml ([`0776184`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0776184c8c0c07e3a0531d0c682eef5b64994396))
+
+* fix: Bump poetry version ([`2cb1741`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2cb17416c67c5a11f924b0080c0d438cf32a31ef))
+
 ## v0.97.0 (2024-04-06)
+
+### Chore
+
+* chore(release): release version 0.97.0 [skip ci] ([`dd13d44`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dd13d44442a782a09e21182ea50241e0c151f059))
 
 ### Feature
 

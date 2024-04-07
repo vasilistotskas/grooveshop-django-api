@@ -23,17 +23,16 @@ jobs:
           python-version: 3.12.0
           cache: 'pip'
 
-      - name: Install latest pip
-        run: python -m pip install --upgrade pip
-
-      - name: Install and configure Poetry
-        uses: abatilo/actions-poetry@v3
-        with:
-          poetry-version: 1.8.2
+      - name: Install pipx and Poetry
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pipx
+          pipx install poetry==1.8.2
+          echo "$(pipx bin)/poetry" >> $GITHUB_PATH  # Ensure Poetry's path is accessible
 
       - name: Configure Poetry settings
-        shell: bash
-        run: python -m poetry config virtualenvs.in-project true
+        run: |
+          poetry config virtualenvs.in-project true
 
       - name: Display Poetry version
         run: |
@@ -41,13 +40,12 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m poetry install
+          poetry install
 
       - name: Lint with flake8
         run: |
-          python -m poetry run flake8 . --exclude .venv --count --select=E9,F63,F7,F82 --show-source --statistics
-          python -m poetry run flake8 . --exclude .venv --count --exit-zero --max-complexity=31 --max-line-length=140 --statistics
-
+          poetry run flake8 . --exclude .venv --count --select=E9,F63,F7,F82 --show-source --statistics
+          poetry run flake8 . --exclude .venv --count --exit-zero --max-complexity=31 --max-line-length=140 --statistics
   testing:
     needs: quality
     runs-on: ubuntu-latest

@@ -3,6 +3,7 @@ from os import getenv
 DEBUG = getenv("DEBUG", "True") == "True"
 
 APP_BASE_URL = getenv("APP_BASE_URL", "http://localhost:8000")
+API_BASE_URL = getenv("API_BASE_URL", "http://localhost:8000")
 NUXT_BASE_URL = getenv("NUXT_BASE_URL", "http://localhost:3000")
 MEDIA_STREAM_BASE_URL = getenv("MEDIA_STREAM_BASE_URL", "http://localhost:3003")
 
@@ -18,12 +19,10 @@ CSRF_HEADER_NAME = "HTTP_X_CSRFTOKEN"
 # CSRF_TRUSTED_ORIGINS should include only the domains that are trusted to send POST requests to your application
 CSRF_TRUSTED_ORIGINS = [
     APP_BASE_URL.replace("http://", "https://"),  # Force HTTPS
+    API_BASE_URL.replace("http://", "https://"),  # Force HTTPS
     NUXT_BASE_URL.replace("http://", "https://"),  # Force HTTPS
     MEDIA_STREAM_BASE_URL.replace("http://", "https://"),  # Force HTTPS
     "https://grooveshop-static.s3.eu-north-1.amazonaws.com",
-    "https://api.grooveshop.site",
-    "https://grooveshop.site",
-    "https://assets.grooveshop.site",
     "http://backend-service:80",
     "http://frontend-nuxt-service:80",
     "http://media-stream-service:80",

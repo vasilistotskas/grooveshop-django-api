@@ -3,7 +3,17 @@
 
 
 
+## v0.99.1 (2024-04-10)
+
+### Fix
+
+* fix: update hardcoded configs ([`340bb2b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/340bb2bd35a961f4f597bb102ffc33e2d03b5726))
+
 ## v0.99.0 (2024-04-08)
+
+### Chore
+
+* chore(release): release version 0.99.0 [skip ci] ([`281d755`](https://github.com/vasilistotskas/grooveshop-django-api/commit/281d755120021e06208b014ca7a4da90f86186a9))
 
 ### Feature
 

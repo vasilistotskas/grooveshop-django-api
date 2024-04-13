@@ -85,9 +85,9 @@ class ActivateTotpAPIViewTestCase(APITestCase):
     def test_unauthenticated_user(self):
         url = reverse("mfa_totp_activate")
         response = self.client.get(url)
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 401)
         response = self.client.post(url, {"code": "123456"})
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 401)
 
     def test_authenticated_user_with_totp(self):
         self.client.login(email="testuser@example.com", password="testpassword")
@@ -139,7 +139,7 @@ class DeactivateTotpAPIViewTestCase(APITestCase):
     def test_unauthenticated_user(self):
         url = reverse("mfa_totp_deactivate")
         response = self.client.post(url)
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 401)
 
     def test_authenticated_user_without_totp(self):
         self.client.login(email="testuser@example.com", password="testpassword")
@@ -169,7 +169,7 @@ class GenerateRecoveryCodesAPIViewTestCase(APITestCase):
     def test_unauthenticated_user(self):
         url = reverse("mfa_recovery_codes_generate")
         response = self.client.post(url)
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 401)
 
     def test_authenticated_user(self):
         self.client.login(email="testuser@example.com", password="testpassword")
@@ -197,7 +197,7 @@ class ViewRecoveryCodesAPIViewTestCase(APITestCase):
     def test_unauthenticated_user(self):
         url = reverse("mfa_recovery_codes_list")
         response = self.client.get(url)
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 401)
 
     def test_authenticated_user_without_recovery_codes(self):
         self.client.login(email="testuser@example.com", password="testpassword")
@@ -231,7 +231,7 @@ class TotpActiveAPIViewTestCase(APITestCase):
     def test_unauthenticated_user(self):
         url = reverse("mfa_totp_active")
         response = self.client.get(url)
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 401)
 
     def test_authenticated_user_with_totp(self):
         self.client.login(email="testuser@example.com", password="testpassword")

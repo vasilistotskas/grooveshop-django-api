@@ -3,7 +3,21 @@
 
 
 
+## v0.101.0 (2024-04-13)
+
+### Feature
+
+* feat: New API endpoints and improvements ([`a3deae2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a3deae2d22e7cc94a9040794c787551c92c2c81c))
+
+### Fix
+
+* fix: Update test for lib update ([`b787ca1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b787ca1e276218075f368b2b79b48a11d2cbceca))
+
 ## v0.100.0 (2024-04-10)
+
+### Chore
+
+* chore(release): release version 0.100.0 [skip ci] ([`f2bf4ab`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f2bf4abd2b29a24014d3b428dc2ba269bb69364b))
 
 ### Feature
 

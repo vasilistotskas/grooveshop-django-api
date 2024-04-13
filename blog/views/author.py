@@ -20,7 +20,7 @@ class BlogAuthorViewSet(BaseModelViewSet):
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
     filterset_fields = ["id", "user"]
     ordering_fields = ["id", "user", "created_at"]
-    ordering = ["id"]
+    ordering = ["-created_at"]
     search_fields = ["id", "user"]
 
     @method_decorator(conditional_cache_page(DEFAULT_BLOG_AUTHOR_CACHE_TTL))

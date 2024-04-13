@@ -10,6 +10,8 @@ from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.decorators import api_view
+from rest_framework.decorators import permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -64,6 +66,7 @@ class AuthenticateTotpAPIView(APIView):
 
 class ActivateTotpAPIView(APIView):
     serializer_class = ActivateTOTPSerializer
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
@@ -130,6 +133,7 @@ class ActivateTotpAPIView(APIView):
 
 class DeactivateTotpAPIView(APIView):
     serializer_class = DeactivateTOTPSerializer
+    permission_classes = [IsAuthenticated]
     authenticator = None
 
     def post(self, request, *args, **kwargs):
@@ -172,6 +176,7 @@ class DeactivateTotpAPIView(APIView):
 
 class GenerateRecoveryCodesAPIView(APIView):
     serializer_class = RecoveryCodeSerializer
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
@@ -204,6 +209,7 @@ class GenerateRecoveryCodesAPIView(APIView):
 
 class ViewRecoveryCodesAPIView(APIView):
     serializer_class = RecoveryCodeSerializer
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
@@ -243,6 +249,7 @@ class ViewRecoveryCodesAPIView(APIView):
     methods=["GET"],
 )
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def totp_active(request):
     if not request.user.is_authenticated:
         return Response({"active": False}, status=status.HTTP_403_FORBIDDEN)

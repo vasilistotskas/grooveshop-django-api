@@ -14,7 +14,6 @@ TINYMCE_DEFAULT_CONFIG = {
     "images_upload_url": "/upload_image",
     "relative_urls": False,
     "remove_script_host": False,
-    "document_base_url": "http://localhost:8000/",
 }
 
 TINYMCE_COMPRESSOR = False

@@ -20,7 +20,7 @@ class VatViewSet(BaseModelViewSet):
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
     filterset_fields = ["id", "value"]
     ordering_fields = ["id", "value", "created_at"]
-    ordering = ["id"]
+    ordering = ["-created_at"]
     search_fields = ["id", "value"]
 
     @method_decorator(conditional_cache_page(DEFAULT_VAT_CACHE_TTL))

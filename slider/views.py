@@ -23,7 +23,7 @@ class SliderViewSet(BaseModelViewSet):
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
     filterset_fields = ["id"]
     ordering_fields = ["id", "created_at"]
-    ordering = ["id"]
+    ordering = ["-created_at"]
     search_fields = ["id"]
 
     @method_decorator(conditional_cache_page(DEFAULT_SLIDER_CACHE_TTL))
@@ -41,7 +41,7 @@ class SlideViewSet(BaseModelViewSet):
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
     filterset_fields = ["id", "slider"]
     ordering_fields = ["id", "slider", "created_at"]
-    ordering = ["id"]
+    ordering = ["-created_at"]
     search_fields = ["id"]
 
     @method_decorator(conditional_cache_page(DEFAULT_SLIDE_CACHE_TTL))

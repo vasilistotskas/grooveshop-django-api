@@ -21,7 +21,7 @@ class BlogTagViewSet(BaseModelViewSet):
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
     filterset_fields = ["id", "active"]
     ordering_fields = ["id", "active", "created_at"]
-    ordering = ["id"]
+    ordering = ["-created_at"]
     search_fields = ["id", "translations__name"]
 
     @method_decorator(conditional_cache_page(DEFAULT_BLOG_TAG_CACHE_TTL))

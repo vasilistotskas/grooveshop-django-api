@@ -13,14 +13,14 @@ from blog.serializers.comment import BlogCommentSerializer
 from blog.serializers.post import BlogPostSerializer
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+from core.utils.serializers import MultiSerializerMixin
 from core.utils.views import conditional_cache_page
 
 DEFAULT_BLOG_POST_CACHE_TTL = 60 * 60 * 2
 
 
-class BlogPostViewSet(BaseModelViewSet):
+class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
     queryset = BlogPost.objects.all()
-    serializer_class = BlogPostSerializer
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
     filterset_fields = ["id", "tags", "slug", "author"]
     ordering_fields = [
@@ -33,6 +33,11 @@ class BlogPostViewSet(BaseModelViewSet):
     ]
     ordering = ["-created_at"]
     search_fields = ["id", "title", "subtitle", "body"]
+
+    serializers = {
+        "default": BlogPostSerializer,
+        "comments": BlogCommentSerializer,
+    }
 
     @method_decorator(conditional_cache_page(DEFAULT_BLOG_POST_CACHE_TTL))
     def list(self, request, *args, **kwargs) -> Response:
@@ -77,31 +82,28 @@ class BlogPostViewSet(BaseModelViewSet):
         methods=["GET"],
     )
     def comments(self, request, pk=None) -> Response:
-        post = self.get_object()
-        comments_queryset = post.blog_comment_post.all()
-        pagination_param = request.query_params.get("pagination", "true").lower()
+        post: BlogPost = self.get_object()
+        queryset = post.blog_comment_post.all()
         parent_id = request.query_params.get("parent", None)
-
         if parent_id is not None:
             if parent_id.lower() == "none":
-                comments_queryset = comments_queryset.filter(parent__isnull=True)
+                queryset = queryset.filter(parent__isnull=True)
             else:
-                comments_queryset = comments_queryset.filter(parent_id=parent_id)
+                queryset = queryset.filter(parent_id=parent_id)
 
-        if pagination_param == "false":
-            serializer = BlogCommentSerializer(
-                comments_queryset, many=True, context=self.get_serializer_context()
+        return self.paginate_and_serialize(queryset, request)
+
+    @action(detail=False, methods=["POST"], permission_classes=[IsAuthenticated])
+    def liked_posts(self, request, *args, **kwargs):
+        user = request.user
+        post_ids = request.data.get("post_ids", [])
+        if not post_ids:
+            return Response(
+                {"error": "No post IDs provided."}, status=status.HTTP_400_BAD_REQUEST
             )
-            return Response(serializer.data, status=status.HTTP_200_OK)
 
-        page = self.paginate_queryset(comments_queryset)
-        if page is not None:
-            serializer = BlogCommentSerializer(
-                page, many=True, context=self.get_serializer_context()
-            )
-            return self.get_paginated_response(serializer.data)
+        liked_post_ids = BlogPost.objects.filter(
+            likes=user, id__in=post_ids
+        ).values_list("id", flat=True)
 
-        serializer = BlogCommentSerializer(
-            comments_queryset, many=True, context=self.get_serializer_context()
-        )
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(liked_post_ids, status=status.HTTP_200_OK)

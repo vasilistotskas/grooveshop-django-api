@@ -283,7 +283,6 @@ paths:
       security:
       - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '200':
           description: No response body
@@ -295,7 +294,6 @@ paths:
       security:
       - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '200':
           description: No response body
@@ -307,7 +305,6 @@ paths:
       security:
       - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '200':
           content:
@@ -334,7 +331,6 @@ paths:
       security:
       - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '200':
           content:
@@ -351,7 +347,6 @@ paths:
       security:
       - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '200':
           content:
@@ -395,7 +390,6 @@ paths:
       security:
       - basicAuth: []
       - tokenAuth: []
-      - {}
       responses:
         '200':
           description: No response body
@@ -1652,7 +1646,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BlogCategory'
+                $ref: '#/components/schemas/BlogPost'
           description: ''
   /api/v1/blog/category/{id}/posts{format}:
     get:
@@ -1681,7 +1675,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BlogCategory'
+                $ref: '#/components/schemas/BlogPost'
           description: ''
   /api/v1/blog/comment:
     get:
@@ -2102,6 +2096,57 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/blog/comment/{id}/post:
+    get:
+      operationId: api_v1_blog_comment_post_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogPost'
+          description: ''
+  /api/v1/blog/comment/{id}/post{format}:
+    get:
+      operationId: api_v1_blog_comment_post_formatted_retrieve
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogPost'
+          description: ''
   /api/v1/blog/comment/{id}/replies:
     get:
       operationId: api_v1_blog_comment_replies_retrieve
@@ -2737,7 +2782,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BlogPost'
+                $ref: '#/components/schemas/BlogComment'
           description: ''
   /api/v1/blog/post/{id}/comments{format}:
     get:
@@ -2766,7 +2811,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BlogPost'
+                $ref: '#/components/schemas/BlogComment'
           description: ''
   /api/v1/blog/post/{id}/update_likes:
     post:
@@ -5589,7 +5634,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Product'
+                $ref: '#/components/schemas/ProductImage'
           description: ''
   /api/v1/product/{id}/images{format}:
     get:
@@ -5618,7 +5663,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Product'
+                $ref: '#/components/schemas/ProductImage'
           description: ''
   /api/v1/product/{id}/reviews:
     get:
@@ -5640,7 +5685,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Product'
+                $ref: '#/components/schemas/ProductReview'
           description: ''
   /api/v1/product/{id}/reviews{format}:
     get:
@@ -5669,7 +5714,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Product'
+                $ref: '#/components/schemas/ProductReview'
           description: ''
   /api/v1/product/{id}/update_view_count:
     post:
@@ -6552,6 +6597,121 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/product/favourite/{id}/product:
+    get:
+      operationId: api_v1_product_favourite_product_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+  /api/v1/product/favourite/{id}/product{format}:
+    get:
+      operationId: api_v1_product_favourite_product_formatted_retrieve
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+  /api/v1/product/favourite/favourites_by_products:
+    post:
+      operationId: api_v1_product_favourite_favourites_by_products_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductFavourite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductFavourite'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductFavourite'
+        required: true
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductFavourite'
+          description: ''
+  /api/v1/product/favourite/favourites_by_products{format}:
+    post:
+      operationId: api_v1_product_favourite_favourites_by_products_formatted_create
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductFavourite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductFavourite'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductFavourite'
+        required: true
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductFavourite'
+          description: ''
   /api/v1/product/image:
     get:
       operationId: api_v1_product_image_list
@@ -7390,6 +7550,57 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/product/review/{id}/product:
+    get:
+      operationId: api_v1_product_review_product_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
+  /api/v1/product/review/{id}/product{format}:
+    get:
+      operationId: api_v1_product_review_product_formatted_retrieve
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+          description: ''
   /api/v1/product/review/user_product_review:
     post:
       operationId: api_v1_product_review_user_product_review_create
@@ -9767,9 +9978,9 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/user/account/{id}/details:
+  /api/v1/user/account/{id}/addresses:
     get:
-      operationId: api_v1_user_account_details_retrieve
+      operationId: api_v1_user_account_addresses_retrieve
       parameters:
       - in: path
         name: id
@@ -9786,11 +9997,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Authentication'
+                $ref: '#/components/schemas/UserAddress'
           description: ''
-  /api/v1/user/account/{id}/details{format}:
+  /api/v1/user/account/{id}/addresses{format}:
     get:
-      operationId: api_v1_user_account_details_formatted_retrieve
+      operationId: api_v1_user_account_addresses_formatted_retrieve
       parameters:
       - in: path
         name: format
@@ -9814,7 +10025,203 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Authentication'
+                $ref: '#/components/schemas/UserAddress'
+          description: ''
+  /api/v1/user/account/{id}/blog_post_comments:
+    get:
+      operationId: api_v1_user_account_blog_post_comments_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogComment'
+          description: ''
+  /api/v1/user/account/{id}/blog_post_comments{format}:
+    get:
+      operationId: api_v1_user_account_blog_post_comments_formatted_retrieve
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogComment'
+          description: ''
+  /api/v1/user/account/{id}/favourite_products:
+    get:
+      operationId: api_v1_user_account_favourite_products_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductFavourite'
+          description: ''
+  /api/v1/user/account/{id}/favourite_products{format}:
+    get:
+      operationId: api_v1_user_account_favourite_products_formatted_retrieve
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductFavourite'
+          description: ''
+  /api/v1/user/account/{id}/orders:
+    get:
+      operationId: api_v1_user_account_orders_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+          description: ''
+  /api/v1/user/account/{id}/orders{format}:
+    get:
+      operationId: api_v1_user_account_orders_formatted_retrieve
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+          description: ''
+  /api/v1/user/account/{id}/product_reviews:
+    get:
+      operationId: api_v1_user_account_product_reviews_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductReview'
+          description: ''
+  /api/v1/user/account/{id}/product_reviews{format}:
+    get:
+      operationId: api_v1_user_account_product_reviews_formatted_retrieve
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductReview'
           description: ''
   /api/v1/user/address:
     get:

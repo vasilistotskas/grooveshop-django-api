@@ -237,7 +237,7 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     # Pagination
     "DEFAULT_PAGINATION_CLASS": "core.pagination.page_number.PageNumberPaginator",
-    "PAGE_SIZE": 100,
+    "PAGE_SIZE": 52,
     # Renderers and parsers
     "DEFAULT_RENDERER_CLASSES": (
         "djangorestframework_camel_case.render.CamelCaseJSONRenderer",
@@ -251,6 +251,8 @@ REST_FRAMEWORK = {
         "djangorestframework_camel_case.parser.CamelCaseJSONParser",
         # Any other parsers
     ),
+    # Metadata
+    "DEFAULT_METADATA_CLASS": "rest_framework.metadata.SimpleMetadata",
     # Other
     "COERCE_DECIMAL_TO_STRING": False,
 }

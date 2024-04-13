@@ -81,10 +81,9 @@ class BlogCommentModelTestCase(TestCase):
             )
 
     def test_str_representation(self):
-        content_snippet = (
-            self.comment.safe_translation_getter("content", any_language=True)[:50]
-            + "..."
-        )
+        content_snippet = self.comment.safe_translation_getter(
+            "content", any_language=True
+        )[:50]
         self.assertEqual(
             str(self.comment), f"Comment by {self.user.full_name}: {content_snippet}"
         )

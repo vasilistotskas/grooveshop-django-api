@@ -6,7 +6,6 @@ from typing import TypeVar
 from django.contrib.postgres.indexes import BTreeIndex
 from django.contrib.postgres.indexes import GinIndex
 from django.contrib.sites.models import Site
-from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
@@ -20,6 +19,7 @@ from django.utils import timezone as tz
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
+from core.caches import cache_instance
 from core.enum import SettingsValueTypeEnum
 
 
@@ -54,7 +54,7 @@ class Settings(models.Model):
             )
         self.validate_value(self.value, self.value_type)
         super(Settings, self).save(*args, **kwargs)
-        cache.delete(f"{self.site.id}_{self.key}")
+        cache_instance.delete(f"{self.site.id}_{self.key}")
 
     def set_value(self, value) -> None:
         self.value = json.dumps(value, cls=DjangoJSONEncoder)
@@ -132,7 +132,7 @@ class Settings(models.Model):
 
     @classmethod
     def get_setting(cls, key: str, site_id: int, default=None) -> Any:
-        cached_value = cache.get(f"{site_id}_{key}")
+        cached_value = cache_instance.get(f"{site_id}_{key}")
         if cached_value is not None:
             return json.loads(cached_value)["value"]
 
@@ -141,7 +141,7 @@ class Settings(models.Model):
             cache_value = json.dumps(
                 {"value": setting.get_value(), "type": setting.value_type}
             )
-            cache.set(key, cache_value)
+            cache_instance.set(key, cache_value)
             return setting.get_value()
         except cls.DoesNotExist:
             return default

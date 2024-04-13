@@ -90,7 +90,7 @@ class CartItem(TimeStampMixinModel, UUIDModel):
     class Meta(TypedModelMeta):
         verbose_name = _("Cart Item")
         verbose_name_plural = _("Cart Items")
-        ordering = ["id"]
+        ordering = ["-created_at"]
         constraints = [
             models.UniqueConstraint(fields=["cart", "product"], name="unique_cart_item")
         ]

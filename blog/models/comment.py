@@ -85,10 +85,16 @@ class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel, MPTTModel):
         return f"Comment by {self.user.full_name}: {content_snippet}"
 
     def __str__(self):
-        content_snippet = (
-            self.safe_translation_getter("content", any_language=True)[:50] + "..."
+        translation_content = (
+            self.safe_translation_getter("content", any_language=True) or "No content"
         )
-        return f"Comment by {self.user.full_name if self.user else 'Anonymous'}: {content_snippet}"
+        content = (
+            f"{translation_content[:50]}..."
+            if len(translation_content) > 50
+            else translation_content
+        )
+        commenter = self.user.full_name if self.user else "Anonymous"
+        return f"Comment by {commenter}: {content}"
 
     @property
     def likes_count(self) -> int:

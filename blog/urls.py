@@ -14,6 +14,11 @@ urlpatterns = [
         name="blog-post-list",
     ),
     path(
+        "blog/post/liked_posts",
+        BlogPostViewSet.as_view({"post": "liked_posts"}),
+        name="blog-post-liked_posts",
+    ),
+    path(
         "blog/post/<int:pk>",
         BlogPostViewSet.as_view(
             {
@@ -102,6 +107,11 @@ urlpatterns = [
         name="blog-comment-user-blog-comment",
     ),
     path(
+        "blog/comment/liked_comments",
+        BlogCommentViewSet.as_view({"post": "liked_comments"}),
+        name="blog-comment-liked_comments",
+    ),
+    path(
         "blog/comment/<int:pk>/update_likes",
         BlogCommentViewSet.as_view({"post": "update_likes"}),
         name="blog-comment-update_likes",
@@ -110,6 +120,11 @@ urlpatterns = [
         "blog/comment/<int:pk>/replies",
         BlogCommentViewSet.as_view({"get": "replies"}),
         name="blog-comment-replies",
+    ),
+    path(
+        "blog/comment/<int:pk>/post",
+        BlogCommentViewSet.as_view({"get": "post"}),
+        name="blog-comment-post",
     ),
     path(
         "blog/tag",

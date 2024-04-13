@@ -23,8 +23,7 @@ class Checkout(APIView):
     queryset = Order.objects.all()
 
     def create_order(self, request: Request, serializer: CheckoutSerializer) -> None:
-        user_id = request.data.get("user_id")
-        user = User.objects.get(id=user_id) if user_id else None
+        user = request.user if request.user.is_authenticated else None
         serializer.save(user=user)
 
     def post(self, request, format=None):
@@ -44,12 +43,9 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
 
     serializers = {
         "default": OrderSerializer,
-        "list": OrderSerializer,
         "create": OrderCreateUpdateSerializer,
-        "retrieve": OrderSerializer,
         "update": OrderCreateUpdateSerializer,
         "partial_update": OrderCreateUpdateSerializer,
-        "destroy": OrderSerializer,
     }
 
     @action(detail=True, methods=["GET"])

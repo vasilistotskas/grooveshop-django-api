@@ -40,7 +40,7 @@ class UserAddressViewSet(BaseModelViewSet):
         "created_at",
         "updated_at",
     ]
-    ordering = ["-created_at"]
+    ordering = ["-is_main", "-created_at"]
     search_fields = ["id", "user", "country", "city", "street", "zipcode"]
 
     def destroy(self, request, pk=None, *args, **kwargs) -> Response:

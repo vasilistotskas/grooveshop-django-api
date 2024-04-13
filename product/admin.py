@@ -26,6 +26,7 @@ def category_update_action(category):
 @admin.register(ProductCategory)
 class CategoryAdmin(TranslatableAdmin, DraggableMPTTAdmin):
     mptt_indent_field = "translations__name"
+    list_per_page = 10
     list_display = (
         "tree_actions",
         "indented_title",

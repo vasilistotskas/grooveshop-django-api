@@ -24,6 +24,7 @@ from djmoney.models.fields import MoneyField
 from djmoney.money import Money
 from measurement.measures import Weight
 from mptt.fields import TreeForeignKey
+from parler.managers import TranslatableManager
 from parler.managers import TranslatableQuerySet
 from parler.models import TranslatableModel
 from parler.models import TranslatedFields
@@ -80,7 +81,7 @@ class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
         )
 
 
-class ProductManager(models.Manager):
+class ProductManager(TranslatableManager):
     def get_queryset(self) -> ProductQuerySet:
         return ProductQuerySet(self.model, using=self._db).exclude(is_deleted=True)
 

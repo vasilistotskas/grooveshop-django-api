@@ -9,13 +9,14 @@ from rest_framework.response import Response
 
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+from core.utils.serializers import MultiSerializerMixin
 from product.models.review import ProductReview
+from product.serializers.product import ProductSerializer
 from product.serializers.review import ProductReviewSerializer
 
 
-class ProductReviewViewSet(BaseModelViewSet):
+class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
     queryset = ProductReview.objects.all()
-    serializer_class = ProductReviewSerializer
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
     filterset_fields = ["id", "user_id", "product_id", "status"]
     ordering_fields = [
@@ -24,12 +25,17 @@ class ProductReviewViewSet(BaseModelViewSet):
         "product_id",
         "created_at",
     ]
-    ordering = ["id"]
+    ordering = ["-created_at"]
     search_fields = [
         "id",
         "user_id",
         "product_id",
     ]
+
+    serializers = {
+        "default": ProductReviewSerializer,
+        "product": ProductSerializer,
+    }
 
     def get_permissions(self):
         if self.action in [
@@ -44,8 +50,14 @@ class ProductReviewViewSet(BaseModelViewSet):
 
     @action(detail=False, methods=["POST"])
     def user_product_review(self, request, *args, **kwargs) -> Response:
-        user_id = request.data.get("user")
+        if not request.user.is_authenticated:
+            return Response(
+                {"detail": "User is not authenticated"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
         product_id = request.data.get("product")
+        user_id = request.user.id
 
         if not user_id or not product_id:
             return Response(
@@ -69,3 +81,11 @@ class ProductReviewViewSet(BaseModelViewSet):
                 {"detail": "Invalid data"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+    @action(detail=True, methods=["GET"])
+    def product(self, request, *args, **kwargs) -> Response:
+        product_review = self.get_object()
+        serializer = self.get_serializer(
+            product_review.product, context=self.get_serializer_context()
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)

@@ -8,6 +8,7 @@ from rest_framework.response import Response
 
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+from core.utils.serializers import MultiSerializerMixin
 from product.filters.product import ProductFilter
 from product.models.product import Product
 from product.serializers.image import ProductImageSerializer
@@ -15,9 +16,8 @@ from product.serializers.product import ProductSerializer
 from product.serializers.review import ProductReviewSerializer
 
 
-class ProductViewSet(BaseModelViewSet):
+class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
     queryset = Product.objects.all()
-    serializer_class = ProductSerializer
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
     filterset_class = ProductFilter
     ordering_fields = [
@@ -31,6 +31,12 @@ class ProductViewSet(BaseModelViewSet):
     ]
     ordering = ["-created_at"]
     search_fields = ["id"]
+
+    serializers = {
+        "default": ProductSerializer,
+        "reviews": ProductReviewSerializer,
+        "images": ProductImageSerializer,
+    }
 
     @action(
         detail=True,
@@ -50,7 +56,7 @@ class ProductViewSet(BaseModelViewSet):
     def reviews(self, request, pk=None) -> Response:
         product = self.get_object()
         reviews = product.reviews.all()
-        serializer = ProductReviewSerializer(
+        serializer = self.get_serializer(
             reviews, many=True, context=self.get_serializer_context()
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -62,7 +68,7 @@ class ProductViewSet(BaseModelViewSet):
     def images(self, request, pk=None) -> Response:
         product = self.get_object()
         images = product.product_images.all()
-        serializer = ProductImageSerializer(
+        serializer = self.get_serializer(
             images, many=True, context=self.get_serializer_context()
         )
         return Response(serializer.data, status=status.HTTP_200_OK)

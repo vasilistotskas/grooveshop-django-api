@@ -23,7 +23,7 @@ class ProductCategoryViewSet(BaseModelViewSet):
         "id",
         "created_at",
     ]
-    ordering = ["id"]
+    ordering = ["-created_at"]
     search_fields = ["id"]
 
     @method_decorator(conditional_cache_page(DEFAULT_PRODUCT_CATEGORY_CACHE_TTL))

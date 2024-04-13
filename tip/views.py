@@ -20,7 +20,7 @@ class TipViewSet(BaseModelViewSet):
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
     filterset_fields = ["id", "kind", "active"]
     ordering_fields = ["id", "kind", "active", "created_at"]
-    ordering = ["id"]
+    ordering = ["-created_at"]
     search_fields = ["id", "translations__title"]
 
     @method_decorator(conditional_cache_page(DEFAULT_TIP_CACHE_TTL))

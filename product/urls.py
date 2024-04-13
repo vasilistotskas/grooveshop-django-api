@@ -66,6 +66,11 @@ urlpatterns = [
         name="product-favourite-list",
     ),
     path(
+        "product/favourite/favourites_by_products",
+        ProductFavouriteViewSet.as_view({"post": "favourites_by_products"}),
+        name="product-favourite-favourites-by-products",
+    ),
+    path(
         "product/favourite/<str:pk>",
         ProductFavouriteViewSet.as_view(
             {
@@ -76,6 +81,11 @@ urlpatterns = [
             }
         ),
         name="product-favourite-detail",
+    ),
+    path(
+        "product/favourite/<str:pk>/product",
+        ProductFavouriteViewSet.as_view({"get": "product"}),
+        name="product-favourite-product",
     ),
     # Review
     path(
@@ -99,6 +109,11 @@ urlpatterns = [
         "product/review/user_product_review",
         ProductReviewViewSet.as_view({"post": "user_product_review"}),
         name="product-review-user-product-review",
+    ),
+    path(
+        "product/review/<str:pk>/product",
+        ProductReviewViewSet.as_view({"get": "product"}),
+        name="product-review-product",
     ),
     # Images
     path(

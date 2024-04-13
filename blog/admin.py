@@ -30,6 +30,7 @@ class BlogTagAdmin(TranslatableAdmin):
 @admin.register(BlogCategory)
 class BlogCategoryAdmin(TranslatableAdmin, DraggableMPTTAdmin):
     mptt_indent_field = "translations__name"
+    list_per_page = 10
     list_display = (
         "id",
         "sort_order",
@@ -118,6 +119,7 @@ class BlogPostAdmin(TranslatableAdmin):
 @admin.register(BlogComment)
 class BlogCommentAdmin(TranslatableAdmin, DraggableMPTTAdmin):
     mptt_indent_field = "user"
+    list_per_page = 10
     list_display = (
         "tree_actions",
         "indented_title",

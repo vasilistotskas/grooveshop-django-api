@@ -3,7 +3,17 @@
 
 
 
+## v0.102.1 (2024-04-15)
+
+### Fix
+
+* fix: hide some urls in production ([`ed2628a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ed2628a9f3048c3a3eadc6fda7f6a4e2037fd98c))
+
 ## v0.102.0 (2024-04-15)
+
+### Chore
+
+* chore(release): release version 0.102.0 [skip ci] ([`069285b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/069285b35be6f35e1e3cf123d802b281310e0cb7))
 
 ### Feature
 

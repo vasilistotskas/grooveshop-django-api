@@ -36,7 +36,6 @@ admin_site_otp.register(TOTPDevice, TOTPDeviceAdmin)
 urlpatterns = i18n_patterns(
     path("__reload__/", include("django_browser_reload.urls")),
     path("", HomeView.as_view(), name="home"),
-    path("auth/", include("authentication.urls.auth")),
     path(_("admin/"), admin_site_otp.urls),
     path(_("admin_no_otp/"), admin.site.urls),
     path("accounts/", include("allauth.mfa.urls")),
@@ -102,5 +101,9 @@ if bool(settings.DEBUG) or settings.SYSTEM_ENV in ["dev", "ci", "docker"]:
         settings.MEDIA_URL,
         document_root=settings.MEDIA_ROOT,
     )
+
+    urlpatterns += [
+        path("auth/", include("authentication.urls.auth")),
+    ]
 
     urlpatterns += staticfiles_urlpatterns()

@@ -3,7 +3,21 @@
 
 
 
+## v0.103.0 (2024-04-16)
+
+### Feature
+
+* feat: Hardcoded values from env ([`39dfbb2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/39dfbb249a46f68ea14a3d25393df5ca498e03d2))
+
+### Fix
+
+* fix: remove useless stuff and bump `dj-rest-auth` version ([`26639a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/26639a10e59098c57b1ff9178188f06b1ff09aff))
+
 ## v0.102.1 (2024-04-15)
+
+### Chore
+
+* chore(release): release version 0.102.1 [skip ci] ([`c067d11`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c067d1145a27e5b21e7fd870f641736ac0298881))
 
 ### Fix
 

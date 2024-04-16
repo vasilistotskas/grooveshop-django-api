@@ -112,78 +112,7 @@
   <body role="document">
     <div class="bg-black text-white grid items-center justify-items-center">
       <div class="container mx-auto flex gap-4">
-        <ul class="flex justify-end space-x-4 py-4">
-          <li class="relative group">
-            <ul class="absolute left-0 hidden bg-white text-black group-hover:block
-            py-2 rounded shadow-lg" id="menu" role="menu" aria-labelledby="button" tabindex="-1">
-              <!-- these pages don't require user token -->
-              <li>
-                <a href="{% url 'signup' %}" class="block px-4 py-2 hover:bg-gray-100
-                text-xs">
-                  Signup
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'email-verification' %}" class="block px-4 py-2
-                hover:bg-gray-100 text-xs">
-                  E-mail verification
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'resend-email-verification' %}" class="block px-4 py-2
-                hover:bg-gray-100 text-xs">
-                  Resend E-mail verification
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'login' %}" class="block px-4 py-2 hover:bg-gray-100
-                text-xs">
-                  Login
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'password-reset' %}" class="block px-4 py-2
-                hover:bg-gray-100 text-xs">
-                  Password Reset
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'password-reset-confirm' %}" class="block px-4 py-2
-                hover:bg-gray-100 text-xs">
-                  Password Reset Confirm
-                </a>
-              </li>
-              <li class="border-t mt-2"></li>
-              <!-- these pages require user token -->
-              <li>
-                <a href="{% url 'user-details' %}" class="block px-4 py-2
-                hover:bg-gray-100 text-xs">
-                  User details
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'logout' %}" class="block px-4 py-2 hover:bg-gray-100
-                text-xs">
-                  Logout
-                </a>
-              </li>
-              <li>
-                <a href="{% url 'password-change' %}" class="block px-4 py-2
-                hover:bg-gray-100 text-xs">
-                Password change
-                </a>
-              </li>
-            </ul>
-          </li>
-        </ul>
-
         <div class="flex items-center justify-between py-4">
-          <button type="button" class="block text-white focus:outline-none">
-            <span class="sr-only">Toggle navigation</span>
-            <span class="icon-bar"></span>
-            <span class="icon-bar"></span>
-            <span class="icon-bar"></span>
-          </button>
           <a class="text-white text-2xl font-bold" href="/">{{ app_title }}</a>
         </div>
 

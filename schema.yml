@@ -2273,6 +2273,70 @@ paths:
               schema:
                 $ref: '#/components/schemas/BlogComment'
           description: ''
+  /api/v1/blog/comment/liked_comments:
+    post:
+      operationId: api_v1_blog_comment_liked_comments_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BlogComment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BlogComment'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlogComment'
+        required: true
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogComment'
+          description: ''
+  /api/v1/blog/comment/liked_comments{format}:
+    post:
+      operationId: api_v1_blog_comment_liked_comments_formatted_create
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BlogComment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BlogComment'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlogComment'
+        required: true
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogComment'
+          description: ''
   /api/v1/blog/comment/user_blog_comment:
     post:
       operationId: api_v1_blog_comment_user_blog_comment_create
@@ -2937,6 +3001,70 @@ paths:
         name: id
         schema:
           type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BlogPost'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BlogPost'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlogPost'
+        required: true
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogPost'
+          description: ''
+  /api/v1/blog/post/liked_posts:
+    post:
+      operationId: api_v1_blog_post_liked_posts_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BlogPost'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BlogPost'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlogPost'
+        required: true
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogPost'
+          description: ''
+  /api/v1/blog/post/liked_posts{format}:
+    post:
+      operationId: api_v1_blog_post_liked_posts_formatted_create
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
         required: true
       tags:
       - api

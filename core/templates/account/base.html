@@ -87,9 +87,9 @@
 			rel="manifest"
 		/>
 
-    <meta name="description" content="grooveShop Auth" />
-    <meta name="keywords" content="auth" />
-    <meta name="author" content="vasilistotskas" />
+    <meta name="description" content="{{ SITE_DESCRIPTION }}" />
+    <meta name="keywords" content="{{ SITE_KEYWORDS }}" />
+    <meta name="author" content="{{ SITE_AUTHOR }}" />
 
     <title>{% block head_title %}{% endblock %}</title>
     {% block extra_head %}
@@ -175,22 +175,6 @@
     {% endif %}
 
     <div class="h-full bg-zinc-900 relative">
-      <nav class="menu fixed z-50 grid items-center justify-center px-4 pt-4 pb-4 backdrop-opacity-10 backdrop-invert bg-primary/95 w-full">
-        <div class="grid items-center w-full relative max-w-5xl text-gray-100">
-          <ul class="grid grid-cols-4 gap-10">
-            {% if user.is_authenticated %}
-              <li class="text-lg font-semibold"><a class="font-medium text-gray-300 hover:underline text-primary-500" href="{% url 'account_email' %}">Change E-mail</a></li>
-                <li class="text-lg font-semibold"><a class="font-medium text-gray-300 hover:underline text-primary-500" href="{% url 'account_change_password' %}">Change Password</a></li>
-              <li class="text-lg font-semibold"><a class="font-medium text-gray-300 hover:underline text-primary-500" href="{% url 'mfa_index' %}">Two Factor Authentication</a></li>
-              <li class="text-lg font-semibold"><a class="font-medium text-gray-300 hover:underline text-primary-500" href="{% url 'account_logout' %}">Sign Out</a></li>
-            {% else %}
-              <li class="text-lg font-semibold"><a class="font-medium text-gray-300 hover:underline text-primary-500" href="{% url 'account_login' %}">Sign In</a></li>
-              <li class="text-lg font-semibold"><a class="font-medium text-gray-300 hover:underline text-primary-500" href="{% url 'account_signup' %}">Sign Up</a></li>
-              <li class="text-lg font-semibold"><a class="font-medium text-gray-300 hover:underline text-primary-500" href="{% url 'account_reset_password' %}">Reset Password</a></li>
-            {% endif %}
-          </ul>
-        </div>
-      </nav>
       <div class="grid h-full min-h-screen max-w-screen-xl mx-auto text-gray-400">
         <section class="h-auto grid grid-rows-auto-1fr items-center mt-60px mb-60px">
           {% block content %}

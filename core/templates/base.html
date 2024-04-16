@@ -11,9 +11,9 @@
 		/>
 		<meta content="width=device-width,initial-scale=1.0" name="viewport" />
 		<meta name="theme-color" content="#ffffff" />
-    <meta name="description" content="grooveShop Home Page" />
-    <meta name="keywords" content="grooveShop, shop" />
-    <meta name="author" content="vasilistotskas" />
+    <meta name="description" content="{{ SITE_DESCRIPTION }}" />
+    <meta name="keywords" content="{{ SITE_KEYWORDS }}" />
+    <meta name="author" content="{{ SITE_AUTHOR }}" />
 
     <link
 			href="{% static 'favicon/apple-icon-57x57.png' %}"
@@ -91,7 +91,7 @@
 		/>
 
     <link rel="stylesheet" href="{% static 'css/styles.css' %}">
-    <title>{{ app_title }}</title>
+    <title>{{ APP_TITLE }}</title>
 
     <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
     <!--[if lt IE 9]>
@@ -113,7 +113,7 @@
     <div class="bg-black text-white grid items-center justify-items-center">
       <div class="container mx-auto flex gap-4">
         <div class="flex items-center justify-between py-4">
-          <a class="text-white text-2xl font-bold" href="/">{{ app_title }}</a>
+          <a class="text-white text-2xl font-bold" href="/">{{ APP_TITLE }}</a>
         </div>
 
         <div class="hidden md:flex md:items-center md:justify-between md:py-4">

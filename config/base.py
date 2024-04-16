@@ -158,6 +158,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "core.context_processors.metadata",
             ],
         },
     },
@@ -182,7 +183,6 @@ USE_I18N = getenv("USE_I18N", "True") == "True"
 USE_TZ = getenv("USE_TZ", "True") == "True"
 
 # Site info
-SITE_NAME = getenv("SITE_NAME", "Django")
 SITE_ID = int(getenv("SITE_ID", 1))
 
 LANGUAGES = [

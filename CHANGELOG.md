@@ -3,7 +3,17 @@
 
 
 
+## v0.104.1 (2024-04-17)
+
+### Fix
+
+* fix: Remove useless validators from models ([`bb36840`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bb3684017eeea109c96f1fc87c480c611d26e055))
+
 ## v0.104.0 (2024-04-17)
+
+### Chore
+
+* chore(release): release version 0.104.0 [skip ci] ([`e207320`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e207320c415a00b33689c985bb21086afe6077f1))
 
 ### Feature
 

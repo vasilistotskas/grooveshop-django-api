@@ -1,4 +1,3 @@
-from django.core.validators import MinLengthValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -61,7 +60,6 @@ class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel, MPTTModel):
             max_length=1000,
             blank=True,
             null=True,
-            validators=[MinLengthValidator(1)],
         )
     )
 

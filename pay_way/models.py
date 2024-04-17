@@ -2,7 +2,6 @@ import os
 
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
-from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models.query import QuerySet
 from django.utils.translation import gettext_lazy as _
@@ -25,14 +24,12 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         max_digits=11,
         decimal_places=2,
         default=0,
-        validators=[MinValueValidator(0)],
     )
     free_for_order_amount = MoneyField(
         _("Free For Order Amount"),
         max_digits=11,
         decimal_places=2,
         default=0,
-        validators=[MinValueValidator(0)],
     )
     icon = models.ImageField(
         _("Icon"), upload_to="uploads/pay_way/", blank=True, null=True

@@ -8,8 +8,6 @@ from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
 from django.contrib.postgres.search import SearchVectorField
 from django.core.exceptions import ValidationError
-from django.core.validators import MaxValueValidator
-from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import Avg
 from django.db.models import F
@@ -121,8 +119,7 @@ class Product(
         _("Discount Percent"),
         max_digits=11,
         decimal_places=2,
-        default=0.0,
-        validators=[MinValueValidator(0.0), MaxValueValidator(100.0)],
+        default=Decimal(0.0),
     )
     vat = models.ForeignKey(
         "vat.Vat",
@@ -158,7 +155,7 @@ class Product(
         _("Price Save Percent"),
         max_digits=11,
         decimal_places=2,
-        default=0.0,
+        default=Decimal(0.0),
         editable=False,
     )
 

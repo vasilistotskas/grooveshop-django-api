@@ -3,7 +3,17 @@
 
 
 
+## v0.106.0 (2024-04-20)
+
+### Feature
+
+* feat: Task improvements new API endpoint `liked_blog_posts` and favicons replaced ([`7738aa1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7738aa105bef036439a2343f8f77134c17b55175))
+
 ## v0.105.0 (2024-04-18)
+
+### Chore
+
+* chore(release): release version 0.105.0 [skip ci] ([`28470cc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/28470ccc6bad4782e3e37c2265b6c10b0e4b3899))
 
 ### Feature
 

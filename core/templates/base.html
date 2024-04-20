@@ -233,13 +233,19 @@
           const submitButtons = document.querySelectorAll('form.ajax-post button[type=submit]');
           const menu = document.getElementById('menu');
 
-          menu.addEventListener('mouseleave', function() {
-              menu.classList.add('hidden');
-          });
+          if (menu) {
+            menu.addEventListener('mouseleave', function() {
+                menu.classList.add('hidden');
+            });
 
-          menu.addEventListener('mouseenter', function() {
+            menu.addEventListener('mouseenter', function() {
               menu.classList.remove('hidden');
-          });
+            });
+          }
+
+          if (!submitButtons) {
+            return;
+          }
 
           submitButtons.forEach(function(button) {
               button.addEventListener('click', function(event) {

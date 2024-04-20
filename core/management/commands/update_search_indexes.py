@@ -9,5 +9,5 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.stdout.write("Updating products")
-        update_product_translation_search_vectors.delay()
-        update_product_translation_search_documents.delay()
+        update_product_translation_search_vectors.delay_on_commit()
+        update_product_translation_search_documents.delay_on_commit()

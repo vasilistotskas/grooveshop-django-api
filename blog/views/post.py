@@ -26,7 +26,6 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
     ordering_fields = [
         "id",
         "title",
-        "slug",
         "created_at",
         "updated_at",
         "published_at",

@@ -7,7 +7,6 @@ import time
 from datetime import datetime
 from datetime import timedelta
 
-from celery import shared_task
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -29,7 +28,7 @@ logger = logging.getLogger("celery")
 languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 
 
-@shared_task(bind=True, name="Clear Expired Sessions Task")
+@celery_app.task
 def clear_expired_sessions_task(self):
     try:
         management.call_command("clearsessions", verbosity=0)
@@ -38,7 +37,7 @@ def clear_expired_sessions_task(self):
         return f"error: {e}"
 
 
-@shared_task(bind=True, name="Clear All Cache Task")
+@celery_app.task
 def clear_all_cache_task(self):
     try:
         management.call_command("clear_cache", verbosity=0)
@@ -47,7 +46,7 @@ def clear_all_cache_task(self):
         return f"error: {e}"
 
 
-@shared_task(bind=True, name="Clear Carts For None Users Task")
+@celery_app.task
 def clear_carts_for_none_users_task(self):
     from cart.models import Cart
 
@@ -62,7 +61,7 @@ def clear_carts_for_none_users_task(self):
         return message
 
 
-@shared_task(bind=True, name="Cleanup Log Files Task")
+@celery_app.task
 def cleanup_log_files_task(self, days=30):
     from django.conf import settings
     from os import path, remove, listdir
@@ -84,7 +83,7 @@ def cleanup_log_files_task(self, days=30):
     return message
 
 
-@shared_task(bind=True, name="Clear Blacklisted expired tokens Task")
+@celery_app.task
 def clear_blacklisted_tokens_task(self):
     try:
         management.call_command("flushexpiredtokens", verbosity=0)

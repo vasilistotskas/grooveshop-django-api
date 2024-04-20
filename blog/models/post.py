@@ -27,7 +27,7 @@ class BlogPost(
         _("Image"), upload_to="uploads/blog/", blank=True, null=True
     )
     likes = models.ManyToManyField(
-        "user.UserAccount", related_name="blog_post_likes", blank=True
+        "user.UserAccount", related_name="liked_blog_posts", blank=True
     )
     category = models.ForeignKey(
         "blog.BlogCategory",

@@ -47,6 +47,11 @@ urlpatterns = [
         UserAccountViewSet.as_view({"get": "blog_post_comments"}),
         name="user-account-blog-post-comments",
     ),
+    path(
+        "user/account/<int:pk>/liked_blog_posts",
+        UserAccountViewSet.as_view({"get": "liked_blog_posts"}),
+        name="user-account-liked-blog-posts",
+    ),
     # Address
     path(
         "user/address",

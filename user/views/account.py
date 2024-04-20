@@ -11,6 +11,7 @@ from rest_framework.permissions import IsAuthenticated
 
 from authentication.serializers import AuthenticationSerializer
 from blog.serializers.comment import BlogCommentSerializer
+from blog.serializers.post import BlogPostSerializer
 from core.api.permissions import IsStaffOrOwner
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
@@ -42,6 +43,7 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         "product_reviews": ProductReviewSerializer,
         "addresses": UserAddressSerializer,
         "blog_post_comments": BlogCommentSerializer,
+        "liked_blog_posts": BlogPostSerializer,
     }
 
     def get_queryset(self):
@@ -66,6 +68,10 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
                 queryset = get_object_or_404(
                     User, id=self.kwargs["pk"]
                 ).blog_comment_user.all()
+            case "liked_blog_posts":
+                queryset = get_object_or_404(
+                    User, id=self.kwargs["pk"]
+                ).liked_blog_posts.all()
             case _:
                 queryset = (
                     User.objects.all()
@@ -151,5 +157,20 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         self.ordering_fields = ["id", "post", "created_at"]
         self.ordering = ["-created_at"]
         self.search_fields = ["id", "post"]
+        queryset = self.filter_queryset(self.get_queryset())
+        return self.paginate_and_serialize(queryset, request)
+
+    @action(detail=True, methods=["GET"])
+    def liked_blog_posts(self, request, pk=None):
+        self.filterset_fields = ["id", "tags", "slug", "author"]
+        self.ordering_fields = [
+            "id",
+            "title",
+            "created_at",
+            "updated_at",
+            "published_at",
+        ]
+        self.ordering = ["-created_at"]
+        self.search_fields = ["id", "title", "subtitle", "body"]
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)

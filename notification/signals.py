@@ -11,7 +11,7 @@ def handle_notification_created(sender, instance: NotificationUser, **kwargs):
         "language_code", "message"
     )
 
-    send_notification_task.delay(
+    send_notification_task.delay_on_commit(
         user=int(instance.user.id),
         seen=instance.seen,
         link=instance.notification.link,

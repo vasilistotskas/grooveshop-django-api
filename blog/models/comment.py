@@ -35,7 +35,7 @@ class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel, MPTTModel):
     id = models.BigAutoField(primary_key=True)
     is_approved = models.BooleanField(_("Is Approved"), default=False)
     likes = models.ManyToManyField(
-        "user.UserAccount", related_name="blog_comment_likes", blank=True
+        "user.UserAccount", related_name="liked_comments", blank=True
     )
     user = models.ForeignKey(
         "user.UserAccount",

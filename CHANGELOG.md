@@ -3,7 +3,17 @@
 
 
 
+## v0.107.0 (2024-04-21)
+
+### Feature
+
+* feat: Add cache disable from env options ([`b26b7c6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b26b7c6397eb566086cc67edbba957f6438da3e0))
+
 ## v0.106.1 (2024-04-20)
+
+### Chore
+
+* chore(release): release version 0.106.1 [skip ci] ([`bd7f41f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bd7f41f967d000ac38dba718151baa8803388c86))
 
 ### Fix
 

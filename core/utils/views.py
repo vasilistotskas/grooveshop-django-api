@@ -31,7 +31,7 @@ class TranslationsProcessingMixin:
 
 
 def conditional_cache_page(*args, **kwargs):
-    if "test" in sys.argv or settings.DEBUG:
+    if "test" in sys.argv or settings.DEBUG or settings.CACHE_DISABLED:
 
         def decorator(func):
             return func

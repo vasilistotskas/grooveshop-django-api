@@ -4,6 +4,7 @@ SYSTEM_ENV = getenv("SYSTEM_ENV", "dev")
 REDIS_HOST = getenv("REDIS_HOST", "localhost")
 REDIS_PORT = getenv("REDIS_PORT", "6379")
 REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
+CACHE_DISABLED = getenv("DISABLE_CACHE", "False").lower() == "true"
 
 CACHES = {
     "default": {

@@ -3,7 +3,21 @@
 
 
 
+## v0.108.0 (2024-04-22)
+
+### Feature
+
+* feat: Default lang `el` by default ([`e492900`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e4929006cf0ef7626fc27ec27813c5ebd5c6153b))
+
+### Fix
+
+* fix: Remove useless model verbose name tests ([`7cae556`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7cae55669481245413339039c9404a5bb7d0c55d))
+
 ## v0.107.0 (2024-04-21)
+
+### Chore
+
+* chore(release): release version 0.107.0 [skip ci] ([`afd1400`](https://github.com/vasilistotskas/grooveshop-django-api/commit/afd14007092ab901520778db02f2b8f0372dbb6a))
 
 ### Feature
 

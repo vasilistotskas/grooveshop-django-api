@@ -177,7 +177,7 @@ WSGI_APPLICATION = "wsgi.application"
 AUTH_USER_MODEL = "user.UserAccount"
 
 # Internationalization
-LANGUAGE_CODE = getenv("LANGUAGE_CODE", "en")
+LANGUAGE_CODE = getenv("LANGUAGE_CODE", "el")
 TIME_ZONE = getenv("TIME_ZONE", "Europe/Athens")
 USE_I18N = getenv("USE_I18N", "True") == "True"
 USE_TZ = getenv("USE_TZ", "True") == "True"
@@ -186,9 +186,9 @@ USE_TZ = getenv("USE_TZ", "True") == "True"
 SITE_ID = int(getenv("SITE_ID", 1))
 
 LANGUAGES = [
+    ("el", _("Greek")),
     ("en", _("English")),
     ("de", _("German")),
-    ("el", _("Greek")),
 ]
 
 # Default primary key field type

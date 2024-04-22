@@ -2,9 +2,13 @@ from os import getenv
 
 SITE_ID = int(getenv("SITE_ID", 1))
 
-PARLER_DEFAULT_LANGUAGE_CODE = "en"
+PARLER_DEFAULT_LANGUAGE_CODE = "el"
 PARLER_LANGUAGES = {
     SITE_ID: (
+        {
+            "code": "el",
+            "name": "greek",
+        },
         {
             "code": "en",
             "name": "english",
@@ -12,10 +16,6 @@ PARLER_LANGUAGES = {
         {
             "code": "de",
             "name": "german",
-        },
-        {
-            "code": "el",
-            "name": "greek",
         },
     ),
     "default": {

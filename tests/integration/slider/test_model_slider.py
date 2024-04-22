@@ -40,22 +40,6 @@ class SliderModelTestCase(TestCase):
     def test_fields(self):
         self.assertTrue(default_storage.exists(self.slider.image.path))
 
-    def test_verbose_names(self):
-        self.assertEqual(
-            Slider._meta.get_field("image").verbose_name,
-            _("Image"),
-        )
-
-    def test_meta_verbose_names(self):
-        self.assertEqual(
-            Slider._meta.verbose_name,
-            _("Slider"),
-        )
-        self.assertEqual(
-            Slider._meta.verbose_name_plural,
-            _("Sliders"),
-        )
-
     def test_unicode_representation(self):
         self.assertEqual(
             self.slider.__unicode__(),

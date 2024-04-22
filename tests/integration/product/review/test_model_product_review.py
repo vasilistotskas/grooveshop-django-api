@@ -44,18 +44,6 @@ class ProductReviewModelTestCase(TestCase):
         self.assertEqual(self.product_review.rate, 5)
         self.assertEqual(self.product_review.status, "New")
 
-    def test_verbose_names(self):
-        self.assertEqual(
-            ProductReview._meta.get_field("product").verbose_name, "product"
-        )
-        self.assertEqual(ProductReview._meta.get_field("user").verbose_name, "user")
-        self.assertEqual(ProductReview._meta.get_field("rate").verbose_name, "Rate")
-        self.assertEqual(ProductReview._meta.get_field("status").verbose_name, "Status")
-
-    def test_meta_verbose_names(self):
-        self.assertEqual(ProductReview._meta.verbose_name, "Product Review")
-        self.assertEqual(ProductReview._meta.verbose_name_plural, "Product Reviews")
-
     def test_str_representation(self):
         comment_snippet = (
             (

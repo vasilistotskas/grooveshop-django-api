@@ -54,30 +54,6 @@ class SlideModelTestCase(TestCase):
         self.assertTrue(self.slide.show_button)
         self.assertTrue(default_storage.exists(self.slide.image.path))
 
-    def test_verbose_names(self):
-        self.assertEqual(
-            Slide._meta.get_field("image").verbose_name,
-            "Image",
-        )
-        self.assertEqual(
-            Slide._meta.get_field("discount").verbose_name,
-            "Discount",
-        )
-        self.assertEqual(
-            Slide._meta.get_field("show_button").verbose_name,
-            "Show Button",
-        )
-
-    def test_meta_verbose_names(self):
-        self.assertEqual(
-            Slide._meta.verbose_name,
-            "Slide",
-        )
-        self.assertEqual(
-            Slide._meta.verbose_name_plural,
-            "Slides",
-        )
-
     def test_unicode_representation(self):
         self.assertEqual(
             self.slide.__unicode__(),

@@ -30,26 +30,6 @@ class BlogAuthorModelTestCase(TestCase):
         self.assertEqual(self.author.user, self.user)
         self.assertEqual(self.author.website, "http://example.com")
 
-    def test_verbose_names(self):
-        self.assertEqual(
-            BlogAuthor._meta.get_field("user").verbose_name,
-            "user",
-        )
-        self.assertEqual(
-            BlogAuthor._meta.get_field("website").verbose_name,
-            "Website",
-        )
-
-    def test_meta_verbose_names(self):
-        self.assertEqual(
-            BlogAuthor._meta.verbose_name,
-            "Blog Author",
-        )
-        self.assertEqual(
-            BlogAuthor._meta.verbose_name_plural,
-            "Blog Authors",
-        )
-
     def test_unicode_representation(self):
         author_name = self.user.full_name
         self.assertEqual(

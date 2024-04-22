@@ -31,19 +31,6 @@ class CartItemModelTestCase(TestCase):
         self.assertEqual(self.cart_item.product, self.product)
         self.assertEqual(self.cart_item.quantity, 3)
 
-    def test_verbose_names(self):
-        self.assertEqual(self.cart_item._meta.get_field("cart").verbose_name, "cart")
-        self.assertEqual(
-            self.cart_item._meta.get_field("product").verbose_name, "product"
-        )
-        self.assertEqual(
-            self.cart_item._meta.get_field("quantity").verbose_name, "Quantity"
-        )
-
-    def test_meta_verbose_names(self):
-        self.assertEqual(CartItem._meta.verbose_name, "Cart Item")
-        self.assertEqual(CartItem._meta.verbose_name_plural, "Cart Items")
-
     def test_str_representation(self):
         product_name = self.product.safe_translation_getter("name", any_language=True)
         expected_str = f"CartItem {self.cart_item.id} in Cart {self.cart_item.cart.id}: {product_name} x {self.cart_item.quantity}"

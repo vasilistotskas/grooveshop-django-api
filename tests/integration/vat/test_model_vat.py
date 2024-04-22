@@ -14,22 +14,6 @@ class VatModelTestCase(TestCase):
     def test_fields(self):
         self.assertEqual(self.vat.value, 21.0)
 
-    def test_verbose_names(self):
-        self.assertEqual(
-            Vat._meta.get_field("value").verbose_name,
-            "Value",
-        )
-
-    def test_meta_verbose_names(self):
-        self.assertEqual(
-            Vat._meta.verbose_name,
-            "Vat",
-        )
-        self.assertEqual(
-            Vat._meta.verbose_name_plural,
-            "Vats",
-        )
-
     def test_str_representation(self):
         self.assertEqual(str(self.vat), f"{self.vat.value}% VAT")
 

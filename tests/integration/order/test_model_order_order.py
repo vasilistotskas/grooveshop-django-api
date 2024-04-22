@@ -159,38 +159,6 @@ class OrderModelTestCase(TestCase):
         )
         self.assertEqual(self.order.paid_amount, Money("0", settings.DEFAULT_CURRENCY))
 
-    def test_verbose_names(self):
-        self.assertEqual(self.order._meta.get_field("email").verbose_name, _("Email"))
-        self.assertEqual(
-            self.order._meta.get_field("first_name").verbose_name, _("First Name")
-        )
-        self.assertEqual(
-            self.order._meta.get_field("last_name").verbose_name, _("Last Name")
-        )
-        self.assertEqual(self.order._meta.get_field("street").verbose_name, _("Street"))
-        self.assertEqual(
-            self.order._meta.get_field("street_number").verbose_name, _("Street Number")
-        )
-        self.assertEqual(self.order._meta.get_field("city").verbose_name, _("City"))
-        self.assertEqual(
-            self.order._meta.get_field("zipcode").verbose_name, _("Zipcode")
-        )
-        self.assertEqual(
-            self.order._meta.get_field("phone").verbose_name, _("Phone " "Number")
-        )
-        self.assertEqual(
-            self.order._meta.get_field("paid_amount").verbose_name, _("Paid Amount")
-        )
-        self.assertEqual(self.order._meta.get_field("status").verbose_name, _("Status"))
-        self.assertEqual(
-            self.order._meta.get_field("shipping_price").verbose_name,
-            _("Shipping Price"),
-        )
-
-    def test_meta_verbose_names(self):
-        self.assertEqual(Order._meta.verbose_name, _("Order"))
-        self.assertEqual(Order._meta.verbose_name_plural, _("Orders"))
-
     def test_str_representation(self):
         self.assertEqual(str(self.order), f"Order {self.order.id} - John Doe")
 

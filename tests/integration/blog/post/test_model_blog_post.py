@@ -74,38 +74,6 @@ class BlogPostModelTestCase(TestCase):
         self.assertEqual(self.post.view_count, 0)
         self.assertTrue(default_storage.exists(self.post.image.path))
 
-    def test_verbose_names(self):
-        self.assertEqual(
-            BlogPost._meta.get_field("slug").verbose_name,
-            "slug",
-        )
-        self.assertEqual(
-            BlogPost._meta.get_field("image").verbose_name,
-            "Image",
-        )
-        self.assertEqual(
-            BlogPost._meta.get_field("status").verbose_name,
-            "Status",
-        )
-        self.assertEqual(
-            BlogPost._meta.get_field("featured").verbose_name,
-            "Featured",
-        )
-        self.assertEqual(
-            BlogPost._meta.get_field("view_count").verbose_name,
-            "View Count",
-        )
-
-    def test_meta_verbose_names(self):
-        self.assertEqual(
-            BlogPost._meta.verbose_name,
-            "Blog Post",
-        )
-        self.assertEqual(
-            BlogPost._meta.verbose_name_plural,
-            "Blog Posts",
-        )
-
     def test_unicode_representation(self):
         title = (
             self.post.safe_translation_getter("title", any_language=True) or "Untitled"

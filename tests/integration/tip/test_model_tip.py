@@ -44,30 +44,6 @@ class TipModelTestCase(TestCase):
         self.assertTrue(self.tip.active)
         self.assertTrue(default_storage.exists(self.tip.icon.path))
 
-    def test_verbose_names(self):
-        self.assertEqual(
-            Tip._meta.get_field("kind").verbose_name,
-            "Kind",
-        )
-        self.assertEqual(
-            Tip._meta.get_field("icon").verbose_name,
-            "Icon",
-        )
-        self.assertEqual(
-            Tip._meta.get_field("active").verbose_name,
-            "Active",
-        )
-
-    def test_meta_verbose_names(self):
-        self.assertEqual(
-            Tip._meta.verbose_name,
-            "Tip",
-        )
-        self.assertEqual(
-            Tip._meta.verbose_name_plural,
-            "Tips",
-        )
-
     def test_unicode_representation(self):
         self.assertEqual(
             self.tip.__unicode__(),

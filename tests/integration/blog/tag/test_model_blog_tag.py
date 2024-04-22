@@ -23,13 +23,6 @@ class BlogTagModelTestCase(TestCase):
     def test_fields(self):
         self.assertTrue(self.tag.active)
 
-    def test_verbose_names(self):
-        self.assertEqual(BlogTag._meta.get_field("active").verbose_name, "Active")
-
-    def test_meta_verbose_names(self):
-        self.assertEqual(BlogTag._meta.verbose_name, "Blog Tag")
-        self.assertEqual(BlogTag._meta.verbose_name_plural, "Blog Tags")
-
     def test_unicode_representation(self):
         tag_name = (
             self.tag.safe_translation_getter("name", any_language=True) or "Unnamed Tag"

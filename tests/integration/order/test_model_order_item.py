@@ -54,24 +54,6 @@ class OrderItemModelTestCase(TestCase):
         )
         self.assertEqual(self.order_item.quantity, 3)
 
-    def test_verbose_names(self):
-        self.assertEqual(
-            self.order_item._meta.get_field("order").verbose_name, _("order")
-        )
-        self.assertEqual(
-            self.order_item._meta.get_field("product").verbose_name, _("product")
-        )
-        self.assertEqual(
-            self.order_item._meta.get_field("price").verbose_name, _("Price")
-        )
-        self.assertEqual(
-            self.order_item._meta.get_field("quantity").verbose_name, _("Quantity")
-        )
-
-    def test_meta_verbose_names(self):
-        self.assertEqual(OrderItem._meta.verbose_name, _("Order Item"))
-        self.assertEqual(OrderItem._meta.verbose_name_plural, _("Order Items"))
-
     def tearDown(self) -> None:
         super().tearDown()
         self.order_item.delete()

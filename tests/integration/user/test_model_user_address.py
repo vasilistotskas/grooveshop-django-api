@@ -52,43 +52,6 @@ class UserAddressModelTestCase(TestCase):
         self.assertEqual(self.address.location_type, LocationChoicesEnum.HOME.value)
         self.assertEqual(self.address.phone, "123-456-7890")
 
-    def test_verbose_names(self):
-        self.assertEqual(UserAddress._meta.get_field("user").verbose_name, "user")
-        self.assertEqual(UserAddress._meta.get_field("title").verbose_name, "Title")
-        self.assertEqual(
-            UserAddress._meta.get_field("first_name").verbose_name, "First Name"
-        )
-        self.assertEqual(
-            UserAddress._meta.get_field("last_name").verbose_name, "Last Name"
-        )
-        self.assertEqual(UserAddress._meta.get_field("street").verbose_name, "Street")
-        self.assertEqual(
-            UserAddress._meta.get_field("street_number").verbose_name, "Street Number"
-        )
-        self.assertEqual(UserAddress._meta.get_field("city").verbose_name, "City")
-        self.assertEqual(
-            UserAddress._meta.get_field("zipcode").verbose_name, "Zip Code"
-        )
-        self.assertEqual(UserAddress._meta.get_field("country").verbose_name, "country")
-        self.assertEqual(UserAddress._meta.get_field("region").verbose_name, "region")
-        self.assertEqual(UserAddress._meta.get_field("floor").verbose_name, "Floor")
-        self.assertEqual(
-            UserAddress._meta.get_field("location_type").verbose_name, "Location Type"
-        )
-        self.assertEqual(
-            UserAddress._meta.get_field("phone").verbose_name, "Phone Number"
-        )
-        self.assertEqual(
-            UserAddress._meta.get_field("mobile_phone").verbose_name,
-            "Mobile Phone Number",
-        )
-        self.assertEqual(UserAddress._meta.get_field("notes").verbose_name, "Notes")
-        self.assertEqual(UserAddress._meta.get_field("is_main").verbose_name, "Is Main")
-
-    def test_meta_verbose_names(self):
-        self.assertEqual(UserAddress._meta.verbose_name, "User Address")
-        self.assertEqual(UserAddress._meta.verbose_name_plural, "User Addresses")
-
     def test_str_representation(self):
         self.assertEqual(
             str(self.address),

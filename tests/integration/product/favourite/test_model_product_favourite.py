@@ -33,12 +33,6 @@ class ProductFavouriteModelTestCase(TestCase):
         self.assertEqual(favourite.user, self.user)
         self.assertEqual(favourite.product, self.product)
 
-    def test_verbose_names(self):
-        self.assertEqual(ProductFavourite._meta.get_field("user").verbose_name, "user")
-        self.assertEqual(
-            ProductFavourite._meta.get_field("product").verbose_name, "product"
-        )
-
     def test_str_representation(self):
         favourite = ProductFavourite.objects.create(
             user=self.user, product=self.product

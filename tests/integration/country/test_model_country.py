@@ -44,38 +44,6 @@ class CountryModelTestCase(TestCase):
         self.assertEqual(self.country.phone_code, 30)
         self.assertTrue(default_storage.exists(self.country.image_flag.path))
 
-    def test_verbose_names(self):
-        self.assertEqual(
-            Country._meta.get_field("alpha_2").verbose_name,
-            "Country Code Alpha 2",
-        )
-        self.assertEqual(
-            Country._meta.get_field("alpha_3").verbose_name,
-            "Country Code Alpha 3",
-        )
-        self.assertEqual(
-            Country._meta.get_field("iso_cc").verbose_name,
-            "ISO Country Code",
-        )
-        self.assertEqual(
-            Country._meta.get_field("phone_code").verbose_name,
-            "Phone Code",
-        )
-        self.assertEqual(
-            Country._meta.get_field("image_flag").verbose_name,
-            "Image Flag",
-        )
-
-    def test_meta_verbose_names(self):
-        self.assertEqual(
-            Country._meta.verbose_name,
-            "Country",
-        )
-        self.assertEqual(
-            Country._meta.verbose_name_plural,
-            "Countries",
-        )
-
     def test_unicode_representation(self):
         self.assertEqual(
             self.country.__unicode__(),

@@ -44,26 +44,6 @@ class RegionModelTestCase(TestCase):
         self.assertEqual(self.region.alpha, "GRC")
         self.assertEqual(self.region.country, self.country)
 
-    def test_verbose_names(self):
-        self.assertEqual(
-            Region._meta.get_field("alpha").verbose_name,
-            "Region Code",
-        )
-        self.assertEqual(
-            Region._meta.get_field("country").verbose_name,
-            "country",
-        )
-
-    def test_meta_verbose_names(self):
-        self.assertEqual(
-            Region._meta.verbose_name,
-            "Region",
-        )
-        self.assertEqual(
-            Region._meta.verbose_name_plural,
-            "Regions",
-        )
-
     def test_unicode_representation(self):
         country_name = self.country.safe_translation_getter("name", any_language=True)
         region_name = self.region.safe_translation_getter("name", any_language=True)

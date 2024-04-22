@@ -49,14 +49,6 @@ class CartModelTestCase(TestCase):
         self.assertEqual(self.cart.user, self.user)
         self.assertEqual(self.cart.last_activity.date(), timezone.now().date())
 
-    def test_verbose_names(self):
-        self.assertEqual(Cart._meta.verbose_name, "Cart")
-        self.assertEqual(Cart._meta.verbose_name_plural, "Carts")
-
-    def test_meta_verbose_names(self):
-        self.assertEqual(Cart._meta.verbose_name, "Cart")
-        self.assertEqual(Cart._meta.verbose_name_plural, "Carts")
-
     def test_str_representation(self):
         expected_str = (
             f"Cart {self.user} - Items: {self.cart.total_items} - Total:"

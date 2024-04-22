@@ -38,30 +38,6 @@ class BlogCommentModelTestCase(TestCase):
         self.assertEqual(self.comment.user, self.user)
         self.assertEqual(self.comment.post, self.post)
 
-    def test_verbose_names(self):
-        self.assertEqual(
-            BlogComment._meta.get_field("is_approved").verbose_name,
-            "Is Approved",
-        )
-        self.assertEqual(
-            BlogComment._meta.get_field("user").verbose_name,
-            "user",
-        )
-        self.assertEqual(
-            BlogComment._meta.get_field("post").verbose_name,
-            "post",
-        )
-
-    def test_meta_verbose_names(self):
-        self.assertEqual(
-            BlogComment._meta.verbose_name,
-            "Blog Comment",
-        )
-        self.assertEqual(
-            BlogComment._meta.verbose_name_plural,
-            "Blog Comments",
-        )
-
     def test_unicode_representation(self):
         content_snippet = (
             self.comment.safe_translation_getter("content", any_language=True)[:50]

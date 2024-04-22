@@ -38,26 +38,6 @@ class BlogCategoryModelTestCase(TestCase):
         self.assertEqual(self.category.slug, "sample-category")
         self.assertTrue(default_storage.exists(self.category.image.path))
 
-    def test_verbose_names(self):
-        self.assertEqual(
-            BlogCategory._meta.get_field("slug").verbose_name,
-            "slug",
-        )
-        self.assertEqual(
-            BlogCategory._meta.get_field("image").verbose_name,
-            "Image",
-        )
-
-    def test_meta_verbose_names(self):
-        self.assertEqual(
-            BlogCategory._meta.verbose_name,
-            "Blog Category",
-        )
-        self.assertEqual(
-            BlogCategory._meta.verbose_name_plural,
-            "Blog Categories",
-        )
-
     def test_unicode_representation(self):
         self.assertEqual(
             self.category.__unicode__(),

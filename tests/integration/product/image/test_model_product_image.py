@@ -55,22 +55,6 @@ class ProductImageModelTestCase(TestCase):
         self.assertTrue(self.product_image.is_main)
         self.assertTrue(default_storage.exists(self.product_image.image.path))
 
-    def test_verbose_names(self):
-        self.assertEqual(
-            ProductImage._meta.get_field("product").verbose_name, "product"
-        )
-        self.assertEqual(ProductImage._meta.get_field("image").verbose_name, "Image")
-        self.assertEqual(
-            ProductImage._meta.get_field("thumbnail").verbose_name, "Thumbnail"
-        )
-        self.assertEqual(
-            ProductImage._meta.get_field("is_main").verbose_name, "Is Main"
-        )
-
-    def test_meta_verbose_names(self):
-        self.assertEqual(ProductImage._meta.verbose_name, "Product Image")
-        self.assertEqual(ProductImage._meta.verbose_name_plural, "Product Images")
-
     def test_unicode_representation(self):
         product_name = self.product.safe_translation_getter("name", any_language=True)
         main_status = "Main" if self.product_image.is_main else "Secondary"

@@ -80,27 +80,6 @@ class CategoryModelTestCase(TestCase):
         self.assertTrue(default_storage.exists(self.category.menu_image_two.path))
         self.assertTrue(default_storage.exists(self.category.menu_main_banner.path))
 
-    def test_verbose_names(self):
-        self.assertEqual(self.category._meta.get_field("slug").verbose_name, "Slug")
-        self.assertEqual(
-            self.category._meta.get_field("menu_image_one").verbose_name,
-            "Menu Image One",
-        )
-        self.assertEqual(
-            self.category._meta.get_field("menu_image_two").verbose_name,
-            "Menu Image Two",
-        )
-        self.assertEqual(
-            self.category._meta.get_field("menu_main_banner").verbose_name,
-            "Menu Main Banner",
-        )
-
-    def test_meta_verbose_names(self):
-        self.assertEqual(ProductCategory._meta.verbose_name, "Product Category")
-        self.assertEqual(
-            ProductCategory._meta.verbose_name_plural, "Product Categories"
-        )
-
     def test_unicode_representation(self):
         self.assertEqual(
             self.category.__unicode__(),

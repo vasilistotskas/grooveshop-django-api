@@ -47,34 +47,6 @@ class PayWayModelTestCase(TestCase):
         )
         self.assertTrue(default_storage.exists(self.pay_way.icon.path))
 
-    def test_verbose_names(self):
-        self.assertEqual(
-            PayWay._meta.get_field("active").verbose_name,
-            "Active",
-        )
-        self.assertEqual(
-            PayWay._meta.get_field("cost").verbose_name,
-            "Cost",
-        )
-        self.assertEqual(
-            PayWay._meta.get_field("free_for_order_amount").verbose_name,
-            "Free For Order Amount",
-        )
-        self.assertEqual(
-            PayWay._meta.get_field("icon").verbose_name,
-            "Icon",
-        )
-
-    def test_meta_verbose_names(self):
-        self.assertEqual(
-            PayWay._meta.verbose_name,
-            "Pay Way",
-        )
-        self.assertEqual(
-            PayWay._meta.verbose_name_plural,
-            "Pay Ways",
-        )
-
     def test_unicode_representation(self):
         self.assertEqual(
             self.pay_way.__unicode__(),

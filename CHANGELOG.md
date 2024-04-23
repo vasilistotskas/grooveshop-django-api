@@ -3,7 +3,17 @@
 
 
 
+## v0.109.0 (2024-04-23)
+
+### Feature
+
+* feat: Bump Versions and add throttling in some API endpoints ([`fc49b91`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc49b91773fc7356e6b8014ace09befd11c0e856))
+
 ## v0.108.0 (2024-04-22)
+
+### Chore
+
+* chore(release): release version 0.108.0 [skip ci] ([`16c4d19`](https://github.com/vasilistotskas/grooveshop-django-api/commit/16c4d19243c7a0896f22488bc666f7cc5ae50f32))
 
 ### Feature
 

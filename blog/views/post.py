@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from blog.models.post import BlogPost
 from blog.serializers.comment import BlogCommentSerializer
 from blog.serializers.post import BlogPostSerializer
+from core.api.throttling import BurstRateThrottle
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from core.utils.serializers import MultiSerializerMixin
@@ -25,13 +26,12 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
     filterset_fields = ["id", "tags", "slug", "author"]
     ordering_fields = [
         "id",
-        "title",
         "created_at",
         "updated_at",
         "published_at",
     ]
     ordering = ["-created_at"]
-    search_fields = ["id", "title", "subtitle", "body"]
+    search_fields = ["id"]
 
     serializers = {
         "default": BlogPostSerializer,
@@ -46,7 +46,12 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
     def retrieve(self, request, pk=None, *args, **kwargs) -> Response:
         return super().retrieve(request, pk=pk, *args, **kwargs)
 
-    @action(detail=True, methods=["POST"], permission_classes=[IsAuthenticated])
+    @action(
+        detail=True,
+        methods=["POST"],
+        permission_classes=[IsAuthenticated],
+        throttle_classes=[BurstRateThrottle],
+    )
     def update_likes(self, request, pk=None) -> Response:
         if not request.user.is_authenticated:
             return Response(

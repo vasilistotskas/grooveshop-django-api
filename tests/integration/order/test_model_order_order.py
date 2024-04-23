@@ -2,7 +2,6 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.test import TestCase
-from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
 
 from helpers.seed import get_or_create_default_image

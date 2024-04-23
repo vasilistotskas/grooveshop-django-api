@@ -7,6 +7,7 @@ from rest_framework.filters import SearchFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from core.api.throttling import BurstRateThrottle
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from user.models.address import UserAddress
@@ -53,7 +54,7 @@ class UserAddressViewSet(BaseModelViewSet):
         self.perform_destroy(address)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=True, methods=["POST"])
+    @action(detail=True, methods=["POST"], throttle_classes=[BurstRateThrottle])
     def set_main(self, request, pk=None, *args, **kwargs) -> Response:
         main_address = UserAddress.objects.filter(user=request.user, is_main=True)
         if main_address.exists():

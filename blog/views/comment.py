@@ -3,6 +3,7 @@ from __future__ import annotations
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.decorators import throttle_classes
 from rest_framework.filters import SearchFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -10,6 +11,7 @@ from rest_framework.response import Response
 from blog.models.comment import BlogComment
 from blog.serializers.comment import BlogCommentSerializer
 from blog.serializers.post import BlogPostSerializer
+from core.api.throttling import BurstRateThrottle
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from core.utils.serializers import MultiSerializerMixin
@@ -39,7 +41,16 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
             self.permission_classes = [IsAuthenticated]
         return super().get_permissions()
 
-    @action(detail=False, methods=["POST"], permission_classes=[IsAuthenticated])
+    @throttle_classes([BurstRateThrottle])
+    def create(self, request, *args, **kwargs) -> Response:
+        return super().create(request, *args, **kwargs)
+
+    @action(
+        detail=False,
+        methods=["POST"],
+        permission_classes=[IsAuthenticated],
+        throttle_classes=[BurstRateThrottle],
+    )
     def user_blog_comment(self, request, *args, **kwargs) -> Response:
         if not request.user.is_authenticated:
             return Response(
@@ -73,7 +84,12 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-    @action(detail=True, methods=["POST"], permission_classes=[IsAuthenticated])
+    @action(
+        detail=True,
+        methods=["POST"],
+        permission_classes=[IsAuthenticated],
+        throttle_classes=[BurstRateThrottle],
+    )
     def update_likes(self, request, pk=None) -> Response:
         if not request.user.is_authenticated:
             return Response(
@@ -92,7 +108,7 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
         serializer = self.get_serializer(comment, context=self.get_serializer_context())
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=["GET"])
+    @action(detail=True, methods=["GET"], throttle_classes=[BurstRateThrottle])
     def replies(self, request, pk=None) -> Response:
         comment = self.get_object()
         if not comment.get_children().exists():

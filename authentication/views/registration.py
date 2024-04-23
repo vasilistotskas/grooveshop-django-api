@@ -6,9 +6,11 @@ from dj_rest_auth.registration.views import ResendEmailVerificationView
 from dj_rest_auth.registration.views import VerifyEmailView
 from django.contrib.auth import get_user_model
 from rest_framework import status
+from rest_framework.decorators import throttle_classes
 from rest_framework.response import Response
 
 from core.api.parsers import NoUnderscoreBeforeNumberCamelCaseJSONParser
+from core.api.throttling import BurstRateThrottle
 
 User = get_user_model()
 
@@ -16,6 +18,7 @@ User = get_user_model()
 class AuthRegisterView(RegisterView):
     parser_classes = [NoUnderscoreBeforeNumberCamelCaseJSONParser]
 
+    @throttle_classes([BurstRateThrottle])
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -35,11 +38,15 @@ class AuthRegisterView(RegisterView):
 
 
 class AuthVerifyEmailView(VerifyEmailView):
-    pass
+    @throttle_classes([BurstRateThrottle])
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
 
 
 class AuthResendEmailVerificationView(ResendEmailVerificationView):
-    pass
+    @throttle_classes([BurstRateThrottle])
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
 
 
 class AuthConfirmEmailView(ConfirmEmailView):

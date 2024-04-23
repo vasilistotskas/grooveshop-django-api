@@ -11,32 +11,50 @@ from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema
 from rest_framework.decorators import api_view
+from rest_framework.decorators import throttle_classes
 from rest_framework.request import Request
 from rest_framework.response import Response
 
 from core.api.parsers import NoUnderscoreBeforeNumberCamelCaseJSONParser
+from core.api.throttling import BurstRateThrottle
 
 User = get_user_model()
 
 
 class AuthPasswordResetView(PasswordResetView):
-    pass
+    @throttle_classes([BurstRateThrottle])
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
 
 
 class AuthPasswordResetConfirmView(PasswordResetConfirmView):
     parser_classes = [NoUnderscoreBeforeNumberCamelCaseJSONParser]
 
+    @throttle_classes([BurstRateThrottle])
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
+
 
 class AuthLoginView(LoginView):
-    pass
+    @throttle_classes([BurstRateThrottle])
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
 
 
 class AuthLogoutView(LogoutView):
     serializer_class = None
 
+    @throttle_classes([BurstRateThrottle])
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
+
 
 class AuthPasswordChangeView(PasswordChangeView):
     parser_classes = [NoUnderscoreBeforeNumberCamelCaseJSONParser]
+
+    @throttle_classes([BurstRateThrottle])
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
 
 
 class AuthUserDetailsView(UserDetailsView):
@@ -53,7 +71,9 @@ class AuthSocialAccountListView(SocialAccountListView):
 
 
 class AuthSocialAccountDisconnectView(SocialAccountDisconnectView):
-    pass
+    @throttle_classes([BurstRateThrottle])
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
 
 
 @extend_schema(
@@ -63,6 +83,7 @@ class AuthSocialAccountDisconnectView(SocialAccountDisconnectView):
     methods=["POST"],
 )
 @api_view(["POST"])
+@throttle_classes([BurstRateThrottle])
 def is_user_registered(request: Request):
     email = request.data.get("email", None)
     if not email:

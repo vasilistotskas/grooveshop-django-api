@@ -7,6 +7,7 @@ from rest_framework.filters import SearchFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from core.api.throttling import BurstRateThrottle
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from core.utils.serializers import MultiSerializerMixin
@@ -48,7 +49,7 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
             self.permission_classes = [IsAuthenticated]
         return super().get_permissions()
 
-    @action(detail=False, methods=["POST"])
+    @action(detail=False, methods=["POST"], throttle_classes=[BurstRateThrottle])
     def user_product_review(self, request, *args, **kwargs) -> Response:
         if not request.user.is_authenticated:
             return Response(

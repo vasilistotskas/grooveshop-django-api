@@ -3,10 +3,12 @@ from __future__ import annotations
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.decorators import throttle_classes
 from rest_framework.filters import SearchFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from core.api.throttling import BurstRateThrottle
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from core.utils.serializers import MultiSerializerMixin
@@ -37,6 +39,10 @@ class ProductFavouriteViewSet(MultiSerializerMixin, BaseModelViewSet):
         "product": ProductSerializer,
         "products": ProductSerializer,
     }
+
+    @throttle_classes([BurstRateThrottle])
+    def create(self, request, *args, **kwargs) -> Response:
+        return super().create(request, *args, **kwargs)
 
     @action(detail=True, methods=["GET"])
     def product(self, request, *args, **kwargs) -> Response:

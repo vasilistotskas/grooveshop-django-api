@@ -230,6 +230,7 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": None if DEBUG else "50000/day",
         "user": None if DEBUG else "150000/day",
+        "burst": None if DEBUG else "5/minute",
     },
     # Filtering
     "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],

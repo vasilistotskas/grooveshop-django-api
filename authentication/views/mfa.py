@@ -11,6 +11,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.decorators import permission_classes
+from rest_framework.decorators import throttle_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -20,11 +21,13 @@ from authentication.serializers import AuthenticateTOTPSerializer
 from authentication.serializers import DeactivateTOTPSerializer
 from authentication.serializers import RecoveryCodeSerializer
 from authentication.serializers import TOTPEnabledSerializer
+from core.api.throttling import BurstRateThrottle
 
 
 class AuthenticateTotpAPIView(APIView):
     serializer_class = AuthenticateTOTPSerializer
 
+    @throttle_classes([BurstRateThrottle])
     def post(self, request, *args, **kwargs):
         serializer = self.serializer_class(
             data=request.data, context={"request": request}
@@ -94,6 +97,7 @@ class ActivateTotpAPIView(APIView):
             {"totp_svg": totp_svg, "secret": secret}, status=status.HTTP_200_OK
         )
 
+    @throttle_classes([BurstRateThrottle])
     def post(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return Response(
@@ -136,6 +140,7 @@ class DeactivateTotpAPIView(APIView):
     permission_classes = [IsAuthenticated]
     authenticator = None
 
+    @throttle_classes([BurstRateThrottle])
     def post(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return Response(
@@ -178,6 +183,7 @@ class GenerateRecoveryCodesAPIView(APIView):
     serializer_class = RecoveryCodeSerializer
     permission_classes = [IsAuthenticated]
 
+    @throttle_classes([BurstRateThrottle])
     def post(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return Response(
@@ -249,6 +255,7 @@ class ViewRecoveryCodesAPIView(APIView):
     methods=["GET"],
 )
 @api_view(["GET"])
+@throttle_classes([BurstRateThrottle])
 @permission_classes([IsAuthenticated])
 def totp_active(request):
     if not request.user.is_authenticated:

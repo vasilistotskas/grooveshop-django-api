@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
+from rest_framework.decorators import throttle_classes
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
 
@@ -11,6 +12,7 @@ from cart.serializers import CartItemCreateSerializer
 from cart.serializers import CartItemSerializer
 from cart.serializers import CartSerializer
 from cart.service import CartService
+from core.api.throttling import BurstRateThrottle
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from core.utils.serializers import MultiSerializerMixin
@@ -40,6 +42,7 @@ class CartViewSet(BaseModelViewSet):
         serializer = self.get_serializer(service.get_or_create_cart(request))
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @throttle_classes([BurstRateThrottle])
     def update(self, request, *args, **kwargs) -> Response:
         partial = kwargs.pop("partial", False)
         service = CartService(request=request)
@@ -49,6 +52,7 @@ class CartViewSet(BaseModelViewSet):
         self.perform_update(serializer)
         return Response(serializer.data)
 
+    @throttle_classes([BurstRateThrottle])
     def partial_update(self, request, *args, **kwargs) -> Response:
         kwargs["partial"] = True
         return self.update(request, *args, **kwargs)
@@ -96,6 +100,7 @@ class CartItemViewSet(MultiSerializerMixin, BaseModelViewSet):
         context["cart"] = service.get_or_create_cart(self.request)
         return context
 
+    @throttle_classes([BurstRateThrottle])
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         service = CartService(request=request)

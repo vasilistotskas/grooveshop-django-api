@@ -4,7 +4,6 @@ from django.conf import settings
 from django.core.files.storage import default_storage
 from django.test import override_settings
 from django.test import TestCase
-from django.utils.translation import gettext_lazy as _
 
 from helpers.seed import get_or_create_default_image
 from slider.models import Slider

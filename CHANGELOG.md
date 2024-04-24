@@ -3,7 +3,17 @@
 
 
 
+## v0.110.0 (2024-04-24)
+
+### Feature
+
+* feat: Search vectors and docs add to blog post and improve whole search concept, Bump Versions ([`de952ad`](https://github.com/vasilistotskas/grooveshop-django-api/commit/de952ad31b029f090ea7c8414ad7fbcfb1a40e90))
+
 ## v0.109.0 (2024-04-23)
+
+### Chore
+
+* chore(release): release version 0.109.0 [skip ci] ([`439b32e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/439b32e514a2c3fada2b816f0f7005ad1cae49b9))
 
 ### Feature
 

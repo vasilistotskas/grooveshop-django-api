@@ -160,21 +160,15 @@ class Product(
     )
 
     translations = TranslatedFields(
-        name=models.CharField(
-            _("Name"), max_length=255, blank=True, null=True, db_index=True
-        ),
-        description=HTMLField(_("Description"), blank=True, null=True, db_index=True),
-        search_document=models.TextField(
-            _("Search Document"), blank=True, default="", db_index=True
-        ),
-        search_vector=SearchVectorField(
-            _("Search Vector"), blank=True, null=True, db_index=True
-        ),
+        name=models.CharField(_("Name"), max_length=255, blank=True, null=True),
+        description=HTMLField(_("Description"), blank=True, null=True),
+        search_document=models.TextField(_("Search Document"), blank=True, default=""),
+        search_vector=SearchVectorField(_("Search Vector"), blank=True, null=True),
         search_document_dirty=models.BooleanField(
-            _("Search Document Dirty"), default=False, db_index=True
+            _("Search Document Dirty"), default=False
         ),
         search_vector_dirty=models.BooleanField(
-            _("Search Vector Dirty"), default=False, db_index=True
+            _("Search Vector Dirty"), default=False
         ),
     )
 
@@ -220,6 +214,11 @@ class Product(
             )
             self.slug = unique_slugify(config)
         super().save(*args, **kwargs)
+
+    def save_translation(self, *args, **kwargs):
+        self.search_vector_dirty = True
+        self.search_document_dirty = True
+        super().save_translation(*args, **kwargs)
 
     def clean(self):
         super().clean()

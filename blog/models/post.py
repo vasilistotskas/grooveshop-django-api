@@ -2,6 +2,7 @@ import os
 
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
+from django.contrib.postgres.search import SearchVectorField
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -54,6 +55,14 @@ class BlogPost(
         title=models.CharField(_("Title"), max_length=255, blank=True, null=True),
         subtitle=models.CharField(_("Subtitle"), max_length=255, blank=True, null=True),
         body=HTMLField(_("Body"), blank=True, null=True),
+        search_document=models.TextField(_("Search Document"), blank=True, default=""),
+        search_vector=SearchVectorField(_("Search Vector"), blank=True, null=True),
+        search_document_dirty=models.BooleanField(
+            _("Search Document Dirty"), default=False
+        ),
+        search_vector_dirty=models.BooleanField(
+            _("Search Vector Dirty"), default=False
+        ),
     )
 
     class Meta(TypedModelMeta):
@@ -84,7 +93,12 @@ class BlogPost(
                 instance=self,
             )
             self.slug = unique_slugify(config)
-        super(BlogPost, self).save(*args, **kwargs)
+        super().save(*args, **kwargs)
+
+    def save_translation(self, *args, **kwargs):
+        self.search_vector_dirty = True
+        self.search_document_dirty = True
+        super().save_translation(*args, **kwargs)
 
     @property
     def main_image_absolute_url(self) -> str:

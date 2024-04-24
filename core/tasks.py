@@ -7,20 +7,18 @@ import time
 from datetime import datetime
 from datetime import timedelta
 
-from django.apps import apps
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import management
 from django.core.mail import send_mail
 from django.db import transaction
-from django.db.models import Q
-from django.db.models import Value
 from django.template.loader import render_to_string
 from django.utils.timezone import now
 
 from app import celery_app
-from core.postgres import FlatConcatSearchVector
-from core.postgres import NoValidationSearchVector
+from blog.models.post import BlogPost
+from core.search import update_translation_search_documents
+from core.search import update_translation_search_vectors
 from product.models.product import Product
 
 User = get_user_model()
@@ -90,90 +88,6 @@ def clear_blacklisted_tokens_task(self):
         return "All expired blacklisted tokens deleted."
     except Exception as e:
         return f"error: {e}"
-
-
-BATCH_SIZE = 500
-PRODUCTS_BATCH_SIZE = 300
-PRODUCT_FIELDS_TO_PREFETCH = [
-    "translations",
-]
-
-
-def get_postgres_search_config(language_code: str) -> str:
-    language_configs = settings.PARLER_LANGUAGES.get(settings.SITE_ID, ())
-    for lang_config in language_configs:
-        if lang_config.get("code") == language_code:
-            return lang_config.get("name", "").lower()
-    return "simple"
-
-
-def prepare_product_translation_search_vector_value(
-    product: "Product", language_code: str, config="simple"
-) -> FlatConcatSearchVector:
-    translation = product.translations.get(language_code=language_code)
-    search_vectors = [
-        NoValidationSearchVector(Value(translation.name), config=config, weight="A"),
-        NoValidationSearchVector(
-            Value(translation.description), config=config, weight="C"
-        ),
-    ]
-
-    return FlatConcatSearchVector(*search_vectors)
-
-
-def prepare_product_translation_search_document(
-    product: "Product", language_code: str
-) -> str:
-    translation = product.translations.get(language_code=language_code)
-    document_parts = [translation.name, translation.description]
-    return " ".join(filter(None, document_parts))
-
-
-@celery_app.task
-def update_product_translation_search_vectors():
-    ProductTranslation = apps.get_model("product", "ProductTranslation")
-    active_languages = languages
-    updated_count = 0
-
-    for language_code in active_languages:
-        translations = ProductTranslation.objects.filter(
-            Q(language_code=language_code)
-            & (Q(search_vector_dirty=True) | Q(search_vector=None)),
-        )
-        config = get_postgres_search_config(language_code)
-
-        for translation in translations.iterator():
-            translation.search_vector = prepare_product_translation_search_vector_value(
-                translation.master, language_code, config
-            )
-            translation.search_vector_dirty = False
-            translation.save(update_fields=["search_vector", "search_vector_dirty"])
-            updated_count += 1
-
-    logger.info(f"Updated search vectors for {updated_count} product translations.")
-
-
-@celery_app.task
-def update_product_translation_search_documents():
-    ProductTranslation = apps.get_model("product", "ProductTranslation")
-    active_languages = languages
-    updated_count = 0
-
-    for language_code in active_languages:
-        translations = ProductTranslation.objects.filter(
-            Q(language_code=language_code)
-            & (Q(search_document_dirty=True) | Q(search_document="")),
-        )
-
-        for translation in translations.iterator():
-            translation.search_document = prepare_product_translation_search_document(
-                translation.master, language_code
-            )
-            translation.search_document_dirty = False
-            translation.save(update_fields=["search_document", "search_document_dirty"])
-            updated_count += 1
-
-    logger.info(f"Updated search documents for {updated_count} product translations.")
 
 
 @celery_app.task
@@ -291,3 +205,35 @@ def optimize_images():
                 logger.error(f"Error optimizing image: {e}")
 
     return "Images optimized successfully."
+
+
+@celery_app.task
+def update_product_translation_search_vectors():
+    total_updated = update_translation_search_vectors(
+        Product, "product", [("name", "A"), ("description", "C")]
+    )
+    logger.info(f"Updated {total_updated} product translation search vectors.")
+
+
+@celery_app.task
+def update_blog_post_translation_search_vectors():
+    total_updated = update_translation_search_vectors(
+        BlogPost, "blog", [("title", "A"), ("subtitle", "B"), ("body", "C")]
+    )
+    logger.info(f"Updated {total_updated} blog post translation search vectors.")
+
+
+@celery_app.task
+def update_product_translation_search_documents():
+    total_updated = update_translation_search_documents(
+        Product, "product", ["name", "description"]
+    )
+    logger.info(f"Updated {total_updated} product translation search documents.")
+
+
+@celery_app.task
+def update_blog_post_translation_search_documents():
+    total_updated = update_translation_search_documents(
+        BlogPost, "blog", ["title", "subtitle", "body"]
+    )
+    logger.info(f"Updated {total_updated} blog post translation search documents.")

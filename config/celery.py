@@ -34,12 +34,6 @@ CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 # Internal settings
 BEAT_UPDATE_SEARCH_SEC = getenv("BEAT_UPDATE_SEARCH_EXPIRE_AFTER_SEC", 20)
 BEAT_UPDATE_SEARCH_EXPIRE_AFTER_SEC = BEAT_UPDATE_SEARCH_SEC
-UPDATE_SEARCH_VECTOR_INDEX_QUEUE_NAME = getenv(
-    "UPDATE_SEARCH_VECTOR_INDEX_QUEUE_NAME", "update_search_vector_index"
-)
-UPDATE_SEARCH_DOCUMENT_INDEX_QUEUE_NAME = getenv(
-    "UPDATE_SEARCH_DOCUMENT_INDEX_QUEUE_NAME", "update_search_document_index"
-)
 
 CELERY_BEAT_SCHEDULE = {
     "update-product-translation-search-vectors": {
@@ -49,6 +43,16 @@ CELERY_BEAT_SCHEDULE = {
     },
     "update-product-translation-search-documents": {
         "task": "core.tasks.update_product_translation_search_documents",
+        "schedule": timedelta(seconds=BEAT_UPDATE_SEARCH_SEC),
+        "options": {"expires": BEAT_UPDATE_SEARCH_EXPIRE_AFTER_SEC},
+    },
+    "update-blog-post-translation-search-vectors": {
+        "task": "core.tasks.update_blog_post_translation_search_vectors",
+        "schedule": timedelta(seconds=BEAT_UPDATE_SEARCH_SEC),
+        "options": {"expires": BEAT_UPDATE_SEARCH_EXPIRE_AFTER_SEC},
+    },
+    "update-blog-post-translation-search-documents": {
+        "task": "core.tasks.update_blog_post_translation_search_documents",
         "schedule": timedelta(seconds=BEAT_UPDATE_SEARCH_SEC),
         "options": {"expires": BEAT_UPDATE_SEARCH_EXPIRE_AFTER_SEC},
     },

@@ -3,7 +3,7 @@ from django.db import connections
 
 
 class Command(BaseCommand):
-    help = "Adds custom Gin indexes to the ProductTranslation model"
+    help = "Adds custom Gin indexes to the BlogPostTranslation model"
 
     fields = {
         "search_vector": {
@@ -12,10 +12,13 @@ class Command(BaseCommand):
         "search_document": {
             "opclass": "gin_trgm_ops",
         },
-        "name": {
+        "title": {
             "opclass": "gin_trgm_ops",
         },
-        "description": {
+        "subtitle": {
+            "opclass": "gin_trgm_ops",
+        },
+        "body": {
             "opclass": "gin_trgm_ops",
         },
     }
@@ -42,15 +45,15 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         with connections["default"].cursor() as cursor:
             for field, props in self.fields.items():
-                index_name = f"product_product_translation_{field}_gin_idx"
+                index_name = f"blog_blogpost_translation_{field}_gin_idx"
                 self.remove_index(cursor, index_name)
 
             for field, props in self.fields.items():
-                index_name = f"product_product_translation_{field}_gin_idx"
+                index_name = f"blog_blogpost_translation_{field}_gin_idx"
                 self.add_index(
                     cursor,
                     index_name,
-                    "product_product_translation",
+                    "blog_blogpost_translation",
                     [field],
                 )
                 self.stdout.write(
@@ -59,12 +62,12 @@ class Command(BaseCommand):
 
             self.add_index(
                 cursor,
-                "product_product_translation_combined_gin_idx",
-                "product_product_translation",
-                ["name", "description"],
+                "blog_blogpost_translation_combined_gin_idx",
+                "blog_blogpost_translation",
+                ["title", "subtitle", "body"],
             )
             self.stdout.write(
                 self.style.SUCCESS(
-                    "Successfully added combined trigram index for name and description"
+                    "Successfully added combined trigram index for title, subtitle and body"
                 )
             )

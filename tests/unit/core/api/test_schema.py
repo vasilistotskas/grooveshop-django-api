@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.test import TestCase
 
-from blog.models.post import BlogPost
+from blog.models.category import BlogCategory
 from core.api.schema import generate_schema_multi_lang
 
 
@@ -11,7 +11,7 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 class GenerateSchemaMultiLangTest(TestCase):
     def test_generate_schema_empty(self):
-        instance = BlogPost()
+        instance = BlogCategory()
 
         schema = generate_schema_multi_lang(instance)
 
@@ -24,17 +24,16 @@ class GenerateSchemaMultiLangTest(TestCase):
             expected_schema["properties"][lang] = {
                 "type": "object",
                 "properties": {
-                    "title": {"type": "string"},
-                    "subtitle": {"type": "string"},
-                    "body": {"type": "string"},
+                    "name": {"type": "string"},
+                    "description": {"type": "string"},
                 },
             }
 
         self.assertEqual(schema, expected_schema)
 
     def test_generate_schema_with_translations(self):
-        instance = BlogPost()
-        instance.title = "Title"
+        instance = BlogCategory()
+        instance.name = "name"
         instance.save()
 
         schema = generate_schema_multi_lang(instance)
@@ -48,9 +47,8 @@ class GenerateSchemaMultiLangTest(TestCase):
             expected_schema["properties"][lang] = {
                 "type": "object",
                 "properties": {
-                    "title": {"type": "string"},
-                    "subtitle": {"type": "string"},
-                    "body": {"type": "string"},
+                    "name": {"type": "string"},
+                    "description": {"type": "string"},
                 },
             }
 
@@ -60,8 +58,8 @@ class GenerateSchemaMultiLangTest(TestCase):
         original_languages = settings.PARLER_LANGUAGES[settings.SITE_ID]
         settings.PARLER_LANGUAGES[settings.SITE_ID] = []
 
-        instance = BlogPost()
-        instance.title = "Title"
+        instance = BlogCategory()
+        instance.name = "name"
         instance.save()
 
         schema = generate_schema_multi_lang(instance)
@@ -77,4 +75,4 @@ class GenerateSchemaMultiLangTest(TestCase):
 
     def tearDown(self) -> None:
         super().tearDown()
-        BlogPost.objects.all().delete()
+        BlogCategory.objects.all().delete()

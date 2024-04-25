@@ -26,14 +26,16 @@ def prepare_translation_search_vector_value(
     config: str = "simple",
 ) -> FlatConcatSearchVector:
     translation = model_instance.translations.get(language_code=language_code)
-    search_vectors = [
-        NoValidationSearchVector(
-            Value(getattr(translation, field), output_field=TextField()),
+    search_vectors = []
+    for field, weight in fields_weights:
+        raw_content = getattr(translation, field, "")
+        cleaned_content = remove_html_tags(raw_content)
+        search_vector = NoValidationSearchVector(
+            Value(cleaned_content, output_field=TextField()),
             config=config,
             weight=weight,
         )
-        for field, weight in fields_weights
-    ]
+        search_vectors.append(search_vector)
     return FlatConcatSearchVector(*search_vectors)
 
 

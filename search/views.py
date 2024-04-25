@@ -8,17 +8,21 @@ from django.contrib.postgres.search import TrigramWordDistance
 from django.contrib.postgres.search import TrigramWordSimilarity
 from django.db.models import F
 from django.db.models import Q
+from django.utils.decorators import method_decorator
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from blog.models.post import BlogPost
+from core.utils.views import conditional_cache_page
 from product.models.product import Product
 from search.serializers import SearchBlogPostSerializer
 from search.serializers import SearchProductSerializer
 
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
+
+DEFAULT_SEARCH_CACHE_TTL = 60 * 5
 
 
 class SearchProduct(ReadOnlyModelViewSet):
@@ -94,6 +98,7 @@ class SearchProduct(ReadOnlyModelViewSet):
         )
         return queryset
 
+    @method_decorator(conditional_cache_page(DEFAULT_SEARCH_CACHE_TTL))
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
 
@@ -203,6 +208,7 @@ class SearchBlogPost(ReadOnlyModelViewSet):
 
         return queryset
 
+    @method_decorator(conditional_cache_page(DEFAULT_SEARCH_CACHE_TTL))
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
 

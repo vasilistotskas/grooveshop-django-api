@@ -3,7 +3,17 @@
 
 
 
+## v0.112.1 (2024-04-25)
+
+### Fix
+
+* fix: minor admin improvements and set `INDEX_MAXIMUM_EXPR_COUNT ` to 8k ([`d1c702c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d1c702cffd48f31fac64735e8a571d1bcdff36d3))
+
 ## v0.112.0 (2024-04-25)
+
+### Chore
+
+* chore(release): release version 0.112.0 [skip ci] ([`e973221`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e9732215cd5fd7a9072181826ebcda4e6debb935))
 
 ### Feature
 

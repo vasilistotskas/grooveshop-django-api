@@ -3,7 +3,17 @@
 
 
 
+## v0.111.0 (2024-04-25)
+
+### Feature
+
+* feat: Improve text preparing for search fields ([`7db90cd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7db90cd8f13fe561cf1ed4d8e6d09cc2fe30f394))
+
 ## v0.110.3 (2024-04-25)
+
+### Chore
+
+* chore(release): release version 0.110.3 [skip ci] ([`54aa634`](https://github.com/vasilistotskas/grooveshop-django-api/commit/54aa6345122ced9333065d5fac7e5ceeb836fd52))
 
 ### Fix
 

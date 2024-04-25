@@ -3,7 +3,17 @@
 
 
 
+## v0.110.3 (2024-04-25)
+
+### Fix
+
+* fix(prepare_translation_search_vector_value): remove existing html from fields ([`829862d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/829862d1baed889a7849331eadd330ae6fb334df))
+
 ## v0.110.2 (2024-04-25)
+
+### Chore
+
+* chore(release): release version 0.110.2 [skip ci] ([`01d59a3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01d59a3500483ff335ab52f0810df1bcf11a736d))
 
 ### Fix
 

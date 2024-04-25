@@ -3,7 +3,17 @@
 
 
 
+## v0.110.2 (2024-04-25)
+
+### Fix
+
+* fix: Add output_field in `FlatConcatSearchVector` ([`d0b204a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d0b204a249cd1d7a5aa3fdd785f0aa7838dd86cb))
+
 ## v0.110.1 (2024-04-25)
+
+### Chore
+
+* chore(release): release version 0.110.1 [skip ci] ([`3222156`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3222156f6dbb1a518f3d6f049d5086c758311bac))
 
 ### Fix
 

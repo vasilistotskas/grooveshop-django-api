@@ -6,7 +6,7 @@ from django.db.models import Value
 
 from core.postgres import FlatConcatSearchVector
 from core.postgres import NoValidationSearchVector
-from core.utils.html import remove_html_tags
+from core.utils.html import preprocess_text
 
 languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 
@@ -29,7 +29,7 @@ def prepare_translation_search_vector_value(
     search_vectors = []
     for field, weight in fields_weights:
         raw_content = getattr(translation, field, "")
-        cleaned_content = remove_html_tags(raw_content)
+        cleaned_content = preprocess_text(raw_content)
         search_vector = NoValidationSearchVector(
             Value(cleaned_content, output_field=TextField()),
             config=config,
@@ -47,7 +47,7 @@ def prepare_translation_search_document(
     for field in fields:
         content = getattr(translation, field, None)
         if content is not None:
-            cleaned_content = remove_html_tags(content)
+            cleaned_content = preprocess_text(content)
             document_parts.append(cleaned_content)
     return " ".join(document_parts)
 

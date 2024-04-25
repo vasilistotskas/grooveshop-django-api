@@ -3,7 +3,17 @@
 
 
 
+## v0.112.2 (2024-04-25)
+
+### Fix
+
+* fix: docker dev env pgadmin initial server works ([`82c0605`](https://github.com/vasilistotskas/grooveshop-django-api/commit/82c0605c8a17e9b0681122298a9cee52af6fe87b))
+
 ## v0.112.1 (2024-04-25)
+
+### Chore
+
+* chore(release): release version 0.112.1 [skip ci] ([`d38cacc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d38caccbf25c4e61e3a92247cf9ac4720f1eb563))
 
 ### Fix
 

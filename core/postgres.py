@@ -6,6 +6,7 @@ from django.conf import settings
 from django.contrib.postgres.search import CombinedSearchVector
 from django.contrib.postgres.search import SearchVector
 from django.contrib.postgres.search import SearchVectorCombinable
+from django.contrib.postgres.search import SearchVectorField
 from django.db.models import Expression
 
 logger = logging.getLogger(__name__)
@@ -138,3 +139,4 @@ class FlatConcat(Expression):
 class FlatConcatSearchVector(FlatConcat):
     max_expression_count = settings.INDEX_MAXIMUM_EXPR_COUNT
     silent_drop_expression = True
+    output_field = SearchVectorField()

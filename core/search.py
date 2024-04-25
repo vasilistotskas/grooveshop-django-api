@@ -1,6 +1,7 @@
 from django.apps import apps
 from django.conf import settings
 from django.db.models import Q
+from django.db.models import TextField
 from django.db.models import Value
 
 from core.postgres import FlatConcatSearchVector
@@ -27,7 +28,9 @@ def prepare_translation_search_vector_value(
     translation = model_instance.translations.get(language_code=language_code)
     search_vectors = [
         NoValidationSearchVector(
-            Value(getattr(translation, field)), config=config, weight=weight
+            Value(getattr(translation, field), output_field=TextField()),
+            config=config,
+            weight=weight,
         )
         for field, weight in fields_weights
     ]

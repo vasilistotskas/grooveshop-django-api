@@ -8267,6 +8267,71 @@ paths:
               schema:
                 $ref: '#/components/schemas/Region'
           description: ''
+  /api/v1/search/blog/post:
+    get:
+      operationId: api_v1_search_blog_post_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: pageSize
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSearchBlogPostList'
+          description: ''
+  /api/v1/search/blog/post{format}:
+    get:
+      operationId: api_v1_search_blog_post_formatted_list
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: pageSize
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSearchBlogPostList'
+          description: ''
   /api/v1/search/product:
     get:
       operationId: api_v1_search_product_list
@@ -10253,6 +10318,55 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProductFavourite'
           description: ''
+  /api/v1/user/account/{id}/liked_blog_posts:
+    get:
+      operationId: api_v1_user_account_liked_blog_posts_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogPost'
+          description: ''
+  /api/v1/user/account/{id}/liked_blog_posts{format}:
+    get:
+      operationId: api_v1_user_account_liked_blog_posts_formatted_retrieve
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogPost'
+          description: ''
   /api/v1/user/account/{id}/orders:
     get:
       operationId: api_v1_user_account_orders_retrieve
@@ -10405,7 +10519,7 @@ paths:
           - 1
           - 2
         description: |-
-          * `0` - Home
+          * `0` - Αρχική
           * `1` - Office
           * `2` - Other
       - name: ordering
@@ -10543,7 +10657,7 @@ paths:
           - 1
           - 2
         description: |-
-          * `0` - Home
+          * `0` - Αρχική
           * `1` - Office
           * `2` - Other
       - name: ordering
@@ -10993,7 +11107,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/Vat'
-        required: true
       security:
       - basicAuth: []
       - tokenAuth: []
@@ -11084,7 +11197,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/Vat'
-        required: true
       security:
       - basicAuth: []
       - tokenAuth: []
@@ -11139,7 +11251,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/Vat'
-        required: true
       security:
       - basicAuth: []
       - tokenAuth: []
@@ -11257,7 +11368,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/Vat'
-        required: true
       security:
       - basicAuth: []
       - tokenAuth: []
@@ -11355,9 +11465,11 @@ components:
         username:
           type: string
           writeOnly: true
+          title: Όνομα χρήστη
         password:
           type: string
           writeOnly: true
+          title: Συνθηματικό
         token:
           type: string
           readOnly: true
@@ -11400,6 +11512,7 @@ components:
           type: string
           format: uri
           nullable: true
+          title: Εικόνα
         phone:
           type: string
         city:
@@ -11486,9 +11599,9 @@ components:
           readOnly: true
         isSuperuser:
           type: boolean
-          title: Superuser status
-          description: Designates that this user has all permissions without explicitly
-            assigning them.
+          title: Κατάσταση υπερχρήστη
+          description: Υποδηλώνει ότι ο συγκεκριμένος χρήστης έχει όλα τα δικαιώματα
+            χωρίς να χρειάζεται να τα παραχωρήσετε ξεχωριστά.
         createdAt:
           type: string
           format: date-time
@@ -11585,17 +11698,17 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                bio:
+                  type: string
             en:
               type: object
               properties:
                 bio:
                   type: string
             de:
-              type: object
-              properties:
-                bio:
-                  type: string
-            el:
               type: object
               properties:
                 bio:
@@ -11644,6 +11757,13 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
             en:
               type: object
               properties:
@@ -11652,13 +11772,6 @@ components:
                 description:
                   type: string
             de:
-              type: object
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-            el:
               type: object
               properties:
                 name:
@@ -11738,17 +11851,17 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                content:
+                  type: string
             en:
               type: object
               properties:
                 content:
                   type: string
             de:
-              type: object
-              properties:
-                content:
-                  type: string
-            el:
               type: object
               properties:
                 content:
@@ -11818,6 +11931,23 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                body:
+                  type: string
+                searchDocument:
+                  type: string
+                searchVector:
+                  type: string
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
+                  type: string
             en:
               type: object
               properties:
@@ -11826,6 +11956,14 @@ components:
                 subtitle:
                   type: string
                 body:
+                  type: string
+                searchDocument:
+                  type: string
+                searchVector:
+                  type: string
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
                   type: string
             de:
               type: object
@@ -11836,14 +11974,13 @@ components:
                   type: string
                 body:
                   type: string
-            el:
-              type: object
-              properties:
-                title:
+                searchDocument:
                   type: string
-                subtitle:
+                searchVector:
                   type: string
-                body:
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
                   type: string
         id:
           type: integer
@@ -11943,6 +12080,23 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                body:
+                  type: string
+                searchDocument:
+                  type: string
+                searchVector:
+                  type: string
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
+                  type: string
             en:
               type: object
               properties:
@@ -11951,6 +12105,14 @@ components:
                 subtitle:
                   type: string
                 body:
+                  type: string
+                searchDocument:
+                  type: string
+                searchVector:
+                  type: string
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
                   type: string
             de:
               type: object
@@ -11961,14 +12123,13 @@ components:
                   type: string
                 body:
                   type: string
-            el:
-              type: object
-              properties:
-                title:
+                searchDocument:
                   type: string
-                subtitle:
+                searchVector:
                   type: string
-                body:
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
                   type: string
         id:
           type: integer
@@ -12349,17 +12510,17 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
             en:
               type: object
               properties:
                 name:
                   type: string
             de:
-              type: object
-              properties:
-                name:
-                  type: string
-            el:
               type: object
               properties:
                 name:
@@ -12464,7 +12625,7 @@ components:
       - 2
       type: integer
       description: |-
-        * `0` - Home
+        * `0` - Αρχική
         * `1` - Office
         * `2` - Other
     NotificationUser:
@@ -13247,6 +13408,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Region'
+    PaginatedSearchBlogPostList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchBlogPost'
     PaginatedSearchProductList:
       type: object
       required:
@@ -13436,6 +13620,7 @@ components:
           type: string
           format: uri
           nullable: true
+          title: Εικόνα
         phone:
           type: string
         city:
@@ -13522,9 +13707,9 @@ components:
           readOnly: true
         isSuperuser:
           type: boolean
-          title: Superuser status
-          description: Designates that this user has all permissions without explicitly
-            assigning them.
+          title: Κατάσταση υπερχρήστη
+          description: Υποδηλώνει ότι ο συγκεκριμένος χρήστης έχει όλα τα δικαιώματα
+            χωρίς να χρειάζεται να τα παραχωρήσετε ξεχωριστά.
         createdAt:
           type: string
           format: date-time
@@ -13544,17 +13729,17 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                bio:
+                  type: string
             en:
               type: object
               properties:
                 bio:
                   type: string
             de:
-              type: object
-              properties:
-                bio:
-                  type: string
-            el:
               type: object
               properties:
                 bio:
@@ -13594,6 +13779,13 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
             en:
               type: object
               properties:
@@ -13602,13 +13794,6 @@ components:
                 description:
                   type: string
             de:
-              type: object
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-            el:
               type: object
               properties:
                 name:
@@ -13673,17 +13858,17 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                content:
+                  type: string
             en:
               type: object
               properties:
                 content:
                   type: string
             de:
-              type: object
-              properties:
-                content:
-                  type: string
-            el:
               type: object
               properties:
                 content:
@@ -13740,6 +13925,23 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                body:
+                  type: string
+                searchDocument:
+                  type: string
+                searchVector:
+                  type: string
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
+                  type: string
             en:
               type: object
               properties:
@@ -13748,6 +13950,14 @@ components:
                 subtitle:
                   type: string
                 body:
+                  type: string
+                searchDocument:
+                  type: string
+                searchVector:
+                  type: string
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
                   type: string
             de:
               type: object
@@ -13758,14 +13968,13 @@ components:
                   type: string
                 body:
                   type: string
-            el:
-              type: object
-              properties:
-                title:
+                searchDocument:
                   type: string
-                subtitle:
+                searchVector:
                   type: string
-                body:
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
                   type: string
         id:
           type: integer
@@ -13838,6 +14047,23 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                body:
+                  type: string
+                searchDocument:
+                  type: string
+                searchVector:
+                  type: string
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
+                  type: string
             en:
               type: object
               properties:
@@ -13846,6 +14072,14 @@ components:
                 subtitle:
                   type: string
                 body:
+                  type: string
+                searchDocument:
+                  type: string
+                searchVector:
+                  type: string
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
                   type: string
             de:
               type: object
@@ -13856,14 +14090,13 @@ components:
                   type: string
                 body:
                   type: string
-            el:
-              type: object
-              properties:
-                title:
+                searchDocument:
                   type: string
-                subtitle:
+                searchVector:
                   type: string
-                body:
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
                   type: string
         id:
           type: integer
@@ -14043,17 +14276,17 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
             en:
               type: object
               properties:
                 name:
                   type: string
             de:
-              type: object
-              properties:
-                name:
-                  type: string
-            el:
               type: object
               properties:
                 name:
@@ -14226,17 +14459,17 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
             en:
               type: object
               properties:
                 name:
                   type: string
             de:
-              type: object
-              properties:
-                name:
-                  type: string
-            el:
               type: object
               properties:
                 name:
@@ -14293,6 +14526,21 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                searchDocument:
+                  type: string
+                searchVector:
+                  type: string
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
+                  type: string
             en:
               type: object
               properties:
@@ -14309,21 +14557,6 @@ components:
                 searchVectorDirty:
                   type: string
             de:
-              type: object
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
-                  type: string
-            el:
               type: object
               properties:
                 name:
@@ -14425,8 +14658,10 @@ components:
         discountPercent:
           type: number
           format: double
-          maximum: 100.0
-          minimum: 0.0
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
         discountValue:
           type: number
           format: double
@@ -14471,6 +14706,13 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
             en:
               type: object
               properties:
@@ -14479,13 +14721,6 @@ components:
                 description:
                   type: string
             de:
-              type: object
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-            el:
               type: object
               properties:
                 name:
@@ -14592,17 +14827,17 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                title:
+                  type: string
             en:
               type: object
               properties:
                 title:
                   type: string
             de:
-              type: object
-              properties:
-                title:
-                  type: string
-            el:
               type: object
               properties:
                 title:
@@ -14615,6 +14850,7 @@ components:
         image:
           type: string
           format: uri
+          title: Εικόνα
         thumbnail:
           type: string
           format: uri
@@ -14650,17 +14886,17 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                comment:
+                  type: string
             en:
               type: object
               properties:
                 comment:
                   type: string
             de:
-              type: object
-              properties:
-                comment:
-                  type: string
-            el:
               type: object
               properties:
                 comment:
@@ -14704,17 +14940,17 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
             en:
               type: object
               properties:
                 name:
                   type: string
             de:
-              type: object
-              properties:
-                name:
-                  type: string
-            el:
               type: object
               properties:
                 name:
@@ -14749,6 +14985,7 @@ components:
           type: integer
         key:
           type: string
+          title: Κλειδί
           maxLength: 255
         value:
           type: string
@@ -14766,6 +15003,21 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
+                url:
+                  type: string
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                description:
+                  type: string
+                buttonLabel:
+                  type: string
             en:
               type: object
               properties:
@@ -14782,21 +15034,6 @@ components:
                 buttonLabel:
                   type: string
             de:
-              type: object
-              properties:
-                name:
-                  type: string
-                url:
-                  type: string
-                title:
-                  type: string
-                subtitle:
-                  type: string
-                description:
-                  type: string
-                buttonLabel:
-                  type: string
-            el:
               type: object
               properties:
                 name:
@@ -14864,6 +15101,17 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
+                url:
+                  type: string
+                title:
+                  type: string
+                description:
+                  type: string
             en:
               type: object
               properties:
@@ -14876,17 +15124,6 @@ components:
                 description:
                   type: string
             de:
-              type: object
-              properties:
-                name:
-                  type: string
-                url:
-                  type: string
-                title:
-                  type: string
-                description:
-                  type: string
-            el:
               type: object
               properties:
                 name:
@@ -14921,6 +15158,15 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+                url:
+                  type: string
             en:
               type: object
               properties:
@@ -14931,15 +15177,6 @@ components:
                 url:
                   type: string
             de:
-              type: object
-              properties:
-                title:
-                  type: string
-                content:
-                  type: string
-                url:
-                  type: string
-            el:
               type: object
               properties:
                 title:
@@ -15077,17 +15314,17 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
             en:
               type: object
               properties:
                 name:
                   type: string
             de:
-              type: object
-              properties:
-                name:
-                  type: string
-            el:
               type: object
               properties:
                 name:
@@ -15155,6 +15392,21 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                searchDocument:
+                  type: string
+                searchVector:
+                  type: string
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
+                  type: string
             en:
               type: object
               properties:
@@ -15171,21 +15423,6 @@ components:
                 searchVectorDirty:
                   type: string
             de:
-              type: object
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
-                  type: string
-            el:
               type: object
               properties:
                 name:
@@ -15287,8 +15524,10 @@ components:
         discountPercent:
           type: number
           format: double
-          maximum: 100.0
-          minimum: 0.0
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
         discountValue:
           type: number
           format: double
@@ -15354,6 +15593,13 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
             en:
               type: object
               properties:
@@ -15362,13 +15608,6 @@ components:
                 description:
                   type: string
             de:
-              type: object
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-            el:
               type: object
               properties:
                 name:
@@ -15500,17 +15739,17 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                title:
+                  type: string
             en:
               type: object
               properties:
                 title:
                   type: string
             de:
-              type: object
-              properties:
-                title:
-                  type: string
-            el:
               type: object
               properties:
                 title:
@@ -15523,6 +15762,7 @@ components:
         image:
           type: string
           format: uri
+          title: Εικόνα
         thumbnail:
           type: string
           format: uri
@@ -15569,17 +15809,17 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                comment:
+                  type: string
             en:
               type: object
               properties:
                 comment:
                   type: string
             de:
-              type: object
-              properties:
-                comment:
-                  type: string
-            el:
               type: object
               properties:
                 comment:
@@ -15666,17 +15906,17 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
             en:
               type: object
               properties:
                 name:
                   type: string
             de:
-              type: object
-              properties:
-                name:
-                  type: string
-            el:
               type: object
               properties:
                 name:
@@ -15720,6 +15960,127 @@ components:
           format: email
       required:
       - email
+    SearchBlogPost:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchBlogPostResult'
+        headlines:
+          type: object
+          additionalProperties:
+            type: string
+        searchRanks:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+        resultCount:
+          type: integer
+        similarities:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+        distances:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+      required:
+      - distances
+      - headlines
+      - resultCount
+      - results
+      - searchRanks
+      - similarities
+    SearchBlogPostResult:
+      type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        mainImageFilename:
+          type: string
+        absoluteUrl:
+          type: string
+        translations:
+          type: object
+          properties:
+            el:
+              type: object
+              properties:
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                body:
+                  type: string
+                searchDocument:
+                  type: string
+                searchVector:
+                  type: string
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
+                  type: string
+            en:
+              type: object
+              properties:
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                body:
+                  type: string
+                searchDocument:
+                  type: string
+                searchVector:
+                  type: string
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
+                  type: string
+            de:
+              type: object
+              properties:
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                body:
+                  type: string
+                searchDocument:
+                  type: string
+                searchVector:
+                  type: string
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
+                  type: string
+        searchRank:
+          type: number
+          format: double
+          readOnly: true
+        headline:
+          type: string
+          readOnly: true
+        similarity:
+          type: number
+          format: double
+          readOnly: true
+      required:
+      - absoluteUrl
+      - headline
+      - id
+      - mainImageFilename
+      - searchRank
+      - similarity
+      - slug
+      - translations
     SearchProduct:
       type: object
       properties:
@@ -15770,6 +16131,21 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                searchDocument:
+                  type: string
+                searchVector:
+                  type: string
+                searchDocumentDirty:
+                  type: string
+                searchVectorDirty:
+                  type: string
             en:
               type: object
               properties:
@@ -15786,21 +16162,6 @@ components:
                 searchVectorDirty:
                   type: string
             de:
-              type: object
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
-                  type: string
-            el:
               type: object
               properties:
                 name:
@@ -15842,6 +16203,7 @@ components:
           type: integer
         key:
           type: string
+          title: Κλειδί
           maxLength: 255
         value:
           type: string
@@ -15863,6 +16225,21 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
+                url:
+                  type: string
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                description:
+                  type: string
+                buttonLabel:
+                  type: string
             en:
               type: object
               properties:
@@ -15879,21 +16256,6 @@ components:
                 buttonLabel:
                   type: string
             de:
-              type: object
-              properties:
-                name:
-                  type: string
-                url:
-                  type: string
-                title:
-                  type: string
-                subtitle:
-                  type: string
-                description:
-                  type: string
-                buttonLabel:
-                  type: string
-            el:
               type: object
               properties:
                 name:
@@ -15973,6 +16335,17 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
+                url:
+                  type: string
+                title:
+                  type: string
+                description:
+                  type: string
             en:
               type: object
               properties:
@@ -15985,17 +16358,6 @@ components:
                 description:
                   type: string
             de:
-              type: object
-              properties:
-                name:
-                  type: string
-                url:
-                  type: string
-                title:
-                  type: string
-                description:
-                  type: string
-            el:
               type: object
               properties:
                 name:
@@ -16037,6 +16399,7 @@ components:
           readOnly: true
         provider:
           type: string
+          title: Πάροχος
           maxLength: 200
         uid:
           type: string
@@ -16045,10 +16408,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Τελευταία σύνδεση
         dateJoined:
           type: string
           format: date-time
           readOnly: true
+          title: Ημερομηνία ένταξης
       required:
       - dateJoined
       - id
@@ -16088,6 +16453,15 @@ components:
         translations:
           type: object
           properties:
+            el:
+              type: object
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+                url:
+                  type: string
             en:
               type: object
               properties:
@@ -16098,15 +16472,6 @@ components:
                 url:
                   type: string
             de:
-              type: object
-              properties:
-                title:
-                  type: string
-                content:
-                  type: string
-                url:
-                  type: string
-            el:
               type: object
               properties:
                 title:
@@ -16273,7 +16638,7 @@ components:
       type: string
       description: |-
         * `str` - String
-        * `int` - Integer
+        * `int` - Ακέραιος
         * `bool` - Boolean
         * `dict` - Dictionary
         * `list` - List
@@ -16308,7 +16673,6 @@ components:
       - id
       - updatedAt
       - uuid
-      - value
     VerifyEmail:
       type: object
       properties:

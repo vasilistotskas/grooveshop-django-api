@@ -38,9 +38,13 @@ def prepare_translation_search_document(
     model_instance, language_code: str, fields: list[str]
 ) -> str:
     translation = model_instance.translations.get(language_code=language_code)
-    document_parts = [getattr(translation, field) for field in fields]
-    document_parts = [remove_html_tags(part) for part in document_parts]
-    return " ".join(filter(None, document_parts))
+    document_parts = []
+    for field in fields:
+        content = getattr(translation, field, None)
+        if content is not None:
+            cleaned_content = remove_html_tags(content)
+            document_parts.append(cleaned_content)
+    return " ".join(document_parts)
 
 
 def update_translation_search_vectors(

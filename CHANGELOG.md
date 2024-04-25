@@ -3,7 +3,17 @@
 
 
 
+## v0.112.0 (2024-04-25)
+
+### Feature
+
+* feat: Add caching in search results API ([`0fe6179`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0fe61795e7fffa1da8226e4383d5c65fba3c5f11))
+
 ## v0.111.0 (2024-04-25)
+
+### Chore
+
+* chore(release): release version 0.111.0 [skip ci] ([`cbdf4ed`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cbdf4edaece9a1f7bb755834b09c6c584d3f04b8))
 
 ### Feature
 

@@ -92,7 +92,6 @@ class BlogPostAdmin(TranslatableAdmin):
     )
     list_editable = (
         "slug",
-        "published_at",
         "is_published",
     )
     search_fields = (

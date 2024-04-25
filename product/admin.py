@@ -5,6 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext
 from mptt.admin import DraggableMPTTAdmin
 from parler.admin import TranslatableAdmin
+from parler.admin import TranslatableTabularInline
 
 from core.admin import ExportModelAdmin
 from product.models.category import ProductCategory
@@ -76,7 +77,7 @@ class FavouriteAdmin(admin.ModelAdmin):
 
 
 @admin_thumbnails.thumbnail("image")
-class ProductImageInline(admin.TabularInline):
+class ProductImageInline(TranslatableTabularInline):
     model = ProductImage
     exclude = ["thumbnail"]
     readonly_fields = ("id",)

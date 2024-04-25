@@ -3,7 +3,17 @@
 
 
 
+## v0.110.1 (2024-04-25)
+
+### Fix
+
+* fix: `prepare_translation_search_document` and `remove_html_tags` fix ([`1f61bb9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1f61bb96e868d655c2faa00d1aeaca231b3124a5))
+
 ## v0.110.0 (2024-04-24)
+
+### Chore
+
+* chore(release): release version 0.110.0 [skip ci] ([`16e5a85`](https://github.com/vasilistotskas/grooveshop-django-api/commit/16e5a85271ee97467be3804ab8d210bc7fd45640))
 
 ### Feature
 

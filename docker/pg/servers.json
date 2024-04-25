@@ -8,7 +8,8 @@
             "Username": "devuser",
             "Password": "changeme",
             "Db": "devdb",
-            "SslMode": "prefer"
+            "SSLMode": "prefer",
+            "MaintenanceDB": "postgres"
         }
     }
 }

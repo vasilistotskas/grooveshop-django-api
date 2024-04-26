@@ -29,7 +29,7 @@ SESSION_PREFIX = "session:"
 USER_AUTHENTICATED = f"{SESSION_PREFIX}user_authenticated:"
 USER_UNAUTHENTICATED = f"{SESSION_PREFIX}user_unauthenticated:"
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "app.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
 
 class CustomCache(BaseCache):

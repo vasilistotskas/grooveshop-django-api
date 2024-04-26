@@ -5,8 +5,8 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.test import TestCase
 
-from app.settings import BASE_DIR
 from helpers.seed import get_or_create_default_image
+from settings import BASE_DIR
 
 
 @override_settings(

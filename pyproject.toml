@@ -176,11 +176,11 @@ match-dir = "^(?!migrations|node_modules|static|templates|venv).*$"
 ignore = ["E203", "D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107", "D203", "D213", "D407", "D202"]
 
 [tool.pytest.ini_options]
-DJANGO_SETTINGS_MODULE = "app.settings"
+DJANGO_SETTINGS_MODULE = "settings"
 python_files = ["test_*.py", "*_test.py", "testing/python/*.py"]
 
 [tool.mypy]
 plugins = ["mypy_django_plugin.main"]
 
 [tool.django-stubs]
-django_settings_module = "app.settings"
+django_settings_module = "settings"

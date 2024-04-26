@@ -13,7 +13,7 @@ from channels.layers import get_channel_layer
 from config.logging import config_logging
 
 CELERY_LOGGER_NAME = "celery"
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "app.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 logger = logging.getLogger("celery")
 
 
@@ -23,7 +23,7 @@ def config_loggers(*args, **kwags):
 
 
 def create_celery_app():
-    tasker = Celery("app")
+    tasker = Celery("core")
     tasker.conf.enable_utc = False
     tasker.conf.update(timezone=os.getenv("TIME_ZONE", "Europe/Athens"))
     tasker.config_from_object("django.conf:settings", namespace="CELERY")

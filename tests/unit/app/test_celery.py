@@ -11,12 +11,12 @@ from unittest.mock import patch
 from django.conf import settings
 from django.test import TestCase
 
-from app import celery
+from core import celery
 from core.tasks import cleanup_log_files_task
 
 
 class CeleryConfigTestCase(TestCase):
-    @patch("app.celery.Celery")
+    @patch("core.celery.Celery")
     def test_create_celery_app(self, mock_celery):
         mock_celery_instance = mock_celery.return_value
 
@@ -28,7 +28,7 @@ class CeleryConfigTestCase(TestCase):
         self.assertTrue(app.autodiscover_tasks.called)
 
     @patch.dict(os.environ, {"DEBUG": "True"})
-    @patch("app.celery.create_celery_app")
+    @patch("core.celery.create_celery_app")
     def test_debug_task_with_debug_true(self, mock_create_celery_app):
         celery.app = mock_create_celery_app.return_value
         celery.debug_task = Mock()
@@ -39,7 +39,7 @@ class CeleryConfigTestCase(TestCase):
         self.assertTrue(celery.debug_task.called)
 
     @patch.dict(os.environ, {"DEBUG": "False"})
-    @patch("app.celery.create_celery_app")
+    @patch("core.celery.create_celery_app")
     def test_debug_task_with_debug_false(self, mock_create_celery_app):
         celery.app = mock_create_celery_app.return_value
         celery.debug_task = Mock()
@@ -49,7 +49,7 @@ class CeleryConfigTestCase(TestCase):
 
         self.assertTrue(celery.debug_task.called)
 
-    @patch("app.celery.get_channel_layer")
+    @patch("core.celery.get_channel_layer")
     @patch("os.getenv")
     @patch.dict(os.environ, {"DEBUG": "True"})
     def test_debug_task_notification_with_debug_true(

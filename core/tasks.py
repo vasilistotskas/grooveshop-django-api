@@ -15,8 +15,8 @@ from django.db import transaction
 from django.template.loader import render_to_string
 from django.utils.timezone import now
 
-from app import celery_app
 from blog.models.post import BlogPost
+from core import celery_app
 from core.search import update_translation_search_documents
 from core.search import update_translation_search_vectors
 from product.models.product import Product

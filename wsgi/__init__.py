@@ -19,14 +19,14 @@ from django.utils.functional import SimpleLazyObject
 
 from wsgi.health_check import health_check
 
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
+
 
 def get_allowed_host_lazy():
     from django.conf import settings
 
     return settings.ALLOWED_HOSTS[0]
 
-
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "app.settings")
 
 application = get_wsgi_application()
 application = health_check(application, "/health/")

@@ -19,7 +19,7 @@ from asgi.gzip_compression import gzip_compression
 from asgi.health_check import health_check
 from notification.consumers import NotificationConsumer
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "app.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
 django_asgi_app = get_asgi_application()
 django_asgi_app = health_check(

@@ -4,7 +4,7 @@ import os
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 
-from app.settings import BASE_DIR
+from settings import BASE_DIR
 
 DEFAULT_IMAGE_PATH = os.path.join(BASE_DIR, "static/images/no_photo.jpg")
 

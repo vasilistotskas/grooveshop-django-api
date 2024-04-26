@@ -70,6 +70,7 @@ class NotificationUserAdmin(admin.ModelAdmin):
     ]
     search_fields = [
         "user__email",
+        "user__username",
     ]
     readonly_fields = [
         "created_at",

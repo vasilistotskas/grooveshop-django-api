@@ -48,6 +48,7 @@ class AuthenticationSerializer(UserDetailsSerializer):
         fields = UserDetailsSerializer.Meta.fields + (
             "id",
             "email",
+            "username",
             "image",
             "first_name",
             "last_name",

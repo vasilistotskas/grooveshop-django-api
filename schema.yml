@@ -11508,11 +11508,15 @@ components:
         id:
           type: integer
           readOnly: true
+        username:
+          type: string
+          nullable: true
+          title: Όνομα χρήστη
+          maxLength: 30
         image:
           type: string
           format: uri
           nullable: true
-          title: Εικόνα
         phone:
           type: string
         city:
@@ -13616,11 +13620,15 @@ components:
         id:
           type: integer
           readOnly: true
+        username:
+          type: string
+          nullable: true
+          title: Όνομα χρήστη
+          maxLength: 30
         image:
           type: string
           format: uri
           nullable: true
-          title: Εικόνα
         phone:
           type: string
         city:
@@ -14850,7 +14858,6 @@ components:
         image:
           type: string
           format: uri
-          title: Εικόνα
         thumbnail:
           type: string
           format: uri
@@ -15762,7 +15769,6 @@ components:
         image:
           type: string
           format: uri
-          title: Εικόνα
         thumbnail:
           type: string
           format: uri
@@ -16638,7 +16644,7 @@ components:
       type: string
       description: |-
         * `str` - String
-        * `int` - Ακέραιος
+        * `int` - Integer
         * `bool` - Boolean
         * `dict` - Dictionary
         * `list` - List

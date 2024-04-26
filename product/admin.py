@@ -130,6 +130,7 @@ class ReviewAdmin(TranslatableAdmin):
     search_fields = [
         "translations__comment",
         "user__email",
+        "user__username",
         "product__translations__name",
     ]
 

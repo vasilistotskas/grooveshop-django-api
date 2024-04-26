@@ -39,7 +39,7 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
     ordering_fields = ["created_at", "status"]
     filterset_fields = ["user_id", "status"]
     ordering = ["-created_at"]
-    search_fields = ["user__email", "user_id"]
+    search_fields = ["user__email", "user__username", "user_id"]
 
     serializers = {
         "default": OrderSerializer,

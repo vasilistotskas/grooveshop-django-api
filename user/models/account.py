@@ -20,6 +20,7 @@ from phonenumber_field.modelfields import PhoneNumberField
 
 from core import caches
 from core.caches import cache_instance
+from core.generators import UserNameGenerator
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
 from user.enum.account import UserRole
@@ -29,21 +30,25 @@ User = settings.AUTH_USER_MODEL
 
 class UserAccountManager(BaseUserManager):
     def create_user(self, email, password, **extra_fields) -> UserAccount:
-        """Create and save a user with the given username, email, and password."""
         if not email:
             raise ValueError("Users must have an email address")
         email: str = self.normalize_email(email)
-        user: UserAccount = self.model(email=email, **extra_fields)
+        username = extra_fields.pop(
+            "username", None
+        ) or UserNameGenerator().generate_username(email)
+        user: UserAccount = self.model(email=email, username=username, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
         return user
 
     def _create_user(self, email, password, **extra_fields) -> UserAccount:
-        """Create and save a user with the given username, email, and password."""
         if not email:
             raise ValueError("Users must have an email address")
         email: str = self.normalize_email(email)
-        user: UserAccount = self.model(email=email, **extra_fields)
+        username = extra_fields.pop(
+            "username", None
+        ) or UserNameGenerator().generate_username(email)
+        user: UserAccount = self.model(email=email, username=username, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
         return user
@@ -62,6 +67,13 @@ class UserAccountManager(BaseUserManager):
 
 class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinModel):
     id = models.BigAutoField(primary_key=True)
+    username = models.CharField(
+        _("Username"),
+        max_length=30,
+        unique=True,
+        blank=True,
+        null=True,
+    )
     email = models.EmailField(_("Email Address"), max_length=254, unique=True)
     first_name = models.CharField(
         _("First Name"), max_length=255, blank=True, null=True
@@ -118,6 +130,7 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
                 name="user_account_trgm_idx",
                 fields=[
                     "email",
+                    "username",
                     "first_name",
                     "last_name",
                     "phone",
@@ -126,15 +139,15 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
                     "address",
                     "place",
                 ],
-                opclasses=["gin_trgm_ops"] * 8,
+                opclasses=["gin_trgm_ops"] * 9,
             ),
         ]
 
     def __unicode__(self):
-        return self.email
+        return self.username if self.username else self.email
 
     def __str__(self):
-        return self.email
+        return self.username if self.username else self.email
 
     def remove_all_sessions(self, request: HttpRequest) -> None:
         user_id = self.pk

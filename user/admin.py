@@ -8,6 +8,7 @@ from user.models.address import UserAddress
 class UserAccountAdmin(admin.ModelAdmin):
     list_display = [
         "email",
+        "username",
         "first_name",
         "last_name",
         "phone",
@@ -22,7 +23,7 @@ class UserAccountAdmin(admin.ModelAdmin):
         "is_active",
         "is_staff",
     ]
-    search_fields = ["email", "phone", "first_name", "last_name"]
+    search_fields = ["email", "username", "phone", "first_name", "last_name"]
 
 
 @admin.register(UserAddress)
@@ -46,4 +47,11 @@ class UserAddressAdmin(admin.ModelAdmin):
         "is_main",
     ]
     list_filter = ["floor", "location_type"]
-    search_fields = ["user__email", "title", "first_name", "last_name", "street"]
+    search_fields = [
+        "user__email",
+        "user__username",
+        "title",
+        "first_name",
+        "last_name",
+        "street",
+    ]

@@ -14,6 +14,7 @@ from blog.models.tag import BlogTag
 class BlogAuthorAdmin(TranslatableAdmin):
     search_fields = (
         "user__email",
+        "user__username",
         "user__first_name",
         "user__last_name",
     )
@@ -130,6 +131,7 @@ class BlogCommentAdmin(TranslatableAdmin, DraggableMPTTAdmin):
     date_hierarchy = "created_at"
     search_fields = (
         "user__email",
+        "user__username",
         "user__first_name",
         "user__last_name",
         "post__translations__title",

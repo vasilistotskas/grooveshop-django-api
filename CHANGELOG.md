@@ -3,7 +3,17 @@
 
 
 
+## v0.113.0 (2024-04-26)
+
+### Feature
+
+* feat: Add username for user account ([`456db5a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/456db5a32c7c8571e2e4a42a0ed73e43017ece2e))
+
 ## v0.112.2 (2024-04-25)
+
+### Chore
+
+* chore(release): release version 0.112.2 [skip ci] ([`38aab9f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/38aab9fcd32e463975956bd65e7b24a23fa4f995))
 
 ### Fix
 

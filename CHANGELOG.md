@@ -3,7 +3,17 @@
 
 
 
+## v0.114.0 (2024-04-26)
+
+### Feature
+
+* feat: Remove `app`  module, move `settings.py` in root ([`c773a3b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c773a3b21446a0ad0135fb89a59c31ecc30b292c))
+
 ## v0.113.0 (2024-04-26)
+
+### Chore
+
+* chore(release): release version 0.113.0 [skip ci] ([`82f18c1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/82f18c1ab296a223b1cedc15212e94d6f81bafb5))
 
 ### Feature
 

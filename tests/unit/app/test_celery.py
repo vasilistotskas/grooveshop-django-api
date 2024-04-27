@@ -73,7 +73,10 @@ class CeleryConfigTestCase(TestCase):
                     {
                         "en": {
                             "message": "This is a test notification",
-                        }
+                        },
+                        "el": {
+                            "message": "Αυτή είναι μια δοκιμαστική ειδοποίηση",
+                        },
                     },
                 ],
             },

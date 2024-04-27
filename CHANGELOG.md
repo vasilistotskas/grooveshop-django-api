@@ -3,7 +3,21 @@
 
 
 
+## v0.115.0 (2024-04-27)
+
+### Feature
+
+* feat: Dev env improvements, core urls.py cleanup and Bump Versions ([`6532f5e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6532f5e0eb56195efe5c6724b552afdbb87214fe))
+
+### Fix
+
+* fix: pass the celery test for updated method ([`45f4ec2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/45f4ec22b811e3f9fbd71dd5de66e08ff827fe93))
+
 ## v0.114.0 (2024-04-26)
+
+### Chore
+
+* chore(release): release version 0.114.0 [skip ci] ([`eba4760`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eba47609151059ef5c2c420c585f4e8d8f751310))
 
 ### Feature
 

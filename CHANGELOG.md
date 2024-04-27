@@ -3,7 +3,17 @@
 
 
 
+## v0.115.1 (2024-04-27)
+
+### Fix
+
+* fix: correct mfa test ([`a447c5d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a447c5d0933a86527f3338e491e995cc6cf68be0))
+
 ## v0.115.0 (2024-04-27)
+
+### Chore
+
+* chore(release): release version 0.115.0 [skip ci] ([`e24f792`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e24f792869c23a1f71d9fdcd7edfa85fe398e94f))
 
 ### Feature
 

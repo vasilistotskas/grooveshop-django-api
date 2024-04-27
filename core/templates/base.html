@@ -139,7 +139,7 @@
     {% django_browser_reload_script %}
     <script type="text/javascript">
       const websocketProtocol = window.location.protocol === "https:" ? "wss" : "ws";
-      const wsEndpoint = `${websocketProtocol}://${window.location.host}/ws/notifications/`;
+      const wsEndpoint = `${websocketProtocol}://${window.location.host}/ws/notifications`;
       const socket = new WebSocket(wsEndpoint);
 
       socket.addEventListener("message", (event) => {
@@ -148,7 +148,7 @@
         showNotification(data);
       });
 
-      function showNotification(notificationHTML) {
+      function showNotification(notification) {
         const notificationsContainer = document.getElementById("notifications");
         notificationsContainer.classList.add(
           "grid",
@@ -159,8 +159,8 @@
         const alertDiv = document.createElement("div");
         alertDiv.classList.add(
           "flex",
+          "flex-col",
           "gap-2",
-          "items-center",
           "bg-blue-100",
           "border",
           "border-blue-400",
@@ -174,34 +174,47 @@
         );
 
         alertDiv.setAttribute("role", "alert");
-        alertDiv.innerHTML = notificationHTML;
 
+        // Displaying message based on user's preferred language or default
+        const message = notification.translations.find(t => t[notification.user.preferredLanguage]) || notification.translations[0];
+        const languageCode = Object.keys(message)[0];
+        const messageContent = message[languageCode].message;
+
+        const messagePara = document.createElement("p");
+        messagePara.textContent = messageContent;
+        alertDiv.appendChild(messagePara);
+
+        // Display link if available
+        if (notification.link) {
+          const linkElement = document.createElement("a");
+          linkElement.setAttribute("href", notification.link);
+          linkElement.setAttribute("target", "_blank");
+          linkElement.textContent = "More Info";
+          linkElement.classList.add("underline");
+          alertDiv.appendChild(linkElement);
+        }
+
+        // Close button for the notification
         const closeButton = document.createElement("button");
         closeButton.setAttribute("type", "button");
         closeButton.classList.add(
-          "h-full",
-          "relative",
-          "grid",
-          "items-center",
-          "justify-center",
-          "p-0"
-        )
-        closeButton.setAttribute("data-bs-dismiss", "alert");
-        closeButton.setAttribute("aria-label", "Close");
+          "absolute",
+          "top-0",
+          "right-0",
+          "bg-transparent",
+          "text-xl",
+          "leading-none",
+          "rounded",
+          "p-1"
+        );
+        closeButton.innerHTML = "&times;";
+        closeButton.onclick = () => notificationsContainer.removeChild(alertDiv);
 
-        const closeIcon = document.createElement("span");
-        closeIcon.classList.add("text-xl");
-        closeIcon.innerHTML = "&times;";
-
-        closeButton.addEventListener("click", () => {
-            notificationsContainer.removeChild(alertDiv);
-        });
-
-        closeButton.appendChild(closeIcon);
         alertDiv.appendChild(closeButton);
 
         notificationsContainer.appendChild(alertDiv);
       }
+
 
       socket.onopen = (event) => {
         console.log("WebSocket connection opened!", event);

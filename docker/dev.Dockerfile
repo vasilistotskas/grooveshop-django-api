@@ -10,6 +10,9 @@ WORKDIR /mnt/app
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
+# Update apk
+RUN apk update
+
 # install system dependencies
 RUN apk add --no-cache  \
     netcat-openbsd  \

@@ -4,7 +4,7 @@ info:
   version: 1.0.0
   description: Grooveshop API description
 paths:
-  /api/v1/api-token-auth/:
+  /api/v1/api-token-auth:
     post:
       operationId: api_v1_api_token_auth_create
       tags:
@@ -4551,6 +4551,16 @@ paths:
   /api/v1/notification/user:
     get:
       operationId: api_v1_notification_user_list
+      description: |-
+        This is the magic.
+
+        Overrides `.as_view()` so that it takes an `actions` keyword that performs
+        the binding of HTTP methods to actions on the Resource.
+
+        For example, to create a concrete view binding the 'GET' and 'POST' methods
+        to the 'list' and 'create' actions...
+
+        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - name: ordering
         required: false
@@ -4588,10 +4598,57 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedNotificationUserList'
+          description: ''
+    post:
+      operationId: api_v1_notification_user_create
+      description: |-
+        This is the magic.
+
+        Overrides `.as_view()` so that it takes an `actions` keyword that performs
+        the binding of HTTP methods to actions on the Resource.
+
+        For example, to create a concrete view binding the 'GET' and 'POST' methods
+        to the 'list' and 'create' actions...
+
+        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationUser'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationUser'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationUser'
+        required: true
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationUser'
           description: ''
   /api/v1/notification/user{format}:
     get:
       operationId: api_v1_notification_user_formatted_list
+      description: |-
+        This is the magic.
+
+        Overrides `.as_view()` so that it takes an `actions` keyword that performs
+        the binding of HTTP methods to actions on the Resource.
+
+        For example, to create a concrete view binding the 'GET' and 'POST' methods
+        to the 'list' and 'create' actions...
+
+        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: format
@@ -4637,9 +4694,386 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedNotificationUserList'
           description: ''
-  /api/v1/notification/user/mark_all_as_seen:
+    post:
+      operationId: api_v1_notification_user_formatted_create
+      description: |-
+        This is the magic.
+
+        Overrides `.as_view()` so that it takes an `actions` keyword that performs
+        the binding of HTTP methods to actions on the Resource.
+
+        For example, to create a concrete view binding the 'GET' and 'POST' methods
+        to the 'list' and 'create' actions...
+
+        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationUser'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationUser'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationUser'
+        required: true
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationUser'
+          description: ''
+  /api/v1/notification/user/{id}:
+    get:
+      operationId: api_v1_notification_user_retrieve
+      description: |-
+        This is the magic.
+
+        Overrides `.as_view()` so that it takes an `actions` keyword that performs
+        the binding of HTTP methods to actions on the Resource.
+
+        For example, to create a concrete view binding the 'GET' and 'POST' methods
+        to the 'list' and 'create' actions...
+
+        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationUser'
+          description: ''
+    put:
+      operationId: api_v1_notification_user_update
+      description: |-
+        This is the magic.
+
+        Overrides `.as_view()` so that it takes an `actions` keyword that performs
+        the binding of HTTP methods to actions on the Resource.
+
+        For example, to create a concrete view binding the 'GET' and 'POST' methods
+        to the 'list' and 'create' actions...
+
+        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationUser'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationUser'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationUser'
+        required: true
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationUser'
+          description: ''
+    patch:
+      operationId: api_v1_notification_user_partial_update
+      description: |-
+        This is the magic.
+
+        Overrides `.as_view()` so that it takes an `actions` keyword that performs
+        the binding of HTTP methods to actions on the Resource.
+
+        For example, to create a concrete view binding the 'GET' and 'POST' methods
+        to the 'list' and 'create' actions...
+
+        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedNotificationUser'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedNotificationUser'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedNotificationUser'
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationUser'
+          description: ''
+    delete:
+      operationId: api_v1_notification_user_destroy
+      description: |-
+        This is the magic.
+
+        Overrides `.as_view()` so that it takes an `actions` keyword that performs
+        the binding of HTTP methods to actions on the Resource.
+
+        For example, to create a concrete view binding the 'GET' and 'POST' methods
+        to the 'list' and 'create' actions...
+
+        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /api/v1/notification/user/{id}{format}:
+    get:
+      operationId: api_v1_notification_user_formatted_retrieve
+      description: |-
+        This is the magic.
+
+        Overrides `.as_view()` so that it takes an `actions` keyword that performs
+        the binding of HTTP methods to actions on the Resource.
+
+        For example, to create a concrete view binding the 'GET' and 'POST' methods
+        to the 'list' and 'create' actions...
+
+        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationUser'
+          description: ''
+    put:
+      operationId: api_v1_notification_user_formatted_update
+      description: |-
+        This is the magic.
+
+        Overrides `.as_view()` so that it takes an `actions` keyword that performs
+        the binding of HTTP methods to actions on the Resource.
+
+        For example, to create a concrete view binding the 'GET' and 'POST' methods
+        to the 'list' and 'create' actions...
+
+        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationUser'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationUser'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationUser'
+        required: true
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationUser'
+          description: ''
+    patch:
+      operationId: api_v1_notification_user_formatted_partial_update
+      description: |-
+        This is the magic.
+
+        Overrides `.as_view()` so that it takes an `actions` keyword that performs
+        the binding of HTTP methods to actions on the Resource.
+
+        For example, to create a concrete view binding the 'GET' and 'POST' methods
+        to the 'list' and 'create' actions...
+
+        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedNotificationUser'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedNotificationUser'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedNotificationUser'
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationUser'
+          description: ''
+    delete:
+      operationId: api_v1_notification_user_formatted_destroy
+      description: |-
+        This is the magic.
+
+        Overrides `.as_view()` so that it takes an `actions` keyword that performs
+        the binding of HTTP methods to actions on the Resource.
+
+        For example, to create a concrete view binding the 'GET' and 'POST' methods
+        to the 'list' and 'create' actions...
+
+        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /api/v1/notification/user/{id}/mark_all_as_seen:
     post:
       operationId: api_v1_notification_user_mark_all_as_seen_create
+      description: |-
+        This is the magic.
+
+        Overrides `.as_view()` so that it takes an `actions` keyword that performs
+        the binding of HTTP methods to actions on the Resource.
+
+        For example, to create a concrete view binding the 'GET' and 'POST' methods
+        to the 'list' and 'create' actions...
+
+        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
       tags:
       - api
       requestBody:
@@ -4665,9 +5099,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/NotificationUser'
           description: ''
-  /api/v1/notification/user/mark_all_as_seen{format}:
+  /api/v1/notification/user/{id}/mark_all_as_seen{format}:
     post:
       operationId: api_v1_notification_user_mark_all_as_seen_formatted_create
+      description: |-
+        This is the magic.
+
+        Overrides `.as_view()` so that it takes an `actions` keyword that performs
+        the binding of HTTP methods to actions on the Resource.
+
+        For example, to create a concrete view binding the 'GET' and 'POST' methods
+        to the 'list' and 'create' actions...
+
+        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: format
@@ -4675,6 +5119,11 @@ paths:
           type: string
           enum:
           - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
         required: true
       tags:
       - api
@@ -4701,9 +5150,25 @@ paths:
               schema:
                 $ref: '#/components/schemas/NotificationUser'
           description: ''
-  /api/v1/notification/user/mark_all_as_unseen:
+  /api/v1/notification/user/{id}/mark_all_as_unseen:
     post:
       operationId: api_v1_notification_user_mark_all_as_unseen_create
+      description: |-
+        This is the magic.
+
+        Overrides `.as_view()` so that it takes an `actions` keyword that performs
+        the binding of HTTP methods to actions on the Resource.
+
+        For example, to create a concrete view binding the 'GET' and 'POST' methods
+        to the 'list' and 'create' actions...
+
+        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
       tags:
       - api
       requestBody:
@@ -4729,9 +5194,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/NotificationUser'
           description: ''
-  /api/v1/notification/user/mark_all_as_unseen{format}:
+  /api/v1/notification/user/{id}/mark_all_as_unseen{format}:
     post:
       operationId: api_v1_notification_user_mark_all_as_unseen_formatted_create
+      description: |-
+        This is the magic.
+
+        Overrides `.as_view()` so that it takes an `actions` keyword that performs
+        the binding of HTTP methods to actions on the Resource.
+
+        For example, to create a concrete view binding the 'GET' and 'POST' methods
+        to the 'list' and 'create' actions...
+
+        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: format
@@ -4739,6 +5214,11 @@ paths:
           type: string
           enum:
           - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
         required: true
       tags:
       - api
@@ -4765,9 +5245,25 @@ paths:
               schema:
                 $ref: '#/components/schemas/NotificationUser'
           description: ''
-  /api/v1/notification/user/mark_as_seen:
+  /api/v1/notification/user/{id}/mark_as_seen:
     post:
       operationId: api_v1_notification_user_mark_as_seen_create
+      description: |-
+        This is the magic.
+
+        Overrides `.as_view()` so that it takes an `actions` keyword that performs
+        the binding of HTTP methods to actions on the Resource.
+
+        For example, to create a concrete view binding the 'GET' and 'POST' methods
+        to the 'list' and 'create' actions...
+
+        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
       tags:
       - api
       requestBody:
@@ -4793,9 +5289,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/NotificationUserAction'
           description: ''
-  /api/v1/notification/user/mark_as_seen{format}:
+  /api/v1/notification/user/{id}/mark_as_seen{format}:
     post:
       operationId: api_v1_notification_user_mark_as_seen_formatted_create
+      description: |-
+        This is the magic.
+
+        Overrides `.as_view()` so that it takes an `actions` keyword that performs
+        the binding of HTTP methods to actions on the Resource.
+
+        For example, to create a concrete view binding the 'GET' and 'POST' methods
+        to the 'list' and 'create' actions...
+
+        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: format
@@ -4803,6 +5309,11 @@ paths:
           type: string
           enum:
           - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
         required: true
       tags:
       - api
@@ -4829,9 +5340,25 @@ paths:
               schema:
                 $ref: '#/components/schemas/NotificationUserAction'
           description: ''
-  /api/v1/notification/user/mark_as_unseen:
+  /api/v1/notification/user/{id}/mark_as_unseen:
     post:
       operationId: api_v1_notification_user_mark_as_unseen_create
+      description: |-
+        This is the magic.
+
+        Overrides `.as_view()` so that it takes an `actions` keyword that performs
+        the binding of HTTP methods to actions on the Resource.
+
+        For example, to create a concrete view binding the 'GET' and 'POST' methods
+        to the 'list' and 'create' actions...
+
+        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
       tags:
       - api
       requestBody:
@@ -4857,9 +5384,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/NotificationUserAction'
           description: ''
-  /api/v1/notification/user/mark_as_unseen{format}:
+  /api/v1/notification/user/{id}/mark_as_unseen{format}:
     post:
       operationId: api_v1_notification_user_mark_as_unseen_formatted_create
+      description: |-
+        This is the magic.
+
+        Overrides `.as_view()` so that it takes an `actions` keyword that performs
+        the binding of HTTP methods to actions on the Resource.
+
+        For example, to create a concrete view binding the 'GET' and 'POST' methods
+        to the 'list' and 'create' actions...
+
+        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: format
@@ -4868,6 +5405,11 @@ paths:
           enum:
           - .json
         required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
       tags:
       - api
       requestBody:
@@ -4893,9 +5435,25 @@ paths:
               schema:
                 $ref: '#/components/schemas/NotificationUserAction'
           description: ''
-  /api/v1/notification/user/unseen_count:
+  /api/v1/notification/user/{id}/unseen_count:
     get:
       operationId: api_v1_notification_user_unseen_count_retrieve
+      description: |-
+        This is the magic.
+
+        Overrides `.as_view()` so that it takes an `actions` keyword that performs
+        the binding of HTTP methods to actions on the Resource.
+
+        For example, to create a concrete view binding the 'GET' and 'POST' methods
+        to the 'list' and 'create' actions...
+
+        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
       tags:
       - api
       security:
@@ -4909,9 +5467,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/NotificationUser'
           description: ''
-  /api/v1/notification/user/unseen_count{format}:
+  /api/v1/notification/user/{id}/unseen_count{format}:
     get:
       operationId: api_v1_notification_user_unseen_count_formatted_retrieve
+      description: |-
+        This is the magic.
+
+        Overrides `.as_view()` so that it takes an `actions` keyword that performs
+        the binding of HTTP methods to actions on the Resource.
+
+        For example, to create a concrete view binding the 'GET' and 'POST' methods
+        to the 'list' and 'create' actions...
+
+        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: format
@@ -4919,6 +5487,11 @@ paths:
           type: string
           enum:
           - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
         required: true
       tags:
       - api
@@ -8397,160 +8970,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedSearchProductList'
           description: ''
-  /api/v1/settings/:
-    get:
-      operationId: api_v1_settings_list
-      parameters:
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
-        schema:
-          type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
-        schema:
-          type: integer
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedSettingsList'
-          description: ''
-    post:
-      operationId: api_v1_settings_create
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/Settings'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/Settings'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Settings'
-        required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Settings'
-          description: ''
-  /api/v1/settings/{key}/:
-    get:
-      operationId: api_v1_settings_retrieve
-      parameters:
-      - in: path
-        name: key
-        schema:
-          type: string
-        required: true
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Settings'
-          description: ''
-    put:
-      operationId: api_v1_settings_update
-      parameters:
-      - in: path
-        name: key
-        schema:
-          type: string
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/Settings'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/Settings'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Settings'
-        required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Settings'
-          description: ''
-    patch:
-      operationId: api_v1_settings_partial_update
-      parameters:
-      - in: path
-        name: key
-        schema:
-          type: string
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedSettings'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedSettings'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedSettings'
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Settings'
-          description: ''
-    delete:
-      operationId: api_v1_settings_destroy
-      parameters:
-      - in: path
-        name: key
-        schema:
-          type: string
-        required: true
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '204':
-          description: No response body
   /api/v1/slide:
     get:
       operationId: api_v1_slide_list
@@ -11442,6 +11861,160 @@ paths:
       responses:
         '204':
           description: No response body
+  /settings:
+    get:
+      operationId: settings_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: pageSize
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - settings
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSettingsList'
+          description: ''
+    post:
+      operationId: settings_create
+      tags:
+      - settings
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Settings'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Settings'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Settings'
+        required: true
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+          description: ''
+  /settings/{key}:
+    get:
+      operationId: settings_retrieve
+      parameters:
+      - in: path
+        name: key
+        schema:
+          type: string
+        required: true
+      tags:
+      - settings
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+          description: ''
+    put:
+      operationId: settings_update
+      parameters:
+      - in: path
+        name: key
+        schema:
+          type: string
+        required: true
+      tags:
+      - settings
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Settings'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Settings'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Settings'
+        required: true
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+          description: ''
+    patch:
+      operationId: settings_partial_update
+      parameters:
+      - in: path
+        name: key
+        schema:
+          type: string
+        required: true
+      tags:
+      - settings
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSettings'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSettings'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSettings'
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+          description: ''
+    delete:
+      operationId: settings_destroy
+      parameters:
+      - in: path
+        name: key
+        schema:
+          type: string
+        required: true
+      tags:
+      - settings
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: No response body
 components:
   schemas:
     ActivateTOTP:
@@ -11517,6 +12090,7 @@ components:
           type: string
           format: uri
           nullable: true
+          title: Εικόνα
         phone:
           type: string
         city:
@@ -12634,6 +13208,7 @@ components:
         * `2` - Other
     NotificationUser:
       type: object
+      description: Base serializer class.
       properties:
         id:
           type: integer
@@ -12650,6 +13225,7 @@ components:
       - user
     NotificationUserAction:
       type: object
+      description: Base serializer class.
       properties:
         notificationUserId:
           type: integer
@@ -13629,6 +14205,7 @@ components:
           type: string
           format: uri
           nullable: true
+          title: Εικόνα
         phone:
           type: string
         city:
@@ -14342,6 +14919,19 @@ components:
         mainImageFilename:
           type: string
           readOnly: true
+    PatchedNotificationUser:
+      type: object
+      description: Base serializer class.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        user:
+          type: integer
+        notification:
+          type: integer
+        seen:
+          type: boolean
     PatchedOrderCreateUpdate:
       type: object
       properties:
@@ -14858,6 +15448,7 @@ components:
         image:
           type: string
           format: uri
+          title: Εικόνα
         thumbnail:
           type: string
           format: uri
@@ -15769,6 +16360,7 @@ components:
         image:
           type: string
           format: uri
+          title: Εικόνα
         thumbnail:
           type: string
           format: uri
@@ -16644,7 +17236,7 @@ components:
       type: string
       description: |-
         * `str` - String
-        * `int` - Integer
+        * `int` - Ακέραιος
         * `bool` - Boolean
         * `dict` - Dictionary
         * `list` - List

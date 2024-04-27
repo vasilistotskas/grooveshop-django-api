@@ -60,7 +60,10 @@ def debug_task_notification(self):
                     {
                         "en": {
                             "message": "This is a test notification",
-                        }
+                        },
+                        "el": {
+                            "message": "Αυτή είναι μια δοκιμαστική ειδοποίηση",
+                        },
                     },
                 ],
             },

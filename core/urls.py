@@ -2,7 +2,7 @@ from django.conf import settings
 from django.conf.urls.i18n import i18n_patterns
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.urls import include
 from django.urls import path
@@ -14,7 +14,6 @@ from django_otp.plugins.otp_totp.models import TOTPDevice
 from drf_spectacular.views import SpectacularAPIView
 from drf_spectacular.views import SpectacularRedocView
 from drf_spectacular.views import SpectacularSwaggerView
-from rest_framework import routers
 
 from core.view import HomeView
 from core.view import SettingsListCreateView
@@ -22,9 +21,9 @@ from core.view import SettingsRetrieveUpdateDestroyView
 from core.view import upload_image
 from user.views.account import ObtainAuthTokenView
 
-app_name = "core"
+User = get_user_model()
 
-router = routers.SimpleRouter()
+app_name = "core"
 
 
 class OTPAdmin(OTPAdminSite):
@@ -40,26 +39,24 @@ urlpatterns = i18n_patterns(
     path("", HomeView.as_view(), name="home"),
     path(_("admin/"), admin_site_otp.urls),
     path(_("admin_no_otp/"), admin.site.urls),
-    path("accounts/", include("allauth.mfa.urls")),
-    path("accounts/", include("allauth.urls")),
-    path("settings/", SettingsListCreateView.as_view(), name="settings-list-create"),
+    path("upload_image", upload_image, name="upload_image"),
+    path("settings", SettingsListCreateView.as_view(), name="settings-list-create"),
     path(
-        "settings/<str:key>/",
+        "settings/<str:key>",
         SettingsRetrieveUpdateDestroyView.as_view(),
         name="settings-detail",
     ),
+    path("accounts/", include("allauth.mfa.urls")),
+    path("accounts/", include("allauth.urls")),
     # rosetta
     path("rosetta/", include("rosetta.urls")),
     # admin html editor
     path("tinymce/", include("tinymce.urls")),
-    path("upload_image", upload_image, name="upload_image"),
     # api
-    path("api/v1/api-token-auth/", ObtainAuthTokenView.as_view()),
     path("api/v1/auth/", include("authentication.urls.base")),
     path("api/v1/auth/", include("authentication.urls.registration")),
     path("api/v1/auth/", include("authentication.urls.social")),
     path("api/v1/auth/", include("authentication.urls.mfa")),
-    path("api/v1/", include(router.urls)),
     path("api/v1/", include("product.urls")),
     path("api/v1/", include("order.urls")),
     path("api/v1/", include("user.urls")),
@@ -74,14 +71,15 @@ urlpatterns = i18n_patterns(
     path("api/v1/", include("session.urls")),
     path("api/v1/", include("cart.urls")),
     path("api/v1/", include("notification.urls")),
-    path("api/v1/schema/", SpectacularAPIView.as_view(), name="schema"),
+    path("api/v1/api-token-auth", ObtainAuthTokenView.as_view()),
+    path("api/v1/schema", SpectacularAPIView.as_view(), name="schema"),
     path(
-        "api/v1/schema/swagger-ui/",
+        "api/v1/schema/swagger-ui",
         SpectacularSwaggerView.as_view(url_name="schema"),
         name="swagger-ui",
     ),
     path(
-        "api/v1/schema/redoc/",
+        "api/v1/schema/redoc",
         SpectacularRedocView.as_view(url_name="schema"),
         name="redoc",
     ),

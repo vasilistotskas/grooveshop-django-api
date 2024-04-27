@@ -54,9 +54,3 @@ class NotificationUser(TimeStampMixinModel, UUIDModel):
         if self.seen and self.seen_at is None:
             self.seen_at = tz.now()
         super().save(*args, **kwargs)
-
-    def mark_as_seen(self):
-        if not self.seen:
-            self.seen = True
-            self.seen_at = tz.now()
-            self.save()

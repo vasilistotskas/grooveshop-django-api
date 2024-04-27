@@ -28,7 +28,7 @@ django_asgi_app = health_check(
 django_asgi_app = gzip_compression(django_asgi_app)
 django_asgi_app = cors_handler(django_asgi_app)
 
-websocket_urlpatterns = [path("ws/notifications/", NotificationConsumer.as_asgi())]
+websocket_urlpatterns = [path("ws/notifications", NotificationConsumer.as_asgi())]
 
 
 application = ProtocolTypeRouter(

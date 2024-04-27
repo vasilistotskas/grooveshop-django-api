@@ -12,8 +12,6 @@ then
 fi
 
 python manage.py makemigrations && \
-python manage.py migrate && \
-python manage.py collectstatic --noinput && \
-python manage.py add_translation_indexes
+python manage.py migrate
 
 exec "$@"

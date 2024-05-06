@@ -90,6 +90,7 @@ PROJECT_APPS = [
 
 # Third-party apps
 THIRD_PARTY_APPS = [
+    "adrf",
     "rest_framework",
     "rest_framework.authtoken",
     "rest_framework_simplejwt.token_blacklist",
@@ -256,6 +257,7 @@ REST_FRAMEWORK = {
     "DEFAULT_METADATA_CLASS": "rest_framework.metadata.SimpleMetadata",
     # Other
     "COERCE_DECIMAL_TO_STRING": False,
+    "URL_FIELD_NAME": "url",
 }
 
 # Other general settings

@@ -1,20 +1,19 @@
-import importlib
-from typing import Dict
-from typing import Type
+from __future__ import annotations
 
+from adrf.serializers import ModelSerializer as AsyncModelSerializer
+from adrf.serializers import Serializer
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
-from rest_framework.relations import PrimaryKeyRelatedField
 
-from core.api.serializers import BaseExpandSerializer
+from core.api.asynchronous.relations import AsyncPrimaryKeyRelatedField
 from notification.models.user import NotificationUser
 
 User = get_user_model()
 
 
-class NotificationUserSerializer(BaseExpandSerializer):
-    user = PrimaryKeyRelatedField(queryset=User.objects.all())
-    notification = PrimaryKeyRelatedField(queryset=NotificationUser.objects.all())
+class NotificationUserSerializer(AsyncModelSerializer):
+    user = AsyncPrimaryKeyRelatedField(queryset=User.objects.all())
+    notification = AsyncPrimaryKeyRelatedField(queryset=NotificationUser.objects.all())
 
     class Meta:
         model = NotificationUser
@@ -25,18 +24,6 @@ class NotificationUserSerializer(BaseExpandSerializer):
             "seen",
         )
 
-    def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:
-        user_account_serializer = importlib.import_module(
-            "authentication.serializers"
-        ).AuthenticationSerializer
-        notification_serializer = importlib.import_module(
-            "notification.serializers.notification"
-        ).NotificationSerializer
-        return {
-            "user": user_account_serializer,
-            "notification": notification_serializer,
-        }
 
-
-class NotificationUserActionSerializer(serializers.Serializer):
+class NotificationUserActionSerializer(Serializer):
     notification_user_id = serializers.IntegerField()

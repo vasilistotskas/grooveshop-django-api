@@ -6,7 +6,6 @@ from allauth.mfa.totp import hotp_counter_from_time
 from allauth.mfa.totp import hotp_value
 from django.contrib.auth import get_user_model
 from django.urls import reverse
-from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 from rest_framework.test import APITestCase

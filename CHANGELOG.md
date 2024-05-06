@@ -3,7 +3,17 @@
 
 
 
+## v0.116.1 (2024-05-06)
+
+### Fix
+
+* fix: update `Notification` app urls ([`871294c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/871294c96f167dd4ef6ff6f6c548fa54566ec03b))
+
 ## v0.116.0 (2024-05-06)
+
+### Chore
+
+* chore(release): release version 0.116.0 [skip ci] ([`ca4112c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ca4112c0f56f0c7891fda9dddb2fd6518da3095d))
 
 ### Feature
 

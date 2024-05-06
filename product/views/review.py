@@ -49,7 +49,12 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
             self.permission_classes = [IsAuthenticated]
         return super().get_permissions()
 
-    @action(detail=False, methods=["POST"], throttle_classes=[BurstRateThrottle])
+    @action(
+        detail=False,
+        methods=["POST"],
+        throttle_classes=[BurstRateThrottle],
+        permission_classes=[IsAuthenticated],
+    )
     def user_product_review(self, request, *args, **kwargs) -> Response:
         if not request.user.is_authenticated:
             return Response(

@@ -4,6 +4,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from core.api.views import ExpandModelViewSet
@@ -30,31 +31,28 @@ class NotificationUserViewSet(
         "mark_as_unseen": NotificationUserActionSerializer,
     }
 
-    @action(detail=False, methods=["GET"])
+    @action(detail=False, methods=["GET"], permission_classes=[IsAuthenticated])
     def unseen_count(self, request):
         if request.user.is_anonymous:
             return Response(status=status.HTTP_401_UNAUTHORIZED)
         count = self.queryset.filter(user=request.user, seen=False).count()
         return Response({"count": count}, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=["POST"])
+    @action(detail=False, methods=["POST"], permission_classes=[IsAuthenticated])
     def mark_all_as_seen(self, request):
         if request.user.is_anonymous:
             return Response(status=status.HTTP_401_UNAUTHORIZED)
         self.queryset.filter(user=request.user, seen=False).update(seen=True)
         return Response({"success": True}, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=["POST"])
+    @action(detail=False, methods=["POST"], permission_classes=[IsAuthenticated])
     def mark_all_as_unseen(self, request):
         if request.user.is_anonymous:
             return Response(status=status.HTTP_401_UNAUTHORIZED)
         self.queryset.filter(user=request.user, seen=True).update(seen=False)
         return Response({"success": True}, status=status.HTTP_200_OK)
 
-    @action(
-        detail=False,
-        methods=["POST"],
-    )
+    @action(detail=False, methods=["POST"], permission_classes=[IsAuthenticated])
     def mark_as_seen(self, request):
         if request.user.is_anonymous:
             return Response(status=status.HTTP_401_UNAUTHORIZED)
@@ -68,10 +66,7 @@ class NotificationUserViewSet(
         )
         return Response({"success": True}, status=status.HTTP_200_OK)
 
-    @action(
-        detail=False,
-        methods=["POST"],
-    )
+    @action(detail=False, methods=["POST"], permission_classes=[IsAuthenticated])
     def mark_as_unseen(self, request):
         if request.user.is_anonymous:
             return Response(status=status.HTTP_401_UNAUTHORIZED)

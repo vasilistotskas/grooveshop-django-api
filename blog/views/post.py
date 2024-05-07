@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.utils.decorators import method_decorator
+from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action
@@ -55,7 +56,7 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
     def update_likes(self, request, pk=None) -> Response:
         if not request.user.is_authenticated:
             return Response(
-                {"detail": "Authentication credentials were not provided."},
+                {"detail": _("Authentication credentials were not provided.")},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 

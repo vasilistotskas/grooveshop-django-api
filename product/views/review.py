@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action
@@ -58,7 +59,7 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
     def user_product_review(self, request, *args, **kwargs) -> Response:
         if not request.user.is_authenticated:
             return Response(
-                {"detail": "User is not authenticated"},
+                {"detail": _("User is not authenticated")},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
@@ -67,7 +68,7 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
 
         if not user_id or not product_id:
             return Response(
-                {"detail": "User and Product are required fields"},
+                {"detail": _("User and Product are required fields")},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -78,13 +79,13 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
 
         except ProductReview.DoesNotExist:
             return Response(
-                {"detail": "Review does not exist"},
+                {"detail": _("Review does not exist")},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
         except ValueError:
             return Response(
-                {"detail": "Invalid data"},
+                {"detail": _("Invalid data")},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

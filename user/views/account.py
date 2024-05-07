@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 from django.contrib.auth import get_user_model
+from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import status
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
 from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAdminUser
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 from authentication.serializers import AuthenticationSerializer
+from authentication.serializers import UsernameUpdateSerializer
 from blog.serializers.comment import BlogCommentSerializer
 from blog.serializers.post import BlogPostSerializer
 from core.api.permissions import IsStaffOrOwner
@@ -44,6 +48,7 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         "addresses": UserAddressSerializer,
         "blog_post_comments": BlogCommentSerializer,
         "liked_blog_posts": BlogPostSerializer,
+        "change_username": UsernameUpdateSerializer,
     }
 
     def get_queryset(self):
@@ -174,3 +179,36 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         self.search_fields = ["id", "title", "subtitle", "body"]
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)
+
+    @action(detail=True, methods=["POST"], permission_classes=[IsAuthenticated])
+    def change_username(self, request, pk=None):
+        user = self.get_object()
+        serializer = UsernameUpdateSerializer(data=request.data)
+
+        if serializer.is_valid():
+            new_username = serializer.validated_data.get("username")
+
+            if user.username == new_username:
+                return Response(
+                    {
+                        "detail": _(
+                            "The new username is the same as the current username."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if User.objects.filter(username=new_username).exists():
+                return Response(
+                    {"detail": _("Username already taken.")},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            user.username = new_username
+            user.save()
+            return Response(
+                {"detail": _("Username updated successfully.")},
+                status=status.HTTP_200_OK,
+            )
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

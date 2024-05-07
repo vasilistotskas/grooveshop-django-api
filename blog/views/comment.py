@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action
@@ -54,7 +55,7 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
     def user_blog_comment(self, request, *args, **kwargs) -> Response:
         if not request.user.is_authenticated:
             return Response(
-                {"detail": "User is not authenticated"},
+                {"detail": _("User is not authenticated")},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
@@ -63,7 +64,7 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
 
         if not user_id or not post_id:
             return Response(
-                {"detail": "User and Post are required fields"},
+                {"detail": _("User and Post are required fields")},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -74,13 +75,13 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
 
         except BlogComment.DoesNotExist:
             return Response(
-                {"detail": "Comment does not exist"},
+                {"detail": _("Comment does not exist")},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
         except ValueError:
             return Response(
-                {"detail": "Invalid data"},
+                {"detail": _("Invalid data")},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -93,7 +94,7 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
     def update_likes(self, request, pk=None) -> Response:
         if not request.user.is_authenticated:
             return Response(
-                {"detail": "Authentication credentials were not provided."},
+                {"detail": _("Authentication credentials were not provided.")},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
@@ -113,7 +114,7 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
         comment = self.get_object()
         if not comment.get_children().exists():
             return Response(
-                {"detail": "No replies found"}, status=status.HTTP_404_NOT_FOUND
+                {"detail": _("No replies found")}, status=status.HTTP_404_NOT_FOUND
             )
 
         queryset = comment.get_children()
@@ -133,7 +134,7 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
         comment_ids = request.data.get("comment_ids", [])
         if not comment_ids:
             return Response(
-                {"error": "No comment IDs provided."},
+                {"error": _("No comment IDs provided.")},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

@@ -3,7 +3,17 @@
 
 
 
+## v0.119.0 (2024-05-07)
+
+### Feature
+
+* feat: Add username change API endpoint ([`0e3ee78`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0e3ee782903b32b6b4f0a5c4457ef43971529508))
+
 ## v0.118.0 (2024-05-07)
+
+### Chore
+
+* chore(release): release version 0.118.0 [skip ci] ([`7e29ada`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7e29ada719a684459179ef3996366c46aeb9a7c0))
 
 ### Feature
 

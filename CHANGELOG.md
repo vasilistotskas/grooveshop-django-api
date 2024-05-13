@@ -3,7 +3,21 @@
 
 
 
+## v0.121.0 (2024-05-13)
+
+### Feature
+
+* feat: Remove settings from core and use new library `django-extra-settings` ([`685c99a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/685c99a26129976f5ab012ff48ec8b7147f445e7))
+
+### Fix
+
+* fix: update poetry ([`148f94c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/148f94cde41f2000ea5c356a5801b5c8db9dc011))
+
 ## v0.120.0 (2024-05-13)
+
+### Chore
+
+* chore(release): release version 0.120.0 [skip ci] ([`e52cb36`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e52cb368297c7d124c276e9cd19c55ffb20d317c))
 
 ### Feature
 

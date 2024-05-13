@@ -8,15 +8,6 @@ from measurement.base import BidimensionalMeasure
 from measurement.base import MeasureBase
 from rest_framework import serializers
 
-from core.api.serializers import BaseExpandSerializer
-from core.models import Settings
-
-
-class SettingsSerializer(BaseExpandSerializer):
-    class Meta:
-        model = Settings
-        fields = ["site", "key", "value", "value_type", "description", "is_public"]
-
 
 def is_valid_unit(unit_to_validate: str, measurement) -> bool:
     return unit_to_validate in measurement.get_units()

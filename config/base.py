@@ -121,6 +121,7 @@ THIRD_PARTY_APPS = [
     "pytest",
     "pytest_django",
     "dbbackup",
+    "extra_settings",
 ]
 
 # Combine all apps together for the INSTALLED_APPS setting

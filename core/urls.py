@@ -16,8 +16,6 @@ from drf_spectacular.views import SpectacularRedocView
 from drf_spectacular.views import SpectacularSwaggerView
 
 from core.view import HomeView
-from core.view import SettingsListCreateView
-from core.view import SettingsRetrieveUpdateDestroyView
 from core.view import upload_image
 from user.views.account import ObtainAuthTokenView
 
@@ -40,12 +38,6 @@ urlpatterns = i18n_patterns(
     path(_("admin/"), admin_site_otp.urls),
     path(_("admin_no_otp/"), admin.site.urls),
     path("upload_image", upload_image, name="upload_image"),
-    path("settings", SettingsListCreateView.as_view(), name="settings-list-create"),
-    path(
-        "settings/<str:key>",
-        SettingsRetrieveUpdateDestroyView.as_view(),
-        name="settings-detail",
-    ),
     path("accounts/", include("allauth.mfa.urls")),
     path("accounts/", include("allauth.urls")),
     # rosetta

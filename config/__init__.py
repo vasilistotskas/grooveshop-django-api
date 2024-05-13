@@ -8,6 +8,7 @@ from config.csrf import *  # noqa
 from config.currency import *  # noqa
 from config.database import *  # noqa
 from config.email import *  # noqa
+from config.extra_settings import *  # noqa
 from config.logging import *  # noqa
 from config.measurement import *  # noqa
 from config.mfa import *  # noqa

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
@@ -16,9 +15,6 @@ from core.api.throttling import BurstRateThrottle
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from core.utils.serializers import MultiSerializerMixin
-from core.utils.views import conditional_cache_page
-
-DEFAULT_BLOG_POST_CACHE_TTL = 60 * 60 * 2
 
 
 class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
@@ -38,14 +34,6 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
         "default": BlogPostSerializer,
         "comments": BlogCommentSerializer,
     }
-
-    @method_decorator(conditional_cache_page(DEFAULT_BLOG_POST_CACHE_TTL))
-    def list(self, request, *args, **kwargs) -> Response:
-        return super().list(request, *args, **kwargs)
-
-    @method_decorator(conditional_cache_page(DEFAULT_BLOG_POST_CACHE_TTL))
-    def retrieve(self, request, pk=None, *args, **kwargs) -> Response:
-        return super().retrieve(request, pk=pk, *args, **kwargs)
 
     @action(
         detail=True,

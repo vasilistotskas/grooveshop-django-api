@@ -3,7 +3,19 @@
 
 
 
+## v0.122.0 (2024-05-14)
+
+### Feature
+
+* feat: Add MFA_TOTP_ISSUER setting ([`620905b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/620905bb8c49cf570ddfa037bdb361f7538be259))
+
+* feat: Bump Versions ([`d49c1c8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d49c1c824c41ede911b91303bdb328a7a54d5f30))
+
 ## v0.121.0 (2024-05-13)
+
+### Chore
+
+* chore(release): release version 0.121.0 [skip ci] ([`7ecf63b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7ecf63b5a6fbc644a2a11b0f61d573122122e3c8))
 
 ### Feature
 

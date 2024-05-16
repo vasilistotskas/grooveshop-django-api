@@ -1,17 +1,20 @@
 import sys
 
 from django.conf import settings
+from django.http import QueryDict
 from django.views.decorators.cache import cache_page
 from rest_framework.request import Request
 
 
 class TranslationsProcessingMixin:
     def process_translations_data(self, request: Request) -> Request:
-        if request.content_type.startswith("multipart/form-data"):
-            # Ensure request.data is mutable by copying the QueryDict
-            data = request.data.copy()
-            translations = {}
+        if request.content_type.startswith("multipart/form-data") and any(
+            key.startswith("translations.") for key in request.data.keys()
+        ):
+            data = QueryDict(mutable=True)
+            data.update(request.data)
 
+            translations = {}
             for key, value in data.items():
                 if key.startswith("translations."):
                     parts = key.split(".")
@@ -25,6 +28,7 @@ class TranslationsProcessingMixin:
 
             data["translations"] = translations
 
+            # Update the request data
             request._full_data = data
 
         return request

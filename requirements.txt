@@ -9,6 +9,7 @@ chardet==5.2.0
 charset_normalizer==3.3.2
 click==8.1.7
 coverage==7.5.1
+cryptography==42.0.7
 django==5.0.6
 django-admin-thumbnails==0.2.9
 django-allauth[mfa]==0.63.0

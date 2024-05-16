@@ -26,7 +26,7 @@ class UsernameUpdateSerializer(serializers.Serializer):
 
 
 class AuthenticationLoginSerializer(LoginSerializer):
-    username = None  # Remove the username field
+    pass
 
 
 class AuthenticationTokenSerializer(TokenSerializer):
@@ -133,15 +133,7 @@ class AuthenticationPasswordChangeSerializer(PasswordChangeSerializer):
 
 
 class AuthenticationRegisterSerializer(RegisterSerializer):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields.pop("username")
-
-    def get_cleaned_data(self):
-        return {
-            "password1": self.validated_data.get("password1", ""),
-            "email": self.validated_data.get("email", ""),
-        }
+    pass
 
 
 # MFA

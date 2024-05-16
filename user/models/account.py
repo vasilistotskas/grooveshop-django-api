@@ -8,6 +8,7 @@ from django.contrib.auth.models import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.auth.models import BaseUserManager
 from django.contrib.auth.models import PermissionsMixin
+from django.contrib.auth.validators import UnicodeUsernameValidator
 from django.contrib.postgres.indexes import GinIndex
 from django.contrib.sessions.models import Session
 from django.db import models
@@ -66,13 +67,23 @@ class UserAccountManager(BaseUserManager):
 
 
 class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinModel):
+    username_validator = UnicodeUsernameValidator()
+
     id = models.BigAutoField(primary_key=True)
     username = models.CharField(
         _("Username"),
-        max_length=30,
+        max_length=settings.ACCOUNT_USERNAME_MAX_LENGTH,
         unique=True,
         blank=True,
         null=True,
+        help_text=_(
+            f"Required. {settings.ACCOUNT_USERNAME_MAX_LENGTH} characters or fewer."
+            "Letters, digits and @/./+/-/_ only."
+        ),
+        validators=[username_validator],
+        error_messages={
+            "unique": _("A user with that username already exists."),
+        },
     )
     email = models.EmailField(_("Email Address"), max_length=254, unique=True)
     first_name = models.CharField(

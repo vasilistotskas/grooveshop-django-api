@@ -4,6 +4,8 @@ import hashlib
 import importlib
 import random
 
+from django.conf import settings
+
 
 class UserNameGenerator:
     ADJECTIVES = [
@@ -111,7 +113,9 @@ class UserNameGenerator:
 
     @staticmethod
     def generate_username(
-        email: str, max_length: int = 21, max_attempts: int = 1000
+        email: str,
+        max_length: int = settings.ACCOUNT_USERNAME_MAX_LENGTH,
+        max_attempts: int = 1000,
     ) -> str:
         user_account_model = importlib.import_module("user.models.account").UserAccount
 

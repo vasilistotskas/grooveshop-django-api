@@ -1,6 +1,5 @@
 import unittest
 from unittest import mock
-from unittest.mock import MagicMock
 from unittest.mock import patch
 
 from django.conf import settings
@@ -100,14 +99,12 @@ class TestAuthenticationRegisterSerializer(TestCase):
         }
         self.auth_serializer = AuthenticationRegisterSerializer(data=self.data)
 
-    def test_init(self):
-        args = MagicMock()
-        kwargs = {"username": "test_username"}
-        auth_serializer = AuthenticationRegisterSerializer(args, kwargs)
-        self.assertNotIn("username", auth_serializer.fields)
-
     def test_get_cleaned_data(self):
         self.auth_serializer.is_valid(raise_exception=True)
         cleaned_data = self.auth_serializer.get_cleaned_data()
-        expected_data = {"password1": "test_password", "email": "test@example.com"}
+        expected_data = {
+            "password1": "test_password",
+            "email": "test@example.com",
+            "username": "",
+        }
         self.assertEqual(cleaned_data, expected_data)

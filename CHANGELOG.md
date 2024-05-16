@@ -3,7 +3,21 @@
 
 
 
+## v0.123.0 (2024-05-16)
+
+### Feature
+
+* feat: Be able to log in via username ([`14c41bc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/14c41bca9b2e81dbde058a7767cd42752c743b9d))
+
+### Fix
+
+* fix: tests include username ([`69e7bd1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/69e7bd13dc0686b52be2acb56ddefb5b707b208b))
+
 ## v0.122.0 (2024-05-14)
+
+### Chore
+
+* chore(release): release version 0.122.0 [skip ci] ([`bca64f1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bca64f16f7f9120dcbd62f99f525bea14f770bce))
 
 ### Feature
 

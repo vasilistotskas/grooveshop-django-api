@@ -3,7 +3,17 @@
 
 
 
+## v0.124.1 (2024-05-18)
+
+### Fix
+
+* fix: add ordering_fields  at blog category posts ([`92c20ce`](https://github.com/vasilistotskas/grooveshop-django-api/commit/92c20ce2e7cc55babceb886013c4cae7d5159055))
+
 ## v0.124.0 (2024-05-18)
+
+### Chore
+
+* chore(release): release version 0.124.0 [skip ci] ([`b0ab8c5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b0ab8c55097c551ceb648523c2303b7893c80a2a))
 
 ### Feature
 

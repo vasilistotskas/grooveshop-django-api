@@ -3,7 +3,17 @@
 
 
 
+## v0.124.2 (2024-05-18)
+
+### Fix
+
+* fix: order API `retrieve_by_uuid` method ([`5445ea5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5445ea51afc8e866fadfd12f6675c4e23ddd0298))
+
 ## v0.124.1 (2024-05-18)
+
+### Chore
+
+* chore(release): release version 0.124.1 [skip ci] ([`f76d72c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f76d72c5cae535db9089de2c4f1c081340cbcdb1))
 
 ### Fix
 

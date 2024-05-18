@@ -10,20 +10,23 @@ WORKDIR /mnt/app
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
-# Update apk
-RUN apk update
-
-# install system dependencies
-RUN apk add --no-cache  \
-    netcat-openbsd  \
-    gcc  \
-    musl-dev  \
+# Update apk and install system dependencies
+RUN apk update && \
+    apk add --no-cache \
+    netcat-openbsd \
+    gcc \
+    musl-dev \
     postgresql-client \
-    postgresql-dev
+    postgresql-dev \
+    git
+
+# install pip
+RUN pip install --upgrade pip
+
+# copy requirements file
+COPY ./grooveshop-django-api/requirements.txt /mnt/app/requirements.txt
 
 # install dependencies
-RUN pip install --upgrade pip
-COPY ./grooveshop-django-api/requirements.txt /mnt/app/requirements.txt
 RUN pip install -r requirements.txt
 
 # copy entrypoint.sh

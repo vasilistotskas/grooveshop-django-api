@@ -4,11 +4,9 @@ from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
-from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
 from rest_framework.generics import get_object_or_404
-from rest_framework.permissions import IsAdminUser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -16,7 +14,6 @@ from authentication.serializers import AuthenticationSerializer
 from authentication.serializers import UsernameUpdateSerializer
 from blog.serializers.comment import BlogCommentSerializer
 from blog.serializers.post import BlogPostSerializer
-from core.api.permissions import IsStaffOrOwner
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from core.utils.serializers import MultiSerializerMixin
@@ -28,12 +25,7 @@ from user.serializers.address import UserAddressSerializer
 User = get_user_model()
 
 
-class ObtainAuthTokenView(ObtainAuthToken):
-    permission_classes = [IsAdminUser]
-
-
 class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
-    permission_classes = [IsAuthenticated, IsStaffOrOwner]
     filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
     filterset_fields = ["id", "email"]
     ordering_fields = ["id", "email"]

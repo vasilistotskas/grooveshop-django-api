@@ -20,3 +20,4 @@ from config.session import *  # noqa
 from config.spectacular import *  # noqa
 from config.storage import *  # noqa
 from config.tinymce import *  # noqa
+from config.knox import *  # noqa

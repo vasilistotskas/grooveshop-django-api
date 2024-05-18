@@ -1,10 +1,4 @@
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
-from allauth.socialaccount.providers.facebook.views import FacebookOAuth2Adapter
-from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
-from allauth.socialaccount.providers.oauth2.client import OAuth2Client
-from dj_rest_auth.registration.views import SocialConnectView
-from dj_rest_auth.registration.views import SocialLoginView
-from django.conf import settings
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -38,27 +32,3 @@ class SocialAccountAdapter(DefaultSocialAccountAdapter):
         if user:
             # if it does, connect this new social login to the existing user.
             sociallogin.connect(request, user)
-
-
-class FacebookLogin(SocialLoginView):
-    authentication_classes = []
-    adapter_class = FacebookOAuth2Adapter
-
-
-class GoogleLogin(SocialLoginView):
-    authentication_classes = []
-    adapter_class = GoogleOAuth2Adapter
-    callback_url = settings.GOOGLE_CALLBACK_URL
-    client_class = OAuth2Client
-
-
-class FacebookConnect(SocialConnectView):
-    authentication_classes = []
-    adapter_class = FacebookOAuth2Adapter
-
-
-class GoogleConnect(SocialConnectView):
-    authentication_classes = []
-    adapter_class = GoogleOAuth2Adapter
-    callback_url = settings.GOOGLE_CALLBACK_URL
-    client_class = OAuth2Client

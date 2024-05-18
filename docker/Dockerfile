@@ -20,7 +20,8 @@ RUN apt-get update && \
     python3-dev \
     libc-dev \
     linux-headers-amd64 \
-    build-essential
+    build-essential \
+    git
 
 # install python dependencies
 COPY ./requirements.txt .

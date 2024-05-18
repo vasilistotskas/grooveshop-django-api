@@ -101,20 +101,16 @@ THIRD_PARTY_APPS = [
     "storages",
     "django_filters",
     "drf_spectacular",
-    "dj_rest_auth",
     "djmoney",
     "phonenumber_field",
     "allauth",
     "allauth.account",
-    "allauth.mfa",
-    "dj_rest_auth.registration",
+    "allauth.headless",
     "allauth.socialaccount",
+    "allauth.mfa",
+    "allauth.usersessions",
     "allauth.socialaccount.providers.facebook",
     "allauth.socialaccount.providers.google",
-    "django_otp",
-    "django_otp.plugins.otp_totp",
-    "django_otp.plugins.otp_hotp",
-    "django_otp.plugins.otp_static",
     "django_celery_beat",
     "django_celery_results",
     "django_browser_reload",
@@ -122,6 +118,7 @@ THIRD_PARTY_APPS = [
     "pytest_django",
     "dbbackup",
     "extra_settings",
+    "knox",
 ]
 
 # Combine all apps together for the INSTALLED_APPS setting
@@ -135,13 +132,13 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "django_otp.middleware.OTPMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     # Reset login flow middleware. If this middleware is included, the login
     # flow is reset if another page is loaded between login and successfully
     # entering two-factor credentials.
     "allauth.account.middleware.AccountMiddleware",
+    "allauth.usersessions.middleware.UserSessionsMiddleware",
     "djangorestframework_camel_case.middleware.CamelCaseMiddleWare",
     "django_browser_reload.middleware.BrowserReloadMiddleware",
 ]
@@ -166,9 +163,7 @@ TEMPLATES = [
 ]
 
 AUTHENTICATION_BACKENDS = [
-    # Needed to log in by username in Django admin, regardless of `allauth`
     "django.contrib.auth.backends.ModelBackend",
-    # `allauth` specific authentication methods, such as login by e-mail
     "allauth.account.auth_backends.AuthenticationBackend",
 ]
 
@@ -214,11 +209,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Rest Framework
 REST_FRAMEWORK = {
     # Authentication
-    "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.BasicAuthentication",
-        "rest_framework.authentication.TokenAuthentication",
-        "dj_rest_auth.jwt_auth.JWTCookieAuthentication",
-    ],
+    "DEFAULT_AUTHENTICATION_CLASSES": ("knox.auth.TokenAuthentication",),
     # Permissions
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.AllowAny",

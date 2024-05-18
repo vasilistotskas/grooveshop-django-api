@@ -38,6 +38,4 @@ if DEBUG:
         ]
     )
 
-CSRF_USE_SESSIONS = (
-    False  # Default is False, use True to store CSRF token in the session
-)
+CSRF_USE_SESSIONS = True

@@ -231,17 +231,17 @@ wcwidth = ">=0.1.4"
 
 [[package]]
 name = "boto3"
-version = "1.34.104"
+version = "1.34.108"
 description = "The AWS SDK for Python"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "boto3-1.34.104-py3-none-any.whl", hash = "sha256:bec91a3bca63320e5f68a25b5eaa7bab65e35bb9253a544875c2e03679f1d5fb"},
-    {file = "boto3-1.34.104.tar.gz", hash = "sha256:5b37c8f4ea6f408147994a6e230c49ca755da57f5964ccea8b8fd4ff5f11759e"},
+    {file = "boto3-1.34.108-py3-none-any.whl", hash = "sha256:3601267d76cac17f1d4595c3d8d968dc15be074b79bfa3985187a02b328a0a5f"},
+    {file = "boto3-1.34.108.tar.gz", hash = "sha256:677723295151d29ff9b363598a20c1997c4e2af7e50669d9e428b757fe586a10"},
 ]
 
 [package.dependencies]
-botocore = ">=1.34.104,<1.35.0"
+botocore = ">=1.34.108,<1.35.0"
 jmespath = ">=0.7.1,<2.0.0"
 s3transfer = ">=0.10.0,<0.11.0"
 
@@ -250,13 +250,13 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.34.106"
+version = "1.34.108"
 description = "Low-level, data-driven core of boto 3."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "botocore-1.34.106-py3-none-any.whl", hash = "sha256:4baf0e27c2dfc4f4d0dee7c217c716e0782f9b30e8e1fff983fce237d88f73ae"},
-    {file = "botocore-1.34.106.tar.gz", hash = "sha256:921fa5202f88c3e58fdcb4b3acffd56d65b24bca47092ee4b27aa988556c0be6"},
+    {file = "botocore-1.34.108-py3-none-any.whl", hash = "sha256:b1b9d00804267669c5fcc36489269f7e9c43580c30f0885fbf669cf73cec720b"},
+    {file = "botocore-1.34.108.tar.gz", hash = "sha256:384c9408c447631475dc41fdc9bf2e0f30c29c420d96bfe8b468bdc2bace3e13"},
 ]
 
 [package.dependencies]
@@ -966,12 +966,12 @@ dev = ["flake8 (>=3.7.7)", "setuptools (>=41.0.0)", "twine (>=1.13.0)", "wheel (
 
 [[package]]
 name = "django-allauth"
-version = "0.63.0"
+version = "0.63.1"
 description = "Integrated set of Django applications addressing authentication, registration, account management as well as 3rd party (social) account authentication."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "django-allauth-0.63.0.tar.gz", hash = "sha256:fbe0148c6258eac44e701a8f36e0950b5d0b1c60bde3e178683a4239f49311fc"},
+    {file = "django-allauth-0.63.1.tar.gz", hash = "sha256:ef52957992ac3dfc57dec4f7c078bb317b7b47bd7bf6b15f2c12a31c9892ad4c"},
 ]
 
 [package.dependencies]
@@ -2662,13 +2662,13 @@ ptyprocess = ">=0.5"
 
 [[package]]
 name = "phonenumbers"
-version = "8.13.36"
+version = "8.13.37"
 description = "Python version of Google's common library for parsing, formatting, storing and validating international phone numbers."
 optional = false
 python-versions = "*"
 files = [
-    {file = "phonenumbers-8.13.36-py2.py3-none-any.whl", hash = "sha256:68e06d20ae2f8fe5c7c7fd5b433f4257bc3cc747dc5196a029c7898ea449b012"},
-    {file = "phonenumbers-8.13.36.tar.gz", hash = "sha256:b4e2371e35a1172aa2c91c9200b1e48e87b9355eb575768dd38058fc8d72c9ff"},
+    {file = "phonenumbers-8.13.37-py2.py3-none-any.whl", hash = "sha256:4ea00ef5012422c08c7955c21131e7ae5baa9a3ef52cf2d561e963f023006b80"},
+    {file = "phonenumbers-8.13.37.tar.gz", hash = "sha256:bd315fed159aea0516f7c367231810fe8344d5bec26156b88fa18374c11d1cf2"},
 ]
 
 [[package]]
@@ -3403,13 +3403,13 @@ yaml = ["PyYaml (>=6.0.1)"]
 
 [[package]]
 name = "python-semantic-release"
-version = "9.7.2"
+version = "9.7.3"
 description = "Automatic Semantic Versioning for Python projects"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "python_semantic_release-9.7.2-py3-none-any.whl", hash = "sha256:0fb65ad18f1e7511f72f906fdca878d7d5c4260c385044029d183f3bf5265618"},
-    {file = "python_semantic_release-9.7.2.tar.gz", hash = "sha256:c8d0c8f2fb453ecd87220450fa55001b40ef26e5de7e8bd200828c1b6037a437"},
+    {file = "python_semantic_release-9.7.3-py3-none-any.whl", hash = "sha256:caf6c2f70e61f888765058752b525d96cff7cee330d65688eb64620a3e10c5d5"},
+    {file = "python_semantic_release-9.7.3.tar.gz", hash = "sha256:15c10cb18a4b3886e2d88460fb825e55299bb44d7036391e90be1d5c99d256ba"},
 ]
 
 [package.dependencies]
@@ -4300,4 +4300,4 @@ brotli = ["Brotli"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10.13,<4.0.0"
-content-hash = "c9f1e95c2ad65e4367364e62e1e381e4aa8e417a6860fe01ace8ea314ac28af3"
+content-hash = "cac1660ae98d04ad3f69df6b275a508757f670b2d378bcf4baeaa2d8cd163168"

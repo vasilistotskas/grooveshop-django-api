@@ -3,7 +3,17 @@
 
 
 
+## v0.125.0 (2024-05-19)
+
+### Feature
+
+* feat: Contact form ([`f8ba7e3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f8ba7e3cd2704fd7d6fc160c4cfcd3e46ecf94b1))
+
 ## v0.124.2 (2024-05-18)
+
+### Chore
+
+* chore(release): release version 0.124.2 [skip ci] ([`8fedbb7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8fedbb7bc86ca72cbd25acad15d0a65c41a19a12))
 
 ### Fix
 

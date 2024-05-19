@@ -63,6 +63,7 @@ urlpatterns = i18n_patterns(
     path("api/v1/", include("session.urls")),
     path("api/v1/", include("cart.urls")),
     path("api/v1/", include("notification.urls")),
+    path("api/v1/", include("contact.urls")),
     path("api/v1/api-token-auth", ObtainAuthTokenView.as_view()),
     path("api/v1/schema", SpectacularAPIView.as_view(), name="schema"),
     path(

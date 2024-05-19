@@ -4105,6 +4105,34 @@ paths:
               schema:
                 $ref: '#/components/schemas/Checkout'
           description: ''
+  /api/v1/contact:
+    post:
+      operationId: api_v1_contact_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Contact'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Contact'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Contact'
+        required: true
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contact'
+          description: ''
   /api/v1/country:
     get:
       operationId: api_v1_country_list
@@ -4551,16 +4579,6 @@ paths:
   /api/v1/notification/user:
     get:
       operationId: api_v1_notification_user_list
-      description: |-
-        This is the magic.
-
-        Overrides `.as_view()` so that it takes an `actions` keyword that performs
-        the binding of HTTP methods to actions on the Resource.
-
-        For example, to create a concrete view binding the 'GET' and 'POST' methods
-        to the 'list' and 'create' actions...
-
-        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - name: ordering
         required: false
@@ -4601,16 +4619,6 @@ paths:
           description: ''
     post:
       operationId: api_v1_notification_user_create
-      description: |-
-        This is the magic.
-
-        Overrides `.as_view()` so that it takes an `actions` keyword that performs
-        the binding of HTTP methods to actions on the Resource.
-
-        For example, to create a concrete view binding the 'GET' and 'POST' methods
-        to the 'list' and 'create' actions...
-
-        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       tags:
       - api
       requestBody:
@@ -4639,16 +4647,6 @@ paths:
   /api/v1/notification/user{format}:
     get:
       operationId: api_v1_notification_user_formatted_list
-      description: |-
-        This is the magic.
-
-        Overrides `.as_view()` so that it takes an `actions` keyword that performs
-        the binding of HTTP methods to actions on the Resource.
-
-        For example, to create a concrete view binding the 'GET' and 'POST' methods
-        to the 'list' and 'create' actions...
-
-        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: format
@@ -4696,16 +4694,6 @@ paths:
           description: ''
     post:
       operationId: api_v1_notification_user_formatted_create
-      description: |-
-        This is the magic.
-
-        Overrides `.as_view()` so that it takes an `actions` keyword that performs
-        the binding of HTTP methods to actions on the Resource.
-
-        For example, to create a concrete view binding the 'GET' and 'POST' methods
-        to the 'list' and 'create' actions...
-
-        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: format
@@ -4742,16 +4730,6 @@ paths:
   /api/v1/notification/user/{id}:
     get:
       operationId: api_v1_notification_user_retrieve
-      description: |-
-        This is the magic.
-
-        Overrides `.as_view()` so that it takes an `actions` keyword that performs
-        the binding of HTTP methods to actions on the Resource.
-
-        For example, to create a concrete view binding the 'GET' and 'POST' methods
-        to the 'list' and 'create' actions...
-
-        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: id
@@ -4773,16 +4751,6 @@ paths:
           description: ''
     put:
       operationId: api_v1_notification_user_update
-      description: |-
-        This is the magic.
-
-        Overrides `.as_view()` so that it takes an `actions` keyword that performs
-        the binding of HTTP methods to actions on the Resource.
-
-        For example, to create a concrete view binding the 'GET' and 'POST' methods
-        to the 'list' and 'create' actions...
-
-        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: id
@@ -4816,16 +4784,6 @@ paths:
           description: ''
     patch:
       operationId: api_v1_notification_user_partial_update
-      description: |-
-        This is the magic.
-
-        Overrides `.as_view()` so that it takes an `actions` keyword that performs
-        the binding of HTTP methods to actions on the Resource.
-
-        For example, to create a concrete view binding the 'GET' and 'POST' methods
-        to the 'list' and 'create' actions...
-
-        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: id
@@ -4858,16 +4816,6 @@ paths:
           description: ''
     delete:
       operationId: api_v1_notification_user_destroy
-      description: |-
-        This is the magic.
-
-        Overrides `.as_view()` so that it takes an `actions` keyword that performs
-        the binding of HTTP methods to actions on the Resource.
-
-        For example, to create a concrete view binding the 'GET' and 'POST' methods
-        to the 'list' and 'create' actions...
-
-        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: id
@@ -4886,16 +4834,6 @@ paths:
   /api/v1/notification/user/{id}{format}:
     get:
       operationId: api_v1_notification_user_formatted_retrieve
-      description: |-
-        This is the magic.
-
-        Overrides `.as_view()` so that it takes an `actions` keyword that performs
-        the binding of HTTP methods to actions on the Resource.
-
-        For example, to create a concrete view binding the 'GET' and 'POST' methods
-        to the 'list' and 'create' actions...
-
-        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: format
@@ -4924,16 +4862,6 @@ paths:
           description: ''
     put:
       operationId: api_v1_notification_user_formatted_update
-      description: |-
-        This is the magic.
-
-        Overrides `.as_view()` so that it takes an `actions` keyword that performs
-        the binding of HTTP methods to actions on the Resource.
-
-        For example, to create a concrete view binding the 'GET' and 'POST' methods
-        to the 'list' and 'create' actions...
-
-        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: format
@@ -4974,16 +4902,6 @@ paths:
           description: ''
     patch:
       operationId: api_v1_notification_user_formatted_partial_update
-      description: |-
-        This is the magic.
-
-        Overrides `.as_view()` so that it takes an `actions` keyword that performs
-        the binding of HTTP methods to actions on the Resource.
-
-        For example, to create a concrete view binding the 'GET' and 'POST' methods
-        to the 'list' and 'create' actions...
-
-        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: format
@@ -5023,16 +4941,6 @@ paths:
           description: ''
     delete:
       operationId: api_v1_notification_user_formatted_destroy
-      description: |-
-        This is the magic.
-
-        Overrides `.as_view()` so that it takes an `actions` keyword that performs
-        the binding of HTTP methods to actions on the Resource.
-
-        For example, to create a concrete view binding the 'GET' and 'POST' methods
-        to the 'list' and 'create' actions...
-
-        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: format
@@ -5058,16 +4966,6 @@ paths:
   /api/v1/notification/user/{id}/mark_all_as_seen:
     post:
       operationId: api_v1_notification_user_mark_all_as_seen_create
-      description: |-
-        This is the magic.
-
-        Overrides `.as_view()` so that it takes an `actions` keyword that performs
-        the binding of HTTP methods to actions on the Resource.
-
-        For example, to create a concrete view binding the 'GET' and 'POST' methods
-        to the 'list' and 'create' actions...
-
-        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: id
@@ -5102,16 +5000,6 @@ paths:
   /api/v1/notification/user/{id}/mark_all_as_seen{format}:
     post:
       operationId: api_v1_notification_user_mark_all_as_seen_formatted_create
-      description: |-
-        This is the magic.
-
-        Overrides `.as_view()` so that it takes an `actions` keyword that performs
-        the binding of HTTP methods to actions on the Resource.
-
-        For example, to create a concrete view binding the 'GET' and 'POST' methods
-        to the 'list' and 'create' actions...
-
-        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: format
@@ -5153,16 +5041,6 @@ paths:
   /api/v1/notification/user/{id}/mark_all_as_unseen:
     post:
       operationId: api_v1_notification_user_mark_all_as_unseen_create
-      description: |-
-        This is the magic.
-
-        Overrides `.as_view()` so that it takes an `actions` keyword that performs
-        the binding of HTTP methods to actions on the Resource.
-
-        For example, to create a concrete view binding the 'GET' and 'POST' methods
-        to the 'list' and 'create' actions...
-
-        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: id
@@ -5197,16 +5075,6 @@ paths:
   /api/v1/notification/user/{id}/mark_all_as_unseen{format}:
     post:
       operationId: api_v1_notification_user_mark_all_as_unseen_formatted_create
-      description: |-
-        This is the magic.
-
-        Overrides `.as_view()` so that it takes an `actions` keyword that performs
-        the binding of HTTP methods to actions on the Resource.
-
-        For example, to create a concrete view binding the 'GET' and 'POST' methods
-        to the 'list' and 'create' actions...
-
-        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: format
@@ -5248,16 +5116,6 @@ paths:
   /api/v1/notification/user/{id}/mark_as_seen:
     post:
       operationId: api_v1_notification_user_mark_as_seen_create
-      description: |-
-        This is the magic.
-
-        Overrides `.as_view()` so that it takes an `actions` keyword that performs
-        the binding of HTTP methods to actions on the Resource.
-
-        For example, to create a concrete view binding the 'GET' and 'POST' methods
-        to the 'list' and 'create' actions...
-
-        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: id
@@ -5292,16 +5150,6 @@ paths:
   /api/v1/notification/user/{id}/mark_as_seen{format}:
     post:
       operationId: api_v1_notification_user_mark_as_seen_formatted_create
-      description: |-
-        This is the magic.
-
-        Overrides `.as_view()` so that it takes an `actions` keyword that performs
-        the binding of HTTP methods to actions on the Resource.
-
-        For example, to create a concrete view binding the 'GET' and 'POST' methods
-        to the 'list' and 'create' actions...
-
-        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: format
@@ -5343,16 +5191,6 @@ paths:
   /api/v1/notification/user/{id}/mark_as_unseen:
     post:
       operationId: api_v1_notification_user_mark_as_unseen_create
-      description: |-
-        This is the magic.
-
-        Overrides `.as_view()` so that it takes an `actions` keyword that performs
-        the binding of HTTP methods to actions on the Resource.
-
-        For example, to create a concrete view binding the 'GET' and 'POST' methods
-        to the 'list' and 'create' actions...
-
-        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: id
@@ -5387,16 +5225,6 @@ paths:
   /api/v1/notification/user/{id}/mark_as_unseen{format}:
     post:
       operationId: api_v1_notification_user_mark_as_unseen_formatted_create
-      description: |-
-        This is the magic.
-
-        Overrides `.as_view()` so that it takes an `actions` keyword that performs
-        the binding of HTTP methods to actions on the Resource.
-
-        For example, to create a concrete view binding the 'GET' and 'POST' methods
-        to the 'list' and 'create' actions...
-
-        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: format
@@ -5438,16 +5266,6 @@ paths:
   /api/v1/notification/user/{id}/unseen_count:
     get:
       operationId: api_v1_notification_user_unseen_count_retrieve
-      description: |-
-        This is the magic.
-
-        Overrides `.as_view()` so that it takes an `actions` keyword that performs
-        the binding of HTTP methods to actions on the Resource.
-
-        For example, to create a concrete view binding the 'GET' and 'POST' methods
-        to the 'list' and 'create' actions...
-
-        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: id
@@ -5470,16 +5288,6 @@ paths:
   /api/v1/notification/user/{id}/unseen_count{format}:
     get:
       operationId: api_v1_notification_user_unseen_count_formatted_retrieve
-      description: |-
-        This is the magic.
-
-        Overrides `.as_view()` so that it takes an `actions` keyword that performs
-        the binding of HTTP methods to actions on the Resource.
-
-        For example, to create a concrete view binding the 'GET' and 'POST' methods
-        to the 'list' and 'create' actions...
-
-        view = MyViewSet.as_view({'get': 'list', 'post': 'create'})
       parameters:
       - in: path
         name: format
@@ -10688,6 +10496,79 @@ paths:
               schema:
                 $ref: '#/components/schemas/BlogComment'
           description: ''
+  /api/v1/user/account/{id}/change_username:
+    post:
+      operationId: api_v1_user_account_change_username_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UsernameUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UsernameUpdate'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsernameUpdate'
+        required: true
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsernameUpdate'
+          description: ''
+  /api/v1/user/account/{id}/change_username{format}:
+    post:
+      operationId: api_v1_user_account_change_username_formatted_create
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UsernameUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UsernameUpdate'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsernameUpdate'
+        required: true
+      security:
+      - basicAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsernameUpdate'
+          description: ''
   /api/v1/user/account/{id}/favourite_products:
     get:
       operationId: api_v1_user_account_favourite_products_retrieve
@@ -11861,160 +11742,6 @@ paths:
       responses:
         '204':
           description: No response body
-  /settings:
-    get:
-      operationId: settings_list
-      parameters:
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
-        schema:
-          type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
-        schema:
-          type: integer
-      tags:
-      - settings
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedSettingsList'
-          description: ''
-    post:
-      operationId: settings_create
-      tags:
-      - settings
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/Settings'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/Settings'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Settings'
-        required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Settings'
-          description: ''
-  /settings/{key}:
-    get:
-      operationId: settings_retrieve
-      parameters:
-      - in: path
-        name: key
-        schema:
-          type: string
-        required: true
-      tags:
-      - settings
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Settings'
-          description: ''
-    put:
-      operationId: settings_update
-      parameters:
-      - in: path
-        name: key
-        schema:
-          type: string
-        required: true
-      tags:
-      - settings
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/Settings'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/Settings'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Settings'
-        required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Settings'
-          description: ''
-    patch:
-      operationId: settings_partial_update
-      parameters:
-      - in: path
-        name: key
-        schema:
-          type: string
-        required: true
-      tags:
-      - settings
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedSettings'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedSettings'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedSettings'
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Settings'
-          description: ''
-    delete:
-      operationId: settings_destroy
-      parameters:
-      - in: path
-        name: key
-        schema:
-          type: string
-        required: true
-      tags:
-      - settings
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '204':
-          description: No response body
 components:
   schemas:
     ActivateTOTP:
@@ -12085,12 +11812,14 @@ components:
           type: string
           nullable: true
           title: Όνομα χρήστη
+          description: Required. 30 characters or fewer.Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
           maxLength: 30
         image:
           type: string
           format: uri
           nullable: true
-          title: Εικόνα
         phone:
           type: string
         city:
@@ -12203,6 +11932,8 @@ components:
     AuthenticationLogin:
       type: object
       properties:
+        username:
+          type: string
         email:
           type: string
           format: email
@@ -12253,6 +11984,10 @@ components:
     AuthenticationRegister:
       type: object
       properties:
+        username:
+          type: string
+          maxLength: 30
+          minLength: 2
         email:
           type: string
           format: email
@@ -13081,6 +12816,41 @@ components:
           minimum: -2147483648
       required:
       - product
+    Contact:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        message:
+          type: string
+      required:
+      - createdAt
+      - email
+      - id
+      - message
+      - name
+      - updatedAt
+      - uuid
     Country:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -13208,7 +12978,6 @@ components:
         * `2` - Other
     NotificationUser:
       type: object
-      description: Base serializer class.
       properties:
         id:
           type: integer
@@ -13225,7 +12994,6 @@ components:
       - user
     NotificationUserAction:
       type: object
-      description: Base serializer class.
       properties:
         notificationUserId:
           type: integer
@@ -14034,29 +13802,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SearchProduct'
-    PaginatedSettingsList:
-      type: object
-      required:
-      - count
-      - results
-      properties:
-        count:
-          type: integer
-          example: 123
-        next:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=4
-        previous:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=2
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/Settings'
     PaginatedSlideList:
       type: object
       required:
@@ -14200,12 +13945,14 @@ components:
           type: string
           nullable: true
           title: Όνομα χρήστη
+          description: Required. 30 characters or fewer.Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
           maxLength: 30
         image:
           type: string
           format: uri
           nullable: true
-          title: Εικόνα
         phone:
           type: string
         city:
@@ -14921,7 +14668,6 @@ components:
           readOnly: true
     PatchedNotificationUser:
       type: object
-      description: Base serializer class.
       properties:
         id:
           type: integer
@@ -15448,7 +15194,6 @@ components:
         image:
           type: string
           format: uri
-          title: Εικόνα
         thumbnail:
           type: string
           format: uri
@@ -15576,24 +15321,6 @@ components:
           type: string
           format: uuid
           readOnly: true
-    PatchedSettings:
-      type: object
-      properties:
-        site:
-          type: integer
-        key:
-          type: string
-          title: Κλειδί
-          maxLength: 255
-        value:
-          type: string
-        valueType:
-          $ref: '#/components/schemas/ValueTypeEnum'
-        description:
-          type: string
-          nullable: true
-        isPublic:
-          type: boolean
     PatchedSlide:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -16360,7 +16087,6 @@ components:
         image:
           type: string
           format: uri
-          title: Εικόνα
         thumbnail:
           type: string
           format: uri
@@ -16794,28 +16520,6 @@ components:
       - similarity
       - slug
       - translations
-    Settings:
-      type: object
-      properties:
-        site:
-          type: integer
-        key:
-          type: string
-          title: Κλειδί
-          maxLength: 255
-        value:
-          type: string
-        valueType:
-          $ref: '#/components/schemas/ValueTypeEnum'
-        description:
-          type: string
-          nullable: true
-        isPublic:
-          type: boolean
-      required:
-      - key
-      - site
-      - value
     Slide:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -17225,22 +16929,14 @@ components:
       - user
       - uuid
       - zipcode
-    ValueTypeEnum:
-      enum:
-      - str
-      - int
-      - bool
-      - dict
-      - list
-      - float
-      type: string
-      description: |-
-        * `str` - String
-        * `int` - Ακέραιος
-        * `bool` - Boolean
-        * `dict` - Dictionary
-        * `list` - List
-        * `float` - Float
+    UsernameUpdate:
+      type: object
+      properties:
+        username:
+          type: string
+          maxLength: 30
+      required:
+      - username
     Vat:
       type: object
       properties:

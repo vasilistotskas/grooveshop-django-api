@@ -41,5 +41,11 @@ class BlogCategoryViewSet(MultiSerializerMixin, BaseModelViewSet):
     @method_decorator(conditional_cache_page(DEFAULT_BLOG_CATEGORY_CACHE_TTL))
     @action(detail=True, methods=["GET"])
     def posts(self, request, pk=None, *args, **kwargs) -> Response:
+        self.ordering_fields = [
+            "title",
+            "created_at",
+            "updated_at",
+            "published_at",
+        ]
         queryset = self.get_object().posts.all()
         return self.paginate_and_serialize(queryset, request)

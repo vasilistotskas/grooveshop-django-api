@@ -3,7 +3,47 @@
 
 
 
+## v0.125.0 (2024-05-19)
+
+### Feature
+
+* feat: Contact form ([`f8ba7e3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f8ba7e3cd2704fd7d6fc160c4cfcd3e46ecf94b1))
+
+## v0.124.2 (2024-05-18)
+
+### Chore
+
+* chore(release): release version 0.124.2 [skip ci] ([`8fedbb7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8fedbb7bc86ca72cbd25acad15d0a65c41a19a12))
+
+### Fix
+
+* fix: order API `retrieve_by_uuid` method ([`5445ea5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5445ea51afc8e866fadfd12f6675c4e23ddd0298))
+
+## v0.124.1 (2024-05-18)
+
+### Chore
+
+* chore(release): release version 0.124.1 [skip ci] ([`f76d72c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f76d72c5cae535db9089de2c4f1c081340cbcdb1))
+
+### Fix
+
+* fix: add ordering_fields  at blog category posts ([`92c20ce`](https://github.com/vasilistotskas/grooveshop-django-api/commit/92c20ce2e7cc55babceb886013c4cae7d5159055))
+
+## v0.124.0 (2024-05-18)
+
+### Chore
+
+* chore(release): release version 0.124.0 [skip ci] ([`b0ab8c5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b0ab8c55097c551ceb648523c2303b7893c80a2a))
+
+### Feature
+
+* feat: Bump Versions ([`5c9e163`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5c9e16387af89abf3ca3487d9eefdb4b1781a951))
+
 ## v0.123.0 (2024-05-16)
+
+### Chore
+
+* chore(release): release version 0.123.0 [skip ci] ([`cdd9058`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cdd9058d705a7e935264c6ad2d26d864fc59f8b3))
 
 ### Feature
 

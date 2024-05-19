@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-04-26 21:26+0300\n"
+"POT-Creation-Date: 2024-05-19 18:26+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,11 +17,11 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: .\authentication\serializers.py:149
+#: .\authentication\serializers.py:145
 msgid "Authenticator code"
 msgstr ""
 
-#: .\authentication\serializers.py:161
+#: .\authentication\serializers.py:157
 msgid "TOTP enabled"
 msgstr ""
 
@@ -73,11 +73,11 @@ msgstr ""
 msgid "Archived"
 msgstr ""
 
-#: .\blog\models\author.py:14 .\user\models\account.py:113
+#: .\blog\models\author.py:14 .\user\models\account.py:124
 msgid "Website"
 msgstr ""
 
-#: .\blog\models\author.py:16 .\user\models\account.py:116
+#: .\blog\models\author.py:16 .\user\models\account.py:127
 msgid "Bio"
 msgstr ""
 
@@ -91,21 +91,20 @@ msgstr ""
 
 #: .\blog\models\category.py:44 .\blog\models\post.py:28
 #: .\product\models\image.py:30 .\slider\models.py:23 .\slider\models.py:102
-#: .\user\models\account.py:104
+#: .\user\models\account.py:115
 #: .\venv\Lib\site-packages\django\db\models\fields\files.py:393
 msgid "Image"
 msgstr ""
 
-#: .\blog\models\category.py:50 .\blog\models\tag.py:24 .\country\models.py:50
-#: .\pay_way\models.py:39 .\product\models\category.py:64
-#: .\product\models\product.py:163 .\region\models.py:20 .\slider\models.py:32
-#: .\slider\models.py:108
+#: .\blog\models\category.py:50 .\blog\models\tag.py:24 .\contact\models.py:13
+#: .\country\models.py:50 .\pay_way\models.py:39
+#: .\product\models\category.py:64 .\product\models\product.py:163
+#: .\region\models.py:20 .\slider\models.py:32 .\slider\models.py:108
 msgid "Name"
 msgstr ""
 
-#: .\blog\models\category.py:51 .\core\models.py:38
-#: .\product\models\category.py:65 .\product\models\product.py:164
-#: .\slider\models.py:36 .\slider\models.py:113
+#: .\blog\models\category.py:51 .\product\models\category.py:65
+#: .\product\models\product.py:164 .\slider\models.py:36 .\slider\models.py:113
 msgid "Description"
 msgstr ""
 
@@ -186,7 +185,7 @@ msgstr ""
 
 #: .\blog\models\tag.py:21 .\pay_way\models.py:21
 #: .\product\models\product.py:116 .\tip\models.py:30
-#: .\user\models\account.py:106
+#: .\user\models\account.py:117
 msgid "Active"
 msgstr ""
 
@@ -196,6 +195,34 @@ msgstr ""
 
 #: .\blog\models\tag.py:35
 msgid "Blog Tags"
+msgstr ""
+
+#: .\blog\views\comment.py:58 .\product\views\review.py:62
+msgid "User is not authenticated"
+msgstr ""
+
+#: .\blog\views\comment.py:67
+msgid "User and Post are required fields"
+msgstr ""
+
+#: .\blog\views\comment.py:78
+msgid "Comment does not exist"
+msgstr ""
+
+#: .\blog\views\comment.py:84 .\product\views\review.py:88
+msgid "Invalid data"
+msgstr ""
+
+#: .\blog\views\comment.py:97 .\blog\views\post.py:47
+msgid "Authentication credentials were not provided."
+msgstr ""
+
+#: .\blog\views\comment.py:117
+msgid "No replies found"
+msgstr ""
+
+#: .\blog\views\comment.py:137
+msgid "No comment IDs provided."
 msgstr ""
 
 #: .\cart\models.py:25
@@ -222,41 +249,32 @@ msgstr ""
 msgid "Cart Items"
 msgstr ""
 
-#: .\config\base.py:189
+#: .\config\base.py:191
 msgid "Greek"
 msgstr ""
 
-#: .\config\base.py:190
+#: .\config\base.py:192
 msgid "English"
 msgstr ""
 
-#: .\config\base.py:191
+#: .\config\base.py:193
 msgid "German"
 msgstr ""
 
-#: .\core\enum.py:6
-msgid "String"
+#: .\contact\models.py:14 .\order\models\order.py:79
+msgid "Email"
 msgstr ""
 
-#: .\core\enum.py:7
-#: .\venv\Lib\site-packages\django\db\models\fields\__init__.py:2056
-msgid "Integer"
+#: .\contact\models.py:15 .\notification\models\notification.py:22
+msgid "Message"
 msgstr ""
 
-#: .\core\enum.py:8
-msgid "Boolean"
+#: .\contact\models.py:24
+msgid "Contact"
 msgstr ""
 
-#: .\core\enum.py:9
-msgid "Dictionary"
-msgstr ""
-
-#: .\core\enum.py:10
-msgid "List"
-msgstr ""
-
-#: .\core\enum.py:11
-msgid "Float"
+#: .\contact\models.py:25
+msgid "Contacts"
 msgstr ""
 
 #: .\core\fields\measurement.py:33
@@ -264,87 +282,23 @@ msgstr ""
 msgid "'%(value)s' (%(type_given)s) value must be of type %(type_wanted)s."
 msgstr ""
 
-#: .\core\models.py:28
-msgid "Site"
-msgstr ""
-
-#: .\core\models.py:30
-msgid "Key"
-msgstr ""
-
-#: .\core\models.py:31 .\vat\models.py:16
-msgid "Value"
-msgstr ""
-
-#: .\core\models.py:33
-msgid "Value Type"
-msgstr ""
-
-#: .\core\models.py:39
-msgid "Is Public"
-msgstr ""
-
-#: .\core\models.py:42
-msgid "Setting"
-msgstr ""
-
-#: .\core\models.py:43
-msgid "Settings"
-msgstr ""
-
-#: .\core\models.py:53
-msgid "Setting key must start with 'APP_'."
-msgstr ""
-
-#: .\core\models.py:99
-msgid "Value is not a valid boolean."
-msgstr ""
-
-#: .\core\models.py:109
-msgid "Value does not match String type."
-msgstr ""
-
-#: .\core\models.py:113
-msgid "Value does not match Integer type."
-msgstr ""
-
-#: .\core\models.py:117
-msgid "Value does not match Float type."
-msgstr ""
-
-#: .\core\models.py:121
-msgid "Value does not match Boolean type."
-msgstr ""
-
-#: .\core\models.py:125
-msgid "Value does not match Dictionary type."
-msgstr ""
-
-#: .\core\models.py:129
-msgid "Value does not match List type."
-msgstr ""
-
-#: .\core\models.py:131
-msgid "Value is not valid JSON."
-msgstr ""
-
-#: .\core\models.py:158
+#: .\core\models.py:22
 msgid "Sort Order"
 msgstr ""
 
-#: .\core\models.py:215
+#: .\core\models.py:79
 msgid "Created At"
 msgstr ""
 
-#: .\core\models.py:216
+#: .\core\models.py:80
 msgid "Updated At"
 msgstr ""
 
-#: .\core\models.py:255
+#: .\core\models.py:119
 msgid "Published At"
 msgstr ""
 
-#: .\core\models.py:256
+#: .\core\models.py:120
 msgid "Is Published"
 msgstr ""
 
@@ -944,11 +898,11 @@ msgid ""
 "following form:"
 msgstr ""
 
-#: .\core\urls.py:41
+#: .\core\urls.py:38
 msgid "admin/"
 msgstr ""
 
-#: .\core\urls.py:42
+#: .\core\urls.py:39
 msgid "admin_no_otp/"
 msgstr ""
 
@@ -1014,10 +968,6 @@ msgstr ""
 
 #: .\notification\models\notification.py:15 .\tip\models.py:22
 msgid "Kind"
-msgstr ""
-
-#: .\notification\models\notification.py:22
-msgid "Message"
 msgstr ""
 
 #: .\notification\models\notification.py:38
@@ -1088,16 +1038,12 @@ msgstr ""
 msgid "The quantity exceeds the available stock."
 msgstr ""
 
-#: .\order\models\order.py:79
-msgid "Email"
-msgstr ""
-
-#: .\order\models\order.py:80 .\user\models\account.py:79
+#: .\order\models\order.py:80 .\user\models\account.py:90
 #: .\user\models\address.py:22
 msgid "First Name"
 msgstr ""
 
-#: .\order\models\order.py:81 .\user\models\account.py:81
+#: .\order\models\order.py:81 .\user\models\account.py:92
 #: .\user\models\address.py:23
 msgid "Last Name"
 msgstr ""
@@ -1110,7 +1056,7 @@ msgstr ""
 msgid "Street Number"
 msgstr ""
 
-#: .\order\models\order.py:84 .\user\models\account.py:83
+#: .\order\models\order.py:84 .\user\models\account.py:94
 #: .\user\models\address.py:26
 msgid "City"
 msgstr ""
@@ -1119,11 +1065,11 @@ msgstr ""
 msgid "Zipcode"
 msgstr ""
 
-#: .\order\models\order.py:86 .\user\models\account.py:86
+#: .\order\models\order.py:86 .\user\models\account.py:97
 msgid "Place"
 msgstr ""
 
-#: .\order\models\order.py:87 .\user\models\account.py:82
+#: .\order\models\order.py:87 .\user\models\account.py:93
 #: .\user\models\address.py:58
 msgid "Phone Number"
 msgstr ""
@@ -1405,6 +1351,14 @@ msgstr ""
 msgid "Invalid rate value."
 msgstr ""
 
+#: .\product\views\review.py:71
+msgid "User and Product are required fields"
+msgstr ""
+
+#: .\product\views\review.py:82
+msgid "Review does not exist"
+msgstr ""
+
 #: .\region\models.py:14
 msgid "Region Code"
 msgstr ""
@@ -1533,59 +1487,70 @@ msgstr ""
 msgid "Other"
 msgstr ""
 
-#: .\user\models\account.py:71
+#: .\user\models\account.py:74
 msgid "Username"
 msgstr ""
 
-#: .\user\models\account.py:77
-msgid "Email Address"
-msgstr ""
-
-#: .\user\models\account.py:84 .\user\models\address.py:27
-msgid "Zip Code"
+#: .\user\models\account.py:80
+#, python-brace-format
+msgid ""
+"Required. {settings.ACCOUNT_USERNAME_MAX_LENGTH} characters or fewer."
+"Letters, digits and @/./+/-/_ only."
 msgstr ""
 
 #: .\user\models\account.py:85
+msgid "A user with that username already exists."
+msgstr ""
+
+#: .\user\models\account.py:88
+msgid "Email Address"
+msgstr ""
+
+#: .\user\models\account.py:95 .\user\models\address.py:27
+msgid "Zip Code"
+msgstr ""
+
+#: .\user\models\account.py:96
 msgid "Address"
 msgstr ""
 
-#: .\user\models\account.py:107
+#: .\user\models\account.py:118
 msgid "Staff"
 msgstr ""
 
-#: .\user\models\account.py:108
+#: .\user\models\account.py:119
 msgid "Birth Date"
 msgstr ""
 
-#: .\user\models\account.py:109
+#: .\user\models\account.py:120
 msgid "Twitter Profile"
 msgstr ""
 
-#: .\user\models\account.py:110
+#: .\user\models\account.py:121
 msgid "LinkedIn Profile"
 msgstr ""
 
-#: .\user\models\account.py:111
+#: .\user\models\account.py:122
 msgid "Facebook Profile"
 msgstr ""
 
-#: .\user\models\account.py:112
+#: .\user\models\account.py:123
 msgid "Instagram Profile"
 msgstr ""
 
-#: .\user\models\account.py:114
+#: .\user\models\account.py:125
 msgid "Youtube Profile"
 msgstr ""
 
-#: .\user\models\account.py:115
+#: .\user\models\account.py:126
 msgid "Github Profile"
 msgstr ""
 
-#: .\user\models\account.py:124
+#: .\user\models\account.py:135
 msgid "User Account"
 msgstr ""
 
-#: .\user\models\account.py:125
+#: .\user\models\account.py:136
 msgid "User Accounts"
 msgstr ""
 
@@ -1611,6 +1576,22 @@ msgstr ""
 
 #: .\user\models\address.py:103
 msgid "There can only be one main address per user."
+msgstr ""
+
+#: .\user\views\account.py:195
+msgid "The new username is the same as the current username."
+msgstr ""
+
+#: .\user\views\account.py:203
+msgid "Username already taken."
+msgstr ""
+
+#: .\user\views\account.py:210
+msgid "Username updated successfully."
+msgstr ""
+
+#: .\vat\models.py:16
+msgid "Value"
 msgstr ""
 
 #: .\vat\models.py:20
@@ -2087,12 +2068,12 @@ msgstr ""
 msgid "Null characters are not allowed."
 msgstr ""
 
-#: .\venv\Lib\site-packages\django\db\models\base.py:1473
+#: .\venv\Lib\site-packages\django\db\models\base.py:1477
 #: .\venv\Lib\site-packages\django\forms\models.py:906
 msgid "and"
 msgstr ""
 
-#: .\venv\Lib\site-packages\django\db\models\base.py:1475
+#: .\venv\Lib\site-packages\django\db\models\base.py:1479
 #, python-format
 msgid "%(model_name)s with this %(field_labels)s already exists."
 msgstr ""
@@ -2237,6 +2218,10 @@ msgstr ""
 #: .\venv\Lib\site-packages\django\db\models\fields\__init__.py:2054
 #, python-format
 msgid "“%(value)s” value must be an integer."
+msgstr ""
+
+#: .\venv\Lib\site-packages\django\db\models\fields\__init__.py:2056
+msgid "Integer"
 msgstr ""
 
 #: .\venv\Lib\site-packages\django\db\models\fields\__init__.py:2152
@@ -3170,6 +3155,35 @@ msgstr ""
 
 #: .\venv\Lib\site-packages\isort\main.py:158
 msgid "show this help message and exit"
+msgstr ""
+
+#: .\venv\Lib\site-packages\jsonfield\fields.py:48
+msgid "Enter valid JSON."
+msgstr ""
+
+#: .\venv\Lib\site-packages\jsonfield\forms.py:15
+#, python-format
+msgid "\"%(value)s\" value must be valid JSON."
+msgstr ""
+
+#: .\venv\Lib\site-packages\knox\auth.py:46
+#: .\venv\src\django-rest-knox\knox\auth.py:40
+msgid "Invalid token header. No credentials provided."
+msgstr ""
+
+#: .\venv\Lib\site-packages\knox\auth.py:49
+#: .\venv\src\django-rest-knox\knox\auth.py:43
+msgid "Invalid token header. Token string should not contain spaces."
+msgstr ""
+
+#: .\venv\Lib\site-packages\knox\auth.py:63
+#: .\venv\src\django-rest-knox\knox\auth.py:57
+msgid "Invalid token."
+msgstr ""
+
+#: .\venv\Lib\site-packages\knox\auth.py:92
+#: .\venv\src\django-rest-knox\knox\auth.py:86
+msgid "User inactive or deleted."
 msgstr ""
 
 #: .\venv\Lib\site-packages\kombu\transport\qpid.py:1311

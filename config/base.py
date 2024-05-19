@@ -86,6 +86,7 @@ PROJECT_APPS = [
     "cart",
     "notification",
     "authentication",
+    "contact",
 ]
 
 # Third-party apps
@@ -258,6 +259,8 @@ DEEPL_AUTH_KEY = getenv("DEEPL_AUTH_KEY", "changeme")
 LOCALE_PATHS = [path.join(BASE_DIR, "locale/")]
 
 ENABLE_DEBUG_TOOLBAR = getenv("ENABLE_DEBUG_TOOLBAR", "False") == "True"
+
+ADMINS = [("Admin", getenv("ADMIN_EMAIL", "")), ("Info", getenv("INFO_EMAIL", ""))]
 
 if ENABLE_DEBUG_TOOLBAR:
     INSTALLED_APPS += ["debug_toolbar"]

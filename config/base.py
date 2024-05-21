@@ -65,6 +65,7 @@ DJANGO_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.sites",
     "django.contrib.postgres",
+    "django.contrib.humanize",
 ]
 
 # Project-specific apps

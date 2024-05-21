@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-05-19 18:26+0300\n"
+"POT-Creation-Date: 2024-05-21 12:34+0300\n"
 "PO-Revision-Date: 2023-07-12 12:32+0300\n"
 "Last-Translator:   <bill@bill.gr>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,42 +18,6 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Translated-Using: django-rosetta 0.9.9\n"
-
-#: .\authentication\serializers.py:145
-msgid "Authenticator code"
-msgstr ""
-
-#: .\authentication\serializers.py:157
-msgid "TOTP enabled"
-msgstr ""
-
-#: .\authentication\views\base.py:80
-msgid "Returns if the user is already registered or not."
-msgstr ""
-
-#: .\authentication\views\mfa.py:48 .\authentication\views\mfa.py:157
-msgid "TOTP is not enabled for this user"
-msgstr ""
-
-#: .\authentication\views\mfa.py:62
-msgid "Invalid code"
-msgstr ""
-
-#: .\authentication\views\mfa.py:83 .\authentication\views\mfa.py:118
-msgid "TOTP is already enabled for this user"
-msgstr ""
-
-#: .\authentication\views\mfa.py:175
-msgid "No TOTP authenticator found for this user"
-msgstr ""
-
-#: .\authentication\views\mfa.py:209 .\authentication\views\mfa.py:234
-msgid "No recovery codes found for this user"
-msgstr ""
-
-#: .\authentication\views\mfa.py:252
-msgid "Check if TOTP is enabled for the current user"
-msgstr ""
 
 #: .\blog\admin.py:67
 msgid "Related posts (for this specific category)"
@@ -251,15 +215,15 @@ msgstr ""
 msgid "Cart Items"
 msgstr ""
 
-#: .\config\base.py:191
+#: .\config\base.py:187
 msgid "Greek"
 msgstr ""
 
-#: .\config\base.py:192
+#: .\config\base.py:188
 msgid "English"
 msgstr ""
 
-#: .\config\base.py:193
+#: .\config\base.py:189
 msgid "German"
 msgstr ""
 
@@ -904,11 +868,7 @@ msgid ""
 "following form:"
 msgstr ""
 
-#: .\core\urls.py:38
-msgid "admin/"
-msgstr ""
-
-#: .\core\urls.py:39
+#: .\core\urls.py:26
 msgid "admin_no_otp/"
 msgstr ""
 
@@ -1584,15 +1544,15 @@ msgstr ""
 msgid "There can only be one main address per user."
 msgstr ""
 
-#: .\user\views\account.py:195
+#: .\user\views\account.py:187
 msgid "The new username is the same as the current username."
 msgstr ""
 
-#: .\user\views\account.py:203
+#: .\user\views\account.py:195
 msgid "Username already taken."
 msgstr ""
 
-#: .\user\views\account.py:210
+#: .\user\views\account.py:202
 msgid "Username updated successfully."
 msgstr ""
 

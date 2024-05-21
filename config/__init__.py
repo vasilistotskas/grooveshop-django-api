@@ -9,6 +9,7 @@ from config.currency import *  # noqa
 from config.database import *  # noqa
 from config.email import *  # noqa
 from config.extra_settings import *  # noqa
+from config.knox import *  # noqa
 from config.logging import *  # noqa
 from config.measurement import *  # noqa
 from config.mfa import *  # noqa
@@ -20,4 +21,3 @@ from config.session import *  # noqa
 from config.spectacular import *  # noqa
 from config.storage import *  # noqa
 from config.tinymce import *  # noqa
-from config.knox import *  # noqa

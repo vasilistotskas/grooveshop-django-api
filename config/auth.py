@@ -53,7 +53,7 @@ HEADLESS_ONLY = True
 HEADLESS_TOKEN_STRATEGY = "core.api.tokens.SessionTokenStrategy"
 HEADLESS_FRONTEND_URLS = {
     "account_confirm_email": f"{NUXT_BASE_URL}/account/verify-email/{{key}}",
-    "account_reset_password": "https://app.project.org/account/password/reset",
+    "account_reset_password": f"{NUXT_BASE_URL}/account/password/reset",
     "account_reset_password_from_key": f"{NUXT_BASE_URL}/account/password/reset/key/{{key}}",
     "account_signup": f"{NUXT_BASE_URL}/account/registration",
     "socialaccount_login_error": f"{NUXT_BASE_URL}/account/provider/callback",

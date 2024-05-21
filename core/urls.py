@@ -12,8 +12,9 @@ from drf_spectacular.views import SpectacularAPIView
 from drf_spectacular.views import SpectacularRedocView
 from drf_spectacular.views import SpectacularSwaggerView
 
-from core.view import HomeView
-from core.view import upload_image
+from core.views import HomeView
+from core.views import upload_image
+
 
 User = get_user_model()
 

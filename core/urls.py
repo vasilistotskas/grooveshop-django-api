@@ -26,7 +26,6 @@ urlpatterns = i18n_patterns(
     path("", HomeView.as_view(), name="home"),
     path(_("admin_no_otp/"), admin.site.urls),
     path("upload_image", upload_image, name="upload_image"),
-    path("accounts/", include("allauth.mfa.urls")),
     path("accounts/", include("allauth.urls")),
     path("_allauth/", include("allauth.headless.urls")),
     # rosetta

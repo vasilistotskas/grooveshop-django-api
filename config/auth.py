@@ -4,37 +4,17 @@ DEBUG = getenv("DEBUG", "True") == "True"
 
 NUXT_BASE_URL = getenv("NUXT_BASE_URL", "http://localhost:3000")
 
-GOOGLE_CALLBACK_URL = getenv("GOOGLE_CALLBACK_URL", "http://localhost:8000")
 SOCIALACCOUNT_ADAPTER = "authentication.views.social.SocialAccountAdapter"
 SOCIALACCOUNT_PROVIDERS = {
-    "facebook": {
-        "METHOD": "oauth2",
-        "SDK_URL": "//connect.facebook.net/{locale}/sdk.js",
-        "SCOPE": ["email", "public_profile"],
-        "AUTH_PARAMS": {"auth_type": "reauthenticate"},
-        "INIT_PARAMS": {"cookie": True},
-        "FIELDS": [
-            "id",
-            "first_name",
-            "last_name",
-            "middle_name",
-            "name",
-            "name_format",
-            "picture",
-            "short_name",
-        ],
-        "EXCHANGE_TOKEN": True,
-        "VERIFIED_EMAIL": False if DEBUG else True,
-        "LOCALE_FUNC": lambda request: "en_US",
-        "VERSION": "v15.0",
-        "GRAPH_API_URL": "https://graph.facebook.com/v15.0/",
-    },
     "google": {
-        "SCOPE": ["profile", "email"],
+        "VERIFIED_EMAIL": False if DEBUG else True,
+        "SCOPE": ["profile", "email", "openid"],
         "AUTH_PARAMS": {"access_type": "online"},
     },
 }
 
+ACCOUNT_CHANGE_EMAIL = True
+ACCOUNT_MAX_EMAIL_ADDRESSES = 2
 ACCOUNT_USER_MODEL_USERNAME_FIELD = "username"
 ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_UNIQUE_EMAIL = True

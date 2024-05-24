@@ -9,6 +9,7 @@ MEDIA_STREAM_BASE_URL = getenv("MEDIA_STREAM_BASE_URL", "http://localhost:3003")
 AWS_STORAGE_BUCKET_NAME = getenv("AWS_STORAGE_BUCKET_NAME")
 AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
 
+CSRF_USE_SESSIONS = False
 CSRF_COOKIE_NAME = "csrftoken"
 CSRF_COOKIE_AGE = 60 * 60 * 24 * 7 * 52  # 1 year
 CSRF_COOKIE_DOMAIN = getenv("CSRF_COOKIE_DOMAIN", ".localhost")
@@ -38,4 +39,3 @@ if DEBUG:
         ]
     )
 
-CSRF_USE_SESSIONS = True

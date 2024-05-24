@@ -3,7 +3,21 @@
 
 
 
+## v0.126.0 (2024-05-24)
+
+### Feature
+
+* feat: Bump Version ([`558c682`](https://github.com/vasilistotskas/grooveshop-django-api/commit/558c6826bcbc4dcb55cfb12f1be4c609c5fd94f9))
+
+### Fix
+
+* fix: Update poetry.lock ([`9ed3378`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ed3378413000ad0980addaaf8fa2675d6c656f5))
+
 ## v0.125.0 (2024-05-19)
+
+### Chore
+
+* chore(release): release version 0.125.0 [skip ci] ([`67d8a80`](https://github.com/vasilistotskas/grooveshop-django-api/commit/67d8a806e5cabea742c3525c940d344fee2683ef))
 
 ### Feature
 

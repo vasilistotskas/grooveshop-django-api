@@ -3,7 +3,17 @@
 
 
 
+## v0.127.0 (2024-05-25)
+
+### Feature
+
+* feat: READEME.md ([`30e5403`](https://github.com/vasilistotskas/grooveshop-django-api/commit/30e5403f0dcd11ca00cd9773c80e705e1b7b60ee))
+
 ## v0.126.0 (2024-05-24)
+
+### Chore
+
+* chore(release): release version 0.126.0 [skip ci] ([`059438f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/059438feb2670b815718f7d82b0024517088edfa))
 
 ### Feature
 

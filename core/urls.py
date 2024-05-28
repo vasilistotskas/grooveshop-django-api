@@ -13,6 +13,7 @@ from drf_spectacular.views import SpectacularRedocView
 from drf_spectacular.views import SpectacularSwaggerView
 
 from core.views import HomeView
+from core.views import ManageTOTPSvgView
 from core.views import upload_image
 
 
@@ -28,6 +29,11 @@ urlpatterns = i18n_patterns(
     path("upload_image", upload_image, name="upload_image"),
     path("accounts/", include("allauth.urls")),
     path("_allauth/", include("allauth.headless.urls")),
+    path(
+        "_allauth/app/v1/account/authenticators/totp/svg",
+        ManageTOTPSvgView.as_api_view(client="app"),
+        name="manage_totp_svg",
+    ),
     # rosetta
     path("rosetta/", include("rosetta.urls")),
     # admin html editor

@@ -1,6 +1,12 @@
 import os
 from uuid import uuid4
 
+from allauth.headless.base.response import APIResponse
+from allauth.headless.base.views import AuthenticatedAPIView
+from allauth.headless.mfa import response
+from allauth.mfa import totp
+from allauth.mfa.adapter import get_adapter
+from allauth.mfa.models import Authenticator
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
@@ -70,3 +76,36 @@ def upload_image(request):
                 "location": f"{base_url}{settings.MEDIA_URL}uploads/tinymce/{file_obj.name}",
             }
         )
+
+
+class TOTPSvgNotFoundResponse(APIResponse):
+    def __init__(self, request, secret, svg):
+        super().__init__(
+            request,
+            meta={
+                "secret": secret,
+                "svg": svg,
+            },
+            status=404,
+        )
+
+
+class ManageTOTPSvgView(AuthenticatedAPIView):
+    def get(self, request, *args, **kwargs):
+        authenticator = self._get_authenticator()
+        if not authenticator:
+            secret = totp.get_totp_secret(regenerate=True)
+            adapter = get_adapter()
+            totp_url = totp.build_totp_url(
+                adapter.get_totp_label(self.request.user),
+                adapter.get_totp_issuer(),
+                secret,
+            )
+            totp_svg = totp.build_totp_svg(totp_url)
+            return TOTPSvgNotFoundResponse(request, secret, totp_svg)
+        return response.TOTPResponse(request, authenticator)
+
+    def _get_authenticator(self):
+        return Authenticator.objects.filter(
+            type=Authenticator.Type.TOTP, user=self.request.user
+        ).first()

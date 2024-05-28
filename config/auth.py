@@ -4,17 +4,26 @@ DEBUG = getenv("DEBUG", "True") == "True"
 
 NUXT_BASE_URL = getenv("NUXT_BASE_URL", "http://localhost:3000")
 
-SOCIALACCOUNT_ADAPTER = "authentication.views.social.SocialAccountAdapter"
+SOCIALACCOUNT_ADAPTER = "user.adapter.SocialAccountAdapter"
+SOCIALACCOUNT_STORE_TOKENS = True
 SOCIALACCOUNT_PROVIDERS = {
     "google": {
-        "VERIFIED_EMAIL": False if DEBUG else True,
+        "APP": {
+            "client_id": getenv("SOCIALACCOUNT_GOOGLE_CLIENT_ID", ""),
+            "secret": getenv("SOCIALACCOUNT_GOOGLE_SECRET", ""),
+            "key": "",
+        },
         "SCOPE": ["profile", "email", "openid"],
         "AUTH_PARAMS": {"access_type": "online"},
     },
 }
+SOCIALACCOUNT_FORMS = {
+    "disconnect": "allauth.socialaccount.forms.DisconnectForm",
+    "signup": "allauth.socialaccount.forms.SignupForm",
+}
 
-ACCOUNT_CHANGE_EMAIL = True
-ACCOUNT_MAX_EMAIL_ADDRESSES = 2
+ACCOUNT_CHANGE_EMAIL = True if DEBUG else False
+ACCOUNT_MAX_EMAIL_ADDRESSES = 2 if DEBUG else None
 ACCOUNT_USER_MODEL_USERNAME_FIELD = "username"
 ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_UNIQUE_EMAIL = True
@@ -26,6 +35,10 @@ ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_AUTHENTICATION_METHOD = "username_email"
 ACCOUNT_ADAPTER = "user.adapter.UserAccountAdapter"
 ACCOUNT_SIGNUP_REDIRECT_URL = NUXT_BASE_URL + "/account"
+ACCOUNT_LOGIN_BY_CODE_ENABLED = True
+ACCOUNT_LOGIN_BY_CODE_MAX_ATTEMPTS = 3
+ACCOUNT_LOGIN_BY_CODE_TIMEOUT = 300
+
 LOGIN_REDIRECT_URL = NUXT_BASE_URL + "/account"
 USERSESSIONS_TRACK_ACTIVITY = True
 

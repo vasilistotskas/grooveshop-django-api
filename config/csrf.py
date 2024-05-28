@@ -15,7 +15,9 @@ CSRF_COOKIE_AGE = 60 * 60 * 24 * 7 * 52  # 1 year
 CSRF_COOKIE_DOMAIN = getenv("CSRF_COOKIE_DOMAIN", ".localhost")
 CSRF_COOKIE_PATH = "/"
 CSRF_COOKIE_SECURE = not DEBUG  # Only send CSRF cookie over HTTPS when DEBUG is False
-CSRF_COOKIE_HTTPONLY = True  # Helps mitigate XSS attacks
+CSRF_COOKIE_HTTPONLY = (
+    False if DEBUG else True
+)  # Set to True to prevent JavaScript from reading the CSRF cookie
 CSRF_COOKIE_SAMESITE = "Lax"  # 'Lax' or 'None'. Use 'None' only if necessary and ensure CSRF_COOKIE_SECURE is True
 CSRF_HEADER_NAME = "HTTP_X_CSRFTOKEN"
 
@@ -38,4 +40,3 @@ if DEBUG:
             "http://localhost:3000",
         ]
     )
-

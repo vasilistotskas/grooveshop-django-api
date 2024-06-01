@@ -3,7 +3,17 @@
 
 
 
+## v0.128.1 (2024-06-01)
+
+### Fix
+
+* fix: wrong param in user signals remove ([`4ecb355`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4ecb35592889869dc4c4518319ca8438dd947337))
+
 ## v0.128.0 (2024-06-01)
+
+### Chore
+
+* chore(release): release version 0.128.0 [skip ci] ([`92ed37a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/92ed37a025e2fedbfa11bff564efbde39d1756bc))
 
 ### Feature
 

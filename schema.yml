@@ -4,561 +4,6 @@ info:
   version: 1.0.0
   description: Grooveshop API description
 paths:
-  /api/v1/api-token-auth:
-    post:
-      operationId: api_v1_api_token_auth_create
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/AuthToken'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/AuthToken'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AuthToken'
-        required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthToken'
-          description: ''
-  /api/v1/auth/facebook/connect:
-    post:
-      operationId: api_v1_auth_facebook_connect_create
-      description: |-
-        class used for social account linking
-
-        example usage for facebook with access_token
-        -------------
-        from allauth.socialaccount.providers.facebook.views import FacebookOAuth2Adapter
-
-        class FacebookConnect(SocialConnectView):
-            adapter_class = FacebookOAuth2Adapter
-        -------------
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/SocialConnect'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/SocialConnect'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SocialConnect'
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SocialConnect'
-          description: ''
-  /api/v1/auth/facebook/login:
-    post:
-      operationId: api_v1_auth_facebook_login_create
-      description: |-
-        class used for social authentications
-        example usage for facebook with access_token
-        -------------
-        from allauth.socialaccount.providers.facebook.views import FacebookOAuth2Adapter
-
-        class FacebookLogin(SocialLoginView):
-            adapter_class = FacebookOAuth2Adapter
-        -------------
-
-        example usage for facebook with code
-
-        -------------
-        from allauth.socialaccount.providers.facebook.views import FacebookOAuth2Adapter
-        from allauth.socialaccount.providers.oauth2.client import OAuth2Client
-
-        class FacebookLogin(SocialLoginView):
-            adapter_class = FacebookOAuth2Adapter
-            client_class = OAuth2Client
-            callback_url = 'localhost:8000'
-        -------------
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/SocialLogin'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/SocialLogin'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SocialLogin'
-      security:
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SocialLogin'
-          description: ''
-  /api/v1/auth/google/connect:
-    post:
-      operationId: api_v1_auth_google_connect_create
-      description: |-
-        class used for social account linking
-
-        example usage for facebook with access_token
-        -------------
-        from allauth.socialaccount.providers.facebook.views import FacebookOAuth2Adapter
-
-        class FacebookConnect(SocialConnectView):
-            adapter_class = FacebookOAuth2Adapter
-        -------------
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/SocialConnect'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/SocialConnect'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SocialConnect'
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SocialConnect'
-          description: ''
-  /api/v1/auth/google/login:
-    post:
-      operationId: api_v1_auth_google_login_create
-      description: |-
-        class used for social authentications
-        example usage for facebook with access_token
-        -------------
-        from allauth.socialaccount.providers.facebook.views import FacebookOAuth2Adapter
-
-        class FacebookLogin(SocialLoginView):
-            adapter_class = FacebookOAuth2Adapter
-        -------------
-
-        example usage for facebook with code
-
-        -------------
-        from allauth.socialaccount.providers.facebook.views import FacebookOAuth2Adapter
-        from allauth.socialaccount.providers.oauth2.client import OAuth2Client
-
-        class FacebookLogin(SocialLoginView):
-            adapter_class = FacebookOAuth2Adapter
-            client_class = OAuth2Client
-            callback_url = 'localhost:8000'
-        -------------
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/SocialLogin'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/SocialLogin'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SocialLogin'
-      security:
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SocialLogin'
-          description: ''
-  /api/v1/auth/is_user_registered:
-    post:
-      operationId: api_v1_auth_is_user_registered_create
-      description: Returns if the user is already registered or not.
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        registered:
-          content:
-            application/json:
-              schema:
-                type: boolean
-          description: ''
-  /api/v1/auth/login:
-    post:
-      operationId: api_v1_auth_login_create
-      description: |-
-        Check the credentials and return the REST Token
-        if the credentials are valid and authenticated.
-        Calls Django Auth login method to register User ID
-        in Django session framework
-
-        Accept the following POST parameters: username, password
-        Return the REST Framework Token Object's key.
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/AuthenticationLogin'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/AuthenticationLogin'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AuthenticationLogin'
-        required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthenticationLogin'
-          description: ''
-  /api/v1/auth/logout:
-    get:
-      operationId: api_v1_auth_logout_retrieve
-      description: |-
-        Calls Django logout method and delete the Token object
-        assigned to the current User object.
-
-        Accepts/Returns nothing.
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          description: No response body
-    post:
-      operationId: api_v1_auth_logout_create
-      description: |-
-        Calls Django logout method and delete the Token object
-        assigned to the current User object.
-
-        Accepts/Returns nothing.
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          description: No response body
-  /api/v1/auth/mfa/recovery-codes/generate:
-    post:
-      operationId: api_v1_auth_mfa_recovery_codes_generate_create
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '200':
-          description: No response body
-  /api/v1/auth/mfa/recovery-codes/list:
-    get:
-      operationId: api_v1_auth_mfa_recovery_codes_list_retrieve
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '200':
-          description: No response body
-  /api/v1/auth/mfa/totp/activate:
-    get:
-      operationId: api_v1_auth_mfa_totp_activate_retrieve
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ActivateTOTP'
-          description: ''
-    post:
-      operationId: api_v1_auth_mfa_totp_activate_create
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ActivateTOTP'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ActivateTOTP'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ActivateTOTP'
-        required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ActivateTOTP'
-          description: ''
-  /api/v1/auth/mfa/totp/active:
-    get:
-      operationId: api_v1_auth_mfa_totp_active_retrieve
-      description: Check if TOTP is enabled for the current user
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TOTPEnabled'
-          description: ''
-  /api/v1/auth/mfa/totp/authenticate:
-    post:
-      operationId: api_v1_auth_mfa_totp_authenticate_create
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/AuthenticateTOTP'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/AuthenticateTOTP'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AuthenticateTOTP'
-        required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthenticateTOTP'
-          description: ''
-  /api/v1/auth/mfa/totp/deactivate:
-    post:
-      operationId: api_v1_auth_mfa_totp_deactivate_create
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '200':
-          description: No response body
-  /api/v1/auth/password/change:
-    post:
-      operationId: api_v1_auth_password_change_create
-      description: |-
-        Calls Django Auth SetPasswordForm save method.
-
-        Accepts the following POST parameters: new_password1, new_password2
-        Returns the success/fail message.
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AuthenticationPasswordChange'
-        required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthenticationPasswordChange'
-          description: ''
-  /api/v1/auth/password/reset:
-    post:
-      operationId: api_v1_auth_password_reset_create
-      description: |-
-        Calls Django Auth PasswordResetForm save method.
-
-        Accepts the following POST parameters: email
-        Returns the success/fail message.
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/AuthenticationPasswordReset'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/AuthenticationPasswordReset'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AuthenticationPasswordReset'
-        required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthenticationPasswordReset'
-          description: ''
-  /api/v1/auth/password/reset/confirm:
-    post:
-      operationId: api_v1_auth_password_reset_confirm_create
-      description: |-
-        Password reset e-mail link is confirmed, therefore
-        this resets the user's password.
-
-        Accepts the following POST parameters: token, uid,
-            new_password1, new_password2
-        Returns the success/fail message.
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AuthenticationPasswordResetConfirm'
-        required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthenticationPasswordResetConfirm'
-          description: ''
-  /api/v1/auth/registration:
-    post:
-      operationId: api_v1_auth_registration_create
-      tags:
-      - api
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AuthenticationRegister'
-        required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthenticationRegister'
-          description: ''
-  /api/v1/auth/registration/resend-email:
-    post:
-      operationId: api_v1_auth_registration_resend_email_create
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ResendEmailVerification'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ResendEmailVerification'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ResendEmailVerification'
-        required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ResendEmailVerification'
-          description: ''
-  /api/v1/auth/registration/verify-email:
-    post:
-      operationId: api_v1_auth_registration_verify_email_create
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/VerifyEmail'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/VerifyEmail'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/VerifyEmail'
-        required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VerifyEmail'
-          description: ''
   /api/v1/auth/session/active_users_count:
     get:
       operationId: api_v1_auth_session_active_users_count_retrieve
@@ -566,8 +11,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -591,8 +34,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -600,233 +41,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ActiveUsersCount'
-          description: ''
-  /api/v1/auth/socialaccounts:
-    get:
-      operationId: api_v1_auth_socialaccounts_list
-      description: List SocialAccounts for the currently logged in user
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/SocialAccount'
-          description: ''
-  /api/v1/auth/socialaccounts/{id}/disconnect:
-    post:
-      operationId: api_v1_auth_socialaccounts_disconnect_create
-      description: |-
-        Disconnect SocialAccount from remote service for
-        the currently logged in user
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/SocialConnect'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/SocialConnect'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SocialConnect'
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SocialConnect'
-          description: ''
-  /api/v1/auth/token/blacklist:
-    post:
-      operationId: api_v1_auth_token_blacklist_create
-      description: |-
-        Takes a token and blacklists it. Must be used with the
-        `rest_framework_simplejwt.token_blacklist` app installed.
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/TokenBlacklist'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/TokenBlacklist'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TokenBlacklist'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TokenBlacklist'
-          description: ''
-  /api/v1/auth/token/refresh:
-    post:
-      operationId: api_v1_auth_token_refresh_create
-      description: |-
-        Takes a refresh type JSON web token and returns an access type JSON web
-        token if the refresh token is valid.
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/TokenRefresh'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/TokenRefresh'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TokenRefresh'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TokenRefresh'
-          description: ''
-  /api/v1/auth/token/verify:
-    post:
-      operationId: api_v1_auth_token_verify_create
-      description: |-
-        Takes a token and indicates if it is valid.  This view provides no
-        information about a token's fitness for a particular use.
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/TokenVerify'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/TokenVerify'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TokenVerify'
-        required: true
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TokenVerify'
-          description: ''
-  /api/v1/auth/user:
-    get:
-      operationId: api_v1_auth_user_retrieve
-      description: |-
-        Reads and updates UserModel fields
-        Accepts GET, PUT, PATCH methods.
-
-        Default accepted fields: username, first_name, last_name
-        Default display fields: pk, username, email, first_name, last_name
-        Read-only fields: pk, email
-
-        Returns UserModel fields.
-      tags:
-      - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Authentication'
-          description: ''
-    put:
-      operationId: api_v1_auth_user_update
-      description: |-
-        Reads and updates UserModel fields
-        Accepts GET, PUT, PATCH methods.
-
-        Default accepted fields: username, first_name, last_name
-        Default display fields: pk, username, email, first_name, last_name
-        Read-only fields: pk, email
-
-        Returns UserModel fields.
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/Authentication'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/Authentication'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Authentication'
-        required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Authentication'
-          description: ''
-    patch:
-      operationId: api_v1_auth_user_partial_update
-      description: |-
-        Reads and updates UserModel fields
-        Accepts GET, PUT, PATCH methods.
-
-        Default accepted fields: username, first_name, last_name
-        Default display fields: pk, username, email, first_name, last_name
-        Read-only fields: pk, email
-
-        Returns UserModel fields.
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedAuthentication'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedAuthentication'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedAuthentication'
-      security:
-      - basicAuth: []
-      - tokenAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Authentication'
           description: ''
   /api/v1/blog/author:
     get:
@@ -867,8 +81,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -894,8 +106,6 @@ paths:
               $ref: '#/components/schemas/BlogAuthor'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -950,8 +160,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -985,8 +193,6 @@ paths:
               $ref: '#/components/schemas/BlogAuthor'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -1007,8 +213,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -1040,8 +244,6 @@ paths:
               $ref: '#/components/schemas/BlogAuthor'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -1072,8 +274,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedBlogAuthor'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -1093,8 +293,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -1118,8 +316,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -1158,8 +354,6 @@ paths:
               $ref: '#/components/schemas/BlogAuthor'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -1197,8 +391,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedBlogAuthor'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -1225,8 +417,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -1266,8 +456,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -1293,8 +481,6 @@ paths:
               $ref: '#/components/schemas/BlogCategory'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -1345,8 +531,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -1380,8 +564,6 @@ paths:
               $ref: '#/components/schemas/BlogCategory'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -1402,8 +584,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -1435,8 +615,6 @@ paths:
               $ref: '#/components/schemas/BlogCategory'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -1467,8 +645,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedBlogCategory'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -1488,8 +664,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -1513,8 +687,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -1553,8 +725,6 @@ paths:
               $ref: '#/components/schemas/BlogCategory'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -1592,8 +762,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedBlogCategory'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -1620,8 +788,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -1638,8 +804,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -1667,8 +831,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -1728,8 +890,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -1754,9 +914,6 @@ paths:
             schema:
               $ref: '#/components/schemas/BlogComment'
         required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '201':
           content:
@@ -1822,8 +979,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -1856,9 +1011,6 @@ paths:
             schema:
               $ref: '#/components/schemas/BlogComment'
         required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '201':
           content:
@@ -1878,8 +1030,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -1910,9 +1060,6 @@ paths:
             schema:
               $ref: '#/components/schemas/BlogComment'
         required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '200':
           content:
@@ -1941,9 +1088,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PatchedBlogComment'
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '200':
           content:
@@ -1961,9 +1105,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '204':
           description: No response body
@@ -1986,8 +1127,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -2025,9 +1164,6 @@ paths:
             schema:
               $ref: '#/components/schemas/BlogComment'
         required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '200':
           content:
@@ -2063,9 +1199,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PatchedBlogComment'
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '200':
           content:
@@ -2090,9 +1223,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '204':
           description: No response body
@@ -2108,8 +1238,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -2137,8 +1265,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -2159,8 +1285,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -2188,8 +1312,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -2222,8 +1344,6 @@ paths:
               $ref: '#/components/schemas/BlogComment'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -2263,8 +1383,6 @@ paths:
               $ref: '#/components/schemas/BlogComment'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -2291,8 +1409,6 @@ paths:
               $ref: '#/components/schemas/BlogComment'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -2327,8 +1443,6 @@ paths:
               $ref: '#/components/schemas/BlogComment'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -2354,9 +1468,6 @@ paths:
             schema:
               $ref: '#/components/schemas/BlogComment'
         required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '200':
           content:
@@ -2389,9 +1500,6 @@ paths:
             schema:
               $ref: '#/components/schemas/BlogComment'
         required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '200':
           content:
@@ -2450,8 +1558,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -2477,8 +1583,6 @@ paths:
               $ref: '#/components/schemas/BlogPost'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -2545,8 +1649,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -2580,8 +1682,6 @@ paths:
               $ref: '#/components/schemas/BlogPost'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -2602,8 +1702,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -2635,8 +1733,6 @@ paths:
               $ref: '#/components/schemas/BlogPost'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -2667,8 +1763,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedBlogPost'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -2688,8 +1782,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -2713,8 +1805,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -2753,8 +1843,6 @@ paths:
               $ref: '#/components/schemas/BlogPost'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -2792,8 +1880,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedBlogPost'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -2820,8 +1906,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -2838,8 +1922,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -2867,8 +1949,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -2901,8 +1981,6 @@ paths:
               $ref: '#/components/schemas/BlogPost'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -2942,8 +2020,6 @@ paths:
               $ref: '#/components/schemas/BlogPost'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -2976,8 +2052,6 @@ paths:
               $ref: '#/components/schemas/BlogPost'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -3017,8 +2091,6 @@ paths:
               $ref: '#/components/schemas/BlogPost'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -3045,8 +2117,6 @@ paths:
               $ref: '#/components/schemas/BlogPost'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -3081,8 +2151,6 @@ paths:
               $ref: '#/components/schemas/BlogPost'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -3130,8 +2198,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -3157,8 +2223,6 @@ paths:
               $ref: '#/components/schemas/BlogTag'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -3213,8 +2277,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -3248,8 +2310,6 @@ paths:
               $ref: '#/components/schemas/BlogTag'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -3270,8 +2330,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -3303,8 +2361,6 @@ paths:
               $ref: '#/components/schemas/BlogTag'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -3335,8 +2391,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedBlogTag'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -3356,8 +2410,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -3381,8 +2433,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -3421,8 +2471,6 @@ paths:
               $ref: '#/components/schemas/BlogTag'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -3460,8 +2508,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedBlogTag'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -3488,8 +2534,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -3500,8 +2544,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -3526,8 +2568,6 @@ paths:
             schema:
               $ref: '#/components/schemas/Cart'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -3552,8 +2592,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedCart'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -3567,8 +2605,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -3587,8 +2623,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -3621,8 +2655,6 @@ paths:
             schema:
               $ref: '#/components/schemas/Cart'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -3655,8 +2687,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedCart'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -3678,8 +2708,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -3719,8 +2747,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -3746,8 +2772,6 @@ paths:
               $ref: '#/components/schemas/CartItemCreate'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -3798,8 +2822,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -3833,8 +2855,6 @@ paths:
               $ref: '#/components/schemas/CartItemCreate'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -3855,8 +2875,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -3887,8 +2905,6 @@ paths:
             schema:
               $ref: '#/components/schemas/CartItem'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -3919,8 +2935,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedCartItem'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -3940,8 +2954,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -3965,8 +2977,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -4004,8 +3014,6 @@ paths:
             schema:
               $ref: '#/components/schemas/CartItem'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -4043,8 +3051,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedCartItem'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -4071,8 +3077,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -4095,8 +3099,6 @@ paths:
               $ref: '#/components/schemas/Checkout'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -4123,8 +3125,6 @@ paths:
               $ref: '#/components/schemas/Contact'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -4184,8 +3184,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -4211,8 +3209,6 @@ paths:
               $ref: '#/components/schemas/Country'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -4279,8 +3275,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -4314,8 +3308,6 @@ paths:
               $ref: '#/components/schemas/Country'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -4338,8 +3330,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -4373,8 +3363,6 @@ paths:
               $ref: '#/components/schemas/Country'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -4407,8 +3395,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedCountry'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -4430,8 +3416,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -4457,8 +3441,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -4499,8 +3481,6 @@ paths:
               $ref: '#/components/schemas/Country'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -4540,8 +3520,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedCountry'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -4570,8 +3548,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -4607,8 +3583,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -4634,8 +3608,6 @@ paths:
               $ref: '#/components/schemas/NotificationUser'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -4682,8 +3654,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -4717,8 +3687,6 @@ paths:
               $ref: '#/components/schemas/NotificationUser'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -4739,8 +3707,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -4772,8 +3738,6 @@ paths:
               $ref: '#/components/schemas/NotificationUser'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -4804,8 +3768,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedNotificationUser'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -4825,8 +3787,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -4850,8 +3810,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -4890,8 +3848,6 @@ paths:
               $ref: '#/components/schemas/NotificationUser'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -4929,8 +3885,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedNotificationUser'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -4957,8 +3911,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -4987,8 +3939,6 @@ paths:
               $ref: '#/components/schemas/NotificationUser'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -5028,8 +3978,6 @@ paths:
               $ref: '#/components/schemas/NotificationUser'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -5062,8 +4010,6 @@ paths:
               $ref: '#/components/schemas/NotificationUser'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -5103,8 +4049,6 @@ paths:
               $ref: '#/components/schemas/NotificationUser'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -5137,8 +4081,6 @@ paths:
               $ref: '#/components/schemas/NotificationUserAction'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -5178,8 +4120,6 @@ paths:
               $ref: '#/components/schemas/NotificationUserAction'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -5212,8 +4152,6 @@ paths:
               $ref: '#/components/schemas/NotificationUserAction'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -5253,8 +4191,6 @@ paths:
               $ref: '#/components/schemas/NotificationUserAction'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -5275,8 +4211,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -5304,8 +4238,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -5364,8 +4296,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -5391,8 +4321,6 @@ paths:
               $ref: '#/components/schemas/OrderCreateUpdate'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -5413,8 +4341,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -5446,8 +4372,6 @@ paths:
               $ref: '#/components/schemas/OrderCreateUpdate'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -5478,8 +4402,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedOrderCreateUpdate'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -5499,8 +4421,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -5518,8 +4438,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -5571,8 +4489,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -5598,8 +4514,6 @@ paths:
               $ref: '#/components/schemas/PayWay'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -5620,8 +4534,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -5653,8 +4565,6 @@ paths:
               $ref: '#/components/schemas/PayWay'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -5685,8 +4595,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedPayWay'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -5706,8 +4614,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -5755,8 +4661,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -5782,8 +4686,6 @@ paths:
               $ref: '#/components/schemas/Product'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -5842,8 +4744,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -5877,8 +4777,6 @@ paths:
               $ref: '#/components/schemas/Product'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -5899,8 +4797,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -5932,8 +4828,6 @@ paths:
               $ref: '#/components/schemas/Product'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -5964,8 +4858,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedProduct'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -5985,8 +4877,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -6010,8 +4900,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -6050,8 +4938,6 @@ paths:
               $ref: '#/components/schemas/Product'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -6089,8 +4975,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedProduct'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -6117,8 +5001,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -6135,8 +5017,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -6164,8 +5044,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -6186,8 +5064,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -6215,8 +5091,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -6249,8 +5123,6 @@ paths:
               $ref: '#/components/schemas/Product'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -6290,8 +5162,6 @@ paths:
               $ref: '#/components/schemas/Product'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -6335,8 +5205,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -6362,8 +5230,6 @@ paths:
               $ref: '#/components/schemas/ProductCategory'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -6414,8 +5280,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -6449,8 +5313,6 @@ paths:
               $ref: '#/components/schemas/ProductCategory'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -6471,8 +5333,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -6504,8 +5364,6 @@ paths:
               $ref: '#/components/schemas/ProductCategory'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -6536,8 +5394,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedProductCategory'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -6557,8 +5413,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -6582,8 +5436,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -6622,8 +5474,6 @@ paths:
               $ref: '#/components/schemas/ProductCategory'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -6661,8 +5511,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedProductCategory'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -6689,8 +5537,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -6738,8 +5584,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -6765,8 +5609,6 @@ paths:
               $ref: '#/components/schemas/ProductFavourite'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -6825,8 +5667,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -6860,8 +5700,6 @@ paths:
               $ref: '#/components/schemas/ProductFavourite'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -6882,8 +5720,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -6915,8 +5751,6 @@ paths:
               $ref: '#/components/schemas/ProductFavourite'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -6947,8 +5781,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedProductFavourite'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -6968,8 +5800,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -6993,8 +5823,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -7033,8 +5861,6 @@ paths:
               $ref: '#/components/schemas/ProductFavourite'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -7072,8 +5898,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedProductFavourite'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -7100,8 +5924,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -7118,8 +5940,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -7147,8 +5967,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -7175,8 +5993,6 @@ paths:
               $ref: '#/components/schemas/ProductFavourite'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -7211,8 +6027,6 @@ paths:
               $ref: '#/components/schemas/ProductFavourite'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -7264,8 +6078,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -7291,8 +6103,6 @@ paths:
               $ref: '#/components/schemas/ProductImage'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -7351,8 +6161,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -7386,8 +6194,6 @@ paths:
               $ref: '#/components/schemas/ProductImage'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -7408,8 +6214,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -7441,8 +6245,6 @@ paths:
               $ref: '#/components/schemas/ProductImage'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -7473,8 +6275,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedProductImage'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -7494,8 +6294,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -7519,8 +6317,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -7559,8 +6355,6 @@ paths:
               $ref: '#/components/schemas/ProductImage'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -7598,8 +6392,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedProductImage'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -7626,8 +6418,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -7687,8 +6477,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -7713,9 +6501,6 @@ paths:
             schema:
               $ref: '#/components/schemas/ProductReview'
         required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '201':
           content:
@@ -7785,8 +6570,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -7819,9 +6602,6 @@ paths:
             schema:
               $ref: '#/components/schemas/ProductReview'
         required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '201':
           content:
@@ -7841,8 +6621,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -7873,9 +6651,6 @@ paths:
             schema:
               $ref: '#/components/schemas/ProductReview'
         required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '200':
           content:
@@ -7904,9 +6679,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PatchedProductReview'
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '200':
           content:
@@ -7924,9 +6696,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '204':
           description: No response body
@@ -7949,8 +6718,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -7988,9 +6755,6 @@ paths:
             schema:
               $ref: '#/components/schemas/ProductReview'
         required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '200':
           content:
@@ -8026,9 +6790,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PatchedProductReview'
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '200':
           content:
@@ -8053,9 +6814,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '204':
           description: No response body
@@ -8071,8 +6829,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -8100,8 +6856,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -8127,9 +6881,6 @@ paths:
             schema:
               $ref: '#/components/schemas/ProductReview'
         required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '200':
           content:
@@ -8162,9 +6913,6 @@ paths:
             schema:
               $ref: '#/components/schemas/ProductReview'
         required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '200':
           content:
@@ -8212,8 +6960,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -8239,8 +6985,6 @@ paths:
               $ref: '#/components/schemas/Region'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -8296,8 +7040,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -8331,8 +7073,6 @@ paths:
               $ref: '#/components/schemas/Region'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -8355,8 +7095,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -8390,8 +7128,6 @@ paths:
               $ref: '#/components/schemas/Region'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -8424,8 +7160,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedRegion'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -8447,8 +7181,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -8474,8 +7206,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -8516,8 +7246,6 @@ paths:
               $ref: '#/components/schemas/Region'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -8557,8 +7285,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedRegion'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -8587,8 +7313,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -8607,8 +7331,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -8638,8 +7360,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -8667,8 +7387,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -8703,8 +7421,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -8732,8 +7448,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -8768,8 +7482,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -8817,8 +7529,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -8844,8 +7554,6 @@ paths:
               $ref: '#/components/schemas/Slide'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -8900,8 +7608,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -8935,8 +7641,6 @@ paths:
               $ref: '#/components/schemas/Slide'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -8957,8 +7661,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -8990,8 +7692,6 @@ paths:
               $ref: '#/components/schemas/Slide'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -9022,8 +7722,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedSlide'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -9043,8 +7741,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -9068,8 +7764,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -9108,8 +7802,6 @@ paths:
               $ref: '#/components/schemas/Slide'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -9147,8 +7839,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedSlide'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -9175,8 +7865,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -9216,8 +7904,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -9243,8 +7929,6 @@ paths:
               $ref: '#/components/schemas/Slider'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -9295,8 +7979,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -9330,8 +8012,6 @@ paths:
               $ref: '#/components/schemas/Slider'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -9352,8 +8032,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -9385,8 +8063,6 @@ paths:
               $ref: '#/components/schemas/Slider'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -9417,8 +8093,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedSlider'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -9438,8 +8112,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -9463,8 +8135,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -9503,8 +8173,6 @@ paths:
               $ref: '#/components/schemas/Slider'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -9542,8 +8210,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedSlider'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -9570,8 +8236,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -9629,8 +8293,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -9656,8 +8318,6 @@ paths:
               $ref: '#/components/schemas/Tip'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -9726,8 +8386,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -9761,8 +8419,6 @@ paths:
               $ref: '#/components/schemas/Tip'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -9783,8 +8439,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -9816,8 +8470,6 @@ paths:
               $ref: '#/components/schemas/Tip'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -9848,8 +8500,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedTip'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -9869,8 +8519,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -9894,8 +8542,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -9934,8 +8580,6 @@ paths:
               $ref: '#/components/schemas/Tip'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -9973,8 +8617,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedTip'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -10001,8 +8643,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -10046,8 +8686,7 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -10072,8 +8711,7 @@ paths:
               $ref: '#/components/schemas/Authentication'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '201':
           content:
@@ -10127,8 +8765,7 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -10161,8 +8798,7 @@ paths:
               $ref: '#/components/schemas/Authentication'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '201':
           content:
@@ -10182,8 +8818,7 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -10214,8 +8849,7 @@ paths:
               $ref: '#/components/schemas/Authentication'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -10245,8 +8879,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedAuthentication'
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -10265,8 +8898,7 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '204':
           description: No response body
@@ -10289,8 +8921,7 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -10328,8 +8959,7 @@ paths:
               $ref: '#/components/schemas/Authentication'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -10366,8 +8996,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedAuthentication'
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -10393,8 +9022,7 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '204':
           description: No response body
@@ -10410,8 +9038,7 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -10438,8 +9065,7 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -10459,8 +9085,7 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -10487,8 +9112,7 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -10520,8 +9144,7 @@ paths:
               $ref: '#/components/schemas/UsernameUpdate'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -10560,8 +9183,7 @@ paths:
               $ref: '#/components/schemas/UsernameUpdate'
         required: true
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -10581,8 +9203,7 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -10609,8 +9230,7 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -10630,8 +9250,7 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -10658,8 +9277,7 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -10679,8 +9297,7 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -10707,8 +9324,7 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -10728,8 +9344,7 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -10756,8 +9371,7 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
+      - {}
       responses:
         '200':
           content:
@@ -10860,9 +9474,6 @@ paths:
           type: string
       tags:
       - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '200':
           content:
@@ -10886,9 +9497,6 @@ paths:
             schema:
               $ref: '#/components/schemas/UserAddress'
         required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '201':
           content:
@@ -10998,9 +9606,6 @@ paths:
           type: string
       tags:
       - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '200':
           content:
@@ -11032,9 +9637,6 @@ paths:
             schema:
               $ref: '#/components/schemas/UserAddress'
         required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '201':
           content:
@@ -11053,9 +9655,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '200':
           content:
@@ -11085,9 +9684,6 @@ paths:
             schema:
               $ref: '#/components/schemas/UserAddress'
         required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '200':
           content:
@@ -11116,9 +9712,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PatchedUserAddress'
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '200':
           content:
@@ -11136,9 +9729,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '204':
           description: No response body
@@ -11160,9 +9750,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '200':
           content:
@@ -11199,9 +9786,6 @@ paths:
             schema:
               $ref: '#/components/schemas/UserAddress'
         required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '200':
           content:
@@ -11237,9 +9821,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PatchedUserAddress'
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '200':
           content:
@@ -11264,9 +9845,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '204':
           description: No response body
@@ -11293,9 +9871,6 @@ paths:
             schema:
               $ref: '#/components/schemas/UserAddress'
         required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '200':
           content:
@@ -11333,9 +9908,6 @@ paths:
             schema:
               $ref: '#/components/schemas/UserAddress'
         required: true
-      security:
-      - basicAuth: []
-      - tokenAuth: []
       responses:
         '200':
           content:
@@ -11382,8 +9954,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -11408,8 +9978,6 @@ paths:
             schema:
               $ref: '#/components/schemas/Vat'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -11464,8 +10032,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -11498,8 +10064,6 @@ paths:
             schema:
               $ref: '#/components/schemas/Vat'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '201':
@@ -11520,8 +10084,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -11552,8 +10114,6 @@ paths:
             schema:
               $ref: '#/components/schemas/Vat'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -11584,8 +10144,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedVat'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -11605,8 +10163,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
@@ -11630,8 +10186,6 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -11669,8 +10223,6 @@ paths:
             schema:
               $ref: '#/components/schemas/Vat'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -11708,8 +10260,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedVat'
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '200':
@@ -11736,22 +10286,12 @@ paths:
       tags:
       - api
       security:
-      - basicAuth: []
-      - tokenAuth: []
       - {}
       responses:
         '204':
           description: No response body
 components:
   schemas:
-    ActivateTOTP:
-      type: object
-      properties:
-        code:
-          type: string
-          title: Authenticator code
-      required:
-      - code
     ActiveUsersCount:
       type: object
       properties:
@@ -11759,34 +10299,8 @@ components:
           type: integer
       required:
       - activeUsers
-    AuthToken:
-      type: object
-      properties:
-        username:
-          type: string
-          writeOnly: true
-          title: Όνομα χρήστη
-        password:
-          type: string
-          writeOnly: true
-          title: Συνθηματικό
-        token:
-          type: string
-          readOnly: true
-      required:
-      - password
-      - token
-      - username
-    AuthenticateTOTP:
-      type: object
-      properties:
-        code:
-          type: string
-      required:
-      - code
     Authentication:
       type: object
-      description: User model w/o password
       properties:
         pk:
           type: integer
@@ -11929,78 +10443,6 @@ components:
       - pk
       - updatedAt
       - uuid
-    AuthenticationLogin:
-      type: object
-      properties:
-        username:
-          type: string
-        email:
-          type: string
-          format: email
-        password:
-          type: string
-      required:
-      - password
-    AuthenticationPasswordChange:
-      type: object
-      properties:
-        newPassword1:
-          type: string
-          maxLength: 128
-        newPassword2:
-          type: string
-          maxLength: 128
-      required:
-      - newPassword1
-      - newPassword2
-    AuthenticationPasswordReset:
-      type: object
-      description: Serializer for requesting a password reset e-mail.
-      properties:
-        email:
-          type: string
-          format: email
-      required:
-      - email
-    AuthenticationPasswordResetConfirm:
-      type: object
-      description: Serializer for confirming a password reset attempt.
-      properties:
-        newPassword1:
-          type: string
-          maxLength: 128
-        newPassword2:
-          type: string
-          maxLength: 128
-        uid:
-          type: string
-        token:
-          type: string
-      required:
-      - newPassword1
-      - newPassword2
-      - token
-      - uid
-    AuthenticationRegister:
-      type: object
-      properties:
-        username:
-          type: string
-          maxLength: 30
-          minLength: 2
-        email:
-          type: string
-          format: email
-        password1:
-          type: string
-          writeOnly: true
-        password2:
-          type: string
-          writeOnly: true
-      required:
-      - email
-      - password1
-      - password2
     BlankEnum:
       enum:
       - ''
@@ -13919,7 +12361,6 @@ components:
             $ref: '#/components/schemas/Vat'
     PatchedAuthentication:
       type: object
-      description: User model w/o password
       properties:
         pk:
           type: integer
@@ -16276,14 +14717,6 @@ components:
       - translations
       - updatedAt
       - uuid
-    ResendEmailVerification:
-      type: object
-      properties:
-        email:
-          type: string
-          format: email
-      required:
-      - email
     SearchBlogPost:
       type: object
       properties:
@@ -16692,62 +15125,6 @@ components:
       - mainImageAbsoluteUrl
       - mainImageFilename
       - translations
-    SocialAccount:
-      type: object
-      description: serialize allauth SocialAccounts for use with a REST API
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        provider:
-          type: string
-          title: Πάροχος
-          maxLength: 200
-        uid:
-          type: string
-          maxLength: 191
-        lastLogin:
-          type: string
-          format: date-time
-          readOnly: true
-          title: Τελευταία σύνδεση
-        dateJoined:
-          type: string
-          format: date-time
-          readOnly: true
-          title: Ημερομηνία ένταξης
-      required:
-      - dateJoined
-      - id
-      - lastLogin
-      - provider
-      - uid
-    SocialConnect:
-      type: object
-      properties:
-        accessToken:
-          type: string
-        code:
-          type: string
-        idToken:
-          type: string
-    SocialLogin:
-      type: object
-      properties:
-        accessToken:
-          type: string
-        code:
-          type: string
-        idToken:
-          type: string
-    TOTPEnabled:
-      type: object
-      properties:
-        enabled:
-          type: boolean
-          title: TOTP enabled
-      required:
-      - enabled
     Tip:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -16813,33 +15190,6 @@ components:
       - translations
       - updatedAt
       - uuid
-    TokenBlacklist:
-      type: object
-      properties:
-        refresh:
-          type: string
-          writeOnly: true
-      required:
-      - refresh
-    TokenRefresh:
-      type: object
-      properties:
-        access:
-          type: string
-          readOnly: true
-        refresh:
-          type: string
-      required:
-      - access
-      - refresh
-    TokenVerify:
-      type: object
-      properties:
-        token:
-          type: string
-          writeOnly: true
-      required:
-      - token
     UserAddress:
       type: object
       properties:
@@ -16967,20 +15317,3 @@ components:
       - id
       - updatedAt
       - uuid
-    VerifyEmail:
-      type: object
-      properties:
-        key:
-          type: string
-          writeOnly: true
-      required:
-      - key
-  securitySchemes:
-    basicAuth:
-      type: http
-      scheme: basic
-    tokenAuth:
-      type: apiKey
-      in: header
-      name: Authorization
-      description: Token-based authentication with required prefix "Token"

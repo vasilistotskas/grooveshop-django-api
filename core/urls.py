@@ -8,47 +8,37 @@ from django.urls import include
 from django.urls import path
 from django.urls import re_path
 from django.utils.translation import gettext_lazy as _
-from django_otp.admin import OTPAdminSite
-from django_otp.plugins.otp_totp.admin import TOTPDeviceAdmin
-from django_otp.plugins.otp_totp.models import TOTPDevice
 from drf_spectacular.views import SpectacularAPIView
 from drf_spectacular.views import SpectacularRedocView
 from drf_spectacular.views import SpectacularSwaggerView
 
-from core.view import HomeView
-from core.view import upload_image
-from user.views.account import ObtainAuthTokenView
+from core.views import HomeView
+from core.views import ManageTOTPSvgView
+from core.views import upload_image
+
 
 User = get_user_model()
 
 app_name = "core"
 
 
-class OTPAdmin(OTPAdminSite):
-    pass
-
-
-admin_site_otp = OTPAdmin(name="OTPAdmin")
-admin_site_otp.register(User)
-admin_site_otp.register(TOTPDevice, TOTPDeviceAdmin)
-
 urlpatterns = i18n_patterns(
     path("__reload__/", include("django_browser_reload.urls")),
     path("", HomeView.as_view(), name="home"),
-    path(_("admin/"), admin_site_otp.urls),
     path(_("admin_no_otp/"), admin.site.urls),
     path("upload_image", upload_image, name="upload_image"),
-    path("accounts/", include("allauth.mfa.urls")),
     path("accounts/", include("allauth.urls")),
+    path("_allauth/", include("allauth.headless.urls")),
+    path(
+        "_allauth/app/v1/account/authenticators/totp/svg",
+        ManageTOTPSvgView.as_api_view(client="app"),
+        name="manage_totp_svg",
+    ),
     # rosetta
     path("rosetta/", include("rosetta.urls")),
     # admin html editor
     path("tinymce/", include("tinymce.urls")),
     # api
-    path("api/v1/auth/", include("authentication.urls.base")),
-    path("api/v1/auth/", include("authentication.urls.registration")),
-    path("api/v1/auth/", include("authentication.urls.social")),
-    path("api/v1/auth/", include("authentication.urls.mfa")),
     path("api/v1/", include("product.urls")),
     path("api/v1/", include("order.urls")),
     path("api/v1/", include("user.urls")),
@@ -64,7 +54,6 @@ urlpatterns = i18n_patterns(
     path("api/v1/", include("cart.urls")),
     path("api/v1/", include("notification.urls")),
     path("api/v1/", include("contact.urls")),
-    path("api/v1/api-token-auth", ObtainAuthTokenView.as_view()),
     path("api/v1/schema", SpectacularAPIView.as_view(), name="schema"),
     path(
         "api/v1/schema/swagger-ui",
@@ -99,9 +88,5 @@ if bool(settings.DEBUG) or settings.SYSTEM_ENV in ["dev", "ci", "docker"]:
         settings.MEDIA_URL,
         document_root=settings.MEDIA_ROOT,
     )
-
-    urlpatterns += [
-        path("auth/", include("authentication.urls.auth")),
-    ]
 
     urlpatterns += staticfiles_urlpatterns()

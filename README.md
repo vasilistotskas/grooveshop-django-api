@@ -5,8 +5,8 @@
 This project delivers a robust headless API using Django and Django REST Framework,
 with support for both synchronous and asynchronous environments facilitated by Uvicorn (ASGI)
 and Gunicorn (WSGI) respectively. It leverages Django Allauth for authentication,
-utilizes Celery with Redis for task management, and employs Postgres for data storage. 
-Features include caching, multi-language support, and comprehensive test coverage. 
+utilizes Celery with Redis for task management, and employs Postgres for data storage.
+Features include caching, multi-language support, and comprehensive test coverage.
 The API also includes a built-in Django admin panel for efficient administrative operations.
 
 ## Project Structure

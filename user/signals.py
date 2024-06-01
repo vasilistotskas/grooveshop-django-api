@@ -19,7 +19,7 @@ def pre_social_login(sender, request, sociallogin: SocialLogin, **kwargs):
 
 
 @receiver(social_account_added)
-def social_account_added(sender, request, sociallogin: SocialLogin, user, **kwargs):
+def on_social_account_added(sender, instance: SocialAccount, created, **kwargs):
     pass
 
 

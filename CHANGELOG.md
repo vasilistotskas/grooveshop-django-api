@@ -3,7 +3,38 @@
 
 
 
+## v0.128.0 (2024-06-01)
+
+### Feature
+
+* feat: Bump Versions and remove useless tests ([`98ec380`](https://github.com/vasilistotskas/grooveshop-django-api/commit/98ec3808fa9949880d132a968262f32e66a07b37))
+
+* feat: Bump versions, improve settings for all auth, implement SocialAccountAdapter and user all auth signals. ([`b192235`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b1922354a71e004b228ff112cfa3ad02c589bd80))
+
+### Fix
+
+* fix: remove useless tests ([`132db14`](https://github.com/vasilistotskas/grooveshop-django-api/commit/132db143191cb4e9f4b12a8f4787f2023931f009))
+
+* fix: Update `poetry.lock` * ([`fa63b40`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fa63b403f4f8119886e36e29775f088f60c37944))
+
+* fix: Update `poetry.lock` and `README.md` ([`746a2ed`](https://github.com/vasilistotskas/grooveshop-django-api/commit/746a2ed40c18df75915bba04fc35fdc1d9dda13f))
+
+### Unknown
+
+* Merge branch &#39;feature/headless-allauth&#39;
+
+# Conflicts: Resolved
+#	poetry.lock
+#	pyproject.toml
+#	requirements.txt ([`66c7f41`](https://github.com/vasilistotskas/grooveshop-django-api/commit/66c7f41329f89b1ddf6179fbd663d0acb183f813))
+
+* Update README.md ([`03894b0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/03894b0fe1074cd81d94fa5637536725d5e36ce4))
+
 ## v0.127.0 (2024-05-25)
+
+### Chore
+
+* chore(release): release version 0.127.0 [skip ci] ([`2145387`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2145387468c48771f5c8485eee16d43b01f2e9e1))
 
 ### Feature
 
@@ -19,9 +50,21 @@
 
 * feat: Bump Version ([`558c682`](https://github.com/vasilistotskas/grooveshop-django-api/commit/558c6826bcbc4dcb55cfb12f1be4c609c5fd94f9))
 
+* feat: Bump versions ([`f421809`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f42180964e91854626fff40b8c0fbb424db3e000))
+
+* feat: add &#34;django.contrib.humanize&#34; and app improvements ([`691d196`](https://github.com/vasilistotskas/grooveshop-django-api/commit/691d196ba495559c678cc6d7c8c486d223dc67b5))
+
 ### Fix
 
 * fix: Update poetry.lock ([`9ed3378`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ed3378413000ad0980addaaf8fa2675d6c656f5))
+
+### Unknown
+
+* Merge branch &#39;main&#39; into feature/headless-allauth
+
+# Conflicts: Resolved
+#	core/urls.py
+#	poetry.lock ([`06de6f1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/06de6f11af3ad71967bf07e253c274e800c647b0))
 
 ## v0.125.0 (2024-05-19)
 
@@ -62,6 +105,8 @@
 ### Feature
 
 * feat: Bump Versions ([`5c9e163`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5c9e16387af89abf3ca3487d9eefdb4b1781a951))
+
+* feat: remove `dj-rest-auth`  and `django-otp`  to use `django-allauth` new headless api ([`e51ccf2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e51ccf2b084a039b980b9046d871b3f5d9226ae2))
 
 ## v0.123.0 (2024-05-16)
 

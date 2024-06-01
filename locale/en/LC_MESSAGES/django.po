@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-05-21 12:34+0300\n"
+"POT-Creation-Date: 2024-06-01 04:11+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -213,15 +213,15 @@ msgstr ""
 msgid "Cart Items"
 msgstr ""
 
-#: .\config\base.py:187
+#: .\config\base.py:244
 msgid "Greek"
 msgstr ""
 
-#: .\config\base.py:188
+#: .\config\base.py:245
 msgid "English"
 msgstr ""
 
-#: .\config\base.py:189
+#: .\config\base.py:246
 msgid "German"
 msgstr ""
 
@@ -862,7 +862,7 @@ msgid ""
 "following form:"
 msgstr ""
 
-#: .\core\urls.py:26
+#: .\core\urls.py:28
 msgid "admin_no_otp/"
 msgstr ""
 

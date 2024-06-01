@@ -5,7 +5,7 @@ from allauth.socialaccount.models import SocialLogin
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from authentication.views.social import SocialAccountAdapter
+from user.adapter import SocialAccountAdapter
 
 User = get_user_model()
 

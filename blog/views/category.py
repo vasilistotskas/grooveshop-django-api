@@ -42,7 +42,6 @@ class BlogCategoryViewSet(MultiSerializerMixin, BaseModelViewSet):
     @action(detail=True, methods=["GET"])
     def posts(self, request, pk=None, *args, **kwargs) -> Response:
         self.ordering_fields = [
-            "title",
             "created_at",
             "updated_at",
             "published_at",

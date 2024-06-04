@@ -3,7 +3,21 @@
 
 
 
+## v0.129.1 (2024-06-04)
+
+### Chore
+
+* chore: `ACCOUNT_SIGNUP_FORM_HONEYPOT_FIELD = &#34;email_confirm&#34;` added ([`75a7547`](https://github.com/vasilistotskas/grooveshop-django-api/commit/75a75478cdaabc9b60e8a4079d056805385c126a))
+
+### Fix
+
+* fix: Remove useless ordering option ([`a2d2d60`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a2d2d6035ccff8d3f0ee9a07ff838b2c5db61bc4))
+
 ## v0.129.0 (2024-06-04)
+
+### Chore
+
+* chore(release): release version 0.129.0 [skip ci] ([`aeb791a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/aeb791a1ac252fb117332c19e69ce426373502da))
 
 ### Feature
 

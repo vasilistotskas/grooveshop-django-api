@@ -3,7 +3,17 @@
 
 
 
+## v0.129.0 (2024-06-04)
+
+### Feature
+
+* feat: new model field `ImageAndSvgField` and usage in blog category model ([`7242345`](https://github.com/vasilistotskas/grooveshop-django-api/commit/72423458559f2fa893f06fbc49d4e75322a36336))
+
 ## v0.128.2 (2024-06-01)
+
+### Chore
+
+* chore(release): release version 0.128.2 [skip ci] ([`887651d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/887651da7ccfa628c1d9102a8e8150ee3f478627))
 
 ### Fix
 

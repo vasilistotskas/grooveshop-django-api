@@ -14,6 +14,7 @@ from parler.models import TranslatableModel
 from parler.models import TranslatedFields
 
 from blog.models.post import BlogPost
+from core.fields.image import ImageAndSvgField
 from core.models import SortableModel
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
@@ -40,7 +41,7 @@ class BlogCategory(
 ):
     id = models.BigAutoField(primary_key=True)
     slug = models.SlugField(unique=True)
-    image = models.ImageField(
+    image = ImageAndSvgField(
         _("Image"), upload_to="uploads/blog/", blank=True, null=True
     )
     parent = TreeForeignKey(

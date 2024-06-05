@@ -3,9 +3,17 @@
 
 
 
+## v0.130.0 (2024-06-05)
+
+### Feature
+
+* feat: Bump versions ([`e0d728e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e0d728e1484b6ac4bb13db995a239143b6489e56))
+
 ## v0.129.1 (2024-06-04)
 
 ### Chore
+
+* chore(release): release version 0.129.1 [skip ci] ([`bc45b58`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bc45b5860e4a59c6beb6bc30fd1283bc715e3fd9))
 
 * chore: `ACCOUNT_SIGNUP_FORM_HONEYPOT_FIELD = &#34;email_confirm&#34;` added ([`75a7547`](https://github.com/vasilistotskas/grooveshop-django-api/commit/75a75478cdaabc9b60e8a4079d056805385c126a))
 

@@ -69,7 +69,7 @@ DJANGO_APPS = [
 ]
 
 # Project-specific apps
-PROJECT_APPS = [
+LOCAL_APPS = [
     "core",
     "user",
     "product",
@@ -124,7 +124,7 @@ THIRD_PARTY_APPS = [
 ]
 
 # Combine all apps together for the INSTALLED_APPS setting
-INSTALLED_APPS = DJANGO_APPS + PROJECT_APPS + THIRD_PARTY_APPS
+INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

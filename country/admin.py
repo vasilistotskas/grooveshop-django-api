@@ -7,5 +7,11 @@ from region.admin import RegionInline
 
 @admin.register(Country)
 class CountryAdmin(TranslatableAdmin):
-    search_fields = ("translations__name", "alpha_2", "alpha_3", "iso_cc", "phone_code")
+    search_fields = (
+        "translations__name",
+        "alpha_2",
+        "alpha_3",
+        "iso_cc",
+        "phone_code",
+    )
     inlines = [RegionInline]

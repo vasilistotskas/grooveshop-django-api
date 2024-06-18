@@ -38,15 +38,11 @@ class Command(BaseCommand):
         slides_per_slider = options["slides_per_slider"]
         total_time = 0
         start_time = time.time()
-        available_languages = [
-            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
-        ]
+        available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 
         if total_sliders < 1 or slides_per_slider < 1:
             self.stdout.write(
-                self.style.WARNING(
-                    "Total number of sliders and slides per slider must be greater than 0."
-                )
+                self.style.WARNING("Total number of sliders and slides per slider must be greater than 0.")
             )
             return
 

@@ -18,7 +18,11 @@ from product.serializers.review import ProductReviewSerializer
 
 class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
     queryset = Product.objects.all()
-    filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        PascalSnakeCaseOrderingFilter,
+        SearchFilter,
+    ]
     filterset_class = ProductFilter
     ordering_fields = [
         "price",
@@ -56,9 +60,7 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
     def reviews(self, request, pk=None) -> Response:
         product = self.get_object()
         reviews = product.reviews.all()
-        serializer = self.get_serializer(
-            reviews, many=True, context=self.get_serializer_context()
-        )
+        serializer = self.get_serializer(reviews, many=True, context=self.get_serializer_context())
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(
@@ -68,7 +70,5 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
     def images(self, request, pk=None) -> Response:
         product = self.get_object()
         images = product.product_images.all()
-        serializer = self.get_serializer(
-            images, many=True, context=self.get_serializer_context()
-        )
+        serializer = self.get_serializer(images, many=True, context=self.get_serializer_context())
         return Response(serializer.data, status=status.HTTP_200_OK)

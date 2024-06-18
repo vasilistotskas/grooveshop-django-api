@@ -83,7 +83,10 @@ class Migration(migrations.Migration):
                 (
                     "phone_code",
                     models.PositiveSmallIntegerField(
-                        blank=True, null=True, unique=True, verbose_name="Phone Code"
+                        blank=True,
+                        null=True,
+                        unique=True,
+                        verbose_name="Phone Code",
                     ),
                 ),
                 (
@@ -117,14 +120,15 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(
-                        db_index=True, max_length=15, verbose_name="Language"
-                    ),
+                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
                 ),
                 (
                     "name",
                     models.CharField(
-                        blank=True, max_length=100, null=True, verbose_name="Name"
+                        blank=True,
+                        max_length=100,
+                        null=True,
+                        verbose_name="Name",
                     ),
                 ),
                 (

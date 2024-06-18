@@ -59,11 +59,12 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(
-                        db_index=True, max_length=15, verbose_name="Language"
-                    ),
+                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
                 ),
-                ("bio", models.TextField(blank=True, null=True, verbose_name="Bio")),
+                (
+                    "bio",
+                    models.TextField(blank=True, null=True, verbose_name="Bio"),
+                ),
             ],
             options={
                 "verbose_name": "Blog Author Translation",
@@ -111,7 +112,10 @@ class Migration(migrations.Migration):
                 ),
                 ("lft", models.PositiveIntegerField(editable=False)),
                 ("rght", models.PositiveIntegerField(editable=False)),
-                ("tree_id", models.PositiveIntegerField(db_index=True, editable=False)),
+                (
+                    "tree_id",
+                    models.PositiveIntegerField(db_index=True, editable=False),
+                ),
                 ("level", models.PositiveIntegerField(editable=False)),
             ],
             options={
@@ -135,14 +139,15 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(
-                        db_index=True, max_length=15, verbose_name="Language"
-                    ),
+                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
                 ),
                 (
                     "name",
                     models.CharField(
-                        blank=True, max_length=50, null=True, verbose_name="Name"
+                        blank=True,
+                        max_length=50,
+                        null=True,
+                        verbose_name="Name",
                     ),
                 ),
                 (
@@ -201,9 +206,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(
-                        db_index=True, max_length=15, verbose_name="Language"
-                    ),
+                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
                 ),
                 (
                     "content",
@@ -242,9 +245,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "published_at",
-                    models.DateTimeField(
-                        blank=True, null=True, verbose_name="Published At"
-                    ),
+                    models.DateTimeField(blank=True, null=True, verbose_name="Published At"),
                 ),
                 (
                     "is_published",
@@ -253,7 +254,10 @@ class Migration(migrations.Migration):
                 (
                     "seo_title",
                     models.CharField(
-                        blank=True, max_length=70, null=True, verbose_name="Seo Title"
+                        blank=True,
+                        max_length=70,
+                        null=True,
+                        verbose_name="Seo Title",
                     ),
                 ),
                 (
@@ -357,7 +361,10 @@ class Migration(migrations.Migration):
                     models.UUIDField(default=uuid.uuid4, editable=False, unique=True),
                 ),
                 ("id", models.BigAutoField(primary_key=True, serialize=False)),
-                ("active", models.BooleanField(default=True, verbose_name="Active")),
+                (
+                    "active",
+                    models.BooleanField(default=True, verbose_name="Active"),
+                ),
             ],
             options={
                 "verbose_name": "Blog Tag",
@@ -383,9 +390,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(
-                        db_index=True, max_length=15, verbose_name="Language"
-                    ),
+                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
                 ),
                 (
                     "name",
@@ -431,27 +436,29 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(
-                        db_index=True, max_length=15, verbose_name="Language"
-                    ),
+                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
                 ),
                 (
                     "title",
                     models.CharField(
-                        blank=True, max_length=255, null=True, verbose_name="Title"
+                        blank=True,
+                        max_length=255,
+                        null=True,
+                        verbose_name="Title",
                     ),
                 ),
                 (
                     "subtitle",
                     models.CharField(
-                        blank=True, max_length=255, null=True, verbose_name="Subtitle"
+                        blank=True,
+                        max_length=255,
+                        null=True,
+                        verbose_name="Subtitle",
                     ),
                 ),
                 (
                     "body",
-                    tinymce.models.HTMLField(
-                        blank=True, null=True, verbose_name="Body"
-                    ),
+                    tinymce.models.HTMLField(blank=True, null=True, verbose_name="Body"),
                 ),
                 (
                     "master",

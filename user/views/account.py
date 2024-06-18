@@ -26,7 +26,11 @@ User = get_user_model()
 
 
 class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
-    filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        PascalSnakeCaseOrderingFilter,
+        SearchFilter,
+    ]
     filterset_fields = ["id", "email"]
     ordering_fields = ["id", "email"]
     ordering = ["-created_at"]
@@ -46,34 +50,20 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
     def get_queryset(self):
         match self.action:
             case "favourite_products":
-                queryset = get_object_or_404(
-                    User, id=self.kwargs["pk"]
-                ).user_product_favourite.all()
+                queryset = get_object_or_404(User, id=self.kwargs["pk"]).user_product_favourite.all()
             case "orders":
-                queryset = get_object_or_404(
-                    User, id=self.kwargs["pk"]
-                ).user_order.all()
+                queryset = get_object_or_404(User, id=self.kwargs["pk"]).user_order.all()
             case "product_reviews":
-                queryset = get_object_or_404(
-                    User, id=self.kwargs["pk"]
-                ).product_reviews.all()
+                queryset = get_object_or_404(User, id=self.kwargs["pk"]).product_reviews.all()
             case "addresses":
-                queryset = get_object_or_404(
-                    User, id=self.kwargs["pk"]
-                ).user_address.all()
+                queryset = get_object_or_404(User, id=self.kwargs["pk"]).user_address.all()
             case "blog_post_comments":
-                queryset = get_object_or_404(
-                    User, id=self.kwargs["pk"]
-                ).blog_comment_user.all()
+                queryset = get_object_or_404(User, id=self.kwargs["pk"]).blog_comment_user.all()
             case "liked_blog_posts":
-                queryset = get_object_or_404(
-                    User, id=self.kwargs["pk"]
-                ).liked_blog_posts.all()
+                queryset = get_object_or_404(User, id=self.kwargs["pk"]).liked_blog_posts.all()
             case _:
                 queryset = (
-                    User.objects.all()
-                    if self.request.user.is_staff
-                    else User.objects.filter(id=self.request.user.id)
+                    User.objects.all() if self.request.user.is_staff else User.objects.filter(id=self.request.user.id)
                 )
 
         return queryset
@@ -182,11 +172,7 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
 
             if user.username == new_username:
                 return Response(
-                    {
-                        "detail": _(
-                            "The new username is the same as the current username."
-                        )
-                    },
+                    {"detail": _("The new username is the same as the current username.")},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 

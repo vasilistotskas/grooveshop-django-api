@@ -17,9 +17,7 @@ class CartViewSetTest(APITestCase):
     update_data: dict = None
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="testuser@example.com", password="testpassword"
-        )
+        self.user = User.objects.create_user(email="testuser@example.com", password="testpassword")
         self.client.login(email="testuser@example.com", password="testpassword")
         self.client.force_authenticate(user=self.user)
         self.cart = Cart.objects.create(user=self.user)
@@ -29,9 +27,7 @@ class CartViewSetTest(APITestCase):
             "last_activity": "2023-07-26T12:00:00.000000Z",
         }
 
-        self.cart.last_activity = datetime.datetime(
-            2023, 7, 26, 12, 0, tzinfo=datetime.timezone.utc
-        )
+        self.cart.last_activity = datetime.datetime(2023, 7, 26, 12, 0, tzinfo=datetime.timezone.utc)
         self.cart.save()
 
     def test_retrieve_cart(self):
@@ -41,16 +37,12 @@ class CartViewSetTest(APITestCase):
         self.assertEqual(response.data["id"], self.cart.pk)
 
     def test_update_cart(self):
-        response = self.client.put(
-            self.detail_url, data=self.update_data, format="json"
-        )
+        response = self.client.put(self.detail_url, data=self.update_data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_partial_update_cart(self):
-        response = self.client.patch(
-            self.detail_url, data=self.update_data, format="json"
-        )
+        response = self.client.patch(self.detail_url, data=self.update_data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 

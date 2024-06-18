@@ -79,9 +79,7 @@ if bool(settings.ENABLE_DEBUG_TOOLBAR):
             settings.py should already have warned the user about it."
         )
     else:
-        urlpatterns += [
-            re_path(r"^__debug__/", include(debug_toolbar.urls))  # type: ignore
-        ]
+        urlpatterns += [re_path(r"^__debug__/", include(debug_toolbar.urls))]  # type: ignore
 
 if bool(settings.DEBUG) or settings.SYSTEM_ENV in ["dev", "ci", "docker"]:
     urlpatterns += static(

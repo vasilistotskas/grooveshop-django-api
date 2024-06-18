@@ -41,24 +41,15 @@ class SearchProductResultSerializer(TranslatableModelSerializer, BaseExpandSeria
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data["translations"] = {
-            language_code: translation
-            for language_code, translation in data["translations"].items()
+            language_code: translation for language_code, translation in data["translations"].items()
         }
 
         request_language = (
-            self.context.get("request").query_params.get("language")
-            if "request" in self.context
-            else None
+            self.context.get("request").query_params.get("language") if "request" in self.context else None
         )
 
-        if (
-            request_language
-            and "translations" in data
-            and request_language in data["translations"]
-        ):
-            data["translations"] = {
-                request_language: data["translations"][request_language]
-            }
+        if request_language and "translations" in data and request_language in data["translations"]:
+            data["translations"] = {request_language: data["translations"][request_language]}
 
         return data
 
@@ -104,24 +95,15 @@ class SearchBlogPostResultSerializer(TranslatableModelSerializer, BaseExpandSeri
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data["translations"] = {
-            language_code: translation
-            for language_code, translation in data["translations"].items()
+            language_code: translation for language_code, translation in data["translations"].items()
         }
 
         request_language = (
-            self.context.get("request").query_params.get("language")
-            if "request" in self.context
-            else None
+            self.context.get("request").query_params.get("language") if "request" in self.context else None
         )
 
-        if (
-            request_language
-            and "translations" in data
-            and request_language in data["translations"]
-        ):
-            data["translations"] = {
-                request_language: data["translations"][request_language]
-            }
+        if request_language and "translations" in data and request_language in data["translations"]:
+            data["translations"] = {request_language: data["translations"][request_language]}
 
         return data
 

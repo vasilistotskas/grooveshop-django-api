@@ -25,22 +25,14 @@ class Command(BaseCommand):
                 with transaction.atomic():
                     call_command(command_name, *args, **options)
             except Exception as e:
-                self.stderr.write(
-                    self.style.ERROR(f"{command_name} failed with error: {e}")
-                )
+                self.stderr.write(self.style.ERROR(f"{command_name} failed with error: {e}"))
                 continue
 
             end_time = time.time()
             execution_time = end_time - start_time
             total_time += execution_time
             self.stdout.write(
-                self.style.SUCCESS(
-                    f"{command_name} completed successfully in {execution_time:.2f} seconds."
-                )
+                self.style.SUCCESS(f"{command_name} completed successfully in {execution_time:.2f} seconds.")
             )
 
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"All commands completed successfully in {total_time:.2f} seconds."
-            )
-        )
+        self.stdout.write(self.style.SUCCESS(f"All commands completed successfully in {total_time:.2f} seconds."))

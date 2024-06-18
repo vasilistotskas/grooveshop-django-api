@@ -17,7 +17,11 @@ DEFAULT_COUNTRY_CACHE_TTL = 60 * 60 * 2
 class CountryViewSet(BaseModelViewSet):
     queryset = Country.objects.all()
     serializer_class = CountrySerializer
-    filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        PascalSnakeCaseOrderingFilter,
+        SearchFilter,
+    ]
     filterset_fields = [
         "alpha_2",
         "alpha_3",

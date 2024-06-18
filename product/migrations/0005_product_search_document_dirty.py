@@ -5,7 +5,10 @@ from django.db import models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("product", "0004_product_search_document_product_search_index_dirty_and_more"),
+        (
+            "product",
+            "0004_product_search_document_product_search_index_dirty_and_more",
+        ),
     ]
 
     operations = [

@@ -38,7 +38,8 @@ class Migration(migrations.Migration):
         migrations.AddConstraint(
             model_name="notificationuser",
             constraint=models.UniqueConstraint(
-                fields=("user", "notification"), name="unique_notification_user"
+                fields=("user", "notification"),
+                name="unique_notification_user",
             ),
         ),
         migrations.AlterUniqueTogether(

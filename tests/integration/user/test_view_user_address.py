@@ -30,9 +30,7 @@ class UserAddressViewSetTestCase(APITestCase):
     address: UserAddress = None
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="test@test.com", password="test12345@!"
-        )
+        self.user = User.objects.create_user(email="test@test.com", password="test12345@!")
 
         image_flag = get_or_create_default_image("uploads/region/no_photo.jpg")
         self.country = Country.objects.create(

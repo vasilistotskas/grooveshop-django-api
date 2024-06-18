@@ -17,7 +17,11 @@ DEFAULT_VAT_CACHE_TTL = 60 * 60 * 2
 class VatViewSet(BaseModelViewSet):
     queryset = Vat.objects.all()
     serializer_class = VatSerializer
-    filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        PascalSnakeCaseOrderingFilter,
+        SearchFilter,
+    ]
     filterset_fields = ["id", "value"]
     ordering_fields = ["id", "value", "created_at"]
     ordering = ["-created_at"]

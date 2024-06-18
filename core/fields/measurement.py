@@ -29,9 +29,7 @@ class MeasurementField(FloatField):
         MeasureBase,
     )
     default_error_messages = {
-        "invalid_type": _(
-            "'%(value)s' (%(type_given)s) value" " must be of type %(type_wanted)s."
-        ),
+        "invalid_type": _("'%(value)s' (%(type_given)s) value" " must be of type %(type_wanted)s."),
     }
 
     def __init__(
@@ -44,9 +42,7 @@ class MeasurementField(FloatField):
         **kwargs,
     ):
         if measurement is None or not issubclass(measurement, self.MEASURE_BASES):
-            raise MeasurementTypeError(
-                "MeasurementField requires a measurement subclass of MeasureBase."
-            )
+            raise MeasurementTypeError("MeasurementField requires a measurement subclass of MeasureBase.")
 
         self.measurement = measurement
         self.widget_args = {
@@ -77,9 +73,7 @@ class MeasurementField(FloatField):
             return unit_choices[0][0]
         return self.measurement.STANDARD_UNIT
 
-    def from_db_value(
-        self, value: Optional[float], *args, **kwargs
-    ) -> Optional[BidimensionalMeasure]:
+    def from_db_value(self, value: Optional[float], *args, **kwargs) -> Optional[BidimensionalMeasure]:
         if value is None:
             return None
 
@@ -95,9 +89,7 @@ class MeasurementField(FloatField):
             return value
         return "%s:%s" % (value.value, value.unit)
 
-    def deserialize_value_from_string(
-        self, value_str: str
-    ) -> Optional[MeasureBase | BidimensionalMeasure]:
+    def deserialize_value_from_string(self, value_str: str) -> Optional[MeasureBase | BidimensionalMeasure]:
         try:
             value, unit = value_str.split(":", 1)
             value = float(value)
@@ -120,16 +112,13 @@ class MeasurementField(FloatField):
 
         return_unit = self.get_default_unit()
 
-        msg = (
-            'You assigned a %s instead of %s to %s.%s.%s, unit was guessed to be "%s".'
-            % (
-                type(value).__name__,
-                str(self.measurement.__name__),
-                self.model.__module__,
-                self.model.__name__,
-                self.name,
-                return_unit,
-            )
+        msg = 'You assigned a %s instead of %s to %s.%s.%s, unit was guessed to be "%s".' % (
+            type(value).__name__,
+            str(self.measurement.__name__),
+            self.model.__module__,
+            self.model.__name__,
+            self.name,
+            return_unit,
         )
         logger.warning(msg)
         return get_measurement(

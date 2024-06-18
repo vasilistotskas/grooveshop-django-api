@@ -12,9 +12,7 @@ from core.models import UUIDModel
 
 class Vat(TimeStampMixinModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
-    value = models.DecimalField(
-        _("Value"), max_digits=11, decimal_places=1, default=Decimal(0.0)
-    )
+    value = models.DecimalField(_("Value"), max_digits=11, decimal_places=1, default=Decimal(0.0))
 
     class Meta(TypedModelMeta):
         verbose_name = _("Vat")

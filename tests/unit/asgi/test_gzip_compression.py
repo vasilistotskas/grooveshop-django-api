@@ -60,9 +60,7 @@ async def test_no_compression(large_asgi_app: ASGI3Application, settings):
             ],
             trailers=False,
         ),
-        HTTPResponseBodyEvent(
-            type="http.response.body", body=10000 * b"x", more_body=False
-        ),
+        HTTPResponseBodyEvent(type="http.response.body", body=10000 * b"x", more_body=False),
     ]
 
 
@@ -79,13 +77,14 @@ async def test_with_supported_compression(large_asgi_app: ASGI3Application, sett
             headers=[
                 (b"content-type", b"text/plain"),
                 (b"content-encoding", b"gzip"),
-                (b"content-length", str(len(expected_payload)).encode("latin1")),
+                (
+                    b"content-length",
+                    str(len(expected_payload)).encode("latin1"),
+                ),
             ],
             trailers=False,
         ),
-        HTTPResponseBodyEvent(
-            type="http.response.body", body=expected_payload, more_body=False
-        ),
+        HTTPResponseBodyEvent(type="http.response.body", body=expected_payload, more_body=False),
     ]
 
 

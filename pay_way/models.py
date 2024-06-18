@@ -31,9 +31,7 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         decimal_places=2,
         default=0,
     )
-    icon = models.ImageField(
-        _("Icon"), upload_to="uploads/pay_way/", blank=True, null=True
-    )
+    icon = models.ImageField(_("Icon"), upload_to="uploads/pay_way/", blank=True, null=True)
     translations = TranslatedFields(
         name=models.CharField(
             _("Name"),

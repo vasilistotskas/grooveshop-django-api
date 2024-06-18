@@ -30,25 +30,17 @@ class Command(BaseCommand):
         total_comments = options["total_comments"]
         total_time = 0
         start_time = time.time()
-        available_languages = [
-            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
-        ]
+        available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 
         if total_comments < 1:
-            self.stdout.write(
-                self.style.WARNING("Total number of comments must be greater than 0.")
-            )
+            self.stdout.write(self.style.WARNING("Total number of comments must be greater than 0."))
             return
 
         users = list(User.objects.all())
         blog_posts = list(BlogPost.objects.all())
 
         if not users or not blog_posts:
-            self.stdout.write(
-                self.style.ERROR(
-                    "Insufficient data. Aborting seeding BlogComment model."
-                )
-            )
+            self.stdout.write(self.style.ERROR("Insufficient data. Aborting seeding BlogComment model."))
             return
 
         if not available_languages:
@@ -63,19 +55,11 @@ class Command(BaseCommand):
                 user = faker.random_element(users)
                 blog_post = faker.random_element(blog_posts)
                 is_approved = faker.boolean()
-                likes = faker.random_elements(
-                    users, unique=True, length=faker.random_int(min=0, max=5)
-                )
+                likes = faker.random_elements(users, unique=True, length=faker.random_int(min=0, max=5))
 
-                blog_comment_exists = BlogComment.objects.filter(
-                    user=user, post=blog_post
-                ).exists()
+                blog_comment_exists = BlogComment.objects.filter(user=user, post=blog_post).exists()
 
-                if (
-                    blog_comment_exists
-                    or user in picked_users
-                    or blog_post in picked_posts
-                ):
+                if blog_comment_exists or user in picked_users or blog_post in picked_posts:
                     continue
 
                 comment, created = BlogComment.objects.get_or_create(
@@ -89,9 +73,7 @@ class Command(BaseCommand):
                     picked_posts.append(blog_post)
                     comment.likes.add(*likes)
                     for lang in available_languages:
-                        lang_seed = hash(
-                            f"{comment.user.id}{comment.post.id}{lang}{comment.id}"
-                        )
+                        lang_seed = hash(f"{comment.user.id}{comment.post.id}{lang}{comment.id}")
                         faker.seed_instance(lang_seed)
                         content = faker.text(max_nb_chars=1000)
                         comment.set_current_language(lang)

@@ -41,38 +41,28 @@ class PaginationModelViewSet(ModelViewSet):
             if self.pagination_class is None:
                 self._paginator = None
             else:
-                pagination_type = self.request.query_params.get(
-                    "pagination_type", ""
-                ).lower()
+                pagination_type = self.request.query_params.get("pagination_type", "").lower()
                 paginator_mapping = {
                     "page_number": PageNumberPaginator,
                     "limit_offset": LimitOffsetPaginator,
                     "cursor": CursorPaginator,
                 }
-                self._paginator = paginator_mapping.get(
-                    pagination_type, self.pagination_class
-                )()
+                self._paginator = paginator_mapping.get(pagination_type, self.pagination_class)()
 
         return self._paginator
 
     def paginate_and_serialize(self, queryset, request, many=True):
         pagination_param = request.query_params.get("pagination", "true").lower()
         if pagination_param == "false":
-            serializer = self.get_serializer(
-                queryset, many=many, context=self.get_serializer_context()
-            )
+            serializer = self.get_serializer(queryset, many=many, context=self.get_serializer_context())
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         page = self.paginate_queryset(queryset)
         if page is not None:
-            serializer = self.get_serializer(
-                page, many=many, context=self.get_serializer_context()
-            )
+            serializer = self.get_serializer(page, many=many, context=self.get_serializer_context())
             return self.get_paginated_response(serializer.data)
 
-        serializer = self.get_serializer(
-            queryset, many=many, context=self.get_serializer_context()
-        )
+        serializer = self.get_serializer(queryset, many=many, context=self.get_serializer_context())
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def list(self, request, *args, **kwargs):
@@ -83,9 +73,7 @@ class PaginationModelViewSet(ModelViewSet):
 class TranslationsModelViewSet(TranslationsProcessingMixin, ModelViewSet):
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        context["language"] = self.request.query_params.get(
-            "language", default_language
-        )
+        context["language"] = self.request.query_params.get("language", default_language)
         return context
 
     def create(self, request, *args, **kwargs):
@@ -100,9 +88,7 @@ class TranslationsModelViewSet(TranslationsProcessingMixin, ModelViewSet):
         return super().partial_update(request, *args, **kwargs)
 
 
-class BaseModelViewSet(
-    ExpandModelViewSet, TranslationsModelViewSet, PaginationModelViewSet
-):
+class BaseModelViewSet(ExpandModelViewSet, TranslationsModelViewSet, PaginationModelViewSet):
     metadata_class = Metadata
 
     @method_decorator(conditional_cache_page(API_SCHEMA_CACHE_TTL))

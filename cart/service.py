@@ -12,9 +12,7 @@ from product.models.product import Product
 
 
 class CartServiceInitException(Exception):
-    def __init__(
-        self, message="CartService init error, cart_id or request is required"
-    ):
+    def __init__(self, message="CartService init error, cart_id or request is required"):
         self.message = message
         super().__init__(self.message)
 
@@ -40,7 +38,9 @@ class ProcessCartOption(Enum):
 
 class CartService:
     def __init__(
-        self, cart_id: int | None = None, request: Request | HttpRequest | None = None
+        self,
+        cart_id: int | None = None,
+        request: Request | HttpRequest | None = None,
     ):
         self.cart_id = cart_id
         self.cart: Cart | None = None
@@ -64,9 +64,7 @@ class CartService:
     def __iter__(self):
         yield from self.cart_items
 
-    def process_cart(
-        self, request: Request | HttpRequest | None, option: ProcessCartOption
-    ) -> None:
+    def process_cart(self, request: Request | HttpRequest | None, option: ProcessCartOption) -> None:
         cart = self.get_or_create_cart(request)
         pre_login_cart_id = request.session.get("pre_log_in_cart_id", None)
         if not isinstance(pre_login_cart_id, (int, str)):

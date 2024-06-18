@@ -55,13 +55,9 @@ class Tip(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     @property
     def image_tag(self):
         no_img_url = static("images/no_photo.jpg")
-        no_img_markup = mark_safe(
-            f'<img src="{no_img_url}" width="100" height="100" />'
-        )
+        no_img_markup = mark_safe(f'<img src="{no_img_url}" width="100" height="100" />')
         if self.icon:
-            return mark_safe(
-                '<img src="{}" width="100" height="100" />'.format(self.icon.url)
-            )
+            return mark_safe('<img src="{}" width="100" height="100" />'.format(self.icon.url))
         return no_img_markup
 
     @property

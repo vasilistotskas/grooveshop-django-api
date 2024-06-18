@@ -20,9 +20,7 @@ class TestBaseExpandSerializer(TestCase):
     serializer: BaseExpandSerializer = None
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="test@test.com", password="test12345@!"
-        )
+        self.user = User.objects.create_user(email="test@test.com", password="test12345@!")
         self.product = Product.objects.create(
             product_code="P123",
             name="Sample Product",
@@ -38,9 +36,7 @@ class TestBaseExpandSerializer(TestCase):
             self.product.save()
         self.product.set_current_language(default_language)
 
-        self.instance = ProductFavourite.objects.create(
-            user=self.user, product=self.product
-        )
+        self.instance = ProductFavourite.objects.create(user=self.user, product=self.product)
         self.serializer = BaseExpandSerializer(instance=self.instance)
         self.serializer.Meta.model = ProductFavourite
 

@@ -22,9 +22,7 @@ class CartItemModelTestCase(TestCase):
             view_count=0,
             weight=0.00,
         )
-        self.cart_item = CartItem.objects.create(
-            cart=self.cart, product=self.product, quantity=3
-        )
+        self.cart_item = CartItem.objects.create(cart=self.cart, product=self.product, quantity=3)
 
     def test_fields(self):
         self.assertEqual(self.cart_item.cart, self.cart)
@@ -33,7 +31,9 @@ class CartItemModelTestCase(TestCase):
 
     def test_str_representation(self):
         product_name = self.product.safe_translation_getter("name", any_language=True)
-        expected_str = f"CartItem {self.cart_item.id} in Cart {self.cart_item.cart.id}: {product_name} x {self.cart_item.quantity}"
+        expected_str = (
+            f"CartItem {self.cart_item.id} in Cart {self.cart_item.cart.id}: {product_name} x {self.cart_item.quantity}"
+        )
         self.assertEqual(str(self.cart_item), expected_str)
 
     def test_price(self):
@@ -46,9 +46,7 @@ class CartItemModelTestCase(TestCase):
         self.assertEqual(self.cart_item.discount_value, self.product.discount_value)
 
     def test_price_save_percent(self):
-        self.assertEqual(
-            self.cart_item.price_save_percent, self.product.price_save_percent
-        )
+        self.assertEqual(self.cart_item.price_save_percent, self.product.price_save_percent)
 
     def test_discount_percent(self):
         self.assertEqual(self.cart_item.discount_percent, self.product.discount_percent)
@@ -83,9 +81,7 @@ class CartItemModelTestCase(TestCase):
             view_count=0,
             weight=0.00,
         )
-        cart_item_2 = CartItem.objects.create(
-            cart=self.cart, product=product_2, quantity=3
-        )
+        cart_item_2 = CartItem.objects.create(cart=self.cart, product=product_2, quantity=3)
         self.assertLess(self.cart_item.id, cart_item_2.id)
 
     def tearDown(self) -> None:

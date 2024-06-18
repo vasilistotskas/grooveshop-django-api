@@ -21,9 +21,7 @@ class BlogCommentViewSetTestCase(APITestCase):
     author = None
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="testuser@example.com", password="testpassword"
-        )
+        self.user = User.objects.create_user(email="testuser@example.com", password="testpassword")
         self.client.login(email="testuser@example.com", password="testpassword")
         self.client.force_authenticate(user=self.user)
         self.author = BlogAuthor.objects.create(user=self.user)
@@ -33,9 +31,7 @@ class BlogCommentViewSetTestCase(APITestCase):
             body="This is a test post.",
             author=self.author,
         )
-        self.comment = BlogComment.objects.create(
-            is_approved=True, user=self.user, post=self.post
-        )
+        self.comment = BlogComment.objects.create(is_approved=True, user=self.user, post=self.post)
         for language in languages:
             self.comment.set_current_language(language)
             self.comment.content = f"Comment Content in {language}"
@@ -59,9 +55,7 @@ class BlogCommentViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_valid(self):
-        user = User.objects.create_user(
-            email="testuser2@example.com", password="testpassword2"
-        )
+        user = User.objects.create_user(email="testuser2@example.com", password="testpassword2")
         author = BlogAuthor.objects.create(user=user)
         post = BlogPost.objects.create(
             slug="test-post-2",
@@ -168,9 +162,7 @@ class BlogCommentViewSetTestCase(APITestCase):
     def test_partial_update_valid(self):
         payload = {
             "translations": {
-                default_language: {
-                    "content": f"Partial update with {default_language} language code"
-                },
+                default_language: {"content": f"Partial update with {default_language} language code"},
             },
         }
 

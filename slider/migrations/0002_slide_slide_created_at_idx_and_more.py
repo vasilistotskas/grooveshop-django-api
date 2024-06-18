@@ -11,21 +11,15 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddIndex(
             model_name="slide",
-            index=django.contrib.postgres.indexes.BTreeIndex(
-                fields=["created_at"], name="slide_created_at_idx"
-            ),
+            index=django.contrib.postgres.indexes.BTreeIndex(fields=["created_at"], name="slide_created_at_idx"),
         ),
         migrations.AddIndex(
             model_name="slide",
-            index=django.contrib.postgres.indexes.BTreeIndex(
-                fields=["updated_at"], name="slide_updated_at_idx"
-            ),
+            index=django.contrib.postgres.indexes.BTreeIndex(fields=["updated_at"], name="slide_updated_at_idx"),
         ),
         migrations.AddIndex(
             model_name="slide",
-            index=django.contrib.postgres.indexes.BTreeIndex(
-                fields=["sort_order"], name="slide_sort_order_idx"
-            ),
+            index=django.contrib.postgres.indexes.BTreeIndex(fields=["sort_order"], name="slide_sort_order_idx"),
         ),
         migrations.AddIndex(
             model_name="slide",
@@ -41,14 +35,10 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="slider",
-            index=django.contrib.postgres.indexes.BTreeIndex(
-                fields=["created_at"], name="slider_created_at_idx"
-            ),
+            index=django.contrib.postgres.indexes.BTreeIndex(fields=["created_at"], name="slider_created_at_idx"),
         ),
         migrations.AddIndex(
             model_name="slider",
-            index=django.contrib.postgres.indexes.BTreeIndex(
-                fields=["updated_at"], name="slider_updated_at_idx"
-            ),
+            index=django.contrib.postgres.indexes.BTreeIndex(fields=["updated_at"], name="slider_updated_at_idx"),
         ),
     ]

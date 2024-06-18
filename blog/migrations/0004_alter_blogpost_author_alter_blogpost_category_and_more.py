@@ -6,7 +6,10 @@ from django.db import models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("blog", "0003_blogcomment_level_blogcomment_lft_blogcomment_parent_and_more"),
+        (
+            "blog",
+            "0003_blogcomment_level_blogcomment_lft_blogcomment_parent_and_more",
+        ),
     ]
 
     operations = [
@@ -33,8 +36,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="blogpost",
             name="tags",
-            field=models.ManyToManyField(
-                blank=True, related_name="tags", to="blog.blogtag"
-            ),
+            field=models.ManyToManyField(blank=True, related_name="tags", to="blog.blogtag"),
         ),
     ]

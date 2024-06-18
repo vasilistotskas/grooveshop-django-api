@@ -18,11 +18,7 @@ def populate_profile(sociallogin=None, user=None, **kwargs):
 
     picture_url = None
     if sociallogin.account.provider == "facebook":
-        picture_url = (
-            "http://graph.facebook.com/"
-            + sociallogin.account.uid
-            + "/picture?type=large"
-        )
+        picture_url = "http://graph.facebook.com/" + sociallogin.account.uid + "/picture?type=large"
 
     if sociallogin.account.provider == "google":
         picture_url = sociallogin.account.extra_data["picture"]

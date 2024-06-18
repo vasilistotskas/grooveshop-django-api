@@ -16,11 +16,13 @@ from notification.serializers.user import NotificationUserActionSerializer
 from notification.serializers.user import NotificationUserSerializer
 
 
-class NotificationUserViewSet(
-    MultiSerializerMixin, ExpandModelViewSet, PaginationModelViewSet
-):
+class NotificationUserViewSet(MultiSerializerMixin, ExpandModelViewSet, PaginationModelViewSet):
     queryset = NotificationUser.objects.all()
-    filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        PascalSnakeCaseOrderingFilter,
+        SearchFilter,
+    ]
     search_fields = ["user__id", "notification__id"]
     ordering_fields = ["id", "user", "notification", "seen"]
 
@@ -61,9 +63,7 @@ class NotificationUserViewSet(
         serializer.is_valid(raise_exception=True)
         notification_user_id = serializer.validated_data.get("notification_user_id")
 
-        self.queryset.filter(id=notification_user_id, user=request.user).update(
-            seen=True
-        )
+        self.queryset.filter(id=notification_user_id, user=request.user).update(seen=True)
         return Response({"success": True}, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["POST"], permission_classes=[IsAuthenticated])
@@ -75,7 +75,5 @@ class NotificationUserViewSet(
         serializer.is_valid(raise_exception=True)
         notification_user_id = serializer.validated_data.get("notification_user_id")
 
-        self.queryset.filter(id=notification_user_id, user=request.user).update(
-            seen=False
-        )
+        self.queryset.filter(id=notification_user_id, user=request.user).update(seen=False)
         return Response({"success": True}, status=status.HTTP_200_OK)

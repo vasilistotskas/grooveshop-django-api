@@ -37,7 +37,10 @@ class Migration(migrations.Migration):
                     "uuid",
                     models.UUIDField(default=uuid.uuid4, editable=False, unique=True),
                 ),
-                ("link", models.URLField(blank=True, null=True, verbose_name="Link")),
+                (
+                    "link",
+                    models.URLField(blank=True, null=True, verbose_name="Link"),
+                ),
                 (
                     "kind",
                     models.CharField(
@@ -75,11 +78,12 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(
-                        db_index=True, max_length=15, verbose_name="Language"
-                    ),
+                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
                 ),
-                ("title", models.CharField(max_length=250, verbose_name="Title")),
+                (
+                    "title",
+                    models.CharField(max_length=250, verbose_name="Title"),
+                ),
                 ("message", models.TextField(verbose_name="Message")),
             ],
             options={
@@ -115,7 +119,10 @@ class Migration(migrations.Migration):
                     "uuid",
                     models.UUIDField(default=uuid.uuid4, editable=False, unique=True),
                 ),
-                ("seen", models.BooleanField(default=False, verbose_name="Seen")),
+                (
+                    "seen",
+                    models.BooleanField(default=False, verbose_name="Seen"),
+                ),
                 (
                     "seen_at",
                     models.DateTimeField(blank=True, null=True, verbose_name="Seen At"),

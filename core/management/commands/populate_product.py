@@ -29,23 +29,17 @@ class Command(BaseCommand):
         total_products = options["total_products"]
         total_time = 0
         start_time = time.time()
-        available_languages = [
-            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
-        ]
+        available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 
         if total_products < 1:
-            self.stdout.write(
-                self.style.WARNING("Total number of products must be greater than 0.")
-            )
+            self.stdout.write(self.style.WARNING("Total number of products must be greater than 0."))
             return
 
         categories = list(ProductCategory.objects.all())
         vats = list(Vat.objects.all())
 
         if not categories or not vats:
-            self.stdout.write(
-                self.style.ERROR("Insufficient data. Aborting seeding Product model.")
-            )
+            self.stdout.write(self.style.ERROR("Insufficient data. Aborting seeding Product model."))
             return
 
         if not available_languages:
@@ -60,9 +54,7 @@ class Command(BaseCommand):
                 slug = faker.unique.slug()
                 price = faker.pydecimal(left_digits=4, right_digits=2, positive=True)
                 stock = faker.random_int(min=0, max=1000)
-                discount_percent = faker.pydecimal(
-                    left_digits=2, right_digits=2, positive=True, max_value=99
-                )
+                discount_percent = faker.pydecimal(left_digits=2, right_digits=2, positive=True, max_value=99)
                 weight = faker.pydecimal(left_digits=3, right_digits=2, positive=True)
 
                 product_slug_exists = Product.objects.filter(slug=slug).exists()

@@ -13,29 +13,21 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="blogposttranslation",
             name="search_document",
-            field=models.TextField(
-                blank=True, default="", verbose_name="Search Document"
-            ),
+            field=models.TextField(blank=True, default="", verbose_name="Search Document"),
         ),
         migrations.AlterField(
             model_name="blogposttranslation",
             name="search_document_dirty",
-            field=models.BooleanField(
-                default=False, verbose_name="Search Document Dirty"
-            ),
+            field=models.BooleanField(default=False, verbose_name="Search Document Dirty"),
         ),
         migrations.AlterField(
             model_name="blogposttranslation",
             name="search_vector",
-            field=django.contrib.postgres.search.SearchVectorField(
-                blank=True, null=True, verbose_name="Search Vector"
-            ),
+            field=django.contrib.postgres.search.SearchVectorField(blank=True, null=True, verbose_name="Search Vector"),
         ),
         migrations.AlterField(
             model_name="blogposttranslation",
             name="search_vector_dirty",
-            field=models.BooleanField(
-                default=False, verbose_name="Search Vector Dirty"
-            ),
+            field=models.BooleanField(default=False, verbose_name="Search Vector Dirty"),
         ),
     ]

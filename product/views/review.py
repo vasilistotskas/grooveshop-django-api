@@ -19,7 +19,11 @@ from product.serializers.review import ProductReviewSerializer
 
 class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
     queryset = ProductReview.objects.all()
-    filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        PascalSnakeCaseOrderingFilter,
+        SearchFilter,
+    ]
     filterset_fields = ["id", "user_id", "product_id", "status"]
     ordering_fields = [
         "id",
@@ -92,7 +96,5 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
     @action(detail=True, methods=["GET"])
     def product(self, request, *args, **kwargs) -> Response:
         product_review = self.get_object()
-        serializer = self.get_serializer(
-            product_review.product, context=self.get_serializer_context()
-        )
+        serializer = self.get_serializer(product_review.product, context=self.get_serializer_context())
         return Response(serializer.data, status=status.HTTP_200_OK)

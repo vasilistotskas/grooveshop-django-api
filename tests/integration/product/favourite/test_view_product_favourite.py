@@ -16,9 +16,7 @@ class ProductFavouriteViewSetTestCase(APITestCase):
     product_favourite: ProductFavourite = None
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="test@test.com", password="test12345@!"
-        )
+        self.user = User.objects.create_user(email="test@test.com", password="test12345@!")
         self.product = Product.objects.create(
             product_code="P123",
             name="Sample Product",
@@ -143,9 +141,7 @@ class ProductFavouriteViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(
-            ProductFavourite.objects.filter(pk=self.product_favourite.id).exists()
-        )
+        self.assertFalse(ProductFavourite.objects.filter(pk=self.product_favourite.id).exists())
 
     def test_destroy_invalid(self):
         invalid_product_favourite_id = 999999

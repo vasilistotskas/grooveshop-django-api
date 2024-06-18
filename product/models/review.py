@@ -13,9 +13,7 @@ from product.enum.review import RateEnum
 from product.enum.review import ReviewStatusEnum
 
 
-class ProductReview(
-    TranslatableModel, TimeStampMixinModel, PublishableModel, UUIDModel
-):
+class ProductReview(TranslatableModel, TimeStampMixinModel, PublishableModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
     product = models.ForeignKey(
         "product.Product",
@@ -23,7 +21,9 @@ class ProductReview(
         on_delete=models.CASCADE,
     )
     user = models.ForeignKey(
-        "user.UserAccount", related_name="product_reviews", on_delete=models.CASCADE
+        "user.UserAccount",
+        related_name="product_reviews",
+        on_delete=models.CASCADE,
     )
     rate = models.PositiveSmallIntegerField(_("Rate"), choices=RateEnum.choices)
     status = models.CharField(
@@ -32,19 +32,13 @@ class ProductReview(
         choices=ReviewStatusEnum.choices,
         default=ReviewStatusEnum.NEW,
     )
-    translations = TranslatedFields(
-        comment=models.TextField(_("Comment"), blank=True, null=True)
-    )
+    translations = TranslatedFields(comment=models.TextField(_("Comment"), blank=True, null=True))
 
     class Meta(TypedModelMeta):
         verbose_name = _("Product Review")
         verbose_name_plural = _("Product Reviews")
         ordering = ["-created_at"]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["product", "user"], name="unique_product_review"
-            )
-        ]
+        constraints = [models.UniqueConstraint(fields=["product", "user"], name="unique_product_review")]
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
             *PublishableModel.Meta.indexes,
@@ -54,19 +48,13 @@ class ProductReview(
 
     def __unicode__(self):
         comment_snippet = (
-            (self.safe_translation_getter("comment", any_language=True)[:50] + "...")
-            if self.comment
-            else "No Comment"
+            (self.safe_translation_getter("comment", any_language=True)[:50] + "...") if self.comment else "No Comment"
         )
-        return "Review by {0} on {1}: {2}".format(
-            self.user.email, self.product, comment_snippet
-        )
+        return "Review by {0} on {1}: {2}".format(self.user.email, self.product, comment_snippet)
 
     def __str__(self):
         comment_snippet = (
-            (self.safe_translation_getter("comment", any_language=True)[:50] + "...")
-            if self.comment
-            else "No Comment"
+            (self.safe_translation_getter("comment", any_language=True)[:50] + "...") if self.comment else "No Comment"
         )
         return f"Review by {self.user.email} on {self.product}: {comment_snippet}"
 

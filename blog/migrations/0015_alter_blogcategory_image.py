@@ -14,7 +14,10 @@ class Migration(migrations.Migration):
             model_name="blogcategory",
             name="image",
             field=core.fields.image.ImageAndSvgField(
-                blank=True, null=True, upload_to="uploads/blog/", verbose_name="Image"
+                blank=True,
+                null=True,
+                upload_to="uploads/blog/",
+                verbose_name="Image",
             ),
         ),
     ]

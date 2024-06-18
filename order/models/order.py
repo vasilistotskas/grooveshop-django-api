@@ -24,12 +24,7 @@ from user.enum.address import LocationChoicesEnum
 
 class OrderManager(models.Manager):
     def get_queryset(self):
-        return (
-            super()
-            .get_queryset()
-            .select_related("user", "pay_way", "country", "region")
-            .exclude(is_deleted=True)
-        )
+        return super().get_queryset().select_related("user", "pay_way", "country", "region").exclude(is_deleted=True)
 
 
 class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
@@ -85,9 +80,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
     zipcode = models.CharField(_("Zipcode"), max_length=255)
     place = models.CharField(_("Place"), max_length=255, blank=True, null=True)
     phone = PhoneNumberField(_("Phone Number"))
-    mobile_phone = PhoneNumberField(
-        _("Mobile Phone Number"), null=True, blank=True, default=None
-    )
+    mobile_phone = PhoneNumberField(_("Mobile Phone Number"), null=True, blank=True, default=None)
     customer_notes = models.TextField(_("Customer Notes"), null=True, blank=True)
     status = models.CharField(
         _("Status"),
@@ -95,9 +88,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
         choices=OrderStatusEnum.choices,
         default=OrderStatusEnum.PENDING,
     )
-    shipping_price = MoneyField(
-        _("Shipping Price"), max_digits=11, decimal_places=2, default=0
-    )
+    shipping_price = MoneyField(_("Shipping Price"), max_digits=11, decimal_places=2, default=0)
     document_type = models.CharField(
         _("Document Type"),
         max_length=100,
@@ -152,13 +143,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
             raise ValidationError({"email": _("Invalid email address.")})
 
         if self.mobile_phone and self.mobile_phone == self.phone:
-            raise ValidationError(
-                {
-                    "mobile_phone": _(
-                        "Mobile phone number cannot be the same as phone number."
-                    )
-                }
-            )
+            raise ValidationError({"mobile_phone": _("Mobile phone number cannot be the same as phone number.")})
 
     @property
     def total_price_items(self) -> Money:
@@ -174,11 +159,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
     @property
     def total_price_extra(self) -> Money:
         payment_cost = Money(0, settings.DEFAULT_CURRENCY)
-        if (
-            self.pay_way
-            and self.total_price_items.amount
-            <= self.pay_way.free_for_order_amount.amount
-        ):
+        if self.pay_way and self.total_price_items.amount <= self.pay_way.free_for_order_amount.amount:
             payment_cost = self.pay_way.cost
 
         return self.shipping_price + payment_cost

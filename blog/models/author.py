@@ -12,9 +12,7 @@ class BlogAuthor(TranslatableModel, TimeStampMixinModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
     user = models.OneToOneField("user.UserAccount", on_delete=models.PROTECT)
     website = models.URLField(_("Website"), blank=True, null=True)
-    translations = TranslatedFields(
-        bio=models.TextField(_("Bio"), blank=True, null=True)
-    )
+    translations = TranslatedFields(bio=models.TextField(_("Bio"), blank=True, null=True))
 
     class Meta(TypedModelMeta):
         verbose_name = _("Blog Author")

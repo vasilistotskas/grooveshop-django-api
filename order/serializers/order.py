@@ -128,9 +128,7 @@ class OrderCreateUpdateSerializer(BaseExpandSerializer):
             quantity = item_data["quantity"]
 
             if product.stock < quantity:
-                raise serializers.ValidationError(
-                    f"Product {product.name} does not have enough stock."
-                )
+                raise serializers.ValidationError(f"Product {product.name} does not have enough stock.")
 
         return data
 
@@ -222,9 +220,7 @@ class CheckoutSerializer(BaseExpandSerializer):
             quantity = item_data["quantity"]
 
             if product.stock < quantity:
-                raise serializers.ValidationError(
-                    f"Product {product.name} does not have enough stock."
-                )
+                raise serializers.ValidationError(f"Product {product.name} does not have enough stock.")
 
         return data
 

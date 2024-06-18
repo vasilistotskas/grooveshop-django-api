@@ -138,8 +138,7 @@ class OrderModelTestCase(TestCase):
 
     def test_full_address(self):
         expected_full_address = (
-            f"{self.order.street} {self.order.street_number}, "
-            f"{self.order.zipcode} {self.order.city}"
+            f"{self.order.street} {self.order.street_number}, " f"{self.order.zipcode} {self.order.city}"
         )
         self.assertEqual(self.order.full_address, expected_full_address)
 
@@ -154,7 +153,8 @@ class OrderModelTestCase(TestCase):
         self.assertEqual(self.order.phone, "123-456-7890")
         self.assertEqual(self.order.status, OrderStatusEnum.PENDING)
         self.assertEqual(
-            self.order.shipping_price, Money("10.00", settings.DEFAULT_CURRENCY)
+            self.order.shipping_price,
+            Money("10.00", settings.DEFAULT_CURRENCY),
         )
         self.assertEqual(self.order.paid_amount, Money("0", settings.DEFAULT_CURRENCY))
 

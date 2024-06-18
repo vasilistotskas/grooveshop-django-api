@@ -19,7 +19,11 @@ from core.utils.serializers import MultiSerializerMixin
 
 class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
     queryset = BlogPost.objects.all()
-    filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        PascalSnakeCaseOrderingFilter,
+        SearchFilter,
+    ]
     filterset_fields = ["id", "tags", "slug", "author"]
     ordering_fields = [
         "id",
@@ -92,11 +96,10 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
         post_ids = request.data.get("post_ids", [])
         if not post_ids:
             return Response(
-                {"error": "No post IDs provided."}, status=status.HTTP_400_BAD_REQUEST
+                {"error": "No post IDs provided."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        liked_post_ids = BlogPost.objects.filter(
-            likes=user, id__in=post_ids
-        ).values_list("id", flat=True)
+        liked_post_ids = BlogPost.objects.filter(likes=user, id__in=post_ids).values_list("id", flat=True)
 
         return Response(liked_post_ids, status=status.HTTP_200_OK)

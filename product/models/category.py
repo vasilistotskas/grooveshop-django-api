@@ -49,16 +49,29 @@ class ProductCategory(
     id = models.BigAutoField(primary_key=True)
     slug = models.SlugField(_("Slug"), max_length=255, unique=True)
     menu_image_one = models.ImageField(
-        _("Menu Image One"), upload_to="uploads/categories/", null=True, blank=True
+        _("Menu Image One"),
+        upload_to="uploads/categories/",
+        null=True,
+        blank=True,
     )
     menu_image_two = models.ImageField(
-        _("Menu Image Two"), upload_to="uploads/categories/", null=True, blank=True
+        _("Menu Image Two"),
+        upload_to="uploads/categories/",
+        null=True,
+        blank=True,
     )
     menu_main_banner = models.ImageField(
-        _("Menu Main Banner"), upload_to="uploads/categories/", null=True, blank=True
+        _("Menu Main Banner"),
+        upload_to="uploads/categories/",
+        null=True,
+        blank=True,
     )
     parent = TreeForeignKey(
-        "self", blank=True, null=True, related_name="children", on_delete=models.CASCADE
+        "self",
+        blank=True,
+        null=True,
+        related_name="children",
+        on_delete=models.CASCADE,
     )
     translations = TranslatedFields(
         name=models.CharField(_("Name"), max_length=255, blank=True, null=True),
@@ -89,10 +102,7 @@ class ProductCategory(
     def __str__(self):
         if not hasattr(self, "_full_path"):
             self._full_path = " / ".join(
-                [
-                    k.safe_translation_getter("name", any_language=True)
-                    for k in self.get_ancestors(include_self=True)
-                ]
+                [k.safe_translation_getter("name", any_language=True) for k in self.get_ancestors(include_self=True)]
             )
         return self._full_path
 
@@ -103,15 +113,11 @@ class ProductCategory(
         super(ProductCategory, self).save(*args, **kwargs)
 
     def get_ordering_queryset(self):
-        return ProductCategory.objects.filter(parent=self.parent).get_descendants(
-            include_self=True
-        )
+        return ProductCategory.objects.filter(parent=self.parent).get_descendants(include_self=True)
 
     @property
     def recursive_product_count(self) -> int:
-        return Product.objects.filter(
-            category__in=self.get_descendants(include_self=True)
-        ).count()
+        return Product.objects.filter(category__in=self.get_descendants(include_self=True)).count()
 
     @property
     def absolute_url(self) -> str:

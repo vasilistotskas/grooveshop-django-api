@@ -17,7 +17,11 @@ DEFAULT_PRODUCT_IMAGE_CACHE_TTL = 60 * 60 * 2
 class ProductImageViewSet(BaseModelViewSet):
     queryset = ProductImage.objects.all()
     serializer_class = ProductImageSerializer
-    filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        PascalSnakeCaseOrderingFilter,
+        SearchFilter,
+    ]
     filterset_fields = ["id", "product", "is_main"]
     ordering_fields = ["created_at", "-is_main"]
     ordering = ["-is_main", "-created_at"]

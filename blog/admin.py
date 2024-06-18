@@ -45,12 +45,8 @@ class BlogCategoryAdmin(TranslatableAdmin, DraggableMPTTAdmin):
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        qs = BlogCategory.objects.add_related_count(
-            qs, BlogPost, "category", "posts_cumulative_count", cumulative=True
-        )
-        qs = BlogCategory.objects.add_related_count(
-            qs, BlogPost, "category", "posts_count", cumulative=False
-        )
+        qs = BlogCategory.objects.add_related_count(qs, BlogPost, "category", "posts_cumulative_count", cumulative=True)
+        qs = BlogCategory.objects.add_related_count(qs, BlogPost, "category", "posts_count", cumulative=False)
         return qs
 
     def get_prepopulated_fields(self, request, obj=None):

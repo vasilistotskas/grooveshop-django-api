@@ -17,9 +17,7 @@ class BlogAuthorViewSetTestCase(APITestCase):
     author: BlogAuthor = None
 
     def setUp(self):
-        user = User.objects.create_user(
-            email="testuser@example.com", password="testpassword"
-        )
+        user = User.objects.create_user(email="testuser@example.com", password="testpassword")
         self.author = BlogAuthor.objects.create(user=user)
 
         for language in languages:
@@ -46,9 +44,7 @@ class BlogAuthorViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_valid(self):
-        user = User.objects.create_user(
-            email="testusercreate@example.com", password="testpassword"
-        )
+        user = User.objects.create_user(email="testusercreate@example.com", password="testpassword")
         payload = {
             "user": user.id,
             "translations": {},
@@ -101,9 +97,7 @@ class BlogAuthorViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_update_valid(self):
-        user = User.objects.create_user(
-            email="testuserupdate@example.com", password="testpassword"
-        )
+        user = User.objects.create_user(email="testuserupdate@example.com", password="testpassword")
         payload = {
             "user": user.id,
             "translations": {},

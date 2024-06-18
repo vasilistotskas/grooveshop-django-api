@@ -23,9 +23,7 @@ class CartServiceTest(TestCase):
     product: Product = None
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="testuser@example.com", password="testpassword"
-        )
+        self.user = User.objects.create_user(email="testuser@example.com", password="testpassword")
         self.factory = RequestFactory()
         self.request = self.factory.get("/")
         self.request.user = self.user
@@ -196,9 +194,7 @@ class CartServiceTest(TestCase):
             view_count=0,
             weight=0.00,
         )
-        CartItem.objects.create(
-            cart=pre_login_cart, product=pre_login_product, quantity=1
-        )
+        CartItem.objects.create(cart=pre_login_cart, product=pre_login_product, quantity=1)
         cart_service.create_cart_item(self.product, 2)
 
         self.request.session = {"pre_log_in_cart_id": pre_login_cart.id}

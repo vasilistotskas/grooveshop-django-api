@@ -33,21 +33,13 @@ class Command(BaseCommand):
         total_addresses = options["total_addresses"]
 
         if total_addresses < 1:
-            self.stdout.write(
-                self.style.WARNING(
-                    "Total number of user addresses must be greater than 0."
-                )
-            )
+            self.stdout.write(self.style.WARNING("Total number of user addresses must be greater than 0."))
             return
 
         users: list[UserAccount] = list(User.objects.all())
 
         if not users:
-            self.stdout.write(
-                self.style.ERROR(
-                    "Insufficient data. Aborting seeding UserAddress model."
-                )
-            )
+            self.stdout.write(self.style.ERROR("Insufficient data. Aborting seeding UserAddress model."))
             return
 
         floor_choices = [choice[0] for choice in FloorChoicesEnum.choices]
@@ -63,9 +55,7 @@ class Command(BaseCommand):
                     main_address_exists = False
 
                 if not main_address_exists:
-                    first_name = (
-                        user.first_name if user.first_name else faker.first_name()
-                    )
+                    first_name = user.first_name if user.first_name else faker.first_name()
                     last_name = user.last_name if user.last_name else faker.last_name()
                     main_address = UserAddress(
                         user=user,

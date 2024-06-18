@@ -9,9 +9,7 @@ from settings import BASE_DIR
 DEFAULT_IMAGE_PATH = os.path.join(BASE_DIR, "static/images/no_photo.jpg")
 
 
-def get_or_create_default_image(
-    image_path: str, use_default_storage: bool = True
-) -> SimpleUploadedFile:
+def get_or_create_default_image(image_path: str, use_default_storage: bool = True) -> SimpleUploadedFile:
     if use_default_storage:
         if default_storage.exists(image_path):
             with default_storage.open(image_path, "rb") as f:

@@ -33,9 +33,7 @@ CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 
 # Internal settings
 BEAT_UPDATE_SEARCH_SEC = int(getenv("BEAT_UPDATE_SEARCH_SEC", 60 * 60 * 8))
-BEAT_UPDATE_SEARCH_EXPIRE_AFTER_SEC = int(
-    getenv("BEAT_UPDATE_SEARCH_EXPIRE_AFTER_SEC", 20)
-)
+BEAT_UPDATE_SEARCH_EXPIRE_AFTER_SEC = int(getenv("BEAT_UPDATE_SEARCH_EXPIRE_AFTER_SEC", 20))
 
 CELERY_BEAT_SCHEDULE = {
     "update-product-translation-search-vectors": {

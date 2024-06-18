@@ -13,9 +13,7 @@ from django.conf import settings
 
 
 def cors_handler(application: ASGI3Application) -> ASGI3Application:
-    async def cors_wrapper(
-        scope: Scope, receive: ASGIReceiveCallable, send: ASGISendCallable
-    ) -> None:
+    async def cors_wrapper(scope: Scope, receive: ASGIReceiveCallable, send: ASGISendCallable) -> None:
         if scope["type"] != "http":
             await application(scope, receive, send)
             return
@@ -37,8 +35,7 @@ def cors_handler(application: ASGI3Application) -> ASGI3Application:
                 (b"access-control-allow-credentials", b"true"),
                 (
                     b"access-control-allow-headers",
-                    b"Origin, Content-Type, Accept, Authorization, "
-                    b"Authorization-Bearer",
+                    b"Origin, Content-Type, Accept, Authorization, " b"Authorization-Bearer",
                 ),
                 (b"access-control-allow-methods", b"POST, OPTIONS"),
                 (b"access-control-max-age", b"600"),
@@ -59,11 +56,7 @@ def cors_handler(application: ASGI3Application) -> ASGI3Application:
                     trailers=False,
                 )
             )
-            await send(
-                HTTPResponseBodyEvent(
-                    type="http.response.body", body=b"", more_body=False
-                )
-            )
+            await send(HTTPResponseBodyEvent(type="http.response.body", body=b"", more_body=False))
         else:
 
             async def send_with_origin(message: ASGISendEvent) -> None:
@@ -78,15 +71,9 @@ def cors_handler(application: ASGI3Application) -> ASGI3Application:
                             b"vary",
                         }
                     ]
-                    response_headers.append(
-                        (b"access-control-allow-credentials", b"true")
-                    )
+                    response_headers.append((b"access-control-allow-credentials", b"true"))
                     vary_header = next(
-                        (
-                            value
-                            for key, value in message["headers"]
-                            if key.lower() == b"vary"
-                        ),
+                        (value for key, value in message["headers"] if key.lower() == b"vary"),
                         b"",
                     )
                     if origin_match:

@@ -18,7 +18,11 @@ DEFAULT_BLOG_TAG_CACHE_TTL = 60 * 60 * 2
 class BlogTagViewSet(BaseModelViewSet):
     queryset = BlogTag.objects.all()
     serializer_class = BlogTagSerializer
-    filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        PascalSnakeCaseOrderingFilter,
+        SearchFilter,
+    ]
     filterset_fields = ["id", "active"]
     ordering_fields = ["id", "active", "created_at"]
     ordering = ["-created_at"]

@@ -261,7 +261,10 @@ LOCALE_PATHS = [path.join(BASE_DIR, "locale/")]
 
 ENABLE_DEBUG_TOOLBAR = getenv("ENABLE_DEBUG_TOOLBAR", "False") == "True"
 
-ADMINS = [("Admin", getenv("ADMIN_EMAIL", "")), ("Info", getenv("INFO_EMAIL", ""))]
+ADMINS = [
+    ("Admin", getenv("ADMIN_EMAIL", "")),
+    ("Info", getenv("INFO_EMAIL", "")),
+]
 
 if ENABLE_DEBUG_TOOLBAR:
     INSTALLED_APPS += ["debug_toolbar"]
@@ -282,4 +285,7 @@ if ENABLE_DEBUG_TOOLBAR:
         "debug_toolbar.panels.redirects.RedirectsPanel",
         "debug_toolbar.panels.profiling.ProfilingPanel",
     ]
-    DEBUG_TOOLBAR_CONFIG = {"INTERCEPT_REDIRECTS": False, "RESULTS_CACHE_SIZE": 100}
+    DEBUG_TOOLBAR_CONFIG = {
+        "INTERCEPT_REDIRECTS": False,
+        "RESULTS_CACHE_SIZE": 100,
+    }

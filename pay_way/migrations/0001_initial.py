@@ -42,7 +42,10 @@ class Migration(migrations.Migration):
                     models.UUIDField(default=uuid.uuid4, editable=False, unique=True),
                 ),
                 ("id", models.BigAutoField(primary_key=True, serialize=False)),
-                ("active", models.BooleanField(default=True, verbose_name="Active")),
+                (
+                    "active",
+                    models.BooleanField(default=True, verbose_name="Active"),
+                ),
                 (
                     "cost_currency",
                     djmoney.models.fields.CurrencyField(
@@ -112,9 +115,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(
-                        db_index=True, max_length=15, verbose_name="Language"
-                    ),
+                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
                 ),
                 (
                     "name",

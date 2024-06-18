@@ -30,9 +30,7 @@ class TranslatedFieldExtended(TranslatedFieldsField):
 
 
 def flatten_dict_for_form_data(input_dict: dict, sep: str = "[{i}]") -> dict:
-    def __flatten(
-        value: any, prefix: str, result_dict: dict, previous: str = ""
-    ) -> dict:
+    def __flatten(value: any, prefix: str, result_dict: dict, previous: str = "") -> dict:
         if isinstance(value, dict):
             if previous == "dict":
                 prefix += "."

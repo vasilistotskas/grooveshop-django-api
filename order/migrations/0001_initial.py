@@ -62,7 +62,10 @@ class Migration(migrations.Migration):
                         null=True,
                     ),
                 ),
-                ("email", models.EmailField(max_length=255, verbose_name="Email")),
+                (
+                    "email",
+                    models.EmailField(max_length=255, verbose_name="Email"),
+                ),
                 (
                     "first_name",
                     models.CharField(max_length=255, verbose_name="First Name"),
@@ -71,23 +74,37 @@ class Migration(migrations.Migration):
                     "last_name",
                     models.CharField(max_length=255, verbose_name="Last Name"),
                 ),
-                ("street", models.CharField(max_length=255, verbose_name="Street")),
+                (
+                    "street",
+                    models.CharField(max_length=255, verbose_name="Street"),
+                ),
                 (
                     "street_number",
                     models.CharField(max_length=255, verbose_name="Street Number"),
                 ),
-                ("city", models.CharField(max_length=255, verbose_name="City")),
-                ("zipcode", models.CharField(max_length=255, verbose_name="Zipcode")),
+                (
+                    "city",
+                    models.CharField(max_length=255, verbose_name="City"),
+                ),
+                (
+                    "zipcode",
+                    models.CharField(max_length=255, verbose_name="Zipcode"),
+                ),
                 (
                     "place",
                     models.CharField(
-                        blank=True, max_length=255, null=True, verbose_name="Place"
+                        blank=True,
+                        max_length=255,
+                        null=True,
+                        verbose_name="Place",
                     ),
                 ),
                 (
                     "phone",
                     phonenumber_field.modelfields.PhoneNumberField(
-                        max_length=128, region=None, verbose_name="Phone Number"
+                        max_length=128,
+                        region=None,
+                        verbose_name="Phone Number",
                     ),
                 ),
                 (
@@ -103,9 +120,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "customer_notes",
-                    models.TextField(
-                        blank=True, null=True, verbose_name="Customer Notes"
-                    ),
+                    models.TextField(blank=True, null=True, verbose_name="Customer Notes"),
                 ),
                 (
                     "status",
@@ -142,7 +157,10 @@ class Migration(migrations.Migration):
                 (
                     "document_type",
                     models.CharField(
-                        choices=[("RECEIPT", "Receipt"), ("INVOICE", "Invoice")],
+                        choices=[
+                            ("RECEIPT", "Receipt"),
+                            ("INVOICE", "Invoice"),
+                        ],
                         default="RECEIPT",
                         max_length=100,
                         verbose_name="Document Type",
@@ -211,11 +229,12 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "price",
-                    djmoney.models.fields.MoneyField(
-                        decimal_places=2, max_digits=11, verbose_name="Price"
-                    ),
+                    djmoney.models.fields.MoneyField(decimal_places=2, max_digits=11, verbose_name="Price"),
                 ),
-                ("quantity", models.IntegerField(default=1, verbose_name="Quantity")),
+                (
+                    "quantity",
+                    models.IntegerField(default=1, verbose_name="Quantity"),
+                ),
                 (
                     "order",
                     models.ForeignKey(

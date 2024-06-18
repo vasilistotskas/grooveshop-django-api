@@ -62,9 +62,7 @@ class PayWayModelTestCase(TestCase):
             )
 
     def test_str_representation(self):
-        self.assertEqual(
-            str(self.pay_way), self.pay_way.safe_translation_getter("name")
-        )
+        self.assertEqual(str(self.pay_way), self.pay_way.safe_translation_getter("name"))
 
     def test_get_ordering_queryset(self):
         queryset = self.pay_way.get_ordering_queryset()

@@ -20,16 +20,16 @@ from seo.models import SeoModel
 
 
 class BlogPost(
-    TranslatableModel, SeoModel, TimeStampMixinModel, PublishableModel, UUIDModel
+    TranslatableModel,
+    SeoModel,
+    TimeStampMixinModel,
+    PublishableModel,
+    UUIDModel,
 ):
     id = models.BigAutoField(primary_key=True)
     slug = models.SlugField(max_length=255, unique=True)
-    image = models.ImageField(
-        _("Image"), upload_to="uploads/blog/", blank=True, null=True
-    )
-    likes = models.ManyToManyField(
-        "user.UserAccount", related_name="liked_blog_posts", blank=True
-    )
+    image = models.ImageField(_("Image"), upload_to="uploads/blog/", blank=True, null=True)
+    likes = models.ManyToManyField("user.UserAccount", related_name="liked_blog_posts", blank=True)
     category = models.ForeignKey(
         "blog.BlogCategory",
         related_name="posts",
@@ -57,12 +57,8 @@ class BlogPost(
         body=HTMLField(_("Body"), blank=True, null=True),
         search_document=models.TextField(_("Search Document"), blank=True, default=""),
         search_vector=SearchVectorField(_("Search Vector"), blank=True, null=True),
-        search_document_dirty=models.BooleanField(
-            _("Search Document Dirty"), default=False
-        ),
-        search_vector_dirty=models.BooleanField(
-            _("Search Vector Dirty"), default=False
-        ),
+        search_document_dirty=models.BooleanField(_("Search Document Dirty"), default=False),
+        search_vector_dirty=models.BooleanField(_("Search Vector Dirty"), default=False),
     )
 
     class Meta(TypedModelMeta):

@@ -29,29 +29,29 @@ class Representation(TypedDict):
 @extend_schema_field(
     {
         "type": "object",
-        "properties": {"unit": {"type": "string"}, "value": {"type": "number"}},
+        "properties": {
+            "unit": {"type": "string"},
+            "value": {"type": "number"},
+        },
         "example": {"unit": "kg", "value": 1.0},
     }
 )
 class MeasurementSerializerField(serializers.Field):
     default_error_messages = {
-        "invalid_unit": "Invalid unit. '{invalid_unit}' is not a valid unit for {measurement}. Valid units are: {valid_units}.",
+        "invalid_unit": "Invalid unit. '{invalid_unit}' is not a valid unit for "
+        "{measurement}. Valid units are: {valid_units}.",
         "invalid_value": "Invalid value. '{invalid_value}' is not a valid decimal.",
         "missing_keys": "Missing required keys. 'unit' and 'value' are required.",
     }
 
-    def __init__(
-        self, measurement: Type[MeasureBase | BidimensionalMeasure], *args, **kwargs
-    ) -> None:
+    def __init__(self, measurement: Type[MeasureBase | BidimensionalMeasure], *args, **kwargs) -> None:
         super(MeasurementSerializerField, self).__init__(*args, **kwargs)
         self.measurement = measurement
 
     def to_representation(self, obj: Any) -> Representation:
         return {"unit": obj.unit, "value": obj.value}
 
-    def to_internal_value(
-        self, data: Representation
-    ) -> MeasureBase | BidimensionalMeasure:
+    def to_internal_value(self, data: Representation) -> MeasureBase | BidimensionalMeasure:
         if not isinstance(data, dict) or "unit" not in data or "value" not in data:
             self.fail("missing_keys")
 

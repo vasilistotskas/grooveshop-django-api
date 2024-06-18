@@ -32,16 +32,12 @@ class CategoryModelTestCase(TestCase):
     default_image = None
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="test@test.com", password="test12345@!"
-        )
+        self.user = User.objects.create_user(email="test@test.com", password="test12345@!")
         self.vat = Vat.objects.create(
             value=Decimal("24.0"),
         )
 
-        self.default_image = get_or_create_default_image(
-            "uploads/categories/no_photo.jpg"
-        )
+        self.default_image = get_or_create_default_image("uploads/categories/no_photo.jpg")
 
         self.category = ProductCategory.objects.create(
             slug="sample-category",
@@ -68,9 +64,7 @@ class CategoryModelTestCase(TestCase):
         for language in languages:
             self.sub_category.set_current_language(language)
             self.sub_category.name = f"Sample Sub Category {language}"
-            self.sub_category.description = (
-                f"Sample Sub Category Description {language}"
-            )
+            self.sub_category.description = f"Sample Sub Category Description {language}"
             self.sub_category.save()
         self.sub_category.set_current_language(default_language)
 
@@ -91,13 +85,12 @@ class CategoryModelTestCase(TestCase):
             self.category.set_current_language(language)
             self.assertEqual(self.category.name, f"Sample Category {language}")
             self.assertEqual(
-                self.category.description, f"Sample Category Description {language}"
+                self.category.description,
+                f"Sample Category Description {language}",
             )
 
     def test_str_representation_no_parent(self):
-        self.assertEqual(
-            str(self.category), self.category.safe_translation_getter("name")
-        )
+        self.assertEqual(str(self.category), self.category.safe_translation_getter("name"))
 
     def test_str_representation_with_parent(self):
         category_name = self.category.safe_translation_getter("name")
@@ -118,10 +111,7 @@ class CategoryModelTestCase(TestCase):
         self.sub_category.parent = grandparent
         self.sub_category.save()
 
-        expected_str = (
-            f"Grandparent Category {default_language} / Sample Sub Category"
-            f" {default_language}"
-        )
+        expected_str = f"Grandparent Category {default_language} / Sample Sub Category" f" {default_language}"
         self.assertEqual(str(self.sub_category), expected_str)
 
     def test_get_ordering_queryset_with_parent(self):
@@ -207,47 +197,32 @@ class CategoryModelTestCase(TestCase):
 
     def test_absolute_url_with_parent(self):
         url = self.sub_category.absolute_url
-        expected_url = (
-            f"/product/category/{self.sub_category.id}/"
-            f"{self.category.slug}/{self.sub_category.slug}"
-        )
+        expected_url = f"/product/category/{self.sub_category.id}/" f"{self.category.slug}/{self.sub_category.slug}"
         self.assertEqual(url, expected_url)
 
     def test_category_menu_image_one_absolute_url(self):
         expected_url = settings.APP_BASE_URL + self.category.menu_image_one.url
-        self.assertEqual(
-            self.category.category_menu_image_one_absolute_url, expected_url
-        )
+        self.assertEqual(self.category.category_menu_image_one_absolute_url, expected_url)
 
     def category_menu_image_one_filename(self):
         expected_filename = os.path.basename(self.category.menu_image_one.name)
-        self.assertEqual(
-            self.category.category_menu_image_one_filename, expected_filename
-        )
+        self.assertEqual(self.category.category_menu_image_one_filename, expected_filename)
 
     def test_category_menu_image_two_absolute_url(self):
         expected_url = settings.APP_BASE_URL + self.category.menu_image_two.url
-        self.assertEqual(
-            self.category.category_menu_image_two_absolute_url, expected_url
-        )
+        self.assertEqual(self.category.category_menu_image_two_absolute_url, expected_url)
 
     def category_menu_image_two_filename(self):
         expected_filename = os.path.basename(self.category.menu_image_two.name)
-        self.assertEqual(
-            self.category.category_menu_image_two_filename, expected_filename
-        )
+        self.assertEqual(self.category.category_menu_image_two_filename, expected_filename)
 
     def test_category_menu_main_banner_absolute_url(self):
         expected_url = settings.APP_BASE_URL + self.category.menu_main_banner.url
-        self.assertEqual(
-            self.category.category_menu_main_banner_absolute_url, expected_url
-        )
+        self.assertEqual(self.category.category_menu_main_banner_absolute_url, expected_url)
 
     def category_menu_main_banner_filename(self):
         expected_filename = os.path.basename(self.category.menu_main_banner.name)
-        self.assertEqual(
-            self.category.category_menu_main_banner_filename, expected_filename
-        )
+        self.assertEqual(self.category.category_menu_main_banner_filename, expected_filename)
 
     def tearDown(self) -> None:
         super().tearDown()

@@ -19,7 +19,11 @@ DEFAULT_BLOG_CATEGORY_CACHE_TTL = 60 * 60 * 2
 
 class BlogCategoryViewSet(MultiSerializerMixin, BaseModelViewSet):
     queryset = BlogCategory.objects.all()
-    filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        PascalSnakeCaseOrderingFilter,
+        SearchFilter,
+    ]
     filterset_fields = ["id"]
     ordering_fields = ["id", "created_at"]
     ordering = ["-updated_at"]

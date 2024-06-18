@@ -26,9 +26,7 @@ class BlogCommentSerializer(TranslatableModelSerializer, BaseExpandSerializer):
     children = serializers.SerializerMethodField()
     user = PrimaryKeyRelatedField(queryset=User.objects.all())
     post = PrimaryKeyRelatedField(queryset=BlogPost.objects.all())
-    likes = PrimaryKeyRelatedField(
-        queryset=User.objects.all(), many=True, required=False
-    )
+    likes = PrimaryKeyRelatedField(queryset=User.objects.all(), many=True, required=False)
     translations = TranslatedFieldsFieldExtend(shared_model=BlogComment)
 
     def get_children(self, obj: BlogComment) -> list[int]:
@@ -56,13 +54,11 @@ class BlogCommentSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "replies_count",
         )
 
-    def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:
-        user_account_serializer = importlib.import_module(
-            "authentication.serializers"
-        ).AuthenticationSerializer
-        blog_post_serializer = importlib.import_module(
-            "blog.serializers.post"
-        ).BlogPostSerializer
+    def get_expand_fields(
+        self,
+    ) -> Dict[str, Type[serializers.ModelSerializer]]:
+        user_account_serializer = importlib.import_module("authentication.serializers").AuthenticationSerializer
+        blog_post_serializer = importlib.import_module("blog.serializers.post").BlogPostSerializer
         return {
             "user": user_account_serializer,
             "post": blog_post_serializer,

@@ -36,7 +36,11 @@ class Checkout(APIView):
 
 class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
     queryset = Order.objects.all()
-    filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        PascalSnakeCaseOrderingFilter,
+        SearchFilter,
+    ]
     ordering_fields = ["created_at", "status"]
     filterset_fields = ["user_id", "status"]
     ordering = ["-created_at"]

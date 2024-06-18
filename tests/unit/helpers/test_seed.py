@@ -32,9 +32,7 @@ class TestGetOrCreateDefaultImage(TestCase):
         )
 
         self.existing_image = get_or_create_default_image(self.existing_image_path)
-        self.non_existing_image = get_or_create_default_image(
-            self.non_existing_image_name
-        )
+        self.non_existing_image = get_or_create_default_image(self.non_existing_image_name)
         self.default_image = get_or_create_default_image(self.default_image_path)
 
     def test_existing_image(self):

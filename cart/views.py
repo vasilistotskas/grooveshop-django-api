@@ -21,7 +21,11 @@ from core.utils.serializers import MultiSerializerMixin
 class CartViewSet(BaseModelViewSet):
     queryset = Cart.objects.all()
     serializer_class = CartSerializer
-    filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        PascalSnakeCaseOrderingFilter,
+        SearchFilter,
+    ]
     filterset_fields = [
         "user",
     ]
@@ -66,7 +70,11 @@ class CartViewSet(BaseModelViewSet):
 
 
 class CartItemViewSet(MultiSerializerMixin, BaseModelViewSet):
-    filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        PascalSnakeCaseOrderingFilter,
+        SearchFilter,
+    ]
     filterset_fields = [
         "cart",
     ]
@@ -108,6 +116,4 @@ class CartItemViewSet(MultiSerializerMixin, BaseModelViewSet):
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
-        return Response(
-            serializer.data, status=status.HTTP_201_CREATED, headers=headers
-        )
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)

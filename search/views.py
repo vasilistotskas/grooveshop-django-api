@@ -38,9 +38,7 @@ class SearchProduct(ReadOnlyModelViewSet):
 
         query = self.request.query_params.get("query")
 
-        language = self.request.query_params.get(
-            "language", settings.PARLER_DEFAULT_LANGUAGE_CODE
-        )
+        language = self.request.query_params.get("language", settings.PARLER_DEFAULT_LANGUAGE_CODE)
 
         self.validate_language(language)
         if not query:
@@ -52,9 +50,7 @@ class SearchProduct(ReadOnlyModelViewSet):
         return self.get_filtered_queryset(decoded_query, language, config)
 
     def validate_language(self, language: str):
-        supported_languages = [
-            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
-        ]
+        supported_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
         if language not in supported_languages:
             raise ValidationError({"error": "Unsupported language."})
 
@@ -68,19 +64,16 @@ class SearchProduct(ReadOnlyModelViewSet):
     def get_filtered_queryset(self, query: str, language: str, config: str):
         search_query = SearchQuery(query, search_type="websearch", config=config)
 
-        lookup = (
-            Q(translations__search_vector=search_query)
-            | Q(translations__search_document__icontains=query)
-        ) & Q(translations__language_code=language)
+        lookup = (Q(translations__search_vector=search_query) | Q(translations__search_document__icontains=query)) & Q(
+            translations__language_code=language
+        )
 
         queryset = (
             Product.objects.filter(lookup)
             .prefetch_related("translations")
             .annotate(
                 search_rank=SearchRank(F("translations__search_vector"), search_query),
-                similarity=TrigramWordSimilarity(
-                    query, F("translations__search_document")
-                ),
+                similarity=TrigramWordSimilarity(query, F("translations__search_document")),
                 headline=SearchHeadline(
                     "translations__name",
                     search_query,
@@ -112,12 +105,8 @@ class SearchProduct(ReadOnlyModelViewSet):
 
             results_data = limited_queryset
             headlines_data = {result.id: result.headline for result in limited_queryset}
-            search_ranks_data = {
-                result.id: result.search_rank for result in limited_queryset
-            }
-            similarities_data = {
-                result.id: result.similarity for result in limited_queryset
-            }
+            search_ranks_data = {result.id: result.search_rank for result in limited_queryset}
+            similarities_data = {result.id: result.similarity for result in limited_queryset}
             distances_data = {result.id: result.distance for result in limited_queryset}
             result_count_data = min(queryset.count(), self.limit)
 
@@ -147,9 +136,7 @@ class SearchBlogPost(ReadOnlyModelViewSet):
 
         query = self.request.query_params.get("query")
 
-        language = self.request.query_params.get(
-            "language", settings.PARLER_DEFAULT_LANGUAGE_CODE
-        )
+        language = self.request.query_params.get("language", settings.PARLER_DEFAULT_LANGUAGE_CODE)
 
         self.validate_language(language)
         if not query:
@@ -161,9 +148,7 @@ class SearchBlogPost(ReadOnlyModelViewSet):
         return self.get_filtered_queryset(decoded_query, language, config)
 
     def validate_language(self, language: str):
-        supported_languages = [
-            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
-        ]
+        supported_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
         if language not in supported_languages:
             raise ValidationError({"error": "Unsupported language."})
 
@@ -177,19 +162,16 @@ class SearchBlogPost(ReadOnlyModelViewSet):
     def get_filtered_queryset(self, query: str, language: str, config: str):
         search_query = SearchQuery(query, search_type="websearch", config=config)
 
-        lookup = (
-            Q(translations__search_vector=search_query)
-            | Q(translations__search_document__icontains=query)
-        ) & Q(translations__language_code=language)
+        lookup = (Q(translations__search_vector=search_query) | Q(translations__search_document__icontains=query)) & Q(
+            translations__language_code=language
+        )
 
         queryset = (
             BlogPost.objects.filter(lookup)
             .prefetch_related("translations")
             .annotate(
                 search_rank=SearchRank(F("translations__search_vector"), search_query),
-                similarity=TrigramWordSimilarity(
-                    query, F("translations__search_document")
-                ),
+                similarity=TrigramWordSimilarity(query, F("translations__search_document")),
                 headline=SearchHeadline(
                     "translations__title",
                     search_query,
@@ -222,12 +204,8 @@ class SearchBlogPost(ReadOnlyModelViewSet):
 
             results_data = limited_queryset
             headlines_data = {result.id: result.headline for result in limited_queryset}
-            search_ranks_data = {
-                result.id: result.search_rank for result in limited_queryset
-            }
-            similarities_data = {
-                result.id: result.similarity for result in limited_queryset
-            }
+            search_ranks_data = {result.id: result.search_rank for result in limited_queryset}
+            similarities_data = {result.id: result.similarity for result in limited_queryset}
             distances_data = {result.id: result.distance for result in limited_queryset}
             result_count_data = min(queryset.count(), self.limit)
 

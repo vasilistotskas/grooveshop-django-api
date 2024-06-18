@@ -41,18 +41,14 @@ class ProductViewSetTestCase(APITestCase):
     product_favourite: ProductFavourite = None
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="test@test.com", password="test12345@!"
-        )
+        self.user = User.objects.create_user(email="test@test.com", password="test12345@!")
         self.category = ProductCategory.objects.create(
             slug="sample-category",
         )
         for language in languages:
             self.category.set_current_language(language)
             self.category.name = f"Sample Category ({language})"
-            self.category.description = (
-                f"This is a sample category description ({language})."
-            )
+            self.category.description = f"This is a sample category description ({language})."
             self.category.save()
         self.category.set_current_language(default_language)
 
@@ -75,9 +71,7 @@ class ProductViewSetTestCase(APITestCase):
         for language in languages:
             self.product.set_current_language(language)
             self.product.name = f"Sample Product ({language})"
-            self.product.description = (
-                f"This is a sample product description ({language})."
-            )
+            self.product.description = f"This is a sample product description ({language})."
             self.product.save()
         self.product.set_current_language(default_language)
 
@@ -111,9 +105,7 @@ class ProductViewSetTestCase(APITestCase):
             user=self.user,
         )
 
-        user_2 = User.objects.create_user(
-            email="test2@test.com", password="test12345@!"
-        )
+        user_2 = User.objects.create_user(email="test2@test.com", password="test12345@!")
 
         product_review_status_true = ProductReview.objects.create(
             product=self.product,

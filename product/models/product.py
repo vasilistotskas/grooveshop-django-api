@@ -47,9 +47,7 @@ from seo.models import SeoModel
 
 class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
     def update_calculated_fields(self) -> ProductQuerySet:
-        vat_subquery = models.Subquery(
-            Product.objects.filter(vat__isnull=False).values("vat__value")[:1]
-        )
+        vat_subquery = models.Subquery(Product.objects.filter(vat__isnull=False).values("vat__value")[:1])
 
         annotated_queryset = self.annotate(
             vat_value_annotation=models.ExpressionWrapper(
@@ -61,9 +59,7 @@ class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
                 output_field=MoneyField(max_digits=11, decimal_places=2),
             ),
             final_price_annotation=models.ExpressionWrapper(
-                models.F("price")
-                + models.F("vat_value_annotation")
-                - models.F("discount_value_annotation"),
+                models.F("price") + models.F("vat_value_annotation") - models.F("discount_value_annotation"),
                 output_field=MoneyField(max_digits=11, decimal_places=2),
             ),
             price_save_percent_annotation=models.ExpressionWrapper(
@@ -96,9 +92,7 @@ class Product(
     ModelWithMetadata,
 ):
     id = models.BigAutoField(primary_key=True)
-    product_code = models.CharField(
-        _("Product Code"), unique=True, max_length=100, default=uuid.uuid4
-    )
+    product_code = models.CharField(_("Product Code"), unique=True, max_length=100, default=uuid.uuid4)
     category = TreeForeignKey(
         "product.ProductCategory",
         on_delete=models.SET_NULL,
@@ -164,12 +158,8 @@ class Product(
         description=HTMLField(_("Description"), blank=True, null=True),
         search_document=models.TextField(_("Search Document"), blank=True, default=""),
         search_vector=SearchVectorField(_("Search Vector"), blank=True, null=True),
-        search_document_dirty=models.BooleanField(
-            _("Search Document Dirty"), default=False
-        ),
-        search_vector_dirty=models.BooleanField(
-            _("Search Vector Dirty"), default=False
-        ),
+        search_document_dirty=models.BooleanField(_("Search Document Dirty"), default=False),
+        search_vector_dirty=models.BooleanField(_("Search Vector Dirty"), default=False),
     )
 
     objects = ProductManager()
@@ -223,18 +213,10 @@ class Product(
     def clean(self):
         super().clean()
         if self.discount_percent > 0 >= self.price.amount:
-            raise ValidationError(
-                {
-                    "discount_percent": _(
-                        "Discount percent cannot be greater than 0 if price is 0."
-                    )
-                }
-            )
+            raise ValidationError({"discount_percent": _("Discount percent cannot be greater than 0 if price is 0.")})
 
         if not 0.0 <= self.discount_percent <= 100.0:
-            raise ValidationError(
-                {"discount_percent": _("Discount percent must be between 0 and 100.")}
-            )
+            raise ValidationError({"discount_percent": _("Discount percent must be between 0 and 100.")})
 
         if self.stock < 0:
             raise ValidationError({"stock": _("Stock cannot be negative.")})
@@ -254,9 +236,7 @@ class Product(
     def decrement_stock(self, quantity: int):
         if quantity < 0:
             raise ValueError("Invalid quantity to decrement")
-        updated_rows = Product.objects.filter(id=self.id, stock__gte=quantity).update(
-            stock=F("stock") - quantity
-        )
+        updated_rows = Product.objects.filter(id=self.id, stock__gte=quantity).update(stock=F("stock") - quantity)
         if not updated_rows:
             raise ValueError("Not enough stock to decrement")
         self.refresh_from_db()
@@ -267,16 +247,14 @@ class Product(
 
     @property
     def review_average(self) -> float:
-        average = ProductReview.objects.filter(
-            product=self, status=ReviewStatusEnum.TRUE
-        ).aggregate(avg=Avg("rate"))["avg"]
+        average = ProductReview.objects.filter(product=self, status=ReviewStatusEnum.TRUE).aggregate(avg=Avg("rate"))[
+            "avg"
+        ]
         return float(average) if average is not None else 0.0
 
     @property
     def review_count(self) -> int:
-        return ProductReview.objects.filter(
-            product=self, status=ReviewStatusEnum.TRUE
-        ).count()
+        return ProductReview.objects.filter(product=self, status=ReviewStatusEnum.TRUE).count()
 
     @property
     def vat_percent(self) -> Decimal | int:
@@ -311,22 +289,16 @@ class Product(
     @property
     def image_tag(self):
         no_img_url = static("images/no_photo.jpg")
-        no_img_markup = mark_safe(
-            f'<img src="{no_img_url}" width="100" height="100" />'
-        )
+        no_img_markup = mark_safe(f'<img src="{no_img_url}" width="100" height="100" />')
         try:
             img = ProductImage.objects.get(product_id=self.id, is_main=True)
         except ProductImage.DoesNotExist:
             return no_img_markup
 
         if img.thumbnail:
-            return mark_safe(
-                '<img src="{}" width="100" height="100" />'.format(img.thumbnail.url)
-            )
+            return mark_safe('<img src="{}" width="100" height="100" />'.format(img.thumbnail.url))
         elif img.image:
-            return mark_safe(
-                '<img src="{}" width="100" height="100" />'.format(img.image.url)
-            )
+            return mark_safe('<img src="{}" width="100" height="100" />'.format(img.image.url))
         else:
             return no_img_markup
 

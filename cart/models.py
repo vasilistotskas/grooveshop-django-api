@@ -37,14 +37,10 @@ class Cart(TimeStampMixinModel, UUIDModel):
         ]
 
     def __unicode__(self):
-        return (
-            f"Cart {self.user} - Items: {self.total_items} - Total: {self.total_price}"
-        )
+        return f"Cart {self.user} - Items: {self.total_items} - Total: {self.total_price}"
 
     def __str__(self):
-        return (
-            f"Cart {self.user} - Items: {self.total_items} - Total: {self.total_price}"
-        )
+        return f"Cart {self.user} - Items: {self.total_items} - Total: {self.total_price}"
 
     def get_items(self) -> models.QuerySet:
         return self.items.prefetch_related("product").all()
@@ -79,21 +75,15 @@ class Cart(TimeStampMixinModel, UUIDModel):
 
 class CartItem(TimeStampMixinModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
-    cart = models.ForeignKey(
-        "cart.Cart", related_name="items", on_delete=models.CASCADE
-    )
-    product = models.ForeignKey(
-        "product.Product", related_name="cart_items", on_delete=models.CASCADE
-    )
+    cart = models.ForeignKey("cart.Cart", related_name="items", on_delete=models.CASCADE)
+    product = models.ForeignKey("product.Product", related_name="cart_items", on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField(_("Quantity"), default=1)
 
     class Meta(TypedModelMeta):
         verbose_name = _("Cart Item")
         verbose_name_plural = _("Cart Items")
         ordering = ["-created_at"]
-        constraints = [
-            models.UniqueConstraint(fields=["cart", "product"], name="unique_cart_item")
-        ]
+        constraints = [models.UniqueConstraint(fields=["cart", "product"], name="unique_cart_item")]
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
             BTreeIndex(fields=["cart", "product"]),

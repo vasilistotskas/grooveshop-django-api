@@ -40,9 +40,7 @@ class Command(BaseCommand):
         start_time = time.time()
 
         if total_orders < 1:
-            self.stdout.write(
-                self.style.WARNING("Total number of orders must be greater than 0.")
-            )
+            self.stdout.write(self.style.WARNING("Total number of orders must be greater than 0."))
             return
 
         users = list(User.objects.all())
@@ -57,9 +55,7 @@ class Command(BaseCommand):
         document_type_choices = [choice[0] for choice in OrderDocumentTypeEnum.choices]
 
         if not users or not products or not countries or not regions or not pay_ways:
-            self.stdout.write(
-                self.style.ERROR("Insufficient data. Aborting seeding Order model.")
-            )
+            self.stdout.write(self.style.ERROR("Insufficient data. Aborting seeding Order model."))
             return
 
         order_objects_to_insert = []
@@ -83,11 +79,7 @@ class Command(BaseCommand):
                 zipcode = faker.zipcode()
                 place = faker.random_element(elements=[None, "A", "B", "C", "D"])
                 phone = faker.phone_number()
-                mobile_phone = (
-                    faker.phone_number()
-                    if faker.boolean(chance_of_getting_true=30)
-                    else None
-                )
+                mobile_phone = faker.phone_number() if faker.boolean(chance_of_getting_true=30) else None
                 paid_amount = Decimal(faker.random_number(digits=2))
                 customer_notes = faker.text(max_nb_chars=200)
                 status = faker.random_element(status_choices)

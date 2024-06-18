@@ -12,15 +12,7 @@ from core.utils.measurement import get_measurement
 
 
 class MeasurementWidget(forms.MultiWidget):
-    def __init__(
-        self,
-        attrs=None,
-        float_widget=None,
-        unit_choices_widget=None,
-        unit_choices=None,
-        *args,
-        **kwargs
-    ):
+    def __init__(self, attrs=None, float_widget=None, unit_choices_widget=None, unit_choices=None, *args, **kwargs):
         self.unit_choices = unit_choices
 
         if not float_widget:
@@ -72,25 +64,23 @@ class MeasurementFormField(forms.MultiValueField):
         self.measurement = measurement
         if not unit_choices:
             if issubclass(measurement, BidimensionalMeasure):
-                assert isinstance(bidimensional_separator, str), (
-                    "Supplied bidimensional_separator for %s must be of string/unicode type;"
-                    " Instead got type %s"
-                    % (
-                        measurement,
-                        str(type(bidimensional_separator)),
-                    )
+                assert isinstance(
+                    bidimensional_separator, str
+                ), "Supplied bidimensional_separator for %s must be of string/unicode type;" " Instead got type %s" % (
+                    measurement,
+                    str(type(bidimensional_separator)),
                 )
                 unit_choices = tuple(
                     (
                         (
                             "{0}__{1}".format(primary, reference),
                             "{0}{1}{2}".format(
-                                getattr(
-                                    measurement.PRIMARY_DIMENSION, "LABELS", {}
-                                ).get(primary, primary),
+                                getattr(measurement.PRIMARY_DIMENSION, "LABELS", {}).get(primary, primary),
                                 bidimensional_separator,
                                 getattr(
-                                    measurement.REFERENCE_DIMENSION, "LABELS", {}
+                                    measurement.REFERENCE_DIMENSION,
+                                    "LABELS",
+                                    {},
                                 ).get(reference, reference),
                             ),
                         )
@@ -102,10 +92,7 @@ class MeasurementFormField(forms.MultiValueField):
                 )
             else:
                 unit_choices = tuple(
-                    (
-                        (u, getattr(measurement, "LABELS", {}).get(u, u))
-                        for u in measurement.get_units()
-                    )
+                    ((u, getattr(measurement, "LABELS", {}).get(u, u)) for u in measurement.get_units())
                 )
 
         if validators is None:
@@ -134,9 +121,7 @@ class MeasurementFormField(forms.MultiValueField):
         }
         defaults.update(kwargs)
         fields = (float_field, choice_field)
-        super(MeasurementFormField, self).__init__(
-            fields, validators=validators, *args, **defaults
-        )
+        super(MeasurementFormField, self).__init__(fields, validators=validators, *args, **defaults)
 
     def compress(self, data_list):
         if not data_list:

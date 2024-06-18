@@ -29,14 +29,10 @@ class Command(BaseCommand):
         total_tips = options["total_tips"]
         total_time = 0
         start_time = time.time()
-        available_languages = [
-            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
-        ]
+        available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 
         if total_tips < 1:
-            self.stdout.write(
-                self.style.WARNING("Total number of tips must be greater than 0.")
-            )
+            self.stdout.write(self.style.WARNING("Total number of tips must be greater than 0."))
             return
 
         img = get_or_create_default_image("uploads/tips/no_photo.jpg")
@@ -75,7 +71,6 @@ class Command(BaseCommand):
         total_time += execution_time
         self.stdout.write(
             self.style.SUCCESS(
-                f"{len(objects_to_insert)} Tip instances created successfully "
-                f"in {execution_time:.2f} seconds."
+                f"{len(objects_to_insert)} Tip instances created successfully " f"in {execution_time:.2f} seconds."
             )
         )

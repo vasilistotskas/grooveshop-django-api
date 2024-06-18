@@ -48,8 +48,6 @@ class SocialAccountAdapter(DefaultSocialAccountAdapter):
             # if it does, connect this new social login to the existing user.
             sociallogin.connect(request, user)
 
-    def get_connect_redirect_url(
-        self, request: HttpRequest, social_account: SocialAccount
-    ) -> str:
+    def get_connect_redirect_url(self, request: HttpRequest, social_account: SocialAccount) -> str:
         url = request.POST.get("next") or request.GET.get("next")
         return url if url else f"{settings.NUXT_BASE_URL}/account"

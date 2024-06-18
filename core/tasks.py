@@ -148,9 +148,7 @@ def backup_database():
         management.call_command("dbbackup", verbosity=3)
         end_time = time.time()
         execution_time = end_time - start_time
-        return (
-            f"Database backup completed successfully in {execution_time:.2f} seconds."
-        )
+        return f"Database backup completed successfully in {execution_time:.2f} seconds."
     except Exception as e:
         return f"error: {e}"
 
@@ -179,9 +177,7 @@ def cleanup_old_database_backups(days=30):
             os.remove(file_path)
             deleted_files_count += 1
 
-    message = (
-        f"Deleted {deleted_files_count} database backup files older than {days} days."
-    )
+    message = f"Deleted {deleted_files_count} database backup files older than {days} days."
     return message
 
 
@@ -209,9 +205,7 @@ def optimize_images():
 
 @celery_app.task
 def update_product_translation_search_vectors():
-    total_updated = update_translation_search_vectors(
-        Product, "product", [("name", "A"), ("description", "C")]
-    )
+    total_updated = update_translation_search_vectors(Product, "product", [("name", "A"), ("description", "C")])
     logger.info(f"Updated {total_updated} product translation search vectors.")
 
 
@@ -225,15 +219,11 @@ def update_blog_post_translation_search_vectors():
 
 @celery_app.task
 def update_product_translation_search_documents():
-    total_updated = update_translation_search_documents(
-        Product, "product", ["name", "description"]
-    )
+    total_updated = update_translation_search_documents(Product, "product", ["name", "description"])
     logger.info(f"Updated {total_updated} product translation search documents.")
 
 
 @celery_app.task
 def update_blog_post_translation_search_documents():
-    total_updated = update_translation_search_documents(
-        BlogPost, "blog", ["title", "subtitle", "body"]
-    )
+    total_updated = update_translation_search_documents(BlogPost, "blog", ["title", "subtitle", "body"])
     logger.info(f"Updated {total_updated} blog post translation search documents.")

@@ -19,23 +19,17 @@ class NotificationUser(TimeStampMixinModel, UUIDModel):
         on_delete=models.CASCADE,
         db_index=True,
     )
-    notification = models.ForeignKey(
-        "notification.Notification", on_delete=models.CASCADE, db_index=True
-    )
+    notification = models.ForeignKey("notification.Notification", on_delete=models.CASCADE, db_index=True)
     seen = models.BooleanField(_("Seen"), default=False)
     seen_at = models.DateTimeField(_("Seen At"), null=True, blank=True)
 
     def __unicode__(self):
         status = "seen" if self.seen else "unseen"
-        return (
-            f"Notification {self.notification.id} for {self.user.full_name}: {status}"
-        )
+        return f"Notification {self.notification.id} for {self.user.full_name}: {status}"
 
     def __str__(self):
         status = "seen" if self.seen else "unseen"
-        return (
-            f"Notification {self.notification.id} for {self.user.full_name}: {status}"
-        )
+        return f"Notification {self.notification.id} for {self.user.full_name}: {status}"
 
     class Meta(TypedModelMeta):
         verbose_name = _("Notification User")
@@ -43,7 +37,8 @@ class NotificationUser(TimeStampMixinModel, UUIDModel):
         ordering = ["-notification__created_at"]
         constraints = [
             models.UniqueConstraint(
-                fields=["user", "notification"], name="unique_notification_user"
+                fields=["user", "notification"],
+                name="unique_notification_user",
             )
         ]
         indexes = [

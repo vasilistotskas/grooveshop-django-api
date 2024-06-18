@@ -31,9 +31,7 @@ class ProductSerializer(TranslatableModelSerializer, BaseExpandSerializer):
     final_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     discount_value = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     vat_value = MoneyField(max_digits=11, decimal_places=2, read_only=True)
-    weight = MeasurementSerializerField(
-        measurement=Weight, required=False, allow_null=True
-    )
+    weight = MeasurementSerializerField(measurement=Weight, required=False, allow_null=True)
 
     class Meta:
         model = Product
@@ -68,9 +66,9 @@ class ProductSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "review_count",
         )
 
-    def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:
-        product_category_serializer = importlib.import_module(
-            "product.serializers.category"
-        ).ProductCategorySerializer
+    def get_expand_fields(
+        self,
+    ) -> Dict[str, Type[serializers.ModelSerializer]]:
+        product_category_serializer = importlib.import_module("product.serializers.category").ProductCategorySerializer
         vat_serializer = importlib.import_module("vat.serializers").VatSerializer
         return {"category": product_category_serializer, "vat": vat_serializer}

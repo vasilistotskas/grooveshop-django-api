@@ -18,9 +18,7 @@ from django_stubs_ext.db.models import TypedModelMeta
 
 
 class SortableModel(models.Model):
-    sort_order = models.IntegerField(
-        _("Sort Order"), editable=False, db_index=True, null=True
-    )
+    sort_order = models.IntegerField(_("Sort Order"), editable=False, db_index=True, null=True)
 
     class Meta(TypedModelMeta):
         abstract = True
@@ -69,9 +67,7 @@ class SortableModel(models.Model):
     def delete(self, *args, **kwargs) -> None:
         if self.sort_order is not None:
             qs = self.get_ordering_queryset()
-            qs.filter(sort_order__gt=self.sort_order).update(
-                sort_order=F("sort_order") - 1
-            )
+            qs.filter(sort_order__gt=self.sort_order).update(sort_order=F("sort_order") - 1)
         super().delete(*args, **kwargs)
 
 
@@ -107,8 +103,7 @@ class PublishedQuerySet(models.QuerySet[T]):
     def published(self):
         today = tz.now()
         return self.filter(
-            Q(published_at__lte=today, is_published=True)
-            | Q(published_at__isnull=True, is_published=True)
+            Q(published_at__lte=today, is_published=True) | Q(published_at__isnull=True, is_published=True)
         )
 
 
@@ -130,9 +125,7 @@ class PublishableModel(models.Model):
 
     @property
     def is_visible(self):
-        return self.is_published and (
-            self.published_at is None or self.published_at <= tz.now()
-        )
+        return self.is_published and (self.published_at is None or self.published_at <= tz.now())
 
 
 class ModelWithMetadata(models.Model):

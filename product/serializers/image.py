@@ -40,10 +40,10 @@ class ProductImageSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "sort_order",
         )
 
-    def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:
-        product_serializer = importlib.import_module(
-            "product.serializers.product"
-        ).ProductSerializer
+    def get_expand_fields(
+        self,
+    ) -> Dict[str, Type[serializers.ModelSerializer]]:
+        product_serializer = importlib.import_module("product.serializers.product").ProductSerializer
         return {
             "product": product_serializer,
         }

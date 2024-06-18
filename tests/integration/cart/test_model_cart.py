@@ -16,9 +16,7 @@ class CartModelTestCase(TestCase):
     cart_item_2: CartItem = None
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="testuser@example.com", password="testpassword"
-        )
+        self.user = User.objects.create_user(email="testuser@example.com", password="testpassword")
         self.cart = Cart.objects.create(user=self.user)
         product_1 = Product.objects.create(
             slug="product_one",
@@ -38,22 +36,15 @@ class CartModelTestCase(TestCase):
             view_count=0,
             weight=0.00,
         )
-        self.cart_item_1 = CartItem.objects.create(
-            cart=self.cart, product=product_1, quantity=2
-        )
-        self.cart_item_2 = CartItem.objects.create(
-            cart=self.cart, product=product_2, quantity=3
-        )
+        self.cart_item_1 = CartItem.objects.create(cart=self.cart, product=product_1, quantity=2)
+        self.cart_item_2 = CartItem.objects.create(cart=self.cart, product=product_2, quantity=3)
 
     def test_fields(self):
         self.assertEqual(self.cart.user, self.user)
         self.assertEqual(self.cart.last_activity.date(), timezone.now().date())
 
     def test_str_representation(self):
-        expected_str = (
-            f"Cart {self.user} - Items: {self.cart.total_items} - Total:"
-            f" {self.cart.total_price}"
-        )
+        expected_str = f"Cart {self.user} - Items: {self.cart.total_items} - Total:" f" {self.cart.total_price}"
         self.assertEqual(str(self.cart), expected_str)
 
     def test_get_items(self):
@@ -63,9 +54,7 @@ class CartModelTestCase(TestCase):
         self.cart_item_1.refresh_from_db()
         self.cart_item_2.refresh_from_db()
 
-        expected_total_price = (
-            self.cart_item_1.total_price.amount + self.cart_item_2.total_price.amount
-        )
+        expected_total_price = self.cart_item_1.total_price.amount + self.cart_item_2.total_price.amount
         self.assertEqual(self.cart.total_price.amount, expected_total_price)
 
     def test_total_discount_value(self):
@@ -73,15 +62,12 @@ class CartModelTestCase(TestCase):
         self.cart_item_2.refresh_from_db()
 
         expected_total_discount = (
-            self.cart_item_1.total_discount_value.amount
-            + self.cart_item_2.total_discount_value.amount
+            self.cart_item_1.total_discount_value.amount + self.cart_item_2.total_discount_value.amount
         )
         self.assertEqual(self.cart.total_discount_value.amount, expected_total_discount)
 
     def test_total_vat_value(self):
-        expected_total_vat = (
-            self.cart_item_1.product.vat_value + self.cart_item_2.product.vat_value
-        )
+        expected_total_vat = self.cart_item_1.product.vat_value + self.cart_item_2.product.vat_value
         self.assertEqual(self.cart.total_vat_value, expected_total_vat)
 
     def test_total_items(self):

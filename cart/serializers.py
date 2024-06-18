@@ -64,9 +64,7 @@ class CartItemCreateSerializer(BaseExpandSerializer):
     def create(self, validated_data):
         cart = self.context.get("cart")
         try:
-            cart_item = CartItem.objects.get(
-                cart=cart, product=validated_data["product"]
-            )
+            cart_item = CartItem.objects.get(cart=cart, product=validated_data["product"])
             cart_item.quantity += validated_data["quantity"]
             cart_item.save()
             return cart_item

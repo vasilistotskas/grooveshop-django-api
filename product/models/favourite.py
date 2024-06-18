@@ -23,7 +23,9 @@ class ProductFavourite(TimeStampMixinModel, UUIDModel):
         on_delete=models.CASCADE,
     )
     product = models.ForeignKey(
-        "product.Product", related_name="product_favourite", on_delete=models.CASCADE
+        "product.Product",
+        related_name="product_favourite",
+        on_delete=models.CASCADE,
     )
 
     objects = ProductFavouriteManager()
@@ -32,11 +34,7 @@ class ProductFavourite(TimeStampMixinModel, UUIDModel):
         verbose_name = _("Product Favourite")
         verbose_name_plural = _("Product Favourites")
         ordering = ["-updated_at"]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["user", "product"], name="unique_product_favourite"
-            )
-        ]
+        constraints = [models.UniqueConstraint(fields=["user", "product"], name="unique_product_favourite")]
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
         ]
@@ -50,11 +48,6 @@ class ProductFavourite(TimeStampMixinModel, UUIDModel):
         return f"{self.user.email} - {product_name}"
 
     def save(self, *args, **kwargs):
-        if (
-            not self.pk
-            and ProductFavourite.objects.filter(
-                user=self.user, product=self.product
-            ).exists()
-        ):
+        if not self.pk and ProductFavourite.objects.filter(user=self.user, product=self.product).exists():
             raise ValidationError(_("This product is already in the user's favorites."))
         super().save(*args, **kwargs)

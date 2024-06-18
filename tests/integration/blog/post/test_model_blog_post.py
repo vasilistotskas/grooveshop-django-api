@@ -30,17 +30,13 @@ class BlogPostModelTestCase(TestCase):
     category: BlogCategory = None
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="testuser@example.com", password="testpassword"
-        )
+        self.user = User.objects.create_user(email="testuser@example.com", password="testpassword")
 
         image_post = get_or_create_default_image("uploads/blog/no_photo.jpg")
         self.author = BlogAuthor.objects.create(user=self.user)
 
         image_category = get_or_create_default_image("uploads/blog/no_photo.jpg")
-        self.category = BlogCategory.objects.create(
-            slug="sample-category", image=image_category
-        )
+        self.category = BlogCategory.objects.create(slug="sample-category", image=image_category)
         for language in languages:
             self.category.set_current_language(language)
             self.category.name = f"Category name in {language}"
@@ -75,9 +71,7 @@ class BlogPostModelTestCase(TestCase):
         self.assertTrue(default_storage.exists(self.post.image.path))
 
     def test_unicode_representation(self):
-        title = (
-            self.post.safe_translation_getter("title", any_language=True) or "Untitled"
-        )
+        title = self.post.safe_translation_getter("title", any_language=True) or "Untitled"
         author_name = self.post.author.user.email if self.author else "Unknown"
         self.assertEqual(
             self.post.__unicode__(),
@@ -101,9 +95,7 @@ class BlogPostModelTestCase(TestCase):
             )
 
     def test_str_representation(self):
-        title = (
-            self.post.safe_translation_getter("title", any_language=True) or "Untitled"
-        )
+        title = self.post.safe_translation_getter("title", any_language=True) or "Untitled"
         author_name = self.post.author.user.email if self.author else "Unknown"
         self.assertEqual(
             str(self.post),

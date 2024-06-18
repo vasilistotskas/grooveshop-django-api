@@ -57,19 +57,13 @@ class BlogPostSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "absolute_url",
         )
 
-    def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:
-        user_account_serializer = importlib.import_module(
-            "authentication.serializers"
-        ).AuthenticationSerializer
-        blog_category_serializer = importlib.import_module(
-            "blog.serializers.category"
-        ).BlogCategorySerializer
-        blog_tag_serializer = importlib.import_module(
-            "blog.serializers.tag"
-        ).BlogTagSerializer
-        blog_author_serializer = importlib.import_module(
-            "blog.serializers.author"
-        ).BlogAuthorSerializer
+    def get_expand_fields(
+        self,
+    ) -> Dict[str, Type[serializers.ModelSerializer]]:
+        user_account_serializer = importlib.import_module("authentication.serializers").AuthenticationSerializer
+        blog_category_serializer = importlib.import_module("blog.serializers.category").BlogCategorySerializer
+        blog_tag_serializer = importlib.import_module("blog.serializers.tag").BlogTagSerializer
+        blog_author_serializer = importlib.import_module("blog.serializers.author").BlogAuthorSerializer
         return {
             "likes": user_account_serializer,
             "category": blog_category_serializer,

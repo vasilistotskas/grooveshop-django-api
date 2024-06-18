@@ -11,9 +11,7 @@ from authentication.signals import populate_profile
 class PopulateProfileTest(TestCase):
     def setUp(self):
         self.user = Mock()
-        self.sociallogin = SocialLogin(
-            account=SocialAccount(provider="facebook", uid="123")
-        )
+        self.sociallogin = SocialLogin(account=SocialAccount(provider="facebook", uid="123"))
         self.sociallogin.account.extra_data = {"picture": "http://example.com"}
 
     def test_populate_profile_no_sociallogin_or_user(self):

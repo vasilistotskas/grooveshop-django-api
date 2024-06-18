@@ -19,14 +19,10 @@ class BlogCommentModelTestCase(TestCase):
     post: BlogPost = None
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="testuser@example.com", password="testpassword"
-        )
+        self.user = User.objects.create_user(email="testuser@example.com", password="testpassword")
         self.author = BlogAuthor.objects.create(user=self.user)
         self.post = BlogPost.objects.create(title="Test Post", author=self.author)
-        self.comment = BlogComment.objects.create(
-            is_approved=True, user=self.user, post=self.post
-        )
+        self.comment = BlogComment.objects.create(is_approved=True, user=self.user, post=self.post)
         for language in languages:
             self.comment.set_current_language(language)
             self.comment.content = f"Comment Content in {language}"
@@ -39,10 +35,7 @@ class BlogCommentModelTestCase(TestCase):
         self.assertEqual(self.comment.post, self.post)
 
     def test_unicode_representation(self):
-        content_snippet = (
-            self.comment.safe_translation_getter("content", any_language=True)[:50]
-            + "..."
-        )
+        content_snippet = self.comment.safe_translation_getter("content", any_language=True)[:50] + "..."
         self.assertEqual(
             self.comment.__unicode__(),
             f"Comment by {self.user.full_name}: {content_snippet}",
@@ -57,17 +50,14 @@ class BlogCommentModelTestCase(TestCase):
             )
 
     def test_str_representation(self):
-        content_snippet = self.comment.safe_translation_getter(
-            "content", any_language=True
-        )[:50]
+        content_snippet = self.comment.safe_translation_getter("content", any_language=True)[:50]
         self.assertEqual(
-            str(self.comment), f"Comment by {self.user.full_name}: {content_snippet}"
+            str(self.comment),
+            f"Comment by {self.user.full_name}: {content_snippet}",
         )
 
     def test_likes_count(self):
-        other_user = User.objects.create_user(
-            email="testuser2@example.com", password="testpassword"
-        )
+        other_user = User.objects.create_user(email="testuser2@example.com", password="testpassword")
 
         self.assertEqual(self.comment.likes_count, 0)
 

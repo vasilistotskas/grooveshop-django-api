@@ -41,15 +41,11 @@ class BlogTag(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         ]
 
     def __unicode__(self):
-        tag_name = (
-            self.safe_translation_getter("name", any_language=True) or "Unnamed Tag"
-        )
+        tag_name = self.safe_translation_getter("name", any_language=True) or "Unnamed Tag"
         return f"{tag_name} ({'Active' if self.active else 'Inactive'})"
 
     def __str__(self):
-        tag_name = (
-            self.safe_translation_getter("name", any_language=True) or "Unnamed Tag"
-        )
+        tag_name = self.safe_translation_getter("name", any_language=True) or "Unnamed Tag"
         return f"{tag_name} ({'Active' if self.active else 'Inactive'})"
 
     def get_ordering_queryset(self):

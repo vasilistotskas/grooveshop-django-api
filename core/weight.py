@@ -17,9 +17,7 @@ def convert_weight(weight: Weight, unit: str) -> Weight:
 
 def get_default_weight_unit():
     site = Site.objects.get_current()
-    return site.settings.get_setting(
-        key="default_weight_unit", site_id=site.id, default=WeightUnits.KG
-    )
+    return site.settings.get_setting(key="default_weight_unit", site_id=site.id, default=WeightUnits.KG)
 
 
 def convert_weight_to_default_weight_unit(weight: Weight) -> Weight:

@@ -16,10 +16,14 @@ from core.models import UUIDModel
 class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
     order = models.ForeignKey(
-        "order.Order", related_name="order_item_order", on_delete=models.CASCADE
+        "order.Order",
+        related_name="order_item_order",
+        on_delete=models.CASCADE,
     )
     product = models.ForeignKey(
-        "product.Product", related_name="order_item_product", on_delete=models.CASCADE
+        "product.Product",
+        related_name="order_item_product",
+        on_delete=models.CASCADE,
     )
     price = MoneyField(_("Price"), max_digits=11, decimal_places=2)
     quantity = models.IntegerField(_("Quantity"), default=1)
@@ -35,7 +39,11 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
 
     def __unicode__(self):
         product_name = self.product.safe_translation_getter("name", any_language=True)
-        return "Order %s - %s x %s" % (self.order.id, product_name, self.quantity)
+        return "Order %s - %s x %s" % (
+            self.order.id,
+            product_name,
+            self.quantity,
+        )
 
     def __str__(self):
         product_name = self.product.safe_translation_getter("name", any_language=True)
@@ -51,7 +59,8 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
     @property
     def subtotal(self) -> Money:
         return Money(
-            amount=self.price.amount * self.quantity, currency=self.price.currency
+            amount=self.price.amount * self.quantity,
+            currency=self.price.currency,
         )
 
     @property

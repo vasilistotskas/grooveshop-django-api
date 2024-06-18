@@ -20,7 +20,11 @@ DEFAULT_SLIDE_CACHE_TTL = 60 * 60 * 2
 class SliderViewSet(BaseModelViewSet):
     queryset = Slider.objects.all()
     serializer_class = SliderSerializer
-    filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        PascalSnakeCaseOrderingFilter,
+        SearchFilter,
+    ]
     filterset_fields = ["id"]
     ordering_fields = ["id", "created_at"]
     ordering = ["-created_at"]
@@ -38,7 +42,11 @@ class SliderViewSet(BaseModelViewSet):
 class SlideViewSet(BaseModelViewSet):
     queryset = Slide.objects.all()
     serializer_class = SlideSerializer
-    filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        PascalSnakeCaseOrderingFilter,
+        SearchFilter,
+    ]
     filterset_fields = ["id", "slider"]
     ordering_fields = ["id", "slider", "created_at"]
     ordering = ["-created_at"]

@@ -27,14 +27,10 @@ class Command(BaseCommand):
         total_categories = options["total_categories"]
         total_time = 0
         start_time = time.time()
-        available_languages = [
-            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
-        ]
+        available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 
         if total_categories < 1:
-            self.stdout.write(
-                self.style.WARNING("Total number of categories must be greater than 0.")
-            )
+            self.stdout.write(self.style.WARNING("Total number of categories must be greater than 0."))
             return
 
         if not available_languages:

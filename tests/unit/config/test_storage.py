@@ -20,9 +20,7 @@ class TestStorage(unittest.TestCase):
             STORAGES,
             {
                 "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
-                "staticfiles": {
-                    "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
-                },
+                "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
             },
         )
 
@@ -38,11 +36,10 @@ class TestStorage(unittest.TestCase):
         STATIC_LOCATION = "static"
         PUBLIC_MEDIA_LOCATION = "media"
 
+        self.assertEqual(STATIC_URL, f"https://{AWS_S3_CUSTOM_DOMAIN}/{STATIC_LOCATION}/")
         self.assertEqual(
-            STATIC_URL, f"https://{AWS_S3_CUSTOM_DOMAIN}/{STATIC_LOCATION}/"
-        )
-        self.assertEqual(
-            MEDIA_URL, f"https://{AWS_S3_CUSTOM_DOMAIN}/{PUBLIC_MEDIA_LOCATION}/"
+            MEDIA_URL,
+            f"https://{AWS_S3_CUSTOM_DOMAIN}/{PUBLIC_MEDIA_LOCATION}/",
         )
         self.assertEqual(
             STORAGES,

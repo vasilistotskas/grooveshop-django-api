@@ -20,9 +20,7 @@ class ProductFilter(filters.FilterSet):
         for category_id in category_ids:
             try:
                 category = ProductCategory.objects.get(id=category_id)
-                descendant_ids = category.get_descendants(
-                    include_self=True
-                ).values_list("id", flat=True)
+                descendant_ids = category.get_descendants(include_self=True).values_list("id", flat=True)
                 all_relevant_category_ids.extend(descendant_ids)
             except ProductCategory.DoesNotExist:
                 pass

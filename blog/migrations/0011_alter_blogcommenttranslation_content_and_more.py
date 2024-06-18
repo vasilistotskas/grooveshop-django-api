@@ -5,22 +5,21 @@ from django.db import models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("blog", "0010_alter_blogcategory_options_alter_blogtag_options_and_more"),
+        (
+            "blog",
+            "0010_alter_blogcategory_options_alter_blogtag_options_and_more",
+        ),
     ]
 
     operations = [
         migrations.AlterField(
             model_name="blogcommenttranslation",
             name="content",
-            field=models.TextField(
-                blank=True, max_length=1000, null=True, verbose_name="Content"
-            ),
+            field=models.TextField(blank=True, max_length=1000, null=True, verbose_name="Content"),
         ),
         migrations.AlterField(
             model_name="blogtagtranslation",
             name="name",
-            field=models.CharField(
-                blank=True, max_length=50, null=True, verbose_name="Name"
-            ),
+            field=models.CharField(blank=True, max_length=50, null=True, verbose_name="Name"),
         ),
     ]

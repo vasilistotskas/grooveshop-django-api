@@ -28,22 +28,16 @@ class Command(BaseCommand):
         total_regions = options["total_regions"]
         total_time = 0
         start_time = time.time()
-        available_languages = [
-            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
-        ]
+        available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 
         if total_regions < 1:
-            self.stdout.write(
-                self.style.WARNING("Total number of regions must be greater than 0.")
-            )
+            self.stdout.write(self.style.WARNING("Total number of regions must be greater than 0."))
             return
 
         countries = list(Country.objects.all())
 
         if not countries:
-            self.stdout.write(
-                self.style.ERROR("Insufficient data. Aborting seeding Region model.")
-            )
+            self.stdout.write(self.style.ERROR("Insufficient data. Aborting seeding Region model."))
             return
 
         if not available_languages:
@@ -77,7 +71,6 @@ class Command(BaseCommand):
         total_time += execution_time
         self.stdout.write(
             self.style.SUCCESS(
-                f"{len(objects_to_insert)} Region instances created successfully "
-                f"in {execution_time:.2f} seconds."
+                f"{len(objects_to_insert)} Region instances created successfully " f"in {execution_time:.2f} seconds."
             )
         )

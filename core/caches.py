@@ -45,18 +45,14 @@ class CustomCache(BaseCache):
             logger.warning("Error connecting to cache: %s", str(exc))
             self.cache = caches[FALLBACK_CACHE_ALIAS]
 
-    def get(
-        self, key: Any, default: Any | None = None, version: int | None = None
-    ) -> Any | None:
+    def get(self, key: Any, default: Any | None = None, version: int | None = None) -> Any | None:
         try:
             return self.cache.get(key, default, version)
         except Exception as exc:
             logger.error("Error getting cache key: %s", str(exc))
             return default
 
-    def get_many(
-        self, keys: list[Any], version: int | None = None
-    ) -> dict[Any, Any | None]:
+    def get_many(self, keys: list[Any], version: int | None = None) -> dict[Any, Any | None]:
         try:
             return self.cache.get_many(keys, version)
         except Exception as exc:
@@ -143,20 +139,14 @@ class CustomCache(BaseCache):
         try:
             if isinstance(self.cache, RedisCache):
                 cache_keys = self.cache._cache.get_client().keys(f"*{search or ''}*")
-                keys_without_prefix = [
-                    key.split(b":", 2)[-1].decode("utf-8") for key in cache_keys
-                ]
+                keys_without_prefix = [key.split(b":", 2)[-1].decode("utf-8") for key in cache_keys]
                 keys_without_prefix.sort()
                 return keys_without_prefix
             elif isinstance(self.cache, LocMemCache):
                 cache_keys = list(self.cache._cache.keys())
-                keys_without_prefix = [
-                    key.split(":", 2)[-1] for key in cache_keys if "locmem:1:" in key
-                ]
+                keys_without_prefix = [key.split(":", 2)[-1] for key in cache_keys if "locmem:1:" in key]
                 keys_without_prefix.sort()
-                filtered_keys = [
-                    key for key in keys_without_prefix if "user_authenticated" in key
-                ]
+                filtered_keys = [key for key in keys_without_prefix if "user_authenticated" in key]
                 return filtered_keys
 
         except Exception as exc:

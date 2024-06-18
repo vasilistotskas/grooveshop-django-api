@@ -20,9 +20,7 @@ class ProductCategorySerializer(TranslatableModelSerializer, BaseExpandSerialize
 
     def get_children(self, obj: ProductCategory) -> ReturnDict | list:
         if obj.get_children().exists():
-            return ProductCategorySerializer(
-                obj.get_children(), many=True, context=self.context
-            ).data
+            return ProductCategorySerializer(obj.get_children(), many=True, context=self.context).data
         return []
 
     class Meta:

@@ -17,7 +17,11 @@ DEFAULT_PRODUCT_CATEGORY_CACHE_TTL = 60 * 60 * 2
 class ProductCategoryViewSet(BaseModelViewSet):
     queryset = ProductCategory.objects.all()
     serializer_class = ProductCategorySerializer
-    filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        PascalSnakeCaseOrderingFilter,
+        SearchFilter,
+    ]
     filterset_fields = ["id"]
     ordering_fields = [
         "id",

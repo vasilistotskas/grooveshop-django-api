@@ -12,19 +12,11 @@ from asgiref.typing import HTTPResponseStartEvent
 from asgiref.typing import Scope
 
 
-def gzip_compression(
-    app: ASGI3Application, minimum_size: int = 500, compresslevel: int = 9
-) -> ASGI3Application:
-    async def gzip_compression_wrapper(
-        scope: Scope, receive: ASGIReceiveCallable, send: ASGISendCallable
-    ) -> None:
+def gzip_compression(app: ASGI3Application, minimum_size: int = 500, compresslevel: int = 9) -> ASGI3Application:
+    async def gzip_compression_wrapper(scope: Scope, receive: ASGIReceiveCallable, send: ASGISendCallable) -> None:
         if scope["type"] == "http":
             accepted_encoding = next(
-                (
-                    value
-                    for key, value in scope["headers"]
-                    if key.lower() == b"accept-encoding"
-                ),
+                (value for key, value in scope["headers"] if key.lower() == b"accept-encoding"),
                 b"",
             )
             if b"gzip" in accepted_encoding:
@@ -32,9 +24,7 @@ def gzip_compression(
                 content_encoding_set = False
                 started = False
                 gzip_buffer = io.BytesIO()
-                gzip_file = gzip.GzipFile(
-                    mode="wb", fileobj=gzip_buffer, compresslevel=compresslevel
-                )
+                gzip_file = gzip.GzipFile(mode="wb", fileobj=gzip_buffer, compresslevel=compresslevel)
 
                 async def send_compressed(message: ASGISendEvent) -> None:
                     nonlocal content_encoding_set
@@ -44,13 +34,9 @@ def gzip_compression(
                         start_message = message
                         headers = start_message["headers"]
                         content_encoding_set = any(
-                            value
-                            for key, value in headers
-                            if key.lower() == b"content-encoding"
+                            value for key, value in headers if key.lower() == b"content-encoding"
                         )
-                    elif (
-                        message["type"] == "http.response.body" and content_encoding_set
-                    ):
+                    elif message["type"] == "http.response.body" and content_encoding_set:
                         if not started:
                             started = True
                             await send(start_message)
@@ -73,8 +59,7 @@ def gzip_compression(
                             headers = [
                                 (key, value)
                                 for key, value in headers
-                                if key.lower()
-                                not in (b"content-length", b"content-encoding")
+                                if key.lower() not in (b"content-length", b"content-encoding")
                             ]
                             headers.append((b"content-encoding", b"gzip"))
                             headers.append(
@@ -100,8 +85,7 @@ def gzip_compression(
                             headers = [
                                 (key, value)
                                 for key, value in headers
-                                if key.lower()
-                                not in (b"content-length", b"content-encoding")
+                                if key.lower() not in (b"content-length", b"content-encoding")
                             ]
                             headers.append((b"content-encoding", b"gzip"))
                             for key, value in headers:

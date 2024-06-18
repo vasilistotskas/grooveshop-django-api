@@ -30,14 +30,10 @@ class Command(BaseCommand):
         total_pay_ways = options["total_pay_ways"]
         total_time = 0
         start_time = time.time()
-        available_languages = [
-            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
-        ]
+        available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 
         if total_pay_ways < 1:
-            self.stdout.write(
-                self.style.WARNING("Total number of PayWays must be greater than 0.")
-            )
+            self.stdout.write(self.style.WARNING("Total number of PayWays must be greater than 0."))
             return
 
         pay_way_choices = [choice[0] for choice in PayWayEnum.choices]
@@ -57,9 +53,7 @@ class Command(BaseCommand):
                 free_for_order_amount = Decimal(faker.random.uniform(0.0, 100.0))
 
                 name = faker.random_element(pay_way_choices)
-                pay_way_name_exists = PayWay.objects.filter(
-                    translations__name=name
-                ).exists()
+                pay_way_name_exists = PayWay.objects.filter(translations__name=name).exists()
 
                 if pay_way_name_exists or name in picked_names:
                     continue

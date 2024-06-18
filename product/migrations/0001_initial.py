@@ -56,7 +56,10 @@ class Migration(migrations.Migration):
                 (
                     "seo_title",
                     models.CharField(
-                        blank=True, max_length=70, null=True, verbose_name="Seo Title"
+                        blank=True,
+                        max_length=70,
+                        null=True,
+                        verbose_name="Seo Title",
                     ),
                 ),
                 (
@@ -109,8 +112,14 @@ class Migration(migrations.Migration):
                         verbose_name="Price",
                     ),
                 ),
-                ("active", models.BooleanField(default=True, verbose_name="Active")),
-                ("stock", models.PositiveIntegerField(default=0, verbose_name="Stock")),
+                (
+                    "active",
+                    models.BooleanField(default=True, verbose_name="Active"),
+                ),
+                (
+                    "stock",
+                    models.PositiveIntegerField(default=0, verbose_name="Stock"),
+                ),
                 (
                     "discount_percent",
                     models.DecimalField(
@@ -124,7 +133,10 @@ class Migration(migrations.Migration):
                         verbose_name="Discount Percent",
                     ),
                 ),
-                ("hits", models.PositiveIntegerField(default=0, verbose_name="Hits")),
+                (
+                    "hits",
+                    models.PositiveIntegerField(default=0, verbose_name="Hits"),
+                ),
                 (
                     "weight",
                     models.DecimalField(
@@ -184,9 +196,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "search_vector",
-                    django.contrib.postgres.search.SearchVectorField(
-                        blank=True, null=True
-                    ),
+                    django.contrib.postgres.search.SearchVectorField(blank=True, null=True),
                 ),
             ],
             options={
@@ -224,7 +234,10 @@ class Migration(migrations.Migration):
                 (
                     "seo_title",
                     models.CharField(
-                        blank=True, max_length=70, null=True, verbose_name="Seo Title"
+                        blank=True,
+                        max_length=70,
+                        null=True,
+                        verbose_name="Seo Title",
                     ),
                 ),
                 (
@@ -279,7 +292,10 @@ class Migration(migrations.Migration):
                 ),
                 ("lft", models.PositiveIntegerField(editable=False)),
                 ("rght", models.PositiveIntegerField(editable=False)),
-                ("tree_id", models.PositiveIntegerField(db_index=True, editable=False)),
+                (
+                    "tree_id",
+                    models.PositiveIntegerField(db_index=True, editable=False),
+                ),
                 ("level", models.PositiveIntegerField(editable=False)),
             ],
             options={
@@ -303,21 +319,20 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(
-                        db_index=True, max_length=15, verbose_name="Language"
-                    ),
+                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
                 ),
                 (
                     "name",
                     models.CharField(
-                        blank=True, max_length=255, null=True, verbose_name="Name"
+                        blank=True,
+                        max_length=255,
+                        null=True,
+                        verbose_name="Name",
                     ),
                 ),
                 (
                     "description",
-                    tinymce.models.HTMLField(
-                        blank=True, null=True, verbose_name="Description"
-                    ),
+                    tinymce.models.HTMLField(blank=True, null=True, verbose_name="Description"),
                 ),
             ],
             options={
@@ -379,9 +394,7 @@ class Migration(migrations.Migration):
                 ("id", models.BigAutoField(primary_key=True, serialize=False)),
                 (
                     "image",
-                    models.ImageField(
-                        upload_to="uploads/products/", verbose_name="Image"
-                    ),
+                    models.ImageField(upload_to="uploads/products/", verbose_name="Image"),
                 ),
                 (
                     "thumbnail",
@@ -392,7 +405,10 @@ class Migration(migrations.Migration):
                         verbose_name="Thumbnail",
                     ),
                 ),
-                ("is_main", models.BooleanField(default=False, verbose_name="Is Main")),
+                (
+                    "is_main",
+                    models.BooleanField(default=False, verbose_name="Is Main"),
+                ),
             ],
             options={
                 "verbose_name": "Product Image",
@@ -415,14 +431,15 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(
-                        db_index=True, max_length=15, verbose_name="Language"
-                    ),
+                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
                 ),
                 (
                     "title",
                     models.CharField(
-                        blank=True, max_length=50, null=True, verbose_name="Title"
+                        blank=True,
+                        max_length=50,
+                        null=True,
+                        verbose_name="Title",
                     ),
                 ),
             ],
@@ -452,9 +469,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "published_at",
-                    models.DateTimeField(
-                        blank=True, null=True, verbose_name="Published At"
-                    ),
+                    models.DateTimeField(blank=True, null=True, verbose_name="Published At"),
                 ),
                 (
                     "is_published",
@@ -482,7 +497,11 @@ class Migration(migrations.Migration):
                 (
                     "status",
                     models.CharField(
-                        choices=[("NEW", "New"), ("TRUE", "True"), ("FALSE", "False")],
+                        choices=[
+                            ("NEW", "New"),
+                            ("TRUE", "True"),
+                            ("FALSE", "False"),
+                        ],
                         default="NEW",
                         max_length=250,
                         verbose_name="Status",
@@ -518,9 +537,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(
-                        db_index=True, max_length=15, verbose_name="Language"
-                    ),
+                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
                 ),
                 (
                     "name",
@@ -535,7 +552,10 @@ class Migration(migrations.Migration):
                 (
                     "description",
                     tinymce.models.HTMLField(
-                        blank=True, db_index=True, null=True, verbose_name="Description"
+                        blank=True,
+                        db_index=True,
+                        null=True,
+                        verbose_name="Description",
                     ),
                 ),
                 (
@@ -572,9 +592,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(
-                        db_index=True, max_length=15, verbose_name="Language"
-                    ),
+                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
                 ),
                 (
                     "comment",

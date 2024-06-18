@@ -16,9 +16,7 @@ class ProductReviewModelTestCase(TestCase):
     product_review: ProductReview = None
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="test@test.com", password="test12345@!"
-        )
+        self.user = User.objects.create_user(email="test@test.com", password="test12345@!")
         self.product = Product.objects.create(
             name="Sample Product",
             description="Sample Product Description",
@@ -46,12 +44,7 @@ class ProductReviewModelTestCase(TestCase):
 
     def test_str_representation(self):
         comment_snippet = (
-            (
-                self.product_review.safe_translation_getter(
-                    "comment", any_language=True
-                )[:50]
-                + "..."
-            )
+            (self.product_review.safe_translation_getter("comment", any_language=True)[:50] + "...")
             if self.product_review.comment
             else "No Comment"
         )
@@ -62,12 +55,7 @@ class ProductReviewModelTestCase(TestCase):
 
     def test_unicode_representation(self):
         comment_snippet = (
-            (
-                self.product_review.safe_translation_getter(
-                    "comment", any_language=True
-                )[:50]
-                + "..."
-            )
+            (self.product_review.safe_translation_getter("comment", any_language=True)[:50] + "...")
             if self.product_review.comment
             else "No Comment"
         )

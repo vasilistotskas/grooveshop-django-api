@@ -19,7 +19,11 @@ DEFAULT_REGION_CACHE_TTL = 60 * 60 * 2
 class RegionViewSet(BaseModelViewSet):
     queryset = Region.objects.all()
     serializer_class = RegionSerializer
-    filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        PascalSnakeCaseOrderingFilter,
+        SearchFilter,
+    ]
     filterset_fields = ["alpha", "country"]
     ordering_fields = ["created_at"]
     ordering = ["-created_at"]
@@ -37,9 +41,7 @@ class RegionViewSet(BaseModelViewSet):
         detail=True,
         methods=["GET"],
     )
-    def get_regions_by_country_alpha_2(
-        self, request, pk=None, *args, **kwargs
-    ) -> Response:
+    def get_regions_by_country_alpha_2(self, request, pk=None, *args, **kwargs) -> Response:
         regions = Region.objects.filter(country__alpha_2=pk)
         serializer = self.get_serializer(regions, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)

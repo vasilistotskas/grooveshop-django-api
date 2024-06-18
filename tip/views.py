@@ -17,7 +17,11 @@ DEFAULT_TIP_CACHE_TTL = 60 * 60 * 2
 class TipViewSet(BaseModelViewSet):
     queryset = Tip.objects.all()
     serializer_class = TipSerializer
-    filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        PascalSnakeCaseOrderingFilter,
+        SearchFilter,
+    ]
     filterset_fields = ["id", "kind", "active"]
     ordering_fields = ["id", "kind", "active", "created_at"]
     ordering = ["-created_at"]

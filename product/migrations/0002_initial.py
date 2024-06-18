@@ -119,9 +119,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name="productreview",
-            constraint=models.UniqueConstraint(
-                fields=("product", "user"), name="unique_product_review"
-            ),
+            constraint=models.UniqueConstraint(fields=("product", "user"), name="unique_product_review"),
         ),
         migrations.AlterUniqueTogether(
             name="productimagetranslation",
@@ -129,9 +127,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name="productfavourite",
-            constraint=models.UniqueConstraint(
-                fields=("user", "product"), name="unique_product_favourite"
-            ),
+            constraint=models.UniqueConstraint(fields=("user", "product"), name="unique_product_favourite"),
         ),
         migrations.AlterUniqueTogether(
             name="productcategorytranslation",
@@ -139,27 +135,19 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="product",
-            index=django.contrib.postgres.indexes.GinIndex(
-                fields=["private_metadata"], name="product_p_meta_idx"
-            ),
+            index=django.contrib.postgres.indexes.GinIndex(fields=["private_metadata"], name="product_p_meta_idx"),
         ),
         migrations.AddIndex(
             model_name="product",
-            index=django.contrib.postgres.indexes.GinIndex(
-                fields=["metadata"], name="product_meta_idx"
-            ),
+            index=django.contrib.postgres.indexes.GinIndex(fields=["metadata"], name="product_meta_idx"),
         ),
         migrations.AddIndex(
             model_name="product",
-            index=django.contrib.postgres.indexes.GinIndex(
-                fields=["search_vector"], name="product_search_vector_idx"
-            ),
+            index=django.contrib.postgres.indexes.GinIndex(fields=["search_vector"], name="product_search_vector_idx"),
         ),
         migrations.AddIndex(
             model_name="product",
-            index=models.Index(
-                fields=["product_code"], name="product_product_code_idx"
-            ),
+            index=models.Index(fields=["product_code"], name="product_product_code_idx"),
         ),
         migrations.AddIndex(
             model_name="product",
@@ -167,8 +155,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="product",
-            index=models.Index(
-                fields=["price", "stock"], name="product_price_stock_idx"
-            ),
+            index=models.Index(fields=["price", "stock"], name="product_price_stock_idx"),
         ),
     ]

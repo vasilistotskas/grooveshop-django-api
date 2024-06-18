@@ -29,9 +29,7 @@ class OrderViewSetTestCase(APITestCase):
     order_items: List[OrderItem] = None
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="test@test.com", password="test12345@!"
-        )
+        self.user = User.objects.create_user(email="test@test.com", password="test12345@!")
         self.client.login(email="test@test.com", password="test12345@!")
         image_icon = get_or_create_default_image("uploads/pay_way/no_photo.jpg")
         self.pay_way = PayWay.objects.create(
@@ -95,12 +93,8 @@ class OrderViewSetTestCase(APITestCase):
             weight=0.00,
         )
 
-        order_item1 = self.order.order_item_order.create(
-            product_id=product_1.id, price=Decimal("50.00"), quantity=2
-        )
-        order_item2 = self.order.order_item_order.create(
-            product_id=product_2.id, price=Decimal("30.00"), quantity=3
-        )
+        order_item1 = self.order.order_item_order.create(product_id=product_1.id, price=Decimal("50.00"), quantity=2)
+        order_item2 = self.order.order_item_order.create(product_id=product_2.id, price=Decimal("30.00"), quantity=3)
         self.order_items = [order_item1, order_item2]
 
     @staticmethod

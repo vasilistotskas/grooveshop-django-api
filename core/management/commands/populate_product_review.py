@@ -32,25 +32,17 @@ class Command(BaseCommand):
         total_reviews = options["total_reviews"]
         total_time = 0
         start_time = time.time()
-        available_languages = [
-            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
-        ]
+        available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 
         if total_reviews < 1:
-            self.stdout.write(
-                self.style.WARNING("Total number of reviews must be greater than 0.")
-            )
+            self.stdout.write(self.style.WARNING("Total number of reviews must be greater than 0."))
             return
 
         users = list(User.objects.all())
         products = list(Product.objects.all())
 
         if not users or not products:
-            self.stdout.write(
-                self.style.ERROR(
-                    "Insufficient data. Aborting seeding ProductReview model."
-                )
-            )
+            self.stdout.write(self.style.ERROR("Insufficient data. Aborting seeding ProductReview model."))
             return
 
         if not available_languages:
@@ -70,9 +62,7 @@ class Command(BaseCommand):
                 status = faker.random_element(status_choices)
 
                 user_product_pair = (user, product)
-                existing_review = ProductReview.objects.filter(
-                    user=user, product=product
-                ).exists()
+                existing_review = ProductReview.objects.filter(user=user, product=product).exists()
 
                 if not existing_review and user_product_pair not in user_product_review:
                     user_product_review.append(user_product_pair)

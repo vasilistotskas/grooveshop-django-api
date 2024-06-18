@@ -19,9 +19,7 @@ class ProductReviewViewSetTestCase(APITestCase):
     product_review: ProductReview = None
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="test@test.com", password="test12345@!"
-        )
+        self.user = User.objects.create_user(email="test@test.com", password="test12345@!")
         self.client.login(email="test@test.com", password="test12345@!")
         self.client.force_authenticate(user=self.user)
         self.product = Product.objects.create(
@@ -204,9 +202,7 @@ class ProductReviewViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(
-            ProductReview.objects.filter(pk=self.product_review.pk).exists()
-        )
+        self.assertFalse(ProductReview.objects.filter(pk=self.product_review.pk).exists())
 
     def test_destroy_invalid(self):
         invalid_product_review_pk = 999999

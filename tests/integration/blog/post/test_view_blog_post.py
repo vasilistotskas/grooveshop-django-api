@@ -30,15 +30,11 @@ class BlogPostViewSetTestCase(APITestCase):
     category: BlogCategory = None
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="testuser@example.com", password="testpassword"
-        )
+        self.user = User.objects.create_user(email="testuser@example.com", password="testpassword")
         self.author = BlogAuthor.objects.create(user=self.user)
 
         image_category = get_or_create_default_image("uploads/blog/no_photo.jpg")
-        self.category = BlogCategory.objects.create(
-            slug="sample-category", image=image_category
-        )
+        self.category = BlogCategory.objects.create(slug="sample-category", image=image_category)
         for language in languages:
             self.category.set_current_language(language)
             self.category.name = f"Category name in {language}"

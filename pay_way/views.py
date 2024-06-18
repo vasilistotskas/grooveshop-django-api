@@ -17,7 +17,11 @@ DEFAULT_PAY_WAY_CACHE_TTL = 60 * 60 * 2
 class PayWayViewSet(BaseModelViewSet):
     queryset = PayWay.objects.all()
     serializer_class = PayWaySerializer
-    filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        PascalSnakeCaseOrderingFilter,
+        SearchFilter,
+    ]
     filterset_fields = ["active", "cost", "free_for_order_amount"]
     ordering_fields = [
         "cost",

@@ -34,9 +34,7 @@ class BlogCommentManager(TreeManager, TranslatableManager):
 class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel, MPTTModel):
     id = models.BigAutoField(primary_key=True)
     is_approved = models.BooleanField(_("Is Approved"), default=False)
-    likes = models.ManyToManyField(
-        "user.UserAccount", related_name="liked_comments", blank=True
-    )
+    likes = models.ManyToManyField("user.UserAccount", related_name="liked_comments", blank=True)
     user = models.ForeignKey(
         "user.UserAccount",
         related_name="blog_comment_user",
@@ -52,7 +50,11 @@ class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel, MPTTModel):
         blank=True,
     )
     parent = TreeForeignKey(
-        "self", blank=True, null=True, related_name="children", on_delete=models.CASCADE
+        "self",
+        blank=True,
+        null=True,
+        related_name="children",
+        on_delete=models.CASCADE,
     )
     translations = TranslatedFields(
         content=models.TextField(
@@ -77,20 +79,12 @@ class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel, MPTTModel):
         order_insertion_by = ["-created_at"]
 
     def __unicode__(self):
-        content_snippet = (
-            self.safe_translation_getter("content", any_language=True)[:50] + "..."
-        )
+        content_snippet = self.safe_translation_getter("content", any_language=True)[:50] + "..."
         return f"Comment by {self.user.full_name}: {content_snippet}"
 
     def __str__(self):
-        translation_content = (
-            self.safe_translation_getter("content", any_language=True) or "No content"
-        )
-        content = (
-            f"{translation_content[:50]}..."
-            if len(translation_content) > 50
-            else translation_content
-        )
+        translation_content = self.safe_translation_getter("content", any_language=True) or "No content"
+        content = f"{translation_content[:50]}..." if len(translation_content) > 50 else translation_content
         commenter = self.user.full_name if self.user else "Anonymous"
         return f"Comment by {commenter}: {content}"
 

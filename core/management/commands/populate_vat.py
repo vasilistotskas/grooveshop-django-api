@@ -29,9 +29,7 @@ class Command(BaseCommand):
         start_time = time.time()
 
         if total_vats < 1:
-            self.stdout.write(
-                self.style.WARNING("Total number of Vats must be greater than 0.")
-            )
+            self.stdout.write(self.style.WARNING("Total number of Vats must be greater than 0."))
             return
 
         objects_to_insert = []
@@ -48,7 +46,6 @@ class Command(BaseCommand):
         total_time += execution_time
         self.stdout.write(
             self.style.SUCCESS(
-                f"{len(objects_to_insert)} Vat instances created successfully "
-                f"in {execution_time:.2f} seconds."
+                f"{len(objects_to_insert)} Vat instances created successfully " f"in {execution_time:.2f} seconds."
             )
         )

@@ -36,16 +36,16 @@ class BlogCategoryManager(TreeManager, TranslatableManager):
     _queryset_class = BlogCategoryQuerySet
 
 
-class BlogCategory(
-    TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel, MPTTModel
-):
+class BlogCategory(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel, MPTTModel):
     id = models.BigAutoField(primary_key=True)
     slug = models.SlugField(unique=True)
-    image = ImageAndSvgField(
-        _("Image"), upload_to="uploads/blog/", blank=True, null=True
-    )
+    image = ImageAndSvgField(_("Image"), upload_to="uploads/blog/", blank=True, null=True)
     parent = TreeForeignKey(
-        "self", blank=True, null=True, related_name="children", on_delete=models.CASCADE
+        "self",
+        blank=True,
+        null=True,
+        related_name="children",
+        on_delete=models.CASCADE,
     )
     translations = TranslatedFields(
         name=models.CharField(_("Name"), max_length=50, blank=True, null=True),
@@ -76,10 +76,7 @@ class BlogCategory(
     def __str__(self):
         if not hasattr(self, "_full_path"):
             self._full_path = " / ".join(
-                [
-                    k.safe_translation_getter("name", any_language=True)
-                    for k in self.get_ancestors(include_self=True)
-                ]
+                [k.safe_translation_getter("name", any_language=True) for k in self.get_ancestors(include_self=True)]
             )
         return self._full_path
 
@@ -90,21 +87,15 @@ class BlogCategory(
         super(BlogCategory, self).save(*args, **kwargs)
 
     def get_ordering_queryset(self):
-        return BlogCategory.objects.filter(parent=self.parent).get_descendants(
-            include_self=True
-        )
+        return BlogCategory.objects.filter(parent=self.parent).get_descendants(include_self=True)
 
     @property
     def recursive_post_count(self) -> int:
-        return BlogPost.objects.filter(
-            category__in=self.get_descendants(include_self=True)
-        ).count()
+        return BlogPost.objects.filter(category__in=self.get_descendants(include_self=True)).count()
 
     @property
     def absolute_url(self) -> str:
-        return "/" + "/".join(
-            [x["slug"] for x in self.get_ancestors(include_self=True).values()]
-        )
+        return "/" + "/".join([x["slug"] for x in self.get_ancestors(include_self=True).values()])
 
     @property
     def main_image_absolute_url(self) -> str:

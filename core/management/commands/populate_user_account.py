@@ -31,9 +31,7 @@ class Command(BaseCommand):
         start_time = time.time()
 
         if total_users < 1:
-            self.stdout.write(
-                self.style.WARNING("Total number of users must be greater than 0.")
-            )
+            self.stdout.write(self.style.WARNING("Total number of users must be greater than 0."))
             return
 
         img = get_or_create_default_image("uploads/users/no_photo.jpg")
@@ -57,9 +55,7 @@ class Command(BaseCommand):
 
                 user = User(
                     email=email,
-                    password=generate_random_password(
-                        use_digits=True, use_special_chars=True
-                    ),
+                    password=generate_random_password(use_digits=True, use_special_chars=True),
                     first_name=first_name,
                     last_name=last_name,
                     phone=phone,

@@ -24,9 +24,7 @@ class BlogTagModelTestCase(TestCase):
         self.assertTrue(self.tag.active)
 
     def test_unicode_representation(self):
-        tag_name = (
-            self.tag.safe_translation_getter("name", any_language=True) or "Unnamed Tag"
-        )
+        tag_name = self.tag.safe_translation_getter("name", any_language=True) or "Unnamed Tag"
         self.assertEqual(
             self.tag.__unicode__(),
             f"{tag_name} ({'Active' if self.tag.active else 'Inactive'})",
@@ -38,9 +36,7 @@ class BlogTagModelTestCase(TestCase):
             self.assertEqual(self.tag.name, f"Tag name in {language}")
 
     def test_str_representation(self):
-        tag_name = (
-            self.tag.safe_translation_getter("name", any_language=True) or "Unnamed Tag"
-        )
+        tag_name = self.tag.safe_translation_getter("name", any_language=True) or "Unnamed Tag"
         self.assertEqual(
             str(self.tag),
             f"{tag_name} ({'Active' if self.tag.active else 'Inactive'})",

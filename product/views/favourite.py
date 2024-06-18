@@ -19,7 +19,11 @@ from product.serializers.product import ProductSerializer
 
 class ProductFavouriteViewSet(MultiSerializerMixin, BaseModelViewSet):
     queryset = ProductFavourite.objects.all()
-    filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        PascalSnakeCaseOrderingFilter,
+        SearchFilter,
+    ]
     filterset_fields = ["id", "user_id", "product_id"]
     ordering_fields = [
         "id",
@@ -47,9 +51,7 @@ class ProductFavouriteViewSet(MultiSerializerMixin, BaseModelViewSet):
     @action(detail=True, methods=["GET"])
     def product(self, request, *args, **kwargs) -> Response:
         product_favourite = self.get_object()
-        serializer = self.get_serializer(
-            product_favourite.product, context=self.get_serializer_context()
-        )
+        serializer = self.get_serializer(product_favourite.product, context=self.get_serializer_context())
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["POST"], permission_classes=[IsAuthenticated])
@@ -62,8 +64,6 @@ class ProductFavouriteViewSet(MultiSerializerMixin, BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        favourites = ProductFavourite.objects.filter(
-            user=user, product_id__in=product_ids
-        )
+        favourites = ProductFavourite.objects.filter(user=user, product_id__in=product_ids)
         serializer = self.get_serializer(favourites, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)

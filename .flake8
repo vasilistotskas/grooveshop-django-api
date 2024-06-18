@@ -1,16 +1,18 @@
 [flake8]
 show-source = True
-statistics = False
 doctests = True
 strictness = long
 docstring-style = numpy
-max-line-length = 140
+max-line-length = 120
 extend-ignore = E203, H101, H238, H301, H306, W503
 exclude =
-    .*/,
-    __pycache__/,
-    node_modules/,
+    __pycache__/
+    node_modules/
     */migrations/
+    */config/
+    manage.py
+    .venv
+    .env
 ignore = E203,H101,H238,H301,H306,W503
 max-complexity = 31
 

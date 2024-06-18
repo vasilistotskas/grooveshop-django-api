@@ -40,13 +40,7 @@ class TestSocialAccountAdapter(TestCase):
 
         mock_email_addresses = mock.Mock()
         mock_email_addresses.configure_mock(
-            **{
-                "__iter__": mock.Mock(
-                    return_value=iter(
-                        [mock.Mock(verified=True, email="test@example.com")]
-                    )
-                )
-            }
+            **{"__iter__": mock.Mock(return_value=iter([mock.Mock(verified=True, email="test@example.com")]))}
         )
         sociallogin.email_addresses = mock_email_addresses
 

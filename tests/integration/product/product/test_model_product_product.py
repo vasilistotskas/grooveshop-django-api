@@ -40,18 +40,14 @@ class ProductModelTestCase(TestCase):
     product_favourite: ProductFavourite = None
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="test@test.com", password="test12345@!"
-        )
+        self.user = User.objects.create_user(email="test@test.com", password="test12345@!")
         self.category = ProductCategory.objects.create(
             slug="sample-category",
         )
         for language in languages:
             self.category.set_current_language(language)
             self.category.name = f"Sample Category ({language})"
-            self.category.description = (
-                f"This is a sample category description ({language})."
-            )
+            self.category.description = f"This is a sample category description ({language})."
             self.category.save()
         self.category.set_current_language(default_language)
 
@@ -74,9 +70,7 @@ class ProductModelTestCase(TestCase):
         for language in languages:
             self.product.set_current_language(language)
             self.product.name = f"Sample Product ({language})"
-            self.product.description = (
-                f"This is a sample product description ({language})."
-            )
+            self.product.description = f"This is a sample product description ({language})."
             self.product.save()
         self.product.set_current_language(default_language)
 
@@ -110,9 +104,7 @@ class ProductModelTestCase(TestCase):
             user=self.user,
         )
 
-        user_2 = User.objects.create_user(
-            email="test2@test.com", password="test12345@!"
-        )
+        user_2 = User.objects.create_user(email="test2@test.com", password="test12345@!")
 
         product_review_status_true = ProductReview.objects.create(
             product=self.product,
@@ -140,16 +132,10 @@ class ProductModelTestCase(TestCase):
         self.product.save()
         self.product.refresh_from_db()
 
-        expected_discount_value = (
-            self.product.price * self.product.discount_percent
-        ) / 100
+        expected_discount_value = (self.product.price * self.product.discount_percent) / 100
         expected_vat_value = (self.product.price * self.vat.value) / 100
-        expected_final_price = (
-            self.product.price + expected_vat_value - expected_discount_value
-        )
-        expected_price_save_percent = (
-            expected_discount_value / self.product.price
-        ) * 100
+        expected_final_price = self.product.price + expected_vat_value - expected_discount_value
+        expected_price_save_percent = (expected_discount_value / self.product.price) * 100
 
         self.assertEqual(self.product.discount_value, expected_discount_value)
         self.assertEqual(self.product.vat_value, expected_vat_value)
@@ -186,9 +172,7 @@ class ProductModelTestCase(TestCase):
             )
 
     def test_str_representation(self):
-        self.assertEqual(
-            str(self.product), self.product.safe_translation_getter("name")
-        )
+        self.assertEqual(str(self.product), self.product.safe_translation_getter("name"))
 
     def test_likes_count(self):
         self.assertEqual(self.product.likes_count, 1)

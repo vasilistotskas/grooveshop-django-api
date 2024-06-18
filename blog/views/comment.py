@@ -20,7 +20,11 @@ from core.utils.serializers import MultiSerializerMixin
 
 class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
     queryset = BlogComment.objects.all()
-    filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        PascalSnakeCaseOrderingFilter,
+        SearchFilter,
+    ]
     filterset_fields = ["id", "user", "post", "parent", "is_approved"]
     ordering_fields = ["id", "user", "post", "created_at"]
     ordering = ["-created_at"]
@@ -114,7 +118,8 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
         comment = self.get_object()
         if not comment.get_children().exists():
             return Response(
-                {"detail": _("No replies found")}, status=status.HTTP_404_NOT_FOUND
+                {"detail": _("No replies found")},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         queryset = comment.get_children()
@@ -123,9 +128,7 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
     @action(detail=True, methods=["GET"])
     def post(self, request, pk=None) -> Response:
         comment = self.get_object()
-        serializer = self.get_serializer(
-            comment.post, context=self.get_serializer_context()
-        )
+        serializer = self.get_serializer(comment.post, context=self.get_serializer_context())
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["POST"], permission_classes=[IsAuthenticated])
@@ -138,8 +141,6 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        liked_comment_ids = BlogComment.objects.filter(
-            likes=user, id__in=comment_ids
-        ).values_list("id", flat=True)
+        liked_comment_ids = BlogComment.objects.filter(likes=user, id__in=comment_ids).values_list("id", flat=True)
 
         return Response(liked_comment_ids, status=status.HTTP_200_OK)

@@ -21,12 +21,13 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="UserAccount",
             fields=[
-                ("password", models.CharField(max_length=128, verbose_name="password")),
+                (
+                    "password",
+                    models.CharField(max_length=128, verbose_name="password"),
+                ),
                 (
                     "last_login",
-                    models.DateTimeField(
-                        blank=True, null=True, verbose_name="last login"
-                    ),
+                    models.DateTimeField(blank=True, null=True, verbose_name="last login"),
                 ),
                 (
                     "is_superuser",
@@ -52,19 +53,27 @@ class Migration(migrations.Migration):
                 (
                     "email",
                     models.EmailField(
-                        max_length=254, unique=True, verbose_name="Email Address"
+                        max_length=254,
+                        unique=True,
+                        verbose_name="Email Address",
                     ),
                 ),
                 (
                     "first_name",
                     models.CharField(
-                        blank=True, max_length=255, null=True, verbose_name="First Name"
+                        blank=True,
+                        max_length=255,
+                        null=True,
+                        verbose_name="First Name",
                     ),
                 ),
                 (
                     "last_name",
                     models.CharField(
-                        blank=True, max_length=255, null=True, verbose_name="Last Name"
+                        blank=True,
+                        max_length=255,
+                        null=True,
+                        verbose_name="Last Name",
                     ),
                 ),
                 (
@@ -81,25 +90,37 @@ class Migration(migrations.Migration):
                 (
                     "city",
                     models.CharField(
-                        blank=True, max_length=255, null=True, verbose_name="City"
+                        blank=True,
+                        max_length=255,
+                        null=True,
+                        verbose_name="City",
                     ),
                 ),
                 (
                     "zipcode",
                     models.CharField(
-                        blank=True, max_length=255, null=True, verbose_name="Zip Code"
+                        blank=True,
+                        max_length=255,
+                        null=True,
+                        verbose_name="Zip Code",
                     ),
                 ),
                 (
                     "address",
                     models.CharField(
-                        blank=True, max_length=255, null=True, verbose_name="Address"
+                        blank=True,
+                        max_length=255,
+                        null=True,
+                        verbose_name="Address",
                     ),
                 ),
                 (
                     "place",
                     models.CharField(
-                        blank=True, max_length=255, null=True, verbose_name="Place"
+                        blank=True,
+                        max_length=255,
+                        null=True,
+                        verbose_name="Place",
                     ),
                 ),
                 (
@@ -111,35 +132,33 @@ class Migration(migrations.Migration):
                         verbose_name="Image",
                     ),
                 ),
-                ("is_active", models.BooleanField(default=True, verbose_name="Active")),
-                ("is_staff", models.BooleanField(default=False, verbose_name="Staff")),
+                (
+                    "is_active",
+                    models.BooleanField(default=True, verbose_name="Active"),
+                ),
+                (
+                    "is_staff",
+                    models.BooleanField(default=False, verbose_name="Staff"),
+                ),
                 (
                     "birth_date",
                     models.DateField(blank=True, null=True, verbose_name="Birth Date"),
                 ),
                 (
                     "twitter",
-                    models.URLField(
-                        blank=True, null=True, verbose_name="Twitter Profile"
-                    ),
+                    models.URLField(blank=True, null=True, verbose_name="Twitter Profile"),
                 ),
                 (
                     "linkedin",
-                    models.URLField(
-                        blank=True, null=True, verbose_name="LinkedIn Profile"
-                    ),
+                    models.URLField(blank=True, null=True, verbose_name="LinkedIn Profile"),
                 ),
                 (
                     "facebook",
-                    models.URLField(
-                        blank=True, null=True, verbose_name="Facebook Profile"
-                    ),
+                    models.URLField(blank=True, null=True, verbose_name="Facebook Profile"),
                 ),
                 (
                     "instagram",
-                    models.URLField(
-                        blank=True, null=True, verbose_name="Instagram Profile"
-                    ),
+                    models.URLField(blank=True, null=True, verbose_name="Instagram Profile"),
                 ),
                 (
                     "website",
@@ -147,17 +166,16 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "youtube",
-                    models.URLField(
-                        blank=True, null=True, verbose_name="Youtube Profile"
-                    ),
+                    models.URLField(blank=True, null=True, verbose_name="Youtube Profile"),
                 ),
                 (
                     "github",
-                    models.URLField(
-                        blank=True, null=True, verbose_name="Github Profile"
-                    ),
+                    models.URLField(blank=True, null=True, verbose_name="Github Profile"),
                 ),
-                ("bio", models.TextField(blank=True, null=True, verbose_name="Bio")),
+                (
+                    "bio",
+                    models.TextField(blank=True, null=True, verbose_name="Bio"),
+                ),
                 (
                     "country",
                     models.ForeignKey(
@@ -173,7 +191,8 @@ class Migration(migrations.Migration):
                     "groups",
                     models.ManyToManyField(
                         blank=True,
-                        help_text="The groups this user belongs to. A user will get all permissions granted to each of their groups.",
+                        help_text="The groups this user belongs to. A user will get all"
+                        " permissions granted to each of their groups.",
                         related_name="user_set",
                         related_query_name="user",
                         to="auth.group",
@@ -225,7 +244,10 @@ class Migration(migrations.Migration):
                     models.UUIDField(default=uuid.uuid4, editable=False, unique=True),
                 ),
                 ("id", models.BigAutoField(primary_key=True, serialize=False)),
-                ("title", models.CharField(max_length=255, verbose_name="Title")),
+                (
+                    "title",
+                    models.CharField(max_length=255, verbose_name="Title"),
+                ),
                 (
                     "first_name",
                     models.CharField(max_length=255, verbose_name="First Name"),
@@ -234,13 +256,22 @@ class Migration(migrations.Migration):
                     "last_name",
                     models.CharField(max_length=255, verbose_name="Last Name"),
                 ),
-                ("street", models.CharField(max_length=255, verbose_name="Street")),
+                (
+                    "street",
+                    models.CharField(max_length=255, verbose_name="Street"),
+                ),
                 (
                     "street_number",
                     models.CharField(max_length=255, verbose_name="Street Number"),
                 ),
-                ("city", models.CharField(max_length=255, verbose_name="City")),
-                ("zipcode", models.CharField(max_length=255, verbose_name="Zip Code")),
+                (
+                    "city",
+                    models.CharField(max_length=255, verbose_name="City"),
+                ),
+                (
+                    "zipcode",
+                    models.CharField(max_length=255, verbose_name="Zip Code"),
+                ),
                 (
                     "floor",
                     models.PositiveSmallIntegerField(
@@ -284,7 +315,9 @@ class Migration(migrations.Migration):
                 (
                     "mobile_phone",
                     phonenumber_field.modelfields.PhoneNumberField(
-                        max_length=128, region=None, verbose_name="Mobile Phone Number"
+                        max_length=128,
+                        region=None,
+                        verbose_name="Mobile Phone Number",
                     ),
                 ),
                 (
@@ -297,7 +330,10 @@ class Migration(migrations.Migration):
                         verbose_name="Notes",
                     ),
                 ),
-                ("is_main", models.BooleanField(default=False, verbose_name="Is Main")),
+                (
+                    "is_main",
+                    models.BooleanField(default=False, verbose_name="Is Main"),
+                ),
                 (
                     "country",
                     models.ForeignKey(

@@ -31,27 +31,19 @@ class Command(BaseCommand):
         start_time = time.time()
 
         if total_images < 1:
-            self.stdout.write(
-                self.style.WARNING("Total number of images must be greater than 0.")
-            )
+            self.stdout.write(self.style.WARNING("Total number of images must be greater than 0."))
             return
 
         products = list(Product.objects.all())
 
         if not products:
-            self.stdout.write(
-                self.style.ERROR(
-                    "Insufficient data. Aborting seeding ProductImage model."
-                )
-            )
+            self.stdout.write(self.style.ERROR("Insufficient data. Aborting seeding ProductImage model."))
             return
 
         img_folder = os.path.join(os.path.dirname(__file__), "images", "products")
         img_files = os.listdir(img_folder)
         if not img_files:
-            self.stdout.write(
-                self.style.ERROR("No image files found in the seed_images folder.")
-            )
+            self.stdout.write(self.style.ERROR("No image files found in the seed_images folder."))
             return
 
         objects_to_insert = []
@@ -70,9 +62,7 @@ class Command(BaseCommand):
                         title="Main Image",
                         product=product,
                         is_main=True,
-                        image=get_or_create_default_image(
-                            img_path, use_default_storage=False
-                        ),
+                        image=get_or_create_default_image(img_path, use_default_storage=False),
                     )
                     objects_to_insert.append(main_image)
 
@@ -84,9 +74,7 @@ class Command(BaseCommand):
                         title=title,
                         product=product,
                         is_main=False,
-                        image=get_or_create_default_image(
-                            img_path, use_default_storage=False
-                        ),
+                        image=get_or_create_default_image(img_path, use_default_storage=False),
                     )
                     objects_to_insert.append(image)
         ProductImage.objects.bulk_create(objects_to_insert)

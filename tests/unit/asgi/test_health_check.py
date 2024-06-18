@@ -16,11 +16,7 @@ async def test_health_check():
                 trailers=False,
             )
         )
-        await send(
-            HTTPResponseBodyEvent(
-                type="http.response.body", body=b"app", more_body=False
-            )
-        )
+        await send(HTTPResponseBodyEvent(type="http.response.body", body=b"app", more_body=False))
 
     async def receive() -> None:
         raise NotImplementedError()

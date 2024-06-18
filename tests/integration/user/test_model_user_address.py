@@ -14,9 +14,7 @@ class UserAddressModelTestCase(TestCase):
     address: UserAddress = None
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="test@test.com", password="test12345@!"
-        )
+        self.user = User.objects.create_user(email="test@test.com", password="test12345@!")
         self.address = UserAddress.objects.create(
             user=self.user,
             title="Home",
@@ -55,8 +53,7 @@ class UserAddressModelTestCase(TestCase):
     def test_str_representation(self):
         self.assertEqual(
             str(self.address),
-            f"{self.address.title} - {self.address.first_name}"
-            f" {self.address.last_name}, {self.address.city}",
+            f"{self.address.title} - {self.address.first_name}" f" {self.address.last_name}, {self.address.city}",
         )
 
     def test_get_main_address(self):

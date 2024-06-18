@@ -10,15 +10,9 @@ from core.models import UUIDModel
 
 
 class Region(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
-    alpha = models.CharField(
-        _("Region Code"), max_length=10, primary_key=True, unique=True
-    )
-    country = models.ForeignKey(
-        "country.Country", related_name="regions", on_delete=models.CASCADE
-    )
-    translations = TranslatedFields(
-        name=models.CharField(_("Name"), max_length=100, blank=True, null=True)
-    )
+    alpha = models.CharField(_("Region Code"), max_length=10, primary_key=True, unique=True)
+    country = models.ForeignKey("country.Country", related_name="regions", on_delete=models.CASCADE)
+    translations = TranslatedFields(name=models.CharField(_("Name"), max_length=100, blank=True, null=True))
 
     class Meta(TypedModelMeta):
         verbose_name = _("Region")

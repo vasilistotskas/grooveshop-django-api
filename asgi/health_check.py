@@ -7,12 +7,8 @@ from asgiref.typing import Scope
 from django.core.handlers.asgi import ASGIHandler
 
 
-def health_check(
-    application: ASGI3Application | ASGIHandler, health_url: str
-) -> ASGI3Application:
-    async def health_check_wrapper(
-        scope: Scope, receive: ASGIReceiveCallable, send: ASGISendCallable
-    ) -> None:
+def health_check(application: ASGI3Application | ASGIHandler, health_url: str) -> ASGI3Application:
+    async def health_check_wrapper(scope: Scope, receive: ASGIReceiveCallable, send: ASGISendCallable) -> None:
         if scope.get("type") == "http" and scope.get("path") != health_url:
             await application(scope, receive, send)
             return
@@ -24,8 +20,6 @@ def health_check(
                 trailers=False,
             )
         )
-        await send(
-            HTTPResponseBodyEvent(type="http.response.body", body=b"", more_body=False)
-        )
+        await send(HTTPResponseBodyEvent(type="http.response.body", body=b"", more_body=False))
 
     return health_check_wrapper

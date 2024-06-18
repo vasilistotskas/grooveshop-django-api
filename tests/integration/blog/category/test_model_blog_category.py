@@ -24,9 +24,7 @@ class BlogCategoryModelTestCase(TestCase):
 
     def setUp(self):
         image_category = get_or_create_default_image("uploads/blog/no_photo.jpg")
-        self.category = BlogCategory.objects.create(
-            slug="sample-category", image=image_category
-        )
+        self.category = BlogCategory.objects.create(slug="sample-category", image=image_category)
         for language in languages:
             self.category.set_current_language(language)
             self.category.name = f"Category name in {language}"

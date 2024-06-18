@@ -35,14 +35,10 @@ class Command(BaseCommand):
         total_countries = options["total_countries"]
         total_time = 0
         start_time = time.time()
-        available_languages = [
-            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
-        ]
+        available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 
         if total_countries < 1:
-            self.stdout.write(
-                self.style.WARNING("Total number of countries must be greater than 0.")
-            )
+            self.stdout.write(self.style.WARNING("Total number of countries must be greater than 0."))
             return
 
         img = get_or_create_default_image("uploads/country/no_photo.jpg")
@@ -60,27 +56,12 @@ class Command(BaseCommand):
                 iso_cc = faker.unique.random_number(3)
                 phone_code = faker.unique.random_number(3)
 
-                alpha_2_exists = (
-                    True if Country.objects.filter(alpha_2=alpha_2).exists() else False
-                )
-                alpha_3_exists = (
-                    True if Country.objects.filter(alpha_3=alpha_3).exists() else False
-                )
-                iso_cc_exists = (
-                    True if Country.objects.filter(iso_cc=iso_cc).exists() else False
-                )
-                phone_code_exists = (
-                    True
-                    if Country.objects.filter(phone_code=phone_code).exists()
-                    else False
-                )
+                alpha_2_exists = True if Country.objects.filter(alpha_2=alpha_2).exists() else False
+                alpha_3_exists = True if Country.objects.filter(alpha_3=alpha_3).exists() else False
+                iso_cc_exists = True if Country.objects.filter(iso_cc=iso_cc).exists() else False
+                phone_code_exists = True if Country.objects.filter(phone_code=phone_code).exists() else False
 
-                if (
-                    alpha_2_exists
-                    or alpha_3_exists
-                    or iso_cc_exists
-                    or phone_code_exists
-                ):
+                if alpha_2_exists or alpha_3_exists or iso_cc_exists or phone_code_exists:
                     continue
 
                 country = Country(

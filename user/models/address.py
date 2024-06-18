@@ -16,7 +16,9 @@ from user.enum.address import LocationChoicesEnum
 class UserAddress(TimeStampMixinModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
     user = models.ForeignKey(
-        "user.UserAccount", related_name="user_address", on_delete=models.CASCADE
+        "user.UserAccount",
+        related_name="user_address",
+        on_delete=models.CASCADE,
     )
     title = models.CharField(_("Title"), max_length=255)
     first_name = models.CharField(_("First Name"), max_length=255)
@@ -57,9 +59,7 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
     )
     phone = PhoneNumberField(_("Phone Number"), null=True, blank=True, default=None)
     mobile_phone = PhoneNumberField(_("Mobile Phone Number"))
-    notes = models.CharField(
-        _("Notes"), max_length=255, null=True, blank=True, default=None
-    )
+    notes = models.CharField(_("Notes"), max_length=255, null=True, blank=True, default=None)
     is_main = models.BooleanField(_("Is Main"), default=False)
 
     class Meta(TypedModelMeta):
@@ -87,18 +87,12 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
 
     def save(self, *args, **kwargs):
         if self.is_main:
-            UserAddress.objects.filter(user=self.user, is_main=True).exclude(
-                pk=self.id
-            ).update(is_main=False)
+            UserAddress.objects.filter(user=self.user, is_main=True).exclude(pk=self.id).update(is_main=False)
         super().save(*args, **kwargs)
 
     def clean(self):
         if self.is_main:
-            main_count = (
-                UserAddress.objects.filter(user=self.user, is_main=True)
-                .exclude(pk=self.pk)
-                .count()
-            )
+            main_count = UserAddress.objects.filter(user=self.user, is_main=True).exclude(pk=self.pk).count()
             if main_count > 0:
                 raise ValidationError(_("There can only be one main address per user."))
 

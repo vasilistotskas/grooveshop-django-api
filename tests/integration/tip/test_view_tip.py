@@ -54,9 +54,7 @@ class TipViewSetTestCase(APITestCase):
         response = self.client.get(url)
         tips = Tip.objects.all()
         serializer = TipSerializer(tips, many=True)
-        for response_item, serializer_item in zip(
-            response.data["results"], serializer.data
-        ):
+        for response_item, serializer_item in zip(response.data["results"], serializer.data):
             compare_serializer_and_response(serializer_item, response_item, ["icon"])
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)

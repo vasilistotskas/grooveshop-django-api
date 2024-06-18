@@ -17,26 +17,21 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddIndex(
             model_name="order",
-            index=django.contrib.postgres.indexes.BTreeIndex(
-                fields=["created_at"], name="order_created_at_idx"
-            ),
+            index=django.contrib.postgres.indexes.BTreeIndex(fields=["created_at"], name="order_created_at_idx"),
+        ),
+        migrations.AddIndex(
+            model_name="order",
+            index=django.contrib.postgres.indexes.BTreeIndex(fields=["updated_at"], name="order_updated_at_idx"),
+        ),
+        migrations.AddIndex(
+            model_name="order",
+            index=django.contrib.postgres.indexes.BTreeIndex(fields=["status"], name="order_order_status_3ebebc_btree"),
         ),
         migrations.AddIndex(
             model_name="order",
             index=django.contrib.postgres.indexes.BTreeIndex(
-                fields=["updated_at"], name="order_updated_at_idx"
-            ),
-        ),
-        migrations.AddIndex(
-            model_name="order",
-            index=django.contrib.postgres.indexes.BTreeIndex(
-                fields=["status"], name="order_order_status_3ebebc_btree"
-            ),
-        ),
-        migrations.AddIndex(
-            model_name="order",
-            index=django.contrib.postgres.indexes.BTreeIndex(
-                fields=["document_type"], name="order_order_documen_0efd90_btree"
+                fields=["document_type"],
+                name="order_order_documen_0efd90_btree",
             ),
         ),
         migrations.AddIndex(
@@ -69,20 +64,14 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="orderitem",
-            index=django.contrib.postgres.indexes.BTreeIndex(
-                fields=["created_at"], name="orderitem_created_at_idx"
-            ),
+            index=django.contrib.postgres.indexes.BTreeIndex(fields=["created_at"], name="orderitem_created_at_idx"),
         ),
         migrations.AddIndex(
             model_name="orderitem",
-            index=django.contrib.postgres.indexes.BTreeIndex(
-                fields=["updated_at"], name="orderitem_updated_at_idx"
-            ),
+            index=django.contrib.postgres.indexes.BTreeIndex(fields=["updated_at"], name="orderitem_updated_at_idx"),
         ),
         migrations.AddIndex(
             model_name="orderitem",
-            index=django.contrib.postgres.indexes.BTreeIndex(
-                fields=["sort_order"], name="orderitem_sort_order_idx"
-            ),
+            index=django.contrib.postgres.indexes.BTreeIndex(fields=["sort_order"], name="orderitem_sort_order_idx"),
         ),
     ]

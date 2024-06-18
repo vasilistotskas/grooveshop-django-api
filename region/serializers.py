@@ -35,10 +35,10 @@ class RegionSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "uuid",
         )
 
-    def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:
-        country_serializer = importlib.import_module(
-            "country.serializers"
-        ).CountrySerializer
+    def get_expand_fields(
+        self,
+    ) -> Dict[str, Type[serializers.ModelSerializer]]:
+        country_serializer = importlib.import_module("country.serializers").CountrySerializer
         return {
             "country": country_serializer,
         }

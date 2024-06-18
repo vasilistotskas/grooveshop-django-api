@@ -34,9 +34,7 @@ class UserAccountManager(BaseUserManager):
         if not email:
             raise ValueError("Users must have an email address")
         email: str = self.normalize_email(email)
-        username = extra_fields.pop(
-            "username", None
-        ) or UserNameGenerator().generate_username(email)
+        username = extra_fields.pop("username", None) or UserNameGenerator().generate_username(email)
         user: UserAccount = self.model(email=email, username=username, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
@@ -46,9 +44,7 @@ class UserAccountManager(BaseUserManager):
         if not email:
             raise ValueError("Users must have an email address")
         email: str = self.normalize_email(email)
-        username = extra_fields.pop(
-            "username", None
-        ) or UserNameGenerator().generate_username(email)
+        username = extra_fields.pop("username", None) or UserNameGenerator().generate_username(email)
         user: UserAccount = self.model(email=email, username=username, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
@@ -86,9 +82,7 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
         },
     )
     email = models.EmailField(_("Email Address"), max_length=254, unique=True)
-    first_name = models.CharField(
-        _("First Name"), max_length=255, blank=True, null=True
-    )
+    first_name = models.CharField(_("First Name"), max_length=255, blank=True, null=True)
     last_name = models.CharField(_("Last Name"), max_length=255, blank=True, null=True)
     phone = PhoneNumberField(_("Phone Number"), null=True, blank=True, default=None)
     city = models.CharField(_("City"), max_length=255, blank=True, null=True)
@@ -111,9 +105,7 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
         default=None,
         on_delete=models.SET_NULL,
     )
-    image = models.ImageField(
-        _("Image"), upload_to="uploads/users/", blank=True, null=True
-    )
+    image = models.ImageField(_("Image"), upload_to="uploads/users/", blank=True, null=True)
     is_active = models.BooleanField(_("Active"), default=True)
     is_staff = models.BooleanField(_("Staff"), default=False)
     birth_date = models.DateField(_("Birth Date"), blank=True, null=True)
@@ -188,9 +180,7 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
                 cache_instance.delete(key)
 
     @staticmethod
-    def remove_session(
-        user: AbstractBaseUser | AnonymousUser, request: HttpRequest
-    ) -> None:
+    def remove_session(user: AbstractBaseUser | AnonymousUser, request: HttpRequest) -> None:
         try:
             session = Session.objects.get(session_key=request.session.session_key)
             session.delete()
@@ -198,20 +188,13 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
             pass
 
         if request.user.is_authenticated:
-            cache_instance.delete(
-                f"{caches.USER_AUTHENTICATED}{user.pk}:"
-                f"{request.session.session_key}"
-            )
+            cache_instance.delete(f"{caches.USER_AUTHENTICATED}{user.pk}:" f"{request.session.session_key}")
         else:
-            cache_instance.delete(
-                f"{caches.USER_UNAUTHENTICATED}{request.session.session_key}"
-            )
+            cache_instance.delete(f"{caches.USER_UNAUTHENTICATED}{request.session.session_key}")
 
         request.session.flush()
 
-        cache_instance.delete(
-            f"django.contrib.sessions.cache{request.session.session_key}"
-        )
+        cache_instance.delete(f"django.contrib.sessions.cache{request.session.session_key}")
 
     def get_cache(self) -> dict:
         user_cache_keys = cache_instance.keys(f"{caches.USER_AUTHENTICATED}{self.pk}:*")
@@ -249,6 +232,4 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
         if self.image and hasattr(self.image, "url"):
             return mark_safe('<img src="{}" height="50"/>'.format(self.image.url))
         else:
-            return mark_safe(
-                '<img src="{}" height="50"/>'.format("/static/images/default.png")
-            )
+            return mark_safe('<img src="{}" height="50"/>'.format("/static/images/default.png"))

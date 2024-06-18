@@ -13,9 +13,7 @@ class ProductFavouriteModelTestCase(TestCase):
     product: Product = None
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="test@test.com", password="test12345@!"
-        )
+        self.user = User.objects.create_user(email="test@test.com", password="test12345@!")
         self.product = Product.objects.create(
             product_code="P123",
             name="Sample Product",
@@ -26,17 +24,13 @@ class ProductFavouriteModelTestCase(TestCase):
         )
 
     def test_fields(self):
-        favourite = ProductFavourite.objects.create(
-            user=self.user, product=self.product
-        )
+        favourite = ProductFavourite.objects.create(user=self.user, product=self.product)
         self.assertIsNotNone(favourite.id)
         self.assertEqual(favourite.user, self.user)
         self.assertEqual(favourite.product, self.product)
 
     def test_str_representation(self):
-        favourite = ProductFavourite.objects.create(
-            user=self.user, product=self.product
-        )
+        favourite = ProductFavourite.objects.create(user=self.user, product=self.product)
         self.assertEqual(str(favourite), f"{self.user.email} - {self.product.name}")
 
     def tearDown(self) -> None:

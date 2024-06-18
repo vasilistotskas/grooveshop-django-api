@@ -20,9 +20,7 @@ class BlogCategorySerializer(TranslatableModelSerializer, BaseExpandSerializer):
 
     def get_children(self, obj: BlogCategory) -> ReturnDict | list:
         if obj.get_children().exists():
-            return BlogCategorySerializer(
-                obj.get_children(), many=True, context=self.context
-            ).data
+            return BlogCategorySerializer(obj.get_children(), many=True, context=self.context).data
         return []
 
     class Meta:

@@ -40,11 +40,13 @@ class CategoryAdmin(TranslatableAdmin, DraggableMPTTAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         qs = ProductCategory.objects.add_related_count(
-            qs, Product, "category", "products_cumulative_count", cumulative=True
+            qs,
+            Product,
+            "category",
+            "products_cumulative_count",
+            cumulative=True,
         )
-        qs = ProductCategory.objects.add_related_count(
-            qs, Product, "category", "products_count", cumulative=False
-        )
+        qs = ProductCategory.objects.add_related_count(qs, Product, "category", "products_count", cumulative=False)
         return qs
 
     def get_prepopulated_fields(self, request, obj=None):
@@ -95,7 +97,12 @@ class ProductAdmin(TranslatableAdmin, ExportModelAdmin):
         "image_tag",
         "likes_count",
     ]
-    search_fields = ["id", "category__name", "translations__name", "product_code"]
+    search_fields = [
+        "id",
+        "category__name",
+        "translations__name",
+        "product_code",
+    ]
     list_filter = ["category"]
     inlines = [ProductImageInline]
     readonly_fields = ("image_tag", "likes_count")

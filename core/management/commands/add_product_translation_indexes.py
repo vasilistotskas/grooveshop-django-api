@@ -25,12 +25,7 @@ class Command(BaseCommand):
 
     def add_index(self, cursor, index_name, table_name, fields):
         fields_string = ", ".join(
-            [
-                f"{field} {self.fields[field]['opclass']}"
-                if self.fields[field]["opclass"]
-                else field
-                for field in fields
-            ]
+            [f"{field} {self.fields[field]['opclass']}" if self.fields[field]["opclass"] else field for field in fields]
         )
         cursor.execute(
             f"""
@@ -53,9 +48,7 @@ class Command(BaseCommand):
                     "product_product_translation",
                     [field],
                 )
-                self.stdout.write(
-                    self.style.SUCCESS(f"Successfully added trigram index for {field}")
-                )
+                self.stdout.write(self.style.SUCCESS(f"Successfully added trigram index for {field}"))
 
             self.add_index(
                 cursor,
@@ -63,8 +56,4 @@ class Command(BaseCommand):
                 "product_product_translation",
                 ["name", "description"],
             )
-            self.stdout.write(
-                self.style.SUCCESS(
-                    "Successfully added combined trigram index for name and description"
-                )
-            )
+            self.stdout.write(self.style.SUCCESS("Successfully added combined trigram index for name and description"))

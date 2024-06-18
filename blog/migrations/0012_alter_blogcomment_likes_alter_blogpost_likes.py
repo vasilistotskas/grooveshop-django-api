@@ -15,14 +15,18 @@ class Migration(migrations.Migration):
             model_name="blogcomment",
             name="likes",
             field=models.ManyToManyField(
-                blank=True, related_name="liked_comments", to=settings.AUTH_USER_MODEL
+                blank=True,
+                related_name="liked_comments",
+                to=settings.AUTH_USER_MODEL,
             ),
         ),
         migrations.AlterField(
             model_name="blogpost",
             name="likes",
             field=models.ManyToManyField(
-                blank=True, related_name="liked_blog_posts", to=settings.AUTH_USER_MODEL
+                blank=True,
+                related_name="liked_blog_posts",
+                to=settings.AUTH_USER_MODEL,
             ),
         ),
     ]

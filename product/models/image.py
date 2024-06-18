@@ -25,16 +25,19 @@ class ProductImageManager(TranslatableManager):
 class ProductImage(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
     product = models.ForeignKey(
-        "product.Product", related_name="product_images", on_delete=models.CASCADE
+        "product.Product",
+        related_name="product_images",
+        on_delete=models.CASCADE,
     )
     image = models.ImageField(_("Image"), upload_to="uploads/products/")
     thumbnail = models.ImageField(
-        _("Thumbnail"), upload_to="uploads/products/thumbnails/", blank=True, null=True
+        _("Thumbnail"),
+        upload_to="uploads/products/thumbnails/",
+        blank=True,
+        null=True,
     )
     is_main = models.BooleanField(_("Is Main"), default=False)
-    translations = TranslatedFields(
-        title=models.CharField(_("Title"), max_length=50, blank=True, null=True)
-    )
+    translations = TranslatedFields(title=models.CharField(_("Title"), max_length=50, blank=True, null=True))
 
     objects = ProductImageManager()
 
@@ -68,9 +71,7 @@ class ProductImage(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDMo
 
     def clean(self):
         if self.is_main:
-            ProductImage.objects.filter(product=self.product, is_main=True).update(
-                is_main=False
-            )
+            ProductImage.objects.filter(product=self.product, is_main=True).update(is_main=False)
         super().clean()
 
     def create_thumbnail(self):

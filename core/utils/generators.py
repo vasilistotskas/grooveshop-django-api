@@ -32,9 +32,7 @@ class SlugifyConfig:
 def unique_slugify(config: SlugifyConfig) -> str:
     base_slug = slugify(getattr(config.instance, config.title_field, ""))
     if base_slug == config.invalid_slug or not base_slug:
-        base_slug = (
-            f"{config.invalid_slug}-{config.random_string_generator(config.size)}"
-        )
+        base_slug = f"{config.invalid_slug}-{config.random_string_generator(config.size)}"
 
     ModelClass = type(config.instance)
     slug = base_slug

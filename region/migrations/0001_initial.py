@@ -80,14 +80,15 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(
-                        db_index=True, max_length=15, verbose_name="Language"
-                    ),
+                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
                 ),
                 (
                     "name",
                     models.CharField(
-                        blank=True, max_length=100, null=True, verbose_name="Name"
+                        blank=True,
+                        max_length=100,
+                        null=True,
+                        verbose_name="Name",
                     ),
                 ),
                 (

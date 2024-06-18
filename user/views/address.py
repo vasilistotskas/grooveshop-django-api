@@ -18,7 +18,11 @@ class UserAddressViewSet(BaseModelViewSet):
     permission_classes = [IsAuthenticated]
     queryset = UserAddress.objects.all()
     serializer_class = UserAddressSerializer
-    filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        PascalSnakeCaseOrderingFilter,
+        SearchFilter,
+    ]
     filterset_fields = [
         "id",
         "user",

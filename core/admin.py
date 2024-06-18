@@ -11,15 +11,9 @@ class ExportActionMixin:
     def export_csv(self, request, queryset) -> HttpResponse:
         opts = self.model._meta
         response = HttpResponse(content_type="text/csv")
-        response["Content-Disposition"] = "attachment; filename={}.csv".format(
-            opts.verbose_name
-        )
+        response["Content-Disposition"] = "attachment; filename={}.csv".format(opts.verbose_name)
         writer = csv.writer(response)
-        fields = [
-            field
-            for field in opts.get_fields()
-            if not field.many_to_many and not field.one_to_many
-        ]
+        fields = [field for field in opts.get_fields() if not field.many_to_many and not field.one_to_many]
         # Write a first row with header information
         writer.writerow([field.verbose_name for field in fields])
         # Write data rows
@@ -35,11 +29,7 @@ class ExportActionMixin:
 
     def export_xml(self, request, queryset) -> HttpResponse:
         opts = self.model._meta
-        fields = [
-            field
-            for field in opts.get_fields()
-            if not field.many_to_many and not field.one_to_many
-        ]
+        fields = [field for field in opts.get_fields() if not field.many_to_many and not field.one_to_many]
 
         root = ET.Element("{}s".format(opts.verbose_name))
         for obj in queryset:
@@ -50,9 +40,7 @@ class ExportActionMixin:
 
         xml_string = ET.tostring(root, encoding="utf-8").decode("utf-8")
         response = HttpResponse(xml_string, content_type="text/xml")
-        response["Content-Disposition"] = "attachment; filename={}.xml".format(
-            opts.verbose_name
-        )
+        response["Content-Disposition"] = "attachment; filename={}.xml".format(opts.verbose_name)
         return response
 
     export_xml.short_description = "Export selected to XML"

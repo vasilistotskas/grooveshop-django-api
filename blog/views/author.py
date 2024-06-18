@@ -17,7 +17,11 @@ DEFAULT_BLOG_AUTHOR_CACHE_TTL = 60 * 60 * 2
 class BlogAuthorViewSet(BaseModelViewSet):
     queryset = BlogAuthor.objects.all()
     serializer_class = BlogAuthorSerializer
-    filter_backends = [DjangoFilterBackend, PascalSnakeCaseOrderingFilter, SearchFilter]
+    filter_backends = [
+        DjangoFilterBackend,
+        PascalSnakeCaseOrderingFilter,
+        SearchFilter,
+    ]
     filterset_fields = ["id", "user"]
     ordering_fields = ["id", "user", "created_at"]
     ordering = ["-created_at"]

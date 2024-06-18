@@ -31,20 +31,14 @@ class Command(BaseCommand):
         start_time = time.time()
 
         if total_favourites < 1:
-            self.stdout.write(
-                self.style.WARNING("Total number of favourites must be greater than 0.")
-            )
+            self.stdout.write(self.style.WARNING("Total number of favourites must be greater than 0."))
             return
 
         users = list(User.objects.all())
         products = list(Product.objects.all())
 
         if not users or not products:
-            self.stdout.write(
-                self.style.ERROR(
-                    "Insufficient data. Aborting seeding ProductFavourite model."
-                )
-            )
+            self.stdout.write(self.style.ERROR("Insufficient data. Aborting seeding ProductFavourite model."))
             return
 
         objects_to_insert = []
@@ -55,15 +49,9 @@ class Command(BaseCommand):
                 user = faker.random_element(users)
                 product = faker.random_element(products)
 
-                product_favourite_exists = ProductFavourite.objects.filter(
-                    user=user, product=product
-                ).exists()
+                product_favourite_exists = ProductFavourite.objects.filter(user=user, product=product).exists()
 
-                if (
-                    product_favourite_exists
-                    or user in picked_users
-                    or product in picked_products
-                ):
+                if product_favourite_exists or user in picked_users or product in picked_products:
                     continue
 
                 favourite = ProductFavourite(

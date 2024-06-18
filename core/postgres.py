@@ -16,17 +16,14 @@ class NoValidationSearchVectorCombinable(SearchVectorCombinable):
     def _combine(self, other, connector, reversed):
         if not isinstance(other, NoValidationSearchVectorCombinable):
             raise TypeError(
-                "SearchVector can only be combined with other SearchVector "
-                f"instances, got {type(other).__name__}."
+                "SearchVector can only be combined with other SearchVector " f"instances, got {type(other).__name__}."
             )
         if reversed:
             return NoValidationCombinedSearchVector(other, connector, self, self.config)  # type: ignore[arg-type, attr-defined] # mixin class # noqa: E501
         return NoValidationCombinedSearchVector(self, connector, other, self.config)  # type: ignore[arg-type, attr-defined] # mixin class # noqa: E501
 
 
-class NoValidationCombinedSearchVector(
-    NoValidationSearchVectorCombinable, CombinedSearchVector
-):
+class NoValidationCombinedSearchVector(NoValidationSearchVectorCombinable, CombinedSearchVector):
     contains_aggregate = False
     contains_over_clause = False
 
@@ -73,10 +70,7 @@ class FlatConcat(Expression):
 
     def __init__(self, *expressions, output_field=None):
         super().__init__(output_field=output_field)
-        if (
-            self.max_expression_count is not None
-            and len(expressions) > self.max_expression_count
-        ):
+        if self.max_expression_count is not None and len(expressions) > self.max_expression_count:
             if self.silent_drop_expression:
                 logger.warning(
                     "Maximum expression count exceed (%d out of %d)",
@@ -96,10 +90,7 @@ class FlatConcat(Expression):
 
     def __add__(self, other):
         if not isinstance(other, FlatConcat):
-            raise TypeError(
-                f"Cannot combine FlatSearchVectorCombinable with other "
-                f"instances types, got {other!r}."
-            )
+            raise TypeError(f"Cannot combine FlatSearchVectorCombinable with other " f"instances types, got {other!r}.")
         return FlatConcat(*self.source_expressions + other.source_expressions)
 
     def get_source_expressions(self):
@@ -114,14 +105,17 @@ class FlatConcat(Expression):
         return copy
 
     def resolve_expression(
-        self, query=None, allow_joins=True, reuse=None, summarize=False, for_save=False
+        self,
+        query=None,
+        allow_joins=True,
+        reuse=None,
+        summarize=False,
+        for_save=False,
     ):
         c = self.copy()
         c.is_summary = summarize
         for pos, arg in enumerate(c.source_expressions):
-            c.source_expressions[pos] = arg.resolve_expression(
-                query, allow_joins, reuse, summarize, for_save
-            )
+            c.source_expressions[pos] = arg.resolve_expression(query, allow_joins, reuse, summarize, for_save)
         return c
 
     def as_sql(self, compiler, connection, **_extra_context):

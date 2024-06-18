@@ -60,8 +60,7 @@ async def test_access_control_header_preflight(asgi_app: ASGI3Application, setti
                 (b"access-control-allow-credentials", b"true"),
                 (
                     b"access-control-allow-headers",
-                    b"Origin, Content-Type, Accept, Authorization, "
-                    b"Authorization-Bearer",
+                    b"Origin, Content-Type, Accept, Authorization, " b"Authorization-Bearer",
                 ),
                 (b"access-control-allow-methods", b"POST, OPTIONS"),
                 (b"access-control-allow-origin", b"http://localhost:3000"),
@@ -110,17 +109,13 @@ async def test_access_control_header_simple(asgi_app: ASGI3Application, settings
     ],
 )
 @pytest.mark.asyncio
-async def test_access_control_allowed_origins(
-    asgi_app, settings, allowed_origins, origin
-):
+async def test_access_control_allowed_origins(asgi_app, settings, allowed_origins, origin):
     settings.CORS_ALLOWED_ORIGINS = allowed_origins
     cors_app = cors_handler(asgi_app)
     events = await run_app(cors_app, build_scope(origin, "OPTIONS"))
     assert events[0]["type"] == "http.response.start"
     assert events[0]["status"] == 200
-    assert (b"access-control-allow-origin", origin.encode("latin1")) in events[0][
-        "headers"
-    ]
+    assert (b"access-control-allow-origin", origin.encode("latin1")) in events[0]["headers"]
 
 
 @pytest.mark.parametrize(
@@ -130,22 +125,26 @@ async def test_access_control_allowed_origins(
         (["http://example.org"], "http://localhost:3000"),
         (["http://example.org"], "file://example.org"),
         (["http://example.org"], "http://example.org:8000"),
-        (["http://example.org", "https://example.org"], "http://api.example.org"),
+        (
+            ["http://example.org", "https://example.org"],
+            "http://api.example.org",
+        ),
         (["https://*.example.org"], "https://apiexample.com"),
     ],
 )
 @pytest.mark.asyncio
-async def test_access_control_disallowed_origins(
-    asgi_app, settings, allowed_origins, origin
-):
+async def test_access_control_disallowed_origins(asgi_app, settings, allowed_origins, origin):
     settings.CORS_ALLOWED_ORIGINS = allowed_origins
     cors_app = cors_handler(asgi_app)
     events = await run_app(cors_app, build_scope(origin, "OPTIONS"))
     assert events[0]["type"] == "http.response.start"
     assert events[0]["status"] == 400
-    assert (b"access-control-allow-origin", origin.encode("latin1")) not in events[0][
-        "headers"
-    ]
+    assert (
+        b"access-control-allow-origin",
+        origin.encode("latin1"),
+    ) not in events[
+        0
+    ]["headers"]
 
 
 @pytest.mark.asyncio
@@ -161,8 +160,4 @@ async def test_non_http_scope(asgi_app: ASGI3Application):
 
     cors_app = cors_handler(asgi_app)
     await cors_app(non_http_scope, receive, send)
-    assert not any(
-        header[0].startswith(b"access-control-")
-        for event in events
-        for header in event.get("headers", [])
-    )
+    assert not any(header[0].startswith(b"access-control-") for event in events for header in event.get("headers", []))

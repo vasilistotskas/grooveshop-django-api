@@ -114,7 +114,10 @@ class Migration(migrations.Migration):
                     "show_button",
                     models.BooleanField(default=False, verbose_name="Show Button"),
                 ),
-                ("date_start", models.DateTimeField(verbose_name="Date Start")),
+                (
+                    "date_start",
+                    models.DateTimeField(verbose_name="Date Start"),
+                ),
                 ("date_end", models.DateTimeField(verbose_name="Date End")),
                 (
                     "image",
@@ -164,32 +167,42 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(
-                        db_index=True, max_length=15, verbose_name="Language"
-                    ),
+                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
                 ),
                 (
                     "name",
                     models.CharField(
-                        blank=True, max_length=50, null=True, verbose_name="Name"
+                        blank=True,
+                        max_length=50,
+                        null=True,
+                        verbose_name="Name",
                     ),
                 ),
                 (
                     "url",
                     models.URLField(
-                        blank=True, max_length=255, null=True, verbose_name="Url"
+                        blank=True,
+                        max_length=255,
+                        null=True,
+                        verbose_name="Url",
                     ),
                 ),
                 (
                     "title",
                     models.CharField(
-                        blank=True, max_length=40, null=True, verbose_name="Title"
+                        blank=True,
+                        max_length=40,
+                        null=True,
+                        verbose_name="Title",
                     ),
                 ),
                 (
                     "subtitle",
                     models.CharField(
-                        blank=True, max_length=40, null=True, verbose_name="Subtitle"
+                        blank=True,
+                        max_length=40,
+                        null=True,
+                        verbose_name="Subtitle",
                     ),
                 ),
                 (
@@ -245,26 +258,33 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(
-                        db_index=True, max_length=15, verbose_name="Language"
-                    ),
+                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
                 ),
                 (
                     "name",
                     models.CharField(
-                        blank=True, max_length=50, null=True, verbose_name="Name"
+                        blank=True,
+                        max_length=50,
+                        null=True,
+                        verbose_name="Name",
                     ),
                 ),
                 (
                     "url",
                     models.CharField(
-                        blank=True, max_length=255, null=True, verbose_name="Url"
+                        blank=True,
+                        max_length=255,
+                        null=True,
+                        verbose_name="Url",
                     ),
                 ),
                 (
                     "title",
                     models.CharField(
-                        blank=True, max_length=40, null=True, verbose_name="Title"
+                        blank=True,
+                        max_length=40,
+                        null=True,
+                        verbose_name="Title",
                     ),
                 ),
                 (

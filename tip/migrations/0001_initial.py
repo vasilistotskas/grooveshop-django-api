@@ -65,7 +65,10 @@ class Migration(migrations.Migration):
                         verbose_name="Icon",
                     ),
                 ),
-                ("active", models.BooleanField(default=True, verbose_name="Active")),
+                (
+                    "active",
+                    models.BooleanField(default=True, verbose_name="Active"),
+                ),
             ],
             options={
                 "verbose_name": "Tip",
@@ -88,26 +91,28 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(
-                        db_index=True, max_length=15, verbose_name="Language"
-                    ),
+                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
                 ),
                 (
                     "title",
                     models.CharField(
-                        blank=True, max_length=200, null=True, verbose_name="Title"
+                        blank=True,
+                        max_length=200,
+                        null=True,
+                        verbose_name="Title",
                     ),
                 ),
                 (
                     "content",
-                    tinymce.models.HTMLField(
-                        blank=True, null=True, verbose_name="Content"
-                    ),
+                    tinymce.models.HTMLField(blank=True, null=True, verbose_name="Content"),
                 ),
                 (
                     "url",
                     models.URLField(
-                        blank=True, max_length=255, null=True, verbose_name="Url"
+                        blank=True,
+                        max_length=255,
+                        null=True,
+                        verbose_name="Url",
                     ),
                 ),
                 (

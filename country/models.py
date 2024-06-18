@@ -22,7 +22,8 @@ class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         max_length=2,
         validators=[
             RegexValidator(
-                regex="^[A-Z]{2}$", message=_("Enter a valid 2-letter country code.")
+                regex="^[A-Z]{2}$",
+                message=_("Enter a valid 2-letter country code."),
             )
         ],
     )
@@ -33,22 +34,15 @@ class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         max_length=3,
         validators=[
             RegexValidator(
-                regex="^[A-Z]{3}$", message=_("Enter a valid 3-letter country code.")
+                regex="^[A-Z]{3}$",
+                message=_("Enter a valid 3-letter country code."),
             )
         ],
     )
-    iso_cc = models.PositiveSmallIntegerField(
-        _("ISO Country Code"), blank=True, null=True, unique=True
-    )
-    phone_code = models.PositiveSmallIntegerField(
-        _("Phone Code"), blank=True, null=True, unique=True
-    )
-    image_flag = models.ImageField(
-        _("Image Flag"), blank=True, null=True, upload_to="uploads/country/"
-    )
-    translations = TranslatedFields(
-        name=models.CharField(_("Name"), max_length=100, blank=True, null=True)
-    )
+    iso_cc = models.PositiveSmallIntegerField(_("ISO Country Code"), blank=True, null=True, unique=True)
+    phone_code = models.PositiveSmallIntegerField(_("Phone Code"), blank=True, null=True, unique=True)
+    image_flag = models.ImageField(_("Image Flag"), blank=True, null=True, upload_to="uploads/country/")
+    translations = TranslatedFields(name=models.CharField(_("Name"), max_length=100, blank=True, null=True))
 
     class Meta(TypedModelMeta):
         ordering = ["sort_order"]

@@ -32,9 +32,7 @@ class ProductCategoryViewSetTestCase(APITestCase):
     default_image: SimpleUploadedFile = None
 
     def setUp(self):
-        self.default_image = get_or_create_default_image(
-            "uploads/categories/no_photo.jpg"
-        )
+        self.default_image = get_or_create_default_image("uploads/categories/no_photo.jpg")
 
         self.category = ProductCategory.objects.create(
             slug="sample-category",
@@ -61,9 +59,7 @@ class ProductCategoryViewSetTestCase(APITestCase):
         for language in languages:
             self.sub_category.set_current_language(language)
             self.sub_category.name = f"Sample Sub Category {language}"
-            self.sub_category.description = (
-                f"Sample Sub Category Description {language}"
-            )
+            self.sub_category.description = f"Sample Sub Category Description {language}"
             self.sub_category.save()
         self.sub_category.set_current_language(default_language)
 
@@ -79,9 +75,7 @@ class ProductCategoryViewSetTestCase(APITestCase):
         image = Image.new("RGB", size=(100, 100), color=(155, 0, 0))
         image_io = io.BytesIO()
         image.save(image_io, format="jpeg")
-        image_file = SimpleUploadedFile(
-            "mock_image.jpg", image_io.getvalue(), content_type="image/jpg"
-        )
+        image_file = SimpleUploadedFile("mock_image.jpg", image_io.getvalue(), content_type="image/jpg")
         return image_file
 
     def test_list(self):

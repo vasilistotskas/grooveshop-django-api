@@ -19,9 +19,7 @@ class CartItemViewSetTest(APITestCase):
     update_data: dict = None
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="testuser@example.com", password="testpassword"
-        )
+        self.user = User.objects.create_user(email="testuser@example.com", password="testpassword")
         self.client.login(email="testuser@example.com", password="testpassword")
         self.client.force_authenticate(user=self.user)
         self.cart = Cart.objects.create(user=self.user)
@@ -35,9 +33,7 @@ class CartItemViewSetTest(APITestCase):
             view_count=0,
             weight=0.00,
         )
-        self.cart_item = CartItem.objects.create(
-            cart=self.cart, product=self.product, quantity=2
-        )
+        self.cart_item = CartItem.objects.create(cart=self.cart, product=self.product, quantity=2)
         self.list_url = reverse("cart-item-list")
         self.detail_url = reverse("cart-item-detail", kwargs={"pk": self.cart_item.pk})
         self.create_data = {"product": self.product.pk, "quantity": 3}
@@ -62,9 +58,7 @@ class CartItemViewSetTest(APITestCase):
         self.assertEqual(response.data["quantity"], self.cart_item.quantity)
 
     def test_update_cart_item(self):
-        response = self.client.patch(
-            self.detail_url, data=self.update_data, format="json"
-        )
+        response = self.client.patch(self.detail_url, data=self.update_data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.cart_item.refresh_from_db()

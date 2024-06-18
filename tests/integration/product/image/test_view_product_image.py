@@ -40,9 +40,7 @@ class ProductImageViewSetTestCase(APITestCase):
             stock=10,
         )
 
-        self.default_image = get_or_create_default_image(
-            "uploads/products/no_photo.jpg"
-        )
+        self.default_image = get_or_create_default_image("uploads/products/no_photo.jpg")
 
         self.product_image = ProductImage.objects.create(
             product=self.product,
@@ -67,9 +65,7 @@ class ProductImageViewSetTestCase(APITestCase):
         image = Image.new("RGB", size=(100, 100), color=(155, 0, 0))
         image_io = io.BytesIO()
         image.save(image_io, format="jpeg")
-        image_file = SimpleUploadedFile(
-            "mock_image.jpg", image_io.getvalue(), content_type="image/jpg"
-        )
+        image_file = SimpleUploadedFile("mock_image.jpg", image_io.getvalue(), content_type="image/jpg")
         return image_file
 
     def test_list(self):
@@ -77,12 +73,8 @@ class ProductImageViewSetTestCase(APITestCase):
         response = self.client.get(url)
         images = ProductImage.objects.all()
         serializer = ProductImageSerializer(images, many=True)
-        for response_item, serializer_item in zip(
-            response.data["results"], serializer.data
-        ):
-            compare_serializer_and_response(
-                serializer_item, response_item, ["image", "thumbnail"]
-            )
+        for response_item, serializer_item in zip(response.data["results"], serializer.data):
+            compare_serializer_and_response(serializer_item, response_item, ["image", "thumbnail"])
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -126,9 +118,7 @@ class ProductImageViewSetTestCase(APITestCase):
         response = self.client.get(url)
         product_image = ProductImage.objects.get(pk=self.product_image.id)
         serializer = ProductImageSerializer(product_image)
-        compare_serializer_and_response(
-            serializer.data, response.data, ["image", "thumbnail"]
-        )
+        compare_serializer_and_response(serializer.data, response.data, ["image", "thumbnail"])
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 

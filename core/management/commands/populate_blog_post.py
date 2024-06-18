@@ -33,14 +33,10 @@ class Command(BaseCommand):
         total_posts = options["total_posts"]
         total_time = 0
         start_time = time.time()
-        available_languages = [
-            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
-        ]
+        available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 
         if total_posts < 1:
-            self.stdout.write(
-                self.style.WARNING("Total number of blog posts must be greater than 0.")
-            )
+            self.stdout.write(self.style.WARNING("Total number of blog posts must be greater than 0."))
             return
 
         categories = list(BlogCategory.objects.all())
@@ -49,9 +45,7 @@ class Command(BaseCommand):
         users = list(User.objects.all())
 
         if not categories or not tags or not authors or not users:
-            self.stdout.write(
-                self.style.ERROR("Insufficient data. Aborting seeding BlogPost model.")
-            )
+            self.stdout.write(self.style.ERROR("Insufficient data. Aborting seeding BlogPost model."))
             return
 
         if not available_languages:

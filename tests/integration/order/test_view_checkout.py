@@ -23,9 +23,7 @@ class CheckoutViewAPITest(APITestCase):
     region: Region = None
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="test@test.com", password="test12345@!"
-        )
+        self.user = User.objects.create_user(email="test@test.com", password="test12345@!")
         self.client.login(email="test@test.com", password="test12345@!")
         image_icon = get_or_create_default_image("uploads/pay_way/no_photo.jpg")
         self.pay_way = PayWay.objects.create(

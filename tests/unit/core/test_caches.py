@@ -22,9 +22,7 @@ class CustomCacheTestCase(TestCase):
         self.assertEqual(cached_value, self.value)
 
     def test_cache_get_default(self):
-        cached_value = self.cache_instance.get(
-            "non_existent_key", default="default_value"
-        )
+        cached_value = self.cache_instance.get("non_existent_key", default="default_value")
         self.assertEqual(cached_value, "default_value")
 
     def test_cache_get_many(self):
@@ -42,9 +40,7 @@ class CustomCacheTestCase(TestCase):
         self.assertEqual(cached_value, self.value)
 
     def test_cache_get_or_set(self):
-        cached_value = self.cache_instance.get_or_set(
-            self.key, default=self.value, timeout=60
-        )
+        cached_value = self.cache_instance.get_or_set(self.key, default=self.value, timeout=60)
         self.assertEqual(cached_value, self.value)
 
     def test_cache_add(self):

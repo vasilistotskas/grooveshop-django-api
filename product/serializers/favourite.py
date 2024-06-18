@@ -21,13 +21,11 @@ class ProductFavouriteSerializer(BaseExpandSerializer):
         model = ProductFavourite
         fields = ("id", "user", "product", "created_at", "updated_at", "uuid")
 
-    def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:
-        user_account_serializer = importlib.import_module(
-            "authentication.serializers"
-        ).AuthenticationSerializer
-        product_serializer = importlib.import_module(
-            "product.serializers.product"
-        ).ProductSerializer
+    def get_expand_fields(
+        self,
+    ) -> Dict[str, Type[serializers.ModelSerializer]]:
+        user_account_serializer = importlib.import_module("authentication.serializers").AuthenticationSerializer
+        product_serializer = importlib.import_module("product.serializers.product").ProductSerializer
         return {
             "user": user_account_serializer,
             "product": product_serializer,

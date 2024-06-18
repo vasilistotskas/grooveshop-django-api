@@ -62,10 +62,10 @@ class SlideSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "uuid",
         )
 
-    def get_expand_fields(self) -> Dict[str, Type[serializers.ModelSerializer]]:
-        slider_serializer = importlib.import_module(
-            "slider.serializers"
-        ).SliderSerializer
+    def get_expand_fields(
+        self,
+    ) -> Dict[str, Type[serializers.ModelSerializer]]:
+        slider_serializer = importlib.import_module("slider.serializers").SliderSerializer
         return {
             "slider": slider_serializer,
         }

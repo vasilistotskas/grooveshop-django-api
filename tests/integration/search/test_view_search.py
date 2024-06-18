@@ -151,9 +151,7 @@ class SearchProductAPITest(APITestCase):
         )
 
         self.product1.set_current_language("de")
-        self.product1.name = (
-            "Samsung Galaxy Z Fold5 5G Dual SIM (12 GB/512 GB) Phantomschwarz"
-        )
+        self.product1.name = "Samsung Galaxy Z Fold5 5G Dual SIM (12 GB/512 GB) Phantomschwarz"
         self.product1.description = (
             "Mit einem innovativen Formfaktor, der durch das "
             "neue Flex-Scharnier durch ein ausgewogenes Design "
@@ -164,9 +162,7 @@ class SearchProductAPITest(APITestCase):
         self.product1.save()
 
         self.product1.set_current_language("el")
-        self.product1.name = (
-            "Samsung Galaxy Z Fold5 5G Dual SIM (12 GB/512 GB) Φανταστικό Μαύρο"
-        )
+        self.product1.name = "Samsung Galaxy Z Fold5 5G Dual SIM (12 GB/512 GB) Φανταστικό Μαύρο"
         self.product1.description = (
             "Με μια καινοτόμο μορφή που βελτιώνεται από το "
             "νέο Flex Hinge για ένα ισορροπημένο σχεδιασμό και "
@@ -188,9 +184,7 @@ class SearchProductAPITest(APITestCase):
 
         self.product2.set_current_language("el")
 
-        self.product2.name = (
-            "Michelin Pilot Sport 5 225/45 R17 94Y XL Ελαστικό Καλοκαιρινό"
-        )
+        self.product2.name = "Michelin Pilot Sport 5 225/45 R17 94Y XL Ελαστικό Καλοκαιρινό"
         self.product2.description = (
             "Pilot Sport 5 Michelin ελαστικό αυτοκινήτου καλοκαιρινό."
             " Αυτός ο τύπος ελαστικού είναι κατάλληλος για χρήση σε υψηλές θερμοκρασίες."
@@ -200,9 +194,7 @@ class SearchProductAPITest(APITestCase):
         self.product2.save()
 
         self.product3.set_current_language("de")
-        self.product3.name = (
-            "Nike Park VII Herren Sport T-Shirt Kurzarm Dri-Fit Schwarz"
-        )
+        self.product3.name = "Nike Park VII Herren Sport T-Shirt Kurzarm Dri-Fit Schwarz"
         self.product3.description = (
             "Fügen Sie Ihrem Training Komfort und Bewegungsfreiheit hinzu"
             " mit diesem T-Shirt von Nike. Benutzer, die es gekauft haben,"
@@ -212,9 +204,7 @@ class SearchProductAPITest(APITestCase):
         self.product3.save()
 
         self.product3.set_current_language("el")
-        self.product3.name = (
-            "Nike Park VII Ανδρικό Αθλητικό T-shirt Κοντομάνικο Dri-Fit Μαύρο"
-        )
+        self.product3.name = "Nike Park VII Ανδρικό Αθλητικό T-shirt Κοντομάνικο Dri-Fit Μαύρο"
         self.product3.description = (
             "Προσθέστε άνεση και ελευθερία κινήσεων στην προπόνησή σας"
             " με αυτό το μπλουζάκι από τη Nike. Οι χρήστες που το έχουν αγοράσει"
@@ -384,9 +374,7 @@ class SearchProductAPITest(APITestCase):
         response_el_2 = self.client.get(url, {"query": "Μαύρο", "language": "el"})
         response_el_3 = self.client.get(url, {"query": "παπούτσι", "language": "el"})
 
-        response_de_1 = self.client.get(
-            url, {"query": "Sommerreifen", "language": "de"}
-        )
+        response_de_1 = self.client.get(url, {"query": "Sommerreifen", "language": "de"})
         response_de_2 = self.client.get(url, {"query": "Schwarz", "language": "de"})
         response_de_3 = self.client.get(url, {"query": "Herren", "language": "de"})
 

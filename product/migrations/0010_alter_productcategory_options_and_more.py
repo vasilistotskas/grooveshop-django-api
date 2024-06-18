@@ -4,7 +4,10 @@ from django.db import migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("product", "0009_remove_product_product_pro_hits_19ae26_btree_and_more"),
+        (
+            "product",
+            "0009_remove_product_product_pro_hits_19ae26_btree_and_more",
+        ),
     ]
 
     operations = [

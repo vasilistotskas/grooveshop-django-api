@@ -52,9 +52,7 @@ class CeleryConfigTestCase(TestCase):
     @patch("core.celery.get_channel_layer")
     @patch("os.getenv")
     @patch.dict(os.environ, {"DEBUG": "True"})
-    def test_debug_task_notification_with_debug_true(
-        self, mock_getenv, mock_get_channel_layer
-    ):
+    def test_debug_task_notification_with_debug_true(self, mock_getenv, mock_get_channel_layer):
         mock_getenv.return_value = "True"
         mock_channel_layer = mock_get_channel_layer.return_value
         mock_channel_layer.group_send = AsyncMock()
@@ -120,9 +118,7 @@ class CleanupLogFilesTaskTest(TestCase):
         self.assertFalse(path.exists(self.old_file))
         self.assertTrue(path.exists(self.new_file))
 
-        mock_logger.info.assert_called_once_with(
-            "Removed log files older than 30 days."
-        )
+        mock_logger.info.assert_called_once_with("Removed log files older than 30 days.")
 
     def test_does_not_remove_recent_logs(self):
         recent_file = path.join(self.logs_path, "logs_01-01-2021.log")

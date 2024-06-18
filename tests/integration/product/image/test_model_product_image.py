@@ -35,9 +35,7 @@ class ProductImageModelTestCase(TestCase):
             stock=10,
         )
 
-        self.default_image = get_or_create_default_image(
-            "uploads/products/no_photo.jpg"
-        )
+        self.default_image = get_or_create_default_image("uploads/products/no_photo.jpg")
 
         self.product_image = ProductImage.objects.create(
             product=self.product,

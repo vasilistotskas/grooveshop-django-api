@@ -35,12 +35,13 @@ class Migration(migrations.Migration):
                     "uuid",
                     models.UUIDField(default=uuid.uuid4, editable=False, unique=True),
                 ),
-                ("name", models.CharField(max_length=100, verbose_name="Name")),
+                (
+                    "name",
+                    models.CharField(max_length=100, verbose_name="Name"),
+                ),
                 (
                     "email",
-                    models.EmailField(
-                        db_index=True, max_length=254, verbose_name="Email"
-                    ),
+                    models.EmailField(db_index=True, max_length=254, verbose_name="Email"),
                 ),
                 ("message", models.TextField(verbose_name="Message")),
             ],

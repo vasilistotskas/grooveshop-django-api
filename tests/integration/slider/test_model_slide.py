@@ -3,12 +3,12 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.core.files.storage import default_storage
-from django.test import override_settings
 from django.test import TestCase
 from django.utils.timezone import now
 from djmoney.money import Money
 
-from helpers.seed import get_or_create_default_image
+from slider.factories import SlideFactory
+from slider.factories import SliderFactory
 from slider.models import Slide
 from slider.models import Slider
 
@@ -16,29 +16,21 @@ languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
-@override_settings(
-    STORAGES={
-        "default": {
-            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
-        },
-    }
-)
 class SlideModelTestCase(TestCase):
     slide: Slide = None
     slider: Slider = None
 
     def setUp(self):
-        image = get_or_create_default_image("uploads/slides/no_photo.jpg")
         date_start = now()
-        self.slider = Slider.objects.create()
-        self.slide = Slide.objects.create(
+        self.slider = SliderFactory()
+        self.slide = SlideFactory(
             discount=0.0,
             show_button=True,
-            image=image,
             date_start=date_start,
             date_end=date_start + timedelta(days=30),
             slider=self.slider,
         )
+
         for language in languages:
             self.slide.set_current_language(language)
             self.slide.name = f"Slide 1_{language}"
@@ -75,7 +67,6 @@ class SlideModelTestCase(TestCase):
         )
 
     def test_save(self):
-        self.slide.image = get_or_create_default_image("uploads/slides/no_photo.jpg")
         self.slide.save()
         self.assertTrue(default_storage.exists(self.slide.image.path))
 
@@ -88,6 +79,6 @@ class SlideModelTestCase(TestCase):
         self.assertEqual(self.slide.main_image_filename, expected_filename)
 
     def tearDown(self) -> None:
+        Slide.objects.all().delete()
+        Slider.objects.all().delete()
         super().tearDown()
-        self.slide.delete()
-        self.slider.delete()

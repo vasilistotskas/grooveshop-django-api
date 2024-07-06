@@ -1,7 +1,10 @@
 from django.test import TestCase
 
+from cart.factories import CartFactory
+from cart.factories import CartItemFactory
 from cart.models import Cart
 from cart.models import CartItem
+from product.factories.product import ProductFactory
 from product.models.product import Product
 
 
@@ -11,18 +14,9 @@ class CartItemModelTestCase(TestCase):
     product: Product = None
 
     def setUp(self):
-        self.cart = Cart.objects.create()
-        self.product = Product.objects.create(
-            name="Product 1",
-            slug="product_one",
-            price=10.00,
-            active=True,
-            stock=10,
-            discount_percent=5.00,
-            view_count=0,
-            weight=0.00,
-        )
-        self.cart_item = CartItem.objects.create(cart=self.cart, product=self.product, quantity=3)
+        self.cart = CartFactory()
+        self.product = ProductFactory()
+        self.cart_item = CartItemFactory(cart=self.cart, product=self.product, quantity=3)
 
     def test_fields(self):
         self.assertEqual(self.cart_item.cart, self.cart)
@@ -71,21 +65,12 @@ class CartItemModelTestCase(TestCase):
         self.assertEqual(self.cart_item.quantity, new_quantity)
 
     def test_cart_item_ordering(self):
-        product_2 = Product.objects.create(
-            name="Product 2",
-            slug="product_two",
-            price=10.00,
-            active=True,
-            stock=10,
-            discount_percent=5.00,
-            view_count=0,
-            weight=0.00,
-        )
-        cart_item_2 = CartItem.objects.create(cart=self.cart, product=product_2, quantity=3)
+        product_2 = ProductFactory()
+        cart_item_2 = CartItemFactory(cart=self.cart, product=product_2, quantity=3)
         self.assertLess(self.cart_item.id, cart_item_2.id)
 
     def tearDown(self) -> None:
+        CartItem.objects.all().delete()
+        Cart.objects.all().delete()
+        Product.objects.all().delete()
         super().tearDown()
-        self.cart_item.delete()
-        self.cart.delete()
-        self.product.delete()

@@ -2,11 +2,10 @@ import os
 
 from django.conf import settings
 from django.core.files.storage import default_storage
-from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import override_settings
 from django.test import TestCase
 
-from helpers.seed import get_or_create_default_image
+from product.factories.image import ProductImageFactory
+from product.factories.product import ProductFactory
 from product.models.image import ProductImage
 from product.models.product import Product
 
@@ -14,32 +13,14 @@ languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
-@override_settings(
-    STORAGES={
-        "default": {
-            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
-        },
-    }
-)
 class ProductImageModelTestCase(TestCase):
     product: Product = None
     product_image: ProductImage = None
-    default_image: SimpleUploadedFile = None
 
     def setUp(self):
-        self.product = Product.objects.create(
-            name="Test Product",
-            slug="test-product",
-            price=20.00,
-            active=True,
-            stock=10,
-        )
-
-        self.default_image = get_or_create_default_image("uploads/products/no_photo.jpg")
-
-        self.product_image = ProductImage.objects.create(
+        self.product = ProductFactory()
+        self.product_image = ProductImageFactory(
             product=self.product,
-            image=self.default_image,
             is_main=True,
         )
         for language in languages:
@@ -97,6 +78,6 @@ class ProductImageModelTestCase(TestCase):
         self.assertEqual(self.product_image.main_image_filename, expected_filename)
 
     def tearDown(self) -> None:
+        Product.objects.all().delete()
+        ProductImage.objects.all().delete()
         super().tearDown()
-        self.product_image.delete()
-        self.product.delete()

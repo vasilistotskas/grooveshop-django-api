@@ -11,6 +11,7 @@ from parler.managers import TranslatableManager
 from parler.models import TranslatableModel
 from parler.models import TranslatedFields
 
+from core.fields.image import ImageAndSvgField
 from core.models import SortableModel
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
@@ -29,7 +30,7 @@ class ProductImage(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDMo
         related_name="product_images",
         on_delete=models.CASCADE,
     )
-    image = models.ImageField(_("Image"), upload_to="uploads/products/")
+    image = ImageAndSvgField(_("Image"), upload_to="uploads/products/")
     thumbnail = models.ImageField(
         _("Thumbnail"),
         upload_to="uploads/products/thumbnails/",

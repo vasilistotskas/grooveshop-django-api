@@ -4,10 +4,14 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from blog.factories.author import BlogAuthorFactory
+from blog.factories.comment import BlogCommentFactory
+from blog.factories.post import BlogPostFactory
 from blog.models.author import BlogAuthor
 from blog.models.comment import BlogComment
 from blog.models.post import BlogPost
 from blog.serializers.comment import BlogCommentSerializer
+from user.factories.account import UserAccountFactory
 
 languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
@@ -15,23 +19,19 @@ User = get_user_model()
 
 
 class BlogCommentViewSetTestCase(APITestCase):
-    comment = None
-    user = None
-    post = None
-    author = None
+    comment: BlogComment = None
+    user: User = None
+    post: BlogPost = None
+    author: BlogAuthor = None
 
     def setUp(self):
-        self.user = User.objects.create_user(email="testuser@example.com", password="testpassword")
-        self.client.login(email="testuser@example.com", password="testpassword")
+        self.user = UserAccountFactory()
         self.client.force_authenticate(user=self.user)
-        self.author = BlogAuthor.objects.create(user=self.user)
-        self.post = BlogPost.objects.create(
-            slug="test-post",
-            title="Test Post",
-            body="This is a test post.",
+        self.author = BlogAuthorFactory(user=self.user)
+        self.post = BlogPostFactory(
             author=self.author,
         )
-        self.comment = BlogComment.objects.create(is_approved=True, user=self.user, post=self.post)
+        self.comment = BlogCommentFactory(is_approved=True, user=self.user, post=self.post)
         for language in languages:
             self.comment.set_current_language(language)
             self.comment.content = f"Comment Content in {language}"
@@ -55,12 +55,9 @@ class BlogCommentViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_valid(self):
-        user = User.objects.create_user(email="testuser2@example.com", password="testpassword2")
-        author = BlogAuthor.objects.create(user=user)
-        post = BlogPost.objects.create(
-            slug="test-post-2",
-            title="Test Post 2",
-            body="This is another test post.",
+        user = UserAccountFactory()
+        author = BlogAuthorFactory(user=user)
+        post = BlogPostFactory(
             author=author,
         )
 
@@ -202,8 +199,8 @@ class BlogCommentViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def tearDown(self) -> None:
+        BlogComment.objects.all().delete()
+        BlogPost.objects.all().delete()
+        BlogAuthor.objects.all().delete()
+        User.objects.all().delete()
         super().tearDown()
-        self.comment.delete()
-        self.post.delete()
-        self.author.delete()
-        self.user.delete()

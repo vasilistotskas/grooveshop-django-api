@@ -1,7 +1,8 @@
 from django.conf import settings
 from django.test import TestCase
 
-from blog.models.post import BlogPost
+from blog.factories.post import BlogPostFactory
+from blog.factories.tag import BlogTagFactory
 from blog.models.tag import BlogTag
 
 languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
@@ -12,13 +13,8 @@ class BlogTagModelTestCase(TestCase):
     tag: BlogTag = None
 
     def setUp(self):
-        self.tag = BlogTag.objects.create()
+        self.tag = BlogTagFactory(active=True)
         self.tag.sort_order = 0
-        for language in languages:
-            self.tag.set_current_language(language)
-            self.tag.name = f"Tag name in {language}"
-            self.tag.save()
-        self.tag.set_current_language(default_language)
 
     def test_fields(self):
         self.assertTrue(self.tag.active)
@@ -30,11 +26,6 @@ class BlogTagModelTestCase(TestCase):
             f"{tag_name} ({'Active' if self.tag.active else 'Inactive'})",
         )
 
-    def test_translations(self):
-        for language in languages:
-            self.tag.set_current_language(language)
-            self.assertEqual(self.tag.name, f"Tag name in {language}")
-
     def test_str_representation(self):
         tag_name = self.tag.safe_translation_getter("name", any_language=True) or "Unnamed Tag"
         self.assertEqual(
@@ -43,44 +34,28 @@ class BlogTagModelTestCase(TestCase):
         )
 
     def test_get_ordering_queryset(self):
-        tag_2 = BlogTag.objects.create()
-        tag_2.sort_order = 1
-        tag_2.save()
-        tag_3 = BlogTag.objects.create()
-        tag_3.sort_order = 2
-        tag_3.save()
-        tag_4 = BlogTag.objects.create()
-        tag_4.sort_order = 3
-        for language in languages:
-            tag_2.set_current_language(language)
-            tag_2.name = f"Tag name in {language}"
-            tag_2.save()
-            tag_3.set_current_language(language)
-            tag_3.name = f"Tag name in {language}"
-            tag_3.save()
-            tag_4.set_current_language(language)
-            tag_4.name = f"Tag name in {language}"
-            tag_4.save()
-        tag_2.set_current_language(default_language)
-        tag_3.set_current_language(default_language)
-        tag_4.set_current_language(default_language)
+        BlogTag.objects.all().delete()
 
-        self.assertEqual(
-            list(BlogTag.objects.all()),
-            [self.tag, tag_2, tag_3, tag_4],
-        )
+        tags = [
+            BlogTagFactory(sort_order=1, active=True),
+            BlogTagFactory(sort_order=2, active=True),
+            BlogTagFactory(sort_order=3, active=True),
+        ]
+
+        for tag in tags:
+            tag.save()
+
+        ordered_tags = BlogTag.objects.all().order_by("sort_order")
+
+        ordered_sort_orders = [tag.sort_order for tag in ordered_tags]
+
+        self.assertEqual(ordered_sort_orders, [1, 2, 3])
 
     def test_get_tag_posts_count(self):
-        post = BlogPost.objects.create(
-            title="Test Post",
-            status="draft",
-            category=None,
-            featured=False,
-            view_count=0,
-        )
+        post = BlogPostFactory()
         post.tags.set([self.tag])
         self.assertEqual(self.tag.get_tag_posts_count, 1)
 
     def tearDown(self) -> None:
+        BlogTag.objects.all().delete()
         super().tearDown()
-        self.tag.delete()

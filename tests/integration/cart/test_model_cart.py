@@ -2,9 +2,13 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
 
+from cart.factories import CartFactory
+from cart.factories import CartItemFactory
 from cart.models import Cart
 from cart.models import CartItem
+from product.factories.product import ProductFactory
 from product.models.product import Product
+from user.factories.account import UserAccountFactory
 
 User = get_user_model()
 
@@ -16,35 +20,21 @@ class CartModelTestCase(TestCase):
     cart_item_2: CartItem = None
 
     def setUp(self):
-        self.user = User.objects.create_user(email="testuser@example.com", password="testpassword")
-        self.cart = Cart.objects.create(user=self.user)
-        product_1 = Product.objects.create(
-            slug="product_one",
-            price=10.00,
-            active=True,
-            stock=10,
-            discount_percent=5.00,
-            view_count=0,
-            weight=0.00,
-        )
-        product_2 = Product.objects.create(
-            slug="product_two",
-            price=25.00,
-            active=True,
-            stock=10,
-            discount_percent=10.00,
-            view_count=0,
-            weight=0.00,
-        )
-        self.cart_item_1 = CartItem.objects.create(cart=self.cart, product=product_1, quantity=2)
-        self.cart_item_2 = CartItem.objects.create(cart=self.cart, product=product_2, quantity=3)
+        products = ProductFactory.create_batch(2)
+        product_1: Product = products[0]
+        product_2: Product = products[1]
+
+        self.user = UserAccountFactory()
+        self.cart = CartFactory(user=self.user)
+        self.cart_item_1 = CartItemFactory(cart=self.cart, product=product_1, quantity=2)
+        self.cart_item_2 = CartItemFactory(cart=self.cart, product=product_2, quantity=3)
 
     def test_fields(self):
         self.assertEqual(self.cart.user, self.user)
         self.assertEqual(self.cart.last_activity.date(), timezone.now().date())
 
     def test_str_representation(self):
-        expected_str = f"Cart {self.user} - Items: {self.cart.total_items} - Total:" f" {self.cart.total_price}"
+        expected_str = f"Cart {self.user} - Items: {self.cart.total_items} - Total: {self.cart.total_price}"
         self.assertEqual(str(self.cart), expected_str)
 
     def test_get_items(self):
@@ -67,8 +57,8 @@ class CartModelTestCase(TestCase):
         self.assertEqual(self.cart.total_discount_value.amount, expected_total_discount)
 
     def test_total_vat_value(self):
-        expected_total_vat = self.cart_item_1.product.vat_value + self.cart_item_2.product.vat_value
-        self.assertEqual(self.cart.total_vat_value, expected_total_vat)
+        expected_total_vat = self.cart_item_1.vat_value.amount + self.cart_item_2.vat_value.amount
+        self.assertEqual(self.cart.total_vat_value.amount, expected_total_vat)
 
     def test_total_items(self):
         expected_total_items = self.cart_item_1.quantity + self.cart_item_2.quantity
@@ -83,8 +73,8 @@ class CartModelTestCase(TestCase):
         self.assertNotEqual(self.cart.last_activity, last_activity_before_refresh)
 
     def tearDown(self) -> None:
+        CartItem.objects.all().delete()
+        Cart.objects.all().delete()
+        Product.objects.all().delete()
+        User.objects.all().delete()
         super().tearDown()
-        self.cart.delete()
-        self.user.delete()
-        self.cart_item_1.delete()
-        self.cart_item_2.delete()

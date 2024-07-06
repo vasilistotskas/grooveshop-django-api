@@ -2,7 +2,6 @@ import io
 
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import override_settings
 from django.urls import reverse
 from PIL import Image
 from rest_framework import status
@@ -10,7 +9,8 @@ from rest_framework.test import APITestCase
 
 from core.utils.serializers import flatten_dict_for_form_data
 from core.utils.tests import compare_serializer_and_response
-from helpers.seed import get_or_create_default_image
+from product.factories.image import ProductImageFactory
+from product.factories.product import ProductFactory
 from product.models.image import ProductImage
 from product.models.product import Product
 from product.serializers.image import ProductImageSerializer
@@ -19,32 +19,15 @@ languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
-@override_settings(
-    STORAGES={
-        "default": {
-            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
-        },
-    }
-)
 class ProductImageViewSetTestCase(APITestCase):
     product: Product = None
     product_image: ProductImage = None
     default_image: SimpleUploadedFile = None
 
     def setUp(self):
-        self.product = Product.objects.create(
-            name="Test Product",
-            slug="test-product",
-            price=20.00,
-            active=True,
-            stock=10,
-        )
-
-        self.default_image = get_or_create_default_image("uploads/products/no_photo.jpg")
-
-        self.product_image = ProductImage.objects.create(
+        self.product = ProductFactory()
+        self.product_image = ProductImageFactory(
             product=self.product,
-            image=self.default_image,
             is_main=True,
         )
         for language in languages:
@@ -199,6 +182,6 @@ class ProductImageViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def tearDown(self) -> None:
+        Product.objects.all().delete()
+        ProductImage.objects.all().delete()
         super().tearDown()
-        self.product_image.delete()
-        self.product.delete()

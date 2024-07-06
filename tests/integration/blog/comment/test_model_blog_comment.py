@@ -2,9 +2,13 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from blog.factories.author import BlogAuthorFactory
+from blog.factories.comment import BlogCommentFactory
+from blog.factories.post import BlogPostFactory
 from blog.models.author import BlogAuthor
 from blog.models.comment import BlogComment
 from blog.models.post import BlogPost
+from user.factories.account import UserAccountFactory
 
 languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
@@ -19,10 +23,10 @@ class BlogCommentModelTestCase(TestCase):
     post: BlogPost = None
 
     def setUp(self):
-        self.user = User.objects.create_user(email="testuser@example.com", password="testpassword")
-        self.author = BlogAuthor.objects.create(user=self.user)
-        self.post = BlogPost.objects.create(title="Test Post", author=self.author)
-        self.comment = BlogComment.objects.create(is_approved=True, user=self.user, post=self.post)
+        self.user = UserAccountFactory()
+        self.author = BlogAuthorFactory(user=self.user)
+        self.post = BlogPostFactory(author=self.author)
+        self.comment = BlogCommentFactory(is_approved=True, user=self.user, post=self.post)
         for language in languages:
             self.comment.set_current_language(language)
             self.comment.content = f"Comment Content in {language}"
@@ -57,7 +61,7 @@ class BlogCommentModelTestCase(TestCase):
         )
 
     def test_likes_count(self):
-        other_user = User.objects.create_user(email="testuser2@example.com", password="testpassword")
+        other_user = UserAccountFactory()
 
         self.assertEqual(self.comment.likes_count, 0)
 
@@ -66,8 +70,8 @@ class BlogCommentModelTestCase(TestCase):
         self.assertEqual(self.comment.likes_count, 1)
 
     def tearDown(self) -> None:
+        BlogComment.objects.all().delete()
+        BlogPost.objects.all().delete()
+        BlogAuthor.objects.all().delete()
+        User.objects.all().delete()
         super().tearDown()
-        self.comment.delete()
-        self.post.delete()
-        self.author.delete()
-        self.user.delete()

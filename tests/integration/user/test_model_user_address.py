@@ -3,6 +3,8 @@ from django.test import TestCase
 
 from user.enum.address import FloorChoicesEnum
 from user.enum.address import LocationChoicesEnum
+from user.factories.account import UserAccountFactory
+from user.factories.address import UserAddressFactory
 from user.models.address import UserAddress
 
 
@@ -14,8 +16,8 @@ class UserAddressModelTestCase(TestCase):
     address: UserAddress = None
 
     def setUp(self):
-        self.user = User.objects.create_user(email="test@test.com", password="test12345@!")
-        self.address = UserAddress.objects.create(
+        self.user = UserAccountFactory()
+        self.address = UserAddressFactory(
             user=self.user,
             title="Home",
             first_name="John",
@@ -57,41 +59,13 @@ class UserAddressModelTestCase(TestCase):
         )
 
     def test_get_main_address(self):
-        non_main_address_1 = UserAddress.objects.create(
+        non_main_address_1 = UserAddressFactory(
             user=self.user,
-            title="Main Address",
             is_main=False,
-            first_name="John",
-            last_name="Doe",
-            street="123 Main St",
-            street_number="Apt 4B",
-            city="Cityville",
-            zipcode="12345",
-            country=None,
-            region=None,
-            floor=FloorChoicesEnum.FIRST_FLOOR.value,
-            location_type=LocationChoicesEnum.HOME.value,
-            phone="123-456-7890",
-            mobile_phone="987-654-3210",
-            notes="Sample notes",
         )
-        non_main_address_2 = UserAddress.objects.create(
+        non_main_address_2 = UserAddressFactory(
             user=self.user,
-            title="Non-Main Address",
             is_main=False,
-            first_name="John",
-            last_name="Doe",
-            street="123 Main St",
-            street_number="Apt 4B",
-            city="Cityville",
-            zipcode="12345",
-            country=None,
-            region=None,
-            floor=FloorChoicesEnum.FIRST_FLOOR.value,
-            location_type=LocationChoicesEnum.HOME.value,
-            phone="123-456-7890",
-            mobile_phone="987-654-3210",
-            notes="Sample notes",
         )
         address = UserAddress.get_main_address(self.user)
 
@@ -100,47 +74,17 @@ class UserAddressModelTestCase(TestCase):
         self.assertFalse(non_main_address_2.is_main)
 
     def test_get_user_address_count(self):
-        UserAddress.objects.create(
+        UserAddressFactory(
             user=self.user,
-            title="Address 1",
-            first_name="John",
-            last_name="Doe",
-            street="123 Main St",
-            street_number="Apt 4B",
-            city="Cityville",
-            zipcode="12345",
-            country=None,
-            region=None,
-            floor=FloorChoicesEnum.FIRST_FLOOR.value,
-            location_type=LocationChoicesEnum.HOME.value,
-            phone="123-456-7890",
-            mobile_phone="987-654-3210",
-            notes="Sample notes",
-            is_main=False,
         )
-        UserAddress.objects.create(
+        UserAddressFactory(
             user=self.user,
-            title="Address 2",
-            first_name="John",
-            last_name="Doe",
-            street="123 Main St",
-            street_number="Apt 4B",
-            city="Cityville",
-            zipcode="12345",
-            country=None,
-            region=None,
-            floor=FloorChoicesEnum.FIRST_FLOOR.value,
-            location_type=LocationChoicesEnum.HOME.value,
-            phone="123-456-7890",
-            mobile_phone="987-654-3210",
-            notes="Sample notes",
-            is_main=False,
         )
         count = UserAddress.get_user_address_count(self.user)
 
         self.assertEqual(count, 3)
 
     def tearDown(self) -> None:
+        UserAddress.objects.all().delete()
+        User.objects.all().delete()
         super().tearDown()
-        self.user.delete()
-        self.address.delete()

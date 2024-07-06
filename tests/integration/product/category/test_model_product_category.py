@@ -1,15 +1,15 @@
 import os
-from decimal import Decimal
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files.storage import default_storage
-from django.test import override_settings
 from django.test import TestCase
 
-from helpers.seed import get_or_create_default_image
+from product.factories.category import ProductCategoryFactory
+from product.factories.product import ProductFactory
 from product.models.category import ProductCategory
-from product.models.product import Product
+from user.factories.account import UserAccountFactory
+from vat.factories import VatFactory
 from vat.models import Vat
 
 languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
@@ -17,34 +17,16 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
 
 
-@override_settings(
-    STORAGES={
-        "default": {
-            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
-        },
-    }
-)
 class CategoryModelTestCase(TestCase):
-    category = None
-    sub_category = None
-    user = None
-    vat = None
-    default_image = None
+    category: ProductCategory = None
+    sub_category: ProductCategory = None
+    user: User = None
+    vat: Vat = None
 
     def setUp(self):
-        self.user = User.objects.create_user(email="test@test.com", password="test12345@!")
-        self.vat = Vat.objects.create(
-            value=Decimal("24.0"),
-        )
-
-        self.default_image = get_or_create_default_image("uploads/categories/no_photo.jpg")
-
-        self.category = ProductCategory.objects.create(
-            slug="sample-category",
-            menu_image_one=self.default_image,
-            menu_image_two=self.default_image,
-            menu_main_banner=self.default_image,
-        )
+        self.user = UserAccountFactory()
+        self.vat = VatFactory()
+        self.category = ProductCategoryFactory()
 
         for language in languages:
             self.category.set_current_language(language)
@@ -53,13 +35,7 @@ class CategoryModelTestCase(TestCase):
             self.category.save()
         self.category.set_current_language(default_language)
 
-        self.sub_category = ProductCategory.objects.create(
-            slug="sample-sub-category",
-            parent=self.category,
-            menu_image_one=self.default_image,
-            menu_image_two=self.default_image,
-            menu_main_banner=self.default_image,
-        )
+        self.sub_category = ProductCategoryFactory(parent=self.category)
 
         for language in languages:
             self.sub_category.set_current_language(language)
@@ -69,7 +45,6 @@ class CategoryModelTestCase(TestCase):
         self.sub_category.set_current_language(default_language)
 
     def test_fields(self):
-        self.assertEqual(self.category.slug, "sample-category")
         self.assertTrue(default_storage.exists(self.category.menu_image_one.path))
         self.assertTrue(default_storage.exists(self.category.menu_image_two.path))
         self.assertTrue(default_storage.exists(self.category.menu_main_banner.path))
@@ -98,7 +73,7 @@ class CategoryModelTestCase(TestCase):
         self.assertEqual(str(self.sub_category), expected_str)
 
     def test_str_representation_with_grandparent(self):
-        grandparent = ProductCategory.objects.create(
+        grandparent = ProductCategoryFactory(
             slug="grandparent-category",
         )
         for language in languages:
@@ -126,7 +101,7 @@ class CategoryModelTestCase(TestCase):
         self.assertIn(self.category, parent_queryset)
 
     def test_get_ordering_queryset_without_parent(self):
-        no_parent_category = ProductCategory.objects.create(
+        no_parent_category = ProductCategoryFactory(
             slug="no-parent-category",
         )
 
@@ -145,46 +120,20 @@ class CategoryModelTestCase(TestCase):
         self.assertEqual(count, 0)
 
     def test_recursive_product_count_one_product(self):
-        Product.objects.create(
-            product_code="P123",
+        ProductFactory(
             category=self.category,
-            slug="product-1",
-            price=Decimal("100.0"),
-            active=True,
-            stock=10,
-            discount_percent=Decimal("0.0"),
-            vat=Vat.objects.create(value=Decimal("18.0")),
-            view_count=10,
-            weight=Decimal("1.0"),
+            vat=self.vat,
         )
 
         count = self.category.recursive_product_count
         self.assertEqual(count, 1)
 
     def test_recursive_product_count_multiple_products(self):
-        Product.objects.create(
-            product_code="P123",
+        ProductFactory(
             category=self.category,
-            slug="product-1",
-            price=Decimal("100.0"),
-            active=True,
-            stock=10,
-            discount_percent=Decimal("0.0"),
-            vat=Vat.objects.create(value=Decimal("18.0")),
-            view_count=10,
-            weight=Decimal("1.0"),
         )
-        Product.objects.create(
-            product_code="P124",
+        ProductFactory(
             category=self.sub_category,
-            slug="product-2",
-            price=Decimal("150.0"),
-            active=True,
-            stock=8,
-            discount_percent=Decimal("0.0"),
-            vat=Vat.objects.create(value=Decimal("18.0")),
-            view_count=8,
-            weight=Decimal("1.5"),
         )
 
         count = self.category.recursive_product_count
@@ -225,8 +174,7 @@ class CategoryModelTestCase(TestCase):
         self.assertEqual(self.category.category_menu_main_banner_filename, expected_filename)
 
     def tearDown(self) -> None:
+        ProductCategory.objects.all().delete()
+        User.objects.all().delete()
+        Vat.objects.all().delete()
         super().tearDown()
-        self.user.delete()
-        self.vat.delete()
-        self.sub_category.delete()
-        self.category.delete()

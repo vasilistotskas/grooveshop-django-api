@@ -2,35 +2,25 @@ import os
 
 from django.conf import settings
 from django.core.files.storage import default_storage
-from django.test import override_settings
 from django.test import TestCase
 from djmoney.money import Money
 
-from helpers.seed import get_or_create_default_image
 from pay_way.enum.pay_way_enum import PayWayEnum
+from pay_way.factories import PayWayFactory
 from pay_way.models import PayWay
 
 languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
-@override_settings(
-    STORAGES={
-        "default": {
-            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
-        },
-    }
-)
 class PayWayModelTestCase(TestCase):
     pay_way: PayWay = None
 
     def setUp(self):
-        image_icon = get_or_create_default_image("uploads/pay_way/no_photo.jpg")
-        self.pay_way = PayWay.objects.create(
+        self.pay_way = PayWayFactory(
             active=True,
             cost=10.00,
             free_for_order_amount=100.00,
-            icon=image_icon,
         )
         for language in languages:
             self.pay_way.set_current_language(language)
@@ -79,5 +69,5 @@ class PayWayModelTestCase(TestCase):
         self.assertEqual(icon_filename, os.path.basename(self.pay_way.icon.name))
 
     def tearDown(self) -> None:
+        PayWay.objects.all().delete()
         super().tearDown()
-        self.pay_way.delete()

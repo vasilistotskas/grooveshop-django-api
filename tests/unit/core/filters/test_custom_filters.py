@@ -47,5 +47,5 @@ class PascalSnakeCaseOrderingFilterTest(APITestCase):
         self.assertEqual(result, default_ordering)
 
     def tearDown(self) -> None:
-        super().tearDown()
         BlogPost.objects.all().delete()
+        super().tearDown()

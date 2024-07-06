@@ -74,5 +74,5 @@ class GenerateSchemaMultiLangTest(TestCase):
         settings.PARLER_LANGUAGES[settings.SITE_ID] = original_languages
 
     def tearDown(self) -> None:
-        super().tearDown()
         BlogCategory.objects.all().delete()
+        super().tearDown()

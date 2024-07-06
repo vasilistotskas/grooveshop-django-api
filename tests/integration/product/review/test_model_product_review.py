@@ -2,8 +2,11 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from product.factories.product import ProductFactory
+from product.factories.review import ProductReviewFactory
 from product.models.product import Product
 from product.models.review import ProductReview
+from user.factories.account import UserAccountFactory
 
 languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
@@ -16,15 +19,9 @@ class ProductReviewModelTestCase(TestCase):
     product_review: ProductReview = None
 
     def setUp(self):
-        self.user = User.objects.create_user(email="test@test.com", password="test12345@!")
-        self.product = Product.objects.create(
-            name="Sample Product",
-            description="Sample Product Description",
-            price=100.0,
-            active=True,
-            stock=10,
-        )
-        self.product_review = ProductReview.objects.create(
+        self.user = UserAccountFactory()
+        self.product = ProductFactory()
+        self.product_review = ProductReviewFactory(
             product=self.product,
             user=self.user,
             rate=5,
@@ -70,7 +67,7 @@ class ProductReviewModelTestCase(TestCase):
             self.assertEqual(self.product_review.comment, f"Sample Comment {language}")
 
     def tearDown(self) -> None:
+        Product.objects.all().delete()
+        ProductReview.objects.all().delete()
+        User.objects.all().delete()
         super().tearDown()
-        self.user.delete()
-        self.product.delete()
-        self.product_review.delete()

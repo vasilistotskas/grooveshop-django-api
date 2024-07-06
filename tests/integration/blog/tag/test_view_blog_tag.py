@@ -3,6 +3,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from blog.factories.tag import BlogTagFactory
 from blog.models.tag import BlogTag
 from blog.serializers.tag import BlogTagSerializer
 
@@ -14,8 +15,7 @@ class BlogTagViewSetTestCase(APITestCase):
     tag: BlogTag = None
 
     def setUp(self):
-        self.tag = BlogTag.objects.create(active=True)
-
+        self.tag = BlogTagFactory(active=True)
         for language in languages:
             self.tag.set_current_language(language)
             self.tag.name = f"Tag name in {language}"
@@ -171,5 +171,5 @@ class BlogTagViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def tearDown(self) -> None:
+        BlogTag.objects.all().delete()
         super().tearDown()
-        self.tag.delete()

@@ -21,6 +21,7 @@ from phonenumber_field.modelfields import PhoneNumberField
 
 from core import caches
 from core.caches import cache_instance
+from core.fields.image import ImageAndSvgField
 from core.generators import UserNameGenerator
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
@@ -105,7 +106,7 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
         default=None,
         on_delete=models.SET_NULL,
     )
-    image = models.ImageField(_("Image"), upload_to="uploads/users/", blank=True, null=True)
+    image = ImageAndSvgField(_("Image"), upload_to="uploads/users/", blank=True, null=True)
     is_active = models.BooleanField(_("Active"), default=True)
     is_staff = models.BooleanField(_("Staff"), default=False)
     birth_date = models.DateField(_("Birth Date"), blank=True, null=True)

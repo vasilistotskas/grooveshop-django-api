@@ -37,7 +37,3 @@ class RandomPasswordGeneratorTest(TestCase):
     def test_generate_multiple_passwords(self):
         passwords = [generate_random_password() for _ in range(10)]
         self.assertEqual(len(passwords), 10)
-
-    def tearDown(self) -> None:
-        super().tearDown()
-        pass

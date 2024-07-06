@@ -2,20 +2,12 @@ import os
 
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import override_settings
 from django.test import TestCase
 
 from helpers.seed import get_or_create_default_image
 from settings import BASE_DIR
 
 
-@override_settings(
-    STORAGES={
-        "default": {
-            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
-        },
-    }
-)
 class TestGetOrCreateDefaultImage(TestCase):
     existing_image: SimpleUploadedFile = None
     existing_image_path: str = "test_image.jpg"
@@ -49,7 +41,3 @@ class TestGetOrCreateDefaultImage(TestCase):
 
     def test_default_image_already_exists(self):
         self.assertTrue(default_storage.exists(self.default_image_path))
-
-    def tearDown(self) -> None:
-        super().tearDown()
-        pass

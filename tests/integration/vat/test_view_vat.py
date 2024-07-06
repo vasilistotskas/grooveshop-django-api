@@ -4,6 +4,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from vat.factories import VatFactory
 from vat.models import Vat
 from vat.serializers import VatSerializer
 
@@ -12,9 +13,7 @@ class VatViewSetTestCase(APITestCase):
     vat: Vat = None
 
     def setUp(self):
-        self.vat = Vat.objects.create(
-            value=21.0,
-        )
+        self.vat = VatFactory()
 
     @staticmethod
     def get_vat_detail_url(pk):
@@ -123,5 +122,5 @@ class VatViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def tearDown(self) -> None:
+        Vat.objects.all().delete()
         super().tearDown()
-        self.vat.delete()

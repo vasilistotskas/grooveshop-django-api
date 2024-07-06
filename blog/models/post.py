@@ -11,6 +11,7 @@ from parler.models import TranslatedFields
 from tinymce.models import HTMLField
 
 from blog.enum.blog_post_enum import PostStatusEnum
+from core.fields.image import ImageAndSvgField
 from core.models import PublishableModel
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
@@ -27,8 +28,8 @@ class BlogPost(
     UUIDModel,
 ):
     id = models.BigAutoField(primary_key=True)
-    slug = models.SlugField(max_length=255, unique=True)
-    image = models.ImageField(_("Image"), upload_to="uploads/blog/", blank=True, null=True)
+    slug = models.SlugField(_("Slug"), max_length=255, unique=True)
+    image = ImageAndSvgField(_("Image"), upload_to="uploads/blog/", blank=True, null=True)
     likes = models.ManyToManyField("user.UserAccount", related_name="liked_blog_posts", blank=True)
     category = models.ForeignKey(
         "blog.BlogCategory",

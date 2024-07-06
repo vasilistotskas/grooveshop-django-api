@@ -81,9 +81,9 @@ class CeleryConfigTestCase(TestCase):
         )
 
     def tearDown(self) -> None:
-        super().tearDown()
         celery.app = None
         celery.debug_task = None
+        super().tearDown()
 
 
 class CleanupLogFilesTaskTest(TestCase):
@@ -105,11 +105,12 @@ class CleanupLogFilesTaskTest(TestCase):
         old_time = (datetime.now() - timedelta(days=31)).timestamp()
         os.utime(self.old_file, (old_time, old_time))
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         if path.exists(self.old_file):
             remove(self.old_file)
         if path.exists(self.new_file):
             remove(self.new_file)
+        super().tearDown()
 
     @patch("core.tasks.logger")
     def test_cleanup_log_files_task(self, mock_logger):

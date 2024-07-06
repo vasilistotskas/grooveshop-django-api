@@ -6,6 +6,8 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from authentication.serializers import AuthenticationSerializer
+from core.utils.tests import compare_serializer_and_response
+from user.factories.account import UserAccountFactory
 
 User = get_user_model()
 
@@ -14,14 +16,10 @@ class UserAccountViewSetTestCase(APITestCase):
     user: User = None
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="test@test.com",
-            password="test12345@!",
+        self.user = UserAccountFactory(
             is_superuser=True,
             is_staff=True,
         )
-
-        self.client.login(email="test@test.com", password="test12345@!")
         self.client.force_authenticate(user=self.user)
 
     @staticmethod
@@ -37,8 +35,9 @@ class UserAccountViewSetTestCase(APITestCase):
         response = self.client.get(url)
         user_accounts = User.objects.all()
         serializer = AuthenticationSerializer(user_accounts, many=True)
+        for response_item, serializer_item in zip(response.data["results"], serializer.data):
+            compare_serializer_and_response(serializer_item, response_item, ["image"])
 
-        self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_valid(self):
@@ -66,8 +65,8 @@ class UserAccountViewSetTestCase(APITestCase):
         response = self.client.get(url)
         user_accounts = User.objects.get(id=self.user.id)
         serializer = AuthenticationSerializer(user_accounts)
+        compare_serializer_and_response(serializer.data, response.data, ["image"])
 
-        self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_retrieve_invalid(self):
@@ -150,5 +149,5 @@ class UserAccountViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def tearDown(self) -> None:
+        User.objects.all().delete()
         super().tearDown()
-        self.user.delete()

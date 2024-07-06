@@ -113,8 +113,5 @@ class CustomCacheTestCase(TestCase):
             self.assertEqual(keys, [self.key, "another_key"])
 
     def tearDown(self) -> None:
-        super().tearDown()
         self.cache_instance.clear()
-        self.cache_instance = None
-        self.key = None
-        self.value = None
+        super().tearDown()

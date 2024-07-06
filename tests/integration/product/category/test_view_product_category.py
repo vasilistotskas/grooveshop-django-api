@@ -3,14 +3,13 @@ import io
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import override_settings
 from django.urls import reverse
 from PIL import Image
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from core.utils.serializers import flatten_dict_for_form_data
-from helpers.seed import get_or_create_default_image
+from product.factories.category import ProductCategoryFactory
 from product.models.category import ProductCategory
 from product.serializers.category import ProductCategorySerializer
 
@@ -19,27 +18,12 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
 
 
-@override_settings(
-    STORAGES={
-        "default": {
-            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
-        },
-    }
-)
 class ProductCategoryViewSetTestCase(APITestCase):
     category: ProductCategory = None
     sub_category: ProductCategory = None
-    default_image: SimpleUploadedFile = None
 
     def setUp(self):
-        self.default_image = get_or_create_default_image("uploads/categories/no_photo.jpg")
-
-        self.category = ProductCategory.objects.create(
-            slug="sample-category",
-            menu_image_one=self.default_image,
-            menu_image_two=self.default_image,
-            menu_main_banner=self.default_image,
-        )
+        self.category = ProductCategoryFactory()
 
         for language in languages:
             self.category.set_current_language(language)
@@ -48,12 +32,8 @@ class ProductCategoryViewSetTestCase(APITestCase):
             self.category.save()
         self.category.set_current_language(default_language)
 
-        self.sub_category = ProductCategory.objects.create(
-            slug="sample-sub-category",
+        self.sub_category = ProductCategoryFactory(
             parent=self.category,
-            menu_image_one=self.default_image,
-            menu_image_two=self.default_image,
-            menu_main_banner=self.default_image,
         )
 
         for language in languages:
@@ -254,6 +234,5 @@ class ProductCategoryViewSetTestCase(APITestCase):
         self.assertTrue(ProductCategory.objects.filter(id=self.category.id).exists())
 
     def tearDown(self) -> None:
+        ProductCategory.objects.all().delete()
         super().tearDown()
-        self.sub_category.delete()
-        self.category.delete()

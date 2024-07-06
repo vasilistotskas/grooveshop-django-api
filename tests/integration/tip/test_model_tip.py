@@ -2,33 +2,22 @@ import os
 
 from django.conf import settings
 from django.core.files.storage import default_storage
-from django.test import override_settings
 from django.test import TestCase
 
-from helpers.seed import get_or_create_default_image
 from tip.enum.tip_enum import TipKindEnum
+from tip.factories import TipFactory
 from tip.models import Tip
 
 languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
-@override_settings(
-    STORAGES={
-        "default": {
-            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
-        },
-    }
-)
 class TipModelTestCase(TestCase):
     tip: Tip = None
-    default_icon: str = None
 
     def setUp(self):
-        self.default_icon = get_or_create_default_image("uploads/tip/no_photo.jpg")
-        self.tip = Tip.objects.create(
+        self.tip = TipFactory(
             kind=TipKindEnum.INFO,
-            icon=self.default_icon,
             active=True,
         )
         for language in languages:
@@ -83,5 +72,5 @@ class TipModelTestCase(TestCase):
         self.assertEqual(self.tip.main_image_filename, expected_filename)
 
     def tearDown(self) -> None:
+        Tip.objects.all().delete()
         super().tearDown()
-        self.tip.delete()

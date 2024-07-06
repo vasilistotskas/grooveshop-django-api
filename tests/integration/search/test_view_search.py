@@ -397,7 +397,5 @@ class SearchProductAPITest(APITestCase):
         self.assertEqual(len(response_de_3.data["results"]), 1)
 
     def tearDown(self) -> None:
+        Product.objects.all().delete()
         super().tearDown()
-        self.product1.delete()
-        self.product2.delete()
-        self.product3.delete()

@@ -1,28 +1,23 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from blog.factories.author import BlogAuthorFactory
+from blog.factories.category import BlogCategoryFactory
+from blog.factories.post import BlogPostFactory
 from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
 from blog.models.post import BlogPost
 from blog.serializers.post import BlogPostSerializer
-from helpers.seed import get_or_create_default_image
+from user.factories.account import UserAccountFactory
 
 languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
 
 
-@override_settings(
-    STORAGES={
-        "default": {
-            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
-        },
-    }
-)
 class BlogPostViewSetTestCase(APITestCase):
     post: BlogPost = None
     user: User = None
@@ -30,11 +25,10 @@ class BlogPostViewSetTestCase(APITestCase):
     category: BlogCategory = None
 
     def setUp(self):
-        self.user = User.objects.create_user(email="testuser@example.com", password="testpassword")
-        self.author = BlogAuthor.objects.create(user=self.user)
+        self.user = UserAccountFactory()
+        self.author = BlogAuthorFactory(user=self.user)
+        self.category = BlogCategoryFactory(slug="sample-category")
 
-        image_category = get_or_create_default_image("uploads/blog/no_photo.jpg")
-        self.category = BlogCategory.objects.create(slug="sample-category", image=image_category)
         for language in languages:
             self.category.set_current_language(language)
             self.category.name = f"Category name in {language}"
@@ -42,15 +36,9 @@ class BlogPostViewSetTestCase(APITestCase):
             self.category.save()
         self.category.set_current_language(default_language)
 
-        image_post = get_or_create_default_image("uploads/blog/no_photo.jpg")
-        self.post = BlogPost.objects.create(
-            title="Test Post",
+        self.post = BlogPostFactory(
             author=self.author,
-            status="draft",
-            image=image_post,
             category=None,
-            featured=False,
-            view_count=0,
         )
         self.post.likes.set([])
         self.post.tags.set([])
@@ -227,8 +215,8 @@ class BlogPostViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def tearDown(self) -> None:
+        BlogPost.objects.all().delete()
+        BlogCategory.objects.all().delete()
+        BlogAuthor.objects.all().delete()
+        User.objects.all().delete()
         super().tearDown()
-        self.post.delete()
-        self.author.delete()
-        self.user.delete()
-        self.category.delete()

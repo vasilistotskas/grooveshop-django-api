@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from django.conf import settings
-from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from helpers.seed import get_or_create_default_image
+from core.utils.tests import compare_serializer_and_response
+from slider.factories import SliderFactory
 from slider.models import Slider
 from slider.serializers import SliderSerializer
 
@@ -15,21 +15,12 @@ languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
-@override_settings(
-    STORAGES={
-        "default": {
-            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
-        },
-    }
-)
 class SliderViewSetTestCase(APITestCase):
     slider: Slider = None
 
     def setUp(self):
-        image = get_or_create_default_image("uploads/sliders/no_photo.jpg")
-        self.slider = Slider.objects.create(
-            image=image,
-        )
+        self.slider = SliderFactory()
+
         for language in languages:
             self.slider.set_current_language(language)
             self.slider.name = f"Slider 1_{language}"
@@ -52,8 +43,9 @@ class SliderViewSetTestCase(APITestCase):
         response = self.client.get(url)
         sliders = Slider.objects.all()
         serializer = SliderSerializer(sliders, many=True)
+        for response_item, serializer_item in zip(response.data["results"], serializer.data):
+            compare_serializer_and_response(serializer_item, response_item, ["video", "thumbnail"])
 
-        self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_valid(self):
@@ -103,8 +95,8 @@ class SliderViewSetTestCase(APITestCase):
         response = self.client.get(url)
         slider = Slider.objects.get(pk=self.slider.pk)
         serializer = SliderSerializer(slider)
+        compare_serializer_and_response(serializer.data, response.data, ["video", "thumbnail"])
 
-        self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_retrieve_invalid(self):
@@ -212,5 +204,5 @@ class SliderViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def tearDown(self) -> None:
+        Slider.objects.all().delete()
         super().tearDown()
-        self.slider.delete()

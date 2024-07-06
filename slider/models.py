@@ -12,6 +12,7 @@ from djmoney.models.fields import MoneyField
 from parler.models import TranslatableModel
 from parler.models import TranslatedFields
 
+from core.fields.image import ImageAndSvgField
 from core.models import SortableModel
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
@@ -19,7 +20,7 @@ from core.models import UUIDModel
 
 class Slider(TranslatableModel, TimeStampMixinModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
-    image = models.ImageField(_("Image"), upload_to="uploads/sliders/", blank=True, null=True)
+    image = ImageAndSvgField(_("Image"), upload_to="uploads/sliders/", blank=True, null=True)
     thumbnail = models.ImageField(
         _("Thumbnail"),
         upload_to="uploads/sliders/thumbnails/",
@@ -85,7 +86,7 @@ class Slide(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     show_button = models.BooleanField(_("Show Button"), blank=False, null=False, default=False)
     date_start = models.DateTimeField(_("Date Start"), auto_now_add=False)
     date_end = models.DateTimeField(_("Date End"), auto_now_add=False)
-    image = models.ImageField(_("Image"), upload_to="uploads/slides/", blank=True, null=True)
+    image = ImageAndSvgField(_("Image"), upload_to="uploads/slides/", blank=True, null=True)
     thumbnail = models.ImageField(
         _("Thumbnail"),
         upload_to="uploads/slides/thumbnails/",

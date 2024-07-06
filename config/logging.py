@@ -1,5 +1,6 @@
 import logging
 import sys
+import uuid
 from datetime import datetime
 from logging.config import dictConfig
 from os import getenv
@@ -12,14 +13,20 @@ DEBUG = getenv("DEBUG", "True") == "True"
 
 
 def config_logging():
+    unique_id = uuid.uuid4().hex
     timestamp = datetime.now().strftime("%d-%m-%Y")
-    celery_log_filename = f"celery_logs_{timestamp}.log"
-    django_log_filename = f"django_logs_{timestamp}.log"
+    celery_log_filename = f"celery_logs_{timestamp}_{unique_id}.log"
+    django_log_filename = f"django_logs_{timestamp}_{unique_id}.log"
+    db_log_filename = f"db_logs_{timestamp}_{unique_id}.log"
     log_dir = path.join(BASE_DIR, "logs")
     makedirs(log_dir, exist_ok=True)  # Create the directory if it does not exist
     celery_log_file_path = path.join(log_dir, celery_log_filename)
     django_log_file_path = path.join(log_dir, django_log_filename)
-    logging_level = "DEBUG" if DEBUG else "INFO"
+    db_log_file_path = path.join(log_dir, db_log_filename)
+
+    logging_level = getenv("LOGGING_LEVEL", "DEBUG" if DEBUG else "INFO")
+    backup_count = int(getenv("LOG_BACKUP_COUNT", 30))
+
     logging_config = {
         "version": 1,
         "disable_existing_loggers": True,
@@ -35,6 +42,11 @@ def config_logging():
             "simple": {
                 "format": "[%(asctime)s] %(levelname)s | %(funcName)s | %(name)s | %(message)s",
                 "datefmt": "%Y-%m-%d %H:%M:%S",
+            },
+            "json": {
+                "format": '{"timestamp": "%(asctime)s", "level": "%(levelname)s",'
+                ' "module": "%(module)s", "message": "%(message)s"}',
+                "datefmt": "%Y-%m-%dT%H:%M:%S",
             },
         },
         "filters": {
@@ -56,8 +68,9 @@ def config_logging():
                 "filename": celery_log_file_path,
                 "when": "D",  # this specifies the interval
                 "interval": 1,  # defaults to 1, only necessary for other values
-                "backupCount": 30,  # how many backup file to keep, 10 days
+                "backupCount": backup_count,  # how many backup file to keep, 30 days
                 "formatter": "standard",
+                "encoding": "utf-8",
             },
             "django_logfile": {
                 "level": logging_level,
@@ -65,8 +78,19 @@ def config_logging():
                 "filename": django_log_file_path,
                 "when": "D",
                 "interval": 1,
-                "backupCount": 30,
+                "backupCount": backup_count,
                 "formatter": "standard",
+                "encoding": "utf-8",
+            },
+            "db_logfile": {
+                "level": "DEBUG",
+                "class": "logging.handlers.TimedRotatingFileHandler",
+                "filename": db_log_file_path,
+                "when": "D",
+                "interval": 1,
+                "backupCount": backup_count,
+                "formatter": "standard",
+                "encoding": "utf-8",
             },
             "console": {
                 "level": "INFO",
@@ -75,15 +99,31 @@ def config_logging():
                 "stream": sys.stdout,
                 "formatter": "verbose",
             },
+            "mail_admins": {
+                "level": "ERROR",
+                "class": "django.utils.log.AdminEmailHandler",
+                "filters": ["require_debug_false"],
+                "formatter": "standard",
+            },
+            "json_logfile": {
+                "level": logging_level,
+                "class": "logging.handlers.TimedRotatingFileHandler",
+                "filename": path.join(log_dir, f"json_logs_{timestamp}_{unique_id}.log"),
+                "when": "D",
+                "interval": 1,
+                "backupCount": backup_count,
+                "formatter": "json",
+                "encoding": "utf-8",
+            },
         },
         "loggers": {
             "django": {
-                "handlers": ["console", "django_logfile"],
+                "handlers": ["console", "django_logfile", "mail_admins", "json_logfile"],
                 "propagate": True,
-                "level": "WARNING",
+                "level": "DEBUG",
             },
             "django.db.backends": {
-                "handlers": ["console"],
+                "handlers": ["console", "db_logfile"],
                 "level": "INFO",
                 "propagate": False,
             },
@@ -91,8 +131,14 @@ def config_logging():
                 "handlers": ["console", "celery_logfile"],
                 "level": logging_level,
             },
+            "django.request": {
+                "handlers": ["django_logfile", "mail_admins"],
+                "level": "ERROR",
+                "propagate": False,
+            },
         },
     }
+
     dictConfig(logging_config)
     return celery_log_filename, django_log_filename, logging_config
 

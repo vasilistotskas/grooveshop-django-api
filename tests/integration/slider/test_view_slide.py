@@ -3,13 +3,14 @@ from __future__ import annotations
 from datetime import timedelta
 
 from django.conf import settings
-from django.test import override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from helpers.seed import get_or_create_default_image
+from core.utils.tests import compare_serializer_and_response
+from slider.factories import SlideFactory
+from slider.factories import SliderFactory
 from slider.models import Slide
 from slider.models import Slider
 from slider.serializers import SlideSerializer
@@ -18,25 +19,16 @@ languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
-@override_settings(
-    STORAGES={
-        "default": {
-            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
-        },
-    }
-)
 class SlideViewSetTestCase(APITestCase):
     slide: Slide = None
     slider: Slider = None
 
     def setUp(self):
-        image = get_or_create_default_image("uploads/slides/no_photo.jpg")
         date_start = now()
-        self.slider = Slider.objects.create()
-        self.slide = Slide.objects.create(
+        self.slider = SliderFactory()
+        self.slide = SlideFactory(
             discount=0.0,
             show_button=True,
-            image=image,
             date_start=date_start,
             date_end=date_start + timedelta(days=30),
             slider=self.slider,
@@ -64,8 +56,9 @@ class SlideViewSetTestCase(APITestCase):
         response = self.client.get(url)
         slides = Slide.objects.all()
         serializer = SlideSerializer(slides, many=True)
+        for response_item, serializer_item in zip(response.data["results"], serializer.data):
+            compare_serializer_and_response(serializer_item, response_item, ["thumbnail"])
 
-        self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_valid(self):
@@ -119,8 +112,8 @@ class SlideViewSetTestCase(APITestCase):
         response = self.client.get(url)
         slide = Slide.objects.get(pk=self.slide.pk)
         serializer = SlideSerializer(slide)
+        compare_serializer_and_response(serializer.data, response.data, ["thumbnail"])
 
-        self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_retrieve_invalid(self):
@@ -226,6 +219,6 @@ class SlideViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def tearDown(self) -> None:
+        Slide.objects.all().delete()
+        Slider.objects.all().delete()
         super().tearDown()
-        self.slide.delete()
-        self.slider.delete()

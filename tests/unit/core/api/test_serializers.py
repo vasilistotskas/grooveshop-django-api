@@ -4,9 +4,12 @@ from django.test import TestCase
 
 from authentication.serializers import AuthenticationSerializer
 from core.api.serializers import BaseExpandSerializer
+from product.factories.favourite import ProductFavouriteFactory
+from product.factories.product import ProductFactory
 from product.models.favourite import ProductFavourite
 from product.models.product import Product
 from product.serializers.product import ProductSerializer
+from user.factories.account import UserAccountFactory
 
 languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
@@ -16,19 +19,12 @@ User = get_user_model()
 class TestBaseExpandSerializer(TestCase):
     user: User = None
     product: Product = None
-    instance: ProductFavourite = None
+    product_favourite: ProductFavourite = None
     serializer: BaseExpandSerializer = None
 
     def setUp(self):
-        self.user = User.objects.create_user(email="test@test.com", password="test12345@!")
-        self.product = Product.objects.create(
-            product_code="P123",
-            name="Sample Product",
-            slug="sample-product",
-            price=100.0,
-            active=True,
-            stock=10,
-        )
+        self.user = UserAccountFactory()
+        self.product = ProductFactory()
         for language in languages:
             self.product.set_current_language(language)
             self.product.name = f"Sample Product ({language})"
@@ -36,13 +32,13 @@ class TestBaseExpandSerializer(TestCase):
             self.product.save()
         self.product.set_current_language(default_language)
 
-        self.instance = ProductFavourite.objects.create(user=self.user, product=self.product)
-        self.serializer = BaseExpandSerializer(instance=self.instance)
+        self.product_favourite = ProductFavouriteFactory(user=self.user, product=self.product)
+        self.serializer = BaseExpandSerializer(instance=self.product_favourite)
         self.serializer.Meta.model = ProductFavourite
 
     def test_to_representation_without_expansion(self):
         self.serializer.context["expand"] = False
-        data = self.serializer.to_representation(self.instance)
+        data = self.serializer.to_representation(self.product_favourite)
 
         self.assertIn("user", data)
         self.assertIn("product", data)
@@ -56,7 +52,7 @@ class TestBaseExpandSerializer(TestCase):
         }
         self.serializer.get_expand_fields = lambda: expand_fields
         self.serializer.context["expand"] = True
-        data = self.serializer.to_representation(self.instance)
+        data = self.serializer.to_representation(self.product_favourite)
 
         self.assertIn("user", data)
         self.assertIn("product", data)
@@ -66,7 +62,7 @@ class TestBaseExpandSerializer(TestCase):
     def test_recursive_expansion_prevention(self):
         self.serializer.context["expand"] = True
         self.serializer.expansion_path.append("User")
-        data = self.serializer.to_representation(self.instance)
+        data = self.serializer.to_representation(self.product_favourite)
 
         self.assertIn("user", data)
         self.assertNotIsInstance(data["user"], dict)
@@ -74,7 +70,7 @@ class TestBaseExpandSerializer(TestCase):
     def test_expand_fields_empty(self):
         self.serializer.get_expand_fields = lambda: {}
         self.serializer.context["expand"] = True
-        data = self.serializer.to_representation(self.instance)
+        data = self.serializer.to_representation(self.product_favourite)
 
         self.assertIn("user", data)
         self.assertIn("product", data)
@@ -82,7 +78,7 @@ class TestBaseExpandSerializer(TestCase):
         self.assertEqual(data["product"], self.product.id)
 
     def tearDown(self) -> None:
+        User.objects.all().delete()
+        Product.objects.all().delete()
+        ProductFavourite.objects.all().delete()
         super().tearDown()
-        self.user.delete()
-        self.product.delete()
-        self.instance.delete()

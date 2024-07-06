@@ -1,36 +1,22 @@
 from django.conf import settings
-from django.test import override_settings
 from django.test import TestCase
 
+from country.factories import CountryFactory
 from country.models import Country
-from helpers.seed import get_or_create_default_image
+from region.factories import RegionFactory
 from region.models import Region
 
 languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
-@override_settings(
-    STORAGES={
-        "default": {
-            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
-        },
-    }
-)
 class RegionModelTestCase(TestCase):
     region: Region = None
     country: Country = None
 
     def setUp(self):
-        image_flag = get_or_create_default_image("uploads/region/no_photo.jpg")
-        self.country = Country.objects.create(
-            alpha_2="GR",
-            alpha_3="GRC",
-            iso_cc=300,
-            phone_code=30,
-            image_flag=image_flag,
-        )
-        self.region = Region.objects.create(
+        self.country = CountryFactory()
+        self.region = RegionFactory(
             alpha="GRC",
             country=self.country,
         )
@@ -65,6 +51,6 @@ class RegionModelTestCase(TestCase):
         self.assertTrue(self.region in queryset)
 
     def tearDown(self) -> None:
+        Region.objects.all().delete()
+        Country.objects.all().delete()
         super().tearDown()
-        self.region.delete()
-        self.country.delete()

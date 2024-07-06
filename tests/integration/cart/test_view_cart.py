@@ -5,7 +5,9 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from cart.factories import CartFactory
 from cart.models import Cart
+from user.factories.account import UserAccountFactory
 
 User = get_user_model()
 
@@ -17,10 +19,9 @@ class CartViewSetTest(APITestCase):
     update_data: dict = None
 
     def setUp(self):
-        self.user = User.objects.create_user(email="testuser@example.com", password="testpassword")
-        self.client.login(email="testuser@example.com", password="testpassword")
+        self.user = UserAccountFactory()
         self.client.force_authenticate(user=self.user)
-        self.cart = Cart.objects.create(user=self.user)
+        self.cart = CartFactory(user=self.user)
         self.detail_url = reverse("cart-detail")
         self.update_data = {
             "user": self.user.pk,
@@ -52,6 +53,6 @@ class CartViewSetTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
     def tearDown(self) -> None:
+        Cart.objects.all().delete()
+        User.objects.all().delete()
         super().tearDown()
-        self.cart.delete()
-        self.user.delete()

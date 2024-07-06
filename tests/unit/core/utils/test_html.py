@@ -11,7 +11,3 @@ class HtmlTest(TestCase):
         self.assertEqual(preprocess_text("<a href='link'>Link</a>"), "Link")
         self.assertEqual(preprocess_text("&amp;"), "&")
         self.assertEqual(preprocess_text("Ελληνικά"), "Ελληνικά")
-
-    def tearDown(self) -> None:
-        super().tearDown()
-        pass

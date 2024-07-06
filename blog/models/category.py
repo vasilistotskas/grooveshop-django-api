@@ -38,7 +38,7 @@ class BlogCategoryManager(TreeManager, TranslatableManager):
 
 class BlogCategory(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel, MPTTModel):
     id = models.BigAutoField(primary_key=True)
-    slug = models.SlugField(unique=True)
+    slug = models.SlugField(_("Slug"), max_length=255, unique=True)
     image = ImageAndSvgField(_("Image"), upload_to="uploads/blog/", blank=True, null=True)
     parent = TreeForeignKey(
         "self",

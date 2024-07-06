@@ -1,22 +1,26 @@
 from decimal import Decimal
-from typing import List
 
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from country.factories import CountryFactory
 from country.models import Country
-from helpers.seed import get_or_create_default_image
 from order.enum.status_enum import OrderStatusEnum
+from order.factories.order import OrderFactory
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.serializers.order import OrderSerializer
+from pay_way.factories import PayWayFactory
 from pay_way.models import PayWay
+from product.factories.product import ProductFactory
 from product.models.product import Product
+from region.factories import RegionFactory
 from region.models import Region
 from user.enum.address import FloorChoicesEnum
 from user.enum.address import LocationChoicesEnum
+from user.factories.account import UserAccountFactory
 
 User = get_user_model()
 
@@ -26,72 +30,25 @@ class OrderViewSetTestCase(APITestCase):
     pay_way: PayWay = None
     country: Country = None
     region: Region = None
-    order_items: List[OrderItem] = None
+    order_items: list[OrderItem] = None
 
     def setUp(self):
-        self.user = User.objects.create_user(email="test@test.com", password="test12345@!")
-        self.client.login(email="test@test.com", password="test12345@!")
-        image_icon = get_or_create_default_image("uploads/pay_way/no_photo.jpg")
-        self.pay_way = PayWay.objects.create(
-            active=True,
-            cost=10.00,
-            free_for_order_amount=100.00,
-            icon=image_icon,
-        )
-
-        image_flag = get_or_create_default_image("uploads/region/no_photo.jpg")
-        self.country = Country.objects.create(
-            alpha_2="GR",
-            alpha_3="GRC",
-            iso_cc=300,
-            phone_code=30,
-            image_flag=image_flag,
-        )
-
-        self.region = Region.objects.create(
-            alpha="GRC",
+        self.user = UserAccountFactory()
+        self.pay_way = PayWayFactory()
+        self.country = CountryFactory()
+        self.region = RegionFactory(
             country=self.country,
         )
-
-        self.order = Order.objects.create(
+        self.order = OrderFactory(
             user=self.user,
             pay_way=self.pay_way,
             country=self.country,
             region=self.region,
-            floor=FloorChoicesEnum.FIRST_FLOOR.value,
-            location_type=LocationChoicesEnum.HOME.value,
-            email="test@example.com",
-            first_name="John",
-            last_name="Doe",
-            street="123 Main St",
-            street_number="Apt 4",
-            city="New York",
-            zipcode="10001",
-            phone="123-456-7890",
-            mobile_phone="123-456-7890",
-            paid_amount=Decimal("150.00"),
-            status=OrderStatusEnum.PENDING.value,
-            shipping_price=Decimal("10.00"),
         )
 
-        product_1 = Product.objects.create(
-            slug="product_one",
-            price=10.00,
-            active=True,
-            stock=10,
-            discount_percent=5.00,
-            view_count=0,
-            weight=0.00,
-        )
-        product_2 = Product.objects.create(
-            slug="product_two",
-            price=25.00,
-            active=True,
-            stock=10,
-            discount_percent=10.00,
-            view_count=0,
-            weight=0.00,
-        )
+        products = ProductFactory.create_batch(2)
+        product_1 = products[0]
+        product_2 = products[1]
 
         order_item1 = self.order.order_item_order.create(product_id=product_1.id, price=Decimal("50.00"), quantity=2)
         order_item2 = self.order.order_item_order.create(product_id=product_2.id, price=Decimal("30.00"), quantity=3)
@@ -150,6 +107,7 @@ class OrderViewSetTestCase(APITestCase):
 
         url = self.get_order_list_url()
         response = self.client.post(url, data=payload, format="json")
+        print("===== OrderViewSetTestCase test_create_valid =====", response.data)
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Order.objects.count(), 2)
@@ -323,9 +281,11 @@ class OrderViewSetTestCase(APITestCase):
         self.assertTrue(Order.objects.filter(id=self.order.id).exists())
 
     def tearDown(self) -> None:
+        OrderItem.objects.all().delete()
+        Order.objects.all().delete()
+        PayWay.objects.all().delete()
+        Product.objects.all().delete()
+        User.objects.all().delete()
+        Country.objects.all().delete()
+        Region.objects.all().delete()
         super().tearDown()
-        self.order.delete()
-        self.user.delete()
-        self.pay_way.delete()
-        self.country.delete()
-        self.region.delete()

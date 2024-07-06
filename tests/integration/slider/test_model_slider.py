@@ -2,31 +2,21 @@ import os
 
 from django.conf import settings
 from django.core.files.storage import default_storage
-from django.test import override_settings
 from django.test import TestCase
 
-from helpers.seed import get_or_create_default_image
+from slider.factories import SliderFactory
 from slider.models import Slider
 
 languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
-@override_settings(
-    STORAGES={
-        "default": {
-            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
-        },
-    }
-)
 class SliderModelTestCase(TestCase):
     slider: Slider = None
 
     def setUp(self):
-        image = get_or_create_default_image("uploads/sliders/no_photo.jpg")
-        self.slider = Slider.objects.create(
-            image=image,
-        )
+        self.slider = SliderFactory()
+
         for language in languages:
             self.slider.set_current_language(language)
             self.slider.name = f"Slider 1_{language}"
@@ -59,7 +49,6 @@ class SliderModelTestCase(TestCase):
         )
 
     def test_save(self):
-        self.slider.image = get_or_create_default_image("uploads/sliders/no_photo.jpg")
         self.slider.save()
         self.assertTrue(default_storage.exists(self.slider.image.path))
 
@@ -72,5 +61,5 @@ class SliderModelTestCase(TestCase):
         self.assertEqual(self.slider.main_image_filename, expected_filename)
 
     def tearDown(self) -> None:
+        Slider.objects.all().delete()
         super().tearDown()
-        self.slider.delete()

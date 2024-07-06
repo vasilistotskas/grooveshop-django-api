@@ -4,9 +4,12 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from product.factories.product import ProductFactory
+from product.factories.review import ProductReviewFactory
 from product.models.product import Product
 from product.models.review import ProductReview
 from product.serializers.review import ProductReviewSerializer
+from user.factories.account import UserAccountFactory
 
 languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
@@ -19,18 +22,10 @@ class ProductReviewViewSetTestCase(APITestCase):
     product_review: ProductReview = None
 
     def setUp(self):
-        self.user = User.objects.create_user(email="test@test.com", password="test12345@!")
-        self.client.login(email="test@test.com", password="test12345@!")
+        self.user = UserAccountFactory()
         self.client.force_authenticate(user=self.user)
-        self.product = Product.objects.create(
-            slug="sample-product",
-            name="Sample Product",
-            description="Sample Product Description",
-            price=100.0,
-            active=True,
-            stock=10,
-        )
-        self.product_review = ProductReview.objects.create(
+        self.product = ProductFactory()
+        self.product_review = ProductReviewFactory(
             product=self.product,
             user=self.user,
             rate=5,
@@ -60,14 +55,7 @@ class ProductReviewViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_valid(self):
-        product_2 = Product.objects.create(
-            slug="sample-product-2",
-            name="Sample Product 2",
-            description="Sample Product Description 2",
-            price=100.0,
-            active=True,
-            stock=10,
-        )
+        product_2 = ProductFactory()
         payload = {
             "product": product_2.pk,
             "user": self.user.pk,
@@ -212,7 +200,7 @@ class ProductReviewViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def tearDown(self) -> None:
+        Product.objects.all().delete()
+        ProductReview.objects.all().delete()
+        User.objects.all().delete()
         super().tearDown()
-        self.user.delete()
-        self.product.delete()
-        self.product_review.delete()

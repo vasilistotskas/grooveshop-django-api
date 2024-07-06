@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 from django.conf import settings
-from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from core.utils.tests import compare_serializer_and_response
-from helpers.seed import get_or_create_default_image
 from tip.enum.tip_enum import TipKindEnum
+from tip.factories import TipFactory
 from tip.models import Tip
 from tip.serializers import TipSerializer
 
@@ -16,21 +15,12 @@ languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
-@override_settings(
-    STORAGES={
-        "default": {
-            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
-        },
-    }
-)
 class TipViewSetTestCase(APITestCase):
     tip: Tip = None
 
     def setUp(self):
-        icon = get_or_create_default_image("uploads/tip/no_photo.jpg")
-        self.tip = Tip.objects.create(
+        self.tip = TipFactory(
             kind=TipKindEnum.INFO,
-            icon=icon,
             active=True,
         )
         for language in languages:
@@ -213,5 +203,5 @@ class TipViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def tearDown(self) -> None:
+        Tip.objects.all().delete()
         super().tearDown()
-        self.tip.delete()

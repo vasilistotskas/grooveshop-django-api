@@ -3,6 +3,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from blog.factories.category import BlogCategoryFactory
 from blog.models.category import BlogCategory
 from blog.serializers.category import BlogCategorySerializer
 
@@ -14,8 +15,7 @@ class BlogCategoryViewSetTestCase(APITestCase):
     category: BlogCategory = None
 
     def setUp(self):
-        self.category = BlogCategory.objects.create(slug="test-category")
-
+        self.category = BlogCategoryFactory(slug="test-category")
         for language in languages:
             self.category.set_current_language(language)
             self.category.name = f"Category Name in {language}"
@@ -178,5 +178,5 @@ class BlogCategoryViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def tearDown(self) -> None:
+        BlogCategory.objects.all().delete()
         super().tearDown()
-        self.category.delete()

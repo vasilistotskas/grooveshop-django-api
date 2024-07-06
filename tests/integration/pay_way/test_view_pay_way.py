@@ -1,12 +1,11 @@
 from django.conf import settings
-from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from core.utils.tests import compare_serializer_and_response
-from helpers.seed import get_or_create_default_image
 from pay_way.enum.pay_way_enum import PayWayEnum
+from pay_way.factories import PayWayFactory
 from pay_way.models import PayWay
 from pay_way.serializers import PayWaySerializer
 
@@ -14,23 +13,14 @@ languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
-@override_settings(
-    STORAGES={
-        "default": {
-            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
-        },
-    }
-)
 class PayWayViewSetTestCase(APITestCase):
     pay_way: PayWay = None
 
     def setUp(self):
-        image_icon = get_or_create_default_image("uploads/pay_way/no_photo.jpg")
-        self.pay_way = PayWay.objects.create(
+        self.pay_way = PayWayFactory(
             active=True,
             cost=10.00,
             free_for_order_amount=100.00,
-            icon=image_icon,
         )
         for language in languages:
             self.pay_way.set_current_language(language)
@@ -195,5 +185,5 @@ class PayWayViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def tearDown(self) -> None:
+        PayWay.objects.all().delete()
         super().tearDown()
-        self.pay_way.delete()

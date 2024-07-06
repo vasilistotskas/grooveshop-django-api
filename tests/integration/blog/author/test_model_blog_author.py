@@ -2,7 +2,9 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from blog.factories.author import BlogAuthorFactory
 from blog.models.author import BlogAuthor
+from user.factories.account import UserAccountFactory
 
 languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
@@ -14,8 +16,8 @@ class BlogAuthorModelTestCase(TestCase):
     user: User = None
 
     def setUp(self):
-        self.user = User.objects.create_user(email="testuser@example.com", password="testpassword")
-        self.author = BlogAuthor.objects.create(user=self.user, website="http://example.com")
+        self.user = UserAccountFactory()
+        self.author = BlogAuthorFactory(user=self.user, website="http://example.com")
         for language in languages:
             self.author.set_current_language(language)
             self.author.bio = f"Bio of {self.user.email} in {language}"
@@ -43,6 +45,6 @@ class BlogAuthorModelTestCase(TestCase):
         self.assertEqual(str(self.author), f"{author_name} ({self.user.email})")
 
     def tearDown(self) -> None:
+        BlogAuthor.objects.all().delete()
+        User.objects.all().delete()
         super().tearDown()
-        self.author.delete()
-        self.user.delete()

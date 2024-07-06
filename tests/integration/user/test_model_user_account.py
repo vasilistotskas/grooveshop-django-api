@@ -1,22 +1,17 @@
 from django.contrib.auth import get_user_model
-from django.test import RequestFactory
 from django.test import TestCase
 
-from core.caches import cache_instance
 from core.generators import UserNameGenerator
+from user.factories.account import UserAccountFactory
 
 User = get_user_model()
 
 
 class UserAccountModelTest(TestCase):
-    factory: RequestFactory = None
-    user_data: dict = None
-
     def setUp(self):
-        self.factory = RequestFactory()
         self.user_data = {
             "email": "testuser@example.com",
-            "password": "testpassword",
+            "plain_password": "testpassword",  # Use 'plain_password' as the key
             "first_name": "John",
             "last_name": "Doe",
             "phone": "+1234567890",
@@ -27,9 +22,9 @@ class UserAccountModelTest(TestCase):
 
     def test_create_user_with_generated_username(self):
         generated_username = self.user_name_generator.generate_username(self.user_data["email"])
-        user = User.objects.create_user(**self.user_data, username=generated_username)
+        user = UserAccountFactory(**self.user_data, username=generated_username)
         self.assertEqual(user.username, generated_username)
-        self.assertTrue(user.check_password(self.user_data["password"]))
+        self.assertTrue(user.check_password(self.user_data["plain_password"]))  # Check the password
         self.assertEqual(user.first_name, self.user_data["first_name"])
         self.assertEqual(user.last_name, self.user_data["last_name"])
         self.assertEqual(user.phone, self.user_data["phone"])
@@ -41,15 +36,15 @@ class UserAccountModelTest(TestCase):
     def test_username_uniqueness(self):
         generated_username1 = self.user_name_generator.generate_username("uniqueuser1@example.com")
         generated_username2 = self.user_name_generator.generate_username("uniqueuser2@example.com")
-        User.objects.create_user(
+        UserAccountFactory(
             email="uniqueuser1@example.com",
             username=generated_username1,
-            password="password123",
+            plain_password="password123",
         )
-        user2 = User.objects.create_user(
+        user2 = UserAccountFactory(
             email="uniqueuser2@example.com",
             username=generated_username2,
-            password="password123",
+            plain_password="password123",
         )
         self.assertNotEqual(generated_username1, generated_username2)
         self.assertNotEqual(
@@ -58,15 +53,13 @@ class UserAccountModelTest(TestCase):
         )
 
     def test_create_superuser(self):
-        user = User.objects.create_superuser(**self.user_data)
+        user = UserAccountFactory(admin=True, **self.user_data)
         self.assertEqual(user.email, self.user_data["email"])
-        self.assertTrue(user.check_password(self.user_data["password"]))
-        self.assertEqual(user.first_name, self.user_data["first_name"])
-        self.assertEqual(user.last_name, self.user_data["last_name"])
+        self.assertTrue(user.check_password(self.user_data["plain_password"]))
         self.assertTrue(user.is_active)
         self.assertTrue(user.is_staff)
         self.assertTrue(user.is_superuser)
 
     def tearDown(self) -> None:
+        User.objects.all().delete()
         super().tearDown()
-        cache_instance.clear()

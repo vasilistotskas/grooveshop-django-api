@@ -3,26 +3,21 @@ import os
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files.storage import default_storage
-from django.test import override_settings
 from django.test import TestCase
 
+from blog.factories.author import BlogAuthorFactory
+from blog.factories.category import BlogCategoryFactory
+from blog.factories.post import BlogPostFactory
 from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
 from blog.models.post import BlogPost
-from helpers.seed import get_or_create_default_image
+from user.factories.account import UserAccountFactory
 
 languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
 
 
-@override_settings(
-    STORAGES={
-        "default": {
-            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
-        },
-    }
-)
 class BlogPostModelTestCase(TestCase):
     post: BlogPost = None
     user: User = None
@@ -30,13 +25,10 @@ class BlogPostModelTestCase(TestCase):
     category: BlogCategory = None
 
     def setUp(self):
-        self.user = User.objects.create_user(email="testuser@example.com", password="testpassword")
+        self.user = UserAccountFactory()
+        self.author = BlogAuthorFactory(user=self.user)
+        self.category = BlogCategoryFactory(slug="sample-category")
 
-        image_post = get_or_create_default_image("uploads/blog/no_photo.jpg")
-        self.author = BlogAuthor.objects.create(user=self.user)
-
-        image_category = get_or_create_default_image("uploads/blog/no_photo.jpg")
-        self.category = BlogCategory.objects.create(slug="sample-category", image=image_category)
         for language in languages:
             self.category.set_current_language(language)
             self.category.name = f"Category name in {language}"
@@ -44,13 +36,11 @@ class BlogPostModelTestCase(TestCase):
             self.category.save()
         self.category.set_current_language(default_language)
 
-        self.post = BlogPost.objects.create(
-            title="Test Post",
+        self.post = BlogPostFactory(
             slug="test-post",
             author=self.author,
             category=self.category,
-            image=image_post,
-            status="draft",
+            status="DRAFT",
             featured=True,
             view_count=0,
         )
@@ -65,7 +55,7 @@ class BlogPostModelTestCase(TestCase):
 
     def test_fields(self):
         self.assertEqual(self.post.slug, "test-post")
-        self.assertEqual(self.post.status, "draft")
+        self.assertEqual(self.post.status, "DRAFT")
         self.assertEqual(self.post.featured, True)
         self.assertEqual(self.post.view_count, 0)
         self.assertTrue(default_storage.exists(self.post.image.path))
@@ -120,8 +110,8 @@ class BlogPostModelTestCase(TestCase):
         self.assertEqual(self.post.tags_count, 0)
 
     def tearDown(self) -> None:
+        BlogPost.objects.all().delete()
+        BlogCategory.objects.all().delete()
+        BlogAuthor.objects.all().delete()
+        User.objects.all().delete()
         super().tearDown()
-        self.post.delete()
-        self.author.delete()
-        self.user.delete()
-        self.category.delete()

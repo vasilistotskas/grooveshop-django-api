@@ -3,9 +3,13 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from cart.factories import CartFactory
+from cart.factories import CartItemFactory
 from cart.models import Cart
 from cart.models import CartItem
+from product.factories.product import ProductFactory
 from product.models.product import Product
+from user.factories.account import UserAccountFactory
 
 User = get_user_model()
 
@@ -19,21 +23,11 @@ class CartItemViewSetTest(APITestCase):
     update_data: dict = None
 
     def setUp(self):
-        self.user = User.objects.create_user(email="testuser@example.com", password="testpassword")
-        self.client.login(email="testuser@example.com", password="testpassword")
+        self.user = UserAccountFactory()
         self.client.force_authenticate(user=self.user)
-        self.cart = Cart.objects.create(user=self.user)
-        self.product = Product.objects.create(
-            name="Test Product",
-            slug="test-product",
-            price=10.00,
-            active=True,
-            stock=10,
-            discount_percent=5.00,
-            view_count=0,
-            weight=0.00,
-        )
-        self.cart_item = CartItem.objects.create(cart=self.cart, product=self.product, quantity=2)
+        self.cart = CartFactory(user=self.user, num_items=0)
+        self.product = ProductFactory()
+        self.cart_item = CartItemFactory(cart=self.cart, product=self.product, quantity=2)
         self.list_url = reverse("cart-item-list")
         self.detail_url = reverse("cart-item-detail", kwargs={"pk": self.cart_item.pk})
         self.create_data = {"product": self.product.pk, "quantity": 3}
@@ -71,8 +65,8 @@ class CartItemViewSetTest(APITestCase):
         self.assertEqual(CartItem.objects.count(), 0)
 
     def tearDown(self) -> None:
+        CartItem.objects.all().delete()
+        Cart.objects.all().delete()
+        Product.objects.all().delete()
+        User.objects.all().delete()
         super().tearDown()
-        self.cart_item.delete()
-        self.cart.delete()
-        self.user.delete()
-        self.product.delete()

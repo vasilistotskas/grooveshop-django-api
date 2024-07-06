@@ -3,9 +3,12 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from product.factories.favourite import ProductFavouriteFactory
+from product.factories.product import ProductFactory
 from product.models.favourite import ProductFavourite
 from product.models.product import Product
 from product.serializers.favourite import ProductFavouriteSerializer
+from user.factories.account import UserAccountFactory
 
 User = get_user_model()
 
@@ -16,16 +19,9 @@ class ProductFavouriteViewSetTestCase(APITestCase):
     product_favourite: ProductFavourite = None
 
     def setUp(self):
-        self.user = User.objects.create_user(email="test@test.com", password="test12345@!")
-        self.product = Product.objects.create(
-            product_code="P123",
-            name="Sample Product",
-            slug="sample-product",
-            price=100.0,
-            active=True,
-            stock=10,
-        )
-        self.product_favourite = ProductFavourite.objects.create(
+        self.user = UserAccountFactory()
+        self.product = ProductFactory()
+        self.product_favourite = ProductFavouriteFactory(
             product=self.product,
             user=self.user,
         )
@@ -48,14 +44,7 @@ class ProductFavouriteViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_valid(self):
-        product_2 = Product.objects.create(
-            product_code="P456",
-            name="Sample Product 2",
-            slug="sample-product-2",
-            price=100.0,
-            active=True,
-            stock=10,
-        )
+        product_2 = ProductFactory()
 
         payload = {
             "product": product_2.id,
@@ -151,7 +140,7 @@ class ProductFavouriteViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def tearDown(self) -> None:
+        Product.objects.all().delete()
+        ProductFavourite.objects.all().delete()
+        User.objects.all().delete()
         super().tearDown()
-        self.user.delete()
-        self.product.delete()
-        self.product_favourite.delete()

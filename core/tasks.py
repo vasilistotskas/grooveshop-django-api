@@ -1,11 +1,13 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
+import gzip
 import logging
 import os
 import time
 from datetime import datetime
 from datetime import timedelta
+from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -179,6 +181,28 @@ def cleanup_old_database_backups(days=30):
 
     message = f"Deleted {deleted_files_count} database backup files older than {days} days."
     return message
+
+
+@celery_app.task
+def compress_old_logs(file_path):
+    try:
+        if Path(file_path).exists():
+            with open(file_path, "rb") as f_in:
+                with gzip.open(f"{file_path}.gz", "wb") as f_out:
+                    f_out.writelines(f_in)
+            os.remove(file_path)
+            logger.info(f"Compressed and removed log file: {file_path}")
+        else:
+            logger.warning(f"Log file not found: {file_path}")
+    except Exception as e:
+        logger.error(f"Failed to compress log file {file_path}: {e}")
+        send_mail(
+            subject="Log Compression Error",
+            message=f"An error occurred while compressing the log file {file_path}: {e}",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[settings.ADMIN_EMAIL],
+            fail_silently=False,
+        )
 
 
 @celery_app.task

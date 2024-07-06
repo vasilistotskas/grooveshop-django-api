@@ -1,21 +1,23 @@
-from decimal import Decimal
-from typing import List
-
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from core.pagination.limit_offset import LimitOffsetPaginator
-from helpers.seed import get_or_create_default_image
+from product.factories.category import ProductCategoryFactory
+from product.factories.favourite import ProductFavouriteFactory
+from product.factories.image import ProductImageFactory
+from product.factories.product import ProductFactory
+from product.factories.review import ProductReviewFactory
 from product.models.category import ProductCategory
 from product.models.favourite import ProductFavourite
 from product.models.image import ProductImage
 from product.models.product import Product
 from product.models.review import ProductReview
 from product.serializers.product import ProductSerializer
+from user.factories.account import UserAccountFactory
+from vat.factories import VatFactory
 from vat.models import Vat
 
 
@@ -24,27 +26,18 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
 
 
-@override_settings(
-    STORAGES={
-        "default": {
-            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
-        },
-    }
-)
 class ProductViewSetTestCase(APITestCase):
     product: Product = None
     user: User = None
     category: ProductCategory = None
     vat: Vat = None
-    product_images: List[ProductImage] = []
-    product_reviews: List[ProductReview] = []
+    product_images: list[ProductImage] = []
+    product_reviews: list[ProductReview] = []
     product_favourite: ProductFavourite = None
 
     def setUp(self):
-        self.user = User.objects.create_user(email="test@test.com", password="test12345@!")
-        self.category = ProductCategory.objects.create(
-            slug="sample-category",
-        )
+        self.user = UserAccountFactory()
+        self.category = ProductCategoryFactory()
         for language in languages:
             self.category.set_current_language(language)
             self.category.name = f"Sample Category ({language})"
@@ -52,22 +45,13 @@ class ProductViewSetTestCase(APITestCase):
             self.category.save()
         self.category.set_current_language(default_language)
 
-        self.vat = Vat.objects.create(
-            value=Decimal("24.0"),
+        self.vat = VatFactory()
+
+        self.product = ProductFactory(
+            category=self.category,
+            vat=self.vat,
         )
 
-        self.product = Product.objects.create(
-            product_code="P123456",
-            category=self.category,
-            slug="sample-product",
-            price=Decimal("100.00"),
-            active=True,
-            stock=10,
-            discount_percent=Decimal("50.0"),
-            vat=self.vat,
-            view_count=10,
-            weight=Decimal("5.00"),
-        )
         for language in languages:
             self.product.set_current_language(language)
             self.product.name = f"Sample Product ({language})"
@@ -75,10 +59,8 @@ class ProductViewSetTestCase(APITestCase):
             self.product.save()
         self.product.set_current_language(default_language)
 
-        image = get_or_create_default_image("uploads/products/no_photo.jpg")
-        main_product_image = ProductImage.objects.create(
+        main_product_image = ProductImageFactory(
             product=self.product,
-            image=image,
             is_main=True,
         )
         for language in languages:
@@ -88,9 +70,8 @@ class ProductViewSetTestCase(APITestCase):
         main_product_image.set_current_language(default_language)
         self.product_images.append(main_product_image)
 
-        non_main_product_image = ProductImage.objects.create(
+        non_main_product_image = ProductImageFactory(
             product=self.product,
-            image=image,
             is_main=False,
         )
         for language in languages:
@@ -100,28 +81,24 @@ class ProductViewSetTestCase(APITestCase):
         non_main_product_image.set_current_language(default_language)
         self.product_images.append(non_main_product_image)
 
-        self.product_favourite = ProductFavourite.objects.create(
+        self.product_favourite = ProductFavouriteFactory(
             product=self.product,
             user=self.user,
         )
 
-        user_2 = User.objects.create_user(email="test2@test.com", password="test12345@!")
+        user_2 = UserAccountFactory()
 
-        product_review_status_true = ProductReview.objects.create(
+        product_review_status_true = ProductReviewFactory(
             product=self.product,
             user=self.user,
-            rate=5,
             status="True",
-            comment="Sample Product Review Comment",
         )
         self.product_reviews.append(product_review_status_true)
 
-        product_review_status_false = ProductReview.objects.create(
+        product_review_status_false = ProductReviewFactory(
             product=self.product,
             user=user_2,
-            rate=5,
             status="False",
-            comment="Sample Product Review Comment",
         )
         self.product_reviews.append(product_review_status_false)
 
@@ -328,9 +305,11 @@ class ProductViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def tearDown(self) -> None:
+        Product.objects.all().delete()
+        ProductCategory.objects.all().delete()
+        ProductImage.objects.all().delete()
+        ProductReview.objects.all().delete()
+        ProductFavourite.objects.all().delete()
+        Vat.objects.all().delete()
+        User.objects.all().delete()
         super().tearDown()
-        self.product_favourite.delete()
-        self.product.delete()
-        self.user.delete()
-        self.category.delete()
-        self.vat.delete()

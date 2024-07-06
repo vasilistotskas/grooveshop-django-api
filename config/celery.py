@@ -96,4 +96,8 @@ CELERY_BEAT_SCHEDULE = {
         "task": "core.tasks.cleanup_old_database_backups",
         "schedule": crontab(hour="12", minute="0"),
     },
+    "compress-old-logs": {
+        "task": "core.tasks.compress_old_logs",
+        "schedule": crontab(hour="1", minute="0", day_of_month="1"),
+    },
 }

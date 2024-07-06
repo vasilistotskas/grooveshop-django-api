@@ -2,14 +2,16 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from country.factories import CountryFactory
 from country.models import Country
-from helpers.seed import get_or_create_default_image
+from region.factories import RegionFactory
 from region.models import Region
+from user.factories.account import UserAccountFactory
+from user.factories.address import UserAddressFactory
 from user.models.address import UserAddress
 from user.serializers.address import UserAddressSerializer
 
@@ -18,52 +20,32 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
 
 
-@override_settings(
-    STORAGES={
-        "default": {
-            "BACKEND": "django.core.files.storage.memory.InMemoryStorage",
-        },
-    }
-)
 class UserAddressViewSetTestCase(APITestCase):
     user: User = None
     address: UserAddress = None
 
     def setUp(self):
-        self.user = User.objects.create_user(email="test@test.com", password="test12345@!")
-
-        image_flag = get_or_create_default_image("uploads/region/no_photo.jpg")
-        self.country = Country.objects.create(
+        self.user = UserAccountFactory()
+        self.country = CountryFactory(
             alpha_2="GR",
             alpha_3="GRC",
             iso_cc=300,
             phone_code=30,
-            image_flag=image_flag,
         )
-        self.region = Region.objects.create(
-            alpha="GRC",
-            country=self.country,
-        )
+        self.region = RegionFactory(alpha="GRC", country=self.country)
+
         for language in languages:
             self.region.set_current_language(language)
             self.region.name = f"Region {language}"
             self.region.save()
         self.region.set_current_language(default_language)
 
-        self.client.login(email="test@test.com", password="test12345@!")
         self.client.force_authenticate(user=self.user)
 
-        self.address = UserAddress.objects.create(
+        self.address = UserAddressFactory(
             user=self.user,
             country=self.country,
             region=self.region,
-            title="test",
-            first_name="test",
-            last_name="test",
-            street="test",
-            street_number="test",
-            city="test",
-            zipcode="test",
             is_main=False,
         )
 
@@ -204,7 +186,6 @@ class UserAddressViewSetTestCase(APITestCase):
     def test_destroy_valid(self):
         url = self.get_user_address_detail_url(self.address.pk)
         response = self.client.delete(url)
-
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(UserAddress.objects.filter(pk=self.address.pk).exists())
 
@@ -216,7 +197,8 @@ class UserAddressViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def tearDown(self) -> None:
+        UserAddress.objects.all().delete()
+        User.objects.all().delete()
+        Region.objects.all().delete()
+        Country.objects.all().delete()
         super().tearDown()
-        self.user.delete()
-        self.address.delete()
-        self.client.logout()

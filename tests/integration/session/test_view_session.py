@@ -19,10 +19,6 @@ class SessionAPITestCase(TestCase):
         cache_instance.clear()
         self.client = APIClient()
 
-    def tearDown(self):
-        self.client.logout()
-        cache_instance.clear()
-
     @staticmethod
     def get_session_active_users_count_url():
         return reverse("session-active-users-count")
@@ -61,3 +57,7 @@ class SessionAPITestCase(TestCase):
         response = self.client.get(self.get_session_active_users_count_url())
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data, {"active_users": 2})
+
+    def tearDown(self):
+        self.client.logout()
+        cache_instance.clear()

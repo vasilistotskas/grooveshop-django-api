@@ -10,6 +10,7 @@ from parler.models import TranslatableModel
 from parler.models import TranslatedFields
 from tinymce.models import HTMLField
 
+from core.fields.image import ImageAndSvgField
 from core.models import SortableModel
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
@@ -20,7 +21,7 @@ from tip.validators import validate_file_extension
 class Tip(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
     kind = models.CharField(_("Kind"), max_length=25, choices=TipKindEnum.choices)
-    icon = models.FileField(
+    icon = ImageAndSvgField(
         _("Icon"),
         upload_to="uploads/tip/",
         validators=[validate_file_extension],

@@ -50,6 +50,11 @@ class OrderViewSetTestCase(APITestCase):
         product_1 = products[0]
         product_2 = products[1]
 
+        product_1.stock = 10
+        product_1.save()
+        product_2.stock = 10
+        product_2.save()
+
         order_item1 = self.order.order_item_order.create(product_id=product_1.id, price=Decimal("50.00"), quantity=2)
         order_item2 = self.order.order_item_order.create(product_id=product_2.id, price=Decimal("30.00"), quantity=3)
         self.order_items = [order_item1, order_item2]
@@ -107,7 +112,6 @@ class OrderViewSetTestCase(APITestCase):
 
         url = self.get_order_list_url()
         response = self.client.post(url, data=payload, format="json")
-        print("===== OrderViewSetTestCase test_create_valid =====", response.data)
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Order.objects.count(), 2)

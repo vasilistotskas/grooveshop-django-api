@@ -29,7 +29,7 @@ class UserAddressViewSetTestCase(APITestCase):
         self.country = CountryFactory(
             alpha_2="GR",
             alpha_3="GRC",
-            iso_cc=300,
+            iso_cc=301,
             phone_code=30,
         )
         self.region = RegionFactory(alpha="GRC", country=self.country)

@@ -3,7 +3,27 @@
 
 
 
+## v0.132.0 (2024-07-06)
+
+### Chore
+
+* chore: format files for linting ([`4cf0b88`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4cf0b88b56608ee93dee1169f077da00f993cf55))
+
+### Feature
+
+* feat: Use factory boy for seeding and testing, logging improvements, `README.md` updated, Bump Versions ([`c445853`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c44585370f8623dc326025098a357bb895ff6099))
+
+### Fix
+
+* fix: test fix ([`e4fed90`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e4fed901626f2c6ce439838d4e386af5d1b86c80))
+
+* fix: test fix ([`ee1d76b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ee1d76b29d83f0be1c099242fc50fd771f52f9dc))
+
 ## v0.131.0 (2024-06-17)
+
+### Chore
+
+* chore(release): release version 0.131.0 [skip ci] ([`e0075be`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e0075beda8d6130490a95b36b78c31814fd19bd3))
 
 ### Feature
 

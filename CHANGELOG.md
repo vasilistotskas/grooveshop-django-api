@@ -3,9 +3,21 @@
 
 
 
+## v0.133.0 (2024-07-15)
+
+### Feature
+
+* feat: model `related_name` and factory improvements, Bump Versions ([`a8ac195`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a8ac19523af1cb1e56b72a7ae5fcc2571ec16e98))
+
+### Fix
+
+* fix: remove unused inline ([`f1ff735`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f1ff7354bcaf46258d7a17e36896cde1b5d1abc0))
+
 ## v0.132.0 (2024-07-06)
 
 ### Chore
+
+* chore(release): release version 0.132.0 [skip ci] ([`8ac81fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8ac81fdc189ee3a4569ee292fffa81f79cb17e5d))
 
 * chore: format files for linting ([`4cf0b88`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4cf0b88b56608ee93dee1169f077da00f993cf55))
 
@@ -93,6 +105,12 @@
 
 * feat: Bump versions, improve settings for all auth, implement SocialAccountAdapter and user all auth signals. ([`b192235`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b1922354a71e004b228ff112cfa3ad02c589bd80))
 
+* feat: Bump versions ([`f421809`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f42180964e91854626fff40b8c0fbb424db3e000))
+
+* feat: add &#34;django.contrib.humanize&#34; and app improvements ([`691d196`](https://github.com/vasilistotskas/grooveshop-django-api/commit/691d196ba495559c678cc6d7c8c486d223dc67b5))
+
+* feat: remove `dj-rest-auth`  and `django-otp`  to use `django-allauth` new headless api ([`e51ccf2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e51ccf2b084a039b980b9046d871b3f5d9226ae2))
+
 ### Fix
 
 * fix: remove useless tests ([`132db14`](https://github.com/vasilistotskas/grooveshop-django-api/commit/132db143191cb4e9f4b12a8f4787f2023931f009))
@@ -109,6 +127,12 @@
 #	poetry.lock
 #	pyproject.toml
 #	requirements.txt ([`66c7f41`](https://github.com/vasilistotskas/grooveshop-django-api/commit/66c7f41329f89b1ddf6179fbd663d0acb183f813))
+
+* Merge branch &#39;main&#39; into feature/headless-allauth
+
+# Conflicts: Resolved
+#	core/urls.py
+#	poetry.lock ([`06de6f1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/06de6f11af3ad71967bf07e253c274e800c647b0))
 
 * Update README.md ([`03894b0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/03894b0fe1074cd81d94fa5637536725d5e36ce4))
 
@@ -132,21 +156,9 @@
 
 * feat: Bump Version ([`558c682`](https://github.com/vasilistotskas/grooveshop-django-api/commit/558c6826bcbc4dcb55cfb12f1be4c609c5fd94f9))
 
-* feat: Bump versions ([`f421809`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f42180964e91854626fff40b8c0fbb424db3e000))
-
-* feat: add &#34;django.contrib.humanize&#34; and app improvements ([`691d196`](https://github.com/vasilistotskas/grooveshop-django-api/commit/691d196ba495559c678cc6d7c8c486d223dc67b5))
-
 ### Fix
 
 * fix: Update poetry.lock ([`9ed3378`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ed3378413000ad0980addaaf8fa2675d6c656f5))
-
-### Unknown
-
-* Merge branch &#39;main&#39; into feature/headless-allauth
-
-# Conflicts: Resolved
-#	core/urls.py
-#	poetry.lock ([`06de6f1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/06de6f11af3ad71967bf07e253c274e800c647b0))
 
 ## v0.125.0 (2024-05-19)
 
@@ -187,8 +199,6 @@
 ### Feature
 
 * feat: Bump Versions ([`5c9e163`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5c9e16387af89abf3ca3487d9eefdb4b1781a951))
-
-* feat: remove `dj-rest-auth`  and `django-otp`  to use `django-allauth` new headless api ([`e51ccf2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e51ccf2b084a039b980b9046d871b3f5d9226ae2))
 
 ## v0.123.0 (2024-05-16)
 
@@ -1814,10 +1824,6 @@
 
 * chore(release): release version 0.36.2 [skip ci] ([`00917b7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/00917b76248f6b7fbd104f03a5533b6245d6210c))
 
-### Fix
-
-* fix(docker.yml): Update dockerfile path. ([`b856bb1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b856bb1b771d1d8bcad4594038f3fb17fe852c28))
-
 ### Unknown
 
 * Merge branch &#39;main&#39; of github.com:vasilistotskas/grooveshop-django-api ([`fc5bb9c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc5bb9c1d9b83166b1af97719abd0c273bc1010d))
@@ -1829,6 +1835,8 @@
 * chore(release): release version 0.36.1 [skip ci] ([`b306c32`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b306c32f55e9b8b7697eab10e5526aeb99c24511))
 
 ### Fix
+
+* fix(docker.yml): Update dockerfile path. ([`b856bb1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b856bb1b771d1d8bcad4594038f3fb17fe852c28))
 
 * fix(cache.py): change redis host in github actions. ([`446e105`](https://github.com/vasilistotskas/grooveshop-django-api/commit/446e1058d0e5ede29c749f92519cfb6a59a930e9))
 

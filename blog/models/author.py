@@ -32,8 +32,8 @@ class BlogAuthor(TranslatableModel, TimeStampMixinModel, UUIDModel):
 
     @property
     def number_of_posts(self) -> int:
-        return self.posts.count()
+        return self.blog_posts.count()
 
     @property
     def total_likes_received(self) -> int:
-        return sum([post.likes.count() for post in self.posts.all()])
+        return sum([post.likes.count() for post in self.blog_posts.all()])

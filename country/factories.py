@@ -5,6 +5,7 @@ from faker import Faker
 
 from core.factories import CustomDjangoModelFactory
 from country.models import Country
+from region.factories import RegionFactory
 
 fake = Faker()
 
@@ -40,6 +41,21 @@ class CountryFactory(CustomDjangoModelFactory):
         model = Country
         django_get_or_create = ("alpha_2",)
         skip_postgeneration_save = True
+        exclude = ("unique_model_fields", "num_regions")
+
+    num_regions = factory.LazyAttribute(lambda o: 2)
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        num_regions = kwargs.pop("num_regions", 2)
+        instance = super()._create(model_class, *args, **kwargs)
+
+        if "create" in kwargs and kwargs["create"]:
+            if num_regions > 0:
+                regions = RegionFactory.create_batch(num_regions)
+                instance.regions.add(*regions)
+
+        return instance
 
     @factory.post_generation
     def translations(self, create, extracted, **kwargs):

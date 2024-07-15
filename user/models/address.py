@@ -17,7 +17,7 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
     user = models.ForeignKey(
         "user.UserAccount",
-        related_name="user_address",
+        related_name="addresses",
         on_delete=models.CASCADE,
     )
     title = models.CharField(_("Title"), max_length=255)
@@ -29,7 +29,7 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
     zipcode = models.CharField(_("Zip Code"), max_length=255)
     country = models.ForeignKey(
         "country.Country",
-        related_name="address_country",
+        related_name="user_addresses",
         null=True,
         blank=True,
         default=None,
@@ -37,7 +37,7 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
     )
     region = models.ForeignKey(
         "region.Region",
-        related_name="address_region",
+        related_name="user_addresses",
         null=True,
         blank=True,
         default=None,

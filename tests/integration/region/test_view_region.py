@@ -18,7 +18,7 @@ class RegionViewSetTestCase(APITestCase):
     country: Country = None
 
     def setUp(self):
-        self.country = CountryFactory()
+        self.country = CountryFactory(num_regions=0)
         self.region = RegionFactory(
             alpha="GRC",
             country=self.country,

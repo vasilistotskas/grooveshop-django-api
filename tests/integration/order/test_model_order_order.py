@@ -36,19 +36,19 @@ class OrderModelTestCase(TestCase):
         self.product_1 = products[0]
         self.product_2 = products[1]
 
-        self.order.order_item_order.create(
+        self.order.items.create(
             product_id=self.product_1.id,
             price=Decimal("50.00"),
             quantity=2,
         )
-        self.order.order_item_order.create(
+        self.order.items.create(
             product_id=self.product_2.id,
             price=Decimal("30.00"),
             quantity=3,
         )
 
     def test_total_price_items_with_items(self):
-        expected_total_price = sum(item.total_price.amount for item in self.order.order_item_order.all())
+        expected_total_price = sum(item.total_price.amount for item in self.order.items.all())
         self.assertEqual(self.order.total_price_items.amount, expected_total_price)
 
     def test_total_price_extra_without_pay_way(self):

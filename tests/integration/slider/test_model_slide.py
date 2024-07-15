@@ -22,7 +22,7 @@ class SlideModelTestCase(TestCase):
 
     def setUp(self):
         date_start = now()
-        self.slider = SliderFactory()
+        self.slider = SliderFactory(num_slides=0)
         self.slide = SlideFactory(
             discount=0.0,
             show_button=True,

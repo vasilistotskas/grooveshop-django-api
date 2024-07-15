@@ -27,7 +27,7 @@ class ProductImage(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDMo
     id = models.BigAutoField(primary_key=True)
     product = models.ForeignKey(
         "product.Product",
-        related_name="product_images",
+        related_name="images",
         on_delete=models.CASCADE,
     )
     image = ImageAndSvgField(_("Image"), upload_to="uploads/products/")
@@ -63,7 +63,7 @@ class ProductImage(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDMo
         return f"{product_name} Image ({main_status})"
 
     def get_ordering_queryset(self):
-        return self.product.product_images.all()
+        return self.product.images.all()
 
     def save(self, *args, **kwargs):
         if not self.thumbnail:

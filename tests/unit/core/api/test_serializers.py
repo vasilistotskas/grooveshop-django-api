@@ -23,7 +23,7 @@ class TestBaseExpandSerializer(TestCase):
     serializer: BaseExpandSerializer = None
 
     def setUp(self):
-        self.user = UserAccountFactory()
+        self.user = UserAccountFactory(num_addresses=0)
         self.product = ProductFactory()
         for language in languages:
             self.product.set_current_language(language)

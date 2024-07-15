@@ -4,6 +4,8 @@ from django.conf import settings
 from faker import Faker
 
 from blog.enum.blog_post_enum import PostStatusEnum
+from blog.factories.comment import BlogCommentFactory
+from blog.factories.tag import BlogTagFactory
 from blog.models.post import BlogPost
 from core.factories import CustomDjangoModelFactory
 
@@ -26,10 +28,7 @@ class BlogPostTranslationFactory(factory.django.DjangoModelFactory):
 
 
 class BlogPostFactory(CustomDjangoModelFactory):
-    unique_model_fields = [
-        ("slug", lambda: fake.slug()),
-    ]
-
+    slug = factory.LazyFunction(lambda: fake.slug())
     image = factory.django.ImageField(
         filename="blog_image.jpg",
         color=factory.Faker("color"),
@@ -46,15 +45,25 @@ class BlogPostFactory(CustomDjangoModelFactory):
         model = BlogPost
         django_get_or_create = ("slug",)
         skip_postgeneration_save = True
+        exclude = ("unique_model_fields", "num_tags", "num_comments")
 
-    @factory.post_generation
-    def tags(self, create, extracted, **kwargs):
-        if not create:
-            return
+    num_tags = factory.LazyAttribute(lambda o: 2)
+    num_comments = factory.LazyAttribute(lambda o: 10)
 
-        if extracted:
-            for tag in extracted:
-                self.tags.add(tag)
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        num_tags = kwargs.pop("num_tags", 2)
+        num_comments = kwargs.pop("num_comments", 10)
+        instance = super()._create(model_class, *args, **kwargs)
+
+        if "create" in kwargs and kwargs["create"]:
+            if num_tags > 0:
+                tags = BlogTagFactory.create_batch(num_tags)
+                instance.tags.add(*tags)
+            if num_comments > 0:
+                BlogCommentFactory.create_batch(num_comments, post=instance)
+
+        return instance
 
     @factory.post_generation
     def translations(self, create, extracted, **kwargs):

@@ -92,7 +92,7 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
     place = models.CharField(_("Place"), max_length=255, blank=True, null=True)
     country = models.ForeignKey(
         "country.Country",
-        related_name="user_account_country",
+        related_name="residents",
         null=True,
         blank=True,
         default=None,
@@ -100,7 +100,7 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
     )
     region = models.ForeignKey(
         "region.Region",
-        related_name="user_account_region",
+        related_name="residents",
         null=True,
         blank=True,
         default=None,

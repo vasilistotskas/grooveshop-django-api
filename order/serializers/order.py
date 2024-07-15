@@ -17,7 +17,7 @@ from region.serializers import RegionSerializer
 
 
 class OrderSerializer(BaseExpandSerializer):
-    order_item_order = OrderItemSerializer(many=True)
+    items = OrderItemSerializer(many=True)
     country = serializers.SerializerMethodField("get_country")
     region = serializers.SerializerMethodField("get_region")
     pay_way = serializers.SerializerMethodField("get_pay_way")
@@ -63,7 +63,7 @@ class OrderSerializer(BaseExpandSerializer):
             "mobile_phone",
             "customer_notes",
             "paid_amount",
-            "order_item_order",
+            "items",
             "shipping_price",
             "document_type",
             "created_at",
@@ -76,7 +76,7 @@ class OrderSerializer(BaseExpandSerializer):
 
 
 class OrderCreateUpdateSerializer(BaseExpandSerializer):
-    order_item_order = OrderItemCreateUpdateSerializer(many=True)
+    items = OrderItemCreateUpdateSerializer(many=True)
     paid_amount = MoneyField(max_digits=11, decimal_places=2, required=False)
     shipping_price = MoneyField(max_digits=11, decimal_places=2)
     total_price_items = MoneyField(max_digits=11, decimal_places=2, read_only=True)
@@ -107,7 +107,7 @@ class OrderCreateUpdateSerializer(BaseExpandSerializer):
             "mobile_phone",
             "paid_amount",
             "customer_notes",
-            "order_item_order",
+            "items",
             "shipping_price",
             "document_type",
             "created_at",
@@ -121,7 +121,7 @@ class OrderCreateUpdateSerializer(BaseExpandSerializer):
     def validate(self, data):
         super().validate(data)
 
-        items_data = data.get("order_item_order", [])
+        items_data = data.get("items", [])
 
         for item_data in items_data:
             product = item_data["product"]
@@ -133,7 +133,7 @@ class OrderCreateUpdateSerializer(BaseExpandSerializer):
         return data
 
     def create(self, validated_data):
-        items_data = validated_data.pop("order_item_order")
+        items_data = validated_data.pop("items")
 
         try:
             order = Order.objects.create(**validated_data)
@@ -154,11 +154,11 @@ class OrderCreateUpdateSerializer(BaseExpandSerializer):
         return order
 
     def update(self, instance, validated_data):
-        if "order_item_order" in validated_data:
-            items_data = validated_data.pop("order_item_order")
+        if "items" in validated_data:
+            items_data = validated_data.pop("items")
 
             # Delete old items
-            instance.order_item_order.all().delete()
+            instance.items.all().delete()
 
             # Create new items
             for item_data in items_data:
@@ -168,7 +168,7 @@ class OrderCreateUpdateSerializer(BaseExpandSerializer):
 
 
 class CheckoutSerializer(BaseExpandSerializer):
-    order_item_order = CheckoutItemSerializer(many=True)
+    items = CheckoutItemSerializer(many=True)
     paid_amount = MoneyField(max_digits=11, decimal_places=2, required=False)
     shipping_price = MoneyField(max_digits=11, decimal_places=2)
     total_price_items = MoneyField(max_digits=11, decimal_places=2, read_only=True)
@@ -199,7 +199,7 @@ class CheckoutSerializer(BaseExpandSerializer):
             "mobile_phone",
             "paid_amount",
             "customer_notes",
-            "order_item_order",
+            "items",
             "shipping_price",
             "document_type",
             "created_at",
@@ -213,7 +213,7 @@ class CheckoutSerializer(BaseExpandSerializer):
     def validate(self, data):
         super().validate(data)
 
-        items_data = data.get("order_item_order", [])
+        items_data = data.get("items", [])
 
         for item_data in items_data:
             product = item_data["product"]
@@ -225,7 +225,7 @@ class CheckoutSerializer(BaseExpandSerializer):
         return data
 
     def create(self, validated_data):
-        items_data = validated_data.pop("order_item_order")
+        items_data = validated_data.pop("items")
 
         try:
             order = Order.objects.create(**validated_data)

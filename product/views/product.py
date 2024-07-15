@@ -69,6 +69,6 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
     )
     def images(self, request, pk=None) -> Response:
         product = self.get_object()
-        images = product.product_images.all()
+        images = product.images.all()
         serializer = self.get_serializer(images, many=True, context=self.get_serializer_context())
         return Response(serializer.data, status=status.HTTP_200_OK)

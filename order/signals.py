@@ -11,7 +11,7 @@ order_created = Signal()
 def handle_order_created(sender, **kwargs):
     order: Order = kwargs["order"]
 
-    items = order.order_item_order.all()
+    items = order.items.all()
     for item in items:
         product = item.product
         product.decrement_stock(item.quantity)

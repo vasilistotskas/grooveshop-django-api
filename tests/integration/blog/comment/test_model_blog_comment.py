@@ -23,7 +23,7 @@ class BlogCommentModelTestCase(TestCase):
     post: BlogPost = None
 
     def setUp(self):
-        self.user = UserAccountFactory()
+        self.user = UserAccountFactory(num_addresses=0)
         self.author = BlogAuthorFactory(user=self.user)
         self.post = BlogPostFactory(author=self.author)
         self.comment = BlogCommentFactory(is_approved=True, user=self.user, post=self.post)
@@ -61,7 +61,7 @@ class BlogCommentModelTestCase(TestCase):
         )
 
     def test_likes_count(self):
-        other_user = UserAccountFactory()
+        other_user = UserAccountFactory(num_addresses=0)
 
         self.assertEqual(self.comment.likes_count, 0)
 

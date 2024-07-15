@@ -33,9 +33,9 @@ class OrderViewSetTestCase(APITestCase):
     order_items: list[OrderItem] = None
 
     def setUp(self):
-        self.user = UserAccountFactory()
+        self.user = UserAccountFactory(num_addresses=0)
         self.pay_way = PayWayFactory()
-        self.country = CountryFactory()
+        self.country = CountryFactory(num_regions=0)
         self.region = RegionFactory(
             country=self.country,
         )
@@ -55,8 +55,8 @@ class OrderViewSetTestCase(APITestCase):
         product_2.stock = 10
         product_2.save()
 
-        order_item1 = self.order.order_item_order.create(product_id=product_1.id, price=Decimal("50.00"), quantity=2)
-        order_item2 = self.order.order_item_order.create(product_id=product_2.id, price=Decimal("30.00"), quantity=3)
+        order_item1 = self.order.items.create(product_id=product_1.id, price=Decimal("50.00"), quantity=2)
+        order_item2 = self.order.items.create(product_id=product_2.id, price=Decimal("30.00"), quantity=3)
         self.order_items = [order_item1, order_item2]
 
     @staticmethod
@@ -96,7 +96,7 @@ class OrderViewSetTestCase(APITestCase):
             "paid_amount": Decimal("150.00"),
             "status": OrderStatusEnum.PENDING.value,
             "shipping_price": Decimal("10.00"),
-            "order_item_order": [
+            "items": [
                 {
                     "product": self.order_items[0].product.id,
                     "price": Decimal("50.00"),
@@ -136,7 +136,7 @@ class OrderViewSetTestCase(APITestCase):
             "paid_amount": "invalid_paid_amount",
             "status": "invalid_status",
             "shipping_price": "invalid_shipping_price",
-            "order_item_order": [
+            "items": [
                 {
                     "product": "invalid_product_id",
                     "price": "invalid_price",
@@ -191,7 +191,7 @@ class OrderViewSetTestCase(APITestCase):
             "paid_amount": Decimal("150.00"),
             "status": OrderStatusEnum.SENT.value,
             "shipping_price": Decimal("10.00"),
-            "order_item_order": [
+            "items": [
                 {
                     "product": self.order_items[0].product.id,
                     "price": Decimal("50.00"),
@@ -230,7 +230,7 @@ class OrderViewSetTestCase(APITestCase):
             "paid_amount": "invalid_paid_amount",
             "status": "invalid_status",
             "shipping_price": "invalid_shipping_price",
-            "order_item_order": [
+            "items": [
                 {
                     "product": "invalid_product_id",
                     "price": "invalid_price",

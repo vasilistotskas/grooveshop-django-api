@@ -30,6 +30,7 @@ class RegionFactory(CustomDjangoModelFactory):
 
     class Meta:
         model = Region
+        django_get_or_create = ("alpha",)
         skip_postgeneration_save = True
 
     @factory.post_generation

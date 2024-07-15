@@ -19,12 +19,12 @@ class ProductFavourite(TimeStampMixinModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
     user = models.ForeignKey(
         "user.UserAccount",
-        related_name="user_product_favourite",
+        related_name="favourite_products",
         on_delete=models.CASCADE,
     )
     product = models.ForeignKey(
         "product.Product",
-        related_name="product_favourite",
+        related_name="favourited_by",
         on_delete=models.CASCADE,
     )
 

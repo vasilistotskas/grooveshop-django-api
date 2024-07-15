@@ -31,28 +31,28 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
     user = models.ForeignKey(
         "user.UserAccount",
-        related_name="user_order",
+        related_name="orders",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
     )
     pay_way = models.ForeignKey(
         "pay_way.PayWay",
-        related_name="order_pay_way",
+        related_name="orders",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
     )
     country = models.ForeignKey(
         "country.Country",
-        related_name="order_country",
+        related_name="orders",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
     )
     region = models.ForeignKey(
         "region.Region",
-        related_name="order_region",
+        related_name="orders",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -147,7 +147,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
 
     @property
     def total_price_items(self) -> Money:
-        total = self.order_item_order.annotate(
+        total = self.items.annotate(
             total_price_per_item=ExpressionWrapper(
                 F("price") * F("quantity"),
                 output_field=MoneyField(max_digits=11, decimal_places=2),

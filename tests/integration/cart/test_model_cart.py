@@ -24,7 +24,7 @@ class CartModelTestCase(TestCase):
         product_1: Product = products[0]
         product_2: Product = products[1]
 
-        self.user = UserAccountFactory()
+        self.user = UserAccountFactory(num_addresses=0)
         self.cart = CartFactory(user=self.user)
         self.cart_item_1 = CartItemFactory(cart=self.cart, product=product_1, quantity=2)
         self.cart_item_2 = CartItemFactory(cart=self.cart, product=product_2, quantity=3)

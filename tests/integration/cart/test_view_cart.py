@@ -19,7 +19,7 @@ class CartViewSetTest(APITestCase):
     update_data: dict = None
 
     def setUp(self):
-        self.user = UserAccountFactory()
+        self.user = UserAccountFactory(num_addresses=0)
         self.client.force_authenticate(user=self.user)
         self.cart = CartFactory(user=self.user)
         self.detail_url = reverse("cart-detail")

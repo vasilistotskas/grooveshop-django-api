@@ -25,7 +25,7 @@ class BlogCommentViewSetTestCase(APITestCase):
     author: BlogAuthor = None
 
     def setUp(self):
-        self.user = UserAccountFactory()
+        self.user = UserAccountFactory(num_addresses=0)
         self.client.force_authenticate(user=self.user)
         self.author = BlogAuthorFactory(user=self.user)
         self.post = BlogPostFactory(
@@ -55,7 +55,7 @@ class BlogCommentViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_valid(self):
-        user = UserAccountFactory()
+        user = UserAccountFactory(num_addresses=0)
         author = BlogAuthorFactory(user=user)
         post = BlogPostFactory(
             author=author,

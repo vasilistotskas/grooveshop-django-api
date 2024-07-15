@@ -27,9 +27,9 @@ class CheckoutViewAPITest(APITestCase):
     region: Region = None
 
     def setUp(self):
-        self.user = UserAccountFactory()
+        self.user = UserAccountFactory(num_addresses=0)
         self.pay_way = PayWayFactory()
-        self.country = CountryFactory()
+        self.country = CountryFactory(num_regions=0)
         self.region = RegionFactory(
             country=self.country,
         )
@@ -69,7 +69,7 @@ class CheckoutViewAPITest(APITestCase):
             "mobile_phone": "6912345678",
             "customer_notes": "Test notes",
             "shipping_price": 10.00,
-            "order_item_order": [
+            "items": [
                 {
                     "product": product_1.id,
                     "quantity": 2,
@@ -102,7 +102,7 @@ class CheckoutViewAPITest(APITestCase):
 
         order_data = {
             "user_id": self.user.id,
-            "order_item_order": [
+            "items": [
                 {"product": product_3.id, "quantity": 15},
                 {"product": product_4.id, "quantity": 3},
             ],

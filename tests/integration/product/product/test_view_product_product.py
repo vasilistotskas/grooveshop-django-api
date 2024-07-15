@@ -31,12 +31,12 @@ class ProductViewSetTestCase(APITestCase):
     user: User = None
     category: ProductCategory = None
     vat: Vat = None
-    product_images: list[ProductImage] = []
-    product_reviews: list[ProductReview] = []
-    product_favourite: ProductFavourite = None
+    images: list[ProductImage] = []
+    reviews: list[ProductReview] = []
+    favourite: ProductFavourite = None
 
     def setUp(self):
-        self.user = UserAccountFactory()
+        self.user = UserAccountFactory(num_addresses=0)
         self.category = ProductCategoryFactory()
         for language in languages:
             self.category.set_current_language(language)
@@ -68,7 +68,7 @@ class ProductViewSetTestCase(APITestCase):
             main_product_image.title = f"Sample Main Product Image ({language})"
             main_product_image.save()
         main_product_image.set_current_language(default_language)
-        self.product_images.append(main_product_image)
+        self.images.append(main_product_image)
 
         non_main_product_image = ProductImageFactory(
             product=self.product,
@@ -79,28 +79,28 @@ class ProductViewSetTestCase(APITestCase):
             non_main_product_image.title = f"Sample Non-Main Product Image ({language})"
             non_main_product_image.save()
         non_main_product_image.set_current_language(default_language)
-        self.product_images.append(non_main_product_image)
+        self.images.append(non_main_product_image)
 
-        self.product_favourite = ProductFavouriteFactory(
+        self.favourite = ProductFavouriteFactory(
             product=self.product,
             user=self.user,
         )
 
-        user_2 = UserAccountFactory()
+        user_2 = UserAccountFactory(num_addresses=0)
 
         product_review_status_true = ProductReviewFactory(
             product=self.product,
             user=self.user,
             status="True",
         )
-        self.product_reviews.append(product_review_status_true)
+        self.reviews.append(product_review_status_true)
 
         product_review_status_false = ProductReviewFactory(
             product=self.product,
             user=user_2,
             status="False",
         )
-        self.product_reviews.append(product_review_status_false)
+        self.reviews.append(product_review_status_false)
 
     @staticmethod
     def get_product_detail_url(pk):

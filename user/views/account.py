@@ -50,15 +50,15 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
     def get_queryset(self):
         match self.action:
             case "favourite_products":
-                queryset = get_object_or_404(User, id=self.kwargs["pk"]).user_product_favourite.all()
+                queryset = get_object_or_404(User, id=self.kwargs["pk"]).favourite_products.all()
             case "orders":
-                queryset = get_object_or_404(User, id=self.kwargs["pk"]).user_order.all()
+                queryset = get_object_or_404(User, id=self.kwargs["pk"]).orders.all()
             case "product_reviews":
                 queryset = get_object_or_404(User, id=self.kwargs["pk"]).product_reviews.all()
             case "addresses":
-                queryset = get_object_or_404(User, id=self.kwargs["pk"]).user_address.all()
+                queryset = get_object_or_404(User, id=self.kwargs["pk"]).addresses.all()
             case "blog_post_comments":
-                queryset = get_object_or_404(User, id=self.kwargs["pk"]).blog_comment_user.all()
+                queryset = get_object_or_404(User, id=self.kwargs["pk"]).blog_comments.all()
             case "liked_blog_posts":
                 queryset = get_object_or_404(User, id=self.kwargs["pk"]).liked_blog_posts.all()
             case _:

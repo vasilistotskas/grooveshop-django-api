@@ -32,12 +32,12 @@ class ProductModelTestCase(TestCase):
     user: User = None
     category: ProductCategory = None
     vat: Vat = None
-    product_images: list[ProductImage] = []
-    product_reviews: list[ProductReview] = []
-    product_favourite: ProductFavourite = None
+    images: list[ProductImage] = []
+    reviews: list[ProductReview] = []
+    favourite: ProductFavourite = None
 
     def setUp(self):
-        self.user = UserAccountFactory()
+        self.user = UserAccountFactory(num_addresses=0)
         self.category = ProductCategoryFactory()
 
         for language in languages:
@@ -78,7 +78,7 @@ class ProductModelTestCase(TestCase):
             main_product_image.title = f"Sample Main Product Image ({language})"
             main_product_image.save()
         main_product_image.set_current_language(default_language)
-        self.product_images.append(main_product_image)
+        self.images.append(main_product_image)
 
         non_main_product_image = ProductImageFactory(
             product=self.product,
@@ -90,14 +90,14 @@ class ProductModelTestCase(TestCase):
             non_main_product_image.title = f"Sample Non-Main Product Image ({language})"
             non_main_product_image.save()
         non_main_product_image.set_current_language(default_language)
-        self.product_images.append(non_main_product_image)
+        self.images.append(non_main_product_image)
 
-        self.product_favourite = ProductFavouriteFactory(
+        self.favourite = ProductFavouriteFactory(
             product=self.product,
             user=self.user,
         )
 
-        user_2 = UserAccountFactory()
+        user_2 = UserAccountFactory(num_addresses=0)
 
         product_review_status_true = ProductReviewFactory(
             product=self.product,
@@ -105,7 +105,7 @@ class ProductModelTestCase(TestCase):
             rate=5,
             status=ReviewStatusEnum.TRUE,
         )
-        self.product_reviews.append(product_review_status_true)
+        self.reviews.append(product_review_status_true)
 
         product_review_status_false = ProductReviewFactory(
             product=self.product,
@@ -113,7 +113,7 @@ class ProductModelTestCase(TestCase):
             rate=5,
             status=ReviewStatusEnum.FALSE,
         )
-        self.product_reviews.append(product_review_status_false)
+        self.reviews.append(product_review_status_false)
 
     def test_save_method(self):
         self.product.price = Decimal("100.00")
@@ -182,12 +182,12 @@ class ProductModelTestCase(TestCase):
         self.assertEqual(self.product.vat_value.amount, expected_vat_value)
 
     def test_main_image_absolute_url(self):
-        main_image = self.product.product_images.filter(is_main=True).first()
+        main_image = self.product.images.filter(is_main=True).first()
         expected_url = settings.APP_BASE_URL + main_image.image.url
         self.assertEqual(self.product.main_image_absolute_url, expected_url)
 
     def test_main_image_filename(self):
-        main_image = self.product.product_images.filter(is_main=True).first()
+        main_image = self.product.images.filter(is_main=True).first()
         expected_filename = os.path.basename(main_image.image.name)
         self.assertEqual(self.product.main_image_filename, expected_filename)
 

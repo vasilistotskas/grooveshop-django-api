@@ -25,13 +25,8 @@ class UserAddressViewSetTestCase(APITestCase):
     address: UserAddress = None
 
     def setUp(self):
-        self.user = UserAccountFactory()
-        self.country = CountryFactory(
-            alpha_2="GR",
-            alpha_3="GRC",
-            iso_cc=301,
-            phone_code=30,
-        )
+        self.user = UserAccountFactory(num_addresses=0)
+        self.country = CountryFactory(alpha_2="GR", alpha_3="GRC", iso_cc=301, phone_code=30, num_regions=0)
         self.region = RegionFactory(alpha="GRC", country=self.country)
 
         for language in languages:
@@ -111,8 +106,8 @@ class UserAddressViewSetTestCase(APITestCase):
     def test_retrieve_valid(self):
         url = self.get_user_address_detail_url(self.address.pk)
         response = self.client.get(url)
-        user_address = UserAddress.objects.get(pk=self.address.pk)
-        serializer = UserAddressSerializer(user_address)
+        addresses = UserAddress.objects.get(pk=self.address.pk)
+        serializer = UserAddressSerializer(addresses)
 
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)

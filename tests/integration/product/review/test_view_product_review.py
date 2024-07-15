@@ -22,7 +22,7 @@ class ProductReviewViewSetTestCase(APITestCase):
     product_review: ProductReview = None
 
     def setUp(self):
-        self.user = UserAccountFactory()
+        self.user = UserAccountFactory(num_addresses=0)
         self.client.force_authenticate(user=self.user)
         self.product = ProductFactory()
         self.product_review = ProductReviewFactory(

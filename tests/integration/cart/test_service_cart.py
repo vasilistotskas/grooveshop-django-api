@@ -27,12 +27,12 @@ class CartServiceTest(TestCase):
     product: Product = None
 
     def setUp(self):
-        self.user = UserAccountFactory()
+        self.user = UserAccountFactory(num_addresses=0)
         self.factory = RequestFactory()
         self.request = self.factory.get("/")
         self.request.user = self.user
 
-        self.cart = CartFactory(user=self.user, num_items=0)
+        self.cart = CartFactory(user=self.user, num_cart_items=0)
         self.product = ProductFactory()
 
         CartItem.objects.all().delete()
@@ -66,7 +66,7 @@ class CartServiceTest(TestCase):
 
     def test_process_cart_merge(self):
         cart_service = CartService(cart_id=self.cart.pk)
-        pre_login_cart = CartFactory(user=None, num_items=0)
+        pre_login_cart = CartFactory(user=None, num_cart_items=0)
         cart_service.create_cart_item(self.product, 2)
         cache_instance.set(str(self.user.id), pre_login_cart.id, 3600)
 
@@ -77,7 +77,7 @@ class CartServiceTest(TestCase):
 
     def test_process_cart_merge_with_pre_login_cart_in_session(self):
         cart_service = CartService(cart_id=self.cart.pk)
-        pre_login_cart = CartFactory(user=None, num_items=0)
+        pre_login_cart = CartFactory(user=None, num_cart_items=0)
         cart_service.create_cart_item(self.product, 2)
         self.request.session = {"pre_log_in_cart_id": pre_login_cart.id}
 
@@ -88,7 +88,7 @@ class CartServiceTest(TestCase):
 
     def test_process_cart_keep(self):
         cart_service = CartService(cart_id=self.cart.pk)
-        pre_login_cart = CartFactory(user=None, num_items=0)
+        pre_login_cart = CartFactory(user=None, num_cart_items=0)
         cart_service.create_cart_item(self.product, 3)
         cache_instance.set(str(self.user.id), pre_login_cart.id, 3600)
 
@@ -172,7 +172,7 @@ class CartServiceTest(TestCase):
     def test_merge_carts_with_items_in_both_carts(self):
         cart_service = CartService(cart_id=self.cart.pk)
 
-        pre_login_cart = CartFactory(user=None, num_items=0)
+        pre_login_cart = CartFactory(user=None, num_cart_items=0)
         pre_login_product = ProductFactory()
         CartItemFactory(cart=pre_login_cart, product=pre_login_product, quantity=1)
         cart_service.create_cart_item(self.product, 2)

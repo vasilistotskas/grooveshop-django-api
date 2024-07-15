@@ -33,14 +33,14 @@ class BlogPost(
     likes = models.ManyToManyField("user.UserAccount", related_name="liked_blog_posts", blank=True)
     category = models.ForeignKey(
         "blog.BlogCategory",
-        related_name="posts",
+        related_name="blog_posts",
         on_delete=models.SET_NULL,
         null=True,
     )
-    tags = models.ManyToManyField("blog.BlogTag", related_name="tags", blank=True)
+    tags = models.ManyToManyField("blog.BlogTag", related_name="blog_posts", blank=True)
     author = models.ForeignKey(
         "blog.BlogAuthor",
-        related_name="posts",
+        related_name="blog_posts",
         on_delete=models.SET_NULL,
         null=True,
     )
@@ -117,7 +117,7 @@ class BlogPost(
 
     @property
     def comments_count(self) -> int:
-        return self.blog_comment_post.count()
+        return self.comments.count()
 
     @property
     def tags_count(self) -> int:

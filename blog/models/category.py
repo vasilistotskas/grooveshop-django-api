@@ -113,4 +113,4 @@ class BlogCategory(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDMo
 
     @property
     def post_count(self) -> int:
-        return self.posts.count()
+        return self.blog_posts.count()

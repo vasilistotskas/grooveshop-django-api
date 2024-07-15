@@ -34,17 +34,17 @@ class BlogCommentManager(TreeManager, TranslatableManager):
 class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel, MPTTModel):
     id = models.BigAutoField(primary_key=True)
     is_approved = models.BooleanField(_("Is Approved"), default=False)
-    likes = models.ManyToManyField("user.UserAccount", related_name="liked_comments", blank=True)
+    likes = models.ManyToManyField("user.UserAccount", related_name="liked_blog_comments", blank=True)
     user = models.ForeignKey(
         "user.UserAccount",
-        related_name="blog_comment_user",
+        related_name="blog_comments",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
     )
     post = models.ForeignKey(
         "blog.BlogPost",
-        related_name="blog_comment_post",
+        related_name="comments",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

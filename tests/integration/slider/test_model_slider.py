@@ -15,7 +15,7 @@ class SliderModelTestCase(TestCase):
     slider: Slider = None
 
     def setUp(self):
-        self.slider = SliderFactory()
+        self.slider = SliderFactory(num_slides=0)
 
         for language in languages:
             self.slider.set_current_language(language)

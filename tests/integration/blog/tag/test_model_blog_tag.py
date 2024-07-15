@@ -54,7 +54,7 @@ class BlogTagModelTestCase(TestCase):
     def test_get_tag_posts_count(self):
         post = BlogPostFactory()
         post.tags.set([self.tag])
-        self.assertEqual(self.tag.get_tag_posts_count, 1)
+        self.assertEqual(self.tag.get_posts_count, 1)
 
     def tearDown(self) -> None:
         BlogTag.objects.all().delete()

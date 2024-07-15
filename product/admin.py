@@ -13,6 +13,7 @@ from product.models.favourite import ProductFavourite
 from product.models.image import ProductImage
 from product.models.product import Product
 from product.models.review import ProductReview
+from tag.admin import TagInLine
 
 
 def category_update_action(category):
@@ -104,7 +105,7 @@ class ProductAdmin(TranslatableAdmin, ExportModelAdmin):
         "product_code",
     ]
     list_filter = ["category"]
-    inlines = [ProductImageInline]
+    inlines = [ProductImageInline, TagInLine]
     readonly_fields = ("image_tag", "likes_count")
 
     def get_prepopulated_fields(self, request, obj=None) -> dict:

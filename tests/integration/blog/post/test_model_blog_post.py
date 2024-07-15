@@ -25,7 +25,7 @@ class BlogPostModelTestCase(TestCase):
     category: BlogCategory = None
 
     def setUp(self):
-        self.user = UserAccountFactory()
+        self.user = UserAccountFactory(num_addresses=0)
         self.author = BlogAuthorFactory(user=self.user)
         self.category = BlogCategoryFactory(slug="sample-category")
 
@@ -43,6 +43,8 @@ class BlogPostModelTestCase(TestCase):
             status="DRAFT",
             featured=True,
             view_count=0,
+            num_tags=0,
+            num_comments=0,
         )
 
         for language in languages:

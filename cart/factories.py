@@ -12,16 +12,17 @@ class CartFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Cart
         django_get_or_create = ("user",)
-        exclude = ("num_items",)  # Ensure num_items is not treated as a model field
+        exclude = ("num_cart_items",)
 
-    num_items = factory.LazyAttribute(lambda o: 3)  # Default to 3, can be overridden
+    num_cart_items = factory.LazyAttribute(lambda o: 3)
 
     @classmethod
     def _create(cls, model_class, *args, **kwargs):
-        num_items = kwargs.pop("num_items", 3)  # Manage num_items during creation
+        num_cart_items = kwargs.pop("num_items", 3)
         instance = super()._create(model_class, *args, **kwargs)
         if "create" in kwargs and kwargs["create"]:
-            CartItemFactory.create_batch(num_items, cart=instance)
+            if num_cart_items > 0:
+                CartItemFactory.create_batch(num_cart_items, cart=instance)
         return instance
 
 

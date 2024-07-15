@@ -24,7 +24,7 @@ class CategoryModelTestCase(TestCase):
     vat: Vat = None
 
     def setUp(self):
-        self.user = UserAccountFactory()
+        self.user = UserAccountFactory(num_addresses=0)
         self.vat = VatFactory()
         self.category = ProductCategoryFactory()
 

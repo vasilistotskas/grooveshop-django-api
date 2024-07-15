@@ -26,5 +26,5 @@ class BlogTagSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "updated_at",
             "sort_order",
             "uuid",
-            "get_tag_posts_count",
+            "get_posts_count",
         )

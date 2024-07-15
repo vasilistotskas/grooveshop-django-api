@@ -16,7 +16,7 @@ class BlogAuthorModelTestCase(TestCase):
     user: User = None
 
     def setUp(self):
-        self.user = UserAccountFactory()
+        self.user = UserAccountFactory(num_addresses=0)
         self.author = BlogAuthorFactory(user=self.user, website="http://example.com")
         for language in languages:
             self.author.set_current_language(language)

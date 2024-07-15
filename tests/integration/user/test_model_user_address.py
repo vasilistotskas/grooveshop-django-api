@@ -16,7 +16,7 @@ class UserAddressModelTestCase(TestCase):
     address: UserAddress = None
 
     def setUp(self):
-        self.user = UserAccountFactory()
+        self.user = UserAccountFactory(num_addresses=0)
         self.address = UserAddressFactory(
             user=self.user,
             title="Home",

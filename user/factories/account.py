@@ -2,7 +2,10 @@ import factory
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
 
+from user.factories.address import UserAddressFactory
+
 User = get_user_model()
+
 
 class UserAccountFactory(factory.django.DjangoModelFactory):
     email = factory.Faker("email")
@@ -38,9 +41,23 @@ class UserAccountFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = User
         django_get_or_create = ("email",)
-        exclude = ("plain_password",)
+        skip_postgeneration_save = True
+        exclude = ("plain_password", "num_addresses")
 
     class Params:
         admin = factory.Trait(is_superuser=True, is_staff=True)
         staff = factory.Trait(is_staff=True)
 
+    num_addresses = factory.LazyAttribute(lambda o: 2)
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        num_addresses = kwargs.pop("num_addresses", 2)
+        instance = super()._create(model_class, *args, **kwargs)
+
+        if "create" in kwargs and kwargs["create"]:
+            if num_addresses > 0:
+                addresses = UserAddressFactory.create_batch(num_addresses)
+                instance.addresses.add(*addresses)
+
+        return instance

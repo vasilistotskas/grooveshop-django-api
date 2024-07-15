@@ -25,7 +25,7 @@ class BlogPostViewSetTestCase(APITestCase):
     category: BlogCategory = None
 
     def setUp(self):
-        self.user = UserAccountFactory()
+        self.user = UserAccountFactory(num_addresses=0)
         self.author = BlogAuthorFactory(user=self.user)
         self.category = BlogCategoryFactory(slug="sample-category")
 

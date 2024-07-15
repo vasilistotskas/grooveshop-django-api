@@ -19,7 +19,7 @@ class BlogAuthorViewSetTestCase(APITestCase):
     author: BlogAuthor = None
 
     def setUp(self):
-        user = UserAccountFactory()
+        user = UserAccountFactory(num_addresses=0)
         self.author = BlogAuthorFactory(user=user)
         for language in languages:
             self.author.set_current_language(language)
@@ -45,7 +45,7 @@ class BlogAuthorViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_valid(self):
-        user = UserAccountFactory()
+        user = UserAccountFactory(num_addresses=0)
         payload = {
             "user": user.id,
             "translations": {},
@@ -98,7 +98,7 @@ class BlogAuthorViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_update_valid(self):
-        user = UserAccountFactory()
+        user = UserAccountFactory(num_addresses=0)
         payload = {
             "user": user.id,
             "translations": {},

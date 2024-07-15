@@ -76,7 +76,7 @@ class Slider(TranslatableModel, TimeStampMixinModel, UUIDModel):
 
 class Slide(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
-    slider = models.ForeignKey("slider.Slider", related_name="slide_slider", on_delete=models.CASCADE)
+    slider = models.ForeignKey("slider.Slider", related_name="slides", on_delete=models.CASCADE)
     discount = MoneyField(
         _("Discount"),
         max_digits=11,

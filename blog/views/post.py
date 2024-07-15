@@ -80,7 +80,7 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
     )
     def comments(self, request, pk=None) -> Response:
         post: BlogPost = self.get_object()
-        queryset = post.blog_comment_post.all()
+        queryset = post.comments.all()
         parent_id = request.query_params.get("parent", None)
         if parent_id is not None:
             if parent_id.lower() == "none":

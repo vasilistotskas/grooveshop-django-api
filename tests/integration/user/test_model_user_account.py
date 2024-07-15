@@ -22,7 +22,7 @@ class UserAccountModelTest(TestCase):
 
     def test_create_user_with_generated_username(self):
         generated_username = self.user_name_generator.generate_username(self.user_data["email"])
-        user = UserAccountFactory(**self.user_data, username=generated_username)
+        user = UserAccountFactory(**self.user_data, username=generated_username, num_addresses=0)
         self.assertEqual(user.username, generated_username)
         self.assertTrue(user.check_password(self.user_data["plain_password"]))  # Check the password
         self.assertEqual(user.first_name, self.user_data["first_name"])
@@ -53,7 +53,7 @@ class UserAccountModelTest(TestCase):
         )
 
     def test_create_superuser(self):
-        user = UserAccountFactory(admin=True, **self.user_data)
+        user = UserAccountFactory(admin=True, **self.user_data, num_addresses=0)
         self.assertEqual(user.email, self.user_data["email"])
         self.assertTrue(user.check_password(self.user_data["plain_password"]))
         self.assertTrue(user.is_active)

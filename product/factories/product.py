@@ -4,6 +4,8 @@ from django.conf import settings
 from faker import Faker
 
 from core.factories import CustomDjangoModelFactory
+from product.factories.image import ProductImageFactory
+from product.factories.review import ProductReviewFactory
 from product.models.product import Product
 
 fake = Faker()
@@ -41,6 +43,26 @@ class ProductFactory(CustomDjangoModelFactory):
         model = Product
         django_get_or_create = ("slug",)
         skip_postgeneration_save = True
+        exclude = ("unique_model_fields", "num_images")
+
+    num_images = factory.LazyAttribute(lambda o: 2)
+    num_reviews = factory.LazyAttribute(lambda o: 2)
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        num_images = kwargs.pop("num_images", 2)
+        num_reviews = kwargs.pop("num_reviews", 2)
+        instance = super()._create(model_class, *args, **kwargs)
+
+        if "create" in kwargs and kwargs["create"]:
+            if num_images > 0:
+                images = ProductImageFactory.create_batch(num_images)
+                instance.images.add(*images)
+            if num_reviews > 0:
+                reviews = ProductReviewFactory.create_batch(num_images)
+                instance.reviews.add(*reviews)
+
+        return instance
 
     @factory.post_generation
     def translations(self, create, extracted, **kwargs):

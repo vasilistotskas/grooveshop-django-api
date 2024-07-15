@@ -17,12 +17,12 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
     order = models.ForeignKey(
         "order.Order",
-        related_name="order_item_order",
+        related_name="items",
         on_delete=models.CASCADE,
     )
     product = models.ForeignKey(
         "product.Product",
-        related_name="order_item_product",
+        related_name="order_items",
         on_delete=models.CASCADE,
     )
     price = MoneyField(_("Price"), max_digits=11, decimal_places=2)
@@ -71,4 +71,4 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
         )
 
     def get_ordering_queryset(self) -> QuerySet:
-        return self.order.order_item_order.all()
+        return self.order.items.all()

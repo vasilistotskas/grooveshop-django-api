@@ -50,5 +50,5 @@ class BlogCategoryViewSet(MultiSerializerMixin, BaseModelViewSet):
             "updated_at",
             "published_at",
         ]
-        queryset = self.get_object().posts.all()
+        queryset = self.get_object().blog_posts.all()
         return self.paginate_and_serialize(queryset, request)

@@ -19,7 +19,7 @@ class OrderItemModelTestCase(TestCase):
     def setUp(self):
         self.order = OrderFactory()
         self.product = ProductFactory()
-        self.order_item = self.order.order_item_order.create(product=self.product, price=Decimal("20.00"), quantity=3)
+        self.order_item = self.order.items.create(product=self.product, price=Decimal("20.00"), quantity=3)
 
     def test_total_price(self):
         expected_total_price = self.order_item.price * self.order_item.quantity

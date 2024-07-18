@@ -37,7 +37,7 @@ django-parler = "2.3.0"
 django-parler-rest = "2.2.0"
 django-phonenumber-field = "8.0.0"
 django-rosetta = "0.10.0"
-django-rest-knox = { git = "https://github.com/jazzband/django-rest-knox.git", rev = "09403255a069c2416a5dfb889f80342a2d7b2646" }
+django-rest-knox = { git = "https://github.com/jazzband/django-rest-knox.git", rev = "5.0.0" }
 django-storages = "1.14.4"
 django-tinymce = "4.1.0"
 djangoql = "*"

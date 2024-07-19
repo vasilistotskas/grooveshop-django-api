@@ -1,7 +1,7 @@
 adrf==0.1.6
 asgiref==3.8.1
 black==24.4.2
-boto3==1.34.144
+boto3==1.34.145
 celery==5.4.0
 channels==4.1.0
 channels-redis==4.2.0
@@ -28,7 +28,7 @@ django-parler==2.3.0
 django-parler-rest==2.2.0
 django-phonenumber-field[phonenumberslite]==8.0.0
 django-rosetta==0.10.0
-django-rest-knox @ git+https://github.com/jazzband/django-rest-knox.git@5.0.0
+django-rest-knox==5.0.0
 django-storages==1.14.4
 django-stubs==5.0.2
 django-tinymce==4.1.0
@@ -61,10 +61,10 @@ pydocstyle==6.3.0
 pylint==3.2.5
 pyjwt==2.8.0
 python-dotenv==1.0.1
-python-gitlab==4.7.0
+python-gitlab==4.8.0
 python-semantic-release==9.8.5
 pytest==8.2.2
-pytest-asyncio==0.23.7
+pytest-asyncio==0.23.8
 pytest-django==4.8.0
 qrcode==7.4.2
 rich==13.7.1

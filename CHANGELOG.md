@@ -3,7 +3,21 @@
 
 
 
+## v0.137.0 (2024-07-26)
+
+### Feature
+
+* feat: More at Description
+
+- Factories remove `_create` classmethod override and use `@factory.post_generation`
+- Implement generic tag model and tagged item model
+- Product tag and get tags API endpoint implemented ([`2b9c891`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b9c891d1d1b7eb715993272aceb161215814f25))
+
 ## v0.136.0 (2024-07-20)
+
+### Chore
+
+* chore(release): release version 0.136.0 [skip ci] ([`bf70fb1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bf70fb135d1ef28a414cb0786db32d32b45d931f))
 
 ### Feature
 

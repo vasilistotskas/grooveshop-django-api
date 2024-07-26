@@ -40,21 +40,14 @@ class SliderFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Slider
         skip_postgeneration_save = True
-        exclude = ("num_slides",)
 
-    num_slides = factory.LazyAttribute(lambda o: 2)
+    @factory.post_generation
+    def num_slides(self, create, extracted, **kwargs):
+        if not create:
+            return
 
-    @classmethod
-    def _create(cls, model_class, *args, **kwargs):
-        num_slides = kwargs.pop("num_slides", 2)
-        instance = super()._create(model_class, *args, **kwargs)
-
-        if "create" in kwargs and kwargs["create"]:
-            if num_slides > 0:
-                slides = SlideFactory.create_batch(num_slides)
-                instance.slides.add(*slides)
-
-        return instance
+        if extracted:
+            SlideFactory.create_batch(extracted, slider=self)
 
     @factory.post_generation
     def translations(self, create, extracted, **kwargs):

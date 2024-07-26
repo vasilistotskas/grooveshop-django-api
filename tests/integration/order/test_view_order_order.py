@@ -46,7 +46,7 @@ class OrderViewSetTestCase(APITestCase):
             region=self.region,
         )
 
-        products = ProductFactory.create_batch(2)
+        products = ProductFactory.create_batch(2, num_images=0, num_reviews=0)
         product_1 = products[0]
         product_2 = products[1]
 

@@ -26,7 +26,7 @@ class CartItemViewSetTest(APITestCase):
         self.user = UserAccountFactory(num_addresses=0)
         self.client.force_authenticate(user=self.user)
         self.cart = CartFactory(user=self.user, num_cart_items=0)
-        self.product = ProductFactory()
+        self.product = ProductFactory(num_images=0, num_reviews=0)
         self.cart_item = CartItemFactory(cart=self.cart, product=self.product, quantity=2)
         self.list_url = reverse("cart-item-list")
         self.detail_url = reverse("cart-item-detail", kwargs={"pk": self.cart_item.pk})

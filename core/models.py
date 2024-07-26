@@ -128,7 +128,7 @@ class PublishableModel(models.Model):
         return self.is_published and (self.published_at is None or self.published_at <= tz.now())
 
 
-class ModelWithMetadata(models.Model):
+class MetaDataModel(models.Model):
     private_metadata = JSONField(blank=True, default=dict, encoder=DjangoJSONEncoder)
     metadata = JSONField(blank=True, default=dict, encoder=DjangoJSONEncoder)
 

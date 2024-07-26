@@ -25,7 +25,7 @@ class ProductImageViewSetTestCase(APITestCase):
     default_image: SimpleUploadedFile = None
 
     def setUp(self):
-        self.product = ProductFactory()
+        self.product = ProductFactory(num_images=0, num_reviews=0)
         self.product_image = ProductImageFactory(
             product=self.product,
             is_main=True,

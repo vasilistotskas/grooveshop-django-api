@@ -42,22 +42,16 @@ class UserAccountFactory(factory.django.DjangoModelFactory):
         model = User
         django_get_or_create = ("email",)
         skip_postgeneration_save = True
-        exclude = ("plain_password", "num_addresses")
+        exclude = ("plain_password",)
 
     class Params:
         admin = factory.Trait(is_superuser=True, is_staff=True)
         staff = factory.Trait(is_staff=True)
 
-    num_addresses = factory.LazyAttribute(lambda o: 2)
+    @factory.post_generation
+    def num_addresses(self, create, extracted, **kwargs):
+        if not create:
+            return
 
-    @classmethod
-    def _create(cls, model_class, *args, **kwargs):
-        num_addresses = kwargs.pop("num_addresses", 2)
-        instance = super()._create(model_class, *args, **kwargs)
-
-        if "create" in kwargs and kwargs["create"]:
-            if num_addresses > 0:
-                addresses = UserAddressFactory.create_batch(num_addresses)
-                instance.addresses.add(*addresses)
-
-        return instance
+        if extracted:
+            UserAddressFactory.create_batch(extracted, user=self)

@@ -12,18 +12,15 @@ class CartFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Cart
         django_get_or_create = ("user",)
-        exclude = ("num_cart_items",)
+        skip_postgeneration_save = True
 
-    num_cart_items = factory.LazyAttribute(lambda o: 3)
+    @factory.post_generation
+    def num_cart_items(self, create, extracted, **kwargs):
+        if not create:
+            return
 
-    @classmethod
-    def _create(cls, model_class, *args, **kwargs):
-        num_cart_items = kwargs.pop("num_items", 3)
-        instance = super()._create(model_class, *args, **kwargs)
-        if "create" in kwargs and kwargs["create"]:
-            if num_cart_items > 0:
-                CartItemFactory.create_batch(num_cart_items, cart=instance)
-        return instance
+        if extracted:
+            CartItemFactory.create_batch(extracted, cart=self)
 
 
 class CartItemFactory(factory.django.DjangoModelFactory):

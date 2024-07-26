@@ -15,7 +15,7 @@ class ProductFavouriteModelTestCase(TestCase):
 
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
-        self.product = ProductFactory()
+        self.product = ProductFactory(num_images=0, num_reviews=0)
 
     def test_fields(self):
         favourite = ProductFavouriteFactory(user=self.user, product=self.product)

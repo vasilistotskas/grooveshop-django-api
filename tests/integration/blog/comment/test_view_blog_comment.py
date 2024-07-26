@@ -30,6 +30,8 @@ class BlogCommentViewSetTestCase(APITestCase):
         self.author = BlogAuthorFactory(user=self.user)
         self.post = BlogPostFactory(
             author=self.author,
+            num_tags=0,
+            num_comments=0,
         )
         self.comment = BlogCommentFactory(is_approved=True, user=self.user, post=self.post)
         for language in languages:
@@ -59,6 +61,8 @@ class BlogCommentViewSetTestCase(APITestCase):
         author = BlogAuthorFactory(user=user)
         post = BlogPostFactory(
             author=author,
+            num_tags=0,
+            num_comments=0,
         )
 
         payload = {

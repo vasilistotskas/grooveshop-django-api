@@ -39,6 +39,8 @@ class BlogPostViewSetTestCase(APITestCase):
         self.post = BlogPostFactory(
             author=self.author,
             category=None,
+            num_tags=0,
+            num_comments=0,
         )
         self.post.likes.set([])
         self.post.tags.set([])

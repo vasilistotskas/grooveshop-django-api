@@ -24,7 +24,7 @@ class TestBaseExpandSerializer(TestCase):
 
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
-        self.product = ProductFactory()
+        self.product = ProductFactory(num_images=0, num_reviews=0)
         for language in languages:
             self.product.set_current_language(language)
             self.product.name = f"Sample Product ({language})"

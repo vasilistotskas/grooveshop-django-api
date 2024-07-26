@@ -20,7 +20,7 @@ class ProductReviewModelTestCase(TestCase):
 
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
-        self.product = ProductFactory()
+        self.product = ProductFactory(num_images=0, num_reviews=0)
         self.product_review = ProductReviewFactory(
             product=self.product,
             user=self.user,

@@ -33,7 +33,7 @@ class CartServiceTest(TestCase):
         self.request.user = self.user
 
         self.cart = CartFactory(user=self.user, num_cart_items=0)
-        self.product = ProductFactory()
+        self.product = ProductFactory(num_images=0, num_reviews=0)
 
         CartItem.objects.all().delete()
 
@@ -148,7 +148,7 @@ class CartServiceTest(TestCase):
     def test_cart_service_add_more_items(self):
         cart_service = CartService(cart_id=self.cart.pk)
 
-        product = ProductFactory()
+        product = ProductFactory(num_images=0, num_reviews=0)
 
         cart_service.create_cart_item(self.product, 3)
         cart_service.create_cart_item(product, 4)
@@ -173,7 +173,7 @@ class CartServiceTest(TestCase):
         cart_service = CartService(cart_id=self.cart.pk)
 
         pre_login_cart = CartFactory(user=None, num_cart_items=0)
-        pre_login_product = ProductFactory()
+        pre_login_product = ProductFactory(num_images=0, num_reviews=0)
         CartItemFactory(cart=pre_login_cart, product=pre_login_product, quantity=1)
         cart_service.create_cart_item(self.product, 2)
 

@@ -41,6 +41,11 @@ urlpatterns = [
         ProductViewSet.as_view({"get": "images"}),
         name="product-images",
     ),
+    path(
+        "product/<int:pk>/tags",
+        ProductViewSet.as_view({"get": "tags"}),
+        name="product-tags",
+    ),
     # Category
     path(
         "product/category",

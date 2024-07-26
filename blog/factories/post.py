@@ -45,25 +45,23 @@ class BlogPostFactory(CustomDjangoModelFactory):
         model = BlogPost
         django_get_or_create = ("slug",)
         skip_postgeneration_save = True
-        exclude = ("unique_model_fields", "num_tags", "num_comments")
 
-    num_tags = factory.LazyAttribute(lambda o: 2)
-    num_comments = factory.LazyAttribute(lambda o: 10)
+    @factory.post_generation
+    def num_tags(self, create, extracted, **kwargs):
+        if not create:
+            return
 
-    @classmethod
-    def _create(cls, model_class, *args, **kwargs):
-        num_tags = kwargs.pop("num_tags", 2)
-        num_comments = kwargs.pop("num_comments", 10)
-        instance = super()._create(model_class, *args, **kwargs)
+        if extracted:
+            tags = BlogTagFactory.create_batch(extracted)
+            self.tags.add(*tags)
 
-        if "create" in kwargs and kwargs["create"]:
-            if num_tags > 0:
-                tags = BlogTagFactory.create_batch(num_tags)
-                instance.tags.add(*tags)
-            if num_comments > 0:
-                BlogCommentFactory.create_batch(num_comments, post=instance)
+    @factory.post_generation
+    def num_comments(self, create, extracted, **kwargs):
+        if not create:
+            return
 
-        return instance
+        if extracted:
+            BlogCommentFactory.create_batch(extracted, post=self)
 
     @factory.post_generation
     def translations(self, create, extracted, **kwargs):

@@ -25,7 +25,7 @@ class BlogCommentModelTestCase(TestCase):
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
         self.author = BlogAuthorFactory(user=self.user)
-        self.post = BlogPostFactory(author=self.author)
+        self.post = BlogPostFactory(author=self.author, num_tags=0, num_comments=0)
         self.comment = BlogCommentFactory(is_approved=True, user=self.user, post=self.post)
         for language in languages:
             self.comment.set_current_language(language)

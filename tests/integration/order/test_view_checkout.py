@@ -40,7 +40,7 @@ class CheckoutViewAPITest(APITestCase):
 
     def test_successful_order_creation(self):
         self.client.force_authenticate(user=self.user)
-        products = ProductFactory.create_batch(2)
+        products = ProductFactory.create_batch(2, num_images=0, num_reviews=0)
 
         product_1 = products[0]
         product_1.stock = 10
@@ -90,7 +90,7 @@ class CheckoutViewAPITest(APITestCase):
 
     def test_failed_order_creation(self):
         self.client.force_authenticate(user=self.user)
-        products = ProductFactory.create_batch(2)
+        products = ProductFactory.create_batch(2, num_images=0, num_reviews=0)
 
         product_3 = products[0]
         product_3.stock = 10

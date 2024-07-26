@@ -39,18 +39,11 @@ class OrderFactory(factory.django.DjangoModelFactory):
         model = Order
         django_get_or_create = ("user",)
         skip_postgeneration_save = True
-        exclude = ("num_order_items",)
 
-    num_order_items = factory.LazyAttribute(lambda o: 2)
+    @factory.post_generation
+    def num_order_items(self, create, extracted, **kwargs):
+        if not create:
+            return
 
-    @classmethod
-    def _create(cls, model_class, *args, **kwargs):
-        num_order_items = kwargs.pop("num_order_items", 2)
-        instance = super()._create(model_class, *args, **kwargs)
-
-        if "create" in kwargs and kwargs["create"]:
-            if num_order_items > 0:
-                order_items = OrderItemFactory.create_batch(num_order_items)
-                instance.items.add(*order_items)
-
-        return instance
+        if extracted:
+            OrderItemFactory.create_batch(extracted, order=self)

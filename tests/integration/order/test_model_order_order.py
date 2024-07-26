@@ -31,7 +31,7 @@ class OrderModelTestCase(TestCase):
             paid_amount=Money("0", settings.DEFAULT_CURRENCY),
         )
 
-        products = ProductFactory.create_batch(2)
+        products = ProductFactory.create_batch(2, num_images=0, num_reviews=0)
 
         self.product_1 = products[0]
         self.product_2 = products[1]

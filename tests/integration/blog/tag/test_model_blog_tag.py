@@ -52,7 +52,10 @@ class BlogTagModelTestCase(TestCase):
         self.assertEqual(ordered_sort_orders, [1, 2, 3])
 
     def test_get_tag_posts_count(self):
-        post = BlogPostFactory()
+        post = BlogPostFactory(
+            num_tags=0,
+            num_comments=0,
+        )
         post.tags.set([self.tag])
         self.assertEqual(self.tag.get_posts_count, 1)
 

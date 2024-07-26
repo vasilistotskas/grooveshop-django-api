@@ -12,17 +12,17 @@ class CursorPaginatorTest(TestCase):
 
     def setUp(self):
         self.factory = RequestFactory()
-        ProductFactory.create_batch(105)
+        ProductFactory.create_batch(4, num_images=0, num_reviews=0)
 
     def test_paginate_queryset(self):
         paginator = CursorPaginator()
         queryset = Product.objects.all()
 
-        request = Request(self.factory.get("/api/v1/products/?c=MA==&page_size=10"))
+        request = Request(self.factory.get("/api/v1/products/?c=MA==&page_size=2"))
 
         paginated_queryset = paginator.paginate_queryset(queryset, request)
 
-        self.assertEqual(len(paginated_queryset), 10)
+        self.assertEqual(len(paginated_queryset), 2)
 
     def test_get_total_pages(self):
         paginator = CursorPaginator()

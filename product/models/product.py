@@ -29,7 +29,7 @@ from parler.models import TranslatedFields
 from tinymce.models import HTMLField
 
 from core.fields.measurement import MeasurementField
-from core.models import ModelWithMetadata
+from core.models import MetaDataModel
 from core.models import SoftDeleteModel
 from core.models import SoftDeleteQuerySet
 from core.models import TimeStampMixinModel
@@ -43,6 +43,7 @@ from product.models.favourite import ProductFavourite
 from product.models.image import ProductImage
 from product.models.review import ProductReview
 from seo.models import SeoModel
+from tag.models.tagged_item import TaggedModel
 
 
 class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
@@ -83,14 +84,7 @@ class ProductManager(TranslatableManager):
         return self.get_queryset().update_calculated_fields()
 
 
-class Product(
-    SoftDeleteModel,
-    TranslatableModel,
-    TimeStampMixinModel,
-    SeoModel,
-    UUIDModel,
-    ModelWithMetadata,
-):
+class Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel, MetaDataModel, TaggedModel):
     id = models.BigAutoField(primary_key=True)
     product_code = models.CharField(_("Product Code"), unique=True, max_length=100, default=uuid.uuid4)
     category = TreeForeignKey(
@@ -164,12 +158,12 @@ class Product(
 
     objects = ProductManager()
 
-    class Meta(ModelWithMetadata.Meta, TypedModelMeta):
+    class Meta(MetaDataModel.Meta, TypedModelMeta):
         verbose_name = _("Product")
         verbose_name_plural = _("Products")
         ordering = ["-created_at"]
         indexes = [
-            *ModelWithMetadata.Meta.indexes,
+            *MetaDataModel.Meta.indexes,
             *TimeStampMixinModel.Meta.indexes,
             models.Index(fields=["product_code"], name="product_product_code_idx"),
             models.Index(fields=["slug"], name="product_slug_idx"),

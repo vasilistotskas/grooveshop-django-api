@@ -24,7 +24,7 @@ class ProductReviewViewSetTestCase(APITestCase):
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
         self.client.force_authenticate(user=self.user)
-        self.product = ProductFactory()
+        self.product = ProductFactory(num_images=0, num_reviews=0)
         self.product_review = ProductReviewFactory(
             product=self.product,
             user=self.user,
@@ -55,7 +55,7 @@ class ProductReviewViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_valid(self):
-        product_2 = ProductFactory()
+        product_2 = ProductFactory(num_images=0, num_reviews=0)
         payload = {
             "product": product_2.pk,
             "user": self.user.pk,

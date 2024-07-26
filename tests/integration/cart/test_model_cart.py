@@ -20,12 +20,12 @@ class CartModelTestCase(TestCase):
     cart_item_2: CartItem = None
 
     def setUp(self):
-        products = ProductFactory.create_batch(2)
+        products = ProductFactory.create_batch(2, num_images=0, num_reviews=0)
         product_1: Product = products[0]
         product_2: Product = products[1]
 
         self.user = UserAccountFactory(num_addresses=0)
-        self.cart = CartFactory(user=self.user)
+        self.cart = CartFactory(user=self.user, num_cart_items=0)
         self.cart_item_1 = CartItemFactory(cart=self.cart, product=product_1, quantity=2)
         self.cart_item_2 = CartItemFactory(cart=self.cart, product=product_2, quantity=3)
 

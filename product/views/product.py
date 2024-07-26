@@ -14,6 +14,7 @@ from product.models.product import Product
 from product.serializers.image import ProductImageSerializer
 from product.serializers.product import ProductSerializer
 from product.serializers.review import ProductReviewSerializer
+from tag.serializers.tag import TagSerializer
 
 
 class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
@@ -40,6 +41,7 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
         "default": ProductSerializer,
         "reviews": ProductReviewSerializer,
         "images": ProductImageSerializer,
+        "tags": TagSerializer,
     }
 
     @action(
@@ -71,4 +73,14 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
         product = self.get_object()
         images = product.images.all()
         serializer = self.get_serializer(images, many=True, context=self.get_serializer_context())
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["GET"],
+    )
+    def tags(self, request, pk=None) -> Response:
+        product = self.get_object()
+        tags = product.get_tags_for_object()
+        serializer = self.get_serializer(tags, many=True, context=self.get_serializer_context())
         return Response(serializer.data, status=status.HTTP_200_OK)

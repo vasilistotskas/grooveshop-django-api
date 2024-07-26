@@ -120,21 +120,14 @@ class CategoryModelTestCase(TestCase):
         self.assertEqual(count, 0)
 
     def test_recursive_product_count_one_product(self):
-        ProductFactory(
-            category=self.category,
-            vat=self.vat,
-        )
+        ProductFactory(category=self.category, vat=self.vat, num_images=0, num_reviews=0)
 
         count = self.category.recursive_product_count
         self.assertEqual(count, 1)
 
     def test_recursive_product_count_multiple_products(self):
-        ProductFactory(
-            category=self.category,
-        )
-        ProductFactory(
-            category=self.sub_category,
-        )
+        ProductFactory(category=self.category, num_images=0, num_reviews=0)
+        ProductFactory(category=self.sub_category, num_images=0, num_reviews=0)
 
         count = self.category.recursive_product_count
         self.assertEqual(count, 2)

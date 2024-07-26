@@ -1,4 +1,5 @@
 import decimal
+import importlib
 from typing import Any
 from typing import Type
 from typing import TypedDict
@@ -7,6 +8,8 @@ from drf_spectacular.utils import extend_schema_field
 from measurement.base import BidimensionalMeasure
 from measurement.base import MeasureBase
 from rest_framework import serializers
+
+from product.models import Product
 
 
 def is_valid_unit(unit_to_validate: str, measurement) -> bool:
@@ -70,3 +73,13 @@ class MeasurementSerializerField(serializers.Field):
             self.fail("invalid_value", invalid_value=value)
 
         return self.measurement(**{unit: value})
+
+
+class ContentObjectRelatedField(serializers.RelatedField):
+    def to_representation(self, value):
+        if isinstance(value, Product):
+            serializer = importlib.import_module("product.serializers.product").ProductSerializer(value)
+        else:
+            raise Exception("Unexpected type of object")
+
+        return serializer.data

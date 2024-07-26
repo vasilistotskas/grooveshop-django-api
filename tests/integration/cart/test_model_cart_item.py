@@ -14,8 +14,8 @@ class CartItemModelTestCase(TestCase):
     product: Product = None
 
     def setUp(self):
-        self.cart = CartFactory()
-        self.product = ProductFactory()
+        self.cart = CartFactory(num_cart_items=0)
+        self.product = ProductFactory(num_images=0, num_reviews=0)
         self.cart_item = CartItemFactory(cart=self.cart, product=self.product, quantity=3)
 
     def test_fields(self):
@@ -65,7 +65,7 @@ class CartItemModelTestCase(TestCase):
         self.assertEqual(self.cart_item.quantity, new_quantity)
 
     def test_cart_item_ordering(self):
-        product_2 = ProductFactory()
+        product_2 = ProductFactory(num_images=0, num_reviews=0)
         cart_item_2 = CartItemFactory(cart=self.cart, product=product_2, quantity=3)
         self.assertLess(self.cart_item.id, cart_item_2.id)
 

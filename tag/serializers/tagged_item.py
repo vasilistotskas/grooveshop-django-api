@@ -1,0 +1,20 @@
+from rest_framework import serializers
+
+from core.serializers import ContentObjectRelatedField
+from tag.models import TaggedItem
+from tag.serializers.tag import TagSerializer
+
+
+class TaggedItemSerializer(serializers.ModelSerializer):
+    tag = TagSerializer(read_only=True)
+    content_object = ContentObjectRelatedField(read_only=True)
+
+    class Meta:
+        model = TaggedItem
+        fields = [
+            "id",
+            "tag",
+            "content_type",
+            "object_id",
+            "content_object",
+        ]

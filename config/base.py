@@ -88,6 +88,7 @@ LOCAL_APPS = [
     "notification",
     "authentication",
     "contact",
+    "tag",
 ]
 
 # Third-party apps
@@ -259,6 +260,9 @@ DEEPL_AUTH_KEY = getenv("DEEPL_AUTH_KEY", "changeme")
 LOCALE_PATHS = [path.join(BASE_DIR, "locale/")]
 
 ENABLE_DEBUG_TOOLBAR = getenv("ENABLE_DEBUG_TOOLBAR", "False") == "True"
+
+# TODO: Remove transitional setting in Django 6.0
+FORMS_URLFIELD_ASSUME_HTTPS = True
 
 ADMINS = [
     ("Admin", getenv("ADMIN_EMAIL", "")),

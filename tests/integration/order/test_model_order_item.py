@@ -18,7 +18,7 @@ class OrderItemModelTestCase(TestCase):
 
     def setUp(self):
         self.order = OrderFactory()
-        self.product = ProductFactory()
+        self.product = ProductFactory(num_images=0, num_reviews=0)
         self.order_item = self.order.items.create(product=self.product, price=Decimal("20.00"), quantity=3)
 
     def test_total_price(self):

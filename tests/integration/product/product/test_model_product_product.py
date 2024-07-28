@@ -181,6 +181,10 @@ class ProductModelTestCase(TestCase):
         expected_vat_value = (self.product.price.amount * self.vat.value) / 100
         self.assertEqual(self.product.vat_value.amount, expected_vat_value)
 
+    def test_product_with_tags(self):
+        product = ProductFactory(num_tags=3)
+        self.assertEqual(product.tags.count(), 3)
+
     def test_main_image_absolute_url(self):
         main_image = self.product.images.filter(is_main=True).first()
         expected_url = settings.APP_BASE_URL + main_image.image.url

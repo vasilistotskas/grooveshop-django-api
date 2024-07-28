@@ -7,6 +7,7 @@ from core.factories import CustomDjangoModelFactory
 from product.factories.image import ProductImageFactory
 from product.factories.review import ProductReviewFactory
 from product.models.product import Product
+from tag.factories.tagged_item import TaggedProductFactory
 
 fake = Faker()
 
@@ -59,6 +60,14 @@ class ProductFactory(CustomDjangoModelFactory):
 
         if extracted:
             ProductReviewFactory.create_batch(extracted, product=self)
+
+    @factory.post_generation
+    def num_tags(self, create, extracted, **kwargs):
+        if not create:
+            return
+
+        if extracted:
+            TaggedProductFactory.create_batch(extracted, content_object=self)
 
     @factory.post_generation
     def translations(self, create, extracted, **kwargs):

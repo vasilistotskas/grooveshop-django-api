@@ -107,7 +107,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.NOTICE(f"\nProcessing module: {module_path}"))
         try:
             for factory_class in factory_classes:
-                model_name = factory_class._meta.model.__name__  # type: ignore
+                model_name = factory_class._meta.model.__name__
                 if model_name.endswith("Translation"):
                     continue
                 model_count = model_counts.get(model_name, default_count)
@@ -137,7 +137,7 @@ class Command(BaseCommand):
         instances = []
         for i in range(count):
             try:
-                instance = await sync_to_async(factory_class.create)()  # type: ignore
+                instance = await sync_to_async(factory_class.create)()
                 await self.save_related_objects(instance)
                 instances.append(instance)
 

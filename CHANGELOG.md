@@ -3,7 +3,21 @@
 
 
 
+## v0.138.0 (2024-07-28)
+
+### Feature
+
+* feat: More at Description
+
+- Factory for model improvements
+- Factory seed command refactor, `sync` and `async`  commands available
+- Bump Versions ([`6d7fdb0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6d7fdb0bebe1dae633b4c4ff0462fd0a90c8f28b))
+
 ## v0.137.0 (2024-07-26)
+
+### Chore
+
+* chore(release): release version 0.137.0 [skip ci] ([`493a9ad`](https://github.com/vasilistotskas/grooveshop-django-api/commit/493a9adb65f7725d99c80e09e04f24e3005a3139))
 
 ### Feature
 

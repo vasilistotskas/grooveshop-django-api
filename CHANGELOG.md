@@ -3,7 +3,17 @@
 
 
 
+## v0.139.0 (2024-07-28)
+
+### Feature
+
+* feat: Tag and TaggedItem factories implement ([`8b03ed7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8b03ed7f44e5ed7b309078ec32498db782110a2c))
+
 ## v0.138.0 (2024-07-28)
+
+### Chore
+
+* chore(release): release version 0.138.0 [skip ci] ([`33b9cb3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/33b9cb34e43b3d527c680e6712a9c2fe099ec861))
 
 ### Feature
 

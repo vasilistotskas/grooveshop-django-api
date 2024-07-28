@@ -1,3 +1,4 @@
+import logging
 from decimal import Decimal
 
 from django.conf import settings
@@ -9,6 +10,8 @@ from order.factories.order import OrderFactory
 from order.models.order import Order
 from product.factories.product import ProductFactory
 from product.models.product import Product
+
+logger = logging.getLogger(__name__)
 
 
 class OrderModelTestCase(TestCase):

@@ -1,12 +1,31 @@
+import importlib
+
 import factory
+from django.contrib.auth import get_user_model
+from django.db.models import Count
 from django.utils import timezone
+from faker import Faker
 
 from cart.models import Cart
 from cart.models import CartItem
 
+fake = Faker()
+
+User = get_user_model()
+
+
+def get_or_create_user():
+    if User.objects.exists():
+        user = User.objects.annotate(num_carts=Count("cart")).order_by("num_carts").first()
+    else:
+        user_factory_module = importlib.import_module("user.factories.account")
+        user_factory_class = getattr(user_factory_module, "UserAccountFactory")
+        user = user_factory_class.create()
+    return user
+
 
 class CartFactory(factory.django.DjangoModelFactory):
-    user = factory.SubFactory("user.factories.account.UserAccountFactory")
+    user = factory.LazyFunction(get_or_create_user)
     last_activity = factory.LazyFunction(timezone.now)
 
     class Meta:

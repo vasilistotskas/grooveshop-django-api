@@ -17,7 +17,7 @@ build-backend = "poetry.masonry.api"
 [tool.poetry.dependencies]
 adrf = "0.1.6"
 asgiref = "3.8.1"
-boto3 = "1.34.145"
+boto3 = "1.34.149"
 python = ">=3.10.13,<4.0.0"
 charset_normalizer = "3.3.2"
 chardet = "5.2.0"
@@ -82,7 +82,7 @@ cryptography = "43.0.0"
 django-browser-reload = "1.13.0"
 django-debug-toolbar = "4.4.6"
 django-extensions = "*"
-django-stubs = "5.0.2"
+django-stubs = "5.0.3"
 flake8 = "7.1.0"
 gitpython = "3.1.43"
 hiredis = "3.0.0"
@@ -91,8 +91,8 @@ jinja2 = "3.1.4"
 pre-commit = "3.7.1"
 pudb = "*"
 pydocstyle = "6.3.0"
-pylint = "3.2.5"
-pytest = "8.3.1"
+pylint = "3.2.6"
+pytest = "8.3.2"
 pytest-asyncio = "0.23.8"
 pytest-cov = "*"
 pytest-django = "4.8.0"
@@ -119,7 +119,7 @@ omit = [
     "*/setup.py",
     "asgi/gunicorn_worker.py",
     "core/storages.py",
-    "wsgi/*",
+    "*/wsgi/*",
 ]
 source = ["*"]
 relative_files = true

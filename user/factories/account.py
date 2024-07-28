@@ -18,8 +18,6 @@ class UserAccountFactory(factory.django.DjangoModelFactory):
     zipcode = factory.Faker("postcode")
     address = factory.Faker("address")
     place = factory.Faker("address")
-    country = factory.SubFactory("country.factories.CountryFactory")
-    region = factory.SubFactory("region.factories.RegionFactory")
     image = factory.django.ImageField(
         filename="user_image.jpg",
         color=factory.Faker("color"),

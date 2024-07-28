@@ -28,7 +28,10 @@ class BlogPostTranslationFactory(factory.django.DjangoModelFactory):
 
 
 class BlogPostFactory(CustomDjangoModelFactory):
-    slug = factory.LazyFunction(lambda: fake.slug())
+    unique_model_fields = [
+        ("slug", lambda: fake.slug()),
+    ]
+
     image = factory.django.ImageField(
         filename="blog_image.jpg",
         color=factory.Faker("color"),

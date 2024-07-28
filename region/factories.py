@@ -4,11 +4,19 @@ from django.conf import settings
 from faker import Faker
 
 from core.factories import CustomDjangoModelFactory
+from country.models import Country
 from region.models import Region
 
 fake = Faker()
 
 available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+
+
+def get_or_create_country():
+    if Country.objects.exists():
+        return Country.objects.order_by("?").first()
+    else:
+        return factory.SubFactory("country.factories.CountryFactory")
 
 
 class RegionTranslationFactory(factory.django.DjangoModelFactory):
@@ -26,7 +34,7 @@ class RegionFactory(CustomDjangoModelFactory):
         ("alpha", lambda: fake.bothify(text="???-######")),
     ]
 
-    country = factory.SubFactory("country.factories.CountryFactory")
+    country = factory.LazyFunction(get_or_create_country)
 
     class Meta:
         model = Region

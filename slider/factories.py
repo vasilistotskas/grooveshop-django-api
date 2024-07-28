@@ -99,7 +99,7 @@ class SlideFactory(factory.django.DjangoModelFactory):
 
     class Meta:
         model = Slide
-        django_get_or_create = ("slider", "image")
+        django_get_or_create = ("slider",)
         skip_postgeneration_save = True
 
     @factory.post_generation

@@ -1,4 +1,8 @@
+import importlib
+
 import factory
+from django.contrib.auth import get_user_model
+from django.db.models import Count
 from faker import Faker
 from phonenumber_field.phonenumber import PhoneNumber
 
@@ -11,10 +15,21 @@ from user.enum.address import LocationChoicesEnum
 
 fake = Faker()
 
+User = get_user_model()
+
+
+def get_or_create_user():
+    if User.objects.exists():
+        user = User.objects.annotate(num_orders=Count("orders")).order_by("num_orders").first()
+    else:
+        user_factory_module = importlib.import_module("user.factories.account")
+        user_factory_class = getattr(user_factory_module, "UserAccountFactory")
+        user = user_factory_class.create()
+    return user
+
 
 class OrderFactory(factory.django.DjangoModelFactory):
-    user = factory.SubFactory("user.factories.account.UserAccountFactory")
-    pay_way = factory.SubFactory("pay_way.factories.PayWayFactory")
+    user = factory.LazyFunction(get_or_create_user)
     country = factory.SubFactory("country.factories.CountryFactory")
     region = factory.SubFactory("region.factories.RegionFactory")
     floor = factory.Iterator(FloorChoicesEnum.choices, getter=lambda x: x[0])
@@ -27,8 +42,8 @@ class OrderFactory(factory.django.DjangoModelFactory):
     city = factory.Faker("city")
     zipcode = factory.Faker("postcode")
     place = factory.Faker("secondary_address")
-    phone = PhoneNumber.from_string(fake.phone_number(), region="US")
-    mobile_phone = PhoneNumber.from_string(fake.phone_number(), region="US")
+    phone = factory.LazyAttribute(lambda _: PhoneNumber.from_string(fake.phone_number(), region="US"))
+    mobile_phone = factory.LazyAttribute(lambda _: PhoneNumber.from_string(fake.phone_number(), region="US"))
     customer_notes = factory.Faker("text", max_nb_chars=200)
     status = factory.Iterator(OrderStatusEnum.choices, getter=lambda x: x[0])
     shipping_price = factory.Faker("pydecimal", left_digits=2, right_digits=2, positive=True)

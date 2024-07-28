@@ -261,9 +261,6 @@ LOCALE_PATHS = [path.join(BASE_DIR, "locale/")]
 
 ENABLE_DEBUG_TOOLBAR = getenv("ENABLE_DEBUG_TOOLBAR", "False") == "True"
 
-# TODO: Remove transitional setting in Django 6.0
-FORMS_URLFIELD_ASSUME_HTTPS = True
-
 ADMINS = [
     ("Admin", getenv("ADMIN_EMAIL", "")),
     ("Info", getenv("INFO_EMAIL", "")),

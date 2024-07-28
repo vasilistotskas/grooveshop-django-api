@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class UniqueFieldMixin:
     @classmethod
     def generate_unique_field(
-        cls, model: type[Model], field_name: str, generator_func: Callable[[], any], max_attempts=1000
+        cls, model: type[Model], field_name: str, generator_func: Callable[[], any], max_attempts=20
     ) -> any:
         attempts = 0
         while attempts < max_attempts:

@@ -48,3 +48,7 @@ if SYSTEM_ENV == "ci":
 
 DBBACKUP_STORAGE = "django.core.files.storage.FileSystemStorage"
 DBBACKUP_STORAGE_OPTIONS = {"location": path.join(BASE_DIR, "backups")}
+
+
+SEED_DEFAULT_COUNT = int(getenv("SEED_DEFAULT_COUNT", 20))
+SEED_BATCH_SIZE = int(getenv("SEED_BATCH_SIZE", 10))

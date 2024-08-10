@@ -4,9 +4,9 @@ from uuid import uuid4
 from allauth.headless.base.response import APIResponse
 from allauth.headless.base.views import AuthenticatedAPIView
 from allauth.headless.mfa import response
-from allauth.mfa import totp
 from allauth.mfa.adapter import get_adapter
 from allauth.mfa.models import Authenticator
+from allauth.mfa.totp.internal.auth import get_totp_secret
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
@@ -86,14 +86,10 @@ class ManageTOTPSvgView(AuthenticatedAPIView):
     def get(self, request, *args, **kwargs):
         authenticator = self._get_authenticator()
         if not authenticator:
-            secret = totp.get_totp_secret(regenerate=True)
+            secret = get_totp_secret(regenerate=True)
             adapter = get_adapter()
-            totp_url = totp.build_totp_url(
-                adapter.get_totp_label(self.request.user),
-                adapter.get_totp_issuer(),
-                secret,
-            )
-            totp_svg = totp.build_totp_svg(totp_url)
+            totp_url = adapter.build_totp_url(request.user, secret)
+            totp_svg = adapter.build_totp_svg(totp_url)
             return TOTPSvgNotFoundResponse(request, secret, totp_svg)
         return response.TOTPResponse(request, authenticator)
 

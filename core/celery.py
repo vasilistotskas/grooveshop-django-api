@@ -10,7 +10,7 @@ from celery import shared_task
 from celery.signals import setup_logging
 from channels.layers import get_channel_layer
 
-from config.logging import config_logging
+from settings import config_logging
 
 CELERY_LOGGER_NAME = "celery"
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")

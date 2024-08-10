@@ -14,6 +14,7 @@ class NotificationAdmin(TranslatableAdmin):
         "id",
         "link",
         "kind",
+        "title",
         "message",
         "created_at",
         "updated_at",
@@ -24,6 +25,7 @@ class NotificationAdmin(TranslatableAdmin):
         "updated_at",
     ]
     search_fields = [
+        "translations__title",
         "translations__message",
     ]
     readonly_fields = [
@@ -37,6 +39,7 @@ class NotificationAdmin(TranslatableAdmin):
                 "fields": (
                     "link",
                     "kind",
+                    "title",
                     "message",
                 )
             },

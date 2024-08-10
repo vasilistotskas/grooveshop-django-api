@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import json
 
 from asgiref.sync import async_to_sync
@@ -11,7 +8,7 @@ from channels.layers import get_channel_layer
 @shared_task(bind=True, name="Send Notification Task")
 def send_notification_task(
     self,
-    user: int,
+    user_id: int,
     seen: bool,
     link: str,
     kind: str,
@@ -25,10 +22,10 @@ def send_notification_task(
     channel_layer = get_channel_layer()
 
     async_to_sync(channel_layer.group_send)(
-        "notifications",
+        f"user_{user_id}",
         {
-            "type": "notification.message",
-            "user": user,
+            "type": "send_notification",
+            "user": user_id,
             "seen": seen,
             "link": link,
             "kind": kind,

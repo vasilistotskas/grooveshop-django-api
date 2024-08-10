@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from django.test import TestCase
 
-from config.base import load_dotenv_file
+from settings import load_dotenv_file
 
 
 class TestConfigBase(TestCase):

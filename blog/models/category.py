@@ -76,7 +76,10 @@ class BlogCategory(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDMo
     def __str__(self):
         if not hasattr(self, "_full_path"):
             self._full_path = " / ".join(
-                [k.safe_translation_getter("name", any_language=True) for k in self.get_ancestors(include_self=True)]
+                [
+                    k.safe_translation_getter("name", default="Unnamed", any_language=True) or "Unnamed"
+                    for k in self.get_ancestors(include_self=True)
+                ]
             )
         return self._full_path
 

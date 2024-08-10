@@ -62,19 +62,18 @@ def clear_carts_for_none_users_task(self):
 
 
 @celery_app.task
-def cleanup_log_files_task(self, days=30):
+def cleanup_log_files_task(days=30):
     from django.conf import settings
     from os import path, remove, listdir
     from datetime import datetime, timedelta
 
     logs_path = path.join(settings.BASE_DIR, "logs")
     files = listdir(logs_path)
-    now = datetime.now()
 
     for file in files:
         file_path = path.join(logs_path, file)
         file_modification_date = datetime.fromtimestamp(path.getmtime(file_path))
-        if now - file_modification_date > timedelta(days=days):
+        if datetime.now() - file_modification_date > timedelta(days=days):
             remove(file_path)
 
     message = f"Removed log files older than {days} days."

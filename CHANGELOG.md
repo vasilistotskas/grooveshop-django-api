@@ -3,7 +3,17 @@
 
 
 
+## v0.140.0 (2024-08-10)
+
+### Feature
+
+* feat: Bump Versions, config moved to settings and websocket notification for user implemented ([`26c7115`](https://github.com/vasilistotskas/grooveshop-django-api/commit/26c7115d23be359e6384659bb4c3066c4fc5de2b))
+
 ## v0.139.0 (2024-07-28)
+
+### Chore
+
+* chore(release): release version 0.139.0 [skip ci] ([`281b38f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/281b38fc5feb81ee13476c5bb8dae0d352b24958))
 
 ### Feature
 

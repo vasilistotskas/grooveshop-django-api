@@ -1,14 +1,7 @@
-from allauth.account.decorators import secure_admin_login
-from django.conf import settings
 from django.contrib import admin
 
 from user.models import UserAccount
 from user.models.address import UserAddress
-
-
-if settings.DJANGO_ADMIN_FORCE_ALLAUTH:
-    admin.autodiscover()
-    admin.site.login = secure_admin_login(admin.site.login)
 
 
 @admin.register(UserAccount)

@@ -660,7 +660,7 @@ MFA_ADAPTER = "allauth.mfa.adapter.DefaultMFAAdapter"
 MFA_RECOVERY_CODE_COUNT = 10
 MFA_TOTP_PERIOD = 30
 MFA_TOTP_DIGITS = 6
-MFA_SUPPORTED_TYPES = ["totp", "webauthn", "recovery_codes"]
+MFA_SUPPORTED_TYPES = ["totp", "recovery_codes", "webauthn"]
 MFA_PASSKEY_LOGIN_ENABLED = True
 MFA_WEBAUTHN_ALLOW_INSECURE_ORIGIN = True if DEBUG else False
 

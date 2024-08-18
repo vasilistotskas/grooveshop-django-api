@@ -3,7 +3,17 @@
 
 
 
+## v0.142.0 (2024-08-18)
+
+### Feature
+
+* feat: factory improvements, useless tests remove and API serializer readonly fields ([`920b449`](https://github.com/vasilistotskas/grooveshop-django-api/commit/920b449b74c1d5de04be8e339e92095be152020c))
+
 ## v0.141.0 (2024-08-17)
+
+### Chore
+
+* chore(release): release version 0.141.0 [skip ci] ([`06756c6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/06756c641e6de83c5f93058581619b6a78a24d36))
 
 ### Feature
 

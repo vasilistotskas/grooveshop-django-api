@@ -23,13 +23,6 @@ class TipViewSetTestCase(APITestCase):
             kind=TipKindEnum.INFO,
             active=True,
         )
-        for language in languages:
-            self.tip.set_current_language(language)
-            self.tip.title = f"Info_{language}"
-            self.tip.content = f"Info content_{language}"
-            self.tip.url = "https://www.google.com"
-            self.tip.save()
-        self.tip.set_current_language(default_language)
 
     @staticmethod
     def get_tip_detail_url(pk):

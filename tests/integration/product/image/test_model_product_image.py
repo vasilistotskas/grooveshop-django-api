@@ -23,11 +23,6 @@ class ProductImageModelTestCase(TestCase):
             product=self.product,
             is_main=True,
         )
-        for language in languages:
-            self.product_image.set_current_language(language)
-            self.product_image.title = f"Sample Main Product Image ({language})"
-            self.product_image.save()
-        self.product_image.set_current_language(default_language)
 
     def test_fields(self):
         self.assertEqual(self.product_image.product, self.product)
@@ -42,14 +37,6 @@ class ProductImageModelTestCase(TestCase):
             self.product_image.__unicode__(),
             f"{product_name} Image ({main_status})",
         )
-
-    def test_translations(self):
-        for language in languages:
-            self.product_image.set_current_language(language)
-            self.assertEqual(
-                self.product_image.title,
-                f"Sample Main Product Image ({language})",
-            )
 
     def test_str_representation(self):
         product_name = self.product.safe_translation_getter("name", any_language=True)

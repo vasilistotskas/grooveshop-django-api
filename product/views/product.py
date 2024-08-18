@@ -32,6 +32,7 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
         "final_price",
         "price_save_percent",
         "review_average",
+        "approved_review_average",
         "likes_count",
     ]
     ordering = ["-created_at"]

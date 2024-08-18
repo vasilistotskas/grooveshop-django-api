@@ -68,6 +68,8 @@ class ProductImage(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDMo
     def save(self, *args, **kwargs):
         if not self.thumbnail:
             self.thumbnail = self.create_thumbnail()
+        if self.is_main:
+            ProductImage.objects.filter(product=self.product, is_main=True).update(is_main=False)
         super().save(*args, **kwargs)
 
     def clean(self):

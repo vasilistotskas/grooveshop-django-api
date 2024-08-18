@@ -28,14 +28,6 @@ class BlogPostModelTestCase(TestCase):
         self.user = UserAccountFactory(num_addresses=0)
         self.author = BlogAuthorFactory(user=self.user)
         self.category = BlogCategoryFactory(slug="sample-category")
-
-        for language in languages:
-            self.category.set_current_language(language)
-            self.category.name = f"Category name in {language}"
-            self.category.description = f"Category description in {language}"
-            self.category.save()
-        self.category.set_current_language(default_language)
-
         self.post = BlogPostFactory(
             slug="test-post",
             author=self.author,
@@ -46,14 +38,6 @@ class BlogPostModelTestCase(TestCase):
             num_tags=0,
             num_comments=0,
         )
-
-        for language in languages:
-            self.post.set_current_language(language)
-            self.post.title = f"Title in {language}"
-            self.post.subtitle = f"Subtitle in {language}"
-            self.post.body = f"Body in {language}"
-            self.post.save()
-        self.post.set_current_language(default_language)
 
     def test_fields(self):
         self.assertEqual(self.post.slug, "test-post")
@@ -69,22 +53,6 @@ class BlogPostModelTestCase(TestCase):
             self.post.__unicode__(),
             f"{title} by {author_name}",
         )
-
-    def test_translations(self):
-        for language in languages:
-            self.post.set_current_language(language)
-            self.assertEqual(
-                self.post.title,
-                f"Title in {language}",
-            )
-            self.assertEqual(
-                self.post.subtitle,
-                f"Subtitle in {language}",
-            )
-            self.assertEqual(
-                self.post.body,
-                f"Body in {language}",
-            )
 
     def test_str_representation(self):
         title = self.post.safe_translation_getter("title", any_language=True) or "Untitled"

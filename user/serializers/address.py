@@ -26,9 +26,6 @@ class UserAddressSerializer(BaseExpandSerializer):
         model = UserAddress
         fields = (
             "id",
-            "created_at",
-            "updated_at",
-            "uuid",
             "title",
             "first_name",
             "last_name",
@@ -45,6 +42,14 @@ class UserAddressSerializer(BaseExpandSerializer):
             "user",
             "country",
             "region",
+            "created_at",
+            "updated_at",
+            "uuid",
+        )
+        read_only_fields = (
+            "created_at",
+            "updated_at",
+            "uuid",
         )
 
     def get_expand_fields(

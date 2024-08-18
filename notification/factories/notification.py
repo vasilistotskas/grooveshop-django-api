@@ -21,7 +21,7 @@ class NotificationTranslationFactory(factory.django.DjangoModelFactory):
 
 class NotificationFactory(factory.django.DjangoModelFactory):
     link = factory.Faker("url")
-    kind = factory.Iterator(NotificationKindEnum.choices, getter=lambda x: x[0])
+    kind = factory.Iterator(NotificationKindEnum, getter=lambda x: x[0])
 
     class Meta:
         model = Notification

@@ -17,4 +17,12 @@ class TaggedItemSerializer(serializers.ModelSerializer):
             "content_type",
             "object_id",
             "content_object",
+            "created_at",
+            "updated_at",
+            "uuid",
         ]
+        read_only_fields = (
+            "created_at",
+            "updated_at",
+            "uuid",
+        )

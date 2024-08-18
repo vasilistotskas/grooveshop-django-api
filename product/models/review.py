@@ -25,11 +25,11 @@ class ProductReview(TranslatableModel, TimeStampMixinModel, PublishableModel, UU
         related_name="product_reviews",
         on_delete=models.CASCADE,
     )
-    rate = models.PositiveSmallIntegerField(_("Rate"), choices=RateEnum.choices)
+    rate = models.PositiveSmallIntegerField(_("Rate"), choices=RateEnum)
     status = models.CharField(
         _("Status"),
         max_length=250,
-        choices=ReviewStatusEnum.choices,
+        choices=ReviewStatusEnum,
         default=ReviewStatusEnum.NEW,
     )
     translations = TranslatedFields(comment=models.TextField(_("Comment"), blank=True, null=True))

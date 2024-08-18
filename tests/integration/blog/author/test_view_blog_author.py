@@ -21,11 +21,6 @@ class BlogAuthorViewSetTestCase(APITestCase):
     def setUp(self):
         user = UserAccountFactory(num_addresses=0)
         self.author = BlogAuthorFactory(user=user)
-        for language in languages:
-            self.author.set_current_language(language)
-            self.author.bio = f"Bio in {language}"
-            self.author.save()
-        self.author.set_current_language(default_language)
 
     @staticmethod
     def get_author_detail_url(pk):

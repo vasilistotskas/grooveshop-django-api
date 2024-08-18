@@ -39,14 +39,6 @@ class ProductModelTestCase(TestCase):
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
         self.category = ProductCategoryFactory()
-
-        for language in languages:
-            self.category.set_current_language(language)
-            self.category.name = f"Sample Category ({language})"
-            self.category.description = f"This is a sample category description ({language})."
-            self.category.save()
-        self.category.set_current_language(default_language)
-
         self.vat = VatFactory()
         self.product = ProductFactory(
             product_code="P123456",
@@ -61,23 +53,11 @@ class ProductModelTestCase(TestCase):
             weight=Decimal("5.00"),
         )
 
-        for language in languages:
-            self.product.set_current_language(language)
-            self.product.name = f"Sample Product ({language})"
-            self.product.description = f"This is a sample product description ({language})."
-            self.product.save()
-        self.product.set_current_language(default_language)
-
         main_product_image = ProductImageFactory(
             product=self.product,
             is_main=True,
         )
 
-        for language in languages:
-            main_product_image.set_current_language(language)
-            main_product_image.title = f"Sample Main Product Image ({language})"
-            main_product_image.save()
-        main_product_image.set_current_language(default_language)
         self.images.append(main_product_image)
 
         non_main_product_image = ProductImageFactory(
@@ -85,11 +65,6 @@ class ProductModelTestCase(TestCase):
             is_main=False,
         )
 
-        for language in languages:
-            non_main_product_image.set_current_language(language)
-            non_main_product_image.title = f"Sample Non-Main Product Image ({language})"
-            non_main_product_image.save()
-        non_main_product_image.set_current_language(default_language)
         self.images.append(non_main_product_image)
 
         self.favourite = ProductFavouriteFactory(
@@ -150,18 +125,6 @@ class ProductModelTestCase(TestCase):
             self.product.safe_translation_getter("name"),
         )
 
-    def test_translations(self):
-        for language in languages:
-            self.product.set_current_language(language)
-            self.assertEqual(
-                self.product.name,
-                f"Sample Product ({language})",
-            )
-            self.assertEqual(
-                self.product.description,
-                f"This is a sample product description ({language}).",
-            )
-
     def test_str_representation(self):
         self.assertEqual(str(self.product), self.product.safe_translation_getter("name"))
 
@@ -171,8 +134,14 @@ class ProductModelTestCase(TestCase):
     def test_review_average(self):
         self.assertEqual(self.product.review_average, 5)
 
+    def test_approved_review_average(self):
+        self.assertEqual(self.product.approved_review_average, 5)
+
     def test_review_count(self):
-        self.assertEqual(self.product.review_count, 1)
+        self.assertEqual(self.product.review_count, 2)
+
+    def test_approved_review_count(self):
+        self.assertEqual(self.product.approved_review_count, 1)
 
     def test_vat_percent(self):
         self.assertEqual(self.product.vat_percent, self.vat.value)

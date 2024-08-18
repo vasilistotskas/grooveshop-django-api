@@ -29,13 +29,6 @@ class BlogPostViewSetTestCase(APITestCase):
         self.author = BlogAuthorFactory(user=self.user)
         self.category = BlogCategoryFactory(slug="sample-category")
 
-        for language in languages:
-            self.category.set_current_language(language)
-            self.category.name = f"Category name in {language}"
-            self.category.description = f"Category description in {language}"
-            self.category.save()
-        self.category.set_current_language(default_language)
-
         self.post = BlogPostFactory(
             author=self.author,
             category=None,
@@ -44,14 +37,6 @@ class BlogPostViewSetTestCase(APITestCase):
         )
         self.post.likes.set([])
         self.post.tags.set([])
-
-        for language in languages:
-            self.post.set_current_language(language)
-            self.post.title = f"Test Post Title in {language}"
-            self.post.subtitle = f"Test Post Subtitle in {language}"
-            self.post.body = f"This is a test post body in {language}"
-            self.post.save()
-        self.post.set_current_language(default_language)
 
     @staticmethod
     def get_post_detail_url(pk):

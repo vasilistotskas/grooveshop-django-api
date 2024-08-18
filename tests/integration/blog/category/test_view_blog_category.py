@@ -16,12 +16,6 @@ class BlogCategoryViewSetTestCase(APITestCase):
 
     def setUp(self):
         self.category = BlogCategoryFactory(slug="test-category")
-        for language in languages:
-            self.category.set_current_language(language)
-            self.category.name = f"Category Name in {language}"
-            self.category.description = f"Category Description in {language}"
-            self.category.save()
-        self.category.set_current_language(default_language)
 
     @staticmethod
     def get_category_detail_url(pk):

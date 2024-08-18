@@ -38,47 +38,23 @@ class ProductViewSetTestCase(APITestCase):
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
         self.category = ProductCategoryFactory()
-        for language in languages:
-            self.category.set_current_language(language)
-            self.category.name = f"Sample Category ({language})"
-            self.category.description = f"This is a sample category description ({language})."
-            self.category.save()
-        self.category.set_current_language(default_language)
-
         self.vat = VatFactory()
-
         self.product = ProductFactory(
             category=self.category,
             vat=self.vat,
         )
-
-        for language in languages:
-            self.product.set_current_language(language)
-            self.product.name = f"Sample Product ({language})"
-            self.product.description = f"This is a sample product description ({language})."
-            self.product.save()
-        self.product.set_current_language(default_language)
-
         main_product_image = ProductImageFactory(
             product=self.product,
             is_main=True,
         )
-        for language in languages:
-            main_product_image.set_current_language(language)
-            main_product_image.title = f"Sample Main Product Image ({language})"
-            main_product_image.save()
-        main_product_image.set_current_language(default_language)
+
         self.images.append(main_product_image)
 
         non_main_product_image = ProductImageFactory(
             product=self.product,
             is_main=False,
         )
-        for language in languages:
-            non_main_product_image.set_current_language(language)
-            non_main_product_image.title = f"Sample Non-Main Product Image ({language})"
-            non_main_product_image.save()
-        non_main_product_image.set_current_language(default_language)
+
         self.images.append(non_main_product_image)
 
         self.favourite = ProductFavouriteFactory(

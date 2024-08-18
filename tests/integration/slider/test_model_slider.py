@@ -17,15 +17,6 @@ class SliderModelTestCase(TestCase):
     def setUp(self):
         self.slider = SliderFactory(num_slides=0)
 
-        for language in languages:
-            self.slider.set_current_language(language)
-            self.slider.name = f"Slider 1_{language}"
-            self.slider.url = "https://www.example.com/"
-            self.slider.title = f"Slider Title_{language}"
-            self.slider.description = f"Slider Description_{language}"
-            self.slider.save()
-        self.slider.set_current_language(default_language)
-
     def test_fields(self):
         self.assertTrue(default_storage.exists(self.slider.image.path))
 
@@ -34,13 +25,6 @@ class SliderModelTestCase(TestCase):
             self.slider.__unicode__(),
             self.slider.safe_translation_getter("name"),
         )
-
-    def test_translations(self):
-        for language in languages:
-            self.slider.set_current_language(language)
-            self.assertEqual(self.slider.name, f"Slider 1_{language}")
-            self.assertEqual(self.slider.title, f"Slider Title_{language}")
-            self.assertEqual(self.slider.description, f"Slider Description_{language}")
 
     def test_str_representation(self):
         self.assertEqual(

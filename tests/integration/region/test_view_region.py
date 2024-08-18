@@ -23,11 +23,6 @@ class RegionViewSetTestCase(APITestCase):
             alpha="GRC",
             country=self.country,
         )
-        for language in languages:
-            self.region.set_current_language(language)
-            self.region.name = f"Region {language}"
-            self.region.save()
-        self.region.set_current_language(default_language)
 
     @staticmethod
     def get_region_detail_url(pk):

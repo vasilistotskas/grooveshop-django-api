@@ -21,15 +21,6 @@ class SliderViewSetTestCase(APITestCase):
     def setUp(self):
         self.slider = SliderFactory(num_slides=0)
 
-        for language in languages:
-            self.slider.set_current_language(language)
-            self.slider.name = f"Slider 1_{language}"
-            self.slider.url = "https://www.example.com/"
-            self.slider.title = f"Slider Title_{language}"
-            self.slider.description = f"Slider Description_{language}"
-            self.slider.save()
-        self.slider.set_current_language(default_language)
-
     @staticmethod
     def get_slider_detail_url(pk):
         return reverse("slider-detail", args=[pk])

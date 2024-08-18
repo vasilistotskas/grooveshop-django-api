@@ -30,12 +30,22 @@ class SliderSerializer(TranslatableModelSerializer, BaseExpandSerializer):
     class Meta:
         model = Slider
         fields = (
-            "translations",
             "id",
-            "main_image_absolute_url",
-            "main_image_filename",
+            "translations",
             "thumbnail",
             "video",
+            "created_at",
+            "updated_at",
+            "uuid",
+            "main_image_absolute_url",
+            "main_image_filename",
+        )
+        read_only_fields = (
+            "created_at",
+            "updated_at",
+            "uuid",
+            "main_image_absolute_url",
+            "main_image_filename",
         )
 
 
@@ -53,13 +63,20 @@ class SlideSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "show_button",
             "date_start",
             "date_end",
-            "main_image_absolute_url",
-            "main_image_filename",
             "thumbnail",
+            "sort_order",
             "created_at",
             "updated_at",
-            "sort_order",
             "uuid",
+            "main_image_absolute_url",
+            "main_image_filename",
+        )
+        read_only_fields = (
+            "created_at",
+            "updated_at",
+            "uuid",
+            "main_image_absolute_url",
+            "main_image_filename",
         )
 
     def get_expand_fields(

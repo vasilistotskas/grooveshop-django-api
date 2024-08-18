@@ -11,7 +11,6 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Avg
 from django.db.models import F
-from django.db.models.functions import Coalesce
 from django.templatetags.static import static
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
@@ -47,41 +46,13 @@ from tag.models.tagged_item import TaggedModel
 
 
 class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
-    def update_calculated_fields(self) -> ProductQuerySet:
-        vat_subquery = models.Subquery(Product.objects.filter(vat__isnull=False).values("vat__value")[:1])
-
-        annotated_queryset = self.annotate(
-            vat_value_annotation=models.ExpressionWrapper(
-                (models.F("price") * Coalesce(vat_subquery, 0)) / 100,
-                output_field=MoneyField(max_digits=11, decimal_places=2),
-            ),
-            discount_value_annotation=models.ExpressionWrapper(
-                (models.F("price") * models.F("discount_percent")) / 100,
-                output_field=MoneyField(max_digits=11, decimal_places=2),
-            ),
-            final_price_annotation=models.ExpressionWrapper(
-                models.F("price") + models.F("vat_value_annotation") - models.F("discount_value_annotation"),
-                output_field=MoneyField(max_digits=11, decimal_places=2),
-            ),
-            price_save_percent_annotation=models.ExpressionWrapper(
-                (models.F("discount_value_annotation") / models.F("price")) * 100,
-                output_field=MoneyField(max_digits=11, decimal_places=2),
-            ),
-        )
-
-        return annotated_queryset.update(
-            discount_value=models.F("discount_value_annotation"),
-            final_price=models.F("final_price_annotation"),
-            price_save_percent=models.F("price_save_percent_annotation"),
-        )
+    def exclude_deleted(self):
+        return self.exclude(is_deleted=True)
 
 
 class ProductManager(TranslatableManager):
-    def get_queryset(self) -> ProductQuerySet:
-        return ProductQuerySet(self.model, using=self._db).exclude(is_deleted=True)
-
-    def update_calculated_fields(self) -> ProductQuerySet:
-        return self.get_queryset().update_calculated_fields()
+    def get_queryset(self):
+        return ProductQuerySet(self.model, using=self._db).exclude_deleted()
 
 
 class Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel, MetaDataModel, TaggedModel):
@@ -123,30 +94,6 @@ class Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, SeoModel,
         unit_choices=WeightUnits.CHOICES,
         default=zero_weight,
     )
-
-    # final_price, discount_value, price_save_percent are calculated fields on save method
-    final_price = MoneyField(
-        _("Final Price"),
-        max_digits=11,
-        decimal_places=2,
-        default=0,
-        editable=False,
-    )
-    discount_value = MoneyField(
-        _("Discount Value"),
-        max_digits=11,
-        decimal_places=2,
-        default=0,
-        editable=False,
-    )
-    price_save_percent = models.DecimalField(
-        _("Price Save Percent"),
-        max_digits=11,
-        decimal_places=2,
-        default=Decimal(0.0),
-        editable=False,
-    )
-
     translations = TranslatedFields(
         name=models.CharField(_("Name"), max_length=255, blank=True, null=True),
         description=HTMLField(_("Description"), blank=True, null=True),
@@ -173,9 +120,6 @@ class Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, SeoModel,
             BTreeIndex(fields=["discount_percent"]),
             BTreeIndex(fields=["view_count"]),
             BTreeIndex(fields=["weight"]),
-            BTreeIndex(fields=["final_price"]),
-            BTreeIndex(fields=["discount_value"]),
-            BTreeIndex(fields=["price_save_percent"]),
         ]
 
     def __unicode__(self):
@@ -236,11 +180,27 @@ class Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, SeoModel,
         self.refresh_from_db()
 
     @property
+    def discount_value(self) -> Money:
+        value = (self.price.amount * self.discount_percent) / 100
+        return Money(value, settings.DEFAULT_CURRENCY)
+
+    @property
+    def price_save_percent(self) -> Decimal:
+        if self.price.amount > 0:
+            return (self.discount_value.amount / self.price.amount) * 100
+        return Decimal(0)
+
+    @property
     def likes_count(self) -> int:
         return ProductFavourite.objects.filter(product=self).count()
 
     @property
     def review_average(self) -> float:
+        average = ProductReview.objects.filter(product=self).aggregate(avg=Avg("rate"))["avg"]
+        return float(average) if average is not None else 0.0
+
+    @property
+    def approved_review_average(self) -> float:
         average = ProductReview.objects.filter(product=self, status=ReviewStatusEnum.TRUE).aggregate(avg=Avg("rate"))[
             "avg"
         ]
@@ -248,6 +208,10 @@ class Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, SeoModel,
 
     @property
     def review_count(self) -> int:
+        return ProductReview.objects.filter(product=self).count()
+
+    @property
+    def approved_review_count(self) -> int:
         return ProductReview.objects.filter(product=self, status=ReviewStatusEnum.TRUE).count()
 
     @property
@@ -262,6 +226,10 @@ class Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, SeoModel,
             value = (self.price.amount * self.vat.value) / 100
             return Money(value, settings.DEFAULT_CURRENCY)
         return Money(0, settings.DEFAULT_CURRENCY)
+
+    @property
+    def final_price(self) -> Money:
+        return self.price + self.vat_value - self.discount_value
 
     @property
     def main_image_absolute_url(self) -> str:

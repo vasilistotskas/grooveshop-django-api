@@ -73,6 +73,14 @@ class OrderSerializer(BaseExpandSerializer):
             "total_price_extra",
             "full_address",
         )
+        read_only_fields = (
+            "created_at",
+            "updated_at",
+            "uuid",
+            "total_price_items",
+            "total_price_extra",
+            "full_address",
+        )
 
 
 class OrderCreateUpdateSerializer(BaseExpandSerializer):
@@ -117,6 +125,14 @@ class OrderCreateUpdateSerializer(BaseExpandSerializer):
             "total_price_extra",
             "full_address",
         )
+        read_only_fields = (
+            "created_at",
+            "updated_at",
+            "uuid",
+            "total_price_items",
+            "total_price_extra",
+            "full_address",
+        )
 
     def validate(self, data):
         super().validate(data)
@@ -141,7 +157,6 @@ class OrderCreateUpdateSerializer(BaseExpandSerializer):
             for item_data in items_data:
                 product = item_data.get("product")
 
-                # Set the price of the product to the final price
                 item_data["price"] = product.final_price
 
                 OrderItem.objects.create(order=order, **item_data)
@@ -157,10 +172,8 @@ class OrderCreateUpdateSerializer(BaseExpandSerializer):
         if "items" in validated_data:
             items_data = validated_data.pop("items")
 
-            # Delete old items
             instance.items.all().delete()
 
-            # Create new items
             for item_data in items_data:
                 OrderItem.objects.create(order=instance, **item_data)
 
@@ -202,6 +215,14 @@ class CheckoutSerializer(BaseExpandSerializer):
             "items",
             "shipping_price",
             "document_type",
+            "created_at",
+            "updated_at",
+            "uuid",
+            "total_price_items",
+            "total_price_extra",
+            "full_address",
+        )
+        read_only_fields = (
             "created_at",
             "updated_at",
             "uuid",

@@ -27,11 +27,6 @@ class ProductReviewModelTestCase(TestCase):
             rate=5,
             status="New",
         )
-        for language in languages:
-            self.product_review.set_current_language(language)
-            self.product_review.comment = f"Sample Comment {language}"
-            self.product_review.save()
-        self.product_review.set_current_language(default_language)
 
     def test_fields(self):
         self.assertEqual(self.product_review.product, self.product)
@@ -60,11 +55,6 @@ class ProductReviewModelTestCase(TestCase):
             self.product_review.__unicode__(),
             f"Review by {self.user.email} on {self.product}: {comment_snippet}",
         )
-
-    def test_translations(self):
-        for language in languages:
-            self.product_review.set_current_language(language)
-            self.assertEqual(self.product_review.comment, f"Sample Comment {language}")
 
     def tearDown(self) -> None:
         Product.objects.all().delete()

@@ -1,3 +1,5 @@
+import importlib
+
 import factory
 from django.apps import apps
 from django.conf import settings
@@ -12,6 +14,24 @@ from core.factories import CustomDjangoModelFactory
 fake = Faker()
 
 available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+
+
+def get_or_create_category():
+    if apps.get_model("blog", "BlogCategory").objects.exists():
+        return apps.get_model("blog", "BlogCategory").objects.order_by("?").first()
+    else:
+        category_factory_module = importlib.import_module("blog.factories.category")
+        category_factory_class = getattr(category_factory_module, "BlogCategoryFactory")
+        return category_factory_class.create()
+
+
+def get_or_create_author():
+    if apps.get_model("blog", "BlogAuthor").objects.exists():
+        return apps.get_model("blog", "BlogAuthor").objects.order_by("?").first()
+    else:
+        author_factory_module = importlib.import_module("blog.factories.author")
+        author_factory_class = getattr(author_factory_module, "BlogAuthorFactory")
+        return author_factory_class.create()
 
 
 class BlogPostTranslationFactory(factory.django.DjangoModelFactory):
@@ -38,8 +58,8 @@ class BlogPostFactory(CustomDjangoModelFactory):
         width=1280,
         height=720,
     )
-    category = factory.SubFactory("blog.factories.category.BlogCategoryFactory")
-    author = factory.SubFactory("blog.factories.author.BlogAuthorFactory")
+    category = factory.LazyFunction(get_or_create_category)
+    author = factory.LazyFunction(get_or_create_author)
     status = factory.Iterator(PostStatusEnum.choices, getter=lambda x: x[0])
     featured = factory.Faker("boolean")
     view_count = factory.Faker("random_int", min=0, max=1000)

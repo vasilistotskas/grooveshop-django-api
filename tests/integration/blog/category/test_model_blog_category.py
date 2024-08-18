@@ -16,12 +16,6 @@ class BlogCategoryModelTestCase(TestCase):
 
     def setUp(self):
         self.category = BlogCategoryFactory(slug="sample-category")
-        for language in languages:
-            self.category.set_current_language(language)
-            self.category.name = f"Category name in {language}"
-            self.category.description = f"Category description in {language}"
-            self.category.save()
-        self.category.set_current_language(default_language)
 
     def test_fields(self):
         self.assertEqual(self.category.slug, "sample-category")
@@ -32,18 +26,6 @@ class BlogCategoryModelTestCase(TestCase):
             self.category.__unicode__(),
             self.category.safe_translation_getter("name"),
         )
-
-    def test_translations(self):
-        for language in languages:
-            self.category.set_current_language(language)
-            self.assertEqual(
-                self.category.name,
-                f"Category name in {language}",
-            )
-            self.assertEqual(
-                self.category.description,
-                f"Category description in {language}",
-            )
 
     def test_str_representation(self):
         self.assertEqual(

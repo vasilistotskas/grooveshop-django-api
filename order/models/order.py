@@ -59,14 +59,14 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
     )
     floor = models.CharField(
         max_length=50,
-        choices=FloorChoicesEnum.choices,
+        choices=FloorChoicesEnum,
         null=True,
         blank=True,
         default=None,
     )
     location_type = models.CharField(
         max_length=100,
-        choices=LocationChoicesEnum.choices,
+        choices=LocationChoicesEnum,
         null=True,
         blank=True,
         default=None,
@@ -85,14 +85,14 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
     status = models.CharField(
         _("Status"),
         max_length=20,
-        choices=OrderStatusEnum.choices,
+        choices=OrderStatusEnum,
         default=OrderStatusEnum.PENDING,
     )
     shipping_price = MoneyField(_("Shipping Price"), max_digits=11, decimal_places=2, default=0)
     document_type = models.CharField(
         _("Document Type"),
         max_length=100,
-        choices=OrderDocumentTypeEnum.choices,
+        choices=OrderDocumentTypeEnum,
         default=OrderDocumentTypeEnum.RECEIPT,
     )
     paid_amount = MoneyField(

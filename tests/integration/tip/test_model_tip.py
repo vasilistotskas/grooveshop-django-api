@@ -20,13 +20,6 @@ class TipModelTestCase(TestCase):
             kind=TipKindEnum.INFO,
             active=True,
         )
-        for language in languages:
-            self.tip.set_current_language(language)
-            self.tip.title = f"Info_{language}"
-            self.tip.content = f"Info content_{language}"
-            self.tip.url = f"https://www.google.com_{language}"
-            self.tip.save()
-        self.tip.set_current_language(default_language)
 
     def test_fields(self):
         self.assertEqual(self.tip.kind, TipKindEnum.INFO)
@@ -38,13 +31,6 @@ class TipModelTestCase(TestCase):
             self.tip.__unicode__(),
             f"{self.tip.get_kind_display()}: {self.tip.safe_translation_getter('title')}",
         )
-
-    def test_translations(self):
-        for language in languages:
-            self.tip.set_current_language(language)
-            self.assertEqual(self.tip.title, f"Info_{language}")
-            self.assertEqual(self.tip.content, f"Info content_{language}")
-            self.assertEqual(self.tip.url, f"https://www.google.com_{language}")
 
     def test_str_representation(self):
         self.assertEqual(

@@ -22,11 +22,6 @@ class PayWayViewSetTestCase(APITestCase):
             cost=10.00,
             free_for_order_amount=100.00,
         )
-        for language in languages:
-            self.pay_way.set_current_language(language)
-            self.pay_way.name = PayWayEnum.CREDIT_CARD
-            self.pay_way.save()
-        self.pay_way.set_current_language(default_language)
 
     @staticmethod
     def get_pay_way_detail_url(pk):

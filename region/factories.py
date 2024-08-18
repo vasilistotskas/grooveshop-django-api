@@ -1,10 +1,11 @@
+import importlib
+
 import factory
 from django.apps import apps
 from django.conf import settings
 from faker import Faker
 
 from core.factories import CustomDjangoModelFactory
-from country.models import Country
 from region.models import Region
 
 fake = Faker()
@@ -13,10 +14,12 @@ available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settin
 
 
 def get_or_create_country():
-    if Country.objects.exists():
-        return Country.objects.order_by("?").first()
+    if apps.get_model("country", "Country").objects.exists():
+        return apps.get_model("country", "Country").objects.order_by("?").first()
     else:
-        return factory.SubFactory("country.factories.CountryFactory")
+        country_factory_module = importlib.import_module("country.factories")
+        country_factory_class = getattr(country_factory_module, "CountryFactory")
+        return country_factory_class.create()
 
 
 class RegionTranslationFactory(factory.django.DjangoModelFactory):

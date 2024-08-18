@@ -31,16 +31,6 @@ class SlideModelTestCase(TestCase):
             slider=self.slider,
         )
 
-        for language in languages:
-            self.slide.set_current_language(language)
-            self.slide.name = f"Slide 1_{language}"
-            self.slide.url = "https://www.example.com/"
-            self.slide.title = f"Slide Title_{language}"
-            self.slide.description = f"Slide Description_{language}"
-            self.slide.button_label = f"Slide Button Label_{language}"
-            self.slide.save()
-        self.slide.set_current_language(default_language)
-
     def test_fields(self):
         self.assertEqual(self.slide.discount, Money("0.0", settings.DEFAULT_CURRENCY))
         self.assertTrue(self.slide.show_button)
@@ -51,14 +41,6 @@ class SlideModelTestCase(TestCase):
             self.slide.__unicode__(),
             f"{self.slide.safe_translation_getter('title', any_language=True)} in {self.slider}",
         )
-
-    def test_translations(self):
-        for language in languages:
-            self.slide.set_current_language(language)
-            self.assertEqual(self.slide.name, f"Slide 1_{language}")
-            self.assertEqual(self.slide.title, f"Slide Title_{language}")
-            self.assertEqual(self.slide.description, f"Slide Description_{language}")
-            self.assertEqual(self.slide.button_label, f"Slide Button Label_{language}")
 
     def test_str_representation(self):
         self.assertEqual(

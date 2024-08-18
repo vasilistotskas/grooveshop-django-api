@@ -57,13 +57,6 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
             raise ValidationError(_("The quantity exceeds the available stock."))
 
     @property
-    def subtotal(self) -> Money:
-        return Money(
-            amount=self.price.amount * self.quantity,
-            currency=self.price.currency,
-        )
-
-    @property
     def total_price(self) -> Money:
         return Money(
             amount=self.price.amount * Decimal(self.quantity),

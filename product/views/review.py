@@ -12,13 +12,13 @@ from core.api.throttling import BurstRateThrottle
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from core.utils.serializers import MultiSerializerMixin
+from product.enum.review import ReviewStatusEnum
 from product.models.review import ProductReview
 from product.serializers.product import ProductSerializer
 from product.serializers.review import ProductReviewSerializer
 
 
 class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
-    queryset = ProductReview.objects.all()
     filter_backends = [
         DjangoFilterBackend,
         PascalSnakeCaseOrderingFilter,
@@ -42,6 +42,11 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
         "default": ProductReviewSerializer,
         "product": ProductSerializer,
     }
+
+    def get_queryset(self):
+        if self.request.user.is_superuser:
+            return ProductReview.objects.all()
+        return ProductReview.objects.filter(status=ReviewStatusEnum.TRUE)
 
     def get_permissions(self):
         if self.action in [

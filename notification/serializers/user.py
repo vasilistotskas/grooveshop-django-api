@@ -23,6 +23,14 @@ class NotificationUserSerializer(BaseExpandSerializer):
             "user",
             "notification",
             "seen",
+            "created_at",
+            "updated_at",
+            "uuid",
+        )
+        read_only_fields = (
+            "created_at",
+            "updated_at",
+            "uuid",
         )
 
     def get_expand_fields(

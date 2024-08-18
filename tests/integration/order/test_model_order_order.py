@@ -21,6 +21,7 @@ class OrderModelTestCase(TestCase):
 
     def setUp(self):
         self.order = OrderFactory(
+            pay_way=None,
             email="test@example.com",
             first_name="John",
             last_name="Doe",
@@ -55,8 +56,7 @@ class OrderModelTestCase(TestCase):
         self.assertEqual(self.order.total_price_items.amount, expected_total_price)
 
     def test_total_price_extra_without_pay_way(self):
-        order = OrderFactory(pay_way=None, paid_amount=Money("0", settings.DEFAULT_CURRENCY))
-        self.assertEqual(order.total_price_extra, order.shipping_price)
+        self.assertEqual(self.order.total_price_extra, self.order.shipping_price)
 
     def test_full_address(self):
         expected_full_address = (

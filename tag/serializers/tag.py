@@ -20,8 +20,13 @@ class TagSerializer(TranslatableModelSerializer):
             "id",
             "translations",
             "active",
+            "sort_order",
             "created_at",
             "updated_at",
-            "sort_order",
             "uuid",
         ]
+        read_only_fields = (
+            "created_at",
+            "updated_at",
+            "uuid",
+        )

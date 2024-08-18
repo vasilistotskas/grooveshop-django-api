@@ -53,6 +53,13 @@ class BlogCommentSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "likes_count",
             "replies_count",
         )
+        read_only_fields = (
+            "created_at",
+            "updated_at",
+            "uuid",
+            "likes_count",
+            "replies_count",
+        )
 
     def get_expand_fields(
         self,

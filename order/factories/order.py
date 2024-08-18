@@ -1,6 +1,7 @@
 import importlib
 
 import factory
+from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.db.models import Count
 from faker import Faker
@@ -28,10 +29,38 @@ def get_or_create_user():
     return user
 
 
+def get_or_create_country():
+    if apps.get_model("country", "Country").objects.exists():
+        return apps.get_model("country", "Country").objects.order_by("?").first()
+    else:
+        country_factory_module = importlib.import_module("country.factories")
+        country_factory_class = getattr(country_factory_module, "CountryFactory")
+        return country_factory_class.create()
+
+
+def get_or_create_region():
+    if apps.get_model("region", "Region").objects.exists():
+        return apps.get_model("region", "Region").objects.order_by("?").first()
+    else:
+        region_factory_module = importlib.import_module("region.factories")
+        region_factory_class = getattr(region_factory_module, "RegionFactory")
+        return region_factory_class.create()
+
+
+def get_or_create_pay_way():
+    if apps.get_model("pay_way", "PayWay").objects.exists():
+        return apps.get_model("pay_way", "PayWay").objects.order_by("?").first()
+    else:
+        pay_way_factory_module = importlib.import_module("pay_way.factories")
+        pay_way_factory_class = getattr(pay_way_factory_module, "PayWayFactory")
+        return pay_way_factory_class.create()
+
+
 class OrderFactory(factory.django.DjangoModelFactory):
     user = factory.LazyFunction(get_or_create_user)
-    country = factory.SubFactory("country.factories.CountryFactory")
-    region = factory.SubFactory("region.factories.RegionFactory")
+    country = factory.LazyFunction(get_or_create_country)
+    region = factory.LazyFunction(get_or_create_region)
+    pay_way = factory.LazyFunction(get_or_create_pay_way)
     floor = factory.Iterator(FloorChoicesEnum.choices, getter=lambda x: x[0])
     location_type = factory.Iterator(LocationChoicesEnum.choices, getter=lambda x: x[0])
     email = factory.Faker("email")

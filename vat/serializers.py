@@ -12,3 +12,8 @@ class VatSerializer(BaseExpandSerializer):
             "updated_at",
             "uuid",
         )
+        read_only_fields = (
+            "created_at",
+            "updated_at",
+            "uuid",
+        )

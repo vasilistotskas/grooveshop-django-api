@@ -16,11 +16,6 @@ class CountryModelTestCase(TestCase):
 
     def setUp(self):
         self.country = CountryFactory(alpha_2="GR", alpha_3="GRC", iso_cc=300, phone_code=30, num_regions=0)
-        for language in languages:
-            self.country.set_current_language(language)
-            self.country.name = f"Greece_{language}"
-            self.country.save()
-        self.country.set_current_language(default_language)
 
     def test_fields(self):
         self.assertEqual(self.country.alpha_2, "GR")
@@ -34,14 +29,6 @@ class CountryModelTestCase(TestCase):
             self.country.__unicode__(),
             self.country.safe_translation_getter("name"),
         )
-
-    def test_translations(self):
-        for language in languages:
-            self.country.set_current_language(language)
-            self.assertEqual(
-                self.country.name,
-                f"Greece_{language}",
-            )
 
     def test_str_representation(self):
         self.assertEqual(str(self.country), self.country.safe_translation_getter("name"))

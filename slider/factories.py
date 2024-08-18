@@ -1,12 +1,29 @@
+import importlib
+
 import factory
 from django.apps import apps
 from django.conf import settings
+from django.db.models import Count
 from django.utils import timezone
 
 from slider.models import Slide
 from slider.models import Slider
 
 available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+
+
+def get_or_create_slider():
+    if apps.get_model("slider", "Slider").objects.exists():
+        return (
+            apps.get_model("slider", "Slider")
+            .objects.annotate(num_slides=Count("slides"))
+            .order_by("num_slides")
+            .first()
+        )
+    else:
+        slider_factory_module = importlib.import_module("slider.factories")
+        slider_factory_class = getattr(slider_factory_module, "SliderFactory")
+        return slider_factory_class.create()
 
 
 class SliderTranslationFactory(factory.django.DjangoModelFactory):
@@ -79,7 +96,7 @@ class SlideTranslationFactory(factory.django.DjangoModelFactory):
 
 
 class SlideFactory(factory.django.DjangoModelFactory):
-    slider = factory.SubFactory("slider.factories.SliderFactory")
+    slider = factory.LazyFunction(get_or_create_slider)
     discount = factory.Faker("pydecimal", left_digits=2, right_digits=2, positive=True)
     show_button = factory.Faker("boolean")
     date_start = factory.LazyFunction(timezone.now)

@@ -28,15 +28,7 @@ class UserAddressViewSetTestCase(APITestCase):
         self.user = UserAccountFactory(num_addresses=0)
         self.country = CountryFactory(alpha_2="GR", alpha_3="GRC", iso_cc=301, phone_code=30, num_regions=0)
         self.region = RegionFactory(alpha="GRC", country=self.country)
-
-        for language in languages:
-            self.region.set_current_language(language)
-            self.region.name = f"Region {language}"
-            self.region.save()
-        self.region.set_current_language(default_language)
-
         self.client.force_authenticate(user=self.user)
-
         self.address = UserAddressFactory(
             user=self.user,
             country=self.country,

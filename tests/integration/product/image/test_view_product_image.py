@@ -30,11 +30,6 @@ class ProductImageViewSetTestCase(APITestCase):
             product=self.product,
             is_main=True,
         )
-        for language in languages:
-            self.product_image.set_current_language(language)
-            self.product_image.title = f"Sample Main Product Image ({language})"
-            self.product_image.save()
-        self.product_image.set_current_language(default_language)
 
     @staticmethod
     def get_product_image_detail_url(pk):

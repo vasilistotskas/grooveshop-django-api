@@ -1,10 +1,25 @@
+import importlib
+
 import factory
 from django.apps import apps
 from django.conf import settings
+from django.contrib.auth import get_user_model
 
 from blog.models.author import BlogAuthor
 
 available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+
+User = get_user_model()
+
+
+def get_or_create_user():
+    if User.objects.exists():
+        user = User.objects.order_by("?").first()
+    else:
+        user_factory_module = importlib.import_module("user.factories.account")
+        user_factory_class = getattr(user_factory_module, "UserAccountFactory")
+        user = user_factory_class.create()
+    return user
 
 
 class BlogAuthorTranslationFactory(factory.django.DjangoModelFactory):
@@ -18,7 +33,7 @@ class BlogAuthorTranslationFactory(factory.django.DjangoModelFactory):
 
 
 class BlogAuthorFactory(factory.django.DjangoModelFactory):
-    user = factory.SubFactory("user.factories.account.UserAccountFactory")
+    user = factory.LazyFunction(get_or_create_user)
     website = factory.Faker("url")
 
     class Meta:

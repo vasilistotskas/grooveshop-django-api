@@ -1,3 +1,5 @@
+import importlib
+
 import factory
 from django.apps import apps
 from django.conf import settings
@@ -5,6 +7,15 @@ from django.conf import settings
 from product.models.product import ProductImage
 
 available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+
+
+def get_or_create_product():
+    if apps.get_model("product", "Product").objects.exists():
+        return apps.get_model("product", "Product").objects.order_by("?").first()
+    else:
+        product_factory_module = importlib.import_module("product.factories.product")
+        product_factory_class = getattr(product_factory_module, "ProductFactory")
+        return product_factory_class.create()
 
 
 class ProductImageTranslationFactory(factory.django.DjangoModelFactory):
@@ -18,7 +29,7 @@ class ProductImageTranslationFactory(factory.django.DjangoModelFactory):
 
 
 class ProductImageFactory(factory.django.DjangoModelFactory):
-    product = factory.SubFactory("product.factories.product.ProductFactory")
+    product = factory.LazyFunction(get_or_create_product)
     image = factory.django.ImageField(
         filename="product_image.jpg",
         color=factory.Faker("color"),

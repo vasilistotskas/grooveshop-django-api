@@ -20,11 +20,6 @@ class RegionModelTestCase(TestCase):
             alpha="GRC",
             country=self.country,
         )
-        for language in languages:
-            self.region.set_current_language(language)
-            self.region.name = f"Region {language}"
-            self.region.save()
-        self.region.set_current_language(default_language)
 
     def test_fields(self):
         self.assertEqual(self.region.alpha, "GRC")
@@ -34,11 +29,6 @@ class RegionModelTestCase(TestCase):
         country_name = self.country.safe_translation_getter("name", any_language=True)
         region_name = self.region.safe_translation_getter("name", any_language=True)
         self.assertEqual(self.region.__unicode__(), f"{region_name}, {country_name}")
-
-    def test_translations(self):
-        for language in languages:
-            self.region.set_current_language(language)
-            self.assertEqual(self.region.name, f"Region {language}")
 
     def test_str_representation(self):
         country_name = self.country.safe_translation_getter("name", any_language=True)

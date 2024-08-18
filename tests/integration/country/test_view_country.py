@@ -16,11 +16,6 @@ class CountryViewSetTestCase(APITestCase):
 
     def setUp(self):
         self.country = CountryFactory(alpha_2="GR", alpha_3="GRC", iso_cc=301, phone_code=30, num_regions=0)
-        for language in languages:
-            self.country.set_current_language(language)
-            self.country.name = f"Greece_{language}"
-            self.country.save()
-        self.country.set_current_language(default_language)
 
     @staticmethod
     def get_country_detail_url(pk):

@@ -22,20 +22,14 @@ class ProductReviewViewSetTestCase(APITestCase):
     product_review: ProductReview = None
 
     def setUp(self):
-        self.user = UserAccountFactory(num_addresses=0)
+        self.user = UserAccountFactory(num_addresses=0, is_superuser=True)
         self.client.force_authenticate(user=self.user)
         self.product = ProductFactory(num_images=0, num_reviews=0)
         self.product_review = ProductReviewFactory(
             product=self.product,
             user=self.user,
             rate=5,
-            status="New",
         )
-        for language in languages:
-            self.product_review.set_current_language(language)
-            self.product_review.comment = f"Sample Comment {language}"
-            self.product_review.save()
-        self.product_review.set_current_language(default_language)
 
     @staticmethod
     def get_product_review_detail_url(pk):

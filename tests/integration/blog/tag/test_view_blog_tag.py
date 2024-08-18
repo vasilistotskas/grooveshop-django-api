@@ -16,11 +16,6 @@ class BlogTagViewSetTestCase(APITestCase):
 
     def setUp(self):
         self.tag = BlogTagFactory(active=True)
-        for language in languages:
-            self.tag.set_current_language(language)
-            self.tag.name = f"Tag name in {language}"
-            self.tag.save()
-        self.tag.set_current_language(default_language)
 
     @staticmethod
     def get_tag_detail_url(pk):

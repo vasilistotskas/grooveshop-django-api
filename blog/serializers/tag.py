@@ -22,9 +22,15 @@ class BlogTagSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "translations",
             "id",
             "active",
+            "sort_order",
             "created_at",
             "updated_at",
-            "sort_order",
+            "uuid",
+            "get_posts_count",
+        )
+        read_only_fields = (
+            "created_at",
+            "updated_at",
             "uuid",
             "get_posts_count",
         )

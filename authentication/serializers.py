@@ -54,8 +54,6 @@ class AuthenticationSerializer(UserDetailsSerializer):
             "place",
             "country",
             "region",
-            "is_active",
-            "is_staff",
             "birth_date",
             "twitter",
             "linkedin",
@@ -65,11 +63,20 @@ class AuthenticationSerializer(UserDetailsSerializer):
             "youtube",
             "github",
             "bio",
-            "main_image_filename",
-            "is_superuser",
             "is_active",
+            "is_staff",
+            "is_superuser",
             "created_at",
             "updated_at",
             "uuid",
+            "main_image_filename",
         )
-        read_only_fields = ()
+        read_only_fields = (
+            "is_active",
+            "is_staff",
+            "is_superuser",
+            "created_at",
+            "updated_at",
+            "uuid",
+            "main_image_filename",
+        )

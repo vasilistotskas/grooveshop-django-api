@@ -47,6 +47,20 @@ class CartItemSerializer(BaseExpandSerializer):
             "updated_at",
             "uuid",
         )
+        read_only_fields = (
+            "price",
+            "final_price",
+            "discount_value",
+            "price_save_percent",
+            "discount_percent",
+            "vat_percent",
+            "vat_value",
+            "total_price",
+            "total_discount_value",
+            "created_at",
+            "updated_at",
+            "uuid",
+        )
 
 
 class CartItemCreateSerializer(BaseExpandSerializer):
@@ -96,6 +110,16 @@ class CartSerializer(BaseExpandSerializer):
             "total_items",
             "total_items_unique",
             "cart_items",
+            "created_at",
+            "updated_at",
+            "uuid",
+        )
+        read_only_fields = (
+            "total_price",
+            "total_discount_value",
+            "total_vat_value",
+            "total_items",
+            "total_items_unique",
             "created_at",
             "updated_at",
             "uuid",

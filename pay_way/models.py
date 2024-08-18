@@ -38,7 +38,7 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
             max_length=50,
             blank=True,
             null=True,
-            choices=PayWayEnum.choices,
+            choices=PayWayEnum,
         )
     )
 

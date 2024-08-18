@@ -19,7 +19,19 @@ class ProductFavouriteSerializer(BaseExpandSerializer):
 
     class Meta:
         model = ProductFavourite
-        fields = ("id", "user", "product", "created_at", "updated_at", "uuid")
+        fields = (
+            "id",
+            "user",
+            "product",
+            "created_at",
+            "updated_at",
+            "uuid",
+        )
+        read_only_fields = (
+            "created_at",
+            "updated_at",
+            "uuid",
+        )
 
     def get_expand_fields(
         self,

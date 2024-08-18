@@ -32,12 +32,19 @@ class ProductImageSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "image",
             "thumbnail",
             "is_main",
-            "main_image_absolute_url",
-            "main_image_filename",
+            "sort_order",
             "created_at",
             "updated_at",
             "uuid",
-            "sort_order",
+            "main_image_absolute_url",
+            "main_image_filename",
+        )
+        read_only_fields = (
+            "created_at",
+            "updated_at",
+            "uuid",
+            "main_image_absolute_url",
+            "main_image_filename",
         )
 
     def get_expand_fields(

@@ -47,7 +47,7 @@ class BlogPost(
     status = models.CharField(
         _("Status"),
         max_length=20,
-        choices=PostStatusEnum.choices,
+        choices=PostStatusEnum,
         default=PostStatusEnum.DRAFT,
     )
     featured = models.BooleanField(_("Featured"), default=False)

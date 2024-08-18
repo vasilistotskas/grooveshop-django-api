@@ -25,13 +25,6 @@ class TestBaseExpandSerializer(TestCase):
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
         self.product = ProductFactory(num_images=0, num_reviews=0)
-        for language in languages:
-            self.product.set_current_language(language)
-            self.product.name = f"Sample Product ({language})"
-            self.product.description = f"Sample Product Description ({language})"
-            self.product.save()
-        self.product.set_current_language(default_language)
-
         self.product_favourite = ProductFavouriteFactory(user=self.user, product=self.product)
         self.serializer = BaseExpandSerializer(instance=self.product_favourite)
         self.serializer.Meta.model = ProductFavourite

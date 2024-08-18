@@ -24,24 +24,9 @@ class ProductCategoryViewSetTestCase(APITestCase):
 
     def setUp(self):
         self.category = ProductCategoryFactory()
-
-        for language in languages:
-            self.category.set_current_language(language)
-            self.category.name = f"Sample Category {language}"
-            self.category.description = f"Sample Category Description {language}"
-            self.category.save()
-        self.category.set_current_language(default_language)
-
         self.sub_category = ProductCategoryFactory(
             parent=self.category,
         )
-
-        for language in languages:
-            self.sub_category.set_current_language(language)
-            self.sub_category.name = f"Sample Sub Category {language}"
-            self.sub_category.description = f"Sample Sub Category Description {language}"
-            self.sub_category.save()
-        self.sub_category.set_current_language(default_language)
 
     @staticmethod
     def get_product_category_detail_url(pk):

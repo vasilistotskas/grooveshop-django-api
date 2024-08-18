@@ -1,3 +1,5 @@
+import importlib
+
 import factory
 from django.apps import apps
 from django.conf import settings
@@ -12,6 +14,24 @@ from tag.factories.tagged_item import TaggedProductFactory
 fake = Faker()
 
 available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+
+
+def get_or_create_category():
+    if apps.get_model("product", "ProductCategory").objects.exists():
+        return apps.get_model("product", "ProductCategory").objects.order_by("?").first()
+    else:
+        category_factory_module = importlib.import_module("product.factories.category")
+        category_factory_class = getattr(category_factory_module, "ProductCategoryFactory")
+        return category_factory_class.create()
+
+
+def get_or_create_vat():
+    if apps.get_model("vat", "Vat").objects.exists():
+        return apps.get_model("vat", "Vat").objects.order_by("?").first()
+    else:
+        vat_factory_module = importlib.import_module("vat.factories")
+        vat_factory_class = getattr(vat_factory_module, "VatFactory")
+        return vat_factory_class.create()
 
 
 class ProductTranslationFactory(factory.django.DjangoModelFactory):
@@ -31,12 +51,12 @@ class ProductFactory(CustomDjangoModelFactory):
     ]
 
     product_code = factory.Faker("uuid4")
-    category = factory.SubFactory("product.factories.category.ProductCategoryFactory")
+    category = factory.LazyFunction(get_or_create_category)
     price = factory.Faker("pydecimal", left_digits=4, right_digits=2, positive=True)
     active = factory.Faker("boolean")
     stock = factory.Faker("random_int", min=0, max=100)
     discount_percent = factory.Faker("pydecimal", left_digits=2, right_digits=2, positive=True, max_value=100)
-    vat = factory.SubFactory("vat.factories.VatFactory")
+    vat = factory.LazyFunction(get_or_create_vat)
     view_count = factory.Faker("random_int", min=0, max=1000)
     weight = factory.Faker("pydecimal", left_digits=3, right_digits=2, positive=True)
 

@@ -23,9 +23,16 @@ class CountrySerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "alpha_3",
             "iso_cc",
             "phone_code",
+            "sort_order",
             "created_at",
             "updated_at",
-            "sort_order",
+            "uuid",
+            "main_image_absolute_url",
+            "main_image_filename",
+        )
+        read_only_fields = (
+            "created_at",
+            "updated_at",
             "uuid",
             "main_image_absolute_url",
             "main_image_filename",

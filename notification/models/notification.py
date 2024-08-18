@@ -14,7 +14,7 @@ class Notification(TranslatableModel, TimeStampMixinModel, UUIDModel):
     kind = models.CharField(
         _("Kind"),
         max_length=250,
-        choices=NotificationKindEnum.choices,
+        choices=NotificationKindEnum,
         default=NotificationKindEnum.INFO,
     )
     translations = TranslatedFields(

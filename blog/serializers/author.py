@@ -32,11 +32,18 @@ class BlogAuthorSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "id",
             "user",
             "website",
-            "number_of_posts",
-            "total_likes_received",
             "created_at",
             "updated_at",
             "uuid",
+            "number_of_posts",
+            "total_likes_received",
+        )
+        read_only_fields = (
+            "created_at",
+            "updated_at",
+            "uuid",
+            "number_of_posts",
+            "total_likes_received",
         )
 
     def get_expand_fields(

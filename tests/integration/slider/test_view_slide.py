@@ -33,15 +33,6 @@ class SlideViewSetTestCase(APITestCase):
             date_end=date_start + timedelta(days=30),
             slider=self.slider,
         )
-        for language in languages:
-            self.slide.set_current_language(language)
-            self.slide.name = f"Slide 1_{language}"
-            self.slide.url = "https://www.example.com/"
-            self.slide.title = f"Slide Title_{language}"
-            self.slide.description = f"Slide Description_{language}"
-            self.slide.button_label = f"Slide Button Label_{language}"
-            self.slide.save()
-        self.slide.set_current_language(default_language)
 
     @staticmethod
     def get_slide_detail_url(pk):

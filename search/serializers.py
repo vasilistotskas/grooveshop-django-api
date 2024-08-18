@@ -37,6 +37,16 @@ class SearchProductResultSerializer(TranslatableModelSerializer, BaseExpandSeria
             "headline",
             "similarity",
         )
+        read_only_fields = (
+            "id",
+            "slug",
+            "main_image_filename",
+            "absolute_url",
+            "translations",
+            "search_rank",
+            "headline",
+            "similarity",
+        )
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -82,6 +92,16 @@ class SearchBlogPostResultSerializer(TranslatableModelSerializer, BaseExpandSeri
     class Meta:
         model = BlogPost
         fields = (
+            "id",
+            "slug",
+            "main_image_filename",
+            "absolute_url",
+            "translations",
+            "search_rank",
+            "headline",
+            "similarity",
+        )
+        read_only_fields = (
             "id",
             "slug",
             "main_image_filename",

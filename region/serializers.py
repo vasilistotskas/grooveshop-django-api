@@ -29,9 +29,14 @@ class RegionSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "translations",
             "alpha",
             "country",
+            "sort_order",
             "created_at",
             "updated_at",
-            "sort_order",
+            "uuid",
+        )
+        read_only_fields = (
+            "created_at",
+            "updated_at",
             "uuid",
         )
 

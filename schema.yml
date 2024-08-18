@@ -2567,6 +2567,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/Cart'
+        required: true
       security:
       - {}
       responses:
@@ -2654,6 +2655,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/Cart'
+        required: true
       security:
       - {}
       responses:
@@ -2904,6 +2906,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CartItem'
+        required: true
       security:
       - {}
       responses:
@@ -3013,6 +3016,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CartItem'
+        required: true
       security:
       - {}
       responses:
@@ -5098,6 +5102,53 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProductReview'
+          description: ''
+  /api/v1/product/{id}/tags:
+    get:
+      operationId: api_v1_product_tags_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+          description: ''
+  /api/v1/product/{id}/tags{format}:
+    get:
+      operationId: api_v1_product_tags_formatted_retrieve
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
           description: ''
   /api/v1/product/{id}/update_view_count:
     post:
@@ -10334,6 +10385,7 @@ components:
           type: string
           format: uri
           nullable: true
+          title: Εικόνα
         phone:
           type: string
         city:
@@ -10361,12 +10413,6 @@ components:
           type: string
           title: Region Code
           nullable: true
-        isActive:
-          type: boolean
-          title: Active
-        isStaff:
-          type: boolean
-          title: Staff
         birthDate:
           type: string
           format: date
@@ -10415,11 +10461,17 @@ components:
         bio:
           type: string
           nullable: true
-        mainImageFilename:
-          type: string
+        isActive:
+          type: boolean
           readOnly: true
+          title: Active
+        isStaff:
+          type: boolean
+          readOnly: true
+          title: Staff
         isSuperuser:
           type: boolean
+          readOnly: true
           title: Κατάσταση υπερχρήστη
           description: Υποδηλώνει ότι ο συγκεκριμένος χρήστης έχει όλα τα δικαιώματα
             χωρίς να χρειάζεται να τα παραχωρήσετε ξεχωριστά.
@@ -10435,10 +10487,16 @@ components:
           type: string
           format: uuid
           readOnly: true
+        mainImageFilename:
+          type: string
+          readOnly: true
       required:
       - createdAt
       - email
       - id
+      - isActive
+      - isStaff
+      - isSuperuser
       - mainImageFilename
       - pk
       - updatedAt
@@ -10478,12 +10536,6 @@ components:
           format: uri
           nullable: true
           maxLength: 200
-        numberOfPosts:
-          type: integer
-          readOnly: true
-        totalLikesReceived:
-          type: integer
-          readOnly: true
         createdAt:
           type: string
           format: date-time
@@ -10495,6 +10547,12 @@ components:
         uuid:
           type: string
           format: uuid
+          readOnly: true
+        numberOfPosts:
+          type: integer
+          readOnly: true
+        totalLikesReceived:
+          type: integer
           readOnly: true
       required:
       - createdAt
@@ -10538,7 +10596,7 @@ components:
           readOnly: true
         slug:
           type: string
-          maxLength: 50
+          maxLength: 255
           pattern: ^[-a-zA-Z0-9_]+$
         children:
           oneOf:
@@ -10556,12 +10614,10 @@ components:
         treeId:
           type: integer
           readOnly: true
-        absoluteUrl:
-          type: string
-          readOnly: true
-        recursivePostCount:
+        sortOrder:
           type: integer
           readOnly: true
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -10570,19 +10626,21 @@ components:
           type: string
           format: date-time
           readOnly: true
-        sortOrder:
-          type: integer
-          readOnly: true
-          nullable: true
         uuid:
           type: string
           format: uuid
+          readOnly: true
+        absoluteUrl:
+          type: string
           readOnly: true
         mainImageAbsoluteUrl:
           type: string
           readOnly: true
         mainImageFilename:
           type: string
+          readOnly: true
+        recursivePostCount:
+          type: integer
           readOnly: true
       required:
       - absoluteUrl
@@ -10765,6 +10823,8 @@ components:
           maximum: 9223372036854775807
           minimum: 0
           format: int64
+        isPublished:
+          type: boolean
         createdAt:
           type: string
           format: date-time
@@ -10776,9 +10836,8 @@ components:
         publishedAt:
           type: string
           format: date-time
+          readOnly: true
           nullable: true
-        isPublished:
-          type: boolean
         uuid:
           type: string
           format: uuid
@@ -10812,6 +10871,7 @@ components:
       - likesCount
       - mainImageAbsoluteUrl
       - mainImageFilename
+      - publishedAt
       - slug
       - tags
       - tagsCount
@@ -10891,6 +10951,10 @@ components:
           readOnly: true
         active:
           type: boolean
+        sortOrder:
+          type: integer
+          readOnly: true
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -10899,20 +10963,16 @@ components:
           type: string
           format: date-time
           readOnly: true
-        sortOrder:
-          type: integer
-          readOnly: true
-          nullable: true
         uuid:
           type: string
           format: uuid
           readOnly: true
-        getTagPostsCount:
+        getPostsCount:
           type: integer
           readOnly: true
       required:
       - createdAt
-      - getTagPostsCount
+      - getPostsCount
       - id
       - sortOrder
       - translations
@@ -10934,7 +10994,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         totalDiscountValue:
           type: number
           format: double
@@ -10942,7 +11001,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         totalVatValue:
           type: number
           format: double
@@ -10950,7 +11008,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         totalItems:
           type: integer
           readOnly: true
@@ -11009,7 +11066,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         finalPrice:
           type: number
           format: double
@@ -11017,7 +11073,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         discountValue:
           type: number
           format: double
@@ -11025,7 +11080,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         priceSavePercent:
           type: number
           format: double
@@ -11047,7 +11101,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         totalPrice:
           type: number
           format: double
@@ -11055,7 +11108,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         totalDiscountValue:
           type: number
           format: double
@@ -11063,7 +11115,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         createdAt:
           type: string
           format: date-time
@@ -11185,7 +11236,7 @@ components:
         customerNotes:
           type: string
           nullable: true
-        orderItemOrder:
+        items:
           type: array
           items:
             $ref: '#/components/schemas/CheckoutItem'
@@ -11217,7 +11268,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         totalPriceExtra:
           type: number
           format: double
@@ -11225,7 +11275,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         fullAddress:
           type: string
           readOnly: true
@@ -11236,8 +11285,8 @@ components:
       - firstName
       - fullAddress
       - id
+      - items
       - lastName
-      - orderItemOrder
       - phone
       - shippingPrice
       - street
@@ -11264,6 +11313,15 @@ components:
         id:
           type: integer
           readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        message:
+          type: string
         createdAt:
           type: string
           format: date-time
@@ -11276,15 +11334,6 @@ components:
           type: string
           format: uuid
           readOnly: true
-        name:
-          type: string
-          maxLength: 100
-        email:
-          type: string
-          format: email
-          maxLength: 254
-        message:
-          type: string
       required:
       - createdAt
       - email
@@ -11336,6 +11385,10 @@ components:
           maximum: 32767
           minimum: 0
           nullable: true
+        sortOrder:
+          type: integer
+          readOnly: true
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -11344,10 +11397,6 @@ components:
           type: string
           format: date-time
           readOnly: true
-        sortOrder:
-          type: integer
-          readOnly: true
-          nullable: true
         uuid:
           type: string
           format: uuid
@@ -11430,10 +11479,25 @@ components:
           type: integer
         seen:
           type: boolean
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
       required:
+      - createdAt
       - id
       - notification
+      - updatedAt
       - user
+      - uuid
     NotificationUserAction:
       type: object
       properties:
@@ -11519,7 +11583,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-        orderItemOrder:
+        items:
           type: array
           items:
             $ref: '#/components/schemas/OrderItem'
@@ -11551,7 +11615,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         totalPriceExtra:
           type: number
           format: double
@@ -11559,7 +11622,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         fullAddress:
           type: string
           readOnly: true
@@ -11571,8 +11633,8 @@ components:
       - firstName
       - fullAddress
       - id
+      - items
       - lastName
-      - orderItemOrder
       - payWay
       - phone
       - region
@@ -11658,7 +11720,7 @@ components:
         customerNotes:
           type: string
           nullable: true
-        orderItemOrder:
+        items:
           type: array
           items:
             $ref: '#/components/schemas/OrderItemCreateUpdate'
@@ -11690,7 +11752,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         totalPriceExtra:
           type: number
           format: double
@@ -11698,7 +11759,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         fullAddress:
           type: string
           readOnly: true
@@ -11709,8 +11769,8 @@ components:
       - firstName
       - fullAddress
       - id
+      - items
       - lastName
-      - orderItemOrder
       - phone
       - shippingPrice
       - street
@@ -11739,6 +11799,10 @@ components:
           type: integer
           maximum: 2147483647
           minimum: -2147483648
+        sortOrder:
+          type: integer
+          readOnly: true
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -11751,10 +11815,6 @@ components:
           type: string
           format: uuid
           readOnly: true
-        sortOrder:
-          type: integer
-          readOnly: true
-          nullable: true
         totalPrice:
           type: number
           format: double
@@ -11762,7 +11822,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
       required:
       - createdAt
       - id
@@ -12394,6 +12453,7 @@ components:
           type: string
           format: uri
           nullable: true
+          title: Εικόνα
         phone:
           type: string
         city:
@@ -12421,12 +12481,6 @@ components:
           type: string
           title: Region Code
           nullable: true
-        isActive:
-          type: boolean
-          title: Active
-        isStaff:
-          type: boolean
-          title: Staff
         birthDate:
           type: string
           format: date
@@ -12475,11 +12529,17 @@ components:
         bio:
           type: string
           nullable: true
-        mainImageFilename:
-          type: string
+        isActive:
+          type: boolean
           readOnly: true
+          title: Active
+        isStaff:
+          type: boolean
+          readOnly: true
+          title: Staff
         isSuperuser:
           type: boolean
+          readOnly: true
           title: Κατάσταση υπερχρήστη
           description: Υποδηλώνει ότι ο συγκεκριμένος χρήστης έχει όλα τα δικαιώματα
             χωρίς να χρειάζεται να τα παραχωρήσετε ξεχωριστά.
@@ -12494,6 +12554,9 @@ components:
         uuid:
           type: string
           format: uuid
+          readOnly: true
+        mainImageFilename:
+          type: string
           readOnly: true
     PatchedBlogAuthor:
       type: object
@@ -12527,12 +12590,6 @@ components:
           format: uri
           nullable: true
           maxLength: 200
-        numberOfPosts:
-          type: integer
-          readOnly: true
-        totalLikesReceived:
-          type: integer
-          readOnly: true
         createdAt:
           type: string
           format: date-time
@@ -12544,6 +12601,12 @@ components:
         uuid:
           type: string
           format: uuid
+          readOnly: true
+        numberOfPosts:
+          type: integer
+          readOnly: true
+        totalLikesReceived:
+          type: integer
           readOnly: true
     PatchedBlogCategory:
       type: object
@@ -12578,7 +12641,7 @@ components:
           readOnly: true
         slug:
           type: string
-          maxLength: 50
+          maxLength: 255
           pattern: ^[-a-zA-Z0-9_]+$
         children:
           oneOf:
@@ -12596,12 +12659,10 @@ components:
         treeId:
           type: integer
           readOnly: true
-        absoluteUrl:
-          type: string
-          readOnly: true
-        recursivePostCount:
+        sortOrder:
           type: integer
           readOnly: true
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -12610,19 +12671,21 @@ components:
           type: string
           format: date-time
           readOnly: true
-        sortOrder:
-          type: integer
-          readOnly: true
-          nullable: true
         uuid:
           type: string
           format: uuid
+          readOnly: true
+        absoluteUrl:
+          type: string
           readOnly: true
         mainImageAbsoluteUrl:
           type: string
           readOnly: true
         mainImageFilename:
           type: string
+          readOnly: true
+        recursivePostCount:
+          type: integer
           readOnly: true
     PatchedBlogComment:
       type: object
@@ -12777,6 +12840,8 @@ components:
           maximum: 9223372036854775807
           minimum: 0
           format: int64
+        isPublished:
+          type: boolean
         createdAt:
           type: string
           format: date-time
@@ -12788,9 +12853,8 @@ components:
         publishedAt:
           type: string
           format: date-time
+          readOnly: true
           nullable: true
-        isPublished:
-          type: boolean
         uuid:
           type: string
           format: uuid
@@ -12876,6 +12940,10 @@ components:
           readOnly: true
         active:
           type: boolean
+        sortOrder:
+          type: integer
+          readOnly: true
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -12884,15 +12952,11 @@ components:
           type: string
           format: date-time
           readOnly: true
-        sortOrder:
-          type: integer
-          readOnly: true
-          nullable: true
         uuid:
           type: string
           format: uuid
           readOnly: true
-        getTagPostsCount:
+        getPostsCount:
           type: integer
           readOnly: true
     PatchedCart:
@@ -12911,7 +12975,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         totalDiscountValue:
           type: number
           format: double
@@ -12919,7 +12982,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         totalVatValue:
           type: number
           format: double
@@ -12927,7 +12989,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         totalItems:
           type: integer
           readOnly: true
@@ -12975,7 +13036,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         finalPrice:
           type: number
           format: double
@@ -12983,7 +13043,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         discountValue:
           type: number
           format: double
@@ -12991,7 +13050,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         priceSavePercent:
           type: number
           format: double
@@ -13013,7 +13071,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         totalPrice:
           type: number
           format: double
@@ -13021,7 +13078,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         totalDiscountValue:
           type: number
           format: double
@@ -13029,7 +13085,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         createdAt:
           type: string
           format: date-time
@@ -13085,6 +13140,10 @@ components:
           maximum: 32767
           minimum: 0
           nullable: true
+        sortOrder:
+          type: integer
+          readOnly: true
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -13093,10 +13152,6 @@ components:
           type: string
           format: date-time
           readOnly: true
-        sortOrder:
-          type: integer
-          readOnly: true
-          nullable: true
         uuid:
           type: string
           format: uuid
@@ -13119,6 +13174,18 @@ components:
           type: integer
         seen:
           type: boolean
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
     PatchedOrderCreateUpdate:
       type: object
       properties:
@@ -13193,7 +13260,7 @@ components:
         customerNotes:
           type: string
           nullable: true
-        orderItemOrder:
+        items:
           type: array
           items:
             $ref: '#/components/schemas/OrderItemCreateUpdate'
@@ -13225,7 +13292,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         totalPriceExtra:
           type: number
           format: double
@@ -13233,7 +13299,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-          readOnly: true
         fullAddress:
           type: string
           readOnly: true
@@ -13282,6 +13347,10 @@ components:
           type: string
           format: uri
           nullable: true
+        sortOrder:
+          type: integer
+          readOnly: true
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -13290,10 +13359,6 @@ components:
           type: string
           format: date-time
           readOnly: true
-        sortOrder:
-          type: integer
-          readOnly: true
-          nullable: true
         uuid:
           type: string
           format: uuid
@@ -13365,9 +13430,6 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         category:
           type: integer
-        absoluteUrl:
-          type: string
-          readOnly: true
         price:
           type: number
           format: double
@@ -13377,36 +13439,11 @@ components:
           exclusiveMinimum: true
         vat:
           type: integer
-        vatPercent:
-          oneOf:
-          - type: number
-            format: double
-          - type: integer
-          readOnly: true
-        vatValue:
-          type: number
-          format: double
-          maximum: 1000000000
-          minimum: -1000000000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
-          readOnly: true
-        finalPrice:
-          type: number
-          format: double
-          maximum: 1000000000
-          minimum: -1000000000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
-          readOnly: true
         viewCount:
           type: integer
           maximum: 9223372036854775807
           minimum: 0
           format: int64
-        likesCount:
-          type: integer
-          readOnly: true
         stock:
           type: integer
           maximum: 2147483647
@@ -13436,10 +13473,6 @@ components:
           type: string
           nullable: true
           maxLength: 255
-        uuid:
-          type: string
-          format: uuid
-          readOnly: true
         discountPercent:
           type: number
           format: double
@@ -13447,22 +13480,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-        discountValue:
-          type: number
-          format: double
-          maximum: 1000000000
-          minimum: -1000000000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
-          readOnly: true
-        priceSavePercent:
-          type: number
-          format: double
-          maximum: 1000000000
-          minimum: -1000000000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
-          readOnly: true
         createdAt:
           type: string
           format: date-time
@@ -13471,6 +13488,41 @@ components:
           type: string
           format: date-time
           readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        discountValue:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        priceSavePercent:
+          type: number
+          format: double
+          readOnly: true
+        vatPercent:
+          oneOf:
+          - type: number
+            format: double
+          - type: integer
+          readOnly: true
+        vatValue:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        finalPrice:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
         mainImageAbsoluteUrl:
           type: string
           readOnly: true
@@ -13481,8 +13533,21 @@ components:
           type: number
           format: double
           readOnly: true
+        approvedReviewAverage:
+          type: number
+          format: double
+          readOnly: true
         reviewCount:
           type: integer
+          readOnly: true
+        approvedReviewCount:
+          type: integer
+          readOnly: true
+        likesCount:
+          type: integer
+          readOnly: true
+        absoluteUrl:
+          type: string
           readOnly: true
     PatchedProductCategory:
       type: object
@@ -13519,24 +13584,6 @@ components:
           type: string
           maxLength: 255
           pattern: ^[-a-zA-Z0-9_]+$
-        categoryMenuImageOneAbsoluteUrl:
-          type: string
-          readOnly: true
-        categoryMenuImageOneFilename:
-          type: string
-          readOnly: true
-        categoryMenuImageTwoAbsoluteUrl:
-          type: string
-          readOnly: true
-        categoryMenuImageTwoFilename:
-          type: string
-          readOnly: true
-        categoryMenuMainBannerAbsoluteUrl:
-          type: string
-          readOnly: true
-        categoryMenuMainBannerFilename:
-          type: string
-          readOnly: true
         children:
           oneOf:
           - type: object
@@ -13551,12 +13598,6 @@ components:
           type: integer
           readOnly: true
         treeId:
-          type: integer
-          readOnly: true
-        absoluteUrl:
-          type: string
-          readOnly: true
-        recursiveProductCount:
           type: integer
           readOnly: true
         seoTitle:
@@ -13582,6 +13623,30 @@ components:
         uuid:
           type: string
           format: uuid
+          readOnly: true
+        categoryMenuImageOneAbsoluteUrl:
+          type: string
+          readOnly: true
+        categoryMenuImageOneFilename:
+          type: string
+          readOnly: true
+        categoryMenuImageTwoAbsoluteUrl:
+          type: string
+          readOnly: true
+        categoryMenuImageTwoFilename:
+          type: string
+          readOnly: true
+        categoryMenuMainBannerAbsoluteUrl:
+          type: string
+          readOnly: true
+        categoryMenuMainBannerFilename:
+          type: string
+          readOnly: true
+        absoluteUrl:
+          type: string
+          readOnly: true
+        recursiveProductCount:
+          type: integer
           readOnly: true
     PatchedProductFavourite:
       type: object
@@ -13635,18 +13700,17 @@ components:
         image:
           type: string
           format: uri
+          title: Εικόνα
         thumbnail:
           type: string
           format: uri
           nullable: true
         isMain:
           type: boolean
-        mainImageAbsoluteUrl:
-          type: string
+        sortOrder:
+          type: integer
           readOnly: true
-        mainImageFilename:
-          type: string
-          readOnly: true
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -13659,10 +13723,12 @@ components:
           type: string
           format: uuid
           readOnly: true
-        sortOrder:
-          type: integer
+        mainImageAbsoluteUrl:
+          type: string
           readOnly: true
-          nullable: true
+        mainImageFilename:
+          type: string
+          readOnly: true
     PatchedProductReview:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -13699,6 +13765,8 @@ components:
           maximum: 32767
         status:
           $ref: '#/components/schemas/ProductReviewStatusEnum'
+        isPublished:
+          type: boolean
         createdAt:
           type: string
           format: date-time
@@ -13710,9 +13778,8 @@ components:
         publishedAt:
           type: string
           format: date-time
+          readOnly: true
           nullable: true
-        isPublished:
-          type: boolean
         uuid:
           type: string
           format: uuid
@@ -13746,6 +13813,10 @@ components:
         country:
           type: string
           title: Country Code Alpha 2
+        sortOrder:
+          type: integer
+          readOnly: true
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -13754,10 +13825,6 @@ components:
           type: string
           format: date-time
           readOnly: true
-        sortOrder:
-          type: integer
-          readOnly: true
-          nullable: true
         uuid:
           type: string
           format: uuid
@@ -13834,15 +13901,13 @@ components:
         dateEnd:
           type: string
           format: date-time
-        mainImageAbsoluteUrl:
-          type: string
-          readOnly: true
-        mainImageFilename:
-          type: string
-          readOnly: true
         thumbnail:
           type: string
           format: uri
+          nullable: true
+        sortOrder:
+          type: integer
+          readOnly: true
           nullable: true
         createdAt:
           type: string
@@ -13852,18 +13917,23 @@ components:
           type: string
           format: date-time
           readOnly: true
-        sortOrder:
-          type: integer
-          readOnly: true
-          nullable: true
         uuid:
           type: string
           format: uuid
+          readOnly: true
+        mainImageAbsoluteUrl:
+          type: string
+          readOnly: true
+        mainImageFilename:
+          type: string
           readOnly: true
     PatchedSlider:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        id:
+          type: integer
+          readOnly: true
         translations:
           type: object
           properties:
@@ -13900,15 +13970,6 @@ components:
                   type: string
                 description:
                   type: string
-        id:
-          type: integer
-          readOnly: true
-        mainImageAbsoluteUrl:
-          type: string
-          readOnly: true
-        mainImageFilename:
-          type: string
-          readOnly: true
         thumbnail:
           type: string
           format: uri
@@ -13917,6 +13978,24 @@ components:
           type: string
           format: uri
           nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        mainImageAbsoluteUrl:
+          type: string
+          readOnly: true
+        mainImageFilename:
+          type: string
+          readOnly: true
     PatchedTip:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -13959,6 +14038,10 @@ components:
           nullable: true
         active:
           type: boolean
+        sortOrder:
+          type: integer
+          readOnly: true
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -13967,10 +14050,6 @@ components:
           type: string
           format: date-time
           readOnly: true
-        sortOrder:
-          type: integer
-          readOnly: true
-          nullable: true
         uuid:
           type: string
           format: uuid
@@ -13980,18 +14059,6 @@ components:
       properties:
         id:
           type: integer
-          readOnly: true
-        createdAt:
-          type: string
-          format: date-time
-          readOnly: true
-        updatedAt:
-          type: string
-          format: date-time
-          readOnly: true
-        uuid:
-          type: string
-          format: uuid
           readOnly: true
         title:
           type: string
@@ -14048,6 +14115,18 @@ components:
         region:
           type: string
           title: Region Code
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
     PatchedVat:
       type: object
       properties:
@@ -14118,6 +14197,10 @@ components:
           type: string
           format: uri
           nullable: true
+        sortOrder:
+          type: integer
+          readOnly: true
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -14126,10 +14209,6 @@ components:
           type: string
           format: date-time
           readOnly: true
-        sortOrder:
-          type: integer
-          readOnly: true
-          nullable: true
         uuid:
           type: string
           format: uuid
@@ -14212,9 +14291,6 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         category:
           type: integer
-        absoluteUrl:
-          type: string
-          readOnly: true
         price:
           type: number
           format: double
@@ -14224,36 +14300,11 @@ components:
           exclusiveMinimum: true
         vat:
           type: integer
-        vatPercent:
-          oneOf:
-          - type: number
-            format: double
-          - type: integer
-          readOnly: true
-        vatValue:
-          type: number
-          format: double
-          maximum: 1000000000
-          minimum: -1000000000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
-          readOnly: true
-        finalPrice:
-          type: number
-          format: double
-          maximum: 1000000000
-          minimum: -1000000000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
-          readOnly: true
         viewCount:
           type: integer
           maximum: 9223372036854775807
           minimum: 0
           format: int64
-        likesCount:
-          type: integer
-          readOnly: true
         stock:
           type: integer
           maximum: 2147483647
@@ -14283,10 +14334,6 @@ components:
           type: string
           nullable: true
           maxLength: 255
-        uuid:
-          type: string
-          format: uuid
-          readOnly: true
         discountPercent:
           type: number
           format: double
@@ -14294,22 +14341,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-        discountValue:
-          type: number
-          format: double
-          maximum: 1000000000
-          minimum: -1000000000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
-          readOnly: true
-        priceSavePercent:
-          type: number
-          format: double
-          maximum: 1000000000
-          minimum: -1000000000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
-          readOnly: true
         createdAt:
           type: string
           format: date-time
@@ -14318,6 +14349,41 @@ components:
           type: string
           format: date-time
           readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        discountValue:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        priceSavePercent:
+          type: number
+          format: double
+          readOnly: true
+        vatPercent:
+          oneOf:
+          - type: number
+            format: double
+          - type: integer
+          readOnly: true
+        vatValue:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        finalPrice:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
         mainImageAbsoluteUrl:
           type: string
           readOnly: true
@@ -14328,11 +14394,26 @@ components:
           type: number
           format: double
           readOnly: true
+        approvedReviewAverage:
+          type: number
+          format: double
+          readOnly: true
         reviewCount:
           type: integer
           readOnly: true
+        approvedReviewCount:
+          type: integer
+          readOnly: true
+        likesCount:
+          type: integer
+          readOnly: true
+        absoluteUrl:
+          type: string
+          readOnly: true
       required:
       - absoluteUrl
+      - approvedReviewAverage
+      - approvedReviewCount
       - category
       - createdAt
       - discountValue
@@ -14387,24 +14468,6 @@ components:
           type: string
           maxLength: 255
           pattern: ^[-a-zA-Z0-9_]+$
-        categoryMenuImageOneAbsoluteUrl:
-          type: string
-          readOnly: true
-        categoryMenuImageOneFilename:
-          type: string
-          readOnly: true
-        categoryMenuImageTwoAbsoluteUrl:
-          type: string
-          readOnly: true
-        categoryMenuImageTwoFilename:
-          type: string
-          readOnly: true
-        categoryMenuMainBannerAbsoluteUrl:
-          type: string
-          readOnly: true
-        categoryMenuMainBannerFilename:
-          type: string
-          readOnly: true
         children:
           oneOf:
           - type: object
@@ -14419,12 +14482,6 @@ components:
           type: integer
           readOnly: true
         treeId:
-          type: integer
-          readOnly: true
-        absoluteUrl:
-          type: string
-          readOnly: true
-        recursiveProductCount:
           type: integer
           readOnly: true
         seoTitle:
@@ -14450,6 +14507,30 @@ components:
         uuid:
           type: string
           format: uuid
+          readOnly: true
+        categoryMenuImageOneAbsoluteUrl:
+          type: string
+          readOnly: true
+        categoryMenuImageOneFilename:
+          type: string
+          readOnly: true
+        categoryMenuImageTwoAbsoluteUrl:
+          type: string
+          readOnly: true
+        categoryMenuImageTwoFilename:
+          type: string
+          readOnly: true
+        categoryMenuMainBannerAbsoluteUrl:
+          type: string
+          readOnly: true
+        categoryMenuMainBannerFilename:
+          type: string
+          readOnly: true
+        absoluteUrl:
+          type: string
+          readOnly: true
+        recursiveProductCount:
+          type: integer
           readOnly: true
       required:
       - absoluteUrl
@@ -14528,18 +14609,17 @@ components:
         image:
           type: string
           format: uri
+          title: Εικόνα
         thumbnail:
           type: string
           format: uri
           nullable: true
         isMain:
           type: boolean
-        mainImageAbsoluteUrl:
-          type: string
+        sortOrder:
+          type: integer
           readOnly: true
-        mainImageFilename:
-          type: string
-          readOnly: true
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -14552,10 +14632,12 @@ components:
           type: string
           format: uuid
           readOnly: true
-        sortOrder:
-          type: integer
+        mainImageAbsoluteUrl:
+          type: string
           readOnly: true
-          nullable: true
+        mainImageFilename:
+          type: string
+          readOnly: true
       required:
       - createdAt
       - id
@@ -14603,6 +14685,8 @@ components:
           maximum: 32767
         status:
           $ref: '#/components/schemas/ProductReviewStatusEnum'
+        isPublished:
+          type: boolean
         createdAt:
           type: string
           format: date-time
@@ -14614,9 +14698,8 @@ components:
         publishedAt:
           type: string
           format: date-time
+          readOnly: true
           nullable: true
-        isPublished:
-          type: boolean
         uuid:
           type: string
           format: uuid
@@ -14625,6 +14708,7 @@ components:
       - createdAt
       - id
       - product
+      - publishedAt
       - rate
       - translations
       - updatedAt
@@ -14693,6 +14777,10 @@ components:
         country:
           type: string
           title: Country Code Alpha 2
+        sortOrder:
+          type: integer
+          readOnly: true
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -14701,10 +14789,6 @@ components:
           type: string
           format: date-time
           readOnly: true
-        sortOrder:
-          type: integer
-          readOnly: true
-          nullable: true
         uuid:
           type: string
           format: uuid
@@ -15025,15 +15109,13 @@ components:
         dateEnd:
           type: string
           format: date-time
-        mainImageAbsoluteUrl:
-          type: string
-          readOnly: true
-        mainImageFilename:
-          type: string
-          readOnly: true
         thumbnail:
           type: string
           format: uri
+          nullable: true
+        sortOrder:
+          type: integer
+          readOnly: true
           nullable: true
         createdAt:
           type: string
@@ -15043,13 +15125,15 @@ components:
           type: string
           format: date-time
           readOnly: true
-        sortOrder:
-          type: integer
-          readOnly: true
-          nullable: true
         uuid:
           type: string
           format: uuid
+          readOnly: true
+        mainImageAbsoluteUrl:
+          type: string
+          readOnly: true
+        mainImageFilename:
+          type: string
           readOnly: true
       required:
       - createdAt
@@ -15067,6 +15151,9 @@ components:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
       properties:
+        id:
+          type: integer
+          readOnly: true
         translations:
           type: object
           properties:
@@ -15103,15 +15190,6 @@ components:
                   type: string
                 description:
                   type: string
-        id:
-          type: integer
-          readOnly: true
-        mainImageAbsoluteUrl:
-          type: string
-          readOnly: true
-        mainImageFilename:
-          type: string
-          readOnly: true
         thumbnail:
           type: string
           format: uri
@@ -15120,11 +15198,82 @@ components:
           type: string
           format: uri
           nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        mainImageAbsoluteUrl:
+          type: string
+          readOnly: true
+        mainImageFilename:
+          type: string
+          readOnly: true
       required:
+      - createdAt
       - id
       - mainImageAbsoluteUrl
       - mainImageFilename
       - translations
+      - updatedAt
+      - uuid
+    Tag:
+      type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        translations:
+          type: object
+          properties:
+            el:
+              type: object
+              properties:
+                label:
+                  type: string
+            en:
+              type: object
+              properties:
+                label:
+                  type: string
+            de:
+              type: object
+              properties:
+                label:
+                  type: string
+        active:
+          type: boolean
+        sortOrder:
+          type: integer
+          readOnly: true
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+      required:
+      - createdAt
+      - id
+      - sortOrder
+      - translations
+      - updatedAt
+      - uuid
     Tip:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -15167,6 +15316,10 @@ components:
           nullable: true
         active:
           type: boolean
+        sortOrder:
+          type: integer
+          readOnly: true
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -15175,10 +15328,6 @@ components:
           type: string
           format: date-time
           readOnly: true
-        sortOrder:
-          type: integer
-          readOnly: true
-          nullable: true
         uuid:
           type: string
           format: uuid
@@ -15195,18 +15344,6 @@ components:
       properties:
         id:
           type: integer
-          readOnly: true
-        createdAt:
-          type: string
-          format: date-time
-          readOnly: true
-        updatedAt:
-          type: string
-          format: date-time
-          readOnly: true
-        uuid:
-          type: string
-          format: uuid
           readOnly: true
         title:
           type: string
@@ -15263,6 +15400,18 @@ components:
         region:
           type: string
           title: Region Code
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
       required:
       - city
       - country

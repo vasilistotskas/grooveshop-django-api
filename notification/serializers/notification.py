@@ -20,9 +20,14 @@ class NotificationSerializer(TranslatableModelSerializer, BaseExpandSerializer):
         fields = (
             "translations",
             "id",
+            "link",
+            "kind",
             "created_at",
             "updated_at",
             "uuid",
-            "link",
-            "kind",
+        )
+        read_only_fields = (
+            "created_at",
+            "updated_at",
+            "uuid",
         )

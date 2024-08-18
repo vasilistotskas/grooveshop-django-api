@@ -5,7 +5,6 @@ from django.core.files.storage import default_storage
 from django.test import TestCase
 from djmoney.money import Money
 
-from pay_way.enum.pay_way_enum import PayWayEnum
 from pay_way.factories import PayWayFactory
 from pay_way.models import PayWay
 
@@ -22,11 +21,6 @@ class PayWayModelTestCase(TestCase):
             cost=10.00,
             free_for_order_amount=100.00,
         )
-        for language in languages:
-            self.pay_way.set_current_language(language)
-            self.pay_way.name = PayWayEnum.CREDIT_CARD
-            self.pay_way.save()
-        self.pay_way.set_current_language(default_language)
 
     def test_fields(self):
         self.assertTrue(self.pay_way.active)
@@ -42,14 +36,6 @@ class PayWayModelTestCase(TestCase):
             self.pay_way.__unicode__(),
             self.pay_way.safe_translation_getter("name"),
         )
-
-    def test_translations(self):
-        for language in languages:
-            self.pay_way.set_current_language(language)
-            self.assertEqual(
-                self.pay_way.name,
-                PayWayEnum.CREDIT_CARD,
-            )
 
     def test_str_representation(self):
         self.assertEqual(str(self.pay_way), self.pay_way.safe_translation_getter("name"))

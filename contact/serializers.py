@@ -6,4 +6,17 @@ from contact.models import Contact
 class ContactSerializer(serializers.ModelSerializer):
     class Meta:
         model = Contact
-        fields = "__all__"
+        fields = (
+            "id",
+            "name",
+            "email",
+            "message",
+            "created_at",
+            "updated_at",
+            "uuid",
+        )
+        read_only_fields = (
+            "created_at",
+            "updated_at",
+            "uuid",
+        )

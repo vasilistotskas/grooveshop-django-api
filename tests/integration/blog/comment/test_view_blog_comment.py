@@ -34,10 +34,6 @@ class BlogCommentViewSetTestCase(APITestCase):
             num_comments=0,
         )
         self.comment = BlogCommentFactory(is_approved=True, user=self.user, post=self.post)
-        for language in languages:
-            self.comment.set_current_language(language)
-            self.comment.content = f"Comment Content in {language}"
-            self.comment.save()
 
     @staticmethod
     def get_comment_detail_url(pk):

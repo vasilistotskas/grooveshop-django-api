@@ -45,14 +45,14 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
     )
     floor = models.PositiveSmallIntegerField(
         _("Floor"),
-        choices=FloorChoicesEnum.choices,
+        choices=FloorChoicesEnum,
         null=True,
         blank=True,
         default=None,
     )
     location_type = models.PositiveSmallIntegerField(
         _("Location Type"),
-        choices=LocationChoicesEnum.choices,
+        choices=LocationChoicesEnum,
         null=True,
         blank=True,
         default=None,

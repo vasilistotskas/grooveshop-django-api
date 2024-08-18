@@ -163,7 +163,7 @@ class Command(BaseCommand):
     async def save_related_objects(self, instance: models.Model):
         for field in instance._meta.get_fields():
             if field.is_relation and field.many_to_one:
-                related_instance = getattr(instance, field.name)
+                related_instance = await sync_to_async(getattr)(instance, field.name)
                 if related_instance and not related_instance.pk:
                     await sync_to_async(related_instance.save)()
 

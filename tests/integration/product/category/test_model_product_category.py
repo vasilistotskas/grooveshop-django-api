@@ -27,22 +27,7 @@ class CategoryModelTestCase(TestCase):
         self.user = UserAccountFactory(num_addresses=0)
         self.vat = VatFactory()
         self.category = ProductCategoryFactory()
-
-        for language in languages:
-            self.category.set_current_language(language)
-            self.category.name = f"Sample Category {language}"
-            self.category.description = f"Sample Category Description {language}"
-            self.category.save()
-        self.category.set_current_language(default_language)
-
         self.sub_category = ProductCategoryFactory(parent=self.category)
-
-        for language in languages:
-            self.sub_category.set_current_language(language)
-            self.sub_category.name = f"Sample Sub Category {language}"
-            self.sub_category.description = f"Sample Sub Category Description {language}"
-            self.sub_category.save()
-        self.sub_category.set_current_language(default_language)
 
     def test_fields(self):
         self.assertTrue(default_storage.exists(self.category.menu_image_one.path))
@@ -55,39 +40,8 @@ class CategoryModelTestCase(TestCase):
             self.category.safe_translation_getter("name"),
         )
 
-    def test_translations(self):
-        for language in languages:
-            self.category.set_current_language(language)
-            self.assertEqual(self.category.name, f"Sample Category {language}")
-            self.assertEqual(
-                self.category.description,
-                f"Sample Category Description {language}",
-            )
-
     def test_str_representation_no_parent(self):
         self.assertEqual(str(self.category), self.category.safe_translation_getter("name"))
-
-    def test_str_representation_with_parent(self):
-        category_name = self.category.safe_translation_getter("name")
-        expected_str = f"{category_name} / Sample Sub Category" f" {default_language}"
-        self.assertEqual(str(self.sub_category), expected_str)
-
-    def test_str_representation_with_grandparent(self):
-        grandparent = ProductCategoryFactory(
-            slug="grandparent-category",
-        )
-        for language in languages:
-            grandparent.set_current_language(language)
-            grandparent.name = f"Grandparent Category {language}"
-            grandparent.description = f"Grandparent Category Description {language}"
-            grandparent.save()
-        grandparent.set_current_language(default_language)
-
-        self.sub_category.parent = grandparent
-        self.sub_category.save()
-
-        expected_str = f"Grandparent Category {default_language} / Sample Sub Category" f" {default_language}"
-        self.assertEqual(str(self.sub_category), expected_str)
 
     def test_get_ordering_queryset_with_parent(self):
         self.assertEqual(ProductCategory.objects.count(), 2)

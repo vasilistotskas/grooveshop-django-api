@@ -17,10 +17,16 @@ class OrderItemSerializer(BaseExpandSerializer):
             "price",
             "product",
             "quantity",
+            "sort_order",
             "created_at",
             "updated_at",
             "uuid",
-            "sort_order",
+            "total_price",
+        )
+        read_only_fields = (
+            "created_at",
+            "updated_at",
+            "uuid",
             "total_price",
         )
 

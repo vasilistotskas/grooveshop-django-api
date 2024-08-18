@@ -6,4 +6,6 @@ from product.models.product import Product
 
 @receiver(post_save, sender=Product)
 def product_post_save(sender, instance, **kwargs):
-    Product.objects.filter(pk=instance.pk).update_calculated_fields()
+    # Find the users from ProductFavouriteManager that has this product in favourites,
+    # in case the product price has changed to lower than before send a notification to the user
+    pass

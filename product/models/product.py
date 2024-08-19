@@ -25,6 +25,7 @@ from parler.managers import TranslatableManager
 from parler.managers import TranslatableQuerySet
 from parler.models import TranslatableModel
 from parler.models import TranslatedFields
+from simple_history.models import HistoricalRecords
 from tinymce.models import HTMLField
 
 from core.fields.measurement import MeasurementField
@@ -94,6 +95,15 @@ class Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, SeoModel,
         unit_choices=WeightUnits.CHOICES,
         default=zero_weight,
     )
+    changed_by = models.ForeignKey(
+        "user.UserAccount",
+        on_delete=models.SET_NULL,
+        related_name="changed_products",
+        null=True,
+        blank=True,
+    )
+    history = HistoricalRecords()
+
     translations = TranslatedFields(
         name=models.CharField(_("Name"), max_length=255, blank=True, null=True),
         description=HTMLField(_("Description"), blank=True, null=True),
@@ -178,6 +188,14 @@ class Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, SeoModel,
         if not updated_rows:
             raise ValueError("Not enough stock to decrement")
         self.refresh_from_db()
+
+    @property
+    def _history_user(self):
+        return self.changed_by
+
+    @_history_user.setter
+    def _history_user(self, value):
+        self.changed_by = value
 
     @property
     def discount_value(self) -> Money:

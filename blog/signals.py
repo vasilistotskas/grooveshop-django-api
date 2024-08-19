@@ -45,6 +45,6 @@ async def notify_comment_liked(sender, instance, action, reverse, pk_set, **kwar
                             "message",
                             f"Το σχόλιο σου άρεσε στον χρήστη {user.username if user.username else user.email}.",
                         )
-                    await sync_to_async(notification.save)()
+                    await notification.asave()
 
                 await NotificationUser.objects.acreate(user=user, notification=notification)

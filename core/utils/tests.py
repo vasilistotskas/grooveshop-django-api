@@ -3,21 +3,25 @@ from typing import List
 
 
 def get_filename_from_url(url):
+    if url is None:
+        return None
     return os.path.basename(url)
 
 
 def compare_serializer_and_response(serializer_data: dict, response_data: dict, fields: List[str]):
-    # Extract filenames from the URLs and compare
     response_filenames = []
     serializer_filenames = []
     for field in fields:
-        response_filenames.append(get_filename_from_url(response_data[field]))
-        serializer_filenames.append(get_filename_from_url(serializer_data[field]))
+        response_filename = get_filename_from_url(response_data[field])
+        if response_filename is not None:
+            response_filenames.append(response_filename)
 
-    # Compare the data excluding the specified fields
+        serializer_filename = get_filename_from_url(serializer_data[field])
+        if serializer_filename is not None:
+            serializer_filenames.append(serializer_filename)
+
     response_data_filtered = {key: value for key, value in response_data.items() if key not in fields}
     serializer_data_filtered = {key: value for key, value in serializer_data.items() if key not in fields}
     assert response_data_filtered == serializer_data_filtered
 
-    # Compare the filenames
     assert response_filenames == serializer_filenames

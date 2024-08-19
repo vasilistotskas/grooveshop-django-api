@@ -6,6 +6,7 @@ from django.utils.translation import ngettext
 from mptt.admin import DraggableMPTTAdmin
 from parler.admin import TranslatableAdmin
 from parler.admin import TranslatableTabularInline
+from simple_history.admin import SimpleHistoryAdmin
 
 from core.admin import ExportModelAdmin
 from product.models.category import ProductCategory
@@ -88,16 +89,18 @@ class ProductImageInline(TranslatableTabularInline):
 
 
 @admin.register(Product)
-class ProductAdmin(TranslatableAdmin, ExportModelAdmin):
+class ProductAdmin(TranslatableAdmin, ExportModelAdmin, SimpleHistoryAdmin):
     list_display = [
         "id",
         "category",
         "price",
+        "stock",
         "colored_stock",
         "boolean_status",
         "image_tag",
         "likes_count",
     ]
+    history_list_display = ["price", "stock"]
     search_fields = [
         "id",
         "category__name",

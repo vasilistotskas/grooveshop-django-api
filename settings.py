@@ -132,6 +132,7 @@ THIRD_PARTY_APPS = [
     "dbbackup",
     "extra_settings",
     "knox",
+    "simple_history",
 ]
 
 # Combine all apps together for the INSTALLED_APPS setting
@@ -154,6 +155,7 @@ MIDDLEWARE = [
     "allauth.usersessions.middleware.UserSessionsMiddleware",
     "djangorestframework_camel_case.middleware.CamelCaseMiddleWare",
     "django_browser_reload.middleware.BrowserReloadMiddleware",
+    "simple_history.middleware.HistoryRequestMiddleware",
 ]
 
 ROOT_URLCONF = "core.urls"

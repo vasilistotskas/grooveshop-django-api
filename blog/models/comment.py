@@ -30,6 +30,9 @@ class BlogCommentQuerySet(TranslatableQuerySet, TreeQuerySet):
 class BlogCommentManager(TreeManager, TranslatableManager):
     _queryset_class = BlogCommentQuerySet
 
+    def approved(self):
+        return BlogCommentQuerySet(self.model, using=self._db).approved()
+
 
 class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel, MPTTModel):
     id = models.BigAutoField(primary_key=True)

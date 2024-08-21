@@ -47,6 +47,38 @@ def clear_all_cache_task(self):
 
 
 @celery_app.task
+def clear_duplicate_history_task(excluded_fields=None, minutes=None):
+    try:
+        command_args = ["clean_duplicate_history"]
+
+        if minutes is not None:
+            command_args.extend(["-m", str(minutes)])
+        if excluded_fields:
+            command_args.extend(["--excluded_fields"] + excluded_fields)
+
+        command_args.append("--auto")
+        management.call_command(*command_args)
+        return "Duplicate history entries cleaned."
+    except Exception as e:
+        return f"error: {e}"
+
+
+@celery_app.task
+def clear_old_history_task(days=365):
+    try:
+        command_args = ["clean_old_history"]
+
+        if days is not None:
+            command_args.extend(["--days", str(days)])
+
+        command_args.append("--auto")
+        management.call_command(*command_args)
+        return "Old history entries cleaned."
+    except Exception as e:
+        return f"error: {e}"
+
+
+@celery_app.task
 def clear_carts_for_none_users_task(self):
     from cart.models import Cart
 
@@ -62,7 +94,7 @@ def clear_carts_for_none_users_task(self):
 
 
 @celery_app.task
-def cleanup_log_files_task(days=30):
+def clear_log_files_task(days=30):
     from django.conf import settings
     from os import path, remove, listdir
     from datetime import datetime, timedelta
@@ -155,7 +187,7 @@ def backup_database():
 
 
 @celery_app.task
-def cleanup_old_database_backups(days=30):
+def clear_old_database_backups(days=30):
     backups_path = os.path.join(settings.BASE_DIR, "backups")
     if not os.path.exists(backups_path):
         return "Backups directory does not exist."

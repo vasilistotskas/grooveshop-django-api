@@ -311,7 +311,7 @@ SOCIALACCOUNT_PROVIDERS = {
             "key": "",
         },
         "SCOPE": ["profile", "email", "openid"],
-        "AUTH_PARAMS": {"access_type": "online"},
+        "AUTH_PARAMS": {"access_type": "online" if DEBUG else "offline"},
     },
 }
 SOCIALACCOUNT_FORMS = {
@@ -437,26 +437,6 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": timedelta(seconds=BEAT_UPDATE_SEARCH_SEC),
         "options": {"expires": BEAT_UPDATE_SEARCH_EXPIRE_AFTER_SEC},
     },
-    "clear-blacklisted-tokens": {
-        "task": "core.tasks.tasks.clear_blacklisted_tokens_task",
-        "schedule": crontab(hour="2", minute="0"),
-    },
-    "cleanup-log-files": {
-        "task": "core.tasks.cleanup_log_files_task",
-        "schedule": crontab(hour="3", minute="0"),
-    },
-    "clear-carts-for-none-users": {
-        "task": "core.tasks.clear_carts_for_none_users_task",
-        "schedule": crontab(hour="4", minute="0", day_of_month="*/2"),
-    },
-    "clear-expired-sessions": {
-        "task": "core.tasks.clear_expired_sessions_task",
-        "schedule": crontab(hour="5", minute="0", day_of_week="sunday"),
-    },
-    "clear-all-cache": {
-        "task": "core.tasks.clear_all_cache_task",
-        "schedule": timedelta(days=30),
-    },
     "send-inactive-user-notifications": {
         "task": "core.tasks.send_inactive_user_notifications",
         "schedule": crontab(hour="6", minute="0", day_of_month="1"),
@@ -473,13 +453,47 @@ CELERY_BEAT_SCHEDULE = {
         "task": "core.tasks.optimize_images",
         "schedule": crontab(hour="3", minute="30", day_of_week="sunday"),
     },
-    "cleanup-old-database-backups": {
-        "task": "core.tasks.cleanup_old_database_backups",
-        "schedule": crontab(hour="12", minute="0"),
-    },
     "compress-old-logs": {
         "task": "core.tasks.compress_old_logs",
         "schedule": crontab(hour="1", minute="0", day_of_month="1"),
+    },
+    "clear-duplicate-history": {
+        "task": "core.tasks.clear_duplicate_history_task",
+        "schedule": crontab(hour="4", minute="0"),
+        "kwargs": {
+            "excluded_fields": [],
+        },
+    },
+    "clear-old-history": {
+        "task": "core.tasks.clear_old_history_task",
+        "schedule": crontab(hour="5", minute="0"),
+        "kwargs": {
+            "days": 365,
+        },
+    },
+    "clear-carts-for-none-users": {
+        "task": "core.tasks.clear_carts_for_none_users_task",
+        "schedule": crontab(hour="4", minute="0", day_of_month="*/2"),
+    },
+    "clear-expired-sessions": {
+        "task": "core.tasks.clear_expired_sessions_task",
+        "schedule": crontab(hour="5", minute="0", day_of_week="sunday"),
+    },
+    "clear-all-cache": {
+        "task": "core.tasks.clear_all_cache_task",
+        "schedule": timedelta(days=30),
+    },
+    "clear-old-database-backups": {
+        "task": "core.tasks.clear_old_database_backups",
+        "schedule": crontab(hour="12", minute="0"),
+    },
+    "clear-blacklisted-tokens": {
+        "task": "core.tasks.tasks.clear_blacklisted_tokens_task",
+        "schedule": crontab(hour="2", minute="0"),
+    },
+    "clear-log-files": {
+        "task": "core.tasks.clear_log_files_task",
+        "schedule": crontab(hour="3", minute="0"),
     },
 }
 

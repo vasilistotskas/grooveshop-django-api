@@ -12,7 +12,7 @@ from django.conf import settings
 from django.test import TestCase
 
 from core import celery
-from core.tasks import cleanup_log_files_task
+from core.tasks import clear_log_files_task
 
 
 class CeleryConfigTestCase(TestCase):
@@ -114,7 +114,7 @@ class CleanupLogFilesTaskTest(TestCase):
 
     @patch("core.tasks.logger")
     def test_cleanup_log_files_task(self, mock_logger):
-        cleanup_log_files_task(self.days)
+        clear_log_files_task(self.days)
 
         self.assertFalse(path.exists(self.old_file))
         self.assertTrue(path.exists(self.new_file))
@@ -129,7 +129,7 @@ class CleanupLogFilesTaskTest(TestCase):
         recent_time = (datetime.now() - timedelta(days=self.days - 1)).timestamp()
         os.utime(recent_file, (recent_time, recent_time))
 
-        cleanup_log_files_task(self.days)
+        clear_log_files_task(self.days)
 
         self.assertTrue(path.exists(recent_file))
 

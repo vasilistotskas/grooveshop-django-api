@@ -3,7 +3,25 @@
 
 
 
+## v0.143.0 (2024-08-21)
+
+### Feature
+
+* feat: notification improvements ([`dbd05b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dbd05b5e17fb739c13746cb120b25fe11533c5cb))
+
+* feat: add `simple_history` and implement notify_product_price_lowered and post_create_historical_record_callback signals, Bump Versions ([`7b4a559`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b4a559c7e221ec7af4cfd0e89e1c9dc1b34839b))
+
+### Fix
+
+* fix: remove signal tests for a while ([`d696c62`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d696c62454dcfabb36f3dc16a7a80e47461ffd97))
+
+* fix: run poetry lock ([`08f5cc3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/08f5cc3f85cd2d45dcafdb82604450851141acfd))
+
 ## v0.142.0 (2024-08-18)
+
+### Chore
+
+* chore(release): release version 0.142.0 [skip ci] ([`5697cf4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5697cf4edabb67816900c2ebee5417d7900ad41d))
 
 ### Feature
 

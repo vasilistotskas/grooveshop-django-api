@@ -3,7 +3,17 @@
 
 
 
+## v0.144.0 (2024-08-21)
+
+### Feature
+
+* feat: tasks for clear history. Bump Versions ([`93e43e2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/93e43e281c6a4fb9802122a1963574330704ba63))
+
 ## v0.143.0 (2024-08-21)
+
+### Chore
+
+* chore(release): release version 0.143.0 [skip ci] ([`1ce04c4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1ce04c4a80f569acf4c0e4e00e83c1b5d1bcb571))
 
 ### Feature
 

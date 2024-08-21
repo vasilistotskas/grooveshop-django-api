@@ -3,7 +3,17 @@
 
 
 
+## v0.144.1 (2024-08-21)
+
+### Fix
+
+* fix: liker_user info at `notify_comment_liked` ([`aa2cb76`](https://github.com/vasilistotskas/grooveshop-django-api/commit/aa2cb76052af033b25671de510963ac9e733b38d))
+
 ## v0.144.0 (2024-08-21)
+
+### Chore
+
+* chore(release): release version 0.144.0 [skip ci] ([`dd61412`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dd6141252a1e3f0db7c04f7d3d4ed0a3954bb6dc))
 
 ### Feature
 

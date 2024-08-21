@@ -19,7 +19,9 @@ class NotificationUser(TimeStampMixinModel, UUIDModel):
         on_delete=models.CASCADE,
         db_index=True,
     )
-    notification = models.ForeignKey("notification.Notification", on_delete=models.CASCADE, db_index=True)
+    notification = models.ForeignKey(
+        "notification.Notification", related_name="user", on_delete=models.CASCADE, db_index=True
+    )
     seen = models.BooleanField(_("Seen"), default=False)
     seen_at = models.DateTimeField(_("Seen At"), null=True, blank=True)
 

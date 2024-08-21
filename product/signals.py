@@ -16,18 +16,19 @@ product_price_lowered = django.dispatch.Signal()
 product_price_increased = django.dispatch.Signal()
 
 
-@receiver(post_create_historical_record, sender=Product)
-async def post_create_historical_record_callback(sender, instance, history_instance, **kwargs):
-    if history_instance is None:
+@receiver(post_create_historical_record)
+def post_create_historical_record_callback(sender, instance, history_instance, **kwargs):
+    prev_record = getattr(history_instance, "prev_record", None)
+    if prev_record is None:
         return
 
-    old_price = history_instance.price
-    new_price = instance.price
+    old_price = prev_record.price.amount
+    new_price = instance.price.amount
 
     if old_price > new_price:
-        await product_price_lowered.asend(sender=Product, instance=instance, old_price=old_price, new_price=new_price)
+        product_price_lowered.send(sender=Product, instance=instance, old_price=old_price, new_price=new_price)
     elif old_price < new_price:
-        await product_price_increased.asend(sender=Product, instance=instance, old_price=old_price, new_price=new_price)
+        product_price_increased.send(sender=Product, instance=instance, old_price=old_price, new_price=new_price)
 
 
 @receiver(product_price_lowered)
@@ -36,7 +37,7 @@ async def notify_product_price_lowered(sender, instance, old_price, new_price, *
         lambda: list(ProductFavourite.objects.filter(product=instance).select_related("user"))
     )()
 
-    product_url = f"{settings.NUXT_BASE_URL}/product/{instance.slug}"
+    product_url = f"{settings.NUXT_BASE_URL}/products/{instance.id}/{instance.slug}"
 
     for favorite in favorite_users:
         user = favorite.user
@@ -48,18 +49,20 @@ async def notify_product_price_lowered(sender, instance, old_price, new_price, *
         for language in languages:
             await sync_to_async(notification.set_current_language)(language)
             if language == "en":
-                await sync_to_async(setattr)(notification, "title", f"<a href='{product_url}'>Product</a> Price Drop!")
+                await sync_to_async(setattr)(notification, "title", "Price Drop!")
                 await sync_to_async(setattr)(
                     notification,
                     "message",
-                    f"The price of {instance.name} has dropped from {old_price} to {new_price}. Check it out now!",
+                    f"The price of <a href='{product_url}'>{instance.name}</a> has dropped"
+                    f" from {old_price} to {new_price}. Check it out now!",
                 )
             elif language == "el":
-                await sync_to_async(setattr)(notification, "title", f"<a href='{product_url}'>Προϊόν</a> Μείωση Τιμής!")
+                await sync_to_async(setattr)(notification, "title", "Μείωση Τιμής!")
                 await sync_to_async(setattr)(
                     notification,
                     "message",
-                    f"Η τιμή του προϊόντος {instance.name} μειώθηκε από {old_price} σε {new_price}. Δείτε το τώρα!",
+                    f"Η τιμή του <a href='{product_url}'>{instance.name}</a> μειώθηκε"
+                    f" από {old_price} σε {new_price}. Δείτε το τώρα!",
                 )
             await notification.asave()
 

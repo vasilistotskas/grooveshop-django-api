@@ -25,10 +25,13 @@ class NotificationUserViewSet(MultiSerializerMixin, ExpandModelViewSet, Paginati
     ]
     search_fields = ["user__id", "notification__id"]
     ordering_fields = ["id", "user", "notification", "seen"]
+    filterset_fields = [
+        "seen",
+        "notification__kind",
+    ]
 
     serializers = {
         "default": NotificationUserSerializer,
-        "list": NotificationUserSerializer,
         "mark_as_seen": NotificationUserActionSerializer,
         "mark_as_unseen": NotificationUserActionSerializer,
     }
@@ -36,44 +39,56 @@ class NotificationUserViewSet(MultiSerializerMixin, ExpandModelViewSet, Paginati
     @action(detail=False, methods=["GET"], permission_classes=[IsAuthenticated])
     def unseen_count(self, request):
         if request.user.is_anonymous:
-            return Response(status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"count": 0}, status=status.HTTP_401_UNAUTHORIZED)
+
         count = self.queryset.filter(user=request.user, seen=False).count()
+        if count == 0:
+            return Response({"count": count}, status=status.HTTP_204_NO_CONTENT)
+
         return Response({"count": count}, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["POST"], permission_classes=[IsAuthenticated])
     def mark_all_as_seen(self, request):
         if request.user.is_anonymous:
-            return Response(status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"success": False}, status=status.HTTP_401_UNAUTHORIZED)
+
         self.queryset.filter(user=request.user, seen=False).update(seen=True)
         return Response({"success": True}, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["POST"], permission_classes=[IsAuthenticated])
     def mark_all_as_unseen(self, request):
         if request.user.is_anonymous:
-            return Response(status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"success": False}, status=status.HTTP_401_UNAUTHORIZED)
+
         self.queryset.filter(user=request.user, seen=True).update(seen=False)
         return Response({"success": True}, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["POST"], permission_classes=[IsAuthenticated])
     def mark_as_seen(self, request):
         if request.user.is_anonymous:
-            return Response(status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"success": False}, status=status.HTTP_401_UNAUTHORIZED)
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        notification_user_id = serializer.validated_data.get("notification_user_id")
+        notification_user_ids = serializer.validated_data.get("notification_user_ids")
 
-        self.queryset.filter(id=notification_user_id, user=request.user).update(seen=True)
+        if not notification_user_ids:
+            return Response({"success": False}, status=status.HTTP_400_BAD_REQUEST)
+
+        self.queryset.filter(id__in=notification_user_ids, user=request.user).update(seen=True)
         return Response({"success": True}, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["POST"], permission_classes=[IsAuthenticated])
     def mark_as_unseen(self, request):
         if request.user.is_anonymous:
-            return Response(status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"success": False}, status=status.HTTP_401_UNAUTHORIZED)
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        notification_user_id = serializer.validated_data.get("notification_user_id")
+        notification_user_ids = serializer.validated_data.get("notification_user_ids")
 
-        self.queryset.filter(id=notification_user_id, user=request.user).update(seen=False)
+        if not notification_user_ids:
+            return Response({"success": False}, status=status.HTTP_400_BAD_REQUEST)
+
+        self.queryset.filter(id__in=notification_user_ids, user=request.user).update(seen=False)
         return Response({"success": True}, status=status.HTTP_200_OK)

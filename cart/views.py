@@ -29,7 +29,7 @@ class CartViewSet(BaseModelViewSet):
     filterset_fields = [
         "user",
     ]
-    ordering_fields = ["user", "-created_at"]
+    ordering_fields = ["user", "created_at"]
     ordering = ["-created_at"]
     search_fields = [
         "user",
@@ -79,7 +79,7 @@ class CartItemViewSet(MultiSerializerMixin, BaseModelViewSet):
         "cart",
     ]
     ordering = ["-created_at"]
-    ordering_fields = ["cart", "-created_at"]
+    ordering_fields = ["cart", "created_at"]
     search_fields = [
         "cart",
     ]

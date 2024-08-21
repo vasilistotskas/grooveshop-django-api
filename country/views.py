@@ -29,7 +29,7 @@ class CountryViewSet(BaseModelViewSet):
         "iso_cc",
         "phone_code",
     ]
-    ordering_fields = ["alpha_2", "-created_at"]
+    ordering_fields = ["alpha_2", "created_at"]
     ordering = ["-created_at"]
     search_fields = [
         "alpha_2",

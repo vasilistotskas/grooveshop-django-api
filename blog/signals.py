@@ -23,6 +23,7 @@ async def notify_comment_liked(sender, instance, action, reverse, pk_set, **kwar
             if user and user.id != user_id:
                 notification = await Notification.objects.acreate(
                     kind=NotificationKindEnum.INFO,
+                    link=blog_post_url,
                 )
 
                 for language in languages:

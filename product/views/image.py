@@ -23,7 +23,7 @@ class ProductImageViewSet(BaseModelViewSet):
         SearchFilter,
     ]
     filterset_fields = ["id", "product", "is_main"]
-    ordering_fields = ["created_at", "-is_main"]
+    ordering_fields = ["created_at", "is_main"]
     ordering = ["-is_main", "-created_at"]
 
     @method_decorator(conditional_cache_page(DEFAULT_PRODUCT_IMAGE_CACHE_TTL))

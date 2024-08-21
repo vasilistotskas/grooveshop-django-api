@@ -17,6 +17,7 @@ from blog.serializers.post import BlogPostSerializer
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from core.utils.serializers import MultiSerializerMixin
+from notification.serializers.user import NotificationUserSerializer
 from order.serializers.order import OrderSerializer
 from product.serializers.favourite import ProductFavouriteSerializer
 from product.serializers.review import ProductReviewSerializer
@@ -44,6 +45,7 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         "addresses": UserAddressSerializer,
         "blog_post_comments": BlogCommentSerializer,
         "liked_blog_posts": BlogPostSerializer,
+        "notifications": NotificationUserSerializer,
         "change_username": UsernameUpdateSerializer,
     }
 
@@ -61,6 +63,8 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
                 queryset = get_object_or_404(User, id=self.kwargs["pk"]).blog_comments.all()
             case "liked_blog_posts":
                 queryset = get_object_or_404(User, id=self.kwargs["pk"]).liked_blog_posts.all()
+            case "notifications":
+                queryset = get_object_or_404(User, id=self.kwargs["pk"]).notification.all()
             case _:
                 queryset = (
                     User.objects.all() if self.request.user.is_staff else User.objects.filter(id=self.request.user.id)
@@ -68,7 +72,7 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
 
         return queryset
 
-    @action(detail=True, methods=["GET"])
+    @action(detail=True, methods=["GET"], permission_classes=[IsAuthenticated])
     def favourite_products(self, request, pk=None):
         self.filterset_fields = ["id"]
         self.ordering_fields = [
@@ -85,7 +89,7 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)
 
-    @action(detail=True, methods=["GET"])
+    @action(detail=True, methods=["GET"], permission_classes=[IsAuthenticated])
     def orders(self, request, pk=None):
         self.ordering_fields = ["created_at", "updated_at", "status"]
         self.filterset_fields = ["status"]
@@ -94,7 +98,7 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)
 
-    @action(detail=True, methods=["GET"])
+    @action(detail=True, methods=["GET"], permission_classes=[IsAuthenticated])
     def product_reviews(self, request, pk=None):
         self.filterset_fields = ["id", "product_id", "status"]
         self.ordering_fields = [
@@ -111,7 +115,7 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)
 
-    @action(detail=True, methods=["GET"])
+    @action(detail=True, methods=["GET"], permission_classes=[IsAuthenticated])
     def addresses(self, request, pk=None):
         self.filterset_fields = [
             "id",
@@ -138,7 +142,7 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)
 
-    @action(detail=True, methods=["GET"])
+    @action(detail=True, methods=["GET"], permission_classes=[IsAuthenticated])
     def blog_post_comments(self, request, pk=None):
         self.filterset_fields = ["id", "post", "parent", "is_approved"]
         self.ordering_fields = ["id", "post", "created_at"]
@@ -147,7 +151,7 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)
 
-    @action(detail=True, methods=["GET"])
+    @action(detail=True, methods=["GET"], permission_classes=[IsAuthenticated])
     def liked_blog_posts(self, request, pk=None):
         self.filterset_fields = ["id", "tags", "slug", "author"]
         self.ordering_fields = [
@@ -159,6 +163,15 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         ]
         self.ordering = ["-created_at"]
         self.search_fields = ["id", "title", "subtitle", "body"]
+        queryset = self.filter_queryset(self.get_queryset())
+        return self.paginate_and_serialize(queryset, request)
+
+    @action(detail=True, methods=["GET"], permission_classes=[IsAuthenticated])
+    def notifications(self, request, pk=None):
+        self.filterset_fields = ["seen", "notification__kind"]
+        self.ordering_fields = ["created_at", "seen_at"]
+        self.ordering = ["-created_at"]
+
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)
 

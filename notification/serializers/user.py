@@ -23,6 +23,7 @@ class NotificationUserSerializer(BaseExpandSerializer):
             "user",
             "notification",
             "seen",
+            "seen_at",
             "created_at",
             "updated_at",
             "uuid",
@@ -47,4 +48,4 @@ class NotificationUserSerializer(BaseExpandSerializer):
 
 
 class NotificationUserActionSerializer(serializers.Serializer):
-    notification_user_id = serializers.IntegerField()
+    notification_user_ids = serializers.ListField(child=serializers.IntegerField(), required=True, allow_empty=False)

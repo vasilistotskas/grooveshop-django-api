@@ -3,7 +3,17 @@
 
 
 
+## v0.146.1 (2024-08-22)
+
+### Fix
+
+* fix: debug fixed ([`327793d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/327793d234f298eb8217d458411165ff222e50c7))
+
 ## v0.146.0 (2024-08-22)
+
+### Chore
+
+* chore(release): release version 0.146.0 [skip ci] ([`bb192f0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bb192f092b9733bc8192b3966fd681deac7e625b))
 
 ### Feature
 

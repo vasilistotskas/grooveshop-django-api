@@ -66,6 +66,8 @@ ALLOWED_HOSTS = []  # Start with an empty list
 additional_hosts = getenv("ALLOWED_HOSTS", "*").split(",")
 ALLOWED_HOSTS.extend(filter(None, additional_hosts))  # Filter out empty strings
 
+USE_X_FORWARDED_HOST = getenv("USE_X_FORWARDED_HOST", "False") == "True"
+
 # Django built-in apps
 DJANGO_APPS = [
     "django.contrib.admin",
@@ -828,7 +830,7 @@ TINYMCE_COMPRESSOR = False
 def config_logging():
     timestamp = datetime.now().strftime("%d-%m-%Y")
     log_dir = path.join(BASE_DIR, "logs")
-    makedirs(log_dir, exist_ok=True)  # Create the directory if it does not exist
+    makedirs(log_dir, exist_ok=True)
 
     celery_log_file_path = path.join(log_dir, f"celery_logs_{timestamp}.log")
     django_log_file_path = path.join(log_dir, f"django_logs_{timestamp}.log")

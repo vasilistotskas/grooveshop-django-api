@@ -3,7 +3,17 @@
 
 
 
+## v0.147.0 (2024-08-22)
+
+### Feature
+
+* feat: Improve API homepage UI, MFAAdapter get_public_key_credential_rp_entity override to set id ([`b26d5ba`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b26d5babf303e1ddbe75d61e38a2f0d53a9dd378))
+
 ## v0.146.1 (2024-08-22)
+
+### Chore
+
+* chore(release): release version 0.146.1 [skip ci] ([`6e450c5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6e450c5f8601bd4b4401a128bfb9f0f030bcd292))
 
 ### Fix
 

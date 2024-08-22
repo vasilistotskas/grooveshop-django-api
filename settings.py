@@ -617,6 +617,13 @@ DATABASES = {
         "USER": getenv("DB_USER", "devuser"),
         "PASSWORD": getenv("DB_PASSWORD", "changeme"),
         "PORT": getenv("DB_PORT", "5432"),
+        "OPTIONS": {
+            "pool": {
+                "min_size": 4,
+                "max_size": 8,
+                "timeout": 60,
+            }
+        },
     },
     "replica": {
         "TIME_ZONE": getenv("TIME_ZONE", "Europe/Athens"),

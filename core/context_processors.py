@@ -22,4 +22,5 @@ def metadata(request: HttpRequest) -> dict[str, str]:
         "SITE_DESCRIPTION": site_description,
         "SITE_KEYWORDS": site_keywords,
         "SITE_AUTHOR": site_author,
+        "REQUEST": request,
     }

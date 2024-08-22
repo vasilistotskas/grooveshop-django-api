@@ -39,7 +39,8 @@ async def notify_comment_liked(sender, instance, action, reverse, pk_set, **kwar
                         await sync_to_async(setattr)(
                             notification,
                             "message",
-                            f"Your comment was liked by {liker_user.username if liker_user.username else liker_user.email}.",
+                            f"Your comment was liked by "
+                            f"{liker_user.username if liker_user.username else liker_user.email}.",
                         )
                     elif language == "el":
                         await sync_to_async(setattr)(
@@ -48,7 +49,8 @@ async def notify_comment_liked(sender, instance, action, reverse, pk_set, **kwar
                         await sync_to_async(setattr)(
                             notification,
                             "message",
-                            f"Το σχόλιο σου άρεσε στον χρήστη {liker_user.username if liker_user.username else liker_user.email}.",
+                            f"Το σχόλιο σου άρεσε στον χρήστη "
+                            f"{liker_user.username if liker_user.username else liker_user.email}.",
                         )
                     await notification.asave()
 

@@ -16,15 +16,13 @@ def metadata(request: HttpRequest) -> dict[str, str]:
     site_keywords = os.getenv("SITE_KEYWORDS", "Grooveshop Keywords")
     site_author = os.getenv("SITE_AUTHOR", "Grooveshop Author")
 
-    request_details = {
-        "method": request.method,
-        "path": request.path,
-        "headers": dict(request.headers),
-        "GET_params": request.GET.dict(),
-        "POST_params": request.POST.dict(),
-        "body": request.body.decode('utf-8') if request.body else '',
-        "cookies": request.COOKIES,
-    }
+    request_details = {}
+    if request.user and request.user.is_superuser:
+        request_details = {
+            "headers": dict(request.headers),
+            "cookies": request.COOKIES,
+            "meta": request.META,
+        }
 
     return {
         "VERSION": get_version_from_toml(),

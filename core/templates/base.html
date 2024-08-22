@@ -1,97 +1,22 @@
 {% load static %}
+{% load i18n %}
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-		<meta content="IE=edge" http-equiv="X-UA-Compatible" />
-		<meta
-			name="viewport"
-			content="width=device-width, initial-scale=1, shrink-to-fit=no"
-		/>
-		<meta content="width=device-width,initial-scale=1.0" name="viewport" />
-		<meta name="theme-color" content="#ffffff" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta content="IE=edge" http-equiv="X-UA-Compatible" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
     <meta name="description" content="{{ SITE_DESCRIPTION }}" />
     <meta name="keywords" content="{{ SITE_KEYWORDS }}" />
     <meta name="author" content="{{ SITE_AUTHOR }}" />
 
-    <link
-			href="{% static 'favicon/apple-icon-57x57.png' %}"
-			rel="apple-touch-icon"
-			sizes="57x57"
-		/>
-		<link
-			href="{% static 'favicon/apple-icon-60x60.png' %}"
-			rel="apple-touch-icon"
-			sizes="60x60"
-		/>
-		<link
-			href="{% static 'favicon/apple-icon-72x72.png' %}"
-			rel="apple-touch-icon"
-			sizes="72x72"
-		/>
-		<link
-			href="{% static 'favicon/apple-icon-76x76.png' %}"
-			rel="apple-touch-icon"
-			sizes="76x76"
-		/>
-		<link
-			href="{% static 'favicon/apple-icon-114x114.png' %}"
-			rel="apple-touch-icon"
-			sizes="114x114"
-		/>
-		<link
-			href="{% static 'favicon/apple-icon-120x120.png' %}"
-			rel="apple-touch-icon"
-			sizes="120x120"
-		/>
-		<link
-			href="{% static 'favicon/apple-icon-144x144.png' %}"
-			rel="apple-touch-icon"
-			sizes="144x144"
-		/>
-		<link
-			href="{% static 'favicon/apple-icon-152x152.png' %}"
-			rel="apple-touch-icon"
-			sizes="152x152"
-		/>
-		<link
-			href="{% static 'favicon/apple-icon-180x180.png' %}"
-			rel="apple-touch-icon"
-			sizes="180x180"
-		/>
-		<link
-			href="{% static 'favicon/android-icon-192x192.png' %}"
-			rel="icon"
-			sizes="192x192"
-			type="image/png"
-		/>
-    <link
-			href="{% static 'favicon/favicon-16x16.png' %}"
-			rel="icon"
-			sizes="16x16"
-			type="image/png"
-		/>
-		<link
-			href="{% static 'favicon/favicon-32x32.png' %}"
-			rel="icon"
-			sizes="32x32"
-			type="image/png"
-		/>
-		<link
-			href="{% static 'favicon/favicon-96x96.png' %}"
-			rel="icon"
-			sizes="96x96"
-			type="image/png"
-		/>
-		<link
-			crossorigin="use-credentials"
-			href="{% static 'favicon/manifest.json' %}"
-			rel="manifest"
-		/>
-
     <link rel="stylesheet" href="{% static 'css/styles.css' %}">
     <title>{{ SITE_NAME }}</title>
+
+    <!-- Custom Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
 
     <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
     <!--[if lt IE 9]>
@@ -100,133 +25,89 @@
     <![endif]-->
   </head>
   <style>
-    /* Custom CSS to remove rounded corners from .alert class */
     .alert {
       border-radius: 0;
     }
     .group:hover .group-hover\:block {
       display: block;
     }
+    body {
+      font-family: 'Roboto', sans-serif;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      font-family: 'Roboto Mono', monospace;
+    }
+    pre, code {
+      font-family: 'Roboto Mono', monospace;
+      background-color: #f5f5f5;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    .link {
+      color: #0070f3;
+      text-decoration: none;
+    }
+    .link:hover {
+      text-decoration: underline;
+    }
   </style>
   {% load django_browser_reload %}
-  <body role="document">
-    <div class="bg-black text-white grid items-center justify-items-center">
-      <div class="container mx-auto flex gap-4">
-        <div class="flex items-center justify-between py-4">
-          <a class="text-white text-2xl font-bold" href="/">{{ SITE_NAME }}</a>
+  <body class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
+    <nav class="bg-white dark:bg-gray-800 shadow-lg py-4">
+      <div class="container mx-auto flex items-center justify-between">
+        <a class="text-2xl font-bold" href="/">{{ SITE_NAME }}</a>
+        <div class="flex gap-4 space-x-6">
+          <a target="_blank" href="{% url 'swagger-ui' %}" class="hover:font-semibold">API Docs Swagger UI</a>
+          <a target="_blank" href="{% url 'redoc' %}" class="hover:font-semibold">API Docs Redoc</a>
         </div>
-
-        <div class="hidden md:flex md:items-center md:justify-between md:py-4">
-          <ul class="flex space-x-4">
-            <li>
-              <a target="_blank" href="{% url 'swagger-ui' %}" class="block">API Docs
-                Swagger UI
-              </a>
-            </li>
-            <li><a target="_blank" href="{% url 'redoc' %}" class="block">API Docs Redoc
-            </a></li>
-          </ul>
-        </div>
+        <button id="dark-mode-toggle" class="focus:outline-none w-9">
+          <span id="theme-toggle-text" class="text-2xl">Light</span>
+        </button>
       </div>
-    </div>
+    </nav>
 
     <div class="container mx-auto p-4">
       {% block content %}{% endblock %}
     </div>
-    <div id="notifications" class="fixed bottom-4 right-4 z-50"></div>
   </body>
-  <footer>
+  <footer class="bg-white dark:bg-gray-800 shadow-lg py-4">
     {% django_browser_reload_script %}
+    <div class="container mx-auto flex items-center justify-between">
+      <p class="text-sm">
+        <a href="https://github.com/vasilistotskas/grooveshop-django-api" class="hover:underline">GitHub</a>
+      </p>
+      <p class="text-sm">{% trans "© 2024" %} {{ SITE_NAME }}. {% trans "All rights reserved." %}</p>
+    </div>
     <script type="text/javascript">
-      const websocketProtocol = window.location.protocol === "https:" ? "wss" : "ws";
-      const wsEndpoint = `${websocketProtocol}://${window.location.host}/ws/notifications`;
-      const socket = new WebSocket(wsEndpoint);
+      document.addEventListener('DOMContentLoaded', function () {
+        const themeToggleText = document.querySelector('#theme-toggle-text');
+        const currentTheme = localStorage.getItem('theme');
 
-      socket.addEventListener("message", (event) => {
-        const data = JSON.parse(event.data);
-        console.log("Received notification:", data);
-        showNotification(data);
-      });
-
-      function showNotification(notification) {
-        const notificationsContainer = document.getElementById("notifications");
-        notificationsContainer.classList.add(
-          "grid",
-          "items-center",
-          "justify-center"
-        );
-
-        const alertDiv = document.createElement("div");
-        alertDiv.classList.add(
-          "flex",
-          "flex-col",
-          "gap-2",
-          "bg-blue-100",
-          "border",
-          "border-blue-400",
-          "text-blue-700",
-          "px-4",
-          "py-3",
-          "rounded",
-          "relative",
-          "mb-2",
-          "alert"
-        );
-
-        alertDiv.setAttribute("role", "alert");
-
-        // Displaying message based on user's preferred language or default
-        const message = notification.translations.find(t => t[notification.user.preferredLanguage]) || notification.translations[0];
-        const languageCode = Object.keys(message)[0];
-        const messageContent = message[languageCode].message;
-
-        const messagePara = document.createElement("p");
-        messagePara.textContent = messageContent;
-        alertDiv.appendChild(messagePara);
-
-        // Display link if available
-        if (notification.link) {
-          const linkElement = document.createElement("a");
-          linkElement.setAttribute("href", notification.link);
-          linkElement.setAttribute("target", "_blank");
-          linkElement.textContent = "More Info";
-          linkElement.classList.add("underline");
-          alertDiv.appendChild(linkElement);
+        function updateThemeText(theme) {
+          themeToggleText.textContent = theme === 'dark' ? '🌚' : '🌞';
+          if (theme === 'dark') {
+             document.documentElement.classList.add('dark');
+             document.documentElement.classList.remove('light');
+          } else {
+             document.documentElement.classList.remove('dark');
+             document.documentElement.classList.add('light');
+          }
         }
 
-        // Close button for the notification
-        const closeButton = document.createElement("button");
-        closeButton.setAttribute("type", "button");
-        closeButton.classList.add(
-          "absolute",
-          "top-0",
-          "right-0",
-          "bg-transparent",
-          "text-xl",
-          "leading-none",
-          "rounded",
-          "p-1"
-        );
-        closeButton.innerHTML = "&times;";
-        closeButton.onclick = () => notificationsContainer.removeChild(alertDiv);
+        if (currentTheme) {
+          document.documentElement.setAttribute('data-theme', currentTheme);
+          updateThemeText(currentTheme);
+        } else {
+          updateThemeText('light');
+        }
 
-        alertDiv.appendChild(closeButton);
-
-        notificationsContainer.appendChild(alertDiv);
-      }
-
-
-      socket.onopen = (event) => {
-        console.log("WebSocket connection opened!", event);
-      };
-
-      socket.onmessage = (event) => {
-        console.log("WebSocket message received:", event);
-      };
-
-      socket.onclose = (event) => {
-        console.log("WebSocket connection closed!", event);
-      };
+        document.querySelector('#dark-mode-toggle').addEventListener('click', function() {
+          const newTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+          document.documentElement.setAttribute('data-theme', newTheme);
+          localStorage.setItem('theme', newTheme);
+          updateThemeText(newTheme);
+        });
+      });
 
       function error_response(data) {
           const apiResponse = document.querySelector('.api-response');

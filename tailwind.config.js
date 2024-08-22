@@ -1,6 +1,11 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: 'class',
   content: ['./core/templates/**/*.html'],
+  future: {
+    hoverOnlyWhenSupported: true,
+  },
+  attributify: false,
   theme: {
     extend: {
       gridTemplateColumns: {
@@ -25,5 +30,7 @@ module.exports = {
       },
     }
   },
-  plugins: [],
+  variants: {
+    typography: ['dark'],
+  },
 }

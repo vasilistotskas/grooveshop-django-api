@@ -3,7 +3,17 @@
 
 
 
+## v0.145.0 (2024-08-22)
+
+### Feature
+
+* feat: USE_X_FORWARDED_HOST setting ([`1d185f5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1d185f502b27be978a9ae5a0180c1145e9852ea3))
+
 ## v0.144.1 (2024-08-21)
+
+### Chore
+
+* chore(release): release version 0.144.1 [skip ci] ([`454bc62`](https://github.com/vasilistotskas/grooveshop-django-api/commit/454bc626a012f86afed1c0917382b277e88cca32))
 
 ### Fix
 

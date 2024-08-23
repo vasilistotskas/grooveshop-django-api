@@ -2,9 +2,9 @@ import os
 from uuid import uuid4
 
 from allauth.headless.base.response import APIResponse
-from allauth.headless.base.views import AuthenticatedAPIView
 from allauth.headless.mfa import response
-from allauth.mfa.adapter import get_adapter
+from allauth.headless.mfa.views import ManageTOTPView
+from allauth.mfa.adapter import get_adapter, DefaultMFAAdapter
 from allauth.mfa.models import Authenticator
 from allauth.mfa.totp.internal.auth import get_totp_secret
 from django.conf import settings
@@ -71,27 +71,25 @@ def upload_image(request):
 
 
 class TOTPSvgNotFoundResponse(APIResponse):
-    def __init__(self, request, secret, svg):
+    def __init__(self, request, secret, totp_url, totp_svg):
         super().__init__(
             request,
             meta={
                 "secret": secret,
-                "svg": svg,
+                "totp_url": totp_url,
+                "totp_svg": totp_svg,
             },
             status=404,
         )
 
 
-class ManageTOTPSvgView(AuthenticatedAPIView):
-    def get(self, request, *args, **kwargs):
+class ManageTOTPSvgView(ManageTOTPView):
+    def get(self, request, *args, **kwargs) -> APIResponse:
         authenticator = self._get_authenticator()
         if not authenticator:
+            adapter: DefaultMFAAdapter = get_adapter()
             secret = get_totp_secret(regenerate=True)
-            adapter = get_adapter()
-            totp_url = adapter.build_totp_url(request.user, secret)
+            totp_url: str = adapter.build_totp_url(request.user, secret)
             totp_svg = adapter.build_totp_svg(totp_url)
-            return TOTPSvgNotFoundResponse(request, secret, totp_svg)
+            return TOTPSvgNotFoundResponse(request, secret, totp_url, totp_svg)
         return response.TOTPResponse(request, authenticator)
-
-    def _get_authenticator(self):
-        return Authenticator.objects.filter(type=Authenticator.Type.TOTP, user=self.request.user).first()

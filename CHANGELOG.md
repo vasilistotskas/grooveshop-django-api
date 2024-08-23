@@ -3,7 +3,17 @@
 
 
 
+## v0.148.0 (2024-08-23)
+
+### Feature
+
+* feat: ManageTOTPSvgView update ([`aad0796`](https://github.com/vasilistotskas/grooveshop-django-api/commit/aad07965daa37e0bf526760aef85ff36eb5016bf))
+
 ## v0.147.0 (2024-08-22)
+
+### Chore
+
+* chore(release): release version 0.147.0 [skip ci] ([`a09eaf5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a09eaf543c07b4d610479a15952905e5a643f7d5))
 
 ### Feature
 

@@ -3,7 +3,17 @@
 
 
 
+## v0.149.0 (2024-08-24)
+
+### Feature
+
+* feat: Added expiry_date field in `Notification` model, task and command to clear expired notifications and model indexes improvements ([`1ba77c0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1ba77c00546d0f24e2a96c1809ce3d37fdd4d9c0))
+
 ## v0.148.0 (2024-08-23)
+
+### Chore
+
+* chore(release): release version 0.148.0 [skip ci] ([`030a14a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/030a14ae82b87941ce6824e940cab23023a62585))
 
 ### Feature
 

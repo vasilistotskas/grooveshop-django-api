@@ -79,6 +79,15 @@ def clear_old_history_task(days=365):
 
 
 @celery_app.task
+def clear_expired_notifications_task(days=365):
+    try:
+        management.call_command("expire_notifications")
+        return "Expired notifications deleted."
+    except Exception as e:
+        return f"error: {e}"
+
+
+@celery_app.task
 def clear_carts_for_none_users_task(self):
     from cart.models import Cart
 

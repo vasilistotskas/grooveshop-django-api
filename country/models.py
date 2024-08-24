@@ -18,7 +18,6 @@ class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         _("Country Code Alpha 2"),
         primary_key=True,
         unique=True,
-        db_index=True,
         max_length=2,
         validators=[
             RegexValidator(
@@ -30,7 +29,6 @@ class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     alpha_3 = models.CharField(
         _("Country Code Alpha 3"),
         unique=True,
-        db_index=True,
         max_length=3,
         validators=[
             RegexValidator(
@@ -51,6 +49,8 @@ class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
             *SortableModel.Meta.indexes,
+            models.Index(fields=["alpha_2"]),
+            models.Index(fields=["alpha_3"]),
         ]
 
     def __unicode__(self):

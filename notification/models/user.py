@@ -17,11 +17,8 @@ class NotificationUser(TimeStampMixinModel, UUIDModel):
         "user.UserAccount",
         related_name="notification",
         on_delete=models.CASCADE,
-        db_index=True,
     )
-    notification = models.ForeignKey(
-        "notification.Notification", related_name="user", on_delete=models.CASCADE, db_index=True
-    )
+    notification = models.ForeignKey("notification.Notification", related_name="user", on_delete=models.CASCADE)
     seen = models.BooleanField(_("Seen"), default=False)
     seen_at = models.DateTimeField(_("Seen At"), null=True, blank=True)
 
@@ -45,6 +42,9 @@ class NotificationUser(TimeStampMixinModel, UUIDModel):
         ]
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
+            models.Index(fields=["user"]),
+            models.Index(fields=["notification"]),
+            models.Index(fields=["seen"]),
         ]
 
     def save(self, *args, **kwargs):

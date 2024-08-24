@@ -11,7 +11,7 @@ class Contact(
     UUIDModel,
 ):
     name = models.CharField(_("Name"), max_length=100)
-    email = models.EmailField(_("Email"), db_index=True)
+    email = models.EmailField(_("Email"))
     message = models.TextField(_("Message"))
 
     def __str__(self):
@@ -24,3 +24,6 @@ class Contact(
         verbose_name = _("Contact")
         verbose_name_plural = _("Contacts")
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["email"]),
+        ]

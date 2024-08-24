@@ -1,4 +1,8 @@
+from datetime import timedelta
+
 from django.db import models
+from django.db.models.functions import Now
+from django.utils import timezone as tz
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel
@@ -8,6 +12,8 @@ from core.models import TimeStampMixinModel
 from core.models import UUIDModel
 from notification.enum import NotificationKindEnum
 
+EXPIRATION_DAYS = 6 * 30
+
 
 class Notification(TranslatableModel, TimeStampMixinModel, UUIDModel):
     link = models.URLField(_("Link"), blank=True, null=True)
@@ -16,6 +22,12 @@ class Notification(TranslatableModel, TimeStampMixinModel, UUIDModel):
         max_length=250,
         choices=NotificationKindEnum,
         default=NotificationKindEnum.INFO,
+    )
+    expiry_date = models.DateTimeField(
+        _("Expiry Date"),
+        null=True,
+        blank=True,
+        db_default=Now() + timedelta(days=EXPIRATION_DAYS),
     )
     translations = TranslatedFields(
         title=models.CharField(_("Title"), max_length=250),
@@ -37,3 +49,6 @@ class Notification(TranslatableModel, TimeStampMixinModel, UUIDModel):
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
         ]
+
+    def is_expired(self) -> bool:
+        return self.expiry_date and tz.now() > self.expiry_date

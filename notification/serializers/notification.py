@@ -22,6 +22,7 @@ class NotificationSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "id",
             "link",
             "kind",
+            "expiry_date",
             "created_at",
             "updated_at",
             "uuid",

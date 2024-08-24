@@ -4,8 +4,8 @@ from uuid import uuid4
 from allauth.headless.base.response import APIResponse
 from allauth.headless.mfa import response
 from allauth.headless.mfa.views import ManageTOTPView
-from allauth.mfa.adapter import get_adapter, DefaultMFAAdapter
-from allauth.mfa.models import Authenticator
+from allauth.mfa.adapter import DefaultMFAAdapter
+from allauth.mfa.adapter import get_adapter
 from allauth.mfa.totp.internal.auth import get_totp_secret
 from django.conf import settings
 from django.contrib.auth.decorators import login_required

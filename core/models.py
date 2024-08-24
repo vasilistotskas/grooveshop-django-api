@@ -18,7 +18,7 @@ from django_stubs_ext.db.models import TypedModelMeta
 
 
 class SortableModel(models.Model):
-    sort_order = models.IntegerField(_("Sort Order"), editable=False, db_index=True, null=True)
+    sort_order = models.IntegerField(_("Sort Order"), editable=False, null=True)
 
     class Meta(TypedModelMeta):
         abstract = True

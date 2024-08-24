@@ -473,6 +473,10 @@ CELERY_BEAT_SCHEDULE = {
             "days": 365,
         },
     },
+    "clear-expired-notifications": {
+        "task": "core.tasks.clear_expired_notifications_task",
+        "schedule": crontab(hour="6", minute="0", day_of_month="*/2"),
+    },
     "clear-carts-for-none-users": {
         "task": "core.tasks.clear_carts_for_none_users_task",
         "schedule": crontab(hour="4", minute="0", day_of_month="*/2"),

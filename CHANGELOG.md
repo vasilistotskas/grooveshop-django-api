@@ -3,7 +3,21 @@
 
 
 
+## v0.151.0 (2024-08-25)
+
+### Feature
+
+* feat: logger improve ([`16fed8f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/16fed8f47706221ebbbd79de884cebe352ea6f59))
+
+### Fix
+
+* fix: test fix after logger update ([`6ed8fff`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6ed8ffffa617459bbef5dede89014b9fea5519a1))
+
 ## v0.150.0 (2024-08-25)
+
+### Chore
+
+* chore(release): release version 0.150.0 [skip ci] ([`3e50368`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3e50368beb7ca9cf212753e25240b5befa3c4366))
 
 ### Feature
 

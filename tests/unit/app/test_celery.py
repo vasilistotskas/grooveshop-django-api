@@ -112,7 +112,7 @@ class CleanupLogFilesTaskTest(TestCase):
             remove(self.new_file)
         super().tearDown()
 
-    @patch("core.tasks.logger")
+    @patch("core.tasks.LogInfo")
     def test_cleanup_log_files_task(self, mock_logger):
         clear_log_files_task(self.days)
 

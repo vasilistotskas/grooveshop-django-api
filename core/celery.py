@@ -1,7 +1,6 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-import logging
 import os
 
 from asgiref.sync import async_to_sync
@@ -10,16 +9,15 @@ from celery import shared_task
 from celery.signals import setup_logging
 from channels.layers import get_channel_layer
 
-from settings import config_logging
+from core.logging import LogInfo
 
 CELERY_LOGGER_NAME = "celery"
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
-logger = logging.getLogger("celery")
 
 
 @setup_logging.connect
 def config_loggers(*args, **kwags):
-    config_logging()
+    from django.conf import settings  # noqa: F401
 
 
 def create_celery_app():
@@ -40,7 +38,7 @@ def debug_task(self):
     debug = os.getenv("DEBUG", "True") == "True"
     if debug:
         print(f"Request: {self.request!r}")
-        logger.debug(f"Request: {self.request!r}")
+        LogInfo.debug(f"Request: {self.request!r}")
 
 
 @shared_task(bind=True, name="Debug Task Notification")
@@ -69,4 +67,4 @@ def debug_task_notification(self):
             },
         )
         print(f"Request: {self.request!r}, Notification sent.")
-        logger.debug(f"Logger Request: {self.request!r}, Notification sent.")
+        LogInfo.debug(f"Logger Request: {self.request!r}, Notification sent.")

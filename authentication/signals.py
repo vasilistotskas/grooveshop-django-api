@@ -1,4 +1,3 @@
-import logging
 from tempfile import NamedTemporaryFile
 
 import requests
@@ -6,14 +5,13 @@ from allauth.account.signals import user_signed_up
 from django.core.files import File
 from django.dispatch import receiver
 
-
-logger = logging.getLogger(__name__)
+from core.logging import LogInfo
 
 
 @receiver(user_signed_up)
 def populate_profile(sociallogin=None, user=None, **kwargs):
     if not sociallogin or not user:
-        logger.warning("No sociallogin or user passed to populate_profile")
+        LogInfo.warning("No sociallogin or user passed to populate_profile")
         return
 
     picture_url = None

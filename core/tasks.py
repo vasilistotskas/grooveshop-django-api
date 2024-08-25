@@ -2,7 +2,6 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 
 import gzip
-import logging
 import os
 import time
 from datetime import datetime
@@ -19,12 +18,12 @@ from django.utils.timezone import now
 
 from blog.models.post import BlogPost
 from core import celery_app
+from core.logging import LogInfo
 from core.search import update_translation_search_documents
 from core.search import update_translation_search_vectors
 from product.models.product import Product
 
 User = get_user_model()
-logger = logging.getLogger("celery")
 languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 
 
@@ -98,7 +97,7 @@ def clear_carts_for_none_users_task(self):
         null_carts.delete()
 
         message = f"Cleared {carts_count} null carts and {cart_items_count} related cart items."
-        logger.info(message)
+        LogInfo.info(message)
         return message
 
 
@@ -119,7 +118,7 @@ def clear_log_files_task(days=30):
 
     message = f"Removed log files older than {days} days."
 
-    logger.info(message)
+    LogInfo.info(message)
     return message
 
 
@@ -169,7 +168,7 @@ def monitor_system_health():
             cursor.fetchone()
 
     except Exception as e:
-        logger.error(f"System health check failed: {e}")
+        LogInfo.error(f"System health check failed: {e}")
 
         send_mail(
             subject="System Health Check Alert",
@@ -231,11 +230,11 @@ def compress_old_logs(file_path):
                 with gzip.open(f"{file_path}.gz", "wb") as f_out:
                     f_out.writelines(f_in)
             os.remove(file_path)
-            logger.info(f"Compressed and removed log file: {file_path}")
+            LogInfo.info(f"Compressed and removed log file: {file_path}")
         else:
-            logger.warning(f"Log file not found: {file_path}")
+            LogInfo.warning(f"Log file not found: {file_path}")
     except Exception as e:
-        logger.error(f"Failed to compress log file {file_path}: {e}")
+        LogInfo.error(f"Failed to compress log file {file_path}: {e}")
         send_mail(
             subject="Log Compression Error",
             message=f"An error occurred while compressing the log file {file_path}: {e}",
@@ -262,7 +261,7 @@ def optimize_images():
                 with Image.open(filepath) as img:
                     img.save(filepath, optimize=True, quality=85)
             except Exception as e:
-                logger.error(f"Error optimizing image: {e}")
+                LogInfo.error(f"Error optimizing image: {e}")
 
     return "Images optimized successfully."
 
@@ -270,7 +269,7 @@ def optimize_images():
 @celery_app.task
 def update_product_translation_search_vectors():
     total_updated = update_translation_search_vectors(Product, "product", [("name", "A"), ("description", "C")])
-    logger.info(f"Updated {total_updated} product translation search vectors.")
+    LogInfo.info(f"Updated {total_updated} product translation search vectors.")
 
 
 @celery_app.task
@@ -278,16 +277,16 @@ def update_blog_post_translation_search_vectors():
     total_updated = update_translation_search_vectors(
         BlogPost, "blog", [("title", "A"), ("subtitle", "B"), ("body", "C")]
     )
-    logger.info(f"Updated {total_updated} blog post translation search vectors.")
+    LogInfo.info(f"Updated {total_updated} blog post translation search vectors.")
 
 
 @celery_app.task
 def update_product_translation_search_documents():
     total_updated = update_translation_search_documents(Product, "product", ["name", "description"])
-    logger.info(f"Updated {total_updated} product translation search documents.")
+    LogInfo.info(f"Updated {total_updated} product translation search documents.")
 
 
 @celery_app.task
 def update_blog_post_translation_search_documents():
     total_updated = update_translation_search_documents(BlogPost, "blog", ["title", "subtitle", "body"])
-    logger.info(f"Updated {total_updated} blog post translation search documents.")
+    LogInfo.info(f"Updated {total_updated} blog post translation search documents.")

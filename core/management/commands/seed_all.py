@@ -1,6 +1,5 @@
 import asyncio
 import importlib
-import logging
 import os
 import pkgutil
 import time
@@ -20,8 +19,6 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import IntegrityError
 from django.db import models
-
-logger = logging.getLogger(__name__)
 
 DEFAULT_COUNT = settings.SEED_DEFAULT_COUNT
 BATCH_SIZE = settings.SEED_BATCH_SIZE

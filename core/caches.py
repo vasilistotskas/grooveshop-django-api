@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import os
 from typing import Any
 
@@ -10,10 +9,9 @@ from django.core.cache import caches
 from django.core.cache.backends.locmem import LocMemCache
 from django.core.cache.backends.redis import RedisCache
 
-logger = logging.getLogger(__name__)
+from core.logging import LogInfo
 
 # Constants
-
 DEFAULT_CACHE_ALIAS = "default"
 FALLBACK_CACHE_ALIAS = "fallback"
 
@@ -25,6 +23,7 @@ ONE_YEAR = ONE_DAY * 365
 
 # Cache Keys
 SESSION_PREFIX = "session:"
+
 # structure should be like "<USER_AUTHENTICATED>:<user_pk>:<random_session_key>"
 USER_AUTHENTICATED = f"{SESSION_PREFIX}user_authenticated:"
 USER_UNAUTHENTICATED = f"{SESSION_PREFIX}user_unauthenticated:"
@@ -42,21 +41,21 @@ class CustomCache(BaseCache):
             if isinstance(self.cache, RedisCache):
                 self.cache._cache.get_client().ping()
         except (redis.exceptions.ConnectionError, Exception) as exc:
-            logger.warning("Error connecting to cache: %s", str(exc))
+            LogInfo.warning("Error connecting to cache: %s", str(exc))
             self.cache = caches[FALLBACK_CACHE_ALIAS]
 
     def get(self, key: Any, default: Any | None = None, version: int | None = None) -> Any | None:
         try:
             return self.cache.get(key, default, version)
         except Exception as exc:
-            logger.error("Error getting cache key: %s", str(exc))
+            LogInfo.error("Error getting cache key: %s", str(exc))
             return default
 
     def get_many(self, keys: list[Any], version: int | None = None) -> dict[Any, Any | None]:
         try:
             return self.cache.get_many(keys, version)
         except Exception as exc:
-            logger.error("Error getting cache keys: %s", str(exc))
+            LogInfo.error("Error getting cache keys: %s", str(exc))
             return {}
 
     def set(
@@ -69,7 +68,7 @@ class CustomCache(BaseCache):
         try:
             return self.cache.set(key, value, timeout, version)
         except Exception as exc:
-            logger.warning("Error setting cache key: %s", str(exc))
+            LogInfo.warning("Error setting cache key: %s", str(exc))
 
     def get_or_set(
         self,
@@ -81,7 +80,7 @@ class CustomCache(BaseCache):
         try:
             return self.cache.get_or_set(key, default, timeout, version)
         except Exception as exc:
-            logger.warning("Error getting or setting cache key: %s", str(exc))
+            LogInfo.warning("Error getting or setting cache key: %s", str(exc))
             return default()
 
     def add(
@@ -94,27 +93,27 @@ class CustomCache(BaseCache):
         try:
             return self.cache.add(key, value, timeout, version)
         except Exception as exc:
-            logger.warning("Error adding cache key: %s", str(exc))
+            LogInfo.warning("Error adding cache key: %s", str(exc))
             return False
 
     def delete(self, key: Any, version: int | None = None) -> bool:
         try:
             return self.cache.delete(key, version)
         except Exception as exc:
-            logger.warning("Error deleting cache key: %s", str(exc))
+            LogInfo.warning("Error deleting cache key: %s", str(exc))
             return False
 
     def clear(self) -> None:
         try:
             self.cache.clear()
         except Exception as exc:
-            logger.warning("Error clearing cache: %s", str(exc))
+            LogInfo.warning("Error clearing cache: %s", str(exc))
 
     def has_key(self, key: Any, version: int | None = None) -> bool:
         try:
             return self.cache.has_key(key, version)
         except Exception as exc:
-            logger.warning("Error checking cache key: %s", str(exc))
+            LogInfo.warning("Error checking cache key: %s", str(exc))
             return False
 
     def set_many(
@@ -126,14 +125,14 @@ class CustomCache(BaseCache):
         try:
             return self.cache.set_many(data, timeout, version)
         except Exception as exc:
-            logger.warning("Error setting cache keys: %s", str(exc))
+            LogInfo.warning("Error setting cache keys: %s", str(exc))
             return []
 
     def delete_many(self, keys: list[Any], version: int | None = None) -> None:
         try:
             return self.cache.delete_many(keys, version)
         except Exception as exc:
-            logger.warning("Error deleting cache keys: %s", str(exc))
+            LogInfo.warning("Error deleting cache keys: %s", str(exc))
 
     def keys(self, search: str | None = None) -> list[Any]:
         try:
@@ -150,7 +149,7 @@ class CustomCache(BaseCache):
                 return filtered_keys
 
         except Exception as exc:
-            logger.warning("Error getting cache keys: %s", str(exc))
+            LogInfo.warning("Error getting cache keys: %s", str(exc))
             return []
 
 

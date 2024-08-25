@@ -1,5 +1,3 @@
-import logging
-
 import factory
 from django.apps import apps
 from django.conf import settings
@@ -9,7 +7,6 @@ from blog.models.category import BlogCategory
 from core.factories import CustomDjangoModelFactory
 
 fake = Faker()
-logger = logging.getLogger(__name__)
 
 available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
 

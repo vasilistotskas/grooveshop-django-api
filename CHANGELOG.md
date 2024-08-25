@@ -3,7 +3,17 @@
 
 
 
+## v0.149.2 (2024-08-25)
+
+### Fix
+
+* fix: minify styles css ([`a2956de`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a2956de6491db4005749038d36577a53521b909f))
+
 ## v0.149.1 (2024-08-25)
+
+### Chore
+
+* chore(release): release version 0.149.1 [skip ci] ([`fb4a1f4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fb4a1f4911fdfdd3c28b86072e76575c2fbcc780))
 
 ### Fix
 

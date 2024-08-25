@@ -8,6 +8,7 @@
       <p class="text-lg text-gray-600 dark:text-gray-400">{% trans "Version" %}: {{ VERSION }}</p>
     </div>
 
+    {% if REQUEST_DETAILS %}
     <div class="w-full grid gap-6 grid-cols-1 md:grid-cols-2">
       <div class="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-6">
         <h2 class="text-2xl font-semibold mb-4">{% trans "Request Headers" %}</h2>
@@ -24,5 +25,6 @@
         <pre class="bg-gray-100 dark:bg-gray-700 p-4 rounded text-sm text-gray-800 dark:text-gray-200 overflow-auto max-h-64">{{ REQUEST_DETAILS.meta|pprint }}</pre>
       </div>
     </div>
+    {% endif %}
   </div>
 {% endblock %}

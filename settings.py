@@ -135,6 +135,7 @@ THIRD_PARTY_APPS = [
     "extra_settings",
     "knox",
     "simple_history",
+    "compressor",
 ]
 
 # Combine all apps together for the INSTALLED_APPS setting
@@ -769,9 +770,13 @@ SPECTACULAR_SETTINGS = {
     },
 }
 
-STATICFILES_DIRS = (path.join(BASE_DIR, "static"),)
+STATICFILES_FINDERS = [
+    "django.contrib.staticfiles.finders.FileSystemFinder",
+    "django.contrib.staticfiles.finders.AppDirectoriesFinder",
+    "compressor.finders.CompressorFinder",
+]
 
-DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880
+STATICFILES_DIRS = (path.join(BASE_DIR, "static"),)
 
 if SYSTEM_ENV in ["dev", "ci", "docker"]:
     STATIC_URL = "/static/"
@@ -798,12 +803,16 @@ else:
     AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
     # s3 static settings
     STATIC_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/"
+    STATIC_ROOT = f"https://{AWS_S3_CUSTOM_DOMAIN}/static/"
     # s3 public media settings
     PUBLIC_MEDIA_LOCATION = "media"
     MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{PUBLIC_MEDIA_LOCATION}/"
     # s3 private media settings
     PRIVATE_MEDIA_LOCATION = "private"
     PRIVATE_FILE_STORAGE = "core.storages.PrivateMediaStorage"
+    # Django compressor settings
+    COMPRESS_ROOT = STATIC_ROOT
+    COMPRESS_URL = STATIC_URL
     STORAGES = {
         "default": {
             "BACKEND": "core.storages.PublicMediaStorage",
@@ -812,6 +821,8 @@ else:
             "BACKEND": "core.storages.StaticStorage",
         },
     }
+    COMPRESS_STORAGE = "core.storages.StaticStorage"
+    COMPRESS_OFFLINE_MANIFEST_STORAGE = "core.storages.StaticStorage"
     TINYMCE_JS_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/tinymce/tinymce.min.js"
     TINYMCE_JS_ROOT = f"https://{AWS_S3_CUSTOM_DOMAIN}/tinymce/"
 
@@ -835,6 +846,8 @@ TINYMCE_DEFAULT_CONFIG = {
 }
 
 TINYMCE_COMPRESSOR = False
+
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880
 
 
 def config_logging():

@@ -1,5 +1,6 @@
 {% load static %}
 {% load i18n %}
+{% load compress %}
 
 <!DOCTYPE html>
 <html lang="en">
@@ -12,7 +13,37 @@
     <meta name="keywords" content="{{ SITE_KEYWORDS }}" />
     <meta name="author" content="{{ SITE_AUTHOR }}" />
 
-    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    {% compress css %}
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}" type="text/css" >
+    <style>
+      .alert {
+        border-radius: 0;
+      }
+      .group:hover .group-hover\:block {
+        display: block;
+      }
+      body {
+        font-family: 'Roboto', sans-serif;
+      }
+      h1, h2, h3, h4, h5, h6 {
+        font-family: 'Roboto Mono', monospace;
+      }
+      pre, code {
+        font-family: 'Roboto Mono', monospace;
+        background-color: #f5f5f5;
+        padding: 10px;
+        border-radius: 4px;
+      }
+      .link {
+        color: #0070f3;
+        text-decoration: none;
+      }
+      .link:hover {
+        text-decoration: underline;
+      }
+    </style>
+    {% endcompress %}
+  
     <title>{{ SITE_NAME }}</title>
 
     <!-- Custom Font -->
@@ -24,33 +55,6 @@
       <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
     <![endif]-->
   </head>
-  <style>
-    .alert {
-      border-radius: 0;
-    }
-    .group:hover .group-hover\:block {
-      display: block;
-    }
-    body {
-      font-family: 'Roboto', sans-serif;
-    }
-    h1, h2, h3, h4, h5, h6 {
-      font-family: 'Roboto Mono', monospace;
-    }
-    pre, code {
-      font-family: 'Roboto Mono', monospace;
-      background-color: #f5f5f5;
-      padding: 10px;
-      border-radius: 4px;
-    }
-    .link {
-      color: #0070f3;
-      text-decoration: none;
-    }
-    .link:hover {
-      text-decoration: underline;
-    }
-  </style>
   {% load django_browser_reload %}
   <body class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
     <nav class="bg-white dark:bg-gray-800 shadow-lg py-4">

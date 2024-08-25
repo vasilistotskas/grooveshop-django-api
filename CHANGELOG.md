@@ -3,7 +3,17 @@
 
 
 
+## v0.150.0 (2024-08-25)
+
+### Feature
+
+* feat: django compressor for static files ([`52740f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/52740f3a19bf2e0b87c325dfbe908ab2899a4d1d))
+
 ## v0.149.2 (2024-08-25)
+
+### Chore
+
+* chore(release): release version 0.149.2 [skip ci] ([`40ba9f3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/40ba9f371f2254fbd6aa2b1dd29ab93f68faafa9))
 
 ### Fix
 

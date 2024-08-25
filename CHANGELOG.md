@@ -3,7 +3,19 @@
 
 
 
+## v0.149.1 (2024-08-25)
+
+### Fix
+
+* fix: correct CSS link in `account/base.html` and test ([`92943ef`](https://github.com/vasilistotskas/grooveshop-django-api/commit/92943ef3934bc6eb0b6b88c8fae39514d8a13d70))
+
+* fix: production static file location fix ([`40f15fb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/40f15fb94ff7d80f344ac7a3caf7acb439b45c6a))
+
 ## v0.149.0 (2024-08-24)
+
+### Chore
+
+* chore(release): release version 0.149.0 [skip ci] ([`4c7b7a4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4c7b7a4b49f95c405829748b1549417fbfcc0ae5))
 
 ### Feature
 

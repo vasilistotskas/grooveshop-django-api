@@ -27,7 +27,7 @@ class TestStorage(unittest.TestCase):
     @patch.dict(
         os.environ,
         {
-            "SYSTEM_ENV": "aws",
+            "USE_AWS": "True",
             "AWS_STORAGE_BUCKET_NAME": "grooveshop-static",
             "AWS_ACCESS_KEY_ID": "fake_access_key",
             "AWS_SECRET_ACCESS_KEY": "fake_secret_key",

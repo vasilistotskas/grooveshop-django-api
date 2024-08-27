@@ -3,7 +3,21 @@
 
 
 
+## v0.152.0 (2024-08-27)
+
+### Feature
+
+* feat: remove aws s3 first attempt ([`7ecaf6d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7ecaf6d51b482e293441a3f2d1ec30acd18cde19))
+
+### Fix
+
+* fix: AWS usage configurable ([`2013f18`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2013f181e498389399499f2d4a6d6f16440c3ce9))
+
 ## v0.151.0 (2024-08-25)
+
+### Chore
+
+* chore(release): release version 0.151.0 [skip ci] ([`cca6859`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cca6859bb1bd803c24b5a00904e19fb9bc2d4a27))
 
 ### Feature
 

@@ -3,7 +3,17 @@
 
 
 
+## v0.152.1 (2024-08-27)
+
+### Fix
+
+* fix: remove `docker` usage from env var `SYSTEM_ENV` ([`b3523f7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b3523f7e891fc3cea8dc39c00b9712e860ebc203))
+
 ## v0.152.0 (2024-08-27)
+
+### Chore
+
+* chore(release): release version 0.152.0 [skip ci] ([`0be88c4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0be88c48073e5863e4987c912cc362cf32b1b5fe))
 
 ### Feature
 

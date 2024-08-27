@@ -13,11 +13,7 @@ if __name__ == "__main__":
         "asgi:application",
         host="0.0.0.0",
         port=port,
-        workers=1,
         reload=is_local,
-        reload_dirs=[
-            ".",
-        ],
         log_level="debug",
         log_config={
             "version": 1,
@@ -27,5 +23,4 @@ if __name__ == "__main__":
                 },
             },
         },
-        access_log=False,
     )

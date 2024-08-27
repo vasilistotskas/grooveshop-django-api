@@ -29,11 +29,12 @@ class ImageAndSvgField(ImageField):
 
             f = data
             if not self.is_svg(f):
-                raise
+                raise ValidationError("Invalid file format", code="invalid_image")
 
             f.content_type = "image/svg+xml"
             if hasattr(f, "seek") and callable(f.seek):
                 f.seek(0)
+
         return f
 
     def is_svg(self, f: File | None) -> bool:

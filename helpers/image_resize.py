@@ -1,14 +1,14 @@
 from io import BytesIO
-from typing import Union
+from typing import IO
 
 from django.core.files import File
-from django.db.models.fields.files import ImageFieldFile
 from PIL import Image
+from PIL._typing import StrOrBytesPath
 
 
-def make_thumbnail(image: Union[ImageFieldFile, File], size: tuple) -> File:
-    if image:
-        img = Image.open(image)
+def make_thumbnail(fp: StrOrBytesPath | IO[bytes], size: tuple[float, float]) -> File:
+    if fp:
+        img = Image.open(fp)
         img.convert("RGB")
         img.thumbnail(size)
         thumb_io = BytesIO()
@@ -25,7 +25,7 @@ def make_thumbnail(image: Union[ImageFieldFile, File], size: tuple) -> File:
             img.save(thumb_io, "JPEG", quality=95)
 
         # Construct the File object for the thumbnail
-        thumbnail_name = image.name.split("/")[-1]  # Extract the filename
+        thumbnail_name = fp.name.split("/")[-1]  # Extract the filename
         thumbnail = File(thumb_io, name=thumbnail_name)
 
         return thumbnail

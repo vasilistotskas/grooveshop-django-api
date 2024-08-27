@@ -1,4 +1,3 @@
-import sys
 from datetime import datetime
 from datetime import timedelta
 from os import getenv
@@ -33,11 +32,9 @@ DEBUG = getenv("DEBUG", "True") == "True"
 
 DJANGO_ADMIN_FORCE_ALLAUTH = getenv("DJANGO_ADMIN_FORCE_ALLAUTH", "True") == "True"
 
-if SYSTEM_ENV not in ["docker", "production"] and "celery" in sys.argv[0]:
-    dotenv.set_key(dotenv_file, "DEBUG", "False")
-
 INTERNAL_IPS = [
     "127.0.0.1",
+    "0.0.0.0",
 ]
 
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 22500

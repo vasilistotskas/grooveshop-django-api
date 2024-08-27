@@ -6,7 +6,7 @@ import uvicorn
 if __name__ == "__main__":
     SYSTEM_ENV = getenv("SYSTEM_ENV", "dev")
 
-    is_local = SYSTEM_ENV in ["dev", "docker"]
+    is_local = SYSTEM_ENV in ["dev"]
     port = 8000
 
     uvicorn.run(

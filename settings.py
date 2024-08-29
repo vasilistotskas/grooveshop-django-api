@@ -792,9 +792,6 @@ if USE_AWS:
     # s3 private media settings
     PRIVATE_MEDIA_LOCATION = "private"
     PRIVATE_FILE_STORAGE = "core.storages.PrivateMediaStorage"
-    # Django compressor settings
-    COMPRESS_ROOT = STATIC_ROOT
-    COMPRESS_URL = STATIC_URL
     STORAGES = {
         "default": {
             "BACKEND": "core.storages.PublicMediaStorage",
@@ -820,6 +817,10 @@ else:
             "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
         },
     }
+
+COMPRESS_ENABLED = True
+COMPRESS_ROOT = STATIC_ROOT
+COMPRESS_URL = STATIC_URL
 
 TINYMCE_DEFAULT_CONFIG = {
     "theme": "silver",

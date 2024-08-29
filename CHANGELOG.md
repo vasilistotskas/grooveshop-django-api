@@ -3,7 +3,17 @@
 
 
 
+## v0.153.1 (2024-08-29)
+
+### Fix
+
+* fix: use env `USE_AWS` in upload_image method for tinymce ([`7b7dc0a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b7dc0a8237161c9fbb82ad941116a48d7cec29e))
+
 ## v0.153.0 (2024-08-29)
+
+### Chore
+
+* chore(release): release version 0.153.0 [skip ci] ([`8c6bc4f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8c6bc4fd5911cfb55b4f3afa2a20fce3504a7c57))
 
 ### Feature
 

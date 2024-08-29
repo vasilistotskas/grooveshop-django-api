@@ -29,6 +29,8 @@ class HomeView(View):
 @csrf_exempt
 @login_required
 def upload_image(request):
+    USE_AWS = os.getenv("USE_AWS", "False") == "True"
+
     user = request.user
     if not user.is_superuser:
         return JsonResponse({"Error Message": "You are not authorized to upload images"})
@@ -44,7 +46,7 @@ def upload_image(request):
         )
 
     debug = os.getenv("DEBUG", "True") == "True"
-    if not debug:
+    if not USE_AWS:
         storage = TinymceS3Storage()
         sanitized_name = sanitize_filename(file_obj.name)
         image_path = storage.save(sanitized_name, file_obj)

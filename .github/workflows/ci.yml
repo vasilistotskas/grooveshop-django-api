@@ -86,6 +86,7 @@ jobs:
         env:
           MEILI_HTTP_ADDR: meilisearch:7700
           MEILI_LOG_LEVEL: INFO
+          MEILI_MASTER_KEY: ${{ secrets.MEILI_MASTER_KEY }}
 
     steps:
       - name: Checkout code

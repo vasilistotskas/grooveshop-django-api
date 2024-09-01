@@ -9,6 +9,7 @@ on:
 
 env:
   SYSTEM_ENV: ci
+  MEILISEARCH_HOST: 127.0.0.1
 
 jobs:
   quality:
@@ -118,6 +119,9 @@ jobs:
           DB_PORT: ${{ matrix.db_port }}
           DB_USER: ${{ matrix.db_user }}
           DB_PASSWORD: ${{ matrix.db_password }}
+          MEILI_HTTP_ADDR: meilisearch:7700
+          MEILI_LOG_LEVEL: INFO
+          MEILI_MASTER_KEY: ${{ secrets.MEILI_MASTER_KEY }}
         run: |
           coverage run --rcfile=.coveragerc --source='.' -m pytest && coverage report
         timeout-minutes: 5

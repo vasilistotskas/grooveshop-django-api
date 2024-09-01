@@ -2567,7 +2567,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/Cart'
-        required: true
       security:
       - {}
       responses:
@@ -2655,7 +2654,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/Cart'
-        required: true
       security:
       - {}
       responses:
@@ -2906,7 +2904,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CartItem'
-        required: true
       security:
       - {}
       responses:
@@ -3016,7 +3013,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CartItem'
-        required: true
       security:
       - {}
       responses:
@@ -3556,34 +3552,10 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/notification/user:
-    get:
-      operationId: api_v1_notification_user_list
-      parameters:
-      - name: ordering
-        required: false
-        in: query
-        description: Which field to use when ordering the results.
-        schema:
-          type: string
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
-        schema:
-          type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
-        schema:
-          type: integer
-      - name: search
-        required: false
-        in: query
-        description: A search term.
-        schema:
-          type: string
+  /api/v1/notification/ids:
+    post:
+      operationId: api_v1_notification_ids_create
+      description: Returns the notifications for a list of ids.
       tags:
       - api
       security:
@@ -3593,81 +3565,14 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedNotificationUserList'
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
           description: ''
+  /api/v1/notification/ids{format}:
     post:
-      operationId: api_v1_notification_user_create
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/NotificationUser'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/NotificationUser'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/NotificationUser'
-        required: true
-      security:
-      - {}
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/NotificationUser'
-          description: ''
-  /api/v1/notification/user{format}:
-    get:
-      operationId: api_v1_notification_user_formatted_list
-      parameters:
-      - in: path
-        name: format
-        schema:
-          type: string
-          enum:
-          - .json
-        required: true
-      - name: ordering
-        required: false
-        in: query
-        description: Which field to use when ordering the results.
-        schema:
-          type: string
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
-        schema:
-          type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
-        schema:
-          type: integer
-      - name: search
-        required: false
-        in: query
-        description: A search term.
-        schema:
-          type: string
-      tags:
-      - api
-      security:
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedNotificationUserList'
-          description: ''
-    post:
-      operationId: api_v1_notification_user_formatted_create
+      operationId: api_v1_notification_ids_formatted_create
+      description: Returns the notifications for a list of ids.
       parameters:
       - in: path
         name: format
@@ -3678,26 +3583,16 @@ paths:
         required: true
       tags:
       - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/NotificationUser'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/NotificationUser'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/NotificationUser'
-        required: true
       security:
       - {}
       responses:
-        '201':
+        '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/NotificationUser'
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
           description: ''
   /api/v1/notification/user/{id}:
     get:
@@ -3919,15 +3814,9 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/notification/user/{id}/mark_all_as_seen:
+  /api/v1/notification/user/mark_all_as_seen:
     post:
       operationId: api_v1_notification_user_mark_all_as_seen_create
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-        required: true
       tags:
       - api
       requestBody:
@@ -3951,7 +3840,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NotificationUser'
           description: ''
-  /api/v1/notification/user/{id}/mark_all_as_seen{format}:
+  /api/v1/notification/user/mark_all_as_seen{format}:
     post:
       operationId: api_v1_notification_user_mark_all_as_seen_formatted_create
       parameters:
@@ -3962,11 +3851,6 @@ paths:
           enum:
           - .json
         required: true
-      - in: path
-        name: id
-        schema:
-          type: string
-        required: true
       tags:
       - api
       requestBody:
@@ -3990,15 +3874,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/NotificationUser'
           description: ''
-  /api/v1/notification/user/{id}/mark_all_as_unseen:
+  /api/v1/notification/user/mark_all_as_unseen:
     post:
       operationId: api_v1_notification_user_mark_all_as_unseen_create
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-        required: true
       tags:
       - api
       requestBody:
@@ -4022,7 +3900,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NotificationUser'
           description: ''
-  /api/v1/notification/user/{id}/mark_all_as_unseen{format}:
+  /api/v1/notification/user/mark_all_as_unseen{format}:
     post:
       operationId: api_v1_notification_user_mark_all_as_unseen_formatted_create
       parameters:
@@ -4033,11 +3911,6 @@ paths:
           enum:
           - .json
         required: true
-      - in: path
-        name: id
-        schema:
-          type: string
-        required: true
       tags:
       - api
       requestBody:
@@ -4061,15 +3934,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/NotificationUser'
           description: ''
-  /api/v1/notification/user/{id}/mark_as_seen:
+  /api/v1/notification/user/mark_as_seen:
     post:
       operationId: api_v1_notification_user_mark_as_seen_create
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-        required: true
       tags:
       - api
       requestBody:
@@ -4093,7 +3960,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NotificationUserAction'
           description: ''
-  /api/v1/notification/user/{id}/mark_as_seen{format}:
+  /api/v1/notification/user/mark_as_seen{format}:
     post:
       operationId: api_v1_notification_user_mark_as_seen_formatted_create
       parameters:
@@ -4104,11 +3971,6 @@ paths:
           enum:
           - .json
         required: true
-      - in: path
-        name: id
-        schema:
-          type: string
-        required: true
       tags:
       - api
       requestBody:
@@ -4132,15 +3994,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/NotificationUserAction'
           description: ''
-  /api/v1/notification/user/{id}/mark_as_unseen:
+  /api/v1/notification/user/mark_as_unseen:
     post:
       operationId: api_v1_notification_user_mark_as_unseen_create
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-        required: true
       tags:
       - api
       requestBody:
@@ -4164,7 +4020,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NotificationUserAction'
           description: ''
-  /api/v1/notification/user/{id}/mark_as_unseen{format}:
+  /api/v1/notification/user/mark_as_unseen{format}:
     post:
       operationId: api_v1_notification_user_mark_as_unseen_formatted_create
       parameters:
@@ -4175,11 +4031,6 @@ paths:
           enum:
           - .json
         required: true
-      - in: path
-        name: id
-        schema:
-          type: string
-        required: true
       tags:
       - api
       requestBody:
@@ -4203,15 +4054,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/NotificationUserAction'
           description: ''
-  /api/v1/notification/user/{id}/unseen_count:
+  /api/v1/notification/user/unseen_count:
     get:
       operationId: api_v1_notification_user_unseen_count_retrieve
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-        required: true
       tags:
       - api
       security:
@@ -4223,7 +4068,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NotificationUser'
           description: ''
-  /api/v1/notification/user/{id}/unseen_count{format}:
+  /api/v1/notification/user/unseen_count{format}:
     get:
       operationId: api_v1_notification_user_unseen_count_formatted_retrieve
       parameters:
@@ -4233,11 +4078,6 @@ paths:
           type: string
           enum:
           - .json
-        required: true
-      - in: path
-        name: id
-        schema:
-          type: string
         required: true
       tags:
       - api
@@ -7421,34 +7261,17 @@ paths:
           description: ''
   /api/v1/search/blog/post:
     get:
-      operationId: api_v1_search_blog_post_list
-      parameters:
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
-        schema:
-          type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
-        schema:
-          type: integer
+      operationId: api_v1_search_blog_post_retrieve
       tags:
       - api
       security:
       - {}
       responses:
         '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedSearchBlogPostList'
-          description: ''
+          description: No response body
   /api/v1/search/blog/post{format}:
     get:
-      operationId: api_v1_search_blog_post_formatted_list
+      operationId: api_v1_search_blog_post_formatted_retrieve
       parameters:
       - in: path
         name: format
@@ -7457,59 +7280,26 @@ paths:
           enum:
           - .json
         required: true
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
-        schema:
-          type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
-        schema:
-          type: integer
       tags:
       - api
       security:
       - {}
       responses:
         '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedSearchBlogPostList'
-          description: ''
+          description: No response body
   /api/v1/search/product:
     get:
-      operationId: api_v1_search_product_list
-      parameters:
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
-        schema:
-          type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
-        schema:
-          type: integer
+      operationId: api_v1_search_product_retrieve
       tags:
       - api
       security:
       - {}
       responses:
         '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedSearchProductList'
-          description: ''
+          description: No response body
   /api/v1/search/product{format}:
     get:
-      operationId: api_v1_search_product_formatted_list
+      operationId: api_v1_search_product_formatted_retrieve
       parameters:
       - in: path
         name: format
@@ -7518,29 +7308,13 @@ paths:
           enum:
           - .json
         required: true
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
-        schema:
-          type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
-        schema:
-          type: integer
       tags:
       - api
       security:
       - {}
       responses:
         '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaginatedSearchProductList'
-          description: ''
+          description: No response body
   /api/v1/slide:
     get:
       operationId: api_v1_slide_list
@@ -9171,77 +8945,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/BlogComment'
           description: ''
-  /api/v1/user/account/{id}/change_username:
-    post:
-      operationId: api_v1_user_account_change_username_create
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: integer
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/UsernameUpdate'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/UsernameUpdate'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UsernameUpdate'
-        required: true
-      security:
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UsernameUpdate'
-          description: ''
-  /api/v1/user/account/{id}/change_username{format}:
-    post:
-      operationId: api_v1_user_account_change_username_formatted_create
-      parameters:
-      - in: path
-        name: format
-        schema:
-          type: string
-          enum:
-          - .json
-        required: true
-      - in: path
-        name: id
-        schema:
-          type: integer
-        required: true
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/UsernameUpdate'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/UsernameUpdate'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UsernameUpdate'
-        required: true
-      security:
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UsernameUpdate'
-          description: ''
   /api/v1/user/account/{id}/favourite_products:
     get:
       operationId: api_v1_user_account_favourite_products_retrieve
@@ -9335,6 +9038,53 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BlogPost'
+          description: ''
+  /api/v1/user/account/{id}/notifications:
+    get:
+      operationId: api_v1_user_account_notifications_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationUser'
+          description: ''
+  /api/v1/user/account/{id}/notifications{format}:
+    get:
+      operationId: api_v1_user_account_notifications_formatted_retrieve
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationUser'
           description: ''
   /api/v1/user/account/{id}/orders:
     get:
@@ -10487,7 +10237,7 @@ components:
           type: string
           format: uuid
           readOnly: true
-        mainImageFilename:
+        mainImagePath:
           type: string
           readOnly: true
       required:
@@ -10497,7 +10247,7 @@ components:
       - isActive
       - isStaff
       - isSuperuser
-      - mainImageFilename
+      - mainImagePath
       - pk
       - updatedAt
       - uuid
@@ -10633,10 +10383,7 @@ components:
         absoluteUrl:
           type: string
           readOnly: true
-        mainImageAbsoluteUrl:
-          type: string
-          readOnly: true
-        mainImageFilename:
+        mainImagePath:
           type: string
           readOnly: true
         recursivePostCount:
@@ -10648,8 +10395,7 @@ components:
       - createdAt
       - id
       - level
-      - mainImageAbsoluteUrl
-      - mainImageFilename
+      - mainImagePath
       - recursivePostCount
       - slug
       - sortOrder
@@ -10753,14 +10499,6 @@ components:
                   type: string
                 body:
                   type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
-                  type: string
             en:
               type: object
               properties:
@@ -10770,14 +10508,6 @@ components:
                   type: string
                 body:
                   type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
-                  type: string
             de:
               type: object
               properties:
@@ -10786,14 +10516,6 @@ components:
                 subtitle:
                   type: string
                 body:
-                  type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
                   type: string
         id:
           type: integer
@@ -10842,10 +10564,7 @@ components:
           type: string
           format: uuid
           readOnly: true
-        mainImageAbsoluteUrl:
-          type: string
-          readOnly: true
-        mainImageFilename:
+        mainImagePath:
           type: string
           readOnly: true
         likesCount:
@@ -10869,8 +10588,7 @@ components:
       - id
       - likes
       - likesCount
-      - mainImageAbsoluteUrl
-      - mainImageFilename
+      - mainImagePath
       - publishedAt
       - slug
       - tags
@@ -10904,14 +10622,6 @@ components:
                   type: string
                 body:
                   type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
-                  type: string
             en:
               type: object
               properties:
@@ -10921,14 +10631,6 @@ components:
                   type: string
                 body:
                   type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
-                  type: string
             de:
               type: object
               properties:
@@ -10937,14 +10639,6 @@ components:
                 subtitle:
                   type: string
                 body:
-                  type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
                   type: string
         id:
           type: integer
@@ -10994,6 +10688,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         totalDiscountValue:
           type: number
           format: double
@@ -11001,6 +10696,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         totalVatValue:
           type: number
           format: double
@@ -11008,6 +10704,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         totalItems:
           type: integer
           readOnly: true
@@ -11066,6 +10763,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         finalPrice:
           type: number
           format: double
@@ -11073,6 +10771,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         discountValue:
           type: number
           format: double
@@ -11080,6 +10779,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         priceSavePercent:
           type: number
           format: double
@@ -11101,6 +10801,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         totalPrice:
           type: number
           format: double
@@ -11108,6 +10809,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         totalDiscountValue:
           type: number
           format: double
@@ -11115,6 +10817,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         createdAt:
           type: string
           format: date-time
@@ -11268,6 +10971,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         totalPriceExtra:
           type: number
           format: double
@@ -11275,6 +10979,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         fullAddress:
           type: string
           readOnly: true
@@ -11401,18 +11106,14 @@ components:
           type: string
           format: uuid
           readOnly: true
-        mainImageAbsoluteUrl:
-          type: string
-          readOnly: true
-        mainImageFilename:
+        mainImagePath:
           type: string
           readOnly: true
       required:
       - alpha2
       - alpha3
       - createdAt
-      - mainImageAbsoluteUrl
-      - mainImageFilename
+      - mainImagePath
       - sortOrder
       - translations
       - updatedAt
@@ -11445,18 +11146,6 @@ components:
         * `5` - Fourth Floor
         * `6` - Fifth Floor
         * `7` - Sixth Floor Plus
-    KindEnum:
-      enum:
-      - SUCCESS
-      - INFO
-      - ERROR
-      - WARNING
-      type: string
-      description: |-
-        * `SUCCESS` - Success
-        * `INFO` - Info
-        * `ERROR` - Error
-        * `WARNING` - Warning
     LocationTypeEnum:
       enum:
       - 0
@@ -11467,6 +11156,80 @@ components:
         * `0` - Αρχική
         * `1` - Office
         * `2` - Other
+    Notification:
+      type: object
+      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
+      properties:
+        translations:
+          type: object
+          properties:
+            el:
+              type: object
+              properties:
+                title:
+                  type: string
+                message:
+                  type: string
+            en:
+              type: object
+              properties:
+                title:
+                  type: string
+                message:
+                  type: string
+            de:
+              type: object
+              properties:
+                title:
+                  type: string
+                message:
+                  type: string
+        id:
+          type: integer
+          readOnly: true
+        link:
+          type: string
+          format: uri
+          nullable: true
+          maxLength: 200
+        kind:
+          $ref: '#/components/schemas/NotificationKindEnum'
+        expiryDate:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+      required:
+      - createdAt
+      - id
+      - translations
+      - updatedAt
+      - uuid
+    NotificationKindEnum:
+      enum:
+      - error
+      - success
+      - info
+      - warning
+      - danger
+      type: string
+      description: |-
+        * `error` - Error
+        * `success` - Success
+        * `info` - Info
+        * `warning` - Warning
+        * `danger` - Danger
     NotificationUser:
       type: object
       properties:
@@ -11479,6 +11242,10 @@ components:
           type: integer
         seen:
           type: boolean
+        seenAt:
+          type: string
+          format: date-time
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -11501,10 +11268,12 @@ components:
     NotificationUserAction:
       type: object
       properties:
-        notificationUserId:
-          type: integer
+        notificationUserIds:
+          type: array
+          items:
+            type: integer
       required:
-      - notificationUserId
+      - notificationUserIds
     NullEnum:
       enum:
       - null
@@ -11615,6 +11384,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         totalPriceExtra:
           type: number
           format: double
@@ -11622,6 +11392,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         fullAddress:
           type: string
           readOnly: true
@@ -11752,6 +11523,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         totalPriceExtra:
           type: number
           format: double
@@ -11759,6 +11531,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         fullAddress:
           type: string
           readOnly: true
@@ -11822,6 +11595,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
       required:
       - createdAt
       - id
@@ -12050,29 +11824,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Country'
-    PaginatedNotificationUserList:
-      type: object
-      required:
-      - count
-      - results
-      properties:
-        count:
-          type: integer
-          example: 123
-        next:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=4
-        previous:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=2
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/NotificationUser'
     PaginatedOrderList:
       type: object
       required:
@@ -12257,52 +12008,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Region'
-    PaginatedSearchBlogPostList:
-      type: object
-      required:
-      - count
-      - results
-      properties:
-        count:
-          type: integer
-          example: 123
-        next:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=4
-        previous:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=2
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/SearchBlogPost'
-    PaginatedSearchProductList:
-      type: object
-      required:
-      - count
-      - results
-      properties:
-        count:
-          type: integer
-          example: 123
-        next:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=4
-        previous:
-          type: string
-          nullable: true
-          format: uri
-          example: http://api.example.org/accounts/?page=2
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/SearchProduct'
     PaginatedSlideList:
       type: object
       required:
@@ -12555,7 +12260,7 @@ components:
           type: string
           format: uuid
           readOnly: true
-        mainImageFilename:
+        mainImagePath:
           type: string
           readOnly: true
     PatchedBlogAuthor:
@@ -12678,10 +12383,7 @@ components:
         absoluteUrl:
           type: string
           readOnly: true
-        mainImageAbsoluteUrl:
-          type: string
-          readOnly: true
-        mainImageFilename:
+        mainImagePath:
           type: string
           readOnly: true
         recursivePostCount:
@@ -12770,14 +12472,6 @@ components:
                   type: string
                 body:
                   type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
-                  type: string
             en:
               type: object
               properties:
@@ -12787,14 +12481,6 @@ components:
                   type: string
                 body:
                   type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
-                  type: string
             de:
               type: object
               properties:
@@ -12803,14 +12489,6 @@ components:
                 subtitle:
                   type: string
                 body:
-                  type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
                   type: string
         id:
           type: integer
@@ -12859,10 +12537,7 @@ components:
           type: string
           format: uuid
           readOnly: true
-        mainImageAbsoluteUrl:
-          type: string
-          readOnly: true
-        mainImageFilename:
+        mainImagePath:
           type: string
           readOnly: true
         likesCount:
@@ -12893,14 +12568,6 @@ components:
                   type: string
                 body:
                   type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
-                  type: string
             en:
               type: object
               properties:
@@ -12910,14 +12577,6 @@ components:
                   type: string
                 body:
                   type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
-                  type: string
             de:
               type: object
               properties:
@@ -12926,14 +12585,6 @@ components:
                 subtitle:
                   type: string
                 body:
-                  type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
                   type: string
         id:
           type: integer
@@ -12975,6 +12626,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         totalDiscountValue:
           type: number
           format: double
@@ -12982,6 +12634,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         totalVatValue:
           type: number
           format: double
@@ -12989,6 +12642,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         totalItems:
           type: integer
           readOnly: true
@@ -13036,6 +12690,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         finalPrice:
           type: number
           format: double
@@ -13043,6 +12698,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         discountValue:
           type: number
           format: double
@@ -13050,6 +12706,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         priceSavePercent:
           type: number
           format: double
@@ -13071,6 +12728,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         totalPrice:
           type: number
           format: double
@@ -13078,6 +12736,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         totalDiscountValue:
           type: number
           format: double
@@ -13085,6 +12744,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         createdAt:
           type: string
           format: date-time
@@ -13156,10 +12816,7 @@ components:
           type: string
           format: uuid
           readOnly: true
-        mainImageAbsoluteUrl:
-          type: string
-          readOnly: true
-        mainImageFilename:
+        mainImagePath:
           type: string
           readOnly: true
     PatchedNotificationUser:
@@ -13174,6 +12831,10 @@ components:
           type: integer
         seen:
           type: boolean
+        seenAt:
+          type: string
+          format: date-time
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -13292,6 +12953,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         totalPriceExtra:
           type: number
           format: double
@@ -13299,6 +12961,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         fullAddress:
           type: string
           readOnly: true
@@ -13383,14 +13046,6 @@ components:
                   type: string
                 description:
                   type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
-                  type: string
             en:
               type: object
               properties:
@@ -13398,28 +13053,12 @@ components:
                   type: string
                 description:
                   type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
-                  type: string
             de:
               type: object
               properties:
                 name:
                   type: string
                 description:
-                  type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
                   type: string
         id:
           type: integer
@@ -13499,6 +13138,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         priceSavePercent:
           type: number
           format: double
@@ -13516,6 +13156,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         finalPrice:
           type: number
           format: double
@@ -13523,10 +13164,8 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-        mainImageAbsoluteUrl:
-          type: string
           readOnly: true
-        mainImageFilename:
+        mainImagePath:
           type: string
           readOnly: true
         reviewAverage:
@@ -13624,22 +13263,13 @@ components:
           type: string
           format: uuid
           readOnly: true
-        categoryMenuImageOneAbsoluteUrl:
+        categoryMenuImageOnePath:
           type: string
           readOnly: true
-        categoryMenuImageOneFilename:
+        categoryMenuImageTwoPath:
           type: string
           readOnly: true
-        categoryMenuImageTwoAbsoluteUrl:
-          type: string
-          readOnly: true
-        categoryMenuImageTwoFilename:
-          type: string
-          readOnly: true
-        categoryMenuMainBannerAbsoluteUrl:
-          type: string
-          readOnly: true
-        categoryMenuMainBannerFilename:
+        categoryMenuMainBannerPath:
           type: string
           readOnly: true
         absoluteUrl:
@@ -13723,10 +13353,7 @@ components:
           type: string
           format: uuid
           readOnly: true
-        mainImageAbsoluteUrl:
-          type: string
-          readOnly: true
-        mainImageFilename:
+        mainImagePath:
           type: string
           readOnly: true
     PatchedProductReview:
@@ -13921,10 +13548,7 @@ components:
           type: string
           format: uuid
           readOnly: true
-        mainImageAbsoluteUrl:
-          type: string
-          readOnly: true
-        mainImageFilename:
+        mainImagePath:
           type: string
           readOnly: true
     PatchedSlider:
@@ -13990,10 +13614,7 @@ components:
           type: string
           format: uuid
           readOnly: true
-        mainImageAbsoluteUrl:
-          type: string
-          readOnly: true
-        mainImageFilename:
+        mainImagePath:
           type: string
           readOnly: true
     PatchedTip:
@@ -14031,7 +13652,7 @@ components:
                 url:
                   type: string
         kind:
-          $ref: '#/components/schemas/KindEnum'
+          $ref: '#/components/schemas/TipKindEnum'
         icon:
           type: string
           format: uri
@@ -14244,14 +13865,6 @@ components:
                   type: string
                 description:
                   type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
-                  type: string
             en:
               type: object
               properties:
@@ -14259,28 +13872,12 @@ components:
                   type: string
                 description:
                   type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
-                  type: string
             de:
               type: object
               properties:
                 name:
                   type: string
                 description:
-                  type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
                   type: string
         id:
           type: integer
@@ -14360,6 +13957,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         priceSavePercent:
           type: number
           format: double
@@ -14377,6 +13975,7 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
+          readOnly: true
         finalPrice:
           type: number
           format: double
@@ -14384,10 +13983,8 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-        mainImageAbsoluteUrl:
-          type: string
           readOnly: true
-        mainImageFilename:
+        mainImagePath:
           type: string
           readOnly: true
         reviewAverage:
@@ -14420,8 +14017,7 @@ components:
       - finalPrice
       - id
       - likesCount
-      - mainImageAbsoluteUrl
-      - mainImageFilename
+      - mainImagePath
       - price
       - priceSavePercent
       - reviewAverage
@@ -14508,22 +14104,13 @@ components:
           type: string
           format: uuid
           readOnly: true
-        categoryMenuImageOneAbsoluteUrl:
+        categoryMenuImageOnePath:
           type: string
           readOnly: true
-        categoryMenuImageOneFilename:
+        categoryMenuImageTwoPath:
           type: string
           readOnly: true
-        categoryMenuImageTwoAbsoluteUrl:
-          type: string
-          readOnly: true
-        categoryMenuImageTwoFilename:
-          type: string
-          readOnly: true
-        categoryMenuMainBannerAbsoluteUrl:
-          type: string
-          readOnly: true
-        categoryMenuMainBannerFilename:
+        categoryMenuMainBannerPath:
           type: string
           readOnly: true
         absoluteUrl:
@@ -14534,12 +14121,9 @@ components:
           readOnly: true
       required:
       - absoluteUrl
-      - categoryMenuImageOneAbsoluteUrl
-      - categoryMenuImageOneFilename
-      - categoryMenuImageTwoAbsoluteUrl
-      - categoryMenuImageTwoFilename
-      - categoryMenuMainBannerAbsoluteUrl
-      - categoryMenuMainBannerFilename
+      - categoryMenuImageOnePath
+      - categoryMenuImageTwoPath
+      - categoryMenuMainBannerPath
       - children
       - createdAt
       - id
@@ -14632,18 +14216,14 @@ components:
           type: string
           format: uuid
           readOnly: true
-        mainImageAbsoluteUrl:
-          type: string
-          readOnly: true
-        mainImageFilename:
+        mainImagePath:
           type: string
           readOnly: true
       required:
       - createdAt
       - id
       - image
-      - mainImageAbsoluteUrl
-      - mainImageFilename
+      - mainImagePath
       - product
       - sortOrder
       - translations
@@ -14801,242 +14381,6 @@ components:
       - translations
       - updatedAt
       - uuid
-    SearchBlogPost:
-      type: object
-      properties:
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/SearchBlogPostResult'
-        headlines:
-          type: object
-          additionalProperties:
-            type: string
-        searchRanks:
-          type: object
-          additionalProperties:
-            type: number
-            format: double
-        resultCount:
-          type: integer
-        similarities:
-          type: object
-          additionalProperties:
-            type: number
-            format: double
-        distances:
-          type: object
-          additionalProperties:
-            type: number
-            format: double
-      required:
-      - distances
-      - headlines
-      - resultCount
-      - results
-      - searchRanks
-      - similarities
-    SearchBlogPostResult:
-      type: object
-      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
-      properties:
-        id:
-          type: integer
-        slug:
-          type: string
-        mainImageFilename:
-          type: string
-        absoluteUrl:
-          type: string
-        translations:
-          type: object
-          properties:
-            el:
-              type: object
-              properties:
-                title:
-                  type: string
-                subtitle:
-                  type: string
-                body:
-                  type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
-                  type: string
-            en:
-              type: object
-              properties:
-                title:
-                  type: string
-                subtitle:
-                  type: string
-                body:
-                  type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
-                  type: string
-            de:
-              type: object
-              properties:
-                title:
-                  type: string
-                subtitle:
-                  type: string
-                body:
-                  type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
-                  type: string
-        searchRank:
-          type: number
-          format: double
-          readOnly: true
-        headline:
-          type: string
-          readOnly: true
-        similarity:
-          type: number
-          format: double
-          readOnly: true
-      required:
-      - absoluteUrl
-      - headline
-      - id
-      - mainImageFilename
-      - searchRank
-      - similarity
-      - slug
-      - translations
-    SearchProduct:
-      type: object
-      properties:
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/SearchProductResult'
-        headlines:
-          type: object
-          additionalProperties:
-            type: string
-        searchRanks:
-          type: object
-          additionalProperties:
-            type: number
-            format: double
-        resultCount:
-          type: integer
-        similarities:
-          type: object
-          additionalProperties:
-            type: number
-            format: double
-        distances:
-          type: object
-          additionalProperties:
-            type: number
-            format: double
-      required:
-      - distances
-      - headlines
-      - resultCount
-      - results
-      - searchRanks
-      - similarities
-    SearchProductResult:
-      type: object
-      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
-      properties:
-        id:
-          type: integer
-        slug:
-          type: string
-        mainImageFilename:
-          type: string
-        absoluteUrl:
-          type: string
-        translations:
-          type: object
-          properties:
-            el:
-              type: object
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
-                  type: string
-            en:
-              type: object
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
-                  type: string
-            de:
-              type: object
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-                searchDocument:
-                  type: string
-                searchVector:
-                  type: string
-                searchDocumentDirty:
-                  type: string
-                searchVectorDirty:
-                  type: string
-        searchRank:
-          type: number
-          format: double
-          readOnly: true
-        headline:
-          type: string
-          readOnly: true
-        similarity:
-          type: number
-          format: double
-          readOnly: true
-      required:
-      - absoluteUrl
-      - headline
-      - id
-      - mainImageFilename
-      - searchRank
-      - similarity
-      - slug
-      - translations
     Slide:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -15129,10 +14473,7 @@ components:
           type: string
           format: uuid
           readOnly: true
-        mainImageAbsoluteUrl:
-          type: string
-          readOnly: true
-        mainImageFilename:
+        mainImagePath:
           type: string
           readOnly: true
       required:
@@ -15140,8 +14481,7 @@ components:
       - dateEnd
       - dateStart
       - id
-      - mainImageAbsoluteUrl
-      - mainImageFilename
+      - mainImagePath
       - slider
       - sortOrder
       - translations
@@ -15210,17 +14550,13 @@ components:
           type: string
           format: uuid
           readOnly: true
-        mainImageAbsoluteUrl:
-          type: string
-          readOnly: true
-        mainImageFilename:
+        mainImagePath:
           type: string
           readOnly: true
       required:
       - createdAt
       - id
-      - mainImageAbsoluteUrl
-      - mainImageFilename
+      - mainImagePath
       - translations
       - updatedAt
       - uuid
@@ -15309,7 +14645,7 @@ components:
                 url:
                   type: string
         kind:
-          $ref: '#/components/schemas/KindEnum'
+          $ref: '#/components/schemas/TipKindEnum'
         icon:
           type: string
           format: uri
@@ -15339,6 +14675,18 @@ components:
       - translations
       - updatedAt
       - uuid
+    TipKindEnum:
+      enum:
+      - SUCCESS
+      - INFO
+      - ERROR
+      - WARNING
+      type: string
+      description: |-
+        * `SUCCESS` - Success
+        * `INFO` - Info
+        * `ERROR` - Error
+        * `WARNING` - Warning
     UserAddress:
       type: object
       properties:
@@ -15428,14 +14776,6 @@ components:
       - user
       - uuid
       - zipcode
-    UsernameUpdate:
-      type: object
-      properties:
-        username:
-          type: string
-          maxLength: 30
-      required:
-      - username
     Vat:
       type: object
       properties:

@@ -36,13 +36,9 @@ class BlogCategoryModelTestCase(TestCase):
     def test_post_count(self):
         self.assertEqual(self.category.post_count, 0)
 
-    def test_main_image_absolute_url(self):
-        expected_url = settings.APP_BASE_URL + self.category.image.url
-        self.assertEqual(self.category.main_image_absolute_url, expected_url)
-
-    def test_main_image_filename(self):
-        expected_filename = os.path.basename(self.category.image.name)
-        self.assertEqual(self.category.main_image_filename, expected_filename)
+    def test_main_image_path(self):
+        expected_filename = f"media/uploads/blog/{os.path.basename(self.category.image.name)}"
+        self.assertEqual(self.category.main_image_path, expected_filename)
 
     def tearDown(self) -> None:
         BlogCategory.objects.all().delete()

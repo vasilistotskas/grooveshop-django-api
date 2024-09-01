@@ -38,13 +38,9 @@ class CountryModelTestCase(TestCase):
         self.assertTrue(queryset.exists())
         self.assertTrue(self.country in queryset)
 
-    def test_main_image_absolute_url(self):
-        expected_url = settings.APP_BASE_URL + self.country.image_flag.url
-        self.assertEqual(self.country.main_image_absolute_url, expected_url)
-
-    def test_main_image_filename(self):
-        expected_filename = os.path.basename(self.country.image_flag.name)
-        self.assertEqual(self.country.main_image_filename, expected_filename)
+    def test_main_image_path(self):
+        expected_filename = f"media/uploads/country/{os.path.basename(self.country.image_flag.name)}"
+        self.assertEqual(self.country.main_image_path, expected_filename)
 
     def tearDown(self) -> None:
         Country.objects.all().delete()

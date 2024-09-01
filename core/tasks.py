@@ -16,12 +16,8 @@ from django.db import transaction
 from django.template.loader import render_to_string
 from django.utils.timezone import now
 
-from blog.models.post import BlogPost
 from core import celery_app
 from core.logging import LogInfo
-from core.search import update_translation_search_documents
-from core.search import update_translation_search_vectors
-from product.models.product import Product
 
 User = get_user_model()
 languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
@@ -264,29 +260,3 @@ def optimize_images():
                 LogInfo.error(f"Error optimizing image: {e}")
 
     return "Images optimized successfully."
-
-
-@celery_app.task
-def update_product_translation_search_vectors():
-    total_updated = update_translation_search_vectors(Product, "product", [("name", "A"), ("description", "C")])
-    LogInfo.info(f"Updated {total_updated} product translation search vectors.")
-
-
-@celery_app.task
-def update_blog_post_translation_search_vectors():
-    total_updated = update_translation_search_vectors(
-        BlogPost, "blog", [("title", "A"), ("subtitle", "B"), ("body", "C")]
-    )
-    LogInfo.info(f"Updated {total_updated} blog post translation search vectors.")
-
-
-@celery_app.task
-def update_product_translation_search_documents():
-    total_updated = update_translation_search_documents(Product, "product", ["name", "description"])
-    LogInfo.info(f"Updated {total_updated} product translation search documents.")
-
-
-@celery_app.task
-def update_blog_post_translation_search_documents():
-    total_updated = update_translation_search_documents(BlogPost, "blog", ["title", "subtitle", "body"])
-    LogInfo.info(f"Updated {total_updated} blog post translation search documents.")

@@ -96,29 +96,17 @@ class CategoryModelTestCase(TestCase):
         expected_url = f"/product/category/{self.sub_category.id}/" f"{self.category.slug}/{self.sub_category.slug}"
         self.assertEqual(url, expected_url)
 
-    def test_category_menu_image_one_absolute_url(self):
-        expected_url = settings.APP_BASE_URL + self.category.menu_image_one.url
-        self.assertEqual(self.category.category_menu_image_one_absolute_url, expected_url)
+    def category_menu_image_one_path(self):
+        expected_path = f"media/uploads/categories/{os.path.basename(self.category.menu_image_one.name)}"
+        self.assertEqual(self.category.category_menu_image_one_path, expected_path)
 
-    def category_menu_image_one_filename(self):
-        expected_filename = os.path.basename(self.category.menu_image_one.name)
-        self.assertEqual(self.category.category_menu_image_one_filename, expected_filename)
+    def category_menu_image_two_path(self):
+        expected_path = f"media/uploads/categories/{os.path.basename(self.category.menu_image_two.name)}"
+        self.assertEqual(self.category.category_menu_image_two_path, expected_path)
 
-    def test_category_menu_image_two_absolute_url(self):
-        expected_url = settings.APP_BASE_URL + self.category.menu_image_two.url
-        self.assertEqual(self.category.category_menu_image_two_absolute_url, expected_url)
-
-    def category_menu_image_two_filename(self):
-        expected_filename = os.path.basename(self.category.menu_image_two.name)
-        self.assertEqual(self.category.category_menu_image_two_filename, expected_filename)
-
-    def test_category_menu_main_banner_absolute_url(self):
-        expected_url = settings.APP_BASE_URL + self.category.menu_main_banner.url
-        self.assertEqual(self.category.category_menu_main_banner_absolute_url, expected_url)
-
-    def category_menu_main_banner_filename(self):
-        expected_filename = os.path.basename(self.category.menu_main_banner.name)
-        self.assertEqual(self.category.category_menu_main_banner_filename, expected_filename)
+    def category_menu_main_banner_path(self):
+        expected_path = f"media/uploads/categories/{os.path.basename(self.category.menu_main_banner.name)}"
+        self.assertEqual(self.category.category_menu_main_banner_path, expected_path)
 
     def tearDown(self) -> None:
         ProductCategory.objects.all().delete()

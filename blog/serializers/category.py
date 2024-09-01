@@ -38,8 +38,7 @@ class BlogCategorySerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "updated_at",
             "uuid",
             "absolute_url",
-            "main_image_absolute_url",
-            "main_image_filename",
+            "main_image_path",
             "recursive_post_count",
         )
         read_only_fields = (
@@ -47,7 +46,6 @@ class BlogCategorySerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "updated_at",
             "uuid",
             "absolute_url",
-            "main_image_absolute_url",
-            "main_image_filename",
+            "main_image_path",
             "recursive_post_count",
         )

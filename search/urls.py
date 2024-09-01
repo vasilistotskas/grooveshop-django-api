@@ -1,19 +1,19 @@
 from django.urls import path
 from rest_framework.urlpatterns import format_suffix_patterns
 
-from search.views import SearchBlogPost
-from search.views import SearchProduct
+from search.views import blog_post_meili_search
+from search.views import product_meili_search
 
 urlpatterns = [
     path(
-        "search/product",
-        SearchProduct.as_view({"get": "list"}),
-        name="search-product",
+        "search/blog/post",
+        blog_post_meili_search,
+        name="search-blog-post",
     ),
     path(
-        "search/blog/post",
-        SearchBlogPost.as_view({"get": "list"}),
-        name="search-blog-post",
+        "search/product",
+        product_meili_search,
+        name="search-product",
     ),
 ]
 

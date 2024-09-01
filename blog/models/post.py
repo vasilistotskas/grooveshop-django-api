@@ -1,13 +1,12 @@
 import os
+from typing import override
 
-from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
-from django.contrib.postgres.search import SearchVectorField
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel
-from parler.models import TranslatedFields
+from parler.models import TranslatedFieldsModel
 from tinymce.models import HTMLField
 
 from blog.enum.blog_post_enum import PostStatusEnum
@@ -17,6 +16,7 @@ from core.models import TimeStampMixinModel
 from core.models import UUIDModel
 from core.utils.generators import SlugifyConfig
 from core.utils.generators import unique_slugify
+from meili.models import IndexMixin
 from seo.models import SeoModel
 
 
@@ -52,15 +52,6 @@ class BlogPost(
     )
     featured = models.BooleanField(_("Featured"), default=False)
     view_count = models.PositiveBigIntegerField(_("View Count"), default=0)
-    translations = TranslatedFields(
-        title=models.CharField(_("Title"), max_length=255, blank=True, null=True),
-        subtitle=models.CharField(_("Subtitle"), max_length=255, blank=True, null=True),
-        body=HTMLField(_("Body"), blank=True, null=True),
-        search_document=models.TextField(_("Search Document"), blank=True, default=""),
-        search_vector=SearchVectorField(_("Search Vector"), blank=True, null=True),
-        search_document_dirty=models.BooleanField(_("Search Document Dirty"), default=False),
-        search_vector_dirty=models.BooleanField(_("Search Vector Dirty"), default=False),
-    )
 
     class Meta(TypedModelMeta):
         verbose_name = _("Blog Post")
@@ -92,24 +83,11 @@ class BlogPost(
             self.slug = unique_slugify(config)
         super().save(*args, **kwargs)
 
-    def save_translation(self, *args, **kwargs):
-        self.search_vector_dirty = True
-        self.search_document_dirty = True
-        super().save_translation(*args, **kwargs)
-
     @property
-    def main_image_absolute_url(self) -> str:
-        image: str = ""
-        if self.image and hasattr(self.image, "url"):
-            return settings.APP_BASE_URL + self.image.url
-        return image
-
-    @property
-    def main_image_filename(self) -> str:
+    def main_image_path(self) -> str:
         if self.image and hasattr(self.image, "name"):
-            return os.path.basename(self.image.name)
-        else:
-            return ""
+            return f"media/uploads/blog/{os.path.basename(self.image.name)}"
+        return ""
 
     @property
     def likes_count(self) -> int:
@@ -125,4 +103,54 @@ class BlogPost(
 
     @property
     def absolute_url(self) -> str:
-        return f"/{self.id}/{self.slug}"
+        return f"/blog/post/{self.id}/{self.slug}"
+
+
+class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
+    master = models.ForeignKey(BlogPost, on_delete=models.CASCADE, related_name="translations", null=True)
+    title = models.CharField(_("Title"), max_length=255, blank=True, null=True)
+    subtitle = models.CharField(_("Subtitle"), max_length=255, blank=True, null=True)
+    body = HTMLField(_("Body"), blank=True, null=True)
+
+    class Meta:
+        app_label = "blog"
+        db_table = "blog_blogpost_translation"
+        unique_together = ("language_code", "master")
+        verbose_name = _("Blog Post Translation")
+        verbose_name_plural = _("Blog Post Translations")
+
+    class MeiliMeta:
+        filterable_fields = ("title", "language_code", "likes_count")
+        searchable_fields = ("id", "title", "subtitle", "body")
+        displayed_fields = ("id", "title", "subtitle", "body", "language_code")
+        sortable_fields = ("likes_count",)
+        ranking_rules = ["words", "typo", "proximity", "attribute", "sort", "likes_count:desc", "exactness"]
+        synonyms = {
+            "blog": ["article", "post"],
+            "article": ["blog", "post"],
+            "post": ["blog", "article"],
+            "tutorial": ["guide", "how-to"],
+            "guide": ["tutorial", "how-to"],
+            "how-to": ["tutorial", "guide"],
+            "υπερθέρμανση": ["καίει", "καίγεται"],
+            "καίει": ["καίγεται", "υπερθέρμανση"],
+            "καίγεται": ["καίει", "υπερθέρμανση"],
+        }
+        typo_tolerance = {
+            "enabled": True,
+            "minWordSizeForTypos": {"oneTypo": 4, "twoTypos": 8},
+            "disableOnWords": ["specific"],
+            "disableOnAttributes": ["id"],
+        }
+        faceting = {"maxValuesPerFacet": 50}
+        pagination = {"maxTotalHits": 1000}
+        proximity_precision = "byWord"
+
+    @classmethod
+    @override
+    def get_additional_meili_fields(cls):
+        return {"likes_count": lambda obj: obj.master.likes_count}
+
+    def __str__(self):
+        model = self._meta.verbose_name.title()
+        return f"{model:s}: {self.title:s}"

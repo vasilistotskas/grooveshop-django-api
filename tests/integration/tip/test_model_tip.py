@@ -49,13 +49,9 @@ class TipModelTestCase(TestCase):
             f'<img src="{self.tip.icon.url}" width="100" height="100" />',
         )
 
-    def test_main_image_absolute_url(self):
-        expected_url = settings.APP_BASE_URL + self.tip.icon.url
-        self.assertEqual(self.tip.main_image_absolute_url, expected_url)
-
-    def test_main_image_filename(self):
-        expected_filename = os.path.basename(self.tip.icon.name)
-        self.assertEqual(self.tip.main_image_filename, expected_filename)
+    def test_main_image_path(self):
+        expected_filename = f"media/uploads/tip/{os.path.basename(self.tip.icon.name)}"
+        self.assertEqual(self.tip.main_image_path, expected_filename)
 
     def tearDown(self) -> None:
         Tip.objects.all().delete()

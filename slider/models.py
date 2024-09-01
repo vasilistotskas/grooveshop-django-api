@@ -1,6 +1,5 @@
 import os
 
-from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -50,18 +49,10 @@ class Slider(TranslatableModel, TimeStampMixinModel, UUIDModel):
         return self.safe_translation_getter("name", any_language=True) or ""
 
     @property
-    def main_image_absolute_url(self) -> str:
-        image: str = ""
-        if self.image and hasattr(self.image, "url"):
-            return settings.APP_BASE_URL + self.image.url
-        return image
-
-    @property
-    def main_image_filename(self) -> str:
+    def main_image_path(self) -> str:
         if self.image and hasattr(self.image, "name"):
-            return os.path.basename(self.image.name)
-        else:
-            return ""
+            return f"media/uploads/sliders/{os.path.basename(self.image.name)}"
+        return ""
 
     @property
     def image_tag(self):
@@ -128,18 +119,10 @@ class Slide(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         super().clean()
 
     @property
-    def main_image_absolute_url(self) -> str:
-        image: str = ""
-        if self.image and hasattr(self.image, "url"):
-            return settings.APP_BASE_URL + self.image.url
-        return image
-
-    @property
-    def main_image_filename(self) -> str:
+    def main_image_path(self) -> str:
         if self.image and hasattr(self.image, "name"):
-            return os.path.basename(self.image.name)
-        else:
-            return ""
+            return f"media/uploads/slides/{os.path.basename(self.image.name)}"
+        return ""
 
     @property
     def image_tag(self):

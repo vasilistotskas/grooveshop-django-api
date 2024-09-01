@@ -45,7 +45,6 @@ def upload_image(request):
             {"Error Message": f"Wrong file suffix ({file_name_suffix}), supported are .jpg, .png, .gif, .jpeg"}
         )
 
-    debug = os.getenv("DEBUG", "True") == "True"
     if not USE_AWS:
         storage = TinymceS3Storage()
         sanitized_name = sanitize_filename(file_obj.name)

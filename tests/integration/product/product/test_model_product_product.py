@@ -154,15 +154,10 @@ class ProductModelTestCase(TestCase):
         product = ProductFactory(num_tags=3)
         self.assertEqual(product.tags.count(), 3)
 
-    def test_main_image_absolute_url(self):
+    def test_main_image_path(self):
         main_image = self.product.images.filter(is_main=True).first()
-        expected_url = settings.APP_BASE_URL + main_image.image.url
-        self.assertEqual(self.product.main_image_absolute_url, expected_url)
-
-    def test_main_image_filename(self):
-        main_image = self.product.images.filter(is_main=True).first()
-        expected_filename = os.path.basename(main_image.image.name)
-        self.assertEqual(self.product.main_image_filename, expected_filename)
+        expected_filename = f"media/uploads/products/{os.path.basename(main_image.image.name)}"
+        self.assertEqual(self.product.main_image_path, expected_filename)
 
     def test_colored_stock_property(self):
         self.product.stock = 5
@@ -178,7 +173,7 @@ class ProductModelTestCase(TestCase):
         )
 
     def test_absolute_url_property(self):
-        expected_absolute_url = f"/{self.product.id}/{self.product.slug}"
+        expected_absolute_url = f"/products/{self.product.id}/{self.product.slug}"
         self.assertEqual(self.product.absolute_url, expected_absolute_url)
 
     def tearDown(self) -> None:

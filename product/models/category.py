@@ -1,6 +1,5 @@
 import os
 
-from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -126,43 +125,19 @@ class ProductCategory(
         )
 
     @property
-    def category_menu_image_one_absolute_url(self) -> str:
-        image: str = ""
+    def category_menu_image_one_path(self) -> str:
         if self.menu_image_one:
-            return settings.APP_BASE_URL + self.menu_image_one.url
-        return image
+            return f"media/uploads/categories/{os.path.basename(self.menu_image_one.name)}"
+        return ""
 
     @property
-    def category_menu_image_one_filename(self) -> str:
-        if self.menu_image_one:
-            return os.path.basename(self.menu_image_one.name)
-        else:
-            return ""
-
-    @property
-    def category_menu_image_two_absolute_url(self) -> str:
-        image: str = ""
+    def category_menu_image_two_path(self) -> str:
         if self.menu_image_two:
-            image = settings.APP_BASE_URL + self.menu_image_two.url
-        return image
+            return f"media/uploads/categories/{os.path.basename(self.menu_image_two.name)}"
+        return ""
 
     @property
-    def category_menu_image_two_filename(self) -> str:
-        if self.menu_image_two:
-            return os.path.basename(self.menu_image_two.name)
-        else:
-            return ""
-
-    @property
-    def category_menu_main_banner_absolute_url(self) -> str:
-        image: str = ""
+    def category_menu_main_banner_path(self) -> str:
         if self.menu_main_banner:
-            return settings.APP_BASE_URL + self.menu_main_banner.url
-        return image
-
-    @property
-    def category_menu_main_banner_filename(self) -> str:
-        if self.menu_main_banner:
-            return os.path.basename(self.menu_main_banner.name)
-        else:
-            return ""
+            return f"media/uploads/categories/{os.path.basename(self.menu_main_banner.name)}"
+        return ""

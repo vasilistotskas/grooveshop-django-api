@@ -62,13 +62,9 @@ class BlogPostModelTestCase(TestCase):
             f"{title} by {author_name}",
         )
 
-    def test_main_image_absolute_url(self):
-        expected_url = settings.APP_BASE_URL + self.post.image.url
-        self.assertEqual(self.post.main_image_absolute_url, expected_url)
-
-    def test_main_image_filename(self):
-        expected_filename = os.path.basename(self.post.image.name)
-        self.assertEqual(self.post.main_image_filename, expected_filename)
+    def test_main_image_path(self):
+        expected_filename = f"media/uploads/blog/{os.path.basename(self.post.image.name)}"
+        self.assertEqual(self.post.main_image_path, expected_filename)
 
     def test_likes_count(self):
         self.assertEqual(self.post.likes_count, 0)

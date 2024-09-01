@@ -39,7 +39,6 @@ class BlogPostTranslationFactory(factory.django.DjangoModelFactory):
     title = factory.Faker("sentence", nb_words=6)
     subtitle = factory.Faker("sentence", nb_words=12)
     body = factory.Faker("paragraph", nb_sentences=5)
-    search_document = factory.Faker("text")
     master = factory.SubFactory("blog.factories.post.BlogPostFactory")
 
     class Meta:

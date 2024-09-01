@@ -69,7 +69,7 @@ class AuthenticationSerializer(UserDetailsSerializer):
             "created_at",
             "updated_at",
             "uuid",
-            "main_image_filename",
+            "main_image_path",
         )
         read_only_fields = (
             "is_active",
@@ -78,5 +78,5 @@ class AuthenticationSerializer(UserDetailsSerializer):
             "created_at",
             "updated_at",
             "uuid",
-            "main_image_filename",
+            "main_image_path",
         )

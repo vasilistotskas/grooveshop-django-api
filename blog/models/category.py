@@ -1,6 +1,5 @@
 import os
 
-from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -98,21 +97,15 @@ class BlogCategory(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDMo
 
     @property
     def absolute_url(self) -> str:
-        return "/" + "/".join([x["slug"] for x in self.get_ancestors(include_self=True).values()])
+        return f"/blog/category/{self.id}/" + "/".join(
+            [x["slug"] for x in self.get_ancestors(include_self=True).values()]
+        )
 
     @property
-    def main_image_absolute_url(self) -> str:
-        image: str = ""
-        if self.image and hasattr(self.image, "url"):
-            return settings.APP_BASE_URL + self.image.url
-        return image
-
-    @property
-    def main_image_filename(self) -> str:
+    def main_image_path(self) -> str:
         if self.image and hasattr(self.image, "name"):
-            return os.path.basename(self.image.name)
-        else:
-            return ""
+            return f"media/uploads/blog/{os.path.basename(self.image.name)}"
+        return ""
 
     @property
     def post_count(self) -> int:

@@ -37,15 +37,13 @@ class SliderSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "created_at",
             "updated_at",
             "uuid",
-            "main_image_absolute_url",
-            "main_image_filename",
+            "main_image_path",
         )
         read_only_fields = (
             "created_at",
             "updated_at",
             "uuid",
-            "main_image_absolute_url",
-            "main_image_filename",
+            "main_image_path",
         )
 
 
@@ -68,15 +66,13 @@ class SlideSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "created_at",
             "updated_at",
             "uuid",
-            "main_image_absolute_url",
-            "main_image_filename",
+            "main_image_path",
         )
         read_only_fields = (
             "created_at",
             "updated_at",
             "uuid",
-            "main_image_absolute_url",
-            "main_image_filename",
+            "main_image_path",
         )
 
     def get_expand_fields(

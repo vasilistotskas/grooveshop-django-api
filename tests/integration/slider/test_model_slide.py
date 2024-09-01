@@ -52,13 +52,9 @@ class SlideModelTestCase(TestCase):
         self.slide.save()
         self.assertTrue(default_storage.exists(self.slide.image.path))
 
-    def test_main_image_absolute_url(self):
-        expected_url = settings.APP_BASE_URL + self.slide.image.url
-        self.assertEqual(self.slide.main_image_absolute_url, expected_url)
-
-    def test_main_image_filename(self):
-        expected_filename = os.path.basename(self.slide.image.name)
-        self.assertEqual(self.slide.main_image_filename, expected_filename)
+    def test_main_image_path(self):
+        expected_filename = f"media/uploads/slides/{os.path.basename(self.slide.image.name)}"
+        self.assertEqual(self.slide.main_image_path, expected_filename)
 
     def tearDown(self) -> None:
         Slide.objects.all().delete()

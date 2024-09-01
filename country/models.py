@@ -1,6 +1,5 @@
 import os
 
-from django.conf import settings
 from django.core.validators import RegexValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -68,15 +67,7 @@ class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         return Country.objects.all()
 
     @property
-    def main_image_absolute_url(self) -> str:
-        image_flag: str = ""
-        if self.image_flag and hasattr(self.image_flag, "url"):
-            return settings.APP_BASE_URL + self.image_flag.url
-        return image_flag
-
-    @property
-    def main_image_filename(self) -> str:
+    def main_image_path(self) -> str:
         if self.image_flag and hasattr(self.image_flag, "name"):
-            return os.path.basename(self.image_flag.name)
-        else:
-            return ""
+            return f"media/uploads/country/{os.path.basename(self.image_flag.name)}"
+        return ""

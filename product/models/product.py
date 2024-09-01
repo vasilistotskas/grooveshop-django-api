@@ -3,10 +3,10 @@ from __future__ import annotations
 import os
 import uuid
 from decimal import Decimal
+from typing import override
 
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
-from django.contrib.postgres.search import SearchVectorField
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Avg
@@ -24,7 +24,7 @@ from mptt.fields import TreeForeignKey
 from parler.managers import TranslatableManager
 from parler.managers import TranslatableQuerySet
 from parler.models import TranslatableModel
-from parler.models import TranslatedFields
+from parler.models import TranslatedFieldsModel
 from simple_history.models import HistoricalRecords
 from tinymce.models import HTMLField
 
@@ -38,6 +38,7 @@ from core.units import WeightUnits
 from core.utils.generators import SlugifyConfig
 from core.utils.generators import unique_slugify
 from core.weight import zero_weight
+from meili.models import IndexMixin
 from product.enum.review import ReviewStatusEnum
 from product.models.favourite import ProductFavourite
 from product.models.image import ProductImage
@@ -104,15 +105,6 @@ class Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, SeoModel,
     )
     history = HistoricalRecords()
 
-    translations = TranslatedFields(
-        name=models.CharField(_("Name"), max_length=255, blank=True, null=True),
-        description=HTMLField(_("Description"), blank=True, null=True),
-        search_document=models.TextField(_("Search Document"), blank=True, default=""),
-        search_vector=SearchVectorField(_("Search Vector"), blank=True, null=True),
-        search_document_dirty=models.BooleanField(_("Search Document Dirty"), default=False),
-        search_vector_dirty=models.BooleanField(_("Search Vector Dirty"), default=False),
-    )
-
     objects = ProductManager()
 
     class Meta(MetaDataModel.Meta, TypedModelMeta):
@@ -152,11 +144,6 @@ class Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, SeoModel,
             )
             self.slug = unique_slugify(config)
         super().save(*args, **kwargs)
-
-    def save_translation(self, *args, **kwargs):
-        self.search_vector_dirty = True
-        self.search_document_dirty = True
-        super().save_translation(*args, **kwargs)
 
     def clean(self):
         super().clean()
@@ -250,21 +237,11 @@ class Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, SeoModel,
         return self.price + self.vat_value - self.discount_value
 
     @property
-    def main_image_absolute_url(self) -> str:
-        img = ProductImage.objects.get(product_id=self.id, is_main=True)
-        if not img:
-            return ""
-        image: str = ""
-        if img.image and hasattr(img.image, "url"):
-            return settings.APP_BASE_URL + img.image.url
-        return image
-
-    @property
-    def main_image_filename(self) -> str:
-        product_image = ProductImage.objects.get(product_id=self.id, is_main=True)
+    def main_image_path(self) -> str:
+        product_image = ProductImage.objects.filter(product_id=self.id, is_main=True).first()
         if not product_image:
             return ""
-        return os.path.basename(product_image.image.name)
+        return f"media/uploads/products/{os.path.basename(product_image.image.name)}"
 
     @property
     def image_tag(self):
@@ -297,4 +274,66 @@ class Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, SeoModel,
 
     @property
     def absolute_url(self) -> str:
-        return f"/{self.id}/{self.slug}"
+        return f"/products/{self.id}/{self.slug}"
+
+
+class ProductTranslation(TranslatedFieldsModel, IndexMixin):
+    master = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="translations", null=True)
+    name = models.CharField(_("Name"), max_length=255, blank=True, null=True)
+    description = HTMLField(_("Description"), blank=True, null=True)
+
+    class Meta:
+        app_label = "product"
+        db_table = "product_product_translation"
+        unique_together = ("language_code", "master")
+        verbose_name = _("Product Translation")
+        verbose_name_plural = _("Product Translations")
+
+    class MeiliMeta:
+        filterable_fields = ("name", "language_code", "likes_count", "final_price", "view_count", "category")
+        searchable_fields = ("id", "name", "description")
+        displayed_fields = (
+            "id",
+            "name",
+            "description",
+            "language_code",
+            "likes_count",
+            "final_price",
+            "view_count",
+            "category",
+        )
+        sortable_fields = ("likes_count", "final_price", "view_count", "discount_percent")
+        ranking_rules = [
+            "words",
+            "typo",
+            "proximity",
+            "attribute",
+            "sort",
+            "likes_count:desc",
+            "view_count:desc",
+            "final_price:desc",
+            "exactness",
+        ]
+        synonyms = {}
+        typo_tolerance = {
+            "enabled": True,
+            "minWordSizeForTypos": {"oneTypo": 3, "twoTypos": 5},
+            "disableOnWords": [],
+            "disableOnAttributes": [],
+        }
+        faceting = {"maxValuesPerFacet": 100, "sortFacetValuesBy": {"final_price": "count"}}
+        pagination = {"maxTotalHits": 1000}
+        proximity_precision = "byWord"
+
+    @classmethod
+    @override
+    def get_additional_meili_fields(cls):
+        return {
+            "likes_count": lambda obj: obj.master.likes_count,
+            "view_count": lambda obj: obj.master.view_count,
+            "final_price": lambda obj: float(obj.master.final_price.amount),
+        }
+
+    def __str__(self):
+        model = self._meta.verbose_name.title()
+        return f"{model:s}: {self.name:s}"

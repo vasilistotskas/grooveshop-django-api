@@ -215,18 +215,10 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
             return UserRole.USER
 
     @property
-    def main_image_absolute_url(self) -> str:
-        image: str = ""
-        if self.image and hasattr(self.image, "url"):
-            return settings.APP_BASE_URL + self.image.url
-        return image
-
-    @property
-    def main_image_filename(self) -> str:
+    def main_image_path(self) -> str:
         if self.image and hasattr(self.image, "name"):
-            return os.path.basename(self.image.name)
-        else:
-            return ""
+            return f"media/uploads/users/{os.path.basename(self.image.name)}"
+        return ""
 
     @property
     def image_tag(self):

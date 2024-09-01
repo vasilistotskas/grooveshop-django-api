@@ -56,13 +56,9 @@ class ProductImageModelTestCase(TestCase):
     def test_save(self):
         self.assertTrue(default_storage.exists(self.product_image.thumbnail.path))
 
-    def test_main_image_absolute_url(self):
-        expected_url = settings.APP_BASE_URL + self.product_image.image.url
-        self.assertEqual(self.product_image.main_image_absolute_url, expected_url)
-
-    def test_main_image_filename(self):
-        expected_filename = os.path.basename(self.product_image.image.url)
-        self.assertEqual(self.product_image.main_image_filename, expected_filename)
+    def test_main_image_path(self):
+        expected_filename = f"media/uploads/products/{os.path.basename(self.product_image.image.name)}"
+        self.assertEqual(self.product_image.main_image_path, expected_filename)
 
     def tearDown(self) -> None:
         Product.objects.all().delete()

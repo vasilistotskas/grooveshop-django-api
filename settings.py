@@ -97,6 +97,7 @@ LOCAL_APPS = [
     "authentication",
     "contact",
     "tag",
+    "meili",
 ]
 
 # Third-party apps
@@ -411,31 +412,7 @@ CELERY_TASK_EAGER_PROPAGATES = False
 
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 
-# Internal settings
-BEAT_UPDATE_SEARCH_SEC = int(getenv("BEAT_UPDATE_SEARCH_SEC", 60 * 60 * 8))
-BEAT_UPDATE_SEARCH_EXPIRE_AFTER_SEC = int(getenv("BEAT_UPDATE_SEARCH_EXPIRE_AFTER_SEC", 20))
-
 CELERY_BEAT_SCHEDULE = {
-    "update-product-translation-search-vectors": {
-        "task": "core.tasks.update_product_translation_search_vectors",
-        "schedule": timedelta(seconds=BEAT_UPDATE_SEARCH_SEC),
-        "options": {"expires": BEAT_UPDATE_SEARCH_EXPIRE_AFTER_SEC},
-    },
-    "update-product-translation-search-documents": {
-        "task": "core.tasks.update_product_translation_search_documents",
-        "schedule": timedelta(seconds=BEAT_UPDATE_SEARCH_SEC),
-        "options": {"expires": BEAT_UPDATE_SEARCH_EXPIRE_AFTER_SEC},
-    },
-    "update-blog-post-translation-search-vectors": {
-        "task": "core.tasks.update_blog_post_translation_search_vectors",
-        "schedule": timedelta(seconds=BEAT_UPDATE_SEARCH_SEC),
-        "options": {"expires": BEAT_UPDATE_SEARCH_EXPIRE_AFTER_SEC},
-    },
-    "update-blog-post-translation-search-documents": {
-        "task": "core.tasks.update_blog_post_translation_search_documents",
-        "schedule": timedelta(seconds=BEAT_UPDATE_SEARCH_SEC),
-        "options": {"expires": BEAT_UPDATE_SEARCH_EXPIRE_AFTER_SEC},
-    },
     "send-inactive-user-notifications": {
         "task": "core.tasks.send_inactive_user_notifications",
         "schedule": crontab(hour="6", minute="0", day_of_month="1"),
@@ -652,6 +629,18 @@ if SYSTEM_ENV == "ci":
 DBBACKUP_STORAGE = "django.core.files.storage.FileSystemStorage"
 DBBACKUP_STORAGE_OPTIONS = {"location": path.join(BASE_DIR, "backups")}
 
+# Maili settings
+MEILISEARCH = {
+    "HTTPS": getenv("MEILISEARCH_HTTPS", "False") == "True",
+    "HOST": getenv("MEILISEARCH_HOST", "localhost"),
+    "MASTER_KEY": getenv("MEILISEARCH_MASTER_KEY", "changeme"),
+    "PORT": int(getenv("MEILISEARCH_PORT", 7700)),
+    "TIMEOUT": int(getenv("MEILISEARCH_TIMEOUT", 30)),
+    "CLIENT_AGENTS": None,
+    "DEBUG": DEBUG,
+    "SYNC": False,
+    "OFFLINE": False,
+}
 
 SEED_DEFAULT_COUNT = int(getenv("SEED_DEFAULT_COUNT", 20))
 SEED_BATCH_SIZE = int(getenv("SEED_BATCH_SIZE", 10))

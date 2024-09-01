@@ -1,6 +1,5 @@
 import os
 
-from django.conf import settings
 from django.db import models
 from django.templatetags.static import static
 from django.utils.safestring import mark_safe
@@ -62,15 +61,7 @@ class Tip(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         return no_img_markup
 
     @property
-    def main_image_absolute_url(self) -> str:
-        icon: str = ""
-        if self.icon and hasattr(self.icon, "url"):
-            return settings.APP_BASE_URL + self.icon.url
-        return icon
-
-    @property
-    def main_image_filename(self) -> str:
+    def main_image_path(self) -> str:
         if self.icon and hasattr(self.icon, "name"):
-            return os.path.basename(self.icon.name)
-        else:
-            return ""
+            return f"media/uploads/tip/{os.path.basename(self.icon.name)}"
+        return ""

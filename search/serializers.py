@@ -1,137 +1,83 @@
-from drf_spectacular.utils import extend_schema_field
-from parler_rest.fields import TranslatedFieldsField
-from parler_rest.serializers import TranslatableModelSerializer
+from __future__ import annotations
+
 from rest_framework import serializers
 
-from blog.models.post import BlogPost
-from core.api.schema import generate_schema_multi_lang
-from core.api.serializers import BaseExpandSerializer
-from product.models.product import Product
+from blog.models.post import BlogPostTranslation
+from product.models.product import ProductTranslation
 
 
-@extend_schema_field(generate_schema_multi_lang(Product))
-class TranslatedFieldsFieldExtendProduct(TranslatedFieldsField):
-    pass
-
-
-class SearchProductResultSerializer(TranslatableModelSerializer, BaseExpandSerializer):
-    id = serializers.IntegerField()
-    slug = serializers.CharField()
-    main_image_filename = serializers.CharField()
-    absolute_url = serializers.CharField()
-
-    translations = TranslatedFieldsFieldExtendProduct(shared_model=Product)
-    search_rank = serializers.FloatField(read_only=True)
-    headline = serializers.CharField(read_only=True)
-    similarity = serializers.FloatField(read_only=True)
+class BlogPostTranslationSerializer(serializers.ModelSerializer):
+    absolute_url = serializers.SerializerMethodField()
+    main_image_path = serializers.SerializerMethodField()
+    matches_position = serializers.SerializerMethodField()
+    ranking_score = serializers.SerializerMethodField()
+    formatted = serializers.SerializerMethodField()
 
     class Meta:
-        model = Product
+        model = BlogPostTranslation
         fields = (
             "id",
-            "slug",
-            "main_image_filename",
+            "language_code",
+            "title",
+            "subtitle",
+            "body",
+            "master",
             "absolute_url",
-            "translations",
-            "search_rank",
-            "headline",
-            "similarity",
-        )
-        read_only_fields = (
-            "id",
-            "slug",
-            "main_image_filename",
-            "absolute_url",
-            "translations",
-            "search_rank",
-            "headline",
-            "similarity",
+            "main_image_path",
+            "matches_position",
+            "ranking_score",
+            "formatted",
         )
 
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        data["translations"] = {
-            language_code: translation for language_code, translation in data["translations"].items()
-        }
+    def get_absolute_url(self, obj):
+        return obj.master.absolute_url if obj.master else ""
 
-        request_language = (
-            self.context.get("request").query_params.get("language") if "request" in self.context else None
-        )
+    def get_main_image_path(self, obj):
+        return obj.master.main_image_path if obj.master else ""
 
-        if request_language and "translations" in data and request_language in data["translations"]:
-            data["translations"] = {request_language: data["translations"][request_language]}
+    def get_matches_position(self, obj):
+        return self.context.get("_matchesPosition", {})
 
-        return data
+    def get_ranking_score(self, obj):
+        return self.context.get("_rankingScore", None)
 
-
-class SearchProductSerializer(serializers.Serializer):
-    results = SearchProductResultSerializer(many=True)
-    headlines = serializers.DictField(child=serializers.CharField())
-    search_ranks = serializers.DictField(child=serializers.FloatField())
-    result_count = serializers.IntegerField()
-    similarities = serializers.DictField(child=serializers.FloatField())
-    distances = serializers.DictField(child=serializers.FloatField())
+    def get_formatted(self, obj):
+        return self.context.get("_formatted", {})
 
 
-@extend_schema_field(generate_schema_multi_lang(BlogPost))
-class TranslatedFieldsFieldExtendBlogPost(TranslatedFieldsField):
-    pass
-
-
-class SearchBlogPostResultSerializer(TranslatableModelSerializer, BaseExpandSerializer):
-    id = serializers.IntegerField()
-    slug = serializers.CharField()
-    main_image_filename = serializers.CharField()
-    absolute_url = serializers.CharField()
-
-    translations = TranslatedFieldsFieldExtendBlogPost(shared_model=BlogPost)
-    search_rank = serializers.FloatField(read_only=True)
-    headline = serializers.CharField(read_only=True)
-    similarity = serializers.FloatField(read_only=True)
+class ProductTranslationSerializer(serializers.ModelSerializer):
+    absolute_url = serializers.SerializerMethodField()
+    main_image_path = serializers.SerializerMethodField()
+    matches_position = serializers.SerializerMethodField()
+    ranking_score = serializers.SerializerMethodField()
+    formatted = serializers.SerializerMethodField()
 
     class Meta:
-        model = BlogPost
+        model = ProductTranslation
         fields = (
             "id",
-            "slug",
-            "main_image_filename",
+            "language_code",
+            "name",
+            "description",
+            "master",
             "absolute_url",
-            "translations",
-            "search_rank",
-            "headline",
-            "similarity",
-        )
-        read_only_fields = (
-            "id",
-            "slug",
-            "main_image_filename",
-            "absolute_url",
-            "translations",
-            "search_rank",
-            "headline",
-            "similarity",
+            "main_image_path",
+            "matches_position",
+            "ranking_score",
+            "formatted",
         )
 
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        data["translations"] = {
-            language_code: translation for language_code, translation in data["translations"].items()
-        }
+    def get_absolute_url(self, obj):
+        return obj.master.absolute_url if obj.master else ""
 
-        request_language = (
-            self.context.get("request").query_params.get("language") if "request" in self.context else None
-        )
+    def get_main_image_path(self, obj):
+        return obj.master.main_image_path if obj.master else ""
 
-        if request_language and "translations" in data and request_language in data["translations"]:
-            data["translations"] = {request_language: data["translations"][request_language]}
+    def get_matches_position(self, obj):
+        return self.context.get("_matchesPosition", {})
 
-        return data
+    def get_ranking_score(self, obj):
+        return self.context.get("_rankingScore", None)
 
-
-class SearchBlogPostSerializer(serializers.Serializer):
-    results = SearchBlogPostResultSerializer(many=True)
-    headlines = serializers.DictField(child=serializers.CharField())
-    search_ranks = serializers.DictField(child=serializers.FloatField())
-    result_count = serializers.IntegerField()
-    similarities = serializers.DictField(child=serializers.FloatField())
-    distances = serializers.DictField(child=serializers.FloatField())
+    def get_formatted(self, obj):
+        return self.context.get("_formatted", {})

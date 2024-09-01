@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 
-from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -93,15 +92,7 @@ class ProductImage(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDMo
             return None
 
     @property
-    def main_image_absolute_url(self) -> str:
-        image: str = ""
-        if self.image and hasattr(self.image, "url"):
-            return settings.APP_BASE_URL + self.image.url
-        return image
-
-    @property
-    def main_image_filename(self) -> str:
+    def main_image_path(self) -> str:
         if self.image and hasattr(self.image, "name"):
-            return os.path.basename(self.image.name)
-        else:
-            return ""
+            return f"media/uploads/products/{os.path.basename(self.image.name)}"
+        return ""

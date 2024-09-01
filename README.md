@@ -167,7 +167,7 @@ This project is open-sourced under the MIT License. See the [LICENSE](LICENSE.md
   - Apply migrations: `python manage.py migrate`
   - Flush the database: `python manage.py sqlflush`
   - Populate database with seed data (Single Factory Example): `python manage.py factory_seed
-    contact.factories.ContactFactory 10`
+    --model="BlogPost" --count="100"`
   - Populate database with seed data (All Factories Example): `python manage.py seed_all
     --model-counts="Country=10,Product=100"`
 - **Manage Users**:
@@ -234,3 +234,9 @@ This project is open-sourced under the MIT License. See the [LICENSE](LICENSE.md
 - **Delete Local Tags**:
   - Delete all local tags:
     `git tag -l | xargs git tag -d`
+
+
+python manage.py syncindex blog.BlogPostTranslation
+python manage.py clearindex blog.BlogPostTranslation
+python manage.py syncindex product.ProductTranslation
+python manage.py clearindex product.ProductTranslation

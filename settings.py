@@ -632,7 +632,7 @@ DBBACKUP_STORAGE_OPTIONS = {"location": path.join(BASE_DIR, "backups")}
 # Maili settings
 MEILISEARCH = {
     "HTTPS": getenv("MEILISEARCH_HTTPS", "False") == "True",
-    "HOST": getenv("MEILISEARCH_HOST", "meilisearch"),
+    "HOST": getenv("MEILISEARCH_HOST", "localhost"),
     "MASTER_KEY": getenv("MEILISEARCH_MASTER_KEY", "changeme"),
     "PORT": int(getenv("MEILISEARCH_PORT", 7700)),
     "TIMEOUT": int(getenv("MEILISEARCH_TIMEOUT", 30)),

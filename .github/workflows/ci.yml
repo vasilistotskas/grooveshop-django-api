@@ -53,6 +53,7 @@ jobs:
       matrix:
         db: [ postgres ]
         python-version: [ 3.12.0 ]
+        meili-version: [ 1.10 ]
         include:
           - db: postgres
             db_port: 5432
@@ -78,6 +79,13 @@ jobs:
           --health-retries 5
         ports:
           - 6379:6379
+      meili:
+        image: getmeili/meilisearch:v${{ matrix.meili-version }}
+        ports:
+          - 7700:7700
+        env:
+          MEILI_HTTP_ADDR: meilisearch:7700
+          MEILI_LOG_LEVEL: INFO
 
     steps:
       - name: Checkout code

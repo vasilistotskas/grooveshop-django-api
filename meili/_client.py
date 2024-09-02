@@ -30,14 +30,11 @@ class Client:
         sortable_fields: Optional[list[str]] = None,
         ranking_rules: Optional[list[str]] = None,
         stop_words: Optional[list[str]] = None,
-        dictionary: Optional[list[str]] = None,
         synonyms: Optional[dict[str, list[str]]] = None,
         distinct_attribute: Optional[str] = None,
         typo_tolerance: Optional[dict[str, any]] = None,
         faceting: Optional[dict[str, any]] = None,
         pagination: Optional[dict[str, any]] = None,
-        proximity_precision: Optional[str] = "byWord",
-        search_cutoff_ms: Optional[int] = None,
     ):
         settings_payload = {
             "displayedAttributes": displayed_fields or ["*"],
@@ -46,7 +43,6 @@ class Client:
             "sortableAttributes": sortable_fields or [],
             "rankingRules": ranking_rules or ["words", "typo", "proximity", "attribute", "sort", "exactness"],
             "stopWords": stop_words or [],
-            "dictionary": dictionary or [],
             "synonyms": synonyms or {},
             "distinctAttribute": distinct_attribute,
             "typoTolerance": typo_tolerance
@@ -58,8 +54,6 @@ class Client:
             },
             "faceting": faceting or {"maxValuesPerFacet": 100},
             "pagination": pagination or {"maxTotalHits": 1000},
-            "proximityPrecision": proximity_precision,
-            "searchCutoffMs": search_cutoff_ms,
         }
 
         self.tasks.append(self._handle_sync(self.client.index(index_name).update_settings(settings_payload)))

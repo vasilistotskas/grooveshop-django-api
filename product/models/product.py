@@ -323,7 +323,6 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
         }
         faceting = {"maxValuesPerFacet": 100, "sortFacetValuesBy": {"final_price": "count"}}
         pagination = {"maxTotalHits": 1000}
-        proximity_precision = "byWord"
 
     @classmethod
     @override

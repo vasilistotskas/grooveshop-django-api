@@ -36,14 +36,11 @@ class IndexMixin(models.Model):
         sortable_fields: Iterable[str] = None
         ranking_rules: Iterable[str] = None
         stop_words: Iterable[str] = None
-        dictionary: Iterable[str] = None
         synonyms: dict[str, list[str]] = None
         distinct_attribute: str = None
         typo_tolerance: dict[str, any] = None
         faceting: dict[str, any] = None
         pagination: dict[str, any] = None
-        proximity_precision: str = "byWord"
-        search_cutoff_ms: int = None
         supports_geo: bool = False
         index_name: str = None
         primary_key: str = "pk"
@@ -57,14 +54,11 @@ class IndexMixin(models.Model):
         sortable_fields = getattr(cls.MeiliMeta, "sortable_fields", None)
         ranking_rules = getattr(cls.MeiliMeta, "ranking_rules", None)
         stop_words = getattr(cls.MeiliMeta, "stop_words", None)
-        dictionary = getattr(cls.MeiliMeta, "dictionary", None)
         synonyms = getattr(cls.MeiliMeta, "synonyms", None)
         distinct_attribute = getattr(cls.MeiliMeta, "distinct_attribute", None)
         typo_tolerance = getattr(cls.MeiliMeta, "typo_tolerance", None)
         faceting = getattr(cls.MeiliMeta, "faceting", None)
         pagination = getattr(cls.MeiliMeta, "pagination", None)
-        proximity_precision = getattr(cls.MeiliMeta, "proximity_precision", "byWord")
-        search_cutoff_ms = getattr(cls.MeiliMeta, "search_cutoff_ms", None)
         supports_geo = getattr(cls.MeiliMeta, "supports_geo", False)
 
         if supports_geo:
@@ -91,14 +85,11 @@ class IndexMixin(models.Model):
                 sortable_fields=sortable_fields,
                 ranking_rules=ranking_rules,
                 stop_words=stop_words,
-                dictionary=dictionary,
                 synonyms=synonyms,
                 distinct_attribute=distinct_attribute,
                 typo_tolerance=typo_tolerance,
                 faceting=faceting,
                 pagination=pagination,
-                proximity_precision=proximity_precision,
-                search_cutoff_ms=search_cutoff_ms,
             )
 
         cls._meilisearch = _Meili(

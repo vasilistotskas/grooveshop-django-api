@@ -144,7 +144,6 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
         }
         faceting = {"maxValuesPerFacet": 50}
         pagination = {"maxTotalHits": 1000}
-        proximity_precision = "byWord"
 
     @classmethod
     @override

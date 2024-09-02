@@ -3,7 +3,49 @@
 
 
 
+## v0.154.0 (2024-09-02)
+
+### Feature
+
+* feat: update ci for meilisearch ([`a63b47d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a63b47d33000e953444c84bbef68006453e4a0f4))
+
+* feat: Meilisearch, remove `main_image_absolute_url` and `main_image_filename` and create a single `main_image_path` ([`f19b88e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f19b88ea83dd65d0a7e52e3f9537318411108be9))
+
+### Fix
+
+* fix: update meili ([`9a1d329`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9a1d3292d7faca0c02f71515be08e0d39c3b7757))
+
+* fix: update meili ([`7864452`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7864452faf9da68ae1e0310b89d11937f9f1cf1b))
+
+* fix: update meili ([`d14ef4d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d14ef4d7d7ccb80a41e25b6ec2691cdeabe2c943))
+
+* fix: update meili ([`441877f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/441877fee70b12f6bbe58d527e9335deb4b066b8))
+
+* fix: update meili client ([`25b0ca9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/25b0ca9a62a197cd5f4d1dcf3f54899549b9f709))
+
+* fix: update env ([`20eb3f8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/20eb3f8dc8d1c7e0ecbe2a00ae3721529b221b30))
+
+* fix: update ci.yml ([`7b4529f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b4529f2effbe84efdaefccce00050ddc95d208d))
+
+* fix: update ci.yml ([`d8dc58f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d8dc58f84b51816a31c9d290381c5e6aad0631c8))
+
+* fix: update settings ([`678cbab`](https://github.com/vasilistotskas/grooveshop-django-api/commit/678cbab3dd2b4f4dc8612e41a71ecffc49d3575f))
+
+* fix: fix meili ci ([`78dbc0d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/78dbc0d273d91aa8188b095b7390c5c24ead0c4f))
+
+* fix: update default meilisearch host ([`16b37f1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/16b37f1d4bb3428be558ce4548e73baa20bc8d29))
+
+### Unknown
+
+* Update ci.yml ([`b659300`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b65930052bc1994cc7fafdc05c7fb74349c04af0))
+
+* Update ci.yml ([`54d74b7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/54d74b721e058315bd954acdcfd9f67dde2d6c99))
+
 ## v0.153.1 (2024-08-29)
+
+### Chore
+
+* chore(release): release version 0.153.1 [skip ci] ([`5dcbe79`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5dcbe7920792aa16dacebec54c11d1348ea09c8f))
 
 ### Fix
 

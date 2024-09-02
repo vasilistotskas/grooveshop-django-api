@@ -321,7 +321,7 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "disableOnWords": [],
             "disableOnAttributes": [],
         }
-        faceting = {"maxValuesPerFacet": 100, "sortFacetValuesBy": {"final_price": "count"}}
+        faceting = {"maxValuesPerFacet": 100}
         pagination = {"maxTotalHits": 1000}
 
     @classmethod

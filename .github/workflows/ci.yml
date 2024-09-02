@@ -88,6 +88,7 @@ jobs:
           MEILI_HTTP_ADDR: meilisearch:7700
           MEILI_LOG_LEVEL: INFO
           MEILI_MASTER_KEY: ${{ secrets.MEILI_MASTER_KEY }}
+          MEILI_ENV: production
 
     steps:
       - name: Checkout code
@@ -120,6 +121,7 @@ jobs:
           MEILI_HTTP_ADDR: meilisearch:7700
           MEILI_LOG_LEVEL: INFO
           MEILI_MASTER_KEY: ${{ secrets.MEILI_MASTER_KEY }}
+          MEILI_ENV: production
 
       - name: Run Tests
         env:
@@ -130,6 +132,7 @@ jobs:
           MEILI_HTTP_ADDR: meilisearch:7700
           MEILI_LOG_LEVEL: INFO
           MEILI_MASTER_KEY: ${{ secrets.MEILI_MASTER_KEY }}
+          MEILI_ENV: production
         run: |
           coverage run --rcfile=.coveragerc --source='.' -m pytest && coverage report
         timeout-minutes: 5

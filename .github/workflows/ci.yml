@@ -9,7 +9,7 @@ on:
 
 env:
   SYSTEM_ENV: ci
-  MEILISEARCH_HOST: 127.0.0.1
+  MEILI_HOST: 127.0.0.1
 
 jobs:
   quality:

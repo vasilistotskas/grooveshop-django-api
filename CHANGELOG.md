@@ -3,7 +3,17 @@
 
 
 
+## v0.154.1 (2024-09-02)
+
+### Fix
+
+* fix: AWS usage in `upload_image` ([`65ee35a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/65ee35a0e4cf74acf80a8e8731fbe16375446642))
+
 ## v0.154.0 (2024-09-02)
+
+### Chore
+
+* chore(release): release version 0.154.0 [skip ci] ([`71574ca`](https://github.com/vasilistotskas/grooveshop-django-api/commit/71574ca9d64ab80ce0f4552fa11ccbf71fcfef27))
 
 ### Feature
 

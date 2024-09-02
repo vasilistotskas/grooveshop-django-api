@@ -36,7 +36,6 @@ class IndexMixin(models.Model):
         sortable_fields: Iterable[str] = None
         ranking_rules: Iterable[str] = None
         stop_words: Iterable[str] = None
-        non_separator_tokens: Iterable[str] = None
         separator_tokens: Iterable[str] = None
         dictionary: Iterable[str] = None
         synonyms: dict[str, list[str]] = None
@@ -59,7 +58,6 @@ class IndexMixin(models.Model):
         sortable_fields = getattr(cls.MeiliMeta, "sortable_fields", None)
         ranking_rules = getattr(cls.MeiliMeta, "ranking_rules", None)
         stop_words = getattr(cls.MeiliMeta, "stop_words", None)
-        non_separator_tokens = getattr(cls.MeiliMeta, "non_separator_tokens", None)
         separator_tokens = getattr(cls.MeiliMeta, "separator_tokens", None)
         dictionary = getattr(cls.MeiliMeta, "dictionary", None)
         synonyms = getattr(cls.MeiliMeta, "synonyms", None)
@@ -95,7 +93,6 @@ class IndexMixin(models.Model):
                 sortable_fields=sortable_fields,
                 ranking_rules=ranking_rules,
                 stop_words=stop_words,
-                non_separator_tokens=non_separator_tokens,
                 separator_tokens=separator_tokens,
                 dictionary=dictionary,
                 synonyms=synonyms,

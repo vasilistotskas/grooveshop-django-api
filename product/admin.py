@@ -103,8 +103,6 @@ class ProductAdmin(TranslatableAdmin, ExportModelAdmin, SimpleHistoryAdmin):
     history_list_display = ["price", "stock"]
     search_fields = [
         "id",
-        "category__name",
-        "translations__name",
         "product_code",
     ]
     list_filter = ["category"]

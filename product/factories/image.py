@@ -20,7 +20,7 @@ def get_or_create_product():
 
 class ProductImageTranslationFactory(factory.django.DjangoModelFactory):
     language_code = factory.Iterator(available_languages)
-    title = factory.Faker("sentence", nb_words=4)
+    title = factory.LazyAttribute(lambda n: factory.Faker("sentence"))
     master = factory.SubFactory("product.factories.image.ProductImageFactory")
 
     class Meta:

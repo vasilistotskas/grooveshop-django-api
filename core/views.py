@@ -67,8 +67,6 @@ def upload_image(request):
         sanitized_name = str(uuid4()) + "." + file_name_suffix
         file_path = os.path.join(upload_dir, sanitized_name)
 
-    base_url = f"{request.scheme}://{request.get_host()}"
-
     with open(file_path, "wb+") as f:
         for chunk in file_obj.chunks():
             f.write(chunk)
@@ -76,7 +74,7 @@ def upload_image(request):
         return JsonResponse(
             {
                 "message": "Image uploaded successfully",
-                "location": f"{base_url}{settings.MEDIA_URL}uploads/tinymce/{sanitized_name}",
+                "location": f"{settings.API_BASE_URL}{settings.MEDIA_URL}uploads/tinymce/{sanitized_name}",
             }
         )
 

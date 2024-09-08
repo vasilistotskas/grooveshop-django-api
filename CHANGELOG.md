@@ -3,7 +3,17 @@
 
 
 
+## v0.156.1 (2024-09-08)
+
+### Fix
+
+* fix: add missing `change_username` api endpoint ([`d5336ff`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d5336ffd649412a6532f03768f27f606331990ff))
+
 ## v0.156.0 (2024-09-08)
+
+### Chore
+
+* chore(release): release version 0.156.0 [skip ci] ([`e3c57bd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e3c57bd0c979288323a656f377a640d25cdece50))
 
 ### Feature
 

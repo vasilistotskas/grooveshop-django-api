@@ -62,6 +62,11 @@ urlpatterns = [
         UserAccountViewSet.as_view({"get": "notifications"}),
         name="user-account-notifications",
     ),
+    path(
+        "user/account/<int:pk>/change_username",
+        UserAccountViewSet.as_view({"post": "change_username"}),
+        name="user-account-change-username",
+    ),
     # Address
     path(
         "user/address",

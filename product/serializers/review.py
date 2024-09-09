@@ -40,12 +40,14 @@ class ProductReviewSerializer(TranslatableModelSerializer, BaseExpandSerializer)
             "created_at",
             "updated_at",
             "published_at",
+            "is_visible",
             "uuid",
         )
         read_only_fields = (
             "created_at",
             "updated_at",
             "published_at",
+            "is_visible",
             "uuid",
         )
 

@@ -3,7 +3,17 @@
 
 
 
+## v0.156.2 (2024-09-09)
+
+### Fix
+
+* fix: include missing API serializer fields ([`e7f858d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e7f858d65619b4f831736ffb6e794c1d55e580b8))
+
 ## v0.156.1 (2024-09-08)
+
+### Chore
+
+* chore(release): release version 0.156.1 [skip ci] ([`0fdc556`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0fdc55683671e8f501b45698866c0ef360364969))
 
 ### Fix
 

@@ -3,7 +3,25 @@
 
 
 
+## v0.157.0 (2024-09-13)
+
+### Feature
+
+* feat: Include `httpx` dep ([`20838ef`](https://github.com/vasilistotskas/grooveshop-django-api/commit/20838efa9b76e966683286bf7663fcd16c8369c1))
+
+* feat: Bump Versions, health check API endpoint and `account/provider/callback` view implemented ([`108a2f1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/108a2f1982e72b8fb7e881ebb937c02ff9e33301))
+
+### Fix
+
+* fix: run poetry lock ([`c5ff0c0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c5ff0c0f5baced846d0c68c09938844827fefdf6))
+
+* fix: run poetry lock ([`7bd01b6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7bd01b65f91783f1af26697445a601111794a51b))
+
 ## v0.156.2 (2024-09-09)
+
+### Chore
+
+* chore(release): release version 0.156.2 [skip ci] ([`8d10f17`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8d10f17c51db8f9abc5c5fcd43332dc41ee7d33c))
 
 ### Fix
 

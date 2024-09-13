@@ -47,6 +47,7 @@ gitpython==3.1.43
 gunicorn==23.0.0
 hiredis==3.0.0
 httptools==0.6.1
+httpx==0.27.2
 importlib-resources==6.4.5
 jinja2==3.1.4
 measurement==3.2.2

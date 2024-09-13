@@ -26,7 +26,7 @@ load_dotenv_file()
 
 SYSTEM_ENV = getenv("SYSTEM_ENV", "dev")
 
-SECRET_KEY = getenv("DJANGO_SECRET_KEY", "changeme")
+SECRET_KEY = getenv("SECRET_KEY", "changeme")
 
 DEBUG = getenv("DEBUG", "True") == "True"
 
@@ -122,6 +122,8 @@ THIRD_PARTY_APPS = [
     "allauth.usersessions",
     "allauth.socialaccount.providers.facebook",
     "allauth.socialaccount.providers.google",
+    "allauth.socialaccount.providers.discord",
+    "allauth.socialaccount.providers.github",
     "django_celery_beat",
     "django_celery_results",
     "django_browser_reload",
@@ -302,7 +304,16 @@ if ENABLE_DEBUG_TOOLBAR:
 
 SOCIALACCOUNT_ADAPTER = "user.adapter.SocialAccountAdapter"
 SOCIALACCOUNT_STORE_TOKENS = True
+SOCIALACCOUNT_QUERY_EMAIL = True
 SOCIALACCOUNT_PROVIDERS = {
+    "github": {
+        "APP": {
+            "client_id": getenv("SOCIALACCOUNT_GITHUB_CLIENT_ID", ""),
+            "secret": getenv("SOCIALACCOUNT_GITHUB_SECRET", ""),
+            "key": "",
+        },
+        "SCOPE": ["read:user", "user:email" "repo"],
+    },
     "google": {
         "APP": {
             "client_id": getenv("SOCIALACCOUNT_GOOGLE_CLIENT_ID", ""),
@@ -311,6 +322,26 @@ SOCIALACCOUNT_PROVIDERS = {
         },
         "SCOPE": ["profile", "email", "openid"],
         "AUTH_PARAMS": {"access_type": "online" if DEBUG else "offline"},
+    },
+    "discord": {
+        "APP": {
+            "client_id": getenv("SOCIALACCOUNT_DISCORD_CLIENT_ID", ""),
+            "secret": getenv("SOCIALACCOUNT_DISCORD_SECRET", ""),
+            "key": getenv("SOCIALACCOUNT_DISCORD_PUBLIC_KEY", ""),
+        },
+        "SCOPE": ["email", "identify"],
+    },
+    "facebook": {
+        "APP": {
+            "client_id": getenv("SOCIALACCOUNT_FACEBOOK_CLIENT_ID", ""),
+            "secret": getenv("SOCIALACCOUNT_FACEBOOK_SECRET", ""),
+        },
+        "METHOD": "js_sdk",
+        "SCOPE": [
+            "email",
+            "public_profile",
+        ],
+        "FIELDS": ["id", "first_name", "last_name", "middle_name", "name", "name_format", "picture", "short_name"],
     },
 }
 SOCIALACCOUNT_FORMS = {

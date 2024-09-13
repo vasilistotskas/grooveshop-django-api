@@ -1,7 +1,24 @@
+import base64
+import hashlib
+import os
+
+from celery import Celery
+from celery.exceptions import CeleryError
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.ciphers import algorithms
+from cryptography.hazmat.primitives.ciphers import Cipher
+from cryptography.hazmat.primitives.ciphers import modes
 from django.conf import settings
+from django.db import connection
+from django.db import DatabaseError
+from django.middleware.csrf import get_token
+from django.shortcuts import redirect
 from django.utils.decorators import method_decorator
+from redis import Redis
+from redis import RedisError
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.decorators import api_view
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -97,3 +114,67 @@ class BaseModelViewSet(ExpandModelViewSet, TranslationsModelViewSet, PaginationM
         meta = self.metadata_class()
         data = meta.determine_metadata(request, self)
         return Response(data)
+
+
+@api_view(["GET"])
+def health_check(request):
+    health_status = {
+        "database": False,
+        "redis": False,
+        "celery": False,
+    }
+
+    try:
+        connection.cursor()
+        health_status["database"] = True
+    except DatabaseError:
+        health_status["database"] = False
+
+    try:
+        redis_conn = Redis(host=settings.REDIS_HOST, port=settings.REDIS_PORT)
+        redis_conn.ping()
+        health_status["redis"] = True
+    except RedisError:
+        health_status["redis"] = False
+
+    try:
+        celery_app = Celery(broker=settings.CELERY_BROKER_URL)
+        celery_status = celery_app.control.ping()
+        health_status["celery"] = bool(celery_status)
+    except CeleryError:
+        health_status["celery"] = False
+
+    response = Response(health_status)
+    get_token(request)
+    return response
+
+
+def encrypt_token(token, SECRET_KEY):
+    key = hashlib.sha256(SECRET_KEY.encode()).digest()
+    nonce = os.urandom(16)
+    cipher = Cipher(algorithms.AES(key), modes.GCM(nonce), backend=default_backend())
+    encryptor = cipher.encryptor()
+    ciphertext = encryptor.update(token.encode()) + encryptor.finalize()
+    encrypted_token = base64.urlsafe_b64encode(nonce + encryptor.tag + ciphertext).decode("utf-8")
+    return encrypted_token
+
+
+def redirect_to_frontend(request):
+    from knox.models import get_token_model
+
+    AuthToken = get_token_model()
+    user = request.user
+
+    if user.is_authenticated:
+        _, token = AuthToken.objects.create(user)
+        encrypted_token = encrypt_token(token, settings.SECRET_KEY)
+    else:
+        encrypted_token = ""
+
+    frontend_url = settings.NUXT_BASE_URL
+    redirect_path = "/account/provider/callback/"
+    response = redirect(f"{frontend_url}{redirect_path}?encrypted_token={encrypted_token}")
+
+    response.headers["X-Encrypted-Token"] = encrypted_token
+
+    return response

@@ -12,6 +12,8 @@ from drf_spectacular.views import SpectacularAPIView
 from drf_spectacular.views import SpectacularRedocView
 from drf_spectacular.views import SpectacularSwaggerView
 
+from core.api.views import health_check
+from core.api.views import redirect_to_frontend
 from core.views import HomeView
 from core.views import ManageTOTPSvgView
 from core.views import upload_image
@@ -28,6 +30,7 @@ urlpatterns = i18n_patterns(
     path(_("admin_no_otp/"), admin.site.urls),
     path("upload_image", upload_image, name="upload_image"),
     path("accounts/", include("allauth.urls")),
+    path("account/provider/callback", redirect_to_frontend, name="provider-callback"),
     path("_allauth/", include("allauth.headless.urls")),
     path(
         "_allauth/app/v1/account/authenticators/totp/svg",
@@ -54,6 +57,7 @@ urlpatterns = i18n_patterns(
     path("api/v1/", include("cart.urls")),
     path("api/v1/", include("notification.urls")),
     path("api/v1/", include("contact.urls")),
+    path("api/v1/health", health_check, name="api-health"),
     path("api/v1/schema", SpectacularAPIView.as_view(), name="schema"),
     path(
         "api/v1/schema/swagger-ui",

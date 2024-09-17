@@ -1,5 +1,6 @@
 import csv
 import xml.etree.ElementTree as ET
+from typing import override
 
 from django.contrib import admin
 from django.http import HttpResponse
@@ -54,6 +55,7 @@ class ExportActionMixin:
 
 
 class ExportModelAdmin(ExportActionMixin, admin.ModelAdmin):
+    @override
     def get_export_formats(self) -> list[dict[str, str]]:
         return super().get_export_formats()
 

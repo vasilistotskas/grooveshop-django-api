@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import override
+
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import throttle_classes
@@ -35,18 +37,21 @@ class CartViewSet(BaseModelViewSet):
         "user",
     ]
 
+    @override
     def get_serializer_context(self):
         context = super().get_serializer_context()
         cart_service = CartService(request=self.request)
         context["cart"] = cart_service.cart
         return context
 
+    @override
     def retrieve(self, request, *args, **kwargs) -> Response:
         service = CartService(request=request)
         serializer = self.get_serializer(service.get_or_create_cart(request))
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @throttle_classes([BurstRateThrottle])
+    @override
     def update(self, request, *args, **kwargs) -> Response:
         partial = kwargs.pop("partial", False)
         service = CartService(request=request)
@@ -57,10 +62,12 @@ class CartViewSet(BaseModelViewSet):
         return Response(serializer.data)
 
     @throttle_classes([BurstRateThrottle])
+    @override
     def partial_update(self, request, *args, **kwargs) -> Response:
         kwargs["partial"] = True
         return self.update(request, *args, **kwargs)
 
+    @override
     def destroy(self, request, *args, **kwargs) -> Response:
         service = CartService(request=request)
         if service.cart:
@@ -94,6 +101,7 @@ class CartItemViewSet(MultiSerializerMixin, BaseModelViewSet):
         "destroy": CartItemSerializer,
     }
 
+    @override
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):
             return CartItem.objects.none()
@@ -102,6 +110,7 @@ class CartItemViewSet(MultiSerializerMixin, BaseModelViewSet):
             return CartItem.objects.filter(cart__id=self.request.session.get("cart_id"))
         return CartItem.objects.filter(cart__user=self.request.user)
 
+    @override
     def get_serializer_context(self):
         context = super().get_serializer_context()
         service = CartService(request=self.request)
@@ -109,6 +118,7 @@ class CartItemViewSet(MultiSerializerMixin, BaseModelViewSet):
         return context
 
     @throttle_classes([BurstRateThrottle])
+    @override
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         service = CartService(request=request)

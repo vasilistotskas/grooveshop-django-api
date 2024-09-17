@@ -1,4 +1,5 @@
 from typing import Optional
+from typing import override
 from typing import Union
 
 from django.conf import settings
@@ -12,6 +13,7 @@ from core.logging import LogInfo
 
 
 class NoValidationSearchVectorCombinable(SearchVectorCombinable):
+    @override
     def _combine(self, other, connector, reversed):
         if not isinstance(other, NoValidationSearchVectorCombinable):
             raise TypeError(
@@ -92,17 +94,21 @@ class FlatConcat(Expression):
             raise TypeError(f"Cannot combine FlatSearchVectorCombinable with other " f"instances types, got {other!r}.")
         return FlatConcat(*self.source_expressions + other.source_expressions)
 
+    @override
     def get_source_expressions(self):
         return self.source_expressions
 
+    @override
     def set_source_expressions(self, exprs):
         self.source_expressions = exprs
 
+    @override
     def copy(self):
         copy = super().copy()
         copy.source_expressions = self.source_expressions[:]
         return copy
 
+    @override
     def resolve_expression(
         self,
         query=None,
@@ -117,6 +123,7 @@ class FlatConcat(Expression):
             c.source_expressions[pos] = arg.resolve_expression(query, allow_joins, reuse, summarize, for_save)
         return c
 
+    @override
     def as_sql(self, compiler, connection, **_extra_context):
         connection.ops.check_expression_support(self)
         sql_parts: list[str] = []

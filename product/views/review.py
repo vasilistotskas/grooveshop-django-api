@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import override
+
 from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
@@ -43,11 +45,13 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
         "product": ProductSerializer,
     }
 
+    @override
     def get_queryset(self):
         if self.request.user.is_superuser:
             return ProductReview.objects.all()
         return ProductReview.objects.filter(status=ReviewStatusEnum.TRUE)
 
+    @override
     def get_permissions(self):
         if self.action in [
             "create",

@@ -1,3 +1,5 @@
+from typing import override
+
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -47,6 +49,7 @@ class ProductFavourite(TimeStampMixinModel, UUIDModel):
         product_name = self.product.safe_translation_getter("name", any_language=True)
         return f"{self.user.email} - {product_name}"
 
+    @override
     def save(self, *args, **kwargs):
         if not self.pk and ProductFavourite.objects.filter(user=self.user, product=self.product).exists():
             raise ValidationError(_("This product is already in the user's favorites."))

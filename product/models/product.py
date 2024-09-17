@@ -53,6 +53,7 @@ class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
 
 
 class ProductManager(TranslatableManager):
+    @override
     def get_queryset(self):
         return ProductQuerySet(self.model, using=self._db).exclude_deleted()
 
@@ -133,6 +134,7 @@ class Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, SeoModel,
     def __repr__(self):
         return f"<Product {self.name} ({self.product_code})>"
 
+    @override
     def save(self, *args, **kwargs):
         if not self.product_code:
             self.product_code = self.generate_unique_product_code()
@@ -145,6 +147,7 @@ class Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, SeoModel,
             self.slug = unique_slugify(config)
         super().save(*args, **kwargs)
 
+    @override
     def clean(self):
         super().clean()
         if self.discount_percent > 0 >= self.price.amount:

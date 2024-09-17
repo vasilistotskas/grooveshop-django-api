@@ -1,5 +1,6 @@
 import importlib
 from typing import Dict
+from typing import override
 from typing import Type
 
 from django.contrib.auth import get_user_model
@@ -34,6 +35,7 @@ class NotificationUserSerializer(BaseExpandSerializer):
             "uuid",
         )
 
+    @override
     def get_expand_fields(
         self,
     ) -> Dict[str, Type[serializers.ModelSerializer]]:

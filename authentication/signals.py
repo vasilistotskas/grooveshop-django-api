@@ -21,6 +21,15 @@ def populate_profile(sociallogin=None, user=None, **kwargs):
     if sociallogin.account.provider == "google":
         picture_url = sociallogin.account.extra_data["picture"]
 
+    if sociallogin.account.provider == "discord":
+        picture_url = (
+            f"https://cdn.discordapp.com/avatars/{sociallogin.account.extra_data.get('id')}"
+            f"/{sociallogin.account.extra_data.get('avatar')}.png"
+        )
+
+    if sociallogin.account.provider == "github":
+        picture_url = sociallogin.account.extra_data["avatar_url"]
+
     if picture_url:
         response = requests.get(picture_url)
 

@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import override
 
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -49,6 +50,7 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
         product_name = self.product.safe_translation_getter("name", any_language=True)
         return f"Order {self.order.id} - {product_name} x {self.quantity}"
 
+    @override
     def clean(self):
         if self.quantity <= 0:
             raise ValidationError(_("Quantity must be greater than 0."))
@@ -63,5 +65,6 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
             currency=self.price.currency,
         )
 
+    @override
     def get_ordering_queryset(self) -> QuerySet:
         return self.order.items.all()

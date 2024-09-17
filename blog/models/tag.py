@@ -1,3 +1,5 @@
+from typing import override
+
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -12,6 +14,7 @@ from core.models import UUIDModel
 
 
 class ActiveBlogTagManager(TranslatableManager):
+    @override
     def get_queryset(self):
         return super().get_queryset().filter(active=True)
 
@@ -48,6 +51,7 @@ class BlogTag(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         tag_name = self.safe_translation_getter("name", any_language=True) or "Unnamed Tag"
         return f"{tag_name} ({'Active' if self.active else 'Inactive'})"
 
+    @override
     def get_ordering_queryset(self):
         return BlogTag.objects.all()
 

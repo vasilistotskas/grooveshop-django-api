@@ -1,5 +1,6 @@
 import importlib
 from typing import Dict
+from typing import override
 from typing import Type
 
 from djmoney.contrib.django_rest_framework import MoneyField
@@ -84,6 +85,7 @@ class ProductSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "absolute_url",
         )
 
+    @override
     def get_expand_fields(
         self,
     ) -> Dict[str, Type[serializers.ModelSerializer]]:

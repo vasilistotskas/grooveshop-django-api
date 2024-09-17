@@ -1,3 +1,5 @@
+from typing import override
+
 from djmoney.contrib.django_rest_framework import MoneyField
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
@@ -75,6 +77,7 @@ class CartItemCreateSerializer(BaseExpandSerializer):
         model = CartItem
         fields = ("id", "cart", "product", "quantity")
 
+    @override
     def create(self, validated_data):
         cart = self.context.get("cart")
         try:

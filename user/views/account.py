@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import override
+
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
@@ -49,6 +51,7 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         "change_username": UsernameUpdateSerializer,
     }
 
+    @override
     def get_queryset(self):
         match self.action:
             case "favourite_products":

@@ -1,4 +1,5 @@
 from typing import Dict
+from typing import override
 from typing import Type
 
 from rest_framework import serializers
@@ -22,6 +23,7 @@ class BaseExpandSerializer(serializers.ModelSerializer):
 
         self.expansion_path = self.context.get("expansion_path", [])
 
+    @override
     def to_representation(self, instance) -> Dict[str, any]:
         ret = super().to_representation(instance)
         request_language = (

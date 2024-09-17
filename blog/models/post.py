@@ -75,6 +75,7 @@ class BlogPost(
         author_name = self.author.user.email if self.author else "Unknown"
         return f"{title} by {author_name}"
 
+    @override
     def save(self, *args, **kwargs):
         if not self.slug:
             config = SlugifyConfig(

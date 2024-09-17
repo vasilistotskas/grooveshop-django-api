@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import override
 
 from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
@@ -29,6 +30,7 @@ class Vat(TimeStampMixinModel, UUIDModel):
     def __str__(self):
         return f"{self.value}% VAT"
 
+    @override
     def clean(self):
         if not 0 <= self.value <= 100:
             raise ValidationError(_("VAT value must be between 0 and 100."))

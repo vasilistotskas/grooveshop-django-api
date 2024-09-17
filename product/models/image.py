@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from typing import override
 
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
@@ -61,9 +62,11 @@ class ProductImage(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDMo
         main_status = "Main" if self.is_main else "Secondary"
         return f"{product_name} Image ({main_status})"
 
+    @override
     def get_ordering_queryset(self):
         return self.product.images.all()
 
+    @override
     def save(self, *args, **kwargs):
         old_instance = None
         if self.pk:
@@ -79,6 +82,7 @@ class ProductImage(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDMo
 
         super().save(*args, **kwargs)
 
+    @override
     def clean(self):
         if self.is_main:
             ProductImage.objects.filter(product=self.product, is_main=True).update(is_main=False)

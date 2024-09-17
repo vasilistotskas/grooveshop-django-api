@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import override
+
 from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
@@ -35,6 +37,7 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
         "post": BlogPostSerializer,
     }
 
+    @override
     def get_permissions(self):
         if self.action in [
             "create",
@@ -47,6 +50,7 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
         return super().get_permissions()
 
     @throttle_classes([BurstRateThrottle])
+    @override
     def create(self, request, *args, **kwargs) -> Response:
         return super().create(request, *args, **kwargs)
 

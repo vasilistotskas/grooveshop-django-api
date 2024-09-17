@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from django.utils.decorators import method_decorator
+from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
@@ -12,11 +12,10 @@ from blog.serializers.post import BlogPostSerializer
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from core.utils.serializers import MultiSerializerMixin
-from core.utils.views import conditional_cache_page
-
-DEFAULT_BLOG_CATEGORY_CACHE_TTL = 60 * 60 * 2
+from core.utils.views import cache_methods
 
 
+@cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve", "posts"])
 class BlogCategoryViewSet(MultiSerializerMixin, BaseModelViewSet):
     queryset = BlogCategory.objects.all()
     filter_backends = [
@@ -34,15 +33,6 @@ class BlogCategoryViewSet(MultiSerializerMixin, BaseModelViewSet):
         "posts": BlogPostSerializer,
     }
 
-    @method_decorator(conditional_cache_page(DEFAULT_BLOG_CATEGORY_CACHE_TTL))
-    def list(self, request, *args, **kwargs) -> Response:
-        return super().list(request, *args, **kwargs)
-
-    @method_decorator(conditional_cache_page(DEFAULT_BLOG_CATEGORY_CACHE_TTL))
-    def retrieve(self, request, pk=None, *args, **kwargs) -> Response:
-        return super().retrieve(request, pk=pk, *args, **kwargs)
-
-    @method_decorator(conditional_cache_page(DEFAULT_BLOG_CATEGORY_CACHE_TTL))
     @action(detail=True, methods=["GET"])
     def posts(self, request, pk=None, *args, **kwargs) -> Response:
         self.ordering_fields = [

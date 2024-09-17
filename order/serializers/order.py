@@ -1,3 +1,5 @@
+from typing import override
+
 from djmoney.contrib.django_rest_framework import MoneyField
 from drf_spectacular.utils import extend_schema_field
 from phonenumber_field.serializerfields import PhoneNumberField
@@ -134,6 +136,7 @@ class OrderCreateUpdateSerializer(BaseExpandSerializer):
             "full_address",
         )
 
+    @override
     def validate(self, data):
         super().validate(data)
 
@@ -148,6 +151,7 @@ class OrderCreateUpdateSerializer(BaseExpandSerializer):
 
         return data
 
+    @override
     def create(self, validated_data):
         items_data = validated_data.pop("items")
 
@@ -168,6 +172,7 @@ class OrderCreateUpdateSerializer(BaseExpandSerializer):
 
         return order
 
+    @override
     def update(self, instance, validated_data):
         if "items" in validated_data:
             items_data = validated_data.pop("items")
@@ -231,6 +236,7 @@ class CheckoutSerializer(BaseExpandSerializer):
             "full_address",
         )
 
+    @override
     def validate(self, data):
         super().validate(data)
 
@@ -245,6 +251,7 @@ class CheckoutSerializer(BaseExpandSerializer):
 
         return data
 
+    @override
     def create(self, validated_data):
         items_data = validated_data.pop("items")
 

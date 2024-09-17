@@ -27,7 +27,7 @@ app_name = "core"
 urlpatterns = i18n_patterns(
     path("__reload__/", include("django_browser_reload.urls")),
     path("", HomeView.as_view(), name="home"),
-    path(_("admin_no_otp/"), admin.site.urls),
+    path(_("admin/"), admin.site.urls),
     path("upload_image", upload_image, name="upload_image"),
     path("accounts/", include("allauth.urls")),
     path("account/provider/callback", redirect_to_frontend, name="provider-callback"),

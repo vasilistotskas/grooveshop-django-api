@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 from typing import Optional
+from typing import override
 from typing import Sequence
 from typing import Type
 
@@ -52,11 +53,13 @@ class MeasurementField(FloatField):
 
         super(MeasurementField, self).__init__(verbose_name, name, *args, **kwargs)
 
+    @override
     def deconstruct(self) -> tuple[str, str, Sequence, dict[str, Any]]:
         name, path, args, kwargs = super(MeasurementField, self).deconstruct()
         kwargs["measurement"] = self.measurement
         return name, path, args, kwargs
 
+    @override
     def get_prep_value(self, value) -> Optional[float]:
         if value is None:
             return None
@@ -83,6 +86,7 @@ class MeasurementField(FloatField):
             original_unit=self.get_default_unit(),
         )
 
+    @override
     def value_to_string(self, obj: Model) -> str:
         value = self.value_from_object(obj)
         if not isinstance(value, self.MEASURE_BASES):
@@ -99,6 +103,7 @@ class MeasurementField(FloatField):
             logger.error(f"Error deserializing measurement: {e}")
             return None
 
+    @override
     def to_python(self, value: Any) -> Optional[MeasureBase | BidimensionalMeasure]:
         if value is None:
             return value
@@ -127,6 +132,7 @@ class MeasurementField(FloatField):
             unit=return_unit,
         )
 
+    @override
     def formfield(self, **kwargs) -> Field:
         defaults = {"form_class": MeasurementFormField}
         defaults.update(kwargs)

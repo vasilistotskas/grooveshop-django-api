@@ -5,22 +5,16 @@ from typing import List
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser
-from django.contrib.auth.models import AnonymousUser
 from django.contrib.auth.models import BaseUserManager
 from django.contrib.auth.models import PermissionsMixin
 from django.contrib.auth.validators import UnicodeUsernameValidator
 from django.contrib.postgres.indexes import GinIndex
-from django.contrib.sessions.models import Session
 from django.db import models
-from django.http import HttpRequest
-from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from phonenumber_field.modelfields import PhoneNumberField
 
-from core import caches
-from core.caches import cache_instance
 from core.fields.image import ImageAndSvgField
 from core.generators import UserNameGenerator
 from core.models import TimeStampMixinModel
@@ -152,54 +146,6 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
 
     def __str__(self):
         return self.username if self.username else self.email
-
-    def remove_all_sessions(self, request: HttpRequest) -> None:
-        user_id = self.pk
-
-        sessions = Session.objects.filter(
-            expire_date__gte=timezone.now(),
-            session_data__contains=f'"_auth_user_id":{user_id}',
-        )
-        sessions.delete()
-
-        user_cache_keys = cache_instance.keys(f"{caches.USER_AUTHENTICATED}{user_id}:*")
-        django_cache_keys = cache_instance.keys("django.contrib.sessions.cache*")
-
-        for key in user_cache_keys:
-            cache_instance.delete(key)
-
-        request.session.flush()
-
-        for key in django_cache_keys:
-            user = cache_instance.get(key)
-            if not user:
-                continue
-            cache_user_id = user.get("_auth_user_id", None)
-            if not cache_user_id:
-                continue
-            if user and int(user.get("_auth_user_id")) == int(user_id):
-                cache_instance.delete(key)
-
-    @staticmethod
-    def remove_session(user: AbstractBaseUser | AnonymousUser, request: HttpRequest) -> None:
-        try:
-            session = Session.objects.get(session_key=request.session.session_key)
-            session.delete()
-        except Session.DoesNotExist:
-            pass
-
-        if request.user.is_authenticated:
-            cache_instance.delete(f"{caches.USER_AUTHENTICATED}{user.pk}:" f"{request.session.session_key}")
-        else:
-            cache_instance.delete(f"{caches.USER_UNAUTHENTICATED}{request.session.session_key}")
-
-        request.session.flush()
-
-        cache_instance.delete(f"django.contrib.sessions.cache{request.session.session_key}")
-
-    def get_cache(self) -> dict:
-        user_cache_keys = cache_instance.keys(f"{caches.USER_AUTHENTICATED}{self.pk}:*")
-        return cache_instance.get_many(keys=user_cache_keys)
 
     @property
     def full_name(self) -> str:

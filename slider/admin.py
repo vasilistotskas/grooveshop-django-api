@@ -1,4 +1,5 @@
 from typing import List
+from typing import override
 
 import admin_thumbnails
 from django.contrib import admin
@@ -24,6 +25,7 @@ class SliderAdmin(TranslatableAdmin):
     readonly_fields = ("image_tag", "thumbnail")
     actions = [""]
 
+    @override
     def get_prepopulated_fields(self, request, obj=None):
         # can't use `prepopulated_fields = ..` because it breaks the admin validation
         # for translated fields. This is the official django-parler workaround.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
+from typing import override
 from typing import TYPE_CHECKING
 
 from django.core import validators
@@ -20,6 +21,7 @@ def validate_image_file_extension(value: File | None) -> None:
 class ImageAndSvgField(ImageField):
     default_validators = [validate_image_file_extension]
 
+    @override
     def to_python(self, data: File | None) -> File | None:
         try:
             f = super().to_python(data)

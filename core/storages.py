@@ -1,3 +1,5 @@
+from typing import override
+
 from django.core.files.storage import storages
 from storages.backends.s3boto3 import S3Boto3Storage
 
@@ -10,6 +12,7 @@ class StaticStorage(S3Boto3Storage):
         super().__init__(*args, **kwargs)
         self.local_storage = storages.create_storage({"BACKEND": "compressor.storage.CompressorFileStorage"})
 
+    @override
     def save(self, name, content, max_length=None):
         self.local_storage.save(name, content)
         super().save(name, self.local_storage._open(name))

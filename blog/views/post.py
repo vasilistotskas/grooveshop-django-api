@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
@@ -15,8 +16,10 @@ from core.api.throttling import BurstRateThrottle
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from core.utils.serializers import MultiSerializerMixin
+from core.utils.views import cache_methods
 
 
+@cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
     queryset = BlogPost.objects.all()
     filter_backends = [

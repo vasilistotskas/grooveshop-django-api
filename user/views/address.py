@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import override
+
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action
@@ -48,6 +50,7 @@ class UserAddressViewSet(BaseModelViewSet):
     ordering = ["-is_main", "-created_at"]
     search_fields = ["id", "user", "country", "city", "street", "zipcode"]
 
+    @override
     def destroy(self, request, pk=None, *args, **kwargs) -> Response:
         address = self.get_object()
         if address.is_main:

@@ -65,7 +65,7 @@ USE_X_FORWARDED_HOST = getenv("USE_X_FORWARDED_HOST", "False") == "True"
 
 # Django built-in apps
 DJANGO_APPS = [
-    "django.contrib.admin",
+    "admin.apps.MyAdminConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -305,6 +305,9 @@ if ENABLE_DEBUG_TOOLBAR:
 SOCIALACCOUNT_ADAPTER = "user.adapter.SocialAccountAdapter"
 SOCIALACCOUNT_STORE_TOKENS = True
 SOCIALACCOUNT_QUERY_EMAIL = True
+SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
+SOCIALACCOUNT_EMAIL_VERIFICATION = "mandatory"
+SOCIALACCOUNT_REQUESTS_TIMEOUT = 10
 SOCIALACCOUNT_PROVIDERS = {
     "github": {
         "APP": {
@@ -313,6 +316,7 @@ SOCIALACCOUNT_PROVIDERS = {
             "key": "",
         },
         "SCOPE": ["read:user", "user:email" "repo"],
+        "VERIFIED_EMAIL": True,
     },
     "google": {
         "APP": {
@@ -321,7 +325,8 @@ SOCIALACCOUNT_PROVIDERS = {
             "key": "",
         },
         "SCOPE": ["profile", "email", "openid"],
-        "AUTH_PARAMS": {"access_type": "online" if DEBUG else "offline"},
+        "AUTH_PARAMS": {"access_type": "offline" if DEBUG else "online"},
+        "VERIFIED_EMAIL": True,
     },
     "discord": {
         "APP": {
@@ -330,18 +335,22 @@ SOCIALACCOUNT_PROVIDERS = {
             "key": getenv("SOCIALACCOUNT_DISCORD_PUBLIC_KEY", ""),
         },
         "SCOPE": ["email", "identify"],
+        "VERIFIED_EMAIL": True,
     },
     "facebook": {
         "APP": {
             "client_id": getenv("SOCIALACCOUNT_FACEBOOK_CLIENT_ID", ""),
             "secret": getenv("SOCIALACCOUNT_FACEBOOK_SECRET", ""),
         },
-        "METHOD": "js_sdk",
+        "METHOD": "oauth2",
         "SCOPE": [
             "email",
             "public_profile",
         ],
+        "VERSION": "v20.0",
+        "GRAPH_API_URL": "https://graph.facebook.com/v20.0",
         "FIELDS": ["id", "first_name", "last_name", "middle_name", "name", "name_format", "picture", "short_name"],
+        "VERIFIED_EMAIL": True,
     },
 }
 SOCIALACCOUNT_FORMS = {
@@ -380,23 +389,18 @@ HEADLESS_FRONTEND_URLS = {
     "socialaccount_login_error": f"{NUXT_BASE_URL}/account/provider/callback",
 }
 
-SYSTEM_ENV = getenv("SYSTEM_ENV", "dev")
 USE_AWS = getenv("USE_AWS", "False") == "True"
 REDIS_HOST = getenv("REDIS_HOST", "localhost")
 REDIS_PORT = getenv("REDIS_PORT", "6379")
 REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
-CACHE_DISABLED = getenv("DISABLE_CACHE", "False").lower() == "true"
+DISABLE_CACHE = getenv("DISABLE_CACHE", "False").lower() == "true"
+DEFAULT_CACHE_TTL = int(getenv("DEFAULT_CACHE_TTL", 60 * 60 * 2))
 
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
         "LOCATION": REDIS_URL,
         "KEY_PREFIX": "redis",
-    },
-    "fallback": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "unique-snowflake",
-        "KEY_PREFIX": "locmem",
     },
 }
 
@@ -406,11 +410,6 @@ if SYSTEM_ENV == "ci":
             "BACKEND": "django.core.cache.backends.redis.RedisCache",
             "LOCATION": "redis://127.0.0.1:6379/0",
             "KEY_PREFIX": "redis",
-        },
-        "fallback": {
-            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-            "LOCATION": "unique-snowflake",
-            "KEY_PREFIX": "locmem",
         },
     }
 
@@ -518,9 +517,7 @@ CHANNEL_LAYERS = {
 
 APP_BASE_URL = getenv("APP_BASE_URL", "http://localhost:8000")
 API_BASE_URL = getenv("API_BASE_URL", "http://localhost:8000")
-NUXT_BASE_URL = getenv("NUXT_BASE_URL", "http://localhost:3000")
-MEDIA_STREAM_BASE_URL = getenv("MEDIA_STREAM_BASE_URL", "http://localhost:3003")
-AWS_STORAGE_BUCKET_NAME = getenv("AWS_STORAGE_BUCKET_NAME")
+AWS_STORAGE_BUCKET_NAME = getenv("AWS_STORAGE_BUCKET_NAME", "changeme")
 AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
 
 CORS_EXPOSE_HEADERS = [
@@ -566,13 +563,6 @@ CORS_ALLOW_HEADERS = (
     "X-Session-Token",
     "location",
 )
-
-APP_BASE_URL = getenv("APP_BASE_URL", "http://localhost:8000")
-API_BASE_URL = getenv("API_BASE_URL", "http://localhost:8000")
-NUXT_BASE_URL = getenv("NUXT_BASE_URL", "http://localhost:3000")
-MEDIA_STREAM_BASE_URL = getenv("MEDIA_STREAM_BASE_URL", "http://localhost:3003")
-AWS_STORAGE_BUCKET_NAME = getenv("AWS_STORAGE_BUCKET_NAME")
-AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
 
 CSRF_USE_SESSIONS = False
 CSRF_COOKIE_NAME = "csrftoken"
@@ -798,10 +788,8 @@ if USE_AWS:
     # aws settings
     AWS_ACCESS_KEY_ID = getenv("AWS_ACCESS_KEY_ID")
     AWS_SECRET_ACCESS_KEY = getenv("AWS_SECRET_ACCESS_KEY")
-    AWS_STORAGE_BUCKET_NAME = getenv("AWS_STORAGE_BUCKET_NAME")
     AWS_DEFAULT_ACL = None
     AWS_QUERYSTRING_AUTH = False
-    AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
     AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
     # s3 static settings
     STATIC_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/"

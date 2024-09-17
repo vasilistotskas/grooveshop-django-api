@@ -2,6 +2,7 @@ import sys
 
 from django.conf import settings
 from django.http import QueryDict
+from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from rest_framework.request import Request
 
@@ -34,15 +35,22 @@ class TranslationsProcessingMixin:
         return request
 
 
-def conditional_cache_page(*args, **kwargs):
-    if "test" in sys.argv or settings.DEBUG or settings.CACHE_DISABLED:
+cache_methods_registry = []
 
-        def decorator(func):
-            return func
 
-    else:
+def cache_methods(timeout, methods, *, cache=None):
+    def class_decorator(cls):
+        if "test" in sys.argv or getattr(settings, "CACHE_DISABLED", False):
+            return cls
+        for method_name in methods:
+            func = getattr(cls, method_name)
+            class_name = cls.__name__
+            key_prefix = f"{class_name}_{method_name}"
+            cache_decorator = cache_page(timeout, cache=cache, key_prefix=key_prefix)
+            decorated_func = method_decorator(cache_decorator)(func)
+            setattr(cls, method_name, decorated_func)
+        if cls not in cache_methods_registry:
+            cache_methods_registry.append(cls)
+        return cls
 
-        def decorator(func):
-            return cache_page(*args, **kwargs)(func)
-
-    return decorator
+    return class_decorator

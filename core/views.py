@@ -1,4 +1,5 @@
 import os
+from typing import override
 from uuid import uuid4
 
 from allauth.headless.base.response import APIResponse
@@ -93,6 +94,7 @@ class TOTPSvgNotFoundResponse(APIResponse):
 
 
 class ManageTOTPSvgView(ManageTOTPView):
+    @override
     def get(self, request, *args, **kwargs) -> APIResponse:
         authenticator = self._get_authenticator()
         if not authenticator:

@@ -1,5 +1,6 @@
 import importlib
 from typing import Dict
+from typing import override
 from typing import Type
 
 from django.contrib.auth import get_user_model
@@ -52,6 +53,7 @@ class UserAddressSerializer(BaseExpandSerializer):
             "uuid",
         )
 
+    @override
     def get_expand_fields(
         self,
     ) -> Dict[str, Type[serializers.ModelSerializer]]:
@@ -64,6 +66,7 @@ class UserAddressSerializer(BaseExpandSerializer):
             "region": region_serializer,
         }
 
+    @override
     def validate(self, data):
         if self.instance and "is_main" in data and data["is_main"]:
             user = data["user"]

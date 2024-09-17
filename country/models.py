@@ -1,4 +1,5 @@
 import os
+from typing import override
 
 from django.core.validators import RegexValidator
 from django.db import models
@@ -58,11 +59,13 @@ class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     def __str__(self):
         return self.safe_translation_getter("name", any_language=True) or ""
 
+    @override
     def save(self, *args, **kwargs):
         self.alpha_2 = self.alpha_2.upper()
         self.alpha_3 = self.alpha_3.upper()
         super().save(*args, **kwargs)
 
+    @override
     def get_ordering_queryset(self):
         return Country.objects.all()
 

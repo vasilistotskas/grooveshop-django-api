@@ -1,3 +1,5 @@
+from typing import override
+
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -15,6 +17,7 @@ from core.models import UUIDModel
 
 
 class BlogCommentQuerySet(TranslatableQuerySet, TreeQuerySet):
+    @override
     def as_manager(cls):
         manager = BlogCommentManager.from_queryset(cls)()
         manager._built_with_as_manager = True

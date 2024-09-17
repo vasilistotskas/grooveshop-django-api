@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import override
+
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action
@@ -45,6 +47,7 @@ class ProductFavouriteViewSet(MultiSerializerMixin, BaseModelViewSet):
     }
 
     @throttle_classes([BurstRateThrottle])
+    @override
     def create(self, request, *args, **kwargs) -> Response:
         return super().create(request, *args, **kwargs)
 

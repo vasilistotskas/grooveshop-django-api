@@ -1,3 +1,5 @@
+from typing import override
+
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 from mptt.admin import DraggableMPTTAdmin
@@ -43,12 +45,14 @@ class BlogCategoryAdmin(TranslatableAdmin, DraggableMPTTAdmin):
     list_display_links = ("indented_title",)
     search_fields = ("translations__name",)
 
+    @override
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         qs = BlogCategory.objects.add_related_count(qs, BlogPost, "category", "posts_cumulative_count", cumulative=True)
         qs = BlogCategory.objects.add_related_count(qs, BlogPost, "category", "posts_count", cumulative=False)
         return qs
 
+    @override
     def get_prepopulated_fields(self, request, obj=None):
         return {
             "slug": ("name",),
@@ -98,6 +102,7 @@ class BlogPostAdmin(TranslatableAdmin):
         "translations__body",
     )
 
+    @override
     def get_prepopulated_fields(self, request, obj=None):
         # can't use `prepopulated_fields = ..` because it breaks the admin validation
         # for translated fields. This is the official django-parler workaround.

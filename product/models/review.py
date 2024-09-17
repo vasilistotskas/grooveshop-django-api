@@ -1,3 +1,5 @@
+from typing import override
+
 from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -58,6 +60,7 @@ class ProductReview(TranslatableModel, TimeStampMixinModel, PublishableModel, UU
         )
         return f"Review by {self.user.email} on {self.product}: {comment_snippet}"
 
+    @override
     def clean(self):
         if self.rate not in [choice.value for choice in RateEnum]:
             raise ValidationError(_("Invalid rate value."))

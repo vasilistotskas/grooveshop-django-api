@@ -1,3 +1,5 @@
+from typing import override
+
 from django.db import models
 from django.utils import timezone as tz
 from django.utils.translation import gettext_lazy as _
@@ -47,6 +49,7 @@ class NotificationUser(TimeStampMixinModel, UUIDModel):
             models.Index(fields=["seen"]),
         ]
 
+    @override
     def save(self, *args, **kwargs):
         if self.seen and self.seen_at is None:
             self.seen_at = tz.now()

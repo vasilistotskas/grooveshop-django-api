@@ -1,3 +1,5 @@
+from typing import override
+
 import admin_thumbnails
 from django.contrib import admin
 from django.contrib import messages
@@ -39,6 +41,7 @@ class CategoryAdmin(TranslatableAdmin, DraggableMPTTAdmin):
     list_display_links = ("indented_title",)
     search_fields = ("translations__name",)
 
+    @override
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         qs = ProductCategory.objects.add_related_count(
@@ -51,6 +54,7 @@ class CategoryAdmin(TranslatableAdmin, DraggableMPTTAdmin):
         qs = ProductCategory.objects.add_related_count(qs, Product, "category", "products_count", cumulative=False)
         return qs
 
+    @override
     def get_prepopulated_fields(self, request, obj=None):
         return {
             "slug": ("name",),
@@ -109,6 +113,7 @@ class ProductAdmin(TranslatableAdmin, ExportModelAdmin, SimpleHistoryAdmin):
     inlines = [ProductImageInline, TagInLine]
     readonly_fields = ("image_tag", "likes_count")
 
+    @override
     def get_prepopulated_fields(self, request, obj=None) -> dict:
         # can't use `prepopulated_fields = ..` because it breaks the admin validation
         # for translated fields. This is the official django-parler workaround.

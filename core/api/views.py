@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import os
+from typing import override
 
 from celery import Celery
 from celery.exceptions import CeleryError
@@ -13,7 +14,6 @@ from django.db import connection
 from django.db import DatabaseError
 from django.middleware.csrf import get_token
 from django.shortcuts import redirect
-from django.utils.decorators import method_decorator
 from redis import Redis
 from redis import RedisError
 from rest_framework import status
@@ -26,14 +26,13 @@ from rest_framework.viewsets import ModelViewSet
 from core.pagination.cursor import CursorPaginator
 from core.pagination.limit_offset import LimitOffsetPaginator
 from core.pagination.page_number import PageNumberPaginator
-from core.utils.views import conditional_cache_page
 from core.utils.views import TranslationsProcessingMixin
 
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
-API_SCHEMA_CACHE_TTL = 60 * 60 * 2
 
 
 class Metadata(SimpleMetadata):
+    @override
     def determine_metadata(self, request, view):
         metadata = super().determine_metadata(request, view)
         metadata["filterset_fields"] = getattr(view, "filterset_fields", [])
@@ -44,6 +43,7 @@ class Metadata(SimpleMetadata):
 
 
 class ExpandModelViewSet(ModelViewSet):
+    @override
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context["expand"] = self.request.query_params.get("expand", "false").lower()
@@ -53,6 +53,7 @@ class ExpandModelViewSet(ModelViewSet):
 
 class PaginationModelViewSet(ModelViewSet):
     @property
+    @override
     def paginator(self):
         if not hasattr(self, "_paginator"):
             if self.pagination_class is None:
@@ -82,25 +83,30 @@ class PaginationModelViewSet(ModelViewSet):
         serializer = self.get_serializer(queryset, many=many, context=self.get_serializer_context())
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @override
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)
 
 
 class TranslationsModelViewSet(TranslationsProcessingMixin, ModelViewSet):
+    @override
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context["language"] = self.request.query_params.get("language", default_language)
         return context
 
+    @override
     def create(self, request, *args, **kwargs):
         request = self.process_translations_data(request)
         return super().create(request, *args, **kwargs)
 
+    @override
     def update(self, request, *args, **kwargs):
         request = self.process_translations_data(request)
         return super().update(request, *args, **kwargs)
 
+    @override
     def partial_update(self, request, *args, **kwargs):
         return super().partial_update(request, *args, **kwargs)
 
@@ -108,7 +114,6 @@ class TranslationsModelViewSet(TranslationsProcessingMixin, ModelViewSet):
 class BaseModelViewSet(ExpandModelViewSet, TranslationsModelViewSet, PaginationModelViewSet):
     metadata_class = Metadata
 
-    @method_decorator(conditional_cache_page(API_SCHEMA_CACHE_TTL))
     @action(detail=False, methods=["GET"])
     def api_schema(self, request, *args, **kwargs):
         meta = self.metadata_class()
@@ -159,7 +164,7 @@ def encrypt_token(token, SECRET_KEY):
     return encrypted_token
 
 
-def redirect_to_frontend(request):
+def redirect_to_frontend(request, *args, **kwargs):
     from knox.models import get_token_model
 
     AuthToken = get_token_model()
@@ -172,7 +177,7 @@ def redirect_to_frontend(request):
         encrypted_token = ""
 
     frontend_url = settings.NUXT_BASE_URL
-    redirect_path = "/account/provider/callback/"
+    redirect_path = "/account/provider/callback"
     response = redirect(f"{frontend_url}{redirect_path}?encrypted_token={encrypted_token}")
 
     response.headers["X-Encrypted-Token"] = encrypted_token

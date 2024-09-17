@@ -1,6 +1,7 @@
 import decimal
 import importlib
 from typing import Any
+from typing import override
 from typing import Type
 from typing import TypedDict
 
@@ -51,9 +52,11 @@ class MeasurementSerializerField(serializers.Field):
         super(MeasurementSerializerField, self).__init__(*args, **kwargs)
         self.measurement = measurement
 
+    @override
     def to_representation(self, obj: Any) -> Representation:
         return {"unit": obj.unit, "value": obj.value}
 
+    @override
     def to_internal_value(self, data: Representation) -> MeasureBase | BidimensionalMeasure:
         if not isinstance(data, dict) or "unit" not in data or "value" not in data:
             self.fail("missing_keys")
@@ -76,6 +79,7 @@ class MeasurementSerializerField(serializers.Field):
 
 
 class ContentObjectRelatedField(serializers.RelatedField):
+    @override
     def to_representation(self, value):
         if isinstance(value, Product):
             serializer = importlib.import_module("product.serializers.product").ProductSerializer(value)

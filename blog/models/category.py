@@ -1,4 +1,5 @@
 import os
+from typing import override
 
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -22,6 +23,7 @@ from core.utils.generators import unique_slugify
 
 
 class BlogCategoryQuerySet(TranslatableQuerySet, TreeQuerySet):
+    @override
     def as_manager(cls):
         manager = BlogCategoryManager.from_queryset(cls)()
         manager._built_with_as_manager = True
@@ -82,12 +84,14 @@ class BlogCategory(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDMo
             )
         return self._full_path
 
+    @override
     def save(self, *args, **kwargs):
         if not self.slug:
             config = SlugifyConfig(instance=self, title_field="name")
             self.slug = unique_slugify(config)
         super(BlogCategory, self).save(*args, **kwargs)
 
+    @override
     def get_ordering_queryset(self):
         return BlogCategory.objects.filter(parent=self.parent).get_descendants(include_self=True)
 

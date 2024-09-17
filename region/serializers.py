@@ -1,5 +1,6 @@
 import importlib
 from typing import Dict
+from typing import override
 from typing import Type
 
 from drf_spectacular.utils import extend_schema_field
@@ -40,6 +41,7 @@ class RegionSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "uuid",
         )
 
+    @override
     def get_expand_fields(
         self,
     ) -> Dict[str, Type[serializers.ModelSerializer]]:

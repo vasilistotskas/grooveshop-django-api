@@ -1,4 +1,5 @@
 import os
+from typing import override
 
 from django.db import models
 from django.templatetags.static import static
@@ -49,6 +50,7 @@ class Tip(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     def __str__(self):
         return f"{self.get_kind_display()}: {self.safe_translation_getter('title', any_language=True)}"
 
+    @override
     def get_ordering_queryset(self):
         return Tip.objects.all()
 

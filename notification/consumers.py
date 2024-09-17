@@ -1,4 +1,5 @@
 import json
+from typing import override
 
 from channels.generic.websocket import AsyncWebsocketConsumer
 
@@ -7,6 +8,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
     user = None
     group_name = None
 
+    @override
     async def connect(self):
         try:
             self.user = self.scope["user"]
@@ -23,6 +25,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         except KeyError:
             await self.close()
 
+    @override
     async def disconnect(self, close_code):
         if not self.user.is_anonymous:
             await self.channel_layer.group_discard(self.group_name, self.channel_name)

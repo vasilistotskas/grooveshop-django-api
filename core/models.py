@@ -1,5 +1,6 @@
 import uuid
 from typing import Any
+from typing import override
 from typing import TypeVar
 
 from django.contrib.postgres.indexes import BTreeIndex
@@ -34,6 +35,7 @@ class SortableModel(models.Model):
     def get_max_sort_order(qs) -> int:
         return qs.aggregate(Max("sort_order"))["sort_order__max"] or 0
 
+    @override
     def save(self, *args, **kwargs) -> None:
         if self.pk is None:
             qs = self.get_ordering_queryset()
@@ -64,6 +66,7 @@ class SortableModel(models.Model):
             self.save()
 
     @transaction.atomic
+    @override
     def delete(self, *args, **kwargs) -> None:
         if self.sort_order is not None:
             qs = self.get_ordering_queryset()
@@ -139,6 +142,7 @@ class MetaDataModel(models.Model):
         ]
         abstract = True
 
+    @override
     def save(self, *args, **kwargs):
         if not self.private_metadata:
             self.private_metadata = {}
@@ -188,6 +192,7 @@ class SoftDeleteMixin(models.Model):
     class Meta(TypedModelMeta):
         abstract = True
 
+    @override
     def delete(self, using=None, keep_parents=False):
         self.deleted_at = tz.now()
         self.is_deleted = True
@@ -200,6 +205,7 @@ class SoftDeleteMixin(models.Model):
 
 
 class SoftDeleteQuerySet(models.QuerySet):
+    @override
     def delete(self):
         return super().update(deleted_at=tz.now(), is_deleted=True)
 

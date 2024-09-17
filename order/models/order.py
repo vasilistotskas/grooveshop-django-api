@@ -1,3 +1,5 @@
+from typing import override
+
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
 from django.contrib.postgres.indexes import GinIndex
@@ -136,6 +138,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
     def __str__(self):
         return f"Order {self.id} - {self.first_name} {self.last_name}"
 
+    @override
     def clean(self):
         try:
             validate_email(self.email)

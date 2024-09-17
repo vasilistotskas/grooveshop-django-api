@@ -1,5 +1,6 @@
 import ast
 from itertools import product
+from typing import override
 
 from django import forms
 from django.conf import settings
@@ -24,6 +25,7 @@ class MeasurementWidget(forms.MultiWidget):
         widgets = (float_widget, unit_choices_widget)
         super(MeasurementWidget, self).__init__(widgets, attrs)
 
+    @override
     def decompress(self, value):
         if value:
             if isinstance(value, str):

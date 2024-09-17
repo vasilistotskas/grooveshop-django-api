@@ -3,7 +3,17 @@
 
 
 
+## v0.158.1 (2024-09-17)
+
+### Fix
+
+* fix: revert admin ([`04f130e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/04f130e4542a84c001e1f5bb1cc64589fa2d24ff))
+
 ## v0.158.0 (2024-09-17)
+
+### Chore
+
+* chore(release): release version 0.158.0 [skip ci] ([`075f9fa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/075f9fa3334b41baa24e6d3fa562f587156d0b10))
 
 ### Feature
 

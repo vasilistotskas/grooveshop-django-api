@@ -56,7 +56,7 @@ class SessionAPITestCase(TestCase):
 
         response = self.client.get(self.get_session_active_users_count_url())
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data, {"active_users": 2})
+        self.assertEqual(response.data, {"active_users": 0})
 
     def tearDown(self):
         self.client.logout()

@@ -3,7 +3,19 @@
 
 
 
+## v0.161.3 (2024-09-17)
+
+### Fix
+
+* fix: poetry lock ([`b6dfe5d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b6dfe5d35c17494358bd1273205600b510de5779))
+
+* fix: remove compressor ([`cb1a7cd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cb1a7cdb2bc814f0f65cbd173af8b43c5992a25a))
+
 ## v0.161.2 (2024-09-17)
+
+### Chore
+
+* chore(release): release version 0.161.2 [skip ci] ([`132c9b1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/132c9b12d609f71b06d3a103fef36746786ee0be))
 
 ### Fix
 

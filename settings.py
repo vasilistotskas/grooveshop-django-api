@@ -65,7 +65,7 @@ USE_X_FORWARDED_HOST = getenv("USE_X_FORWARDED_HOST", "False") == "True"
 
 # Django built-in apps
 DJANGO_APPS = [
-    "admin.apps.MyAdminConfig",
+    "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",

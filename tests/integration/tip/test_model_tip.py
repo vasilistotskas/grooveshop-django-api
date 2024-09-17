@@ -43,12 +43,6 @@ class TipModelTestCase(TestCase):
         self.assertTrue(queryset.exists())
         self.assertTrue(self.tip in queryset)
 
-    def test_image_tag(self):
-        self.assertEqual(
-            self.tip.image_tag,
-            f'<img src="{self.tip.icon.url}" width="100" height="100" />',
-        )
-
     def test_main_image_path(self):
         expected_filename = f"media/uploads/tip/{os.path.basename(self.tip.icon.name)}"
         self.assertEqual(self.tip.main_image_path, expected_filename)

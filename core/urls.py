@@ -84,7 +84,7 @@ if bool(settings.ENABLE_DEBUG_TOOLBAR):
     else:
         urlpatterns += [re_path(r"^__debug__/", include(debug_toolbar.urls))]  # type: ignore
 
-if not bool(settings.USE_AWS) or settings.SYSTEM_ENV in ["dev", "ci"]:
+if not bool(settings.USE_AWS):
     urlpatterns += static(
         settings.MEDIA_URL,
         document_root=settings.MEDIA_ROOT,

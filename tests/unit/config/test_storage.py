@@ -49,7 +49,7 @@ class TestStorage(unittest.TestCase):
         self.assertEqual(
             STORAGES,
             {
-                "default": {"BACKEND": "core.storages.PublicMediaStorage"},
-                "staticfiles": {"BACKEND": "core.storages.StaticStorage"},
+                "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+                "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
             },
         )

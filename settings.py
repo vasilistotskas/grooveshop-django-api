@@ -802,7 +802,7 @@ if USE_AWS:
     PRIVATE_FILE_STORAGE = "core.storages.PrivateMediaStorage"
     STORAGES = {
         "default": {
-            "BACKEND": "core.storages.PublicMediaStorage",
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
         },
         "staticfiles": {
             "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",

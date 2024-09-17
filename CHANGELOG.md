@@ -3,7 +3,17 @@
 
 
 
+## v0.159.0 (2024-09-17)
+
+### Feature
+
+* feat: Custom admin enable and remove django_browser_reload ([`35666fb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/35666fb56e1de8f485efb9c54c03a9919ecec386))
+
 ## v0.158.1 (2024-09-17)
+
+### Chore
+
+* chore(release): release version 0.158.1 [skip ci] ([`684aa38`](https://github.com/vasilistotskas/grooveshop-django-api/commit/684aa38684cb760423fb9520040223c1d5fb8363))
 
 ### Fix
 

@@ -306,7 +306,6 @@ SOCIALACCOUNT_QUERY_EMAIL = True
 SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
 SOCIALACCOUNT_EMAIL_VERIFICATION = "mandatory"
 SOCIALACCOUNT_REQUESTS_TIMEOUT = 10
-ACCOUNT_DEFAULT_HTTP_PROTOCOL = "http" if DEBUG else "https"
 SOCIALACCOUNT_PROVIDERS = {
     "github": {
         "APP": {
@@ -374,6 +373,7 @@ ACCOUNT_LOGIN_BY_CODE_ENABLED = True
 ACCOUNT_LOGIN_BY_CODE_MAX_ATTEMPTS = 3
 ACCOUNT_LOGIN_BY_CODE_TIMEOUT = 300
 ACCOUNT_SIGNUP_FORM_HONEYPOT_FIELD = "email_confirm"
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = "http" if DEBUG else "https"
 
 LOGIN_REDIRECT_URL = NUXT_BASE_URL + "/account"
 USERSESSIONS_TRACK_ACTIVITY = True
@@ -570,7 +570,7 @@ CSRF_COOKIE_DOMAIN = getenv("CSRF_COOKIE_DOMAIN", "localhost")
 CSRF_COOKIE_PATH = "/"
 CSRF_COOKIE_SECURE = not DEBUG  # Only send CSRF cookie over HTTPS when DEBUG is False
 CSRF_COOKIE_HTTPONLY = False if DEBUG else True  # Set to True to prevent JavaScript from reading the CSRF cookie
-CSRF_COOKIE_SAMESITE = "Lax"  # 'Lax' or 'None'. Use 'None' only if necessary and ensure CSRF_COOKIE_SECURE is True
+CSRF_COOKIE_SAMESITE = "None"  # 'Lax' or 'None'. Use 'None' only if necessary and ensure CSRF_COOKIE_SECURE is True
 CSRF_HEADER_NAME = "HTTP_X_CSRFTOKEN"
 
 # CSRF_TRUSTED_ORIGINS should include only the domains that are trusted to send POST requests to your application

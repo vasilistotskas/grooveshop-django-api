@@ -3,7 +3,17 @@
 
 
 
+## v0.160.0 (2024-09-17)
+
+### Feature
+
+* feat: set CSRF_COOKIE_SAMESITE  to `None` ([`bce89e0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bce89e011fd0cd87743819c64da651665958eafd))
+
 ## v0.159.0 (2024-09-17)
+
+### Chore
+
+* chore(release): release version 0.159.0 [skip ci] ([`70dc660`](https://github.com/vasilistotskas/grooveshop-django-api/commit/70dc660ab6e7a6bd232782915aa0ea117c1a7bb2))
 
 ### Feature
 

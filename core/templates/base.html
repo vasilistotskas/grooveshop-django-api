@@ -1,6 +1,5 @@
 {% load static %}
 {% load i18n %}
-{% load compress %}
 
 <!DOCTYPE html>
 <html lang="en">
@@ -13,7 +12,6 @@
     <meta name="keywords" content="{{ SITE_KEYWORDS }}" />
     <meta name="author" content="{{ SITE_AUTHOR }}" />
 
-    {% compress css %}
     <link rel="stylesheet" href="{% static 'css/styles.css' %}" type="text/css" >
     <style>
       .alert {
@@ -42,7 +40,6 @@
         text-decoration: underline;
       }
     </style>
-    {% endcompress %}
 
     <title>{{ SITE_NAME }}</title>
 

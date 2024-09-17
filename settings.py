@@ -140,6 +140,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -804,7 +805,7 @@ if USE_AWS:
             "BACKEND": "core.storages.PublicMediaStorage",
         },
         "staticfiles": {
-            "BACKEND": "core.storages.StaticStorage",
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
         },
     }
     COMPRESS_STORAGE = "core.storages.StaticStorage"

@@ -3,7 +3,21 @@
 
 
 
+## v0.158.0 (2024-09-17)
+
+### Feature
+
+* feat: cache improvements and admin clear cache, ([`0188cac`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0188caca7b66f48a04b10ff4a11cb557b3d6b2b6))
+
+### Fix
+
+* fix: temporary ([`2ed504a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2ed504a378015e2282d8f0b37b39553cd89f51b0))
+
 ## v0.157.0 (2024-09-13)
+
+### Chore
+
+* chore(release): release version 0.157.0 [skip ci] ([`736021a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/736021a5fba8009af55dfc8bc7c9f94d2cde59e1))
 
 ### Feature
 

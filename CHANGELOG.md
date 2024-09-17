@@ -3,7 +3,21 @@
 
 
 
+## v0.161.1 (2024-09-17)
+
+### Fix
+
+* fix: remove useless tests ([`7a44e3e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7a44e3e4ebc6c3e5d9aee030a76aa1dbceae3967))
+
+* fix: remove useless tests ([`d4f7006`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d4f700637a85cfa773c148cbcbfd25dbe6d7d17f))
+
+* fix: whitenoise ([`c874dbd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c874dbd7b003a90a00df9b22adb9fc76bff81553))
+
 ## v0.161.0 (2024-09-17)
+
+### Chore
+
+* chore(release): release version 0.161.0 [skip ci] ([`56119eb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/56119eb33a0544dce7e612093bfa1e7d49389f6f))
 
 ### Feature
 

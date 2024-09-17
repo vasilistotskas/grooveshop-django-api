@@ -65,7 +65,7 @@ USE_X_FORWARDED_HOST = getenv("USE_X_FORWARDED_HOST", "False") == "True"
 
 # Django built-in apps
 DJANGO_APPS = [
-    "django.contrib.admin",
+    "admin.apps.MyAdminConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -126,7 +126,6 @@ THIRD_PARTY_APPS = [
     "allauth.socialaccount.providers.github",
     "django_celery_beat",
     "django_celery_results",
-    "django_browser_reload",
     "pytest",
     "pytest_django",
     "dbbackup",
@@ -155,7 +154,6 @@ MIDDLEWARE = [
     "allauth.account.middleware.AccountMiddleware",
     "allauth.usersessions.middleware.UserSessionsMiddleware",
     "djangorestframework_camel_case.middleware.CamelCaseMiddleWare",
-    "django_browser_reload.middleware.BrowserReloadMiddleware",
     "simple_history.middleware.HistoryRequestMiddleware",
 ]
 
@@ -308,6 +306,7 @@ SOCIALACCOUNT_QUERY_EMAIL = True
 SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
 SOCIALACCOUNT_EMAIL_VERIFICATION = "mandatory"
 SOCIALACCOUNT_REQUESTS_TIMEOUT = 10
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = "http" if DEBUG else "https"
 SOCIALACCOUNT_PROVIDERS = {
     "github": {
         "APP": {

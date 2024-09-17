@@ -25,7 +25,6 @@ app_name = "core"
 
 
 urlpatterns = i18n_patterns(
-    path("__reload__/", include("django_browser_reload.urls")),
     path("", HomeView.as_view(), name="home"),
     path(_("admin/"), admin.site.urls),
     path("upload_image", upload_image, name="upload_image"),
@@ -85,7 +84,7 @@ if bool(settings.ENABLE_DEBUG_TOOLBAR):
     else:
         urlpatterns += [re_path(r"^__debug__/", include(debug_toolbar.urls))]  # type: ignore
 
-if bool(settings.DEBUG) or settings.SYSTEM_ENV in ["dev", "ci"]:
+if not bool(settings.USE_AWS) or settings.SYSTEM_ENV in ["dev", "ci"]:
     urlpatterns += static(
         settings.MEDIA_URL,
         document_root=settings.MEDIA_ROOT,

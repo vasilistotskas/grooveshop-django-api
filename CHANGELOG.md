@@ -3,7 +3,21 @@
 
 
 
+## v0.161.0 (2024-09-17)
+
+### Feature
+
+* feat: whitenoise ([`add9ab1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/add9ab1f315f0a4f69cc2f7b20aa57c83b38e76c))
+
+### Fix
+
+* fix: whitenoise test ([`ee827e6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ee827e62392a33b34f53d843aa3ced52198bde6c))
+
 ## v0.160.1 (2024-09-17)
+
+### Chore
+
+* chore(release): release version 0.160.1 [skip ci] ([`8d95827`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8d95827560a689de34c77101dd046bef295a3781))
 
 ### Fix
 

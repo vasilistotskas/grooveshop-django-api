@@ -132,7 +132,6 @@ THIRD_PARTY_APPS = [
     "extra_settings",
     "knox",
     "simple_history",
-    "compressor",
 ]
 
 # Combine all apps together for the INSTALLED_APPS setting
@@ -779,7 +778,6 @@ SPECTACULAR_SETTINGS = {
 STATICFILES_FINDERS = [
     "django.contrib.staticfiles.finders.FileSystemFinder",
     "django.contrib.staticfiles.finders.AppDirectoriesFinder",
-    "compressor.finders.CompressorFinder",
 ]
 
 STATICFILES_DIRS = [

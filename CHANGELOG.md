@@ -3,7 +3,17 @@
 
 
 
+## v0.161.2 (2024-09-17)
+
+### Fix
+
+* fix: csrf http ([`761c71b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/761c71b0b956fa430af8c0d81594d318068733af))
+
 ## v0.161.1 (2024-09-17)
+
+### Chore
+
+* chore(release): release version 0.161.1 [skip ci] ([`a3c2825`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a3c28250a5fc825869a677ba7d946c70558baebd))
 
 ### Fix
 

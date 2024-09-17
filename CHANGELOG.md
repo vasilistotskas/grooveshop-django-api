@@ -3,7 +3,17 @@
 
 
 
+## v0.160.1 (2024-09-17)
+
+### Fix
+
+* fix: url static and media path ([`28fc35c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/28fc35c318dd1bfaffc1114fa08990a77ba8b8cf))
+
 ## v0.160.0 (2024-09-17)
+
+### Chore
+
+* chore(release): release version 0.160.0 [skip ci] ([`3d920eb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3d920eb7fe6b533eba417abe0bb928c9458b0628))
 
 ### Feature
 

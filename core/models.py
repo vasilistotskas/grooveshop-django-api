@@ -127,7 +127,7 @@ class PublishableModel(models.Model):
         ]
 
     @property
-    def is_visible(self):
+    def is_visible(self) -> bool:
         return self.is_published and (self.published_at is None or self.published_at <= tz.now())
 
 

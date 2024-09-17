@@ -802,10 +802,10 @@ if USE_AWS:
     PRIVATE_FILE_STORAGE = "core.storages.PrivateMediaStorage"
     STORAGES = {
         "default": {
-            "BACKEND": "django.core.files.storage.FileSystemStorage",
+            "BACKEND": "core.storages.PublicMediaStorage",
         },
         "staticfiles": {
-            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+            "BACKEND": "core.storages.StaticStorage",
         },
     }
     COMPRESS_STORAGE = "core.storages.StaticStorage"
@@ -822,7 +822,7 @@ else:
             "BACKEND": "django.core.files.storage.FileSystemStorage",
         },
         "staticfiles": {
-            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
         },
     }
 

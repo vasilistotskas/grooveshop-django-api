@@ -3552,6 +3552,16 @@ paths:
       responses:
         '204':
           description: No response body
+  /api/v1/health:
+    get:
+      operationId: api_v1_health_retrieve
+      tags:
+      - api
+      security:
+      - {}
+      responses:
+        '200':
+          description: No response body
   /api/v1/notification/ids:
     post:
       operationId: api_v1_notification_ids_create
@@ -8945,6 +8955,77 @@ paths:
               schema:
                 $ref: '#/components/schemas/BlogComment'
           description: ''
+  /api/v1/user/account/{id}/change_username:
+    post:
+      operationId: api_v1_user_account_change_username_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UsernameUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UsernameUpdate'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsernameUpdate'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsernameUpdate'
+          description: ''
+  /api/v1/user/account/{id}/change_username{format}:
+    post:
+      operationId: api_v1_user_account_change_username_formatted_create
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UsernameUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UsernameUpdate'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsernameUpdate'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsernameUpdate'
+          description: ''
   /api/v1/user/account/{id}/favourite_products:
     get:
       operationId: api_v1_user_account_favourite_products_retrieve
@@ -10560,6 +10641,9 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+        isVisible:
+          type: boolean
+          readOnly: true
         uuid:
           type: string
           format: uuid
@@ -10579,6 +10663,18 @@ components:
         absoluteUrl:
           type: string
           readOnly: true
+        seoTitle:
+          type: string
+          nullable: true
+          maxLength: 70
+        seoDescription:
+          type: string
+          nullable: true
+          maxLength: 300
+        seoKeywords:
+          type: string
+          nullable: true
+          maxLength: 255
       required:
       - absoluteUrl
       - author
@@ -10586,6 +10682,7 @@ components:
       - commentsCount
       - createdAt
       - id
+      - isVisible
       - likes
       - likesCount
       - mainImagePath
@@ -12533,6 +12630,9 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+        isVisible:
+          type: boolean
+          readOnly: true
         uuid:
           type: string
           format: uuid
@@ -12552,6 +12652,18 @@ components:
         absoluteUrl:
           type: string
           readOnly: true
+        seoTitle:
+          type: string
+          nullable: true
+          maxLength: 70
+        seoDescription:
+          type: string
+          nullable: true
+          maxLength: 300
+        seoKeywords:
+          type: string
+          nullable: true
+          maxLength: 255
     PatchedBlogTag:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -13407,6 +13519,9 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+        isVisible:
+          type: boolean
+          readOnly: true
         uuid:
           type: string
           format: uuid
@@ -14280,6 +14395,9 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+        isVisible:
+          type: boolean
+          readOnly: true
         uuid:
           type: string
           format: uuid
@@ -14287,6 +14405,7 @@ components:
       required:
       - createdAt
       - id
+      - isVisible
       - product
       - publishedAt
       - rate
@@ -14776,6 +14895,14 @@ components:
       - user
       - uuid
       - zipcode
+    UsernameUpdate:
+      type: object
+      properties:
+        username:
+          type: string
+          maxLength: 30
+      required:
+      - username
     Vat:
       type: object
       properties:

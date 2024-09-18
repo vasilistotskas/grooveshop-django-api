@@ -54,6 +54,7 @@ APP_MAIN_HOST_NAME = getenv("APP_MAIN_HOST_NAME", "localhost")
 NUXT_BASE_URL = getenv("NUXT_BASE_URL", "http://localhost:3000")
 NUXT_BASE_DOMAIN = getenv("NUXT_BASE_DOMAIN", "localhost:3000")
 MEDIA_STREAM_BASE_URL = getenv("MEDIA_STREAM_BASE_URL", "http://localhost:3003")
+STATIC_BASE_URL = getenv("STATIC_BASE_URL", "http://localhost:3000")
 
 ALLOWED_HOSTS = []  # Start with an empty list
 
@@ -139,7 +140,6 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -529,6 +529,7 @@ CORS_ALLOWED_ORIGINS = [
     API_BASE_URL,
     NUXT_BASE_URL,
     MEDIA_STREAM_BASE_URL,
+    STATIC_BASE_URL,
     f"https://{AWS_S3_CUSTOM_DOMAIN}",
     "http://backend-service:80",
     "http://frontend-nuxt-service:80",
@@ -543,6 +544,7 @@ CORS_ORIGIN_WHITELIST = [
     API_BASE_URL,
     NUXT_BASE_URL,
     MEDIA_STREAM_BASE_URL,
+    STATIC_BASE_URL,
     f"https://{AWS_S3_CUSTOM_DOMAIN}",
     "http://backend-service:80",
     "http://frontend-nuxt-service:80",
@@ -579,6 +581,7 @@ CSRF_TRUSTED_ORIGINS = [
     API_BASE_URL.replace("http://", "https://"),  # Force HTTPS
     NUXT_BASE_URL.replace("http://", "https://"),  # Force HTTPS
     MEDIA_STREAM_BASE_URL.replace("http://", "https://"),  # Force HTTPS
+    STATIC_BASE_URL.replace("http://", "https://"),  # Force HTTPS
     f"https://{AWS_S3_CUSTOM_DOMAIN}",
     "http://backend-service:80",
     "http://frontend-nuxt-service:80",
@@ -729,7 +732,7 @@ ROSETTA_ENABLE_TRANSLATION_SUGGESTIONS = True
 ROSETTA_SHOW_AT_ADMIN_PANEL = True
 
 # Security Settings
-SECURE_SSL_REDIRECT = False
+SECURE_SSL_REDIRECT = False if DEBUG else True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https") if not DEBUG else None
 SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 3600
 SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
@@ -812,6 +815,19 @@ if USE_AWS:
     COMPRESS_OFFLINE_MANIFEST_STORAGE = "core.storages.StaticStorage"
     TINYMCE_JS_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/tinymce/tinymce.min.js"
     TINYMCE_JS_ROOT = f"https://{AWS_S3_CUSTOM_DOMAIN}/tinymce/"
+elif not DEBUG:
+    STATIC_URL = f"https://{STATIC_BASE_URL}/static/"
+    STATIC_ROOT = path.join(BASE_DIR, "staticfiles")
+    MEDIA_URL = f"https://{STATIC_BASE_URL}/media/"
+    MEDIA_ROOT = path.join(BASE_DIR, "mediafiles")
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.ManifestStaticFilesStorage",
+        },
+    }
 else:
     STATIC_URL = "/static/"
     STATIC_ROOT = path.join(BASE_DIR, "staticfiles")
@@ -822,10 +838,11 @@ else:
             "BACKEND": "django.core.files.storage.FileSystemStorage",
         },
         "staticfiles": {
-            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
         },
     }
 
+# Django Compressor
 COMPRESS_ENABLED = True
 COMPRESS_ROOT = STATIC_ROOT
 COMPRESS_URL = STATIC_URL

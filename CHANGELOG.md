@@ -3,7 +3,21 @@
 
 
 
+## v0.161.4 (2024-09-18)
+
+### Fix
+
+* fix: SECURE_SSL_REDIRECT  to false for now ([`c4bf5fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c4bf5fddfb9e682df8da1f5d5b93354ba7f48fa5))
+
+### Unknown
+
+* feat; static for production ([`f396c98`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f396c98c076ca6567e416496f48b0a2837eba46b))
+
 ## v0.161.3 (2024-09-17)
+
+### Chore
+
+* chore(release): release version 0.161.3 [skip ci] ([`99dcee9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/99dcee9c9f681b28ea4951917512ce0e692b4bb4))
 
 ### Fix
 

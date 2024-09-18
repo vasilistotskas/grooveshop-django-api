@@ -3,7 +3,17 @@
 
 
 
+## v0.161.5 (2024-09-18)
+
+### Fix
+
+* fix: production STATIC_URL  and MEDIA_URL  fix ([`5e0c650`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5e0c6506e2ba79947a60af3d1c7504cf5dec927f))
+
 ## v0.161.4 (2024-09-18)
+
+### Chore
+
+* chore(release): release version 0.161.4 [skip ci] ([`4a0a8f1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4a0a8f19383ec437cb462f062917c28828f86571))
 
 ### Fix
 

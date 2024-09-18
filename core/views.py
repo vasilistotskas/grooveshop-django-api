@@ -72,10 +72,17 @@ def upload_image(request):
         for chunk in file_obj.chunks():
             f.write(chunk)
 
+        debug = os.getenv("DEBUG", "False") == "True"
+        location = (
+            f"{settings.API_BASE_URL}{settings.MEDIA_URL}uploads/tinymce/" f"{sanitized_name}"
+            if debug
+            else f"{settings.MEDIA_URL}uploads/tinymce/{sanitized_name}"
+        )
+
         return JsonResponse(
             {
                 "message": "Image uploaded successfully",
-                "location": f"{settings.API_BASE_URL}{settings.MEDIA_URL}uploads/tinymce/{sanitized_name}",
+                "location": location,
             }
         )
 

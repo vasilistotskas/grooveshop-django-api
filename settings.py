@@ -816,9 +816,9 @@ if USE_AWS:
     TINYMCE_JS_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/tinymce/tinymce.min.js"
     TINYMCE_JS_ROOT = f"https://{AWS_S3_CUSTOM_DOMAIN}/tinymce/"
 elif not DEBUG:
-    STATIC_URL = f"https://{STATIC_BASE_URL}/static/"
+    STATIC_URL = f"{STATIC_BASE_URL}/static/"
     STATIC_ROOT = path.join(BASE_DIR, "staticfiles")
-    MEDIA_URL = f"https://{STATIC_BASE_URL}/media/"
+    MEDIA_URL = f"{STATIC_BASE_URL}/media/"
     MEDIA_ROOT = path.join(BASE_DIR, "mediafiles")
     STORAGES = {
         "default": {

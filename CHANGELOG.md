@@ -3,7 +3,17 @@
 
 
 
+## v0.162.0 (2024-09-18)
+
+### Feature
+
+* feat: SECURE_SSL_REDIRECT from env ([`76210fb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/76210fb21e67749e932d2e97755a570caa8a3532))
+
 ## v0.161.6 (2024-09-18)
+
+### Chore
+
+* chore(release): release version 0.161.6 [skip ci] ([`d263ed0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d263ed0a6e73456dd02a2791012887ed574ccffd))
 
 ### Fix
 

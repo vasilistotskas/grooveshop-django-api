@@ -3,7 +3,17 @@
 
 
 
+## v0.162.1 (2024-09-18)
+
+### Fix
+
+* fix: upload_image ([`f4bda52`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f4bda525c0910bc7efc732d61bd579f179961698))
+
 ## v0.162.0 (2024-09-18)
+
+### Chore
+
+* chore(release): release version 0.162.0 [skip ci] ([`9eda182`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9eda18209267962aabc25891a098256eafef96c3))
 
 ### Feature
 

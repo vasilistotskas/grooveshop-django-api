@@ -74,7 +74,6 @@ DJANGO_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.sites",
     "django.contrib.postgres",
-    "django.contrib.humanize",
 ]
 
 # Project-specific apps
@@ -572,7 +571,7 @@ CSRF_COOKIE_DOMAIN = getenv("CSRF_COOKIE_DOMAIN", "localhost")
 CSRF_COOKIE_PATH = "/"
 CSRF_COOKIE_SECURE = not DEBUG  # Only send CSRF cookie over HTTPS when DEBUG is False
 CSRF_COOKIE_HTTPONLY = False  # Set to True to prevent JavaScript from reading the CSRF
-CSRF_COOKIE_SAMESITE = "None"  # 'Lax' or 'None'. Use 'None' only if necessary and ensure CSRF_COOKIE_SECURE is True
+CSRF_COOKIE_SAMESITE = "Lax"  # 'Lax' or 'None'. Use 'None' only if necessary and ensure CSRF_COOKIE_SECURE is True
 CSRF_HEADER_NAME = "HTTP_X_CSRFTOKEN"
 
 # CSRF_TRUSTED_ORIGINS should include only the domains that are trusted to send POST requests to your application

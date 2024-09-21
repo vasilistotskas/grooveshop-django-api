@@ -3,7 +3,17 @@
 
 
 
+## v0.162.2 (2024-09-21)
+
+### Fix
+
+* fix: remove unused `django.contrib.humanize` and CSRF_COOKIE_SAMESITE  set to `lax` ([`c814b1e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c814b1e87e745591e30068cb49ba7e8b4c6cebe4))
+
 ## v0.162.1 (2024-09-18)
+
+### Chore
+
+* chore(release): release version 0.162.1 [skip ci] ([`1972999`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1972999142129c4137b6860eb46a95e80a1165cc))
 
 ### Fix
 

@@ -3,7 +3,21 @@
 
 
 
+## v0.163.0 (2024-09-22)
+
+### Feature
+
+* feat: Bump Versions ([`1af8e15`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1af8e15c08d6c3c5a4da56207601292a94c796c0))
+
+### Fix
+
+* fix: ACCOUNT_EMAIL_VERIFICATION_BY_CODE_ENABLED true ([`2c45dfe`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2c45dfe9083ec162a85c50712424a45d817d0d16))
+
 ## v0.162.2 (2024-09-21)
+
+### Chore
+
+* chore(release): release version 0.162.2 [skip ci] ([`c9ddfe4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c9ddfe48dedc860ab182c54d5567b78e1c6ad4aa))
 
 ### Fix
 

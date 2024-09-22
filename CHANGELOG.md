@@ -3,7 +3,17 @@
 
 
 
+## v0.163.1 (2024-09-22)
+
+### Fix
+
+* fix: Include missing account email templates ([`d9dd09d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d9dd09dc6ba33cef1e205347f339e133cf56214c))
+
 ## v0.163.0 (2024-09-22)
+
+### Chore
+
+* chore(release): release version 0.163.0 [skip ci] ([`c1daa19`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c1daa19d4f2e104acc11ba46156cc17c98fb75ad))
 
 ### Feature
 

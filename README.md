@@ -234,9 +234,3 @@ This project is open-sourced under the MIT License. See the [LICENSE](LICENSE.md
 - **Delete Local Tags**:
   - Delete all local tags:
     `git tag -l | xargs git tag -d`
-
-
-python manage.py syncindex blog.BlogPostTranslation
-python manage.py clearindex blog.BlogPostTranslation
-python manage.py syncindex product.ProductTranslation
-python manage.py clearindex product.ProductTranslation

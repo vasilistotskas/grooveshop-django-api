@@ -72,13 +72,13 @@ tests = ["mypy (>=0.800)", "pytest", "pytest-asyncio"]
 
 [[package]]
 name = "astroid"
-version = "3.3.3"
+version = "3.3.4"
 description = "An abstract syntax tree for Python with inference support."
 optional = false
 python-versions = ">=3.9.0"
 files = [
-    {file = "astroid-3.3.3-py3-none-any.whl", hash = "sha256:2d79acfd3c594b6a2d4141fea98a1d62ab4a52e54332b1f1ddcf07b652cc5c0f"},
-    {file = "astroid-3.3.3.tar.gz", hash = "sha256:63f8c5370d9bad8294163c87b2d440a7fdf546be6c72bbeac0549c93244dbd72"},
+    {file = "astroid-3.3.4-py3-none-any.whl", hash = "sha256:5eba185467253501b62a9f113c263524b4f5d55e1b30456370eed4cdbd6438fd"},
+    {file = "astroid-3.3.4.tar.gz", hash = "sha256:e73d0b62dd680a7c07cb2cd0ce3c22570b044dd01bd994bc3a2dd16c6cbba162"},
 ]
 
 [[package]]
@@ -978,12 +978,12 @@ dev = ["flake8 (>=3.7.7)", "setuptools (>=41.0.0)", "twine (>=1.13.0)", "wheel (
 
 [[package]]
 name = "django-allauth"
-version = "65.0.0"
+version = "65.0.1"
 description = "Integrated set of Django applications addressing authentication, registration, account management as well as 3rd party (social) account authentication."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "django_allauth-65.0.0.tar.gz", hash = "sha256:5bc344c7caa610b4ef87f529831473cb0c17184696a5f3bcd4678c8ead983e61"},
+    {file = "django_allauth-65.0.1.tar.gz", hash = "sha256:1f8281e2dc17d3b977bcd95b99538f128c5cd2fb2551346a7f8ad31aa76f17cc"},
 ]
 
 [package.dependencies]
@@ -1303,19 +1303,19 @@ sftp = ["paramiko (>=1.15)"]
 
 [[package]]
 name = "django-stubs"
-version = "5.0.4"
+version = "5.1.0"
 description = "Mypy stubs for Django"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "django_stubs-5.0.4-py3-none-any.whl", hash = "sha256:c2502f5ecbae50c68f9a86d52b5b2447d8648fd205036dad0ccb41e19a445927"},
-    {file = "django_stubs-5.0.4.tar.gz", hash = "sha256:78e3764488fdfd2695f12502136548ec22f8d4b1780541a835042b8238d11514"},
+    {file = "django_stubs-5.1.0-py3-none-any.whl", hash = "sha256:b98d49a80aa4adf1433a97407102d068de26c739c405431d93faad96dd282c40"},
+    {file = "django_stubs-5.1.0.tar.gz", hash = "sha256:86128c228b65e6c9a85e5dc56eb1c6f41125917dae0e21e6cfecdf1b27e630c5"},
 ]
 
 [package.dependencies]
 asgiref = "*"
 django = "*"
-django-stubs-ext = ">=5.0.4"
+django-stubs-ext = ">=5.1.0"
 types-PyYAML = "*"
 typing-extensions = ">=4.11.0"
 
@@ -1326,13 +1326,13 @@ redis = ["redis"]
 
 [[package]]
 name = "django-stubs-ext"
-version = "5.0.4"
+version = "5.1.0"
 description = "Monkey-patching and extensions for django-stubs"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "django_stubs_ext-5.0.4-py3-none-any.whl", hash = "sha256:910cbaff3d1e8e806a5c27d5ddd4088535aae8371ea921b7fd680fdfa5f14e30"},
-    {file = "django_stubs_ext-5.0.4.tar.gz", hash = "sha256:85da065224204774208be29c7d02b4482d5a69218a728465c2fbe41725fdc819"},
+    {file = "django_stubs_ext-5.1.0-py3-none-any.whl", hash = "sha256:a455fc222c90b30b29ad8c53319559f5b54a99b4197205ddbb385aede03b395d"},
+    {file = "django_stubs_ext-5.1.0.tar.gz", hash = "sha256:ed7d51c0b731651879fc75f331fb0806d98b67bfab464e96e2724db6b46ef926"},
 ]
 
 [package.dependencies]
@@ -4169,13 +4169,13 @@ files = [
 
 [[package]]
 name = "tzdata"
-version = "2024.1"
+version = "2024.2"
 description = "Provider of IANA time zone data"
 optional = false
 python-versions = ">=2"
 files = [
-    {file = "tzdata-2024.1-py2.py3-none-any.whl", hash = "sha256:9068bc196136463f5245e51efda838afa15aaeca9903f49050dfa2679db4d252"},
-    {file = "tzdata-2024.1.tar.gz", hash = "sha256:2674120f8d891909751c38abcdfd386ac0a5a1127954fbc332af6b5ceae07efd"},
+    {file = "tzdata-2024.2-py2.py3-none-any.whl", hash = "sha256:a48093786cdcde33cad18c2555e8532f34422074448fbc874186f0abd79565cd"},
+    {file = "tzdata-2024.2.tar.gz", hash = "sha256:7d85cc416e9382e69095b7bdf4afd9e3880418a2413feec7069d533d6b4e31cc"},
 ]
 
 [[package]]
@@ -4247,12 +4247,12 @@ zmq = ["zmq"]
 
 [[package]]
 name = "urwid-readline"
-version = "0.14"
+version = "0.15.1"
 description = "A textbox edit widget for urwid that supports readline shortcuts"
 optional = false
 python-versions = "*"
 files = [
-    {file = "urwid_readline-0.14.tar.gz", hash = "sha256:8fabd2e501c124a30d38cfb10610b32f119a615ec0b310ae5591c583fb00bd09"},
+    {file = "urwid_readline-0.15.1.tar.gz", hash = "sha256:9301444b86d58f7d26388506b704f142cefd193888488b4070d3a0fdfcfc0f84"},
 ]
 
 [package.dependencies]
@@ -4480,4 +4480,4 @@ watchdog = ["watchdog (>=2.3)"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<4.0.0"
-content-hash = "25875326a38fd33c2c590e954a7e9caa44b22aee614c28caf9203afe6364b416"
+content-hash = "e30d3f17cd4bd1e9e9fae9d5221dfb507b8a8692af9b8015bb9ebb00ec725a1f"

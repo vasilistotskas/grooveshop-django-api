@@ -3,7 +3,17 @@
 
 
 
+## v0.164.0 (2024-09-24)
+
+### Feature
+
+* feat: Bump Versions and remove useless template overrides ([`788cff6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/788cff6e2368dd74b6ec0466872ea2e2f8ed19bb))
+
 ## v0.163.1 (2024-09-22)
+
+### Chore
+
+* chore(release): release version 0.163.1 [skip ci] ([`fdfab7e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fdfab7e57352ab33173286c8d868dfd751caa724))
 
 ### Fix
 

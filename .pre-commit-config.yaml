@@ -29,7 +29,7 @@ repos:
     hooks:
       - id: coverage
         name: coverage
-        stages: [push]
+        stages: [pre-push]
         language: system
         entry: coverage run
         types: [python]

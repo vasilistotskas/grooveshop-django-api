@@ -1,5 +1,4 @@
 from fnmatch import fnmatchcase
-from typing import cast
 
 from asgiref.typing import ASGI3Application
 from asgiref.typing import ASGIReceiveCallable
@@ -7,7 +6,6 @@ from asgiref.typing import ASGISendCallable
 from asgiref.typing import ASGISendEvent
 from asgiref.typing import HTTPResponseBodyEvent
 from asgiref.typing import HTTPResponseStartEvent
-from asgiref.typing import HTTPScope
 from asgiref.typing import Scope
 from django.conf import settings
 
@@ -30,7 +28,6 @@ def cors_handler(application: ASGI3Application) -> ASGI3Application:
                     origin_match = True
                     break
         if scope["method"] == "OPTIONS":
-            scope = cast(HTTPScope, scope)
             response_headers: list[tuple[bytes, bytes]] = [
                 (b"access-control-allow-credentials", b"true"),
                 (
@@ -61,9 +58,9 @@ def cors_handler(application: ASGI3Application) -> ASGI3Application:
 
             async def send_with_origin(message: ASGISendEvent) -> None:
                 if message["type"] == "http.response.start":
-                    response_headers = [
-                        (key, value)
-                        for key, value in message["headers"]
+                    res_headers = [
+                        (key, val)
+                        for key, val in message["headers"]
                         if key.lower()
                         not in {
                             b"access-control-allow-credentials",
@@ -71,13 +68,13 @@ def cors_handler(application: ASGI3Application) -> ASGI3Application:
                             b"vary",
                         }
                     ]
-                    response_headers.append((b"access-control-allow-credentials", b"true"))
+                    res_headers.append((b"access-control-allow-credentials", b"true"))
                     vary_header = next(
-                        (value for key, value in message["headers"] if key.lower() == b"vary"),
+                        (val for key, val in message["headers"] if key.lower() == b"vary"),
                         b"",
                     )
                     if origin_match:
-                        response_headers.append(
+                        res_headers.append(
                             (
                                 b"access-control-allow-origin",
                                 request_origin.encode("latin1"),
@@ -89,8 +86,8 @@ def cors_handler(application: ASGI3Application) -> ASGI3Application:
                             else:
                                 vary_header = b"Origin"
                     if vary_header:
-                        response_headers.append((b"vary", vary_header))
-                    message["headers"] = sorted(response_headers)
+                        res_headers.append((b"vary", vary_header))
+                    message["headers"] = sorted(res_headers)
                 await send(message)
 
             await application(scope, receive, send_with_origin)

@@ -11,6 +11,8 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddIndex(
             model_name="vat",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["value"], name="vat_vat_value_d54579_btree"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["value"], name="vat_vat_value_d54579_btree"
+            ),
         ),
     ]

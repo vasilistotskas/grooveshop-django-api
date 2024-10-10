@@ -3,7 +3,7 @@ from django.conf import settings
 
 def generate_schema_multi_lang(model_instance) -> dict:
     fields = {}
-    translated_fields = model_instance._parler_meta.get_all_fields()
+    translated_fields = model_instance._parler_meta.get_all_fields()  # noqa
     languages = settings.PARLER_LANGUAGES[settings.SITE_ID]
 
     if not translated_fields or not languages:

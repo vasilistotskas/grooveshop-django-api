@@ -13,7 +13,7 @@ class ProductFilter(filters.FilterSet):
         model = Product
         fields = ["min_final_price", "max_final_price", "category"]
 
-    def filter_category(self, queryset, name, value):
+    def filter_category(self, queryset, name, value):  # noqa
         category_ids = value.split("_")
         all_relevant_category_ids = []
 

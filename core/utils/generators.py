@@ -34,7 +34,7 @@ def unique_slugify(config: SlugifyConfig) -> str:
     if base_slug == config.invalid_slug or not base_slug:
         base_slug = f"{config.invalid_slug}-{config.random_string_generator(config.size)}"
 
-    ModelClass = type(config.instance)
+    ModelClass = type(config.instance)  # noqa
     slug = base_slug
     attempt = 0
 

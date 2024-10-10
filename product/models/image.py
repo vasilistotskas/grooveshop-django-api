@@ -38,7 +38,9 @@ class ProductImage(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDMo
         null=True,
     )
     is_main = models.BooleanField(_("Is Main"), default=False)
-    translations = TranslatedFields(title=models.CharField(_("Title"), max_length=50, blank=True, null=True))
+    translations = TranslatedFields(
+        title=models.CharField(_("Title"), max_length=50, blank=True, null=True)
+    )
 
     objects = ProductImageManager()
 

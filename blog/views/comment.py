@@ -145,6 +145,8 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        liked_comment_ids = BlogComment.objects.filter(likes=user, id__in=comment_ids).values_list("id", flat=True)
+        liked_comment_ids = BlogComment.objects.filter(likes=user, id__in=comment_ids).values_list(
+            "id", flat=True
+        )
 
         return Response(liked_comment_ids, status=status.HTTP_200_OK)

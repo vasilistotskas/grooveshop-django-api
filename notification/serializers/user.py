@@ -39,7 +39,9 @@ class NotificationUserSerializer(BaseExpandSerializer):
     def get_expand_fields(
         self,
     ) -> Dict[str, Type[serializers.ModelSerializer]]:
-        user_account_serializer = importlib.import_module("authentication.serializers").AuthenticationSerializer
+        user_account_serializer = importlib.import_module(
+            "authentication.serializers"
+        ).AuthenticationSerializer
         notification_serializer = importlib.import_module(
             "notification.serializers.notification"
         ).NotificationSerializer
@@ -50,4 +52,6 @@ class NotificationUserSerializer(BaseExpandSerializer):
 
 
 class NotificationUserActionSerializer(serializers.Serializer):
-    notification_user_ids = serializers.ListField(child=serializers.IntegerField(), required=True, allow_empty=False)
+    notification_user_ids = serializers.ListField(
+        child=serializers.IntegerField(), required=True, allow_empty=False
+    )

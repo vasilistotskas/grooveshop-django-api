@@ -12,7 +12,10 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AlterModelOptions(
             name="blogposttranslation",
-            options={"verbose_name": "Blog Post Translation", "verbose_name_plural": "Blog Post Translations"},
+            options={
+                "verbose_name": "Blog Post Translation",
+                "verbose_name_plural": "Blog Post Translations",
+            },
         ),
         migrations.RemoveField(
             model_name="blogposttranslation",
@@ -34,7 +37,10 @@ class Migration(migrations.Migration):
             model_name="blogposttranslation",
             name="master",
             field=models.ForeignKey(
-                null=True, on_delete=django.db.models.deletion.CASCADE, related_name="translations", to="blog.blogpost"
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="translations",
+                to="blog.blogpost",
             ),
         ),
     ]

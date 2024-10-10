@@ -45,7 +45,9 @@ class BaseExpandSerializer(serializers.ModelSerializer):
 
     def _expand_fields(self, instance, data: Dict[str, any]) -> Dict[str, any]:
         for field_name, serializer_class in self.get_expand_fields().items():
-            if field_name in self.expansion_path or (self.expand_fields and field_name not in self.expand_fields):
+            if field_name in self.expansion_path or (
+                self.expand_fields and field_name not in self.expand_fields
+            ):
                 continue
 
             field_value = getattr(instance, field_name, None)

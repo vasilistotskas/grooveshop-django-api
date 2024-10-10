@@ -65,7 +65,7 @@ class PaginationModelViewSet(ModelViewSet):
                     "limit_offset": LimitOffsetPaginator,
                     "cursor": CursorPaginator,
                 }
-                self._paginator = paginator_mapping.get(pagination_type, self.pagination_class)()
+                self._paginator = paginator_mapping.get(pagination_type, self.pagination_class)()  # noqa
 
         return self._paginator
 
@@ -154,7 +154,7 @@ def health_check(request):
     return response
 
 
-def encrypt_token(token, SECRET_KEY):
+def encrypt_token(token, SECRET_KEY):  # noqa
     key = hashlib.sha256(SECRET_KEY.encode()).digest()
     nonce = os.urandom(16)
     cipher = Cipher(algorithms.AES(key), modes.GCM(nonce), backend=default_backend())
@@ -167,7 +167,7 @@ def encrypt_token(token, SECRET_KEY):
 def redirect_to_frontend(request, *args, **kwargs):
     from knox.models import get_token_model
 
-    AuthToken = get_token_model()
+    AuthToken = get_token_model()  # noqa
     user = request.user
 
     if user.is_authenticated:

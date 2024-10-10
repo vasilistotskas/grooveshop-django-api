@@ -35,7 +35,9 @@ class NotificationUserFactory(factory.django.DjangoModelFactory):
     user = factory.LazyFunction(get_or_create_user)
     notification = factory.LazyFunction(get_or_create_notification)
     seen = factory.Faker("boolean")
-    seen_at = factory.Maybe("seen", factory.Faker("date_time_this_year", tzinfo=timezone.get_current_timezone()), None)
+    seen_at = factory.Maybe(
+        "seen", factory.Faker("date_time_this_year", tzinfo=timezone.get_current_timezone()), None
+    )
 
     class Meta:
         model = NotificationUser

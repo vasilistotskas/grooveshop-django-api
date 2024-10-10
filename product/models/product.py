@@ -58,7 +58,9 @@ class ProductManager(TranslatableManager):
         return ProductQuerySet(self.model, using=self._db).exclude_deleted()
 
 
-class Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel, MetaDataModel, TaggedModel):
+class Product(
+    SoftDeleteModel, TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel, MetaDataModel, TaggedModel
+):
     id = models.BigAutoField(primary_key=True)
     product_code = models.CharField(_("Product Code"), unique=True, max_length=100, default=uuid.uuid4)
     category = TreeForeignKey(
@@ -151,7 +153,9 @@ class Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, SeoModel,
     def clean(self):
         super().clean()
         if self.discount_percent > 0 >= self.price.amount:
-            raise ValidationError({"discount_percent": _("Discount percent cannot be greater than 0 if price is 0.")})
+            raise ValidationError(
+                {"discount_percent": _("Discount percent cannot be greater than 0 if price is 0.")}
+            )
 
         if not 0.0 <= self.discount_percent <= 100.0:
             raise ValidationError({"discount_percent": _("Discount percent must be between 0 and 100.")})
@@ -162,7 +166,7 @@ class Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, SeoModel,
     def generate_unique_product_code(self) -> uuid.UUID:
         while True:
             unique_code = uuid.uuid4()
-            if not Product.objects.filter(product_code=unique_code).exists():
+            if not self.objects.filter(product_code=unique_code).exists():
                 return unique_code
 
     def increment_stock(self, quantity: int):
@@ -174,7 +178,9 @@ class Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, SeoModel,
     def decrement_stock(self, quantity: int):
         if quantity < 0:
             raise ValueError("Invalid quantity to decrement")
-        updated_rows = Product.objects.filter(id=self.id, stock__gte=quantity).update(stock=F("stock") - quantity)
+        updated_rows = Product.objects.filter(id=self.id, stock__gte=quantity).update(
+            stock=F("stock") - quantity
+        )
         if not updated_rows:
             raise ValueError("Not enough stock to decrement")
         self.refresh_from_db()
@@ -209,9 +215,9 @@ class Product(SoftDeleteModel, TranslatableModel, TimeStampMixinModel, SeoModel,
 
     @property
     def approved_review_average(self) -> float:
-        average = ProductReview.objects.filter(product=self, status=ReviewStatusEnum.TRUE).aggregate(avg=Avg("rate"))[
-            "avg"
-        ]
+        average = ProductReview.objects.filter(product=self, status=ReviewStatusEnum.TRUE).aggregate(
+            avg=Avg("rate")
+        )["avg"]
         return float(average) if average is not None else 0.0
 
     @property
@@ -293,7 +299,14 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
         verbose_name_plural = _("Product Translations")
 
     class MeiliMeta:
-        filterable_fields = ("name", "language_code", "likes_count", "final_price", "view_count", "category")
+        filterable_fields = (
+            "name",
+            "language_code",
+            "likes_count",
+            "final_price",
+            "view_count",
+            "category",
+        )
         searchable_fields = ("id", "name", "description")
         displayed_fields = (
             "id",

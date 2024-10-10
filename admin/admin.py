@@ -56,11 +56,12 @@ class MyAdminSite(admin.AdminSite):
         }
         return render(request, "admin/clear_cache.html", context)
 
-    def clear_cache_for_class(self, request, class_name):
+    @staticmethod
+    def clear_cache_for_class(request, class_name):
         cache_keys = cache_instance.keys(f"*{class_name}*")
 
         if cache_keys:
-            client = cache_instance._cache.get_client()
+            client = cache_instance._cache.get_client()  # noqa
             client.delete(*cache_keys)
             messages.success(request, _("Deleted %d keys for %s") % (len(cache_keys), class_name))
 
@@ -69,5 +70,6 @@ class MyAdminSite(admin.AdminSite):
         messages.success(request, _("Entire site cache cleared"))
         return redirect("admin:clear-cache")
 
-    def clear_site_cache(self):
+    @staticmethod
+    def clear_site_cache():
         management.call_command("clear_cache")

@@ -72,7 +72,9 @@ class OrderFactory(factory.django.DjangoModelFactory):
     zipcode = factory.Faker("postcode")
     place = factory.Faker("secondary_address")
     phone = factory.LazyAttribute(lambda _: PhoneNumber.from_string(fake.phone_number(), region="US"))
-    mobile_phone = factory.LazyAttribute(lambda _: PhoneNumber.from_string(fake.phone_number(), region="US"))
+    mobile_phone = factory.LazyAttribute(
+        lambda _: PhoneNumber.from_string(fake.phone_number(), region="US")
+    )
     customer_notes = factory.Faker("text", max_nb_chars=200)
     status = factory.Iterator(OrderStatusEnum.choices, getter=lambda x: x[0])
     shipping_price = factory.Faker("pydecimal", left_digits=2, right_digits=2, positive=True)

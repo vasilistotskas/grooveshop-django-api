@@ -23,7 +23,9 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="blogposttranslation",
             name="search_vector",
-            field=django.contrib.postgres.search.SearchVectorField(blank=True, null=True, verbose_name="Search Vector"),
+            field=django.contrib.postgres.search.SearchVectorField(
+                blank=True, null=True, verbose_name="Search Vector"
+            ),
         ),
         migrations.AlterField(
             model_name="blogposttranslation",

@@ -76,62 +76,66 @@ class IndexQuerySet:
             if not self.model._meilisearch["supports_geo"]:  # noqa
                 raise TypeError(f"Model {self.model.__name__} does not support geo filters")
             if not isinstance(geo_filter, (Radius, BoundingBox)):
-                raise TypeError(f"Unnamed Argument must be of type Radius or BoundingBox, not {type(geo_filter)}")
+                raise TypeError(
+                    f"Unnamed Argument must be of type Radius or BoundingBox, not {type(geo_filter)}"
+                )
             if isinstance(geo_filter, Radius):
-                self.__filters.append(f"_geoRadius({geo_filter.lat}, {geo_filter.lng}, {geo_filter.radius})")
+                self.__filters.append(
+                    f"_geoRadius({geo_filter.lat}, {geo_filter.lng}, {geo_filter.radius})"
+                )
             elif isinstance(geo_filter, BoundingBox):
                 self.__filters.append(
                     f"_geoBoundingBox([{geo_filter.top_right[0]},"
                     f" {geo_filter.top_right[1]}], [{geo_filter.bottom_left[0]}, {geo_filter.bottom_left[1]}])"
                 )
-        for filter, value in filters.items():
-            if "__" not in filter or "__exact" in filter:
+        for _filter, value in filters.items():
+            if "__" not in _filter or "__exact" in _filter:
                 if value == "" or (isinstance(value, list) and len(value) == 0) or value == {}:
-                    self.__filters.append(f"{filter.split('_')[0]} IS EMPTY")
+                    self.__filters.append(f"{_filter.split('_')[0]} IS EMPTY")
                 elif value is None:
-                    self.__filters.append(f"{filter.split('_')[0]} IS NULL")
+                    self.__filters.append(f"{_filter.split('_')[0]} IS NULL")
                 else:
                     self.__filters.append(
-                        f"{filter.split('_')[0]} = '{value}'"
+                        f"{_filter.split('_')[0]} = '{value}'"
                         if isinstance(value, str)
-                        else f"{filter.split('_')[0]} = {value}"
+                        else f"{_filter.split('_')[0]} = {value}"
                     )
-            elif "__gte" in filter:
+            elif "__gte" in _filter:
                 if not isinstance(value, (int, float)):
                     raise TypeError(f"Cannot compare {type(value)} with int or float")
-                self.__filters.append(f"{filter.split('_')[0]} >= {value}")
-            elif "__gt" in filter:
+                self.__filters.append(f"{_filter.split('_')[0]} >= {value}")
+            elif "__gt" in _filter:
                 if not isinstance(value, (int, float)):
                     raise TypeError(f"Cannot compare {type(value)} with int or float")
-                self.__filters.append(f"{filter.split('_')[0]} > {value}")
-            elif "__lte" in filter:
+                self.__filters.append(f"{_filter.split('_')[0]} > {value}")
+            elif "__lte" in _filter:
                 if not isinstance(value, (int, float)):
                     raise TypeError(f"Cannot compare {type(value)} with int or float")
-                self.__filters.append(f"{filter.split('_')[0]} <= {value}")
-            elif "__lt" in filter:
+                self.__filters.append(f"{_filter.split('_')[0]} <= {value}")
+            elif "__lt" in _filter:
                 if not isinstance(value, (int, float)):
                     raise TypeError(f"Cannot compare {type(value)} with int or float")
-                self.__filters.append(f"{filter.split('_')[0]} < {value}")
-            elif "__in" in filter:
+                self.__filters.append(f"{_filter.split('_')[0]} < {value}")
+            elif "__in" in _filter:
                 if not isinstance(value, list):
                     raise TypeError(f"Cannot compare {type(value)} with list")
-                self.__filters.append(f"{filter.split('_')[0]} IN {value}")
-            elif "__range" in filter:
+                self.__filters.append(f"{_filter.split('_')[0]} IN {value}")
+            elif "__range" in _filter:
                 if not isinstance(value, (range, list, tuple)):
                     raise TypeError(f"Cannot compare {type(value)} with range, list or tuple")
                 self.__filters.append(
-                    f"{filter.split('_')[0]} {value[0]} TO {value[1]}"
+                    f"{_filter.split('_')[0]} {value[0]} TO {value[1]}"
                     if not isinstance(value, range)
-                    else f"{filter.split('_')[0]} {value.start} TO {value.stop}"
+                    else f"{_filter.split('_')[0]} {value.start} TO {value.stop}"
                 )
-            elif "__exists" in filter:
+            elif "__exists" in _filter:
                 if not isinstance(value, bool):
                     raise TypeError(f"Cannot compare {type(value)} with bool")
-                self.__filters.append(f"{filter.split('_')[0]} {'NOT ' if not value else ''}EXISTS")
-            elif "__isnull" in filter:
+                self.__filters.append(f"{_filter.split('_')[0]} {'NOT ' if not value else ''}EXISTS")
+            elif "__isnull" in _filter:
                 if not isinstance(value, bool):
                     raise TypeError(f"Cannot compare {type(value)} with bool")
-                self.__filters.append(f"{filter.split('_')[0]} {'NOT ' if not value else ''}IS NULL")
+                self.__filters.append(f"{_filter.split('_')[0]} {'NOT ' if not value else ''}IS NULL")
 
         return self
 

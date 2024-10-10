@@ -19,7 +19,9 @@ class Migration(migrations.Migration):
             field=models.DateTimeField(
                 blank=True,
                 db_default=django.db.models.expressions.CombinedExpression(
-                    django.db.models.functions.datetime.Now(), "+", models.Value(datetime.timedelta(days=180))
+                    django.db.models.functions.datetime.Now(),
+                    "+",
+                    models.Value(datetime.timedelta(days=180)),
                 ),
                 null=True,
                 verbose_name="Expiry Date",

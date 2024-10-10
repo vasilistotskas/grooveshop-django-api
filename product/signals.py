@@ -26,9 +26,13 @@ def post_create_historical_record_callback(sender, instance, history_instance, *
     new_price = instance.price.amount
 
     if old_price > new_price:
-        product_price_lowered.send(sender=Product, instance=instance, old_price=old_price, new_price=new_price)
+        product_price_lowered.send(
+            sender=Product, instance=instance, old_price=old_price, new_price=new_price
+        )
     elif old_price < new_price:
-        product_price_increased.send(sender=Product, instance=instance, old_price=old_price, new_price=new_price)
+        product_price_increased.send(
+            sender=Product, instance=instance, old_price=old_price, new_price=new_price
+        )
 
 
 @receiver(product_price_lowered)

@@ -57,7 +57,9 @@ class UserAddressSerializer(BaseExpandSerializer):
     def get_expand_fields(
         self,
     ) -> Dict[str, Type[serializers.ModelSerializer]]:
-        user_account_serializer = importlib.import_module("authentication.serializers").AuthenticationSerializer
+        user_account_serializer = importlib.import_module(
+            "authentication.serializers"
+        ).AuthenticationSerializer
         country_serializer = importlib.import_module("country.serializers").CountrySerializer
         region_serializer = importlib.import_module("region.serializers").RegionSerializer
         return {

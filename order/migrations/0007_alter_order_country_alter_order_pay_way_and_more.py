@@ -71,7 +71,9 @@ class Migration(migrations.Migration):
             model_name="orderitem",
             name="product",
             field=models.ForeignKey(
-                on_delete=django.db.models.deletion.CASCADE, related_name="order_items", to="product.product"
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="order_items",
+                to="product.product",
             ),
         ),
     ]

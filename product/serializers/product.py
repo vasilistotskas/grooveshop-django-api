@@ -89,6 +89,8 @@ class ProductSerializer(TranslatableModelSerializer, BaseExpandSerializer):
     def get_expand_fields(
         self,
     ) -> Dict[str, Type[serializers.ModelSerializer]]:
-        product_category_serializer = importlib.import_module("product.serializers.category").ProductCategorySerializer
+        product_category_serializer = importlib.import_module(
+            "product.serializers.category"
+        ).ProductCategorySerializer
         vat_serializer = importlib.import_module("vat.serializers").VatSerializer
         return {"category": product_category_serializer, "vat": vat_serializer}

@@ -1,5 +1,5 @@
 import csv
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # noqa
 from typing import override
 
 from django.contrib import admin
@@ -10,7 +10,7 @@ class ExportActionMixin:
     model = None
 
     def export_csv(self, request, queryset) -> HttpResponse:
-        opts = self.model._meta
+        opts = self.model._meta  # noqa
         response = HttpResponse(content_type="text/csv")
         response["Content-Disposition"] = "attachment; filename={}.csv".format(opts.verbose_name)
         writer = csv.writer(response)
@@ -29,7 +29,7 @@ class ExportActionMixin:
     export_csv.short_description = "Export selected to CSV"
 
     def export_xml(self, request, queryset) -> HttpResponse:
-        opts = self.model._meta
+        opts = self.model._meta  # noqa
         fields = [field for field in opts.get_fields() if not field.many_to_many and not field.one_to_many]
 
         root = ET.Element("{}s".format(opts.verbose_name))

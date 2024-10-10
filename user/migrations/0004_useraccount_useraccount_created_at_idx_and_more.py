@@ -14,11 +14,15 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddIndex(
             model_name="useraccount",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["created_at"], name="useraccount_created_at_idx"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["created_at"], name="useraccount_created_at_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="useraccount",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["updated_at"], name="useraccount_updated_at_idx"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["updated_at"], name="useraccount_updated_at_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="useraccount",
@@ -48,10 +52,14 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="useraddress",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["created_at"], name="useraddress_created_at_idx"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["created_at"], name="useraddress_created_at_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="useraddress",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["updated_at"], name="useraddress_updated_at_idx"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["updated_at"], name="useraddress_updated_at_idx"
+            ),
         ),
     ]

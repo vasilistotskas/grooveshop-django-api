@@ -43,30 +43,45 @@ class Migration(migrations.Migration):
                 ("uuid", models.UUIDField(db_index=True, default=uuid.uuid4, editable=False)),
                 (
                     "private_metadata",
-                    models.JSONField(blank=True, default=dict, encoder=django.core.serializers.json.DjangoJSONEncoder),
+                    models.JSONField(
+                        blank=True, default=dict, encoder=django.core.serializers.json.DjangoJSONEncoder
+                    ),
                 ),
                 (
                     "metadata",
-                    models.JSONField(blank=True, default=dict, encoder=django.core.serializers.json.DjangoJSONEncoder),
+                    models.JSONField(
+                        blank=True, default=dict, encoder=django.core.serializers.json.DjangoJSONEncoder
+                    ),
                 ),
                 ("deleted_at", models.DateTimeField(blank=True, null=True)),
                 ("is_deleted", models.BooleanField(default=False)),
-                ("seo_title", models.CharField(blank=True, max_length=70, null=True, verbose_name="Seo Title")),
+                (
+                    "seo_title",
+                    models.CharField(blank=True, max_length=70, null=True, verbose_name="Seo Title"),
+                ),
                 (
                     "seo_description",
                     models.TextField(blank=True, max_length=300, null=True, verbose_name="Seo Description"),
                 ),
-                ("seo_keywords", models.CharField(blank=True, max_length=255, null=True, verbose_name="Seo Keywords")),
+                (
+                    "seo_keywords",
+                    models.CharField(blank=True, max_length=255, null=True, verbose_name="Seo Keywords"),
+                ),
                 ("id", models.BigIntegerField(blank=True, db_index=True)),
                 (
                     "product_code",
-                    models.CharField(db_index=True, default=uuid.uuid4, max_length=100, verbose_name="Product Code"),
+                    models.CharField(
+                        db_index=True, default=uuid.uuid4, max_length=100, verbose_name="Product Code"
+                    ),
                 ),
                 ("slug", models.SlugField(max_length=255, verbose_name="Slug")),
                 (
                     "price_currency",
                     djmoney.models.fields.CurrencyField(
-                        choices=[("EUR", "EUR €"), ("USD", "USD $")], default="EUR", editable=False, max_length=3
+                        choices=[("EUR", "EUR €"), ("USD", "USD $")],
+                        default="EUR",
+                        editable=False,
+                        max_length=3,
                     ),
                 ),
                 (
@@ -80,7 +95,10 @@ class Migration(migrations.Migration):
                 (
                     "discount_percent",
                     models.DecimalField(
-                        decimal_places=2, default=Decimal("0"), max_digits=11, verbose_name="Discount Percent"
+                        decimal_places=2,
+                        default=Decimal("0"),
+                        max_digits=11,
+                        verbose_name="Discount Percent",
                     ),
                 ),
                 ("view_count", models.PositiveBigIntegerField(default=0, verbose_name="View Count")),
@@ -97,7 +115,9 @@ class Migration(migrations.Migration):
                 ("history_change_reason", models.CharField(max_length=100, null=True)),
                 (
                     "history_type",
-                    models.CharField(choices=[("+", "Created"), ("~", "Changed"), ("-", "Deleted")], max_length=1),
+                    models.CharField(
+                        choices=[("+", "Created"), ("~", "Changed"), ("-", "Deleted")], max_length=1
+                    ),
                 ),
                 (
                     "category",

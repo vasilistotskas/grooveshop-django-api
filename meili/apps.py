@@ -20,7 +20,9 @@ class MeiliConfig(AppConfig):
                 pk = (
                     model.pk
                     if model._meilisearch["primary_key"] == "pk"  # noqa
-                    else model._meta.get_field(model._meilisearch["primary_key"]).value_from_object(  # noqa  # noqa
+                    else model._meta.get_field(
+                        model._meilisearch["primary_key"]
+                    ).value_from_object(  # noqa  # noqa
                         model
                     )
                 )
@@ -40,7 +42,9 @@ class MeiliConfig(AppConfig):
             model: IndexMixin = kwargs["instance"]  # noqa
             if model.meili_filter():
                 pk = (
-                    model._meta.get_field(model._meilisearch["primary_key"]).value_from_object(model)  # noqa  # noqa
+                    model._meta.get_field(model._meilisearch["primary_key"]).value_from_object(
+                        model
+                    )  # noqa  # noqa
                     if model._meilisearch["primary_key"] != "pk"  # noqa
                     else model.pk
                 )

@@ -55,7 +55,8 @@ class UserAddressModelTestCase(TestCase):
     def test_str_representation(self):
         self.assertEqual(
             str(self.address),
-            f"{self.address.title} - {self.address.first_name}" f" {self.address.last_name}, {self.address.city}",
+            f"{self.address.title} - {self.address.first_name}"
+            f" {self.address.last_name}, {self.address.city}",
         )
 
     def test_get_main_address(self):

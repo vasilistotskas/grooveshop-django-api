@@ -1,5 +1,3 @@
-# adapted from Starlette's GZipMiddleware
-# Starlette does not work with Django's case-sensitive headers
 import gzip
 import io
 from typing import Optional
@@ -12,8 +10,12 @@ from asgiref.typing import HTTPResponseStartEvent
 from asgiref.typing import Scope
 
 
-def gzip_compression(app: ASGI3Application, minimum_size: int = 500, compresslevel: int = 9) -> ASGI3Application:
-    async def gzip_compression_wrapper(scope: Scope, receive: ASGIReceiveCallable, send: ASGISendCallable) -> None:
+def gzip_compression(
+    app: ASGI3Application, minimum_size: int = 500, compresslevel: int = 9
+) -> ASGI3Application:
+    async def gzip_compression_wrapper(
+        scope: Scope, receive: ASGIReceiveCallable, send: ASGISendCallable
+    ) -> None:
         if scope["type"] == "http":
             accepted_encoding = next(
                 (value for key, value in scope["headers"] if key.lower() == b"accept-encoding"),

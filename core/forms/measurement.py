@@ -13,7 +13,9 @@ from core.utils.measurement import get_measurement
 
 
 class MeasurementWidget(forms.MultiWidget):
-    def __init__(self, attrs=None, float_widget=None, unit_choices_widget=None, unit_choices=None, *args, **kwargs):
+    def __init__(
+        self, attrs=None, float_widget=None, unit_choices_widget=None, unit_choices=None, *args, **kwargs
+    ):
         self.unit_choices = unit_choices
 
         if not float_widget:
@@ -66,11 +68,13 @@ class MeasurementFormField(forms.MultiValueField):
         self.measurement = measurement
         if not unit_choices:
             if issubclass(measurement, BidimensionalMeasure):
-                assert isinstance(
-                    bidimensional_separator, str
-                ), "Supplied bidimensional_separator for %s must be of string/unicode type;" " Instead got type %s" % (
-                    measurement,
-                    str(type(bidimensional_separator)),
+                assert isinstance(bidimensional_separator, str), (
+                    "Supplied bidimensional_separator for %s must be of string/unicode type;"
+                    " Instead got type %s"
+                    % (
+                        measurement,
+                        str(type(bidimensional_separator)),
+                    )
                 )
                 unit_choices = tuple(
                     (

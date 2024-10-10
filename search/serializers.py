@@ -29,10 +29,10 @@ class BlogPostTranslationSerializer(serializers.ModelSerializer):
             "formatted",
         )
 
-    def get_absolute_url(self, obj):
+    def get_absolute_url(self, obj):  # noqa
         return obj.master.absolute_url if obj.master else ""
 
-    def get_main_image_path(self, obj):
+    def get_main_image_path(self, obj):  # noqa
         return obj.master.main_image_path if obj.master else ""
 
     def get_matches_position(self, obj):
@@ -67,10 +67,10 @@ class ProductTranslationSerializer(serializers.ModelSerializer):
             "formatted",
         )
 
-    def get_absolute_url(self, obj):
+    def get_absolute_url(self, obj):  # noqa
         return obj.master.absolute_url if obj.master else ""
 
-    def get_main_image_path(self, obj):
+    def get_main_image_path(self, obj):  # noqa
         return obj.master.main_image_path if obj.master else ""
 
     def get_matches_position(self, obj):

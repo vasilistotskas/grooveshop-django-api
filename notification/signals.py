@@ -10,7 +10,9 @@ from notification.tasks import send_notification_task
 @receiver(post_save, sender=NotificationUser)
 def handle_notification_created(sender, instance: NotificationUser, created, **kwargs):
     if created:
-        translations_queryset = instance.notification.translations.all().values("language_code", "title", "message")
+        translations_queryset = instance.notification.translations.all().values(
+            "language_code", "title", "message"
+        )
 
         translations = {
             translation["language_code"]: {"title": translation["title"], "message": translation["message"]}

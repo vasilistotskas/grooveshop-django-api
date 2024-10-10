@@ -48,8 +48,12 @@ class BlogCategoryAdmin(TranslatableAdmin, DraggableMPTTAdmin):
     @override
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        qs = BlogCategory.objects.add_related_count(qs, BlogPost, "category", "posts_cumulative_count", cumulative=True)
-        qs = BlogCategory.objects.add_related_count(qs, BlogPost, "category", "posts_count", cumulative=False)
+        qs = BlogCategory.objects.add_related_count(
+            qs, BlogPost, "category", "posts_cumulative_count", cumulative=True
+        )
+        qs = BlogCategory.objects.add_related_count(
+            qs, BlogPost, "category", "posts_count", cumulative=False
+        )
         return qs
 
     @override
@@ -58,7 +62,7 @@ class BlogCategoryAdmin(TranslatableAdmin, DraggableMPTTAdmin):
             "slug": ("name",),
         }
 
-    def related_posts_count(self, instance):
+    def related_posts_count(self, instance):  # noqa
         return instance.posts_count
 
     setattr(
@@ -67,7 +71,7 @@ class BlogCategoryAdmin(TranslatableAdmin, DraggableMPTTAdmin):
         _("Related posts (for this specific category)"),
     )
 
-    def related_posts_cumulative_count(self, instance):
+    def related_posts_cumulative_count(self, instance):  # noqa
         return instance.posts_cumulative_count
 
     setattr(

@@ -30,7 +30,7 @@ class HomeView(View):
 @csrf_exempt
 @login_required
 def upload_image(request):
-    USE_AWS = os.getenv("USE_AWS", "False") == "True"
+    USE_AWS = os.getenv("USE_AWS", "False") == "True"  # noqa
 
     user = request.user
     if not user.is_superuser:
@@ -43,7 +43,9 @@ def upload_image(request):
     file_name_suffix = file_obj.name.split(".")[-1].lower()
     if file_name_suffix not in ["jpg", "png", "gif", "jpeg"]:
         return JsonResponse(
-            {"Error Message": f"Wrong file suffix ({file_name_suffix}), supported are .jpg, .png, .gif, .jpeg"}
+            {
+                "Error Message": f"Wrong file suffix ({file_name_suffix}), supported are .jpg, .png, .gif, .jpeg"
+            }
         )
 
     if USE_AWS:

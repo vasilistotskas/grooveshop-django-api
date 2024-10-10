@@ -12,14 +12,20 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddIndex(
             model_name="region",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["created_at"], name="region_created_at_idx"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["created_at"], name="region_created_at_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="region",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["updated_at"], name="region_updated_at_idx"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["updated_at"], name="region_updated_at_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="region",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["sort_order"], name="region_sort_order_idx"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["sort_order"], name="region_sort_order_idx"
+            ),
         ),
     ]

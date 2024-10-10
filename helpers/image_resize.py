@@ -3,7 +3,7 @@ from typing import IO
 
 from django.core.files import File
 from PIL import Image
-from PIL._typing import StrOrBytesPath
+from PIL._typing import StrOrBytesPath  # noqa
 
 
 def make_thumbnail(fp: StrOrBytesPath | IO[bytes], size: tuple[float, float]) -> File:

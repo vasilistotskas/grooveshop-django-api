@@ -135,7 +135,9 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="product",
-            index=django.contrib.postgres.indexes.GinIndex(fields=["private_metadata"], name="product_p_meta_idx"),
+            index=django.contrib.postgres.indexes.GinIndex(
+                fields=["private_metadata"], name="product_p_meta_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="product",
@@ -143,7 +145,9 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="product",
-            index=django.contrib.postgres.indexes.GinIndex(fields=["search_vector"], name="product_search_vector_idx"),
+            index=django.contrib.postgres.indexes.GinIndex(
+                fields=["search_vector"], name="product_search_vector_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="product",

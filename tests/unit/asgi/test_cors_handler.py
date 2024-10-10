@@ -160,4 +160,6 @@ async def test_non_http_scope(asgi_app: ASGI3Application):
 
     cors_app = cors_handler(asgi_app)
     await cors_app(non_http_scope, receive, send)
-    assert not any(header[0].startswith(b"access-control-") for event in events for header in event.get("headers", []))
+    assert not any(
+        header[0].startswith(b"access-control-") for event in events for header in event.get("headers", [])
+    )

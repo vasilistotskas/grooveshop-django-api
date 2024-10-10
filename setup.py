@@ -13,7 +13,7 @@ setup(
 )
 
 try:
-    from semantic_release import setup_hook
+    from semantic_release import setup_hook  # noqa
 
     setup_hook(sys.argv)
 except ImportError:

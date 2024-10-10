@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # noqa
 from typing import override
 from typing import TYPE_CHECKING
 
@@ -39,7 +39,8 @@ class ImageAndSvgField(ImageField):
 
         return f
 
-    def is_svg(self, f: File | None) -> bool:
+    @staticmethod
+    def is_svg(f: File | None) -> bool:
         if f is None:
             return False
 

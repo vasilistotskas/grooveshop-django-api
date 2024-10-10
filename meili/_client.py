@@ -41,7 +41,8 @@ class Client:
             "searchableAttributes": searchable_fields or ["*"],
             "filterableAttributes": filterable_fields or [],
             "sortableAttributes": sortable_fields or [],
-            "rankingRules": ranking_rules or ["words", "typo", "proximity", "attribute", "sort", "exactness"],
+            "rankingRules": ranking_rules
+            or ["words", "typo", "proximity", "attribute", "sort", "exactness"],
             "stopWords": stop_words or [],
             "synonyms": synonyms or {},
             "distinctAttribute": distinct_attribute,
@@ -56,12 +57,16 @@ class Client:
             "pagination": pagination or {"maxTotalHits": 1000},
         }
 
-        self.tasks.append(self._handle_sync(self.client.index(index_name).update_settings(settings_payload)))
+        self.tasks.append(
+            self._handle_sync(self.client.index(index_name).update_settings(settings_payload))
+        )
         return self
 
     def create_index(self, index_name: str, primary_key: str):
         if index_name not in [i.uid for i in self.get_indexes()]:
-            self.tasks.append(self._handle_sync(self.client.create_index(index_name, {"primaryKey": primary_key})))
+            self.tasks.append(
+                self._handle_sync(self.client.create_index(index_name, {"primaryKey": primary_key}))
+            )
         return self
 
     def get_index(self, index_name: str):

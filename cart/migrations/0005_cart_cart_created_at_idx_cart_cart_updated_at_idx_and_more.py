@@ -14,23 +14,33 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddIndex(
             model_name="cart",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["created_at"], name="cart_created_at_idx"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["created_at"], name="cart_created_at_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="cart",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["updated_at"], name="cart_updated_at_idx"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["updated_at"], name="cart_updated_at_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="cart",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["user"], name="cart_cart_user_id_0a6acd_btree"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["user"], name="cart_cart_user_id_0a6acd_btree"
+            ),
         ),
         migrations.AddIndex(
             model_name="cartitem",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["created_at"], name="cartitem_created_at_idx"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["created_at"], name="cartitem_created_at_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="cartitem",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["updated_at"], name="cartitem_updated_at_idx"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["updated_at"], name="cartitem_updated_at_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="cartitem",

@@ -13,7 +13,7 @@ from tag.models.tag import Tag
 
 
 class TaggedItemManager(models.Manager):
-    def get_tags_for(self, obj_type, obj_id):
+    def get_tags_for(self, obj_type, obj_id):  # noqa
         content_type = ContentType.objects.get_for_model(obj_type)
 
         return TaggedItem.objects.select_related("tag").filter(content_type=content_type, object_id=obj_id)
@@ -53,7 +53,8 @@ class TaggedModel(models.Model):
 
     def get_tags_for_object(self) -> QuerySet[Tag]:
         return Tag.objects.filter(
-            taggeditem__content_type=ContentType.objects.get_for_model(type(self)), taggeditem__object_id=self.id
+            taggeditem__content_type=ContentType.objects.get_for_model(type(self)),
+            taggeditem__object_id=self.id,
         ).distinct()
 
     def add_tag(self, tag: TaggedItem) -> None:
@@ -64,7 +65,7 @@ class TaggedModel(models.Model):
         except Exception as e:
             LogInfo.error(f"Failed to add tag: {e}")
 
-    def remove_tag(self, tag: TaggedItem) -> None:
+    def remove_tag(self, tag: TaggedItem) -> None:  # noqa
         try:
             if isinstance(tag, TaggedItem):
                 tag.delete()

@@ -14,7 +14,9 @@ class Migration(migrations.Migration):
             model_name="notificationuser",
             name="notification",
             field=models.ForeignKey(
-                on_delete=django.db.models.deletion.CASCADE, related_name="user", to="notification.notification"
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="user",
+                to="notification.notification",
             ),
         ),
     ]

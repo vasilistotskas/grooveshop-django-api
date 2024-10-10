@@ -11,18 +11,26 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddIndex(
             model_name="payway",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["created_at"], name="payway_created_at_idx"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["created_at"], name="payway_created_at_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="payway",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["updated_at"], name="payway_updated_at_idx"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["updated_at"], name="payway_updated_at_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="payway",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["sort_order"], name="payway_sort_order_idx"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["sort_order"], name="payway_sort_order_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="payway",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["active"], name="pay_way_pay_active_1c54dd_btree"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["active"], name="pay_way_pay_active_1c54dd_btree"
+            ),
         ),
     ]

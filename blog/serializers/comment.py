@@ -30,7 +30,7 @@ class BlogCommentSerializer(TranslatableModelSerializer, BaseExpandSerializer):
     likes = PrimaryKeyRelatedField(queryset=User.objects.all(), many=True, required=False)
     translations = TranslatedFieldsFieldExtend(shared_model=BlogComment)
 
-    def get_children(self, obj: BlogComment) -> list[int]:
+    def get_children(self, obj: BlogComment) -> list[int]:  # noqa
         if obj.get_children().exists():
             return list(obj.get_children().values_list("id", flat=True))
         return []
@@ -66,7 +66,9 @@ class BlogCommentSerializer(TranslatableModelSerializer, BaseExpandSerializer):
     def get_expand_fields(
         self,
     ) -> Dict[str, Type[serializers.ModelSerializer]]:
-        user_account_serializer = importlib.import_module("authentication.serializers").AuthenticationSerializer
+        user_account_serializer = importlib.import_module(
+            "authentication.serializers"
+        ).AuthenticationSerializer
         blog_post_serializer = importlib.import_module("blog.serializers.post").BlogPostSerializer
         return {
             "user": user_account_serializer,

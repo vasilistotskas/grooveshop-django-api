@@ -125,6 +125,9 @@ class UserNameGenerator:
             email_hash = UserNameGenerator.generate_hash(email)
             prefix = f"{adjective}{noun}"
             username = f"{prefix}#{email_hash}"
-            if len(username) <= max_length and not user_account_model.objects.filter(username=username).exists():
+            if (
+                len(username) <= max_length
+                and not user_account_model.objects.filter(username=username).exists()
+            ):
                 return username
         raise RuntimeError("Failed to generate a unique username within the maximum attempts.")

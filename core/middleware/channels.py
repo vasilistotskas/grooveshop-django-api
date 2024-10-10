@@ -14,7 +14,7 @@ def get_user(user_id):
     from django.contrib.auth.models import AnonymousUser
     from django.contrib.auth import get_user_model
 
-    User = get_user_model()
+    User = get_user_model()  # noqa
 
     try:
         return User.objects.get(id=user_id)
@@ -110,5 +110,5 @@ class TokenAuthMiddleware:
         return await self.app(scope, receive, send)
 
 
-def TokenAuthMiddlewareStack(inner):
+def tokenAuthMiddlewareStack(inner):
     return TokenAuthMiddleware(inner)

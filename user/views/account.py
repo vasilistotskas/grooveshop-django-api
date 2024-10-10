@@ -70,7 +70,9 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
                 queryset = get_object_or_404(User, id=self.kwargs["pk"]).notification.all()
             case _:
                 queryset = (
-                    User.objects.all() if self.request.user.is_staff else User.objects.filter(id=self.request.user.id)
+                    User.objects.all()
+                    if self.request.user.is_staff
+                    else User.objects.filter(id=self.request.user.id)
                 )
 
         return queryset

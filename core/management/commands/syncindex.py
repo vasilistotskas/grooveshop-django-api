@@ -28,7 +28,7 @@ class Command(BaseCommand):
             exit(1)
         self.stdout.write(self.style.SUCCESS(f"Synced index for {options['model']}"))
 
-    def _serialize(self, model) -> dict:
+    def _serialize(self, model) -> dict:  # noqa
         serialized = model.meili_serialize()
         pk = model.pk
         return serialized | {"id": pk, "pk": pk}

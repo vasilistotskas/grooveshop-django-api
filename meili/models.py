@@ -106,7 +106,7 @@ class IndexMixin(models.Model):
 
         cls.meilisearch = IndexQuerySet(cls)
 
-    def meili_filter(self) -> bool:
+    def meili_filter(self) -> bool:  # noqa
         return True
 
     @classmethod

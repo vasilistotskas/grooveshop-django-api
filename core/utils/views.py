@@ -8,7 +8,8 @@ from rest_framework.request import Request
 
 
 class TranslationsProcessingMixin:
-    def process_translations_data(self, request: Request) -> Request:
+    @staticmethod
+    def process_translations_data(request: Request) -> Request:
         if request.content_type.startswith("multipart/form-data") and any(
             key.startswith("translations.") for key in request.data.keys()
         ):

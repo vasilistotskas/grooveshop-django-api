@@ -23,11 +23,12 @@ class Checkout(APIView):
     serializer_class = CheckoutSerializer
     queryset = Order.objects.all()
 
-    def create_order(self, request: Request, serializer: CheckoutSerializer) -> None:
+    @staticmethod
+    def create_order(request: Request, serializer: CheckoutSerializer) -> None:
         user = request.user if request.user.is_authenticated else None
         serializer.save(user=user)
 
-    def post(self, request, format=None):
+    def post(self, request):
         serializer = CheckoutSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         self.create_order(request, serializer)

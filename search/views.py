@@ -24,7 +24,9 @@ def blog_post_meili_search(request):
 
     decoded_query = unquote(query)
 
-    enriched_results = BlogPostTranslation.meilisearch.paginate(limit=limit, offset=offset).search(q=decoded_query)
+    enriched_results = BlogPostTranslation.meilisearch.paginate(limit=limit, offset=offset).search(
+        q=decoded_query
+    )
 
     serialized_data = []
     for result in enriched_results["results"]:
@@ -59,7 +61,9 @@ def product_meili_search(request):
 
     decoded_query = unquote(query)
 
-    enriched_results = ProductTranslation.meilisearch.paginate(limit=limit, offset=offset).search(q=decoded_query)
+    enriched_results = ProductTranslation.meilisearch.paginate(limit=limit, offset=offset).search(
+        q=decoded_query
+    )
 
     serialized_data = []
     for result in enriched_results["results"]:

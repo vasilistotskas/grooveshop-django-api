@@ -44,7 +44,9 @@ async def notify_comment_liked(sender, instance, action, reverse, pk_set, **kwar
                         )
                     elif language == "el":
                         await sync_to_async(setattr)(
-                            notification, "title", f"Το <a href=" f"'" f"{blog_post_url}'>σχόλιο</a> " f"σου πήρε like!"
+                            notification,
+                            "title",
+                            f"Το <a href=" f"'" f"{blog_post_url}'>σχόλιο</a> " f"σου πήρε like!",
                         )
                         await sync_to_async(setattr)(
                             notification,

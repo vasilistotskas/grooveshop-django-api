@@ -14,19 +14,27 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddIndex(
             model_name="product",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["created_at"], name="product_created_at_idx"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["created_at"], name="product_created_at_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="product",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["updated_at"], name="product_updated_at_idx"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["updated_at"], name="product_updated_at_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="product",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["price"], name="product_pro_price_9daef3_btree"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["price"], name="product_pro_price_9daef3_btree"
+            ),
         ),
         migrations.AddIndex(
             model_name="product",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["stock"], name="product_pro_stock_c26e64_btree"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["stock"], name="product_pro_stock_c26e64_btree"
+            ),
         ),
         migrations.AddIndex(
             model_name="product",
@@ -37,11 +45,15 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="product",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["hits"], name="product_pro_hits_19ae26_btree"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["hits"], name="product_pro_hits_19ae26_btree"
+            ),
         ),
         migrations.AddIndex(
             model_name="product",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["weight"], name="product_pro_weight_bf3d6d_btree"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["weight"], name="product_pro_weight_bf3d6d_btree"
+            ),
         ),
         migrations.AddIndex(
             model_name="product",
@@ -95,15 +107,21 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="productimage",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["created_at"], name="productimage_created_at_idx"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["created_at"], name="productimage_created_at_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="productimage",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["updated_at"], name="productimage_updated_at_idx"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["updated_at"], name="productimage_updated_at_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="productimage",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["sort_order"], name="productimage_sort_order_idx"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["sort_order"], name="productimage_sort_order_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="productimage",
@@ -138,10 +156,14 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="productreview",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["status"], name="product_pro_status_8c2214_btree"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["status"], name="product_pro_status_8c2214_btree"
+            ),
         ),
         migrations.AddIndex(
             model_name="productreview",
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=["rate"], name="product_pro_rate_b78d32_btree"),
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["rate"], name="product_pro_rate_b78d32_btree"
+            ),
         ),
     ]

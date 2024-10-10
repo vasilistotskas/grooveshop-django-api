@@ -14,10 +14,11 @@ from core.logging import LogInfo
 
 class NoValidationSearchVectorCombinable(SearchVectorCombinable):
     @override
-    def _combine(self, other, connector, reversed):
+    def _combine(self, other, connector, reversed):  # noqa
         if not isinstance(other, NoValidationSearchVectorCombinable):
             raise TypeError(
-                "SearchVector can only be combined with other SearchVector " f"instances, got {type(other).__name__}."
+                "SearchVector can only be combined with other SearchVector "
+                f"instances, got {type(other).__name__}."
             )
         if reversed:
             return NoValidationCombinedSearchVector(other, connector, self, self.config)  # type: ignore[arg-type, attr-defined] # mixin class # noqa: E501
@@ -91,7 +92,9 @@ class FlatConcat(Expression):
 
     def __add__(self, other):
         if not isinstance(other, FlatConcat):
-            raise TypeError(f"Cannot combine FlatSearchVectorCombinable with other " f"instances types, got {other!r}.")
+            raise TypeError(
+                f"Cannot combine FlatSearchVectorCombinable with other " f"instances types, got {other!r}."
+            )
         return FlatConcat(*self.source_expressions + other.source_expressions)
 
     @override
@@ -120,7 +123,9 @@ class FlatConcat(Expression):
         c = self.copy()
         c.is_summary = summarize
         for pos, arg in enumerate(c.source_expressions):
-            c.source_expressions[pos] = arg.resolve_expression(query, allow_joins, reuse, summarize, for_save)
+            c.source_expressions[pos] = arg.resolve_expression(
+                query, allow_joins, reuse, summarize, for_save
+            )
         return c
 
     @override

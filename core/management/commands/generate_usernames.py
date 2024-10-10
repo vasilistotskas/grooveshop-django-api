@@ -20,7 +20,9 @@ class Command(BaseCommand):
                 user.username = new_username
                 user.save()
                 updated_count += 1
-                self.stdout.write(self.style.SUCCESS(f"Successfully updated username for user: {user.email}"))
+                self.stdout.write(
+                    self.style.SUCCESS(f"Successfully updated username for user: {user.email}")
+                )
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f"Error updating user {user.email}: {str(e)}"))
 

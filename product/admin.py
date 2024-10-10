@@ -51,7 +51,9 @@ class CategoryAdmin(TranslatableAdmin, DraggableMPTTAdmin):
             "products_cumulative_count",
             cumulative=True,
         )
-        qs = ProductCategory.objects.add_related_count(qs, Product, "category", "products_count", cumulative=False)
+        qs = ProductCategory.objects.add_related_count(
+            qs, Product, "category", "products_count", cumulative=False
+        )
         return qs
 
     @override
@@ -60,7 +62,7 @@ class CategoryAdmin(TranslatableAdmin, DraggableMPTTAdmin):
             "slug": ("name",),
         }
 
-    def related_products_count(self, instance):
+    def related_products_count(self, instance):  # noqa
         return instance.products_count
 
     setattr(
@@ -69,7 +71,7 @@ class CategoryAdmin(TranslatableAdmin, DraggableMPTTAdmin):
         _("Related products (for this specific category)"),
     )
 
-    def related_products_cumulative_count(self, instance):
+    def related_products_cumulative_count(self, instance):  # noqa
         return instance.products_cumulative_count
 
     setattr(
@@ -121,7 +123,7 @@ class ProductAdmin(TranslatableAdmin, ExportModelAdmin, SimpleHistoryAdmin):
             "slug": ("name",),
         }
 
-    def boolean_status(self, obj) -> bool:
+    def boolean_status(self, obj) -> bool:  # noqa
         return True if obj.active else False
 
     setattr(

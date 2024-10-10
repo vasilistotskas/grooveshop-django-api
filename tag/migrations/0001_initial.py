@@ -23,7 +23,9 @@ class Migration(migrations.Migration):
             fields=[
                 (
                     "sort_order",
-                    models.IntegerField(db_index=True, editable=False, null=True, verbose_name="Sort Order"),
+                    models.IntegerField(
+                        db_index=True, editable=False, null=True, verbose_name="Sort Order"
+                    ),
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True, verbose_name="Created At")),
                 ("updated_at", models.DateTimeField(auto_now=True, verbose_name="Updated At")),
@@ -36,10 +38,18 @@ class Migration(migrations.Migration):
                 "verbose_name_plural": "Blog Tags",
                 "ordering": ["sort_order"],
                 "indexes": [
-                    django.contrib.postgres.indexes.BTreeIndex(fields=["created_at"], name="tag_created_at_idx"),
-                    django.contrib.postgres.indexes.BTreeIndex(fields=["updated_at"], name="tag_updated_at_idx"),
-                    django.contrib.postgres.indexes.BTreeIndex(fields=["sort_order"], name="tag_sort_order_idx"),
-                    django.contrib.postgres.indexes.BTreeIndex(fields=["active"], name="tag_tag_active_5d272a_btree"),
+                    django.contrib.postgres.indexes.BTreeIndex(
+                        fields=["created_at"], name="tag_created_at_idx"
+                    ),
+                    django.contrib.postgres.indexes.BTreeIndex(
+                        fields=["updated_at"], name="tag_updated_at_idx"
+                    ),
+                    django.contrib.postgres.indexes.BTreeIndex(
+                        fields=["sort_order"], name="tag_sort_order_idx"
+                    ),
+                    django.contrib.postgres.indexes.BTreeIndex(
+                        fields=["active"], name="tag_tag_active_5d272a_btree"
+                    ),
                 ],
             },
             bases=(parler.models.TranslatableModelMixin, models.Model),
@@ -50,27 +60,43 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="TaggedItem",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
                 ("created_at", models.DateTimeField(auto_now_add=True, verbose_name="Created At")),
                 ("updated_at", models.DateTimeField(auto_now=True, verbose_name="Updated At")),
                 ("uuid", models.UUIDField(default=uuid.uuid4, editable=False, unique=True)),
                 ("object_id", models.PositiveIntegerField()),
                 (
                     "content_type",
-                    models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to="contenttypes.contenttype"),
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE, to="contenttypes.contenttype"
+                    ),
                 ),
                 ("tag", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to="tag.tag")),
             ],
             options={
                 "verbose_name": "Tagged Item",
                 "verbose_name_plural": "Tagged Items",
-                "indexes": [models.Index(fields=["content_type", "object_id"], name="tag_taggedi_content_cd6f88_idx")],
+                "indexes": [
+                    models.Index(
+                        fields=["content_type", "object_id"], name="tag_taggedi_content_cd6f88_idx"
+                    )
+                ],
             },
         ),
         migrations.CreateModel(
             name="TagTranslation",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
                 ("language_code", models.CharField(db_index=True, max_length=15, verbose_name="Language")),
                 ("label", models.CharField(blank=True, max_length=255, null=True, verbose_name="Label")),
                 (

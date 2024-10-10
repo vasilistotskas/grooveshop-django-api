@@ -89,13 +89,17 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
     @override
     def save(self, *args, **kwargs):
         if self.is_main:
-            UserAddress.objects.filter(user=self.user, is_main=True).exclude(pk=self.id).update(is_main=False)
+            UserAddress.objects.filter(user=self.user, is_main=True).exclude(pk=self.id).update(
+                is_main=False
+            )
         super().save(*args, **kwargs)
 
     @override
     def clean(self):
         if self.is_main:
-            main_count = UserAddress.objects.filter(user=self.user, is_main=True).exclude(pk=self.pk).count()
+            main_count = (
+                UserAddress.objects.filter(user=self.user, is_main=True).exclude(pk=self.pk).count()
+            )
             if main_count > 0:
                 raise ValidationError(_("There can only be one main address per user."))
 

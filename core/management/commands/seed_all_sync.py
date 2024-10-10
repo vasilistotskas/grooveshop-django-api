@@ -63,7 +63,9 @@ class Command(BaseCommand):
 
         for module_path in factory_modules:
             if isinstance(module_path, str):
-                result = self.process_module(module_path, model_counts, count, created_counts, factory_timings)
+                result = self.process_module(
+                    module_path, model_counts, count, created_counts, factory_timings
+                )
                 if result:
                     success_messages.extend(result)
 
@@ -99,12 +101,14 @@ class Command(BaseCommand):
         self.stdout.write(self.style.NOTICE(f"\nProcessing module: {module_path}"))
         try:
             for factory_class in factory_classes:
-                model_name = factory_class._meta.model.__name__
+                model_name = factory_class._meta.model.__name__  # noqa
                 if model_name.endswith("Translation"):
                     continue
                 model_count = model_counts.get(model_name, default_count)
 
-                self.stdout.write(self.style.NOTICE(f"Running factory: {factory_class.__name__} for {model_name}"))
+                self.stdout.write(
+                    self.style.NOTICE(f"Running factory: {factory_class.__name__} for {model_name}")
+                )
 
                 start_time = time.time()
                 self.create_records(factory_class, model_count, created_counts)
@@ -140,7 +144,8 @@ class Command(BaseCommand):
 
             except Exception as e:
                 error_message = (
-                    f"Failed to create {factory_class._meta.model.__name__} instance {i + 1}/{count}: {str(e)}"
+                    f"Failed to create {factory_class._meta.model.__name__} instance "  # noqa
+                    f"{i + 1}/{count}: {str(e)}"
                 )
                 self.stdout.write(self.style.ERROR(error_message))
 
@@ -152,8 +157,9 @@ class Command(BaseCommand):
 
         return count
 
-    def save_related_objects(self, instance: models.Model):
-        for field in instance._meta.get_fields():
+    @staticmethod
+    def save_related_objects(instance: models.Model):
+        for field in instance._meta.get_fields():  # noqa
             if field.is_relation and field.many_to_one:
                 related_instance = getattr(instance, field.name)
                 if related_instance and not related_instance.pk:
@@ -161,7 +167,7 @@ class Command(BaseCommand):
 
     def save_batch(self, instances: list[models.Model], factory_class: type[F]):
         try:
-            factory_class._meta.model.objects.bulk_create(instances, batch_size=BATCH_SIZE)
+            factory_class._meta.model.objects.bulk_create(instances, batch_size=BATCH_SIZE)  # noqa
             self.stdout.write(self.style.NOTICE(f"Saved batch of {len(instances)} records."))
         except IntegrityError:
             for instance in instances:
@@ -214,8 +220,8 @@ class Command(BaseCommand):
         factory_classes = []
         for attr_name in dir(module):
             attr = getattr(module, attr_name)
-            if hasattr(attr, "_meta") and hasattr(attr._meta, "model"):
-                if attr._meta.model is not None and "Factory" in attr.__name__:
+            if hasattr(attr, "_meta") and hasattr(attr._meta, "model"):  # noqa
+                if attr._meta.model is not None and "Factory" in attr.__name__:  # noqa
                     factory_classes.append(cast(type[F], attr))
         return factory_classes
 
@@ -226,12 +232,13 @@ class Command(BaseCommand):
             module = importlib.import_module(module_path)
             factory_classes = self.get_factory_classes(module)
             for factory_class in factory_classes:
-                model_name = factory_class._meta.model.__name__
+                model_name = factory_class._meta.model.__name__  # noqa
                 if not model_name.endswith("Translation"):
                     available_models.append(model_name)
         return available_models
 
-    def get_initial_counts(self) -> dict[str, int]:
+    @staticmethod
+    def get_initial_counts() -> dict[str, int]:
         initial_counts = {}
         for model in apps.get_models():
             model_name = model.__name__

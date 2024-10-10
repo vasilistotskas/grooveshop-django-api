@@ -50,13 +50,17 @@ class ProductReview(TranslatableModel, TimeStampMixinModel, PublishableModel, UU
 
     def __unicode__(self):
         comment_snippet = (
-            (self.safe_translation_getter("comment", any_language=True)[:50] + "...") if self.comment else "No Comment"
+            (self.safe_translation_getter("comment", any_language=True)[:50] + "...")
+            if self.comment
+            else "No Comment"
         )
         return "Review by {0} on {1}: {2}".format(self.user.email, self.product, comment_snippet)
 
     def __str__(self):
         comment_snippet = (
-            (self.safe_translation_getter("comment", any_language=True)[:50] + "...") if self.comment else "No Comment"
+            (self.safe_translation_getter("comment", any_language=True)[:50] + "...")
+            if self.comment
+            else "No Comment"
         )
         return f"Review by {self.user.email} on {self.product}: {comment_snippet}"
 

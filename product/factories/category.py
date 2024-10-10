@@ -58,7 +58,8 @@ class ProductCategoryFactory(CustomDjangoModelFactory):
             return
 
         translations = extracted or [
-            ProductCategoryTranslationFactory(language_code=lang, master=self) for lang in available_languages
+            ProductCategoryTranslationFactory(language_code=lang, master=self)
+            for lang in available_languages
         ]
 
         for translation in translations:

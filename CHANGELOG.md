@@ -3,7 +3,31 @@
 
 
 
+## v0.168.0 (2024-10-10)
+
+### Features
+
+* feat: Bump Versions and lint fixes ([`931ec0f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/931ec0f86d2d4f5ba4caa09a798800a686e27621))
+
+### Fixes
+
+* fix: lint fix ([`5f84aa6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5f84aa6542825d144bb19c84dffdb670e0407e17))
+
+### Unknown
+
+* Merge pull request #1 from vasilistotskas/qodana-automation-402410151
+
+Add qodana CI checks ([`aa3ec82`](https://github.com/vasilistotskas/grooveshop-django-api/commit/aa3ec822a36e28b9f6cea74dea739a6e1c69a340))
+
+* Add github workflow file ([`7576a20`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7576a20e4c88e0fd8d23e1b44b055c1148197be3))
+
+* Add qodana.yaml file ([`5e1a6e6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5e1a6e6b8f744e7c00491ec04e4eee057e9542e8))
+
 ## v0.167.0 (2024-10-08)
+
+### Chores
+
+* chore(release): release version 0.167.0 [skip ci] ([`875187f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/875187f93fb5d85fb969a7b5624dcdc7acb13680))
 
 ### Features
 

@@ -30,7 +30,7 @@ class SliderTranslationFactory(factory.django.DjangoModelFactory):
     language_code = factory.Iterator(available_languages)
     name = factory.Faker("word")
     url = factory.Faker("url")
-    title = factory.Faker("sentence", nb_words=3)
+    title = factory.LazyAttribute(lambda: factory.Faker("sentence")[:40])
     description = factory.Faker("paragraph")
     master = factory.SubFactory("slider.factories.SliderFactory")
 

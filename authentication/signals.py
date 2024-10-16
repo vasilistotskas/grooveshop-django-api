@@ -9,7 +9,7 @@ from core.logging import LogInfo
 
 
 @receiver(user_signed_up)
-def populate_profile(sociallogin=None, user=None, **kwargs): # noqa
+def populate_profile(sociallogin=None, user=None, **kwargs):  # noqa
     if not sociallogin or not user:
         LogInfo.warning("No sociallogin or user passed to populate_profile")
         return

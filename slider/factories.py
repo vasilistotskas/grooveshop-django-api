@@ -13,13 +13,9 @@ available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settin
 
 
 def get_or_create_slider():
-    if apps.get_model("slider", "Slider").objects.exists():
-        return (
-            apps.get_model("slider", "Slider")
-            .objects.annotate(num_slides=Count("slides"))
-            .order_by("num_slides")
-            .first()
-        )
+    SliderModel = apps.get_model("slider", "Slider")  # noqa
+    if SliderModel.objects.exists():
+        return SliderModel.objects.annotate(num_slides=Count("slides")).order_by("num_slides").first()
     else:
         slider_factory_module = importlib.import_module("slider.factories")
         slider_factory_class = getattr(slider_factory_module, "SliderFactory")
@@ -30,7 +26,7 @@ class SliderTranslationFactory(factory.django.DjangoModelFactory):
     language_code = factory.Iterator(available_languages)
     name = factory.Faker("word")
     url = factory.Faker("url")
-    title = factory.LazyAttribute(lambda obj: factory.Faker("sentence")[:40])
+    title = factory.LazyAttribute(lambda obj: obj.faker.sentence()[:40])
     description = factory.Faker("paragraph")
     master = factory.SubFactory("slider.factories.SliderFactory")
 
@@ -84,7 +80,7 @@ class SlideTranslationFactory(factory.django.DjangoModelFactory):
     language_code = factory.Iterator(available_languages)
     name = factory.Faker("word")
     url = factory.Faker("url")
-    title = factory.Faker("sentence", nb_words=3)
+    title = factory.LazyAttribute(lambda obj: obj.faker.sentence()[:40])
     subtitle = factory.Faker("sentence", nb_words=3)
     description = factory.Faker("paragraph")
     button_label = factory.Faker("word")

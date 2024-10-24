@@ -4,7 +4,7 @@ from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 
-from core.helpers.seed import get_or_create_default_image
+from helpers.seed import get_or_create_default_image
 from settings import BASE_DIR
 
 

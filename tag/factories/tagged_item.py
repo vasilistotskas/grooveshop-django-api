@@ -1,28 +1,26 @@
-import importlib
-
 import factory
-from django.apps import apps
 from django.contrib.contenttypes.models import ContentType
 
+from core.helpers.factory import get_or_create_instance
 from tag.models.tagged_item import TaggedItem
 
 
 def get_or_create_product():
-    if apps.get_model("product", "Product").objects.exists():
-        return apps.get_model("product", "Product").objects.order_by("?").first()
-    else:
-        product_factory_module = importlib.import_module("product.factories.product")
-        product_factory_class = getattr(product_factory_module, "ProductFactory")
-        return product_factory_class.create()
+    return get_or_create_instance(
+        app_label="product",
+        model_name="Product",
+        factory_module_path="product.factories.product",
+        factory_class_name="ProductFactory",
+    )
 
 
 def get_or_create_tag():
-    if apps.get_model("tag", "Tag").objects.exists():
-        return apps.get_model("tag", "Tag").objects.order_by("?").first()
-    else:
-        tag_factory_module = importlib.import_module("tag.factories.tag")
-        tag_factory_class = getattr(tag_factory_module, "TagFactory")
-        return tag_factory_class.create()
+    return get_or_create_instance(
+        app_label="tag",
+        model_name="Tag",
+        factory_module_path="tag.factories.tag",
+        factory_class_name="TagFactory",
+    )
 
 
 class TaggedItemFactory(factory.django.DjangoModelFactory):

@@ -12,10 +12,10 @@ from parler.models import TranslatableModel
 from parler.models import TranslatedFields
 
 from core.fields.image import ImageAndSvgField
+from core.helpers.image_resize import make_thumbnail
 from core.models import SortableModel
 from core.models import TimeStampMixinModel
 from core.models import UUIDModel
-from helpers.image_resize import make_thumbnail
 
 
 class ProductImageManager(TranslatableManager):

@@ -4,7 +4,7 @@ from django.core.files import File
 from django.test import TestCase
 from PIL import Image
 
-from helpers.image_resize import make_thumbnail
+from core.helpers.image_resize import make_thumbnail
 
 
 class TestMakeThumbnail(TestCase):

@@ -1,4 +1,26 @@
 import importlib
+from typing import override
+
+from factory import declarations
+from factory.faker import Faker
+
+
+class MaxLengthFaker(declarations.BaseDeclaration):
+    def __init__(self, provider, model_class, field_name, **kwargs):
+        super().__init__(**kwargs)
+        self.provider = provider
+        self.model_class = model_class
+        self.field_name = field_name
+        self.provider_kwargs = kwargs
+
+    @override
+    def evaluate(self, instance, step, extra):
+        faker = Faker._get_faker()  # noqa
+        value = getattr(faker, self.provider)(**self.provider_kwargs)
+        max_length = self.model_class._meta.get_field(self.field_name).max_length  # noqa
+        if max_length:
+            return value[:max_length]
+        return value
 
 
 def generate_unique_country_codes():

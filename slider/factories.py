@@ -13,7 +13,7 @@ available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settin
 
 
 def get_or_create_slider():
-    SliderModel = apps.get_model("slider", "Slider")  # noqa
+    SliderModel = apps.get_model("slider", "Slider")
     if SliderModel.objects.exists():
         return SliderModel.objects.annotate(num_slides=Count("slides")).order_by("num_slides").first()
     else:
@@ -24,11 +24,31 @@ def get_or_create_slider():
 
 class SliderTranslationFactory(factory.django.DjangoModelFactory):
     language_code = factory.Iterator(available_languages)
-    name = factory.Faker("word")
-    url = factory.Faker("url")
-    title = factory.LazyAttribute(lambda obj: obj.faker.sentence()[:40])
-    description = factory.Faker("paragraph")
     master = factory.SubFactory("slider.factories.SliderFactory")
+
+    name = factory.LazyAttribute(
+        lambda _: factory.Faker._get_faker().word()[
+            : apps.get_model("slider", "SliderTranslation")._meta.get_field("name").max_length
+        ]
+    )
+
+    url = factory.LazyAttribute(
+        lambda _: factory.Faker._get_faker().url()[
+            : apps.get_model("slider", "SliderTranslation")._meta.get_field("url").max_length
+        ]
+    )
+
+    title = factory.LazyAttribute(
+        lambda _: factory.Faker._get_faker().sentence(nb_words=3)[
+            : apps.get_model("slider", "SliderTranslation")._meta.get_field("title").max_length
+        ]
+    )
+
+    description = factory.LazyAttribute(
+        lambda _: factory.Faker._get_faker().paragraph()[
+            : apps.get_model("slider", "SliderTranslation")._meta.get_field("description").max_length
+        ]
+    )
 
     class Meta:
         model = apps.get_model("slider", "SliderTranslation")
@@ -78,13 +98,43 @@ class SliderFactory(factory.django.DjangoModelFactory):
 
 class SlideTranslationFactory(factory.django.DjangoModelFactory):
     language_code = factory.Iterator(available_languages)
-    name = factory.Faker("word")
-    url = factory.Faker("url")
-    title = factory.LazyAttribute(lambda obj: obj.faker.sentence()[:40])
-    subtitle = factory.Faker("sentence", nb_words=3)
-    description = factory.Faker("paragraph")
-    button_label = factory.Faker("word")
     master = factory.SubFactory("slider.factories.SlideFactory")
+
+    name = factory.LazyAttribute(
+        lambda _: factory.Faker._get_faker().word()[
+            : apps.get_model("slider", "SlideTranslation")._meta.get_field("name").max_length
+        ]
+    )
+
+    url = factory.LazyAttribute(
+        lambda _: factory.Faker._get_faker().url()[
+            : apps.get_model("slider", "SlideTranslation")._meta.get_field("url").max_length
+        ]
+    )
+
+    title = factory.LazyAttribute(
+        lambda _: factory.Faker._get_faker().sentence(nb_words=3)[
+            : apps.get_model("slider", "SlideTranslation")._meta.get_field("title").max_length
+        ]
+    )
+
+    subtitle = factory.LazyAttribute(
+        lambda _: factory.Faker._get_faker().sentence(nb_words=3)[
+            : apps.get_model("slider", "SlideTranslation")._meta.get_field("subtitle").max_length
+        ]
+    )
+
+    description = factory.LazyAttribute(
+        lambda _: factory.Faker._get_faker().paragraph()[
+            : apps.get_model("slider", "SlideTranslation")._meta.get_field("description").max_length
+        ]
+    )
+
+    button_label = factory.LazyAttribute(
+        lambda _: factory.Faker._get_faker().word()[
+            : apps.get_model("slider", "SlideTranslation")._meta.get_field("button_label").max_length
+        ]
+    )
 
     class Meta:
         model = apps.get_model("slider", "SlideTranslation")

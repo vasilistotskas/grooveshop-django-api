@@ -59,7 +59,3 @@ class UserAccountModelTest(TestCase):
         self.assertTrue(user.is_active)
         self.assertTrue(user.is_staff)
         self.assertTrue(user.is_superuser)
-
-    def tearDown(self) -> None:
-        User.objects.all().delete()
-        super().tearDown()

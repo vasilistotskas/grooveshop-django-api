@@ -39,7 +39,3 @@ class SliderModelTestCase(TestCase):
     def test_main_image_path(self):
         expected_filename = f"media/uploads/sliders/{os.path.basename(self.slider.image.name)}"
         self.assertEqual(self.slider.main_image_path, expected_filename)
-
-    def tearDown(self) -> None:
-        Slider.objects.all().delete()
-        super().tearDown()

@@ -74,10 +74,3 @@ class BlogPostModelTestCase(TestCase):
 
     def test_tags_count(self):
         self.assertEqual(self.post.tags_count, 0)
-
-    def tearDown(self) -> None:
-        BlogPost.objects.all().delete()
-        BlogCategory.objects.all().delete()
-        BlogAuthor.objects.all().delete()
-        User.objects.all().delete()
-        super().tearDown()

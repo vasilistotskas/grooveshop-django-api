@@ -41,7 +41,3 @@ class CountryModelTestCase(TestCase):
     def test_main_image_path(self):
         expected_filename = f"media/uploads/country/{os.path.basename(self.country.image_flag.name)}"
         self.assertEqual(self.country.main_image_path, expected_filename)
-
-    def tearDown(self) -> None:
-        Country.objects.all().delete()
-        super().tearDown()

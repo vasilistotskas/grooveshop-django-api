@@ -59,8 +59,3 @@ class ProductImageModelTestCase(TestCase):
     def test_main_image_path(self):
         expected_filename = f"media/uploads/products/{os.path.basename(self.product_image.image.name)}"
         self.assertEqual(self.product_image.main_image_path, expected_filename)
-
-    def tearDown(self) -> None:
-        Product.objects.all().delete()
-        ProductImage.objects.all().delete()
-        super().tearDown()

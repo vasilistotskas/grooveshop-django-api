@@ -186,10 +186,3 @@ class CartServiceTest(TestCase):
             [item.product for item in self.cart.items.all()],
             [self.product, pre_login_product],
         )
-
-    def tearDown(self):
-        CartItem.objects.all().delete()
-        Cart.objects.all().delete()
-        Product.objects.all().delete()
-        User.objects.all().delete()
-        super().tearDown()

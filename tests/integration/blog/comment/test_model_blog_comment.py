@@ -48,10 +48,3 @@ class BlogCommentModelTestCase(TestCase):
         self.comment.likes.add(other_user)
 
         self.assertEqual(self.comment.likes_count, 1)
-
-    def tearDown(self) -> None:
-        BlogComment.objects.all().delete()
-        BlogPost.objects.all().delete()
-        BlogAuthor.objects.all().delete()
-        User.objects.all().delete()
-        super().tearDown()

@@ -7,9 +7,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from country.factories import CountryFactory
-from country.models import Country
 from region.factories import RegionFactory
-from region.models import Region
 from user.factories.account import UserAccountFactory
 from user.factories.address import UserAddressFactory
 from user.models.address import UserAddress
@@ -182,10 +180,3 @@ class UserAddressViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-    def tearDown(self) -> None:
-        UserAddress.objects.all().delete()
-        User.objects.all().delete()
-        Region.objects.all().delete()
-        Country.objects.all().delete()
-        super().tearDown()

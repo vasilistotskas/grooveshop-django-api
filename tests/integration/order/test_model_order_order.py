@@ -82,8 +82,3 @@ class OrderModelTestCase(TestCase):
 
     def test_str_representation(self):
         self.assertEqual(str(self.order), f"Order {self.order.id} - John Doe")
-
-    def tearDown(self) -> None:
-        Order.objects.all().delete()
-        Product.objects.all().delete()
-        super().tearDown()

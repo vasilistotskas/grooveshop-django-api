@@ -46,7 +46,3 @@ class TipModelTestCase(TestCase):
     def test_main_image_path(self):
         expected_filename = f"media/uploads/tip/{os.path.basename(self.tip.icon.name)}"
         self.assertEqual(self.tip.main_image_path, expected_filename)
-
-    def tearDown(self) -> None:
-        Tip.objects.all().delete()
-        super().tearDown()

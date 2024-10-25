@@ -30,8 +30,3 @@ class BlogAuthorModelTestCase(TestCase):
     def test_str_representation(self):
         author_name = self.user.full_name
         self.assertEqual(str(self.author), f"{author_name} ({self.user.email})")
-
-    def tearDown(self) -> None:
-        BlogAuthor.objects.all().delete()
-        User.objects.all().delete()
-        super().tearDown()

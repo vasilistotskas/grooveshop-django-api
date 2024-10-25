@@ -53,7 +53,3 @@ class PayWayModelTestCase(TestCase):
     def test_icon_filename(self):
         icon_filename = self.pay_way.icon_filename
         self.assertEqual(icon_filename, os.path.basename(self.pay_way.icon.name))
-
-    def tearDown(self) -> None:
-        PayWay.objects.all().delete()
-        super().tearDown()

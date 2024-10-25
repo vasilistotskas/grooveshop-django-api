@@ -84,8 +84,3 @@ class UserAddressModelTestCase(TestCase):
         count = UserAddress.get_user_address_count(self.user)
 
         self.assertEqual(count, 3)
-
-    def tearDown(self) -> None:
-        UserAddress.objects.all().delete()
-        User.objects.all().delete()
-        super().tearDown()

@@ -30,9 +30,3 @@ class OrderItemModelTestCase(TestCase):
         self.assertEqual(self.order_item.product, self.product)
         self.assertEqual(self.order_item.price, Money("20.00", settings.DEFAULT_CURRENCY))
         self.assertEqual(self.order_item.quantity, 3)
-
-    def tearDown(self) -> None:
-        OrderItem.objects.all().delete()
-        Order.objects.all().delete()
-        Product.objects.all().delete()
-        super().tearDown()

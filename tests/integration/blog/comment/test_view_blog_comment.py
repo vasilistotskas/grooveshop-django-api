@@ -197,10 +197,3 @@ class BlogCommentViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-    def tearDown(self) -> None:
-        BlogComment.objects.all().delete()
-        BlogPost.objects.all().delete()
-        BlogAuthor.objects.all().delete()
-        User.objects.all().delete()
-        super().tearDown()

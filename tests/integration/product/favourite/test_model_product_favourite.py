@@ -26,8 +26,3 @@ class ProductFavouriteModelTestCase(TestCase):
     def test_str_representation(self):
         favourite = ProductFavouriteFactory(user=self.user, product=self.product)
         self.assertEqual(str(favourite), f"{self.user.email} - {self.product.name}")
-
-    def tearDown(self) -> None:
-        Product.objects.all().delete()
-        User.objects.all().delete()
-        super().tearDown()

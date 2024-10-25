@@ -279,13 +279,3 @@ class ProductViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-    def tearDown(self) -> None:
-        Product.objects.all().delete()
-        ProductCategory.objects.all().delete()
-        ProductImage.objects.all().delete()
-        ProductReview.objects.all().delete()
-        ProductFavourite.objects.all().delete()
-        Vat.objects.all().delete()
-        User.objects.all().delete()
-        super().tearDown()

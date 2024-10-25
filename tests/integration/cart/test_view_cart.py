@@ -51,8 +51,3 @@ class CartViewSetTest(APITestCase):
         response = self.client.delete(self.detail_url)
         self.assertFalse(Cart.objects.filter(pk=self.cart.pk).exists())
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-
-    def tearDown(self) -> None:
-        Cart.objects.all().delete()
-        User.objects.all().delete()
-        super().tearDown()

@@ -43,7 +43,3 @@ class CursorPaginatorTest(TestCase):
         self.assertIn("page_total_results", response.data)
         self.assertIn("results", response.data)
         self.assertEqual(response.data["page_total_results"], len(data))
-
-    def tearDown(self) -> None:
-        Product.objects.all().delete()
-        super().tearDown()

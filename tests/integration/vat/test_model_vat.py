@@ -21,7 +21,3 @@ class VatModelTestCase(TestCase):
         VatFactory(value=20.0)
         VatFactory(value=30.0)
         self.assertEqual(Vat.get_highest_vat_value(), 30.0)
-
-    def tearDown(self) -> None:
-        Vat.objects.all().delete()
-        super().tearDown()

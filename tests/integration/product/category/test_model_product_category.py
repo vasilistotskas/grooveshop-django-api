@@ -109,9 +109,3 @@ class CategoryModelTestCase(TestCase):
     def category_menu_main_banner_path(self):
         expected_path = f"media/uploads/categories/{os.path.basename(self.category.menu_main_banner.name)}"
         self.assertEqual(self.category.category_menu_main_banner_path, expected_path)
-
-    def tearDown(self) -> None:
-        ProductCategory.objects.all().delete()
-        User.objects.all().delete()
-        Vat.objects.all().delete()
-        super().tearDown()

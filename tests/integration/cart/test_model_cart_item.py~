@@ -69,3 +69,9 @@ class CartItemModelTestCase(TestCase):
         product_2 = ProductFactory(num_images=0, num_reviews=0)
         cart_item_2 = CartItemFactory(cart=self.cart, product=product_2, quantity=3)
         self.assertLess(self.cart_item.id, cart_item_2.id)
+
+    def tearDown(self) -> None:
+        CartItem.objects.all().delete()
+        Cart.objects.all().delete()
+        Product.objects.all().delete()
+        super().tearDown()

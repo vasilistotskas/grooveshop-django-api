@@ -8,7 +8,6 @@ from blog.factories.author import BlogAuthorFactory
 from blog.factories.category import BlogCategoryFactory
 from blog.factories.post import BlogPostFactory
 from blog.factories.tag import BlogTagFactory
-from blog.models import BlogTag
 from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
 from blog.models.post import BlogPost
@@ -84,10 +83,10 @@ class BlogPostViewSetTestCase(APITestCase):
     def test_list(self):
         url = self.get_post_list_url()
         response = self.client.get(url)
-        serializer = BlogPostSerializer(BlogPost.objects.all(), many=True)
-
-        self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        serializer = BlogPostSerializer(BlogPost.objects.all()[: response.data["count"]], many=True)
+        self.assertEqual(response.data["results"], serializer.data)
 
     def test_create_valid(self):
         payload = {
@@ -295,11 +294,3 @@ class BlogPostViewSetTestCase(APITestCase):
             serializer = BlogPostSerializer(BlogPost.objects.get(id=first_related_post["id"]))
             expected_data = serializer.data
             self.assertEqual(first_related_post, expected_data)
-
-    def tearDown(self) -> None:
-        BlogPost.objects.all().delete()
-        BlogCategory.objects.all().delete()
-        BlogAuthor.objects.all().delete()
-        User.objects.all().delete()
-        BlogTag.objects.all().delete()
-        super().tearDown()

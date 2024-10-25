@@ -63,10 +63,3 @@ class CartItemViewSetTest(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(CartItem.objects.count(), 0)
-
-    def tearDown(self) -> None:
-        CartItem.objects.all().delete()
-        Cart.objects.all().delete()
-        Product.objects.all().delete()
-        User.objects.all().delete()
-        super().tearDown()

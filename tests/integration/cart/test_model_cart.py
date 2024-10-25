@@ -71,10 +71,3 @@ class CartModelTestCase(TestCase):
         last_activity_before_refresh = self.cart.last_activity
         self.cart.refresh_last_activity()
         self.assertNotEqual(self.cart.last_activity, last_activity_before_refresh)
-
-    def tearDown(self) -> None:
-        CartItem.objects.all().delete()
-        Cart.objects.all().delete()
-        Product.objects.all().delete()
-        User.objects.all().delete()
-        super().tearDown()

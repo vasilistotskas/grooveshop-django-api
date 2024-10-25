@@ -39,3 +39,7 @@ class BlogCategoryModelTestCase(TestCase):
     def test_main_image_path(self):
         expected_filename = f"media/uploads/blog/{os.path.basename(self.category.image.name)}"
         self.assertEqual(self.category.main_image_path, expected_filename)
+
+    def tearDown(self) -> None:
+        BlogCategory.objects.all().delete()
+        super().tearDown()

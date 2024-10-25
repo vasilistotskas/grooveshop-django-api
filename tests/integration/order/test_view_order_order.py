@@ -15,7 +15,6 @@ from order.serializers.order import OrderSerializer
 from pay_way.factories import PayWayFactory
 from pay_way.models import PayWay
 from product.factories.product import ProductFactory
-from product.models.product import Product
 from region.factories import RegionFactory
 from region.models import Region
 from user.enum.address import FloorChoicesEnum
@@ -283,13 +282,3 @@ class OrderViewSetTestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertTrue(Order.objects.filter(id=self.order.id).exists())
-
-    def tearDown(self) -> None:
-        OrderItem.objects.all().delete()
-        Order.objects.all().delete()
-        PayWay.objects.all().delete()
-        Product.objects.all().delete()
-        User.objects.all().delete()
-        Country.objects.all().delete()
-        Region.objects.all().delete()
-        super().tearDown()

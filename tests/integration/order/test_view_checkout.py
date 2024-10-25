@@ -115,12 +115,3 @@ class CheckoutViewAPITest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(Product.objects.get(pk=product_3.id).stock, 10)
         self.assertEqual(Product.objects.get(pk=product_4.id).stock, 15)
-
-    def tearDown(self) -> None:
-        Order.objects.all().delete()
-        PayWay.objects.all().delete()
-        Product.objects.all().delete()
-        User.objects.all().delete()
-        Country.objects.all().delete()
-        Region.objects.all().delete()
-        super().tearDown()

@@ -69,9 +69,3 @@ class TestBaseExpandSerializer(TestCase):
         self.assertIn("product", data)
         self.assertEqual(data["user"], self.user.id)
         self.assertEqual(data["product"], self.product.id)
-
-    def tearDown(self) -> None:
-        User.objects.all().delete()
-        Product.objects.all().delete()
-        ProductFavourite.objects.all().delete()
-        super().tearDown()

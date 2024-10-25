@@ -138,9 +138,3 @@ class ProductFavouriteViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-    def tearDown(self) -> None:
-        Product.objects.all().delete()
-        ProductFavourite.objects.all().delete()
-        User.objects.all().delete()
-        super().tearDown()

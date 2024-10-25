@@ -175,3 +175,13 @@ class ProductModelTestCase(TestCase):
     def test_absolute_url_property(self):
         expected_absolute_url = f"/products/{self.product.id}/{self.product.slug}"
         self.assertEqual(self.product.absolute_url, expected_absolute_url)
+
+    def tearDown(self) -> None:
+        Product.objects.all().delete()
+        User.objects.all().delete()
+        ProductCategory.objects.all().delete()
+        Vat.objects.all().delete()
+        ProductImage.objects.all().delete()
+        ProductReview.objects.all().delete()
+        ProductFavourite.objects.all().delete()
+        super().tearDown()

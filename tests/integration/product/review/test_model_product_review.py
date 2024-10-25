@@ -55,9 +55,3 @@ class ProductReviewModelTestCase(TestCase):
             self.product_review.__unicode__(),
             f"Review by {self.user.email} on {self.product}: {comment_snippet}",
         )
-
-    def tearDown(self) -> None:
-        Product.objects.all().delete()
-        ProductReview.objects.all().delete()
-        User.objects.all().delete()
-        super().tearDown()

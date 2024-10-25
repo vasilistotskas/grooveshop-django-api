@@ -7,6 +7,8 @@ from rest_framework.test import APITestCase
 from blog.factories.author import BlogAuthorFactory
 from blog.factories.category import BlogCategoryFactory
 from blog.factories.post import BlogPostFactory
+from blog.factories.tag import BlogTagFactory
+from blog.models import BlogTag
 from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
 from blog.models.post import BlogPost
@@ -23,20 +25,53 @@ class BlogPostViewSetTestCase(APITestCase):
     user: User = None
     author: BlogAuthor = None
     category: BlogCategory = None
+    other_category: BlogCategory = None
+    tag1 = None
+    tag2 = None
+    tag3 = None
+    default_related_posts = []
+    tag_based_related_posts = []
 
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
         self.author = BlogAuthorFactory(user=self.user)
         self.category = BlogCategoryFactory(slug="sample-category")
+        self.other_category = BlogCategoryFactory(slug="other-category")
+
+        self.tag1 = BlogTagFactory(name="Django")
+        self.tag2 = BlogTagFactory(name="Python")
+        self.tag3 = BlogTagFactory(name="REST")
 
         self.post = BlogPostFactory(
             author=self.author,
-            category=None,
+            category=self.category,
+            num_tags=2,
+            num_comments=0,
+        )
+        self.post.tags.set([self.tag1, self.tag2])
+        self.post.likes.set([])
+
+        self.default_related_posts = BlogPostFactory.create_batch(
+            5,
+            author=self.author,
+            category=self.category,
             num_tags=0,
             num_comments=0,
         )
-        self.post.likes.set([])
-        self.post.tags.set([])
+
+        self.tag_based_related_posts = BlogPostFactory.create_batch(
+            3,
+            author=self.author,
+            category=self.other_category,
+            num_tags=1,
+            num_comments=0,
+        )
+        for i, post in enumerate(self.tag_based_related_posts):
+            if i % 2 == 0:
+                post.tags.set([self.tag1])
+            else:
+                post.tags.set([self.tag2])
+            post.likes.set([])
 
     @staticmethod
     def get_post_detail_url(pk):
@@ -201,9 +236,70 @@ class BlogPostViewSetTestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+    def test_related_posts_default_strategy_fills_limit(self):
+        additional_default_posts = BlogPostFactory.create_batch(
+            3,
+            author=self.author,
+            category=self.category,
+            num_tags=0,
+            num_comments=0,
+        )
+        for post in additional_default_posts:
+            post.tags.set([])
+            post.likes.set([])
+
+        url = reverse("blog-post-related_posts", args=[self.post.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 8)
+
+        for related_post in response.data:
+            self.assertEqual(related_post["category"], self.category.id)
+            self.assertNotEqual(related_post["id"], self.post.id)
+
+    def test_related_posts_default_strategy_partial_and_fallback_strategy_fills_limit(self):
+        for post in self.default_related_posts[:1]:
+            post.delete()
+
+        url = reverse("blog-post-related_posts", args=[self.post.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 7)
+
+        default_ids = set(p.id for p in self.default_related_posts[1:])
+        tag_based_ids = set(p.id for p in self.tag_based_related_posts)
+        related_ids = set(p["id"] for p in response.data)
+
+        self.assertTrue(default_ids.intersection(related_ids))
+        self.assertTrue(tag_based_ids.intersection(related_ids))
+
+    def test_related_posts_when_no_related_posts_exist(self):
+        BlogPost.objects.exclude(id=self.post.id).delete()
+
+        url = reverse("blog-post-related_posts", args=[self.post.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 0)
+
+    def test_related_posts_response_structure(self):
+        url = reverse("blog-post-related_posts", args=[self.post.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        if response.data:
+            first_related_post = response.data[0]
+            serializer = BlogPostSerializer(BlogPost.objects.get(id=first_related_post["id"]))
+            expected_data = serializer.data
+            self.assertEqual(first_related_post, expected_data)
+
     def tearDown(self) -> None:
         BlogPost.objects.all().delete()
         BlogCategory.objects.all().delete()
         BlogAuthor.objects.all().delete()
         User.objects.all().delete()
+        BlogTag.objects.all().delete()
         super().tearDown()

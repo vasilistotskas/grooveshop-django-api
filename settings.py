@@ -883,6 +883,20 @@ TINYMCE_COMPRESSOR = False
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880
 
+# Related Posts Strategies Configuration
+RELATED_POSTS_STRATEGIES = [
+    {
+        "strategy": "blog.strategies.default_related_posts_strategy.DefaultRelatedPostsStrategy",
+        "weight": 0.6,
+    },
+    {
+        "strategy": "blog.strategies.tag_based_related_posts_strategy.TagBasedRelatedPostsStrategy",
+        "weight": 0.4,
+    },
+]
+RELATED_POSTS_LIMIT = 8
+
+# Logging
 timestamp = datetime.now().strftime("%d-%m-%Y")
 log_dir = path.join(BASE_DIR, "logs")
 makedirs(log_dir, exist_ok=True)

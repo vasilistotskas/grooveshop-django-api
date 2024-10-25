@@ -46,6 +46,11 @@ urlpatterns = [
         name="blog-post-comments",
     ),
     path(
+        "blog/post/<int:pk>/related_posts",
+        BlogPostViewSet.as_view({"get": "related_posts"}),
+        name="blog-post-related_posts",
+    ),
+    path(
         "blog/category",
         BlogCategoryViewSet.as_view({"get": "list", "post": "create"}),
         name="blog-category-list",

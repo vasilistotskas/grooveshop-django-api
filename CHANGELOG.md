@@ -3,6 +3,16 @@
 
 
 
+## v0.171.0 (2024-10-25)
+
+### Bug fixes
+
+* fix: remove useless test `tearDown` ([`60a4531`](https://github.com/vasilistotskas/grooveshop-django-api/commit/60a4531feeb84bb29d5ffed460672c91917d5e1a))
+
+### Features
+
+* feat: related blog posts ([`578ae0d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/578ae0dac6d869afbde83fb930c0138e9939ab88))
+
 ## v0.170.0 (2024-10-24)
 
 ### Bug fixes
@@ -12,6 +22,10 @@
 * fix: Slider factory title max length ([`f2214ff`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f2214ff8d0c30d1fd8333ba754702636e53ffb13))
 
 * fix: Slider factory title max length ([`66f9471`](https://github.com/vasilistotskas/grooveshop-django-api/commit/66f9471dd7c57fb28d03dd5c4f3aa0ead5ef7638))
+
+### Chores
+
+* chore(release): release version 0.170.0 [skip ci] ([`c43ff7a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c43ff7ada8cd107e7853531dee3baa35a26dac41))
 
 ### Features
 

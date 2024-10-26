@@ -3,11 +3,23 @@
 
 
 
+## v0.171.1 (2024-10-26)
+
+### Bug fixes
+
+* fix: revert setting ([`fa6b715`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fa6b715b7fdd34877557c4b16a61aae0e10db8dd))
+
+* fix: use TranslationsForeignKey in Translation models ([`bbe0b75`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bbe0b75f068ab63e4c9177b9024b9c7677e8e77c))
+
 ## v0.171.0 (2024-10-25)
 
 ### Bug fixes
 
 * fix: remove useless test `tearDown` ([`60a4531`](https://github.com/vasilistotskas/grooveshop-django-api/commit/60a4531feeb84bb29d5ffed460672c91917d5e1a))
+
+### Chores
+
+* chore(release): release version 0.171.0 [skip ci] ([`a26587b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a26587b0eb5d0feff1e66c7ce152b09d8f18f638))
 
 ### Features
 

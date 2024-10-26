@@ -21,6 +21,7 @@ from djmoney.models.fields import MoneyField
 from djmoney.money import Money
 from measurement.measures import Weight
 from mptt.fields import TreeForeignKey
+from parler.fields import TranslationsForeignKey
 from parler.managers import TranslatableManager
 from parler.managers import TranslatableQuerySet
 from parler.models import TranslatableModel
@@ -287,7 +288,9 @@ class Product(
 
 
 class ProductTranslation(TranslatedFieldsModel, IndexMixin):
-    master = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="translations", null=True)
+    master = TranslationsForeignKey(
+        "product.Product", on_delete=models.CASCADE, related_name="translations", null=True
+    )
     name = models.CharField(_("Name"), max_length=255, blank=True, null=True)
     description = HTMLField(_("Description"), blank=True, null=True)
 

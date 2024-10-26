@@ -5,6 +5,7 @@ from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
+from parler.fields import TranslationsForeignKey
 from parler.models import TranslatableModel
 from parler.models import TranslatedFieldsModel
 from tinymce.models import HTMLField
@@ -108,7 +109,9 @@ class BlogPost(
 
 
 class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
-    master = models.ForeignKey(BlogPost, on_delete=models.CASCADE, related_name="translations", null=True)
+    master = TranslationsForeignKey(
+        "blog.BlogPost", on_delete=models.CASCADE, related_name="translations", null=True
+    )
     title = models.CharField(_("Title"), max_length=255, blank=True, null=True)
     subtitle = models.CharField(_("Subtitle"), max_length=255, blank=True, null=True)
     body = HTMLField(_("Body"), blank=True, null=True)

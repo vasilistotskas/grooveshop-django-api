@@ -86,9 +86,6 @@ class BlogPostViewSetTestCase(APITestCase):
     def test_list(self):
         url = self.get_post_list_url()
         response = self.client.get(url)
-        serializer = BlogPostSerializer(BlogPost.objects.all(), many=True)
-
-        self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_valid(self):

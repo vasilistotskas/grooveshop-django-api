@@ -3,6 +3,16 @@
 
 
 
+## v0.172.0 (2024-10-26)
+
+### Bug fixes
+
+* fix: remove useless test ([`0d7e6a4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0d7e6a45369ae24b0d6f7c0494a7279a884b23fe))
+
+### Features
+
+* feat: remove `unicode` and improve related blog posts ([`00b34e7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/00b34e7aec4c2894502acb62f34e257a4ca61d82))
+
 ## v0.171.1 (2024-10-26)
 
 ### Bug fixes
@@ -10,6 +20,10 @@
 * fix: revert setting ([`fa6b715`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fa6b715b7fdd34877557c4b16a61aae0e10db8dd))
 
 * fix: use TranslationsForeignKey in Translation models ([`bbe0b75`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bbe0b75f068ab63e4c9177b9024b9c7677e8e77c))
+
+### Chores
+
+* chore(release): release version 0.171.1 [skip ci] ([`054f1aa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/054f1aa234cdd89983f36195a6757c4852fb2b7b))
 
 ## v0.171.0 (2024-10-25)
 

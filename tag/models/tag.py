@@ -43,10 +43,6 @@ class Tag(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
             BTreeIndex(fields=["active"]),
         ]
 
-    def __unicode__(self):
-        tag_label = self.safe_translation_getter("label", any_language=True) or "Unnamed Label"
-        return f"{tag_label} ({'Active' if self.active else 'Inactive'})"
-
     def __str__(self):
         tag_label = self.safe_translation_getter("label", any_language=True) or "Unnamed Label"
         return f"{tag_label} ({'Active' if self.active else 'Inactive'})"

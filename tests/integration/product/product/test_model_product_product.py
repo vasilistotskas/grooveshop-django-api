@@ -119,12 +119,6 @@ class ProductModelTestCase(TestCase):
         self.assertEqual(self.product.view_count, 10)
         self.assertEqual(self.product.weight, Decimal("5.00"))
 
-    def test_unicode_representation(self):
-        self.assertEqual(
-            self.product.__unicode__(),
-            self.product.safe_translation_getter("name"),
-        )
-
     def test_str_representation(self):
         self.assertEqual(str(self.product), self.product.safe_translation_getter("name"))
 

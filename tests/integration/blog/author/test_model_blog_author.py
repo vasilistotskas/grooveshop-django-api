@@ -23,10 +23,6 @@ class BlogAuthorModelTestCase(TestCase):
         self.assertEqual(self.author.user, self.user)
         self.assertEqual(self.author.website, "http://example.com")
 
-    def test_unicode_representation(self):
-        author_name = self.user.full_name
-        self.assertEqual(self.author.__unicode__(), f"{author_name} ({self.user.email})")
-
     def test_str_representation(self):
         author_name = self.user.full_name
         self.assertEqual(str(self.author), f"{author_name} ({self.user.email})")

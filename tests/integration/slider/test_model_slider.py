@@ -20,12 +20,6 @@ class SliderModelTestCase(TestCase):
     def test_fields(self):
         self.assertTrue(default_storage.exists(self.slider.image.path))
 
-    def test_unicode_representation(self):
-        self.assertEqual(
-            self.slider.__unicode__(),
-            self.slider.safe_translation_getter("name"),
-        )
-
     def test_str_representation(self):
         self.assertEqual(
             str(self.slider),

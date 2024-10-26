@@ -29,15 +29,6 @@ class ProductImageModelTestCase(TestCase):
         self.assertTrue(self.product_image.is_main)
         self.assertTrue(default_storage.exists(self.product_image.image.path))
 
-    def test_unicode_representation(self):
-        product_name = self.product.safe_translation_getter("name", any_language=True)
-        main_status = "Main" if self.product_image.is_main else "Secondary"
-
-        self.assertEqual(
-            self.product_image.__unicode__(),
-            f"{product_name} Image ({main_status})",
-        )
-
     def test_str_representation(self):
         product_name = self.product.safe_translation_getter("name", any_language=True)
         main_status = "Main" if self.product_image.is_main else "Secondary"

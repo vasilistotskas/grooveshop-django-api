@@ -53,9 +53,6 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
             BTreeIndex(fields=["active"]),
         ]
 
-    def __unicode__(self):
-        return self.safe_translation_getter("name", any_language=True) or ""
-
     def __str__(self):
         return self.safe_translation_getter("name", any_language=True) or ""
 

@@ -25,11 +25,6 @@ class Region(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
             *SortableModel.Meta.indexes,
         ]
 
-    def __unicode__(self):
-        country_name = self.country.safe_translation_getter("name", any_language=True)
-        region_name = self.safe_translation_getter("name", any_language=True)
-        return f"{region_name}, {country_name}"
-
     def __str__(self):
         country_name = self.country.safe_translation_getter("name", any_language=True)
         region_name = self.safe_translation_getter("name", any_language=True)

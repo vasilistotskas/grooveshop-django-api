@@ -84,10 +84,6 @@ class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel, MPTTModel):
     class MPTTMeta:
         order_insertion_by = ["-created_at"]
 
-    def __unicode__(self):
-        content_snippet = self.safe_translation_getter("content", any_language=True)[:50] + "..."
-        return f"Comment by {self.user.full_name}: {content_snippet}"
-
     def __str__(self):
         translation_content = self.safe_translation_getter("content", any_language=True) or "No content"
         content = f"{translation_content[:50]}..." if len(translation_content) > 50 else translation_content

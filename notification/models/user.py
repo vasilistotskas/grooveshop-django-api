@@ -26,10 +26,6 @@ class NotificationUser(TimeStampMixinModel, UUIDModel):
     seen = models.BooleanField(_("Seen"), default=False)
     seen_at = models.DateTimeField(_("Seen At"), null=True, blank=True)
 
-    def __unicode__(self):
-        status = "seen" if self.seen else "unseen"
-        return f"Notification {self.notification.id} for {self.user.full_name}: {status}"
-
     def __str__(self):
         status = "seen" if self.seen else "unseen"
         return f"Notification {self.notification.id} for {self.user.full_name}: {status}"

@@ -31,12 +31,6 @@ class PayWayModelTestCase(TestCase):
         )
         self.assertTrue(default_storage.exists(self.pay_way.icon.path))
 
-    def test_unicode_representation(self):
-        self.assertEqual(
-            self.pay_way.__unicode__(),
-            self.pay_way.safe_translation_getter("name"),
-        )
-
     def test_str_representation(self):
         self.assertEqual(str(self.pay_way), self.pay_way.safe_translation_getter("name"))
 

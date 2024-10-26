@@ -36,9 +36,6 @@ class Cart(TimeStampMixinModel, UUIDModel):
             BTreeIndex(fields=["user"]),
         ]
 
-    def __unicode__(self):
-        return f"Cart {self.user} - Items: {self.total_items} - Total: {self.total_price}"
-
     def __str__(self):
         return f"Cart {self.user} - Items: {self.total_items} - Total: {self.total_price}"
 
@@ -88,10 +85,6 @@ class CartItem(TimeStampMixinModel, UUIDModel):
             *TimeStampMixinModel.Meta.indexes,
             BTreeIndex(fields=["cart", "product"]),
         ]
-
-    def __unicode__(self):
-        product_name = self.product.safe_translation_getter("name", any_language=True)
-        return f"CartItem {self.id} in Cart {self.cart.id}: {product_name} x {self.quantity}"
 
     def __str__(self):
         product_name = self.product.safe_translation_getter("name", any_language=True)

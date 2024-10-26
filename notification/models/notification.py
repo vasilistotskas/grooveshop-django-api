@@ -34,10 +34,6 @@ class Notification(TranslatableModel, TimeStampMixinModel, UUIDModel):
         message=models.TextField(_("Message")),
     )
 
-    def __unicode__(self):
-        message_snippet = self.safe_translation_getter("title", any_language=True)[:50] + "..."
-        return f"{self.get_kind_display()}: {message_snippet}"
-
     def __str__(self):
         message_snippet = self.safe_translation_getter("title", any_language=True)[:50] + "..."
         return f"{self.get_kind_display()}: {message_snippet}"

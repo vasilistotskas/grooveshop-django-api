@@ -38,14 +38,6 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
             *SortableModel.Meta.indexes,
         ]
 
-    def __unicode__(self):
-        product_name = self.product.safe_translation_getter("name", any_language=True)
-        return "Order %s - %s x %s" % (
-            self.order.id,
-            product_name,
-            self.quantity,
-        )
-
     def __str__(self):
         product_name = self.product.safe_translation_getter("name", any_language=True)
         return f"Order {self.order.id} - {product_name} x {self.quantity}"

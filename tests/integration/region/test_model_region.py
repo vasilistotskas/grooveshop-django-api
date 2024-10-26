@@ -25,11 +25,6 @@ class RegionModelTestCase(TestCase):
         self.assertEqual(self.region.alpha, "GRC")
         self.assertEqual(self.region.country, self.country)
 
-    def test_unicode_representation(self):
-        country_name = self.country.safe_translation_getter("name", any_language=True)
-        region_name = self.region.safe_translation_getter("name", any_language=True)
-        self.assertEqual(self.region.__unicode__(), f"{region_name}, {country_name}")
-
     def test_str_representation(self):
         country_name = self.country.safe_translation_getter("name", any_language=True)
         region_name = self.region.safe_translation_getter("name", any_language=True)

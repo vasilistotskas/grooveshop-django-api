@@ -64,12 +64,9 @@ class BlogPost(
             BTreeIndex(fields=["view_count"]),
             BTreeIndex(fields=["status"]),
             BTreeIndex(fields=["featured"]),
+            BTreeIndex(fields=["category"]),
+            BTreeIndex(fields=["author"]),
         ]
-
-    def __unicode__(self):
-        title = self.safe_translation_getter("title", any_language=True) or "Untitled"
-        author_name = self.author.user.email if self.author else "Unknown"
-        return f"{title} by {author_name}"
 
     def __str__(self):
         title = self.safe_translation_getter("title", any_language=True) or "Untitled"

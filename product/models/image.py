@@ -54,11 +54,6 @@ class ProductImage(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDMo
             BTreeIndex(fields=["product", "is_main"]),
         ]
 
-    def __unicode__(self):
-        product_name = self.product.safe_translation_getter("name", any_language=True)
-        main_status = "Main" if self.is_main else "Secondary"
-        return f"{product_name} Image ({main_status})"
-
     def __str__(self):
         product_name = self.product.safe_translation_getter("name", any_language=True)
         main_status = "Main" if self.is_main else "Secondary"

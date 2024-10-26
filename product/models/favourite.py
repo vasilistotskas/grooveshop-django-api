@@ -41,10 +41,6 @@ class ProductFavourite(TimeStampMixinModel, UUIDModel):
             *TimeStampMixinModel.Meta.indexes,
         ]
 
-    def __unicode__(self):
-        product_name = self.product.safe_translation_getter("name", any_language=True)
-        return f"{self.user.email} - {product_name}"
-
     def __str__(self):
         product_name = self.product.safe_translation_getter("name", any_language=True)
         return f"{self.user.email} - {product_name}"

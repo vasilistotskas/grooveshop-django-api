@@ -262,6 +262,23 @@ class BlogPostViewSetTestCase(APITestCase):
             self.assertIn(related_post["category"], allowed_categories)
             self.assertNotEqual(related_post["id"], self.post.id)
 
+    def test_related_posts_default_strategy_partial_and_fallback_strategy_fills_limit(self):
+        for post in self.default_related_posts[:1]:
+            post.delete()
+
+        url = reverse("blog-post-related_posts", args=[self.post.id])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 7)
+
+        default_ids = set(p.id for p in self.default_related_posts[1:])
+        tag_based_ids = set(p.id for p in self.tag_based_related_posts)
+        related_ids = set(p["id"] for p in response.data)
+
+        self.assertTrue(default_ids.intersection(related_ids))
+        self.assertTrue(tag_based_ids.intersection(related_ids))
+
     def test_related_posts_when_no_related_posts_exist(self):
         BlogPost.objects.exclude(id=self.post.id).delete()
 

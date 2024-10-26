@@ -36,12 +36,6 @@ class SlideModelTestCase(TestCase):
         self.assertTrue(self.slide.show_button)
         self.assertTrue(default_storage.exists(self.slide.image.path))
 
-    def test_unicode_representation(self):
-        self.assertEqual(
-            self.slide.__unicode__(),
-            f"{self.slide.safe_translation_getter('title', any_language=True)} in {self.slider}",
-        )
-
     def test_str_representation(self):
         self.assertEqual(
             str(self.slide),

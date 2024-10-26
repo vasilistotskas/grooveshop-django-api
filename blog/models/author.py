@@ -22,10 +22,6 @@ class BlogAuthor(TranslatableModel, TimeStampMixinModel, UUIDModel):
             *TimeStampMixinModel.Meta.indexes,
         ]
 
-    def __unicode__(self):
-        author_name = self.user.full_name
-        return f"{author_name} ({self.user.email})"
-
     def __str__(self):
         author_name = self.user.full_name
         return f"{author_name} ({self.user.email})"

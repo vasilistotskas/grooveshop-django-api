@@ -46,14 +46,6 @@ class BlogPostModelTestCase(TestCase):
         self.assertEqual(self.post.view_count, 0)
         self.assertTrue(default_storage.exists(self.post.image.path))
 
-    def test_unicode_representation(self):
-        title = self.post.safe_translation_getter("title", any_language=True) or "Untitled"
-        author_name = self.post.author.user.email if self.author else "Unknown"
-        self.assertEqual(
-            self.post.__unicode__(),
-            f"{title} by {author_name}",
-        )
-
     def test_str_representation(self):
         title = self.post.safe_translation_getter("title", any_language=True) or "Untitled"
         author_name = self.post.author.user.email if self.author else "Unknown"

@@ -24,12 +24,6 @@ class CountryModelTestCase(TestCase):
         self.assertEqual(self.country.phone_code, 30)
         self.assertTrue(default_storage.exists(self.country.image_flag.path))
 
-    def test_unicode_representation(self):
-        self.assertEqual(
-            self.country.__unicode__(),
-            self.country.safe_translation_getter("name"),
-        )
-
     def test_str_representation(self):
         self.assertEqual(str(self.country), self.country.safe_translation_getter("name"))
 

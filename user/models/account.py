@@ -141,9 +141,6 @@ class UserAccount(AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinM
             ),
         ]
 
-    def __unicode__(self):
-        return self.username if self.username else self.email
-
     def __str__(self):
         return self.username if self.username else self.email
 

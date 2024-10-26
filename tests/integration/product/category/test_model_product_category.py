@@ -34,12 +34,6 @@ class CategoryModelTestCase(TestCase):
         self.assertTrue(default_storage.exists(self.category.menu_image_two.path))
         self.assertTrue(default_storage.exists(self.category.menu_main_banner.path))
 
-    def test_unicode_representation(self):
-        self.assertEqual(
-            self.category.__unicode__(),
-            self.category.safe_translation_getter("name"),
-        )
-
     def test_str_representation_no_parent(self):
         self.assertEqual(str(self.category), self.category.safe_translation_getter("name"))
 

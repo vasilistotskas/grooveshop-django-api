@@ -21,12 +21,6 @@ class BlogCategoryModelTestCase(TestCase):
         self.assertEqual(self.category.slug, "sample-category")
         self.assertTrue(default_storage.exists(self.category.image.path))
 
-    def test_unicode_representation(self):
-        self.assertEqual(
-            self.category.__unicode__(),
-            self.category.safe_translation_getter("name"),
-        )
-
     def test_str_representation(self):
         self.assertEqual(
             str(self.category),

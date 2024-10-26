@@ -71,9 +71,6 @@ class BlogCategory(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDMo
         super(BlogCategory, self).__init__(*args, **kwargs)
         self.sub_categories_list = None
 
-    def __unicode__(self):
-        return self.safe_translation_getter("name", any_language=True) or ""
-
     def __str__(self):
         if not hasattr(self, "_full_path"):
             self._full_path = " / ".join(

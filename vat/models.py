@@ -24,9 +24,6 @@ class Vat(TimeStampMixinModel, UUIDModel):
             BTreeIndex(fields=["value"]),
         ]
 
-    def __unicode__(self):
-        return f"{self.value}% VAT"
-
     def __str__(self):
         return f"{self.value}% VAT"
 

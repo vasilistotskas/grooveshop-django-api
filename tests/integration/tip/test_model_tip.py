@@ -26,12 +26,6 @@ class TipModelTestCase(TestCase):
         self.assertTrue(self.tip.active)
         self.assertTrue(default_storage.exists(self.tip.icon.path))
 
-    def test_unicode_representation(self):
-        self.assertEqual(
-            self.tip.__unicode__(),
-            f"{self.tip.get_kind_display()}: {self.tip.safe_translation_getter('title')}",
-        )
-
     def test_str_representation(self):
         self.assertEqual(
             str(self.tip),

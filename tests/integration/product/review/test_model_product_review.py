@@ -44,14 +44,3 @@ class ProductReviewModelTestCase(TestCase):
             str(self.product_review),
             f"Review by {self.user.email} on {self.product}: {comment_snippet}",
         )
-
-    def test_unicode_representation(self):
-        comment_snippet = (
-            (self.product_review.safe_translation_getter("comment", any_language=True)[:50] + "...")
-            if self.product_review.comment
-            else "No Comment"
-        )
-        self.assertEqual(
-            self.product_review.__unicode__(),
-            f"Review by {self.user.email} on {self.product}: {comment_snippet}",
-        )

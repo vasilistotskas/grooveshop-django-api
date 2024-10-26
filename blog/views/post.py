@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import cached_property
 from importlib import import_module
 
 from django.conf import settings
@@ -12,6 +13,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from blog.filters import BlogPostFilter
 from blog.models.post import BlogPost
 from blog.serializers.comment import BlogCommentSerializer
 from blog.serializers.post import BlogPostSerializer
@@ -26,7 +28,7 @@ from core.utils.views import cache_methods
 
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
-    queryset = BlogPost.objects.all()
+    queryset = BlogPost.objects.select_related("author", "category").prefetch_related("tags", "likes").all()
     filter_backends = [
         DjangoFilterBackend,
         PascalSnakeCaseOrderingFilter,
@@ -40,14 +42,15 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
         "published_at",
     ]
     ordering = ["-created_at"]
-    search_fields = ["id"]
+    filterset_class = BlogPostFilter
 
     serializers = {
         "default": BlogPostSerializer,
         "comments": BlogCommentSerializer,
     }
 
-    def get_related_posts_strategy(self) -> RelatedPostsStrategy:
+    @cached_property
+    def related_posts_strategy(self) -> RelatedPostsStrategy:
         strategies_with_weights: list[tuple[RelatedPostsStrategy, float]] = []
         for strategy_config in settings.RELATED_POSTS_STRATEGIES:
             strategy_path = strategy_config["strategy"]
@@ -60,6 +63,9 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
 
         limit = getattr(settings, "RELATED_POSTS_LIMIT", 8)
         return WeightedRelatedPostsStrategy(strategies_with_weights, limit=limit)
+
+    def get_related_posts_strategy(self) -> RelatedPostsStrategy:
+        return self.related_posts_strategy
 
     @action(
         detail=True,

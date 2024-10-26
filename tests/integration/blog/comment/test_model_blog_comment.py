@@ -33,13 +33,6 @@ class BlogCommentModelTestCase(TestCase):
         self.assertEqual(self.comment.user, self.user)
         self.assertEqual(self.comment.post, self.post)
 
-    def test_unicode_representation(self):
-        content_snippet = self.comment.safe_translation_getter("content", any_language=True)[:50] + "..."
-        self.assertEqual(
-            self.comment.__unicode__(),
-            f"Comment by {self.user.full_name}: {content_snippet}",
-        )
-
     def test_likes_count(self):
         other_user = UserAccountFactory(num_addresses=0)
 

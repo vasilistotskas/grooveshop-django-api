@@ -44,9 +44,6 @@ class Tip(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
             *SortableModel.Meta.indexes,
         ]
 
-    def __unicode__(self):
-        return f"{self.get_kind_display()}: {self.safe_translation_getter('title', any_language=True)}"
-
     def __str__(self):
         return f"{self.get_kind_display()}: {self.safe_translation_getter('title', any_language=True)}"
 

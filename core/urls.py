@@ -16,6 +16,7 @@ from core.api.views import health_check
 from core.api.views import redirect_to_frontend
 from core.views import HomeView
 from core.views import ManageTOTPSvgView
+from core.views import robots_txt
 from core.views import upload_image
 
 
@@ -23,8 +24,11 @@ User = get_user_model()
 
 app_name = "core"
 
+urlpatterns = [
+    path("robots.txt", robots_txt, name="robots_txt"),
+]
 
-urlpatterns = i18n_patterns(
+urlpatterns += i18n_patterns(
     path("", HomeView.as_view(), name="home"),
     path(_("admin/"), admin.site.urls),
     path("upload_image", upload_image, name="upload_image"),

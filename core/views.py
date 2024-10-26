@@ -11,6 +11,7 @@ from allauth.mfa.totp.internal.auth import get_totp_secret
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.http import HttpResponse
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views import View
@@ -18,6 +19,26 @@ from django.views.decorators.csrf import csrf_exempt
 
 from core.storages import TinymceS3Storage
 from core.utils.files import sanitize_filename
+
+
+def robots_txt(request):
+    if settings.DEBUG:
+        lines = [
+            "User-agent: *",
+            "Disallow: /",
+        ]
+    else:
+        lines = [
+            "User-agent: *",
+            "Disallow: /admin/",
+            "Disallow: /api/",
+            "Disallow: /upload_image",
+            "Disallow: /accounts/",
+            "Disallow: /_allauth/",
+            "Disallow: /rosetta/",
+            "Disallow: /tinymce/",
+        ]
+    return HttpResponse("\n".join(lines), content_type="text/plain")
 
 
 class HomeView(View):

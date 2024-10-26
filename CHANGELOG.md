@@ -3,11 +3,21 @@
 
 
 
+## v0.173.0 (2024-10-26)
+
+### Features
+
+* feat: Robots txt added ([`ffc560c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ffc560c418330928cfbdeb50fe1872454d31706e))
+
 ## v0.172.0 (2024-10-26)
 
 ### Bug fixes
 
 * fix: remove useless test ([`0d7e6a4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0d7e6a45369ae24b0d6f7c0494a7279a884b23fe))
+
+### Chores
+
+* chore(release): release version 0.172.0 [skip ci] ([`d253ade`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d253adee150fa8dda7c79875fc8e1a603ce2f0a5))
 
 ### Features
 

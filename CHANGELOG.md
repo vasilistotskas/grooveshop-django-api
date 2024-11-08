@@ -3,7 +3,17 @@
 
 
 
+## v0.174.0 (2024-11-08)
+
+### Features
+
+* feat: API schema fixes, NonceMiddleware implemented rosetta base template override and Bump Versions ([`521e3f0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/521e3f026303cded368391e09f4388e9a653d954))
+
 ## v0.173.0 (2024-10-26)
+
+### Chores
+
+* chore(release): release version 0.173.0 [skip ci] ([`77b6505`](https://github.com/vasilistotskas/grooveshop-django-api/commit/77b6505dcbc50050d5bad496ed04417a366347c2))
 
 ### Features
 

@@ -64,3 +64,9 @@ class BaseExpandSerializer(serializers.ModelSerializer):
         self,
     ) -> Dict[str, Type[serializers.ModelSerializer]]:
         return {}
+
+
+class HealthCheckResponseSerializer(serializers.Serializer):
+    database = serializers.BooleanField()
+    redis = serializers.BooleanField()
+    celery = serializers.BooleanField()

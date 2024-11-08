@@ -14,6 +14,7 @@ from django.db import connection
 from django.db import DatabaseError
 from django.middleware.csrf import get_token
 from django.shortcuts import redirect
+from drf_spectacular.utils import extend_schema
 from redis import Redis
 from redis import RedisError
 from rest_framework import status
@@ -23,6 +24,7 @@ from rest_framework.metadata import SimpleMetadata
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
+from core.api.serializers import HealthCheckResponseSerializer
 from core.pagination.cursor import CursorPaginator
 from core.pagination.limit_offset import LimitOffsetPaginator
 from core.pagination.page_number import PageNumberPaginator
@@ -121,6 +123,10 @@ class BaseModelViewSet(ExpandModelViewSet, TranslationsModelViewSet, PaginationM
         return Response(data)
 
 
+@extend_schema(
+    responses=HealthCheckResponseSerializer,
+    description="Check the health status of database, Redis, and Celery",
+)
 @api_view(["GET"])
 def health_check(request):
     health_status = {

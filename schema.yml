@@ -1516,6 +1516,10 @@ paths:
         schema:
           type: integer
       - in: query
+        name: authorEmail
+        schema:
+          type: string
+      - in: query
         name: id
         schema:
           type: integer
@@ -1555,6 +1559,10 @@ paths:
             type: integer
         explode: true
         style: form
+      - in: query
+        name: title
+        schema:
+          type: string
       tags:
       - api
       security:
@@ -1599,6 +1607,10 @@ paths:
         name: author
         schema:
           type: integer
+      - in: query
+        name: authorEmail
+        schema:
+          type: string
       - in: path
         name: format
         schema:
@@ -1646,6 +1658,10 @@ paths:
             type: integer
         explode: true
         style: form
+      - in: query
+        name: title
+        schema:
+          type: string
       tags:
       - api
       security:
@@ -1956,6 +1972,53 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BlogComment'
+          description: ''
+  /api/v1/blog/post/{id}/related_posts:
+    get:
+      operationId: api_v1_blog_post_related_posts_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogPost'
+          description: ''
+  /api/v1/blog/post/{id}/related_posts{format}:
+    get:
+      operationId: api_v1_blog_post_related_posts_formatted_retrieve
+      parameters:
+      - in: path
+        name: format
+        schema:
+          type: string
+          enum:
+          - .json
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogPost'
           description: ''
   /api/v1/blog/post/{id}/update_likes:
     post:
@@ -3555,13 +3618,18 @@ paths:
   /api/v1/health:
     get:
       operationId: api_v1_health_retrieve
+      description: Check the health status of database, Redis, and Celery
       tags:
       - api
       security:
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+          description: ''
   /api/v1/notification/ids:
     post:
       operationId: api_v1_notification_ids_create
@@ -7272,16 +7340,22 @@ paths:
   /api/v1/search/blog/post:
     get:
       operationId: api_v1_search_blog_post_retrieve
+      description: Search blog posts with MeiliSearch
       tags:
       - api
       security:
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogPostMeiliSearchResponse'
+          description: ''
   /api/v1/search/blog/post{format}:
     get:
       operationId: api_v1_search_blog_post_formatted_retrieve
+      description: Search blog posts with MeiliSearch
       parameters:
       - in: path
         name: format
@@ -7296,20 +7370,30 @@ paths:
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogPostMeiliSearchResponse'
+          description: ''
   /api/v1/search/product:
     get:
       operationId: api_v1_search_product_retrieve
+      description: Search products with MeiliSearch
       tags:
       - api
       security:
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductMeiliSearchResponse'
+          description: ''
   /api/v1/search/product{format}:
     get:
       operationId: api_v1_search_product_formatted_retrieve
+      description: Search products with MeiliSearch
       parameters:
       - in: path
         name: format
@@ -7324,7 +7408,11 @@ paths:
       - {}
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductMeiliSearchResponse'
+          description: ''
   /api/v1/slide:
     get:
       operationId: api_v1_slide_list
@@ -10693,6 +10781,61 @@ components:
       - translations
       - updatedAt
       - uuid
+    BlogPostMeiliSearchResponse:
+      type: object
+      properties:
+        limit:
+          type: integer
+        offset:
+          type: integer
+        estimatedTotalHits:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/BlogPostMeiliSearchResult'
+      required:
+      - estimatedTotalHits
+      - limit
+      - offset
+      - results
+    BlogPostMeiliSearchResult:
+      type: object
+      properties:
+        id:
+          type: integer
+        languageCode:
+          type: string
+        title:
+          type: string
+        subtitle:
+          type: string
+        body:
+          type: string
+        master:
+          type: integer
+        absoluteUrl:
+          type: string
+        mainImagePath:
+          type: string
+        matchesPosition: {}
+        rankingScore:
+          type: number
+          format: double
+          nullable: true
+        formatted: {}
+      required:
+      - absoluteUrl
+      - body
+      - formatted
+      - id
+      - languageCode
+      - mainImagePath
+      - master
+      - matchesPosition
+      - rankingScore
+      - subtitle
+      - title
     BlogPostStatusEnum:
       enum:
       - DRAFT
@@ -11243,6 +11386,19 @@ components:
         * `5` - Fourth Floor
         * `6` - Fifth Floor
         * `7` - Sixth Floor Plus
+    HealthCheckResponse:
+      type: object
+      properties:
+        database:
+          type: boolean
+        redis:
+          type: boolean
+        celery:
+          type: boolean
+      required:
+      - celery
+      - database
+      - redis
     LocationTypeEnum:
       enum:
       - 0
@@ -14344,6 +14500,58 @@ components:
       - translations
       - updatedAt
       - uuid
+    ProductMeiliSearchResponse:
+      type: object
+      properties:
+        limit:
+          type: integer
+        offset:
+          type: integer
+        estimatedTotalHits:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductMeiliSearchResult'
+      required:
+      - estimatedTotalHits
+      - limit
+      - offset
+      - results
+    ProductMeiliSearchResult:
+      type: object
+      properties:
+        id:
+          type: integer
+        languageCode:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        master:
+          type: integer
+        absoluteUrl:
+          type: string
+        mainImagePath:
+          type: string
+        matchesPosition: {}
+        rankingScore:
+          type: number
+          format: double
+          nullable: true
+        formatted: {}
+      required:
+      - absoluteUrl
+      - description
+      - formatted
+      - id
+      - languageCode
+      - mainImagePath
+      - master
+      - matchesPosition
+      - name
+      - rankingScore
     ProductReview:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.

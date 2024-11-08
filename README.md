@@ -202,6 +202,11 @@ This project is open-sourced under the MIT License. See the [LICENSE](LICENSE.md
   - Run a script: `poetry run <script_name>`
   - Enter virtual environment shell: `poetry shell`
 
+### How to auto pip-upgrade requirements.txt
+- **Using pip-upgrader**:
+- **Run pip-upgrader**:
+  `pip-upgrade`
+
 ### Strawberry GraphQL
 - **Install Strawberry**:
   `pip install strawberry-graphql`

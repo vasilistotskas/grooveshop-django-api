@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from urllib.parse import unquote
 
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.exceptions import ValidationError
@@ -9,10 +10,16 @@ from rest_framework.response import Response
 
 from blog.models.post import BlogPostTranslation
 from product.models.product import ProductTranslation
+from search.serializers import BlogPostMeiliSearchResponseSerializer
 from search.serializers import BlogPostTranslationSerializer
+from search.serializers import ProductMeiliSearchResponseSerializer
 from search.serializers import ProductTranslationSerializer
 
 
+@extend_schema(
+    responses=BlogPostMeiliSearchResponseSerializer,
+    description="Search blog posts with MeiliSearch",
+)
 @api_view(["GET"])
 def blog_post_meili_search(request):
     query = request.query_params.get("query")
@@ -50,6 +57,10 @@ def blog_post_meili_search(request):
     )
 
 
+@extend_schema(
+    responses=ProductMeiliSearchResponseSerializer,
+    description="Search products with MeiliSearch",
+)
 @api_view(["GET"])
 def product_meili_search(request):
     query = request.query_params.get("query")

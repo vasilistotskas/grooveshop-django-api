@@ -81,3 +81,44 @@ class ProductTranslationSerializer(serializers.ModelSerializer):
 
     def get_formatted(self, obj):
         return self.context.get("_formatted", {})
+
+
+class BlogPostMeiliSearchResultSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    language_code = serializers.CharField()
+    title = serializers.CharField()
+    subtitle = serializers.CharField()
+    body = serializers.CharField()
+    master = serializers.IntegerField()
+    absolute_url = serializers.CharField()
+    main_image_path = serializers.CharField()
+    matches_position = serializers.JSONField()
+    ranking_score = serializers.FloatField(allow_null=True)
+    formatted = serializers.JSONField()
+
+
+class ProductMeiliSearchResultSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    language_code = serializers.CharField()
+    name = serializers.CharField()
+    description = serializers.CharField()
+    master = serializers.IntegerField()
+    absolute_url = serializers.CharField()
+    main_image_path = serializers.CharField()
+    matches_position = serializers.JSONField()
+    ranking_score = serializers.FloatField(allow_null=True)
+    formatted = serializers.JSONField()
+
+
+class BlogPostMeiliSearchResponseSerializer(serializers.Serializer):
+    limit = serializers.IntegerField()
+    offset = serializers.IntegerField()
+    estimated_total_hits = serializers.IntegerField()
+    results = BlogPostMeiliSearchResultSerializer(many=True)
+
+
+class ProductMeiliSearchResponseSerializer(serializers.Serializer):
+    limit = serializers.IntegerField()
+    offset = serializers.IntegerField()
+    estimated_total_hits = serializers.IntegerField()
+    results = ProductMeiliSearchResultSerializer(many=True)

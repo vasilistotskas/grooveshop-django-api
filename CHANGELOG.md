@@ -3,7 +3,17 @@
 
 
 
+## v0.176.0 (2024-11-09)
+
+### Features
+
+* feat: csp policy package `django-csp` ([`568d986`](https://github.com/vasilistotskas/grooveshop-django-api/commit/568d98692fbf6b69745926f7f21a6d8acfbeda05))
+
 ## v0.175.0 (2024-11-09)
+
+### Chores
+
+* chore(release): release version 0.175.0 [skip ci] ([`1ca2f95`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1ca2f957dae6f4d59f4a51aa3d2e55e090b3a94a))
 
 ### Features
 

@@ -16,7 +16,7 @@ build-backend = "poetry.masonry.api"
 
 [tool.poetry.dependencies]
 asgiref = "3.8.1"
-boto3 = "1.35.56"
+boto3 = "1.35.57"
 python = ">=3.11,<4.0.0"
 charset_normalizer = "3.4.0"
 chardet = "5.2.0"

@@ -5,15 +5,15 @@
     <title>{% block pagetitle %}Rosetta{% endblock %}</title>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 
-    <link rel="stylesheet" href="{% static 'admin/css/base.css' %}" type="text/css" nonce="{{ request.csp_nonce }}"/>
-    <link rel="stylesheet" href="{% static 'admin/css/forms.css' %}" type="text/css" nonce="{{ request.csp_nonce }}"/>
-    <link rel="stylesheet" href="{% static 'admin/css/changelists.css' %}" type="text/css" nonce="{{ request.csp_nonce }}"/>
-    <link rel="stylesheet" href="{% static 'admin/rosetta/css/rosetta.css' %}" type="text/css" nonce="{{ request.csp_nonce }}"/>
+    <link rel="stylesheet" href="{% static 'admin/css/base.css' %}" type="text/css" nonce="{{ csp_nonce }}"/>
+    <link rel="stylesheet" href="{% static 'admin/css/forms.css' %}" type="text/css" nonce="{{ csp_nonce }}"/>
+    <link rel="stylesheet" href="{% static 'admin/css/changelists.css' %}" type="text/css" nonce="{{ csp_nonce }}"/>
+    <link rel="stylesheet" href="{% static 'admin/rosetta/css/rosetta.css' %}" type="text/css" nonce="{{ csp_nonce }}"/>
     {% block extra_styles %}{% endblock %}
 
-    <script src="{% static 'admin/js/vendor/jquery/jquery.min.js' %}" nonce="{{ request.csp_nonce }}"></script>
+    <script src="{% static 'admin/js/vendor/jquery/jquery.min.js' %}" nonce="{{ csp_nonce }}"></script>
     {{ rosetta_settings_js|json_script:"rosetta-settings-js" }}
-    <script src="{% static 'admin/rosetta/js/rosetta.js' %}" nonce="{{ request.csp_nonce }}"></script>
+    <script src="{% static 'admin/rosetta/js/rosetta.js' %}" nonce="{{ csp_nonce }}"></script>
 </head>
 <body>
     <div id="container">

@@ -1063,6 +1063,26 @@ asgiref = ">=3.6"
 django = ">=4.2"
 
 [[package]]
+name = "django-csp"
+version = "4.0b2"
+description = "Django Content Security Policy support."
+optional = false
+python-versions = "*"
+files = [
+    {file = "django_csp-4.0b2-py3-none-any.whl", hash = "sha256:48b159f9eddd9a2140df483e224c76ec4bf6118010e67d5b62279dd897b6b88a"},
+    {file = "django_csp-4.0b2.tar.gz", hash = "sha256:3d4912655d5b97a6b9bd74c3fc78af534d531f5e72c17c4565083b4bd872ff09"},
+]
+
+[package.dependencies]
+django = ">=4.2"
+
+[package.extras]
+dev = ["django-stubs[compatible-mypy]", "jinja2 (>=2.9.6)", "mypy", "pre-commit", "pytest", "pytest-cov", "pytest-django", "pytest-ruff", "sphinx", "sphinx-rtd-theme", "tox", "tox-gh-actions", "types-setuptools"]
+jinja2 = ["jinja2 (>=2.9.6)"]
+tests = ["jinja2 (>=2.9.6)", "pytest", "pytest-cov", "pytest-django", "pytest-ruff"]
+typing = ["django-stubs[compatible-mypy]", "jinja2 (>=2.9.6)", "mypy", "pytest", "pytest-django", "types-setuptools"]
+
+[[package]]
 name = "django-dbbackup"
 version = "4.2.1"
 description = "Management commands to help backup and restore a project database and media."
@@ -4306,4 +4326,4 @@ watchdog = ["watchdog (>=2.3)"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<4.0.0"
-content-hash = "7d719fc495a771b54f9a81809e090a3a2992b2cfda1e7e77b0256ce779e2032e"
+content-hash = "e30354018876ab0878db0cd08731d1af00f227e1990087d222ef282d56e940a2"

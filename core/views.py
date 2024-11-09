@@ -1,3 +1,5 @@
+import json
+import logging
 import os
 from typing import override
 from uuid import uuid4
@@ -19,6 +21,8 @@ from django.views.decorators.csrf import csrf_exempt
 
 from core.storages import TinymceS3Storage
 from core.utils.files import sanitize_filename
+
+logger = logging.getLogger(__name__)
 
 
 def robots_txt(request):
@@ -46,6 +50,17 @@ class HomeView(View):
 
     def get(self, request):
         return render(request, self.template_name, {})
+
+
+@csrf_exempt
+def csp_report(request):
+    if request.method == "POST":
+        try:
+            report = json.loads(request.body.decode("utf-8"))
+            logger.warning(f"CSP Violation: {json.dumps(report, indent=2)}")
+        except json.JSONDecodeError:
+            logger.error("Failed to decode CSP report")
+    return HttpResponse(status=204)
 
 
 @csrf_exempt

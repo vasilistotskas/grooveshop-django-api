@@ -32,3 +32,10 @@ def metadata(request: HttpRequest) -> dict[str, str]:
         "SITE_AUTHOR": site_author,
         "REQUEST_DETAILS": request_details,
     }
+
+
+def csp_nonce(request: HttpRequest) -> dict[str, str]:
+    nonce = getattr(request, "csp_nonce", "")
+    return {
+        "csp_nonce": nonce,
+    }

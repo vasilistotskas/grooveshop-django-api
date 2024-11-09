@@ -44,7 +44,8 @@
     <title>{{ SITE_NAME }}</title>
 
     <!-- Custom Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet" nonce="{{request.csp_nonce}}">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Roboto:wght@400;
+    700&display=swap" rel="stylesheet" nonce="{{request.csp_nonce}}">
 
     <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
     <!--[if lt IE 9]>

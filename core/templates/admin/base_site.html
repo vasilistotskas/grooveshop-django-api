@@ -3,6 +3,6 @@
 {% load i18n %}
 
 {% block userlinks %}
-  <a href="{% url 'admin:clear-cache' %}" style="margin-left: 0.5rem;">{% trans "Clear cache" %}</a> /
+  <a href="{% url 'admin:clear-cache' %}" class="ml-4">{% trans "Clear cache" %}</a> /
   {{ block.super }}
 {% endblock %}

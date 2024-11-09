@@ -14,6 +14,7 @@ from drf_spectacular.views import SpectacularSwaggerView
 
 from core.api.views import health_check
 from core.api.views import redirect_to_frontend
+from core.views import csp_report
 from core.views import HomeView
 from core.views import ManageTOTPSvgView
 from core.views import robots_txt
@@ -26,6 +27,7 @@ app_name = "core"
 
 urlpatterns = [
     path("robots.txt", robots_txt, name="robots_txt"),
+    path("csp-report/", csp_report, name="csp-report"),
 ]
 
 urlpatterns += i18n_patterns(

@@ -10,6 +10,8 @@ from celery.schedules import crontab
 from corsheaders.defaults import (
     default_headers,
 )
+from csp.constants import SELF
+from csp.constants import UNSAFE_INLINE
 from django.utils.translation import gettext_lazy as _
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -54,8 +56,8 @@ APP_MAIN_HOST_NAME = getenv("APP_MAIN_HOST_NAME", "localhost")
 NUXT_BASE_URL = getenv("NUXT_BASE_URL", "http://localhost:3000")
 NUXT_BASE_DOMAIN = getenv("NUXT_BASE_DOMAIN", "localhost:3000")
 MEDIA_STREAM_BASE_URL = getenv("MEDIA_STREAM_BASE_URL", "http://localhost:3003")
-STATIC_BASE_URL = getenv("STATIC_BASE_URL", "http://localhost:3000")
-CSP_STATIC_BASE_URL = getenv("STATIC_BASE_URL", "http://localhost:3000")
+STATIC_BASE_URL = getenv("STATIC_BASE_URL", "http://localhost:8000")
+CSP_STATIC_BASE_URL = getenv("STATIC_BASE_URL", "http://localhost:8000")
 
 ALLOWED_HOSTS = []  # Start with an empty list
 
@@ -133,6 +135,7 @@ THIRD_PARTY_APPS = [
     "extra_settings",
     "knox",
     "simple_history",
+    "csp",
 ]
 
 # Combine all apps together for the INSTALLED_APPS setting
@@ -140,12 +143,12 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "core.middleware.nonce.NonceMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
+    "csp.middleware.CSPMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -169,7 +172,6 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "core.context_processors.metadata",
-                "core.context_processors.csp_nonce",
             ],
         },
     },
@@ -608,6 +610,55 @@ if DEBUG:
             "http://localhost:3000",
         ]
     )
+
+# CSP
+CONTENT_SECURITY_POLICY = {
+    "DIRECTIVES": {
+        "default-src": [SELF, STATIC_BASE_URL, "https://static.cloudflareinsights.com"],
+        "style-src": [
+            SELF,
+            STATIC_BASE_URL,
+            "https://cdn.jsdelivr.net",
+        ],
+        "style-src-elem": [
+            SELF,
+            STATIC_BASE_URL,
+            UNSAFE_INLINE,
+            "https://fonts.googleapis.com",
+            "https://cdn.jsdelivr.net",
+        ],
+        "script-src": [
+            SELF,
+            STATIC_BASE_URL,
+            "https://static.cloudflareinsights.com",
+            "https://cdn.jsdelivr.net",
+        ],
+        "script-src-elem": [
+            SELF,
+            STATIC_BASE_URL,
+            UNSAFE_INLINE,
+            "https://static.cloudflareinsights.com",
+            "https://cdn.jsdelivr.net",
+        ],
+        "worker-src": [
+            SELF,
+            "blob:",
+        ],
+        "img-src": [
+            SELF,
+            "data:",
+            STATIC_BASE_URL,
+            "https://cdn.jsdelivr.net",
+        ],
+        "connect-src": [SELF, STATIC_BASE_URL, "https://static.cloudflareinsights.com"],
+        "font-src": [SELF, STATIC_BASE_URL, "https://fonts.gstatic.com"],
+        "base-uri": [SELF],
+        "form-action": [SELF],
+        "frame-ancestors": [SELF],
+        "frame-src": [SELF, "https://www.youtube.com"],
+        "report-uri": "/csp-report/",
+    },
+}
 
 # Currency
 DEFAULT_CURRENCY = "EUR"

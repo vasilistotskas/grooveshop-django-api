@@ -619,6 +619,7 @@ CONTENT_SECURITY_POLICY = {
             SELF,
             STATIC_BASE_URL,
             "https://cdn.jsdelivr.net",
+            "https://cdn.redoc.ly",
         ],
         "style-src-elem": [
             SELF,
@@ -626,12 +627,14 @@ CONTENT_SECURITY_POLICY = {
             UNSAFE_INLINE,
             "https://fonts.googleapis.com",
             "https://cdn.jsdelivr.net",
+            "https://cdn.redoc.ly",
         ],
         "script-src": [
             SELF,
             STATIC_BASE_URL,
             "https://static.cloudflareinsights.com",
             "https://cdn.jsdelivr.net",
+            "https://cdn.redoc.ly",
         ],
         "script-src-elem": [
             SELF,
@@ -639,6 +642,7 @@ CONTENT_SECURITY_POLICY = {
             UNSAFE_INLINE,
             "https://static.cloudflareinsights.com",
             "https://cdn.jsdelivr.net",
+            "https://cdn.redoc.ly",
         ],
         "worker-src": [
             SELF,
@@ -649,6 +653,7 @@ CONTENT_SECURITY_POLICY = {
             "data:",
             STATIC_BASE_URL,
             "https://cdn.jsdelivr.net",
+            "https://cdn.redoc.ly",
         ],
         "connect-src": [SELF, STATIC_BASE_URL, "https://static.cloudflareinsights.com"],
         "font-src": [SELF, STATIC_BASE_URL, "https://fonts.gstatic.com"],

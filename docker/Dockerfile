@@ -3,14 +3,14 @@
 ###########
 
 # Pull official base image
-FROM python:3.13.0-slim-bookworm AS builder
+FROM python:3.13.0-slim-bookworm as builder
 
 # Set work directory
 WORKDIR /usr/src/app
 
 # Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
 
 # Install system dependencies
 RUN apt-get update && \
@@ -35,18 +35,18 @@ RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/app/wheels -r requir
 # Pull official base image
 FROM python:3.13.0-slim-bookworm
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    HOME=/home/app \
-    APP_HOME=/home/app/web
+# Create directory for the app user
+RUN mkdir -p /home/app
 
-# Create the app user and directories
-RUN groupadd -r app && useradd -r -g app app && \
-    mkdir -p $APP_HOME/staticfiles $APP_HOME/mediafiles $APP_HOME/logs && \
-    chown -R app:app $APP_HOME
+# Create the app user
+RUN groupadd app && useradd -g app app
 
-# Set work directory
+# Create the appropriate directories
+ENV HOME=/home/app
+ENV APP_HOME=/home/app/web
+RUN mkdir $APP_HOME
+RUN mkdir $APP_HOME/staticfiles
+RUN mkdir $APP_HOME/mediafiles
 WORKDIR $APP_HOME
 
 # Install system dependencies
@@ -64,23 +64,27 @@ RUN pip install --no-cache-dir /wheels/*
 # Install psycopg binary and pool
 RUN pip install --no-cache-dir "psycopg[binary,pool]"
 
-# Copy entrypoint script and set ownership
-COPY --chown=app:app ./docker/entrypoint.prod.sh .
+# Copy entrypoint.prod.sh
+COPY ./docker/entrypoint.prod.sh .
 
-# Ensure entrypoint script has execution permissions
-RUN chmod +x entrypoint.prod.sh
+# Set entrypoint permissions
+RUN sed -i 's/\r$//g'  $APP_HOME/entrypoint.prod.sh
+RUN chmod +x  $APP_HOME/entrypoint.prod.sh
 
-# Copy project files and set ownership
-COPY --chown=app:app . .
+# copy project
+COPY . $APP_HOME
 
-# Switch to app user
+# create empty logs folder
+RUN mkdir $APP_HOME/logs
+
+# chown all the files to the app user
+RUN chown -R app:app $APP_HOME
+
+# change to the app user
 USER app
 
-# Expose port (if applicable)
-EXPOSE 8000
+# run entrypoint.prod.sh
+ENTRYPOINT ["/home/app/web/entrypoint.prod.sh"]
 
-# Run entrypoint script
-ENTRYPOINT ["./entrypoint.prod.sh"]
-
-# Run application
+# run uvicorn
 CMD ["uvicorn", "asgi:application", "--host", "0.0.0.0", "--port", "8000"]

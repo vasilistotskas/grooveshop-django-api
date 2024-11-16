@@ -63,17 +63,14 @@ RUN pip install --no-cache-dir /wheels/*
 # Install psycopg binary and pool
 RUN pip install --no-cache-dir "psycopg[binary,pool]"
 
-# Copy entrypoint script
-COPY ./docker/entrypoint.prod.sh .
+# Copy entrypoint script and set ownership
+COPY --chown=app:app ./docker/entrypoint.prod.sh .
 
-# Ensure entrypoint script has Unix line endings and execution permissions
+# Ensure entrypoint script has execution permissions
 RUN chmod +x entrypoint.prod.sh
 
-# Copy project
-COPY . .
-
-# Change ownership to app user
-RUN chown -R app:app $APP_HOME
+# Copy project files and set ownership
+COPY --chown=app:app . .
 
 # Switch to app user
 USER app

@@ -3,7 +3,17 @@
 
 
 
+## v0.179.0 (2024-11-16)
+
+### Features
+
+* feat(ci): Updaste python to 3.13 and use `slim-bookworm` image ([`1986853`](https://github.com/vasilistotskas/grooveshop-django-api/commit/19868533704237d6055693331cdff2388261f7fb))
+
 ## v0.178.0 (2024-11-16)
+
+### Chores
+
+* chore(release): release version 0.178.0 [skip ci] ([`b05a4a2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b05a4a225cea069f2406d25293343c25ca2289d3))
 
 ### Features
 

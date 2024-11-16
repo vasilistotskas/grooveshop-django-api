@@ -60,7 +60,7 @@ The Django applications within this project include:
 
 ### Prerequisites
 
-- Python 3.12 or higher
+- Python 3.13 or higher
 - Django 5.0 or higher
 - PostgreSQL
 - Redis
@@ -138,7 +138,7 @@ This project is open-sourced under the MIT License. See the [LICENSE](LICENSE.md
 
 # Python Development Setup and Utilities
 
-## Python Version 3.12.0
+## Python Version 3.13.0
 
 ### Virtual Environment Management
 - **Install Virtualenv**:
@@ -218,7 +218,7 @@ This project is open-sourced under the MIT License. See the [LICENSE](LICENSE.md
 ### Anaconda for Environment Management
 - **Install Anaconda**: [Anaconda Installation Guide](https://docs.anaconda.com/anaconda/install/)
 - **Conda Environment Commands**:
-  - Create: `conda create --name <env_name> python=3.12.0`
+  - Create: `conda create --name <env_name> python=3.13.0`
   - Activate/Deactivate: `conda activate <env_name>` and `conda deactivate`
   - Create from YML: `conda env create -f environment.yml`
 

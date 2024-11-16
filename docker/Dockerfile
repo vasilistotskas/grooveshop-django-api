@@ -2,28 +2,29 @@
 # BUILDER #
 ###########
 
-# pull official base image
-FROM python:3.12.2-slim as builder
+# Pull official base image
+FROM python:3.13.0-slim-bookworm AS builder
 
-# set work directory
+# Set work directory
 WORKDIR /usr/src/app
 
-# set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
-# install system dependencies
+# Install system dependencies
 RUN apt-get update && \
-    apt-get install -y gcc \
-    postgresql-client \
+    apt-get install -y --no-install-recommends \
+    gcc \
     libpq-dev \
-    python3-dev \
-    libc-dev \
-    linux-headers-amd64 \
     build-essential \
-    git
+    git && \
+    rm -rf /var/lib/apt/lists/*
 
-# install python dependencies
+# Install pip
+RUN pip install --upgrade pip
+
+# Install python dependencies
 COPY ./requirements.txt .
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/app/wheels -r requirements.txt
 
@@ -31,52 +32,57 @@ RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/app/wheels -r requir
 # FINAL #
 #########
 
-# pull official base image
-FROM python:3.12.2-slim
+# Pull official base image
+FROM python:3.13.0-slim-bookworm
 
-# create directory for the app user
-RUN mkdir -p /home/app
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    HOME=/home/app \
+    APP_HOME=/home/app/web
 
-# create the app user
-RUN groupadd app && useradd -g app app
+# Create the app user and directories
+RUN groupadd -r app && useradd -r -g app app && \
+    mkdir -p $APP_HOME/staticfiles $APP_HOME/mediafiles $APP_HOME/logs
 
-# create the appropriate directories
-ENV HOME=/home/app
-ENV APP_HOME=/home/app/web
-RUN mkdir $APP_HOME
-RUN mkdir $APP_HOME/staticfiles
-RUN mkdir $APP_HOME/mediafiles
+# Set work directory
 WORKDIR $APP_HOME
 
-# install dependencies
-RUN apt-get update && apt-get install -y netcat-openbsd
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends netcat-openbsd && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy python dependencies from builder
 COPY --from=builder /usr/src/app/wheels /wheels
 COPY --from=builder /usr/src/app/requirements.txt .
-RUN pip install --upgrade pip
-RUN pip install --no-cache /wheels/*
 
-# install psycopg binary and pool
-RUN pip install "psycopg[binary,pool]"
+# Install dependencies
+RUN pip install --no-cache-dir /wheels/*
 
-# copy entrypoint.prod.sh
+# Install psycopg binary and pool
+RUN pip install --no-cache-dir "psycopg[binary,pool]"
+
+# Copy entrypoint script
 COPY ./docker/entrypoint.prod.sh .
-RUN sed -i 's/\r$//g'  $APP_HOME/entrypoint.prod.sh
-RUN chmod +x  $APP_HOME/entrypoint.prod.sh
 
-# copy project
-COPY . $APP_HOME
+# Ensure entrypoint script has Unix line endings and execution permissions
+RUN chmod +x entrypoint.prod.sh
 
-# create empty logs folder
-RUN mkdir $APP_HOME/logs
+# Copy project
+COPY . .
 
-# chown all the files to the app user
+# Change ownership to app user
 RUN chown -R app:app $APP_HOME
 
-# change to the app user
+# Switch to app user
 USER app
 
-# run entrypoint.prod.sh
-ENTRYPOINT ["/home/app/web/entrypoint.prod.sh"]
+# Expose port (if applicable)
+EXPOSE 8000
 
-# run uvicorn
+# Run entrypoint script
+ENTRYPOINT ["./entrypoint.prod.sh"]
+
+# Run application
 CMD ["uvicorn", "asgi:application", "--host", "0.0.0.0", "--port", "8000"]

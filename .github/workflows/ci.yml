@@ -21,7 +21,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: 3.12.0
+          python-version: 3.13.0
           cache: 'pip'
 
       - name: Install pipx and Poetry
@@ -53,7 +53,7 @@ jobs:
       max-parallel: 4
       matrix:
         db: [ postgres ]
-        python-version: [ 3.12.0 ]
+        python-version: [ 3.13.0 ]
         meilisearch-version: [ 1.10 ]
         include:
           - db: postgres
@@ -166,10 +166,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Python 3.12.0
+      - name: Set up Python 3.13.0
         uses: actions/setup-python@v5
         with:
-          python-version: 3.12.0
+          python-version: 3.13.0
           cache: 'pip'
 
       - name: Install latest pip
@@ -200,17 +200,21 @@ jobs:
           name: dist_build
           path: dist_build/
 
+      - name: Remove non-distribution files
+        run: |
+          find dist_build/ -type f ! -name '*.whl' ! -name '*.tar.gz' -delete
+
       - name: Publish package distributions 📦 to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
           packages-dir: dist_build/
+          attestations: false  # Added this line
         if: steps.release.outputs.released == 'true'
 
       - name: Publish distribution 📦 to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist_build/
-        # NOTE: DO NOT wrap the conditional in ${{ }} as it will always evaluate to true.
-        # See https://github.com/actions/runner/issues/1173
+          attestations: false  # Added this line
         if: steps.release.outputs.released == 'true'

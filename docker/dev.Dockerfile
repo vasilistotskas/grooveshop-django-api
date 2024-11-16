@@ -1,7 +1,5 @@
 # pull official base image
-FROM python:3.12-alpine
-
-VOLUME /mnt/app
+FROM python:3.13.0-slim-bookworm
 
 # set work directory
 WORKDIR /mnt/app
@@ -10,15 +8,15 @@ WORKDIR /mnt/app
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
-# Update apk and install system dependencies
-RUN apk update && \
-    apk add --no-cache \
+# Update apt and install system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
     netcat-openbsd \
     gcc \
-    musl-dev \
-    postgresql-client \
-    postgresql-dev \
-    git
+    build-essential \
+    libpq-dev \
+    git && \
+    rm -rf /var/lib/apt/lists/*
 
 # install pip
 RUN pip install --upgrade pip
@@ -27,7 +25,7 @@ RUN pip install --upgrade pip
 COPY ./grooveshop-django-api/requirements.txt /mnt/app/requirements.txt
 
 # install dependencies
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # copy entrypoint.sh
 COPY ./grooveshop-django-api/docker/entrypoint.sh /docker-entrypoint.sh

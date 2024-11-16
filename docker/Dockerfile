@@ -43,7 +43,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 # Create the app user and directories
 RUN groupadd -r app && useradd -r -g app app && \
-    mkdir -p $APP_HOME/staticfiles $APP_HOME/mediafiles $APP_HOME/logs
+    mkdir -p $APP_HOME/staticfiles $APP_HOME/mediafiles $APP_HOME/logs && \
+    chown -R app:app $APP_HOME
 
 # Set work directory
 WORKDIR $APP_HOME

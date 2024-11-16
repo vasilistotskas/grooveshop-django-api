@@ -3,7 +3,17 @@
 
 
 
+## v0.179.1 (2024-11-16)
+
+### Bug fixes
+
+* fix(Dockerfile): attempt ([`45e32c3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/45e32c3685c2ed48ce7f48554b5229768ae374d6))
+
 ## v0.179.0 (2024-11-16)
+
+### Chores
+
+* chore(release): release version 0.179.0 [skip ci] ([`a6d097a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a6d097a0ff08653aaccdc6e424735b9bd2315eff))
 
 ### Features
 

@@ -3,10 +3,10 @@ from __future__ import annotations
 import os
 from os import getenv
 from typing import Any
-from typing import override
 
 import redis
 from django.core.cache.backends.redis import RedisCache
+from django.core.cache.backends.redis import RedisCacheClient
 
 from core.logging import LogInfo
 
@@ -30,122 +30,45 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
 
 class CustomCache(RedisCache):
+    _cache: RedisCacheClient
+
     def __init__(self, server, params):
         super().__init__(server, params)
+
         try:
             self._cache.get_client().ping()
         except (redis.exceptions.ConnectionError, Exception) as exc:
             LogInfo.error("Error connecting to cache: %s", str(exc))
 
-    @override
-    def get(self, key: Any, default: Any | None = None, version: int | None = None) -> Any | None:
+    def keys(self, search: str | None = None) -> list[str]:
         try:
-            return super().get(key, default, version)
-        except Exception as exc:
-            LogInfo.error("Error getting cache key: %s", str(exc))
-            return default
-
-    @override
-    def get_many(self, keys: list[Any], version: int | None = None) -> dict[Any, Any | None]:
-        try:
-            return super().get_many(keys, version)
-        except Exception as exc:
-            LogInfo.error("Error getting cache keys: %s", str(exc))
-            return {}
-
-    @override
-    def set(
-        self,
-        key: Any,
-        value: Any,
-        timeout: float | None = None,
-        version: int | None = None,
-    ) -> None:
-        try:
-            return super().set(key, value, timeout, version)
-        except Exception as exc:
-            LogInfo.warning("Error setting cache key: %s", str(exc))
-
-    @override
-    def get_or_set(
-        self,
-        key: Any,
-        default: Any | None = None,
-        timeout: float | None = None,
-        version: int | None = None,
-    ) -> Any | None:
-        try:
-            return super().get_or_set(key, default, timeout, version)
-        except Exception as exc:
-            LogInfo.warning("Error getting or setting cache key: %s", str(exc))
-            return default()
-
-    @override
-    def add(
-        self,
-        key: Any,
-        value: Any,
-        timeout: float | None = None,
-        version: int | None = None,
-    ) -> bool:
-        try:
-            return super().add(key, value, timeout, version)
-        except Exception as exc:
-            LogInfo.warning("Error adding cache key: %s", str(exc))
-            return False
-
-    @override
-    def delete(self, key: Any, version: int | None = None) -> bool:
-        try:
-            return super().delete(key, version)
-        except Exception as exc:
-            LogInfo.warning("Error deleting cache key: %s", str(exc))
-            return False
-
-    @override
-    def clear(self) -> None:
-        try:
-            return super().clear()
-        except Exception as exc:
-            LogInfo.warning("Error clearing cache: %s", str(exc))
-
-    @override
-    def has_key(self, key: Any, version: int | None = None) -> bool:
-        try:
-            return super().has_key(key, version)
-        except Exception as exc:
-            LogInfo.warning("Error checking cache key: %s", str(exc))
-            return False
-
-    @override
-    def set_many(
-        self,
-        data: dict[Any, Any],
-        timeout: float | None = None,
-        version: int | None = None,
-    ) -> list[Any]:
-        try:
-            return super().set_many(data, timeout, version)
-        except Exception as exc:
-            LogInfo.warning("Error setting cache keys: %s", str(exc))
-            return []
-
-    @override
-    def delete_many(self, keys: list[Any], version: int | None = None) -> None:
-        try:
-            return super().delete_many(keys, version)
-        except Exception as exc:
-            LogInfo.warning("Error deleting cache keys: %s", str(exc))
-
-    def keys(self, search: str | None = None) -> list[Any]:
-        try:
-            cache_keys = self._cache.get_client().keys(f"*{search or ''}*")
-            keys_without_prefix = [key.decode("utf-8") for key in cache_keys]
+            pattern = self._make_pattern(search)
+            cache_keys = list(self._cache.get_client().scan_iter(match=pattern))
+            keys_without_prefix = [key.decode("utf-8").split(":", 2)[-1] for key in cache_keys]
             keys_without_prefix.sort()
             return keys_without_prefix
         except Exception as exc:
             LogInfo.warning("Error getting cache keys: %s", str(exc))
             return []
+
+    def _make_pattern(self, search: str | None = None) -> str:
+        if search is None:
+            search = ""
+        version = self.version or ""
+        key_prefix = self.key_prefix or ""
+        pattern_parts = []
+
+        if key_prefix or version:
+            pattern_parts.append("")
+
+        if key_prefix:
+            pattern_parts.append(key_prefix)
+        if version:
+            pattern_parts.append(str(version))
+
+        pattern_parts.append(f"{search}*")
+        pattern = ":".join(pattern_parts)
+        return pattern
 
 
 def generate_user_cache_key(request: Any) -> str:

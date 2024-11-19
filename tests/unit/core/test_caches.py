@@ -101,9 +101,9 @@ class CustomCacheTestCase(TestCase):
         self.assertEqual(
             keys,
             [
-                f"{default_cache_key_prefix}:1:search_key1",
-                f"{default_cache_key_prefix}:1:search_key2",
-                f"{default_cache_key_prefix}:1:search_key3",
+                f"{default_cache_key_prefix}search_key1",
+                f"{default_cache_key_prefix}search_key2",
+                f"{default_cache_key_prefix}search_key3",
             ],
         )
 

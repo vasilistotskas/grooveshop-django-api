@@ -26,9 +26,8 @@ User = get_user_model()
 def active_users_count(request):
     active_users = 0
     last_activity_threshold = timezone.now() - timedelta(minutes=15)
-    default_cache_key_prefix = cache_instance.key_prefix
 
-    for key in cache_instance.keys(f"{default_cache_key_prefix}:1:{caches.USER_AUTHENTICATED}*"):
+    for key in cache_instance.keys(caches.USER_AUTHENTICATED):
         user_data = cache_instance.get(key)
         if not user_data:
             continue

@@ -63,7 +63,7 @@ multidict = "6.1.0"
 phonenumbers = "8.13.50"
 pillow = "11.0.0"
 psycopg = { version = "3.2.3", extras = ["binary", "pool"] }
-pyjwt = "2.9.0"
+pyjwt = "2.10.0"
 python-dotenv = "1.0.1"
 pydantic = "2.9.2"
 qrcode = "8.0"

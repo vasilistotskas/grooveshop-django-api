@@ -3,11 +3,25 @@
 
 
 
+## v0.180.0 (2024-11-20)
+
+### Features
+
+* feat: Bump Versions ([`3aa27c4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3aa27c49c7a212342dbb95a9c32fbc15c453b227))
+
+### Refactoring
+
+* refactor(cache): `CustomCache`  class improved ([`d387782`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d387782c63ce5f9638e6443489e8a5b81a8d6b6d))
+
 ## v0.179.3 (2024-11-16)
 
 ### Bug fixes
 
 * fix(Dockerfile): attempt ([`0782a70`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0782a704f3cd8bb8e1ca152145f050e76c971347))
+
+### Chores
+
+* chore(release): release version 0.179.3 [skip ci] ([`943003c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/943003c5032dba4a0a1d9fa8b4cee57d615712f2))
 
 ## v0.179.2 (2024-11-16)
 

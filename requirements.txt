@@ -1,6 +1,6 @@
 asgiref==3.8.1
 black==24.10.0
-boto3==1.35.63
+boto3==1.35.67
 celery==5.4.0
 channels==4.2.0
 channels-redis==4.2.1
@@ -60,7 +60,7 @@ pre-commit==4.0.1
 psycopg==3.2.3
 psycopg-binary==3.2.3
 psycopg-pool==3.2.4
-pydantic==2.9.2
+pydantic==2.10.1
 pylint==3.3.1
 pyjwt==2.10.0
 python-dotenv==1.0.1
@@ -72,5 +72,5 @@ pytest-django==4.9.0
 qrcode==8.0
 rich==13.9.4
 urllib3==2.2.3
-uvicorn[standard]==0.32.0
+uvicorn[standard]==0.32.1
 websockets==14.1

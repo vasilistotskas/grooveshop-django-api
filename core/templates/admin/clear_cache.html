@@ -3,7 +3,7 @@
 
 {% block content %}
 <h1>{% trans "Clear Cache" %}</h1>
-<form method="post" style="margin-top: 20px;">
+<form method="post" class="mt-5">
     {% csrf_token %}
     <div>
         <label for="id_viewset_class">{% trans "Select ViewSet class to clear cache" %}:</label>
@@ -13,7 +13,7 @@
     <input type="submit" name="clear_cache_for_class" value="{% trans "Clear Cache" %}">
 </form>
 
-<form method="post" style="margin-top: 20px;">
+<form method="post" class="mt-5">
     {% csrf_token %}
     <input type="submit" name="clear_site_cache" value="{% trans "Clear Entire Site Cache" %}">
 </form>

@@ -10,6 +10,7 @@ __pycache__/
 *.so
 
 # Docker
+docker-compose.yml
 dev.Dockerfile
 Dockerfile
 
@@ -32,11 +33,13 @@ db.sqlite3
 *.pyd
 .Python
 
-# Virtual environment
+# Environment
+.env
 venv/
 myenv/
 
 # Git files
+.git
 .gitignore
 
 # macOS specific files

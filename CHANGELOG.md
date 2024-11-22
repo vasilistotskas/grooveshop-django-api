@@ -3,7 +3,17 @@
 
 
 
+## v0.181.0 (2024-11-22)
+
+### Features
+
+* feat: Bump Versions, remove `run.py` file, update `.dockerignore` and entrypoints for dockerfile ([`5beefe6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5beefe61eeae99f6e7484c7f3dfd7b538e9d73d9))
+
 ## v0.180.0 (2024-11-20)
+
+### Chores
+
+* chore(release): release version 0.180.0 [skip ci] ([`0ff1c24`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0ff1c24bd17ed5801763c35096d4afd61db2603e))
 
 ### Features
 

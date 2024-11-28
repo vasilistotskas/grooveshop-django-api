@@ -3,7 +3,17 @@
 
 
 
+## v0.182.0 (2024-11-28)
+
+### Features
+
+* feat: Bump Versions, Improve `cart` app, remove `compress-old-logs` task and meilisearch queryset improve ([`be3c247`](https://github.com/vasilistotskas/grooveshop-django-api/commit/be3c2472b7056f1e8a4bd7a73f03d78a8a73f2b4))
+
 ## v0.181.0 (2024-11-22)
+
+### Chores
+
+* chore(release): release version 0.181.0 [skip ci] ([`6fd2093`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6fd2093ad8b123c13e634553ac7412ea23860fb4))
 
 ### Features
 

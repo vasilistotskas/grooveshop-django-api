@@ -11,8 +11,8 @@ from product.serializers.product import ProductSerializer
 
 
 class CartItemSerializer(BaseExpandSerializer):
-    cart = serializers.SerializerMethodField("get_cart_id")
-    product = serializers.SerializerMethodField("get_product")
+    cart = serializers.SerializerMethodField()
+    product = serializers.SerializerMethodField()
     price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     final_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     discount_value = MoneyField(max_digits=11, decimal_places=2, read_only=True)
@@ -21,13 +21,12 @@ class CartItemSerializer(BaseExpandSerializer):
     total_discount_value = MoneyField(max_digits=11, decimal_places=2, read_only=True)
 
     @extend_schema_field(ProductSerializer)
-    def get_product(self, cart_item):
-        return ProductSerializer(cart_item.product).data
+    def get_product(self, obj):
+        return ProductSerializer(obj.product).data
 
     @extend_schema_field(serializers.IntegerField)
-    def get_cart_id(self, cart_item) -> int:
-        cart = cart_item.cart
-        return cart.id
+    def get_cart(self, obj) -> int:
+        return obj.cart.id
 
     class Meta:
         model = CartItem
@@ -66,12 +65,11 @@ class CartItemSerializer(BaseExpandSerializer):
 
 
 class CartItemCreateSerializer(BaseExpandSerializer):
-    cart = serializers.SerializerMethodField("get_cart_id")
+    cart = serializers.SerializerMethodField()
 
     @extend_schema_field(serializers.IntegerField)
-    def get_cart_id(self, cart_item) -> int:
-        cart = self.context.get("cart")
-        return cart.id
+    def get_cart(self, _obj) -> int:
+        return self.context.get("cart").id
 
     class Meta:
         model = CartItem
@@ -80,27 +78,27 @@ class CartItemCreateSerializer(BaseExpandSerializer):
     @override
     def create(self, validated_data):
         cart = self.context.get("cart")
-        try:
-            cart_item = CartItem.objects.get(cart=cart, product=validated_data["product"])
+        cart_item, created = CartItem.objects.get_or_create(
+            cart=cart, product=validated_data["product"], defaults={"quantity": validated_data["quantity"]}
+        )
+
+        if not created:
             cart_item.quantity += validated_data["quantity"]
             cart_item.save()
-            return cart_item
-        except CartItem.DoesNotExist:
-            cart_item = CartItem.objects.create(cart=cart, **validated_data)
-            return cart_item
+
+        return cart_item
 
 
 class CartSerializer(BaseExpandSerializer):
-    cart_items = serializers.SerializerMethodField("get_cart_items")
+    cart_items = serializers.SerializerMethodField()
     total_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     total_discount_value = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     total_vat_value = MoneyField(max_digits=11, decimal_places=2, read_only=True)
 
     @extend_schema_field(serializers.ListSerializer(child=CartItemSerializer()))
-    def get_cart_items(self, cart: Cart):
-        qs = CartItem.objects.filter(cart=cart)
-        serializer = CartItemSerializer(qs, many=True, context=self.context)
-        return serializer.data
+    def get_cart_items(self, obj):
+        cart_items = CartItem.objects.filter(cart=obj)
+        return CartItemSerializer(cart_items, many=True, context=self.context).data
 
     class Meta:
         model = Cart

@@ -471,10 +471,6 @@ CELERY_BEAT_SCHEDULE = {
         "task": "core.tasks.optimize_images",
         "schedule": crontab(hour="3", minute="30", day_of_week="sunday"),
     },
-    "compress-old-logs": {
-        "task": "core.tasks.compress_old_logs",
-        "schedule": crontab(hour="1", minute="0", day_of_month="1"),
-    },
     "clear-duplicate-history": {
         "task": "core.tasks.clear_duplicate_history_task",
         "schedule": crontab(hour="4", minute="0"),

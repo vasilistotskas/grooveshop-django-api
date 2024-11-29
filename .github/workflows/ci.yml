@@ -54,7 +54,7 @@ jobs:
       matrix:
         db: [ postgres ]
         python-version: [ 3.13.0 ]
-        meilisearch-version: [ 1.10 ]
+        meilisearch-version: [ 1.11 ]
         include:
           - db: postgres
             db_port: 5432

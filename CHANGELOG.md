@@ -3,7 +3,23 @@
 
 
 
+## v0.185.0 (2024-12-08)
+
+### Bug fixes
+
+* fix: session test patch env values ([`5bc874d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5bc874d4a78624c409c1479754eeb709cfb901c2))
+
+* fix: remove qodana ([`2d06f0b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2d06f0bbfc98c86e9be67028af26371bb875e4a6))
+
+### Features
+
+* feat: Remove gzip compression asgi, Cart improved, Cache improved, Bump Version ([`8386bf0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8386bf04a1692fea902f38790550890dded0a7d0))
+
 ## v0.184.0 (2024-12-04)
+
+### Chores
+
+* chore(release): release version 0.184.0 [skip ci] ([`44dc5ab`](https://github.com/vasilistotskas/grooveshop-django-api/commit/44dc5ab8114adc5a1e638a9a1ee94998434b659c))
 
 ### Features
 

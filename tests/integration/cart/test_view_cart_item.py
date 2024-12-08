@@ -19,19 +19,33 @@ class CartItemViewSetTest(APITestCase):
     cart: Cart = None
     product: Product = None
     cart_item: CartItem = None
+    list_url: str = None
     detail_url: str = None
+    create_data: dict = None
     update_data: dict = None
 
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
         self.client.force_authenticate(user=self.user)
+
         self.cart = CartFactory(user=self.user, num_cart_items=0)
+        self.cart.save()
+
         self.product = ProductFactory(num_images=0, num_reviews=0)
+        self.product.save()
+
         self.cart_item = CartItemFactory(cart=self.cart, product=self.product, quantity=2)
+        self.cart_item.save()
+
         self.list_url = reverse("cart-item-list")
         self.detail_url = reverse("cart-item-detail", kwargs={"pk": self.cart_item.pk})
+
         self.create_data = {"product": self.product.pk, "quantity": 3}
         self.update_data = {"quantity": 5}
+
+        self.assertIsNotNone(self.cart, "Cart should not be None")
+        self.assertEqual(self.cart.user, self.user, "Cart's user should match the authenticated user")
+        self.assertTrue(Cart.objects.filter(user=self.user).exists(), "Cart should exist for the user")
 
     def test_list(self):
         response = self.client.get(self.list_url)
@@ -44,6 +58,9 @@ class CartItemViewSetTest(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(CartItem.objects.count(), 1)
+
+        cart_item = CartItem.objects.get(product=self.product)
+        self.assertEqual(cart_item.quantity, 5)
 
     def test_retrieve_cart_item(self):
         response = self.client.get(self.detail_url)

@@ -1,4 +1,3 @@
-from django.core.cache import cache
 from django.core.management.base import BaseCommand
 
 from core.caches import cache_instance
@@ -9,7 +8,6 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
         try:
-            cache.clear()
             cache_instance.clear()
             self.stdout.write(self.style.SUCCESS("Successfully cleared cache"))
         except Exception as exc:

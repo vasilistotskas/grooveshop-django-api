@@ -65,25 +65,25 @@ class CartItemSerializer(BaseExpandSerializer):
 
 
 class CartItemCreateSerializer(BaseExpandSerializer):
-    cart = serializers.SerializerMethodField()
-
-    @extend_schema_field(serializers.IntegerField)
-    def get_cart(self, _obj) -> int:
-        return self.context.get("cart").id
-
     class Meta:
         model = CartItem
-        fields = ("id", "cart", "product", "quantity")
+        fields = ("id", "product", "quantity")
+        read_only_fields = ("id",)
 
     @override
     def create(self, validated_data):
         cart = self.context.get("cart")
-        cart_item, created = CartItem.objects.get_or_create(
-            cart=cart, product=validated_data["product"], defaults={"quantity": validated_data["quantity"]}
-        )
+        product = validated_data.get("product")
+        quantity = validated_data.get("quantity")
 
+        if not cart:
+            raise serializers.ValidationError("Cart is not provided.")
+
+        cart_item, created = CartItem.objects.get_or_create(
+            cart=cart, product=product, defaults={"quantity": quantity}
+        )
         if not created:
-            cart_item.quantity += validated_data["quantity"]
+            cart_item.quantity += quantity
             cart_item.save()
 
         return cart_item
@@ -114,6 +114,7 @@ class CartSerializer(BaseExpandSerializer):
             "created_at",
             "updated_at",
             "uuid",
+            "last_activity",
         )
         read_only_fields = (
             "total_price",

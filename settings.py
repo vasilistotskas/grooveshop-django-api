@@ -402,17 +402,23 @@ HEADLESS_FRONTEND_URLS = {
 }
 
 USE_AWS = getenv("USE_AWS", "False") == "True"
+
 REDIS_HOST = getenv("REDIS_HOST", "localhost")
 REDIS_PORT = getenv("REDIS_PORT", "6379")
 REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
-DISABLE_CACHE = getenv("DISABLE_CACHE", "False").lower() == "true"
+
+DEFAULT_CACHE_KEY_PREFIX = getenv("DEFAULT_CACHE_KEY_PREFIX", "default")
+DEFAULT_CACHE_VERSION = int(getenv("DEFAULT_CACHE_VERSION", "1"))
 DEFAULT_CACHE_TTL = int(getenv("DEFAULT_CACHE_TTL", 60 * 60 * 2))
+DISABLE_CACHE = getenv("DISABLE_CACHE", "False").lower() == "true"
 
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
         "LOCATION": REDIS_URL,
-        "KEY_PREFIX": "redis",
+        "KEY_PREFIX": DEFAULT_CACHE_KEY_PREFIX,
+        "VERSION": DEFAULT_CACHE_VERSION,
+        "TIMEOUT": DEFAULT_CACHE_TTL,
     },
 }
 

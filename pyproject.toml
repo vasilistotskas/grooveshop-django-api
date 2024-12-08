@@ -11,12 +11,12 @@ packages = [
 ]
 
 [build-system]
-requires = ["poetry>=1.8.4"]
+requires = ["poetry>=1.8.5"]
 build-backend = "poetry.masonry.api"
 
 [tool.poetry.dependencies]
 asgiref = "3.8.1"
-boto3 = "1.35.74"
+boto3 = "1.35.76"
 python = ">=3.11,<4.0.0"
 charset_normalizer = "3.4.0"
 chardet = "5.2.0"
@@ -24,7 +24,7 @@ channels = "4.2.0"
 channels-redis = "4.2.1"
 click = "8.1.7"
 cryptography = "44.0.0"
-django = "5.1.3"
+django = "5.1.4"
 django-admin-thumbnails = "0.2.9"
 django-allauth = "65.3.0"
 django-csp = "4.0b2"
@@ -53,9 +53,9 @@ drf-spectacular = "0.28.0"
 fido2 = "1.2.0"
 flower = "2.0.1"
 gunicorn = "23.0.0"
-hiredis = "3.0.0"
+hiredis = "3.1.0"
 httptools = "0.6.4"
-httpx = "0.28.0"
+httpx = "0.28.1"
 importlib-resources = "6.4.5"
 measurement = "3.2.2"
 meilisearch = "0.33.0"
@@ -77,7 +77,7 @@ sentry-sdk = "*"
 [tool.poetry.dev-dependencies]
 bpython = "*"
 black = "24.10.0"
-coverage = "7.6.8"
+coverage = "7.6.9"
 djangorestframework-stubs = "3.15.1"
 django-debug-toolbar = "4.4.6"
 django-extensions = "*"

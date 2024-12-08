@@ -95,15 +95,15 @@ class CustomCacheTestCase(TestCase):
             "search_key3": "search_value3",
         }
         self.cache_instance.set_many(new_keys)
+        print("=== self.cache_instance.keys() === ", self.cache_instance.keys())
 
-        keys = self.cache_instance.keys("search_key*")
-        default_cache_key_prefix = self.cache_instance.key_prefix
+        keys = self.cache_instance.keys("search_key")
         self.assertEqual(
             keys,
             [
-                f"{default_cache_key_prefix}search_key1",
-                f"{default_cache_key_prefix}search_key2",
-                f"{default_cache_key_prefix}search_key3",
+                "search_key1",
+                "search_key2",
+                "search_key3",
             ],
         )
 

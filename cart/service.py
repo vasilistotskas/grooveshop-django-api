@@ -31,32 +31,36 @@ class ProcessCartOption(Enum):
 
 
 class CartService:
-    def __init__(self, cart_id: int | None = None, request: Request | HttpRequest | None = None):
-        self.cart_id = cart_id
+    def __init__(self, request: Request | HttpRequest):
+        if not request:
+            raise CartServiceInitException("Request must be provided to initialize CartService.")
+
+        self.request = request
         self.cart: Cart | None = None
         self.cart_items: list[CartItem] = []
-
-        if not cart_id and not request:
-            raise CartServiceInitException()
-
-        if request:
-            self.get_or_create_cart(request)
-        elif cart_id:
-            self.cart = self.get_cart_by_id(cart_id)
-            self.cart_items = self.cart.get_items()
+        try:
+            self._initialize_cart()
+        except CartServiceInitException:
+            raise
 
     def __str__(self):
-        return f"Cart {self.cart.user}"
+        return f"Cart {self.cart.user if self.cart and self.cart.user else 'Anonymous'}"
 
     def __len__(self):
-        return self.cart.total_items
+        return self.cart.total_items if self.cart else 0
 
     def __iter__(self):
-        yield from self.cart_items
+        if self.cart:
+            yield from self.cart_items
 
-    def process_cart(self, request: Request | HttpRequest | None, option: ProcessCartOption) -> None:
-        cart = self.get_or_create_cart(request)
-        pre_login_cart_id = request.session.get("pre_log_in_cart_id")
+    def _initialize_cart(self) -> None:
+        self.cart = self.get_cart()
+        self.cart_items = self.cart.get_items() if self.cart else []
+        if self.cart:
+            self.cart.refresh_last_activity()
+
+    def process_cart(self, option: ProcessCartOption) -> None:
+        pre_login_cart_id = self.request.session.get("pre_log_in_cart_id")
         if isinstance(pre_login_cart_id, (int, str)):
             pre_login_cart_id = int(pre_login_cart_id)
 
@@ -64,69 +68,60 @@ class CartService:
             case ProcessCartOption.MERGE:
                 if pre_login_cart_id:
                     pre_login_cart = self.get_cart_by_id(pre_login_cart_id)
-                    self.merge_carts(request, cart, pre_login_cart)
+                    if pre_login_cart:
+                        self.merge_carts(pre_login_cart)
             case ProcessCartOption.CLEAN:
-                self.clean_cart(cart)
+                self.clean_cart()
             case ProcessCartOption.KEEP:
                 pass
             case _:
-                raise InvalidProcessCartOptionException()
+                raise InvalidProcessCartOptionException(f"Invalid option: {option}")
 
-    def get_or_create_cart(self, request: Request | HttpRequest | None) -> Cart:
-        cart_id = request.session.get("cart_id")
-        user = request.user
-
-        if self.cart:
-            return self.cart
-
+    def get_cart(self) -> Cart | None:
+        cart_id = self.request.session.get("cart_id")
+        user = self.request.user
         if user.is_authenticated:
-            cart, _ = Cart.objects.get_or_create(user=user)
+            cart_qs = Cart.objects.filter(user=user)
+            cart = cart_qs.first()
+            return cart
         elif cart_id:
-            cart, _ = Cart.objects.get_or_create(id=int(cart_id))
-            request.session["pre_log_in_cart_id"] = cart.id
-        else:
-            cart = Cart.objects.create()
-            request.session["pre_log_in_cart_id"] = cart.id
+            cart_qs = Cart.objects.filter(id=cart_id)
+            cart = cart_qs.first()
+            return cart
+        return None
 
-        request.session["cart_id"] = cart.id
-        request.session.save()
-        self.cart = cart
-        self.cart_items = cart.get_items()
-        self.cart.refresh_last_activity()
-        return cart
-
-    @staticmethod
-    def merge_carts(request: Request | HttpRequest | None, cart: Cart, pre_login_cart: Cart) -> None:
+    def merge_carts(self, pre_login_cart: Cart) -> None:
         for item in pre_login_cart.items.all():
-            if not CartItem.objects.filter(cart=cart, product=item.product).exists():
-                item.cart = cart
+            if not CartItem.objects.filter(cart=self.cart, product=item.product).exists():
+                item.cart = self.cart
                 item.save()
         pre_login_cart.delete()
-        request.session["pre_log_in_cart_id"] = None
+        self.request.session["pre_log_in_cart_id"] = None
 
-    @staticmethod
-    def clean_cart(cart: Cart) -> None:
-        cart.items.all().delete()
+    def clean_cart(self) -> None:
+        if self.cart:
+            self.cart.items.all().delete()
+            self.cart_items = []
 
     @staticmethod
     def get_cart_by_id(cart_id: int) -> Cart | None:
         return Cart.objects.filter(id=cart_id).first()
 
     def get_cart_item(self, product_id: int | None) -> CartItem | None:
-        return self.cart.items.filter(product_id=product_id).first()
+        if self.cart:
+            return self.cart.items.filter(product_id=product_id).first()
+        return None
 
     def create_cart_item(self, product: Product, quantity: int) -> CartItem:
         if not self.cart:
-            raise CartNotSetException()
-
+            raise CartNotSetException("Cart is not set.")
         cart_item = CartItem.objects.create(cart=self.cart, product=product, quantity=quantity)
         self.cart_items = self.cart.get_items()
         return cart_item
 
     def update_cart_item(self, product_id: int, quantity: int) -> CartItem:
         if not self.cart:
-            raise CartNotSetException()
-
+            raise CartNotSetException("Cart is not set.")
         cart_item = self.cart.items.get(product_id=product_id)
         cart_item.quantity = quantity
         cart_item.save()
@@ -135,7 +130,6 @@ class CartService:
 
     def delete_cart_item(self, product_id: int) -> None:
         if not self.cart:
-            raise CartNotSetException()
-
+            raise CartNotSetException("Cart is not set.")
         self.cart.items.filter(product_id=product_id).delete()
         self.cart_items = self.cart.get_items()

@@ -27,6 +27,7 @@ class SessionAPITestCase(APITestCase):
     def get_session_active_users_count_url():
         return reverse("session-active-users-count")
 
+    @patch.dict("os.environ", {"DEFAULT_CACHE_KEY_PREFIX": "redis", "DEFAULT_CACHE_VERSION": "1"})
     @patch("django.utils.timezone.now")
     def test_active_users_count_admin_access(self, mock_now):
         fixed_now = datetime(2024, 12, 8, 12, 0, 0, tzinfo=timezone.utc)
@@ -114,6 +115,7 @@ class SessionAPITestCase(APITestCase):
             mock_get.assert_not_called()
             mock_filter.assert_not_called()
 
+    @patch.dict("os.environ", {"DEFAULT_CACHE_KEY_PREFIX": "redis", "DEFAULT_CACHE_VERSION": "1"})
     @patch("django.utils.timezone.now")
     def test_active_users_count_with_active_users(self, mock_now):
         fixed_now = datetime(2024, 12, 8, 12, 0, 0, tzinfo=timezone.utc)
@@ -166,6 +168,7 @@ class SessionAPITestCase(APITestCase):
                 mock_get_session.assert_any_call(session_key="session1")
                 mock_get_session.assert_any_call(session_key="session2")
 
+    @patch.dict("os.environ", {"DEFAULT_CACHE_KEY_PREFIX": "redis", "DEFAULT_CACHE_VERSION": "1"})
     @patch("django.utils.timezone.now")
     def test_active_users_count_with_mixed_sessions(self, mock_now):
         fixed_now = datetime(2024, 12, 8, 12, 0, 0, tzinfo=timezone.utc)
@@ -296,6 +299,7 @@ class SessionAPITestCase(APITestCase):
             mock_get.assert_not_called()
             mock_filter.assert_not_called()
 
+    @patch.dict("os.environ", {"DEFAULT_CACHE_KEY_PREFIX": "redis", "DEFAULT_CACHE_VERSION": "1"})
     @patch("django.utils.timezone.now")
     def test_active_users_count_duplicate_users(self, mock_now):
         fixed_now = datetime(2024, 12, 8, 12, 0, 0, tzinfo=timezone.utc)

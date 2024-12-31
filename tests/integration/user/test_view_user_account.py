@@ -35,8 +35,12 @@ class UserAccountViewSetTestCase(APITestCase):
         response = self.client.get(url)
         user_accounts = User.objects.all()
         serializer = AuthenticationSerializer(user_accounts, many=True)
-        for response_item, serializer_item in zip(response.data["results"], serializer.data):
-            compare_serializer_and_response(serializer_item, response_item, ["image"])
+        for response_item, serializer_item in zip(
+            response.data["results"], serializer.data, strict=False
+        ):
+            compare_serializer_and_response(
+                serializer_item, response_item, ["image"]
+            )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -65,7 +69,9 @@ class UserAccountViewSetTestCase(APITestCase):
         response = self.client.get(url)
         user_accounts = User.objects.get(id=self.user.id)
         serializer = AuthenticationSerializer(user_accounts)
-        compare_serializer_and_response(serializer.data, response.data, ["image"])
+        compare_serializer_and_response(
+            serializer.data, response.data, ["image"]
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 

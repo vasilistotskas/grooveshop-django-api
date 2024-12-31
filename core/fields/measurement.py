@@ -1,16 +1,9 @@
 import logging
-from typing import Any
-from typing import Optional
-from typing import override
-from typing import Sequence
-from typing import Type
+from typing import Any, Optional, override
 
-from django.db.models import FloatField
-from django.db.models import Model
-from django.forms.fields import Field
+from django.db.models import FloatField, Model
 from django.utils.translation import gettext_lazy as _
-from measurement.base import BidimensionalMeasure
-from measurement.base import MeasureBase
+from measurement.base import BidimensionalMeasure, MeasureBase
 
 from core.forms.measurement import MeasurementFormField
 from core.utils.measurement import get_measurement
@@ -30,20 +23,27 @@ class MeasurementField(FloatField):
         MeasureBase,
     )
     default_error_messages = {
-        "invalid_type": _("'%(value)s' (%(type_given)s) value" " must be of type %(type_wanted)s."),
+        "invalid_type": _(
+            "'%(value)s' (%(type_given)s) value"
+            " must be of type %(type_wanted)s."
+        ),
     }
 
     def __init__(
         self,
         verbose_name: Optional[str] = None,
         name: Optional[str] = None,
-        measurement: Type[MeasureBase | BidimensionalMeasure] = None,
+        measurement: Optional[type[MeasureBase | BidimensionalMeasure]] = None,
         unit_choices: Optional[list[tuple[str, str]]] = None,
         *args,
         **kwargs,
     ):
-        if measurement is None or not issubclass(measurement, self.MEASURE_BASES):
-            raise MeasurementTypeError("MeasurementField requires a measurement subclass of MeasureBase.")
+        if measurement is None or not issubclass(
+            measurement, self.MEASURE_BASES
+        ):
+            raise MeasurementTypeError(
+                "MeasurementField requires a measurement subclass of MeasureBase."
+            )
 
         self.measurement = measurement
         self.widget_args = {
@@ -51,16 +51,16 @@ class MeasurementField(FloatField):
             "unit_choices": unit_choices,
         }
 
-        super(MeasurementField, self).__init__(verbose_name, name, *args, **kwargs)
+        super().__init__(verbose_name, name, *args, **kwargs)
 
     @override
-    def deconstruct(self) -> tuple[str, str, Sequence, dict[str, Any]]:
-        name, path, args, kwargs = super(MeasurementField, self).deconstruct()
+    def deconstruct(self):
+        name, path, args, kwargs = super().deconstruct()
         kwargs["measurement"] = self.measurement
         return name, path, args, kwargs
 
     @override
-    def get_prep_value(self, value) -> Optional[float]:
+    def get_prep_value(self, value):
         if value is None:
             return None
 
@@ -68,15 +68,15 @@ class MeasurementField(FloatField):
             return float(value.standard)
 
         else:
-            return super(MeasurementField, self).get_prep_value(value)
+            return super().get_prep_value(value)
 
-    def get_default_unit(self) -> str:
+    def get_default_unit(self):
         unit_choices = self.widget_args["unit_choices"]
         if unit_choices:
             return unit_choices[0][0]
         return self.measurement.STANDARD_UNIT
 
-    def from_db_value(self, value: Optional[float], *args, **kwargs) -> Optional[BidimensionalMeasure]:
+    def from_db_value(self, value: Optional[float], *args, **kwargs):
         if value is None:
             return None
 
@@ -87,13 +87,13 @@ class MeasurementField(FloatField):
         )
 
     @override
-    def value_to_string(self, obj: Model) -> str:
+    def value_to_string(self, obj: Model):
         value = self.value_from_object(obj)
         if not isinstance(value, self.MEASURE_BASES):
             return value
-        return "%s:%s" % (value.value, value.unit)
+        return "{}:{}".format(value.value, value.unit)
 
-    def deserialize_value_from_string(self, value_str: str) -> Optional[MeasureBase | BidimensionalMeasure]:
+    def deserialize_value_from_string(self, value_str: str):
         try:
             value, unit = value_str.split(":", 1)
             value = float(value)
@@ -104,20 +104,18 @@ class MeasurementField(FloatField):
             return None
 
     @override
-    def to_python(self, value: Any) -> Optional[MeasureBase | BidimensionalMeasure]:
-        if value is None:
-            return value
-        elif isinstance(value, self.MEASURE_BASES):
+    def to_python(self, value: Any):
+        if value is None or isinstance(value, self.MEASURE_BASES):
             return value
         elif isinstance(value, str):
             parsed = self.deserialize_value_from_string(value)
             if parsed is not None:
                 return parsed
-        value = super(MeasurementField, self).to_python(value)
+        value = super().to_python(value)
 
         return_unit = self.get_default_unit()
 
-        msg = 'You assigned a %s instead of %s to %s.%s.%s, unit was guessed to be "%s".' % (
+        msg = 'You assigned a {} instead of {} to {}.{}.{}, unit was guessed to be "{}".'.format(
             type(value).__name__,
             str(self.measurement.__name__),
             self.model.__module__,
@@ -133,8 +131,8 @@ class MeasurementField(FloatField):
         )
 
     @override
-    def formfield(self, **kwargs) -> Field:
+    def formfield(self, **kwargs):
         defaults = {"form_class": MeasurementFormField}
         defaults.update(kwargs)
         defaults.update(self.widget_args)
-        return super(MeasurementField, self).formfield(**defaults)
+        return super().formfield(**defaults)

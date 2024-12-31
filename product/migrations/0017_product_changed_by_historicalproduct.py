@@ -38,40 +38,72 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="HistoricalProduct",
             fields=[
-                ("created_at", models.DateTimeField(blank=True, editable=False, verbose_name="Created At")),
-                ("updated_at", models.DateTimeField(blank=True, editable=False, verbose_name="Updated At")),
-                ("uuid", models.UUIDField(db_index=True, default=uuid.uuid4, editable=False)),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        blank=True, editable=False, verbose_name="Created At"
+                    ),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(
+                        blank=True, editable=False, verbose_name="Updated At"
+                    ),
+                ),
+                (
+                    "uuid",
+                    models.UUIDField(db_index=True, default=uuid.uuid4, editable=False),
+                ),
                 (
                     "private_metadata",
                     models.JSONField(
-                        blank=True, default=dict, encoder=django.core.serializers.json.DjangoJSONEncoder
+                        blank=True,
+                        default=dict,
+                        encoder=django.core.serializers.json.DjangoJSONEncoder,
                     ),
                 ),
                 (
                     "metadata",
                     models.JSONField(
-                        blank=True, default=dict, encoder=django.core.serializers.json.DjangoJSONEncoder
+                        blank=True,
+                        default=dict,
+                        encoder=django.core.serializers.json.DjangoJSONEncoder,
                     ),
                 ),
                 ("deleted_at", models.DateTimeField(blank=True, null=True)),
                 ("is_deleted", models.BooleanField(default=False)),
                 (
                     "seo_title",
-                    models.CharField(blank=True, max_length=70, null=True, verbose_name="Seo Title"),
+                    models.CharField(
+                        blank=True, max_length=70, null=True, verbose_name="Seo Title"
+                    ),
                 ),
                 (
                     "seo_description",
-                    models.TextField(blank=True, max_length=300, null=True, verbose_name="Seo Description"),
+                    models.TextField(
+                        blank=True,
+                        max_length=300,
+                        null=True,
+                        verbose_name="Seo Description",
+                    ),
                 ),
                 (
                     "seo_keywords",
-                    models.CharField(blank=True, max_length=255, null=True, verbose_name="Seo Keywords"),
+                    models.CharField(
+                        blank=True,
+                        max_length=255,
+                        null=True,
+                        verbose_name="Seo Keywords",
+                    ),
                 ),
                 ("id", models.BigIntegerField(blank=True, db_index=True)),
                 (
                     "product_code",
                     models.CharField(
-                        db_index=True, default=uuid.uuid4, max_length=100, verbose_name="Product Code"
+                        db_index=True,
+                        default=uuid.uuid4,
+                        max_length=100,
+                        verbose_name="Product Code",
                     ),
                 ),
                 ("slug", models.SlugField(max_length=255, verbose_name="Slug")),
@@ -87,7 +119,10 @@ class Migration(migrations.Migration):
                 (
                     "price",
                     djmoney.models.fields.MoneyField(
-                        decimal_places=2, default=Decimal("0"), max_digits=11, verbose_name="Price"
+                        decimal_places=2,
+                        default=Decimal("0"),
+                        max_digits=11,
+                        verbose_name="Price",
                     ),
                 ),
                 ("active", models.BooleanField(default=True, verbose_name="Active")),
@@ -101,7 +136,12 @@ class Migration(migrations.Migration):
                         verbose_name="Discount Percent",
                     ),
                 ),
-                ("view_count", models.PositiveBigIntegerField(default=0, verbose_name="View Count")),
+                (
+                    "view_count",
+                    models.PositiveBigIntegerField(
+                        default=0, verbose_name="View Count"
+                    ),
+                ),
                 (
                     "weight",
                     core.fields.measurement.MeasurementField(
@@ -116,7 +156,8 @@ class Migration(migrations.Migration):
                 (
                     "history_type",
                     models.CharField(
-                        choices=[("+", "Created"), ("~", "Changed"), ("-", "Deleted")], max_length=1
+                        choices=[("+", "Created"), ("~", "Changed"), ("-", "Deleted")],
+                        max_length=1,
                     ),
                 ),
                 (

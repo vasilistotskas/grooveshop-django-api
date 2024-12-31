@@ -4,7 +4,9 @@ from django.conf import settings
 
 from blog.models.tag import BlogTag
 
-available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+available_languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 
 
 class BlogTagTranslationFactory(factory.django.DjangoModelFactory):
@@ -30,7 +32,8 @@ class BlogTagFactory(factory.django.DjangoModelFactory):
             return
 
         translations = extracted or [
-            BlogTagTranslationFactory(language_code=lang, master=self) for lang in available_languages
+            BlogTagTranslationFactory(language_code=lang, master=self)
+            for lang in available_languages
         ]
 
         for translation in translations:

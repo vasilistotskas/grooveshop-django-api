@@ -1,7 +1,9 @@
-from django.dispatch import receiver
-from django.dispatch import Signal
+from typing import TYPE_CHECKING
 
-from order.models.order import Order
+from django.dispatch import Signal, receiver
+
+if TYPE_CHECKING:
+    from order.models.order import Order
 
 # Signal that order has been created
 order_created = Signal()

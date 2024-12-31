@@ -7,7 +7,9 @@ from blog.factories.tag import BlogTagFactory
 from blog.models.tag import BlogTag
 from blog.serializers.tag import BlogTagSerializer
 
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 

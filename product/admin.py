@@ -1,13 +1,11 @@
 from typing import override
 
 import admin_thumbnails
-from django.contrib import admin
-from django.contrib import messages
+from django.contrib import admin, messages
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext
 from mptt.admin import DraggableMPTTAdmin
-from parler.admin import TranslatableAdmin
-from parler.admin import TranslatableTabularInline
+from parler.admin import TranslatableAdmin, TranslatableTabularInline
 from simple_history.admin import SimpleHistoryAdmin
 
 from core.admin import ExportModelAdmin
@@ -23,8 +21,10 @@ def category_update_action(category):
     def category_update(model_admin, request, queryset):
         return queryset.update(category=category)
 
-    category_update.__name__ = "make_action_%s" % category.name
-    category_update.short_description = _("Update category to %s") % category.name
+    category_update.__name__ = "make_action_{}".format(category.name)
+    category_update.short_description = (
+        _("Update category to %s") % category.name
+    )
     return category_update
 
 
@@ -62,22 +62,18 @@ class CategoryAdmin(TranslatableAdmin, DraggableMPTTAdmin):
             "slug": ("name",),
         }
 
-    def related_products_count(self, instance):  # noqa
+    def related_products_count(self, instance):
         return instance.products_count
 
-    setattr(
-        related_products_count,
-        "short_description",
-        _("Related products (for this specific category)"),
+    related_products_count.short_description = _(
+        "Related products (for this specific category)"
     )
 
-    def related_products_cumulative_count(self, instance):  # noqa
+    def related_products_cumulative_count(self, instance):
         return instance.products_cumulative_count
 
-    setattr(
-        related_products_cumulative_count,
-        "short_description",
-        _("Related products (in tree)"),
+    related_products_cumulative_count.short_description = _(
+        "Related products (in tree)"
     )
 
 
@@ -116,21 +112,17 @@ class ProductAdmin(TranslatableAdmin, ExportModelAdmin, SimpleHistoryAdmin):
     readonly_fields = ("image_tag", "likes_count")
 
     @override
-    def get_prepopulated_fields(self, request, obj=None) -> dict:
+    def get_prepopulated_fields(self, request, obj=None):
         # can't use `prepopulated_fields = ..` because it breaks the admin validation
         # for translated fields. This is the official django-parler workaround.
         return {
             "slug": ("name",),
         }
 
-    def boolean_status(self, obj) -> bool:  # noqa
-        return True if obj.active else False
+    def boolean_status(self, obj):
+        return bool(obj.active)
 
-    setattr(
-        boolean_status,
-        "boolean",
-        True,
-    )
+    boolean_status.boolean = True
 
     actions = [
         "export_csv",
@@ -184,14 +176,8 @@ class ReviewAdmin(TranslatableAdmin):
             messages.SUCCESS,
         )
 
-    setattr(
-        make_published,
-        "short_description",
-        _("Mark selected comments as published"),
-    )
+    make_published.short_description = _("Mark selected comments as published")
 
-    setattr(
-        make_unpublished,
-        "short_description",
-        _("Mark selected comments as unpublished"),
+    make_unpublished.short_description = _(
+        "Mark selected comments as unpublished"
     )

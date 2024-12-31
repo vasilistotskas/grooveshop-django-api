@@ -5,12 +5,9 @@ from django.core.validators import RegexValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
-from parler.models import TranslatableModel
-from parler.models import TranslatedFields
+from parler.models import TranslatableModel, TranslatedFields
 
-from core.models import SortableModel
-from core.models import TimeStampMixinModel
-from core.models import UUIDModel
+from core.models import SortableModel, TimeStampMixinModel, UUIDModel
 
 
 class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
@@ -37,10 +34,18 @@ class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
             )
         ],
     )
-    iso_cc = models.PositiveSmallIntegerField(_("ISO Country Code"), blank=True, null=True, unique=True)
-    phone_code = models.PositiveSmallIntegerField(_("Phone Code"), blank=True, null=True, unique=True)
-    image_flag = models.ImageField(_("Image Flag"), blank=True, null=True, upload_to="uploads/country/")
-    translations = TranslatedFields(name=models.CharField(_("Name"), max_length=100, blank=True, null=True))
+    iso_cc = models.PositiveSmallIntegerField(
+        _("ISO Country Code"), blank=True, null=True, unique=True
+    )
+    phone_code = models.PositiveSmallIntegerField(
+        _("Phone Code"), blank=True, null=True, unique=True
+    )
+    image_flag = models.ImageField(
+        _("Image Flag"), blank=True, null=True, upload_to="uploads/country/"
+    )
+    translations = TranslatedFields(
+        name=models.CharField(_("Name"), max_length=100, blank=True, null=True)
+    )
 
     class Meta(TypedModelMeta):
         ordering = ["sort_order"]
@@ -67,7 +72,7 @@ class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         return Country.objects.all()
 
     @property
-    def main_image_path(self) -> str:
+    def main_image_path(self):
         if self.image_flag and hasattr(self.image_flag, "name"):
             return f"media/uploads/country/{os.path.basename(self.image_flag.name)}"
         return ""

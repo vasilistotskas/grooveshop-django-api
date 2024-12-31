@@ -13,7 +13,9 @@ from user.factories.address import UserAddressFactory
 from user.models.address import UserAddress
 from user.serializers.address import UserAddressSerializer
 
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
 
@@ -24,7 +26,13 @@ class UserAddressViewSetTestCase(APITestCase):
 
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
-        self.country = CountryFactory(alpha_2="GR", alpha_3="GRC", iso_cc=301, phone_code=30, num_regions=0)
+        self.country = CountryFactory(
+            alpha_2="GR",
+            alpha_3="GRC",
+            iso_cc=301,
+            phone_code=30,
+            num_regions=0,
+        )
         self.region = RegionFactory(alpha="GRC", country=self.country)
         self.client.force_authenticate(user=self.user)
         self.address = UserAddressFactory(
@@ -172,7 +180,9 @@ class UserAddressViewSetTestCase(APITestCase):
         url = self.get_user_address_detail_url(self.address.pk)
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(UserAddress.objects.filter(pk=self.address.pk).exists())
+        self.assertFalse(
+            UserAddress.objects.filter(pk=self.address.pk).exists()
+        )
 
     def test_destroy_invalid(self):
         invalid_user_address_id = 9999

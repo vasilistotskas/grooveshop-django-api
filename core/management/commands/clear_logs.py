@@ -1,6 +1,4 @@
-from os import listdir
-from os import path
-from os import remove
+from os import listdir, path, remove
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
@@ -22,7 +20,9 @@ class Command(BaseCommand):
                     self.stdout.write(f"Deleting file: {file_path}")
                     remove(file_path)
                 except Exception as e:
-                    warning_message = f"Could not delete file {file_path}: {str(e)}"
+                    warning_message = (
+                        f"Could not delete file {file_path}: {e!s}"
+                    )
                     LogInfo.warning(warning_message)
                     self.stdout.write(self.style.WARNING(warning_message))
 
@@ -30,6 +30,6 @@ class Command(BaseCommand):
             LogInfo.info(message)
             self.stdout.write(self.style.SUCCESS(message))
         except Exception as e:
-            error_message = f"Error while deleting log files: {str(e)}"
+            error_message = f"Error while deleting log files: {e!s}"
             LogInfo.error(error_message)
             self.stdout.write(self.style.ERROR(error_message))

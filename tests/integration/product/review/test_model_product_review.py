@@ -8,7 +8,9 @@ from product.models.product import Product
 from product.models.review import ProductReview
 from user.factories.account import UserAccountFactory
 
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
 
@@ -36,7 +38,12 @@ class ProductReviewModelTestCase(TestCase):
 
     def test_str_representation(self):
         comment_snippet = (
-            (self.product_review.safe_translation_getter("comment", any_language=True)[:50] + "...")
+            (
+                self.product_review.safe_translation_getter(
+                    "comment", any_language=True
+                )[:50]
+                + "..."
+            )
             if self.product_review.comment
             else "No Comment"
         )

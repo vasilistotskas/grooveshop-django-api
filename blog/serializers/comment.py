@@ -1,7 +1,5 @@
 import importlib
-from typing import Dict
 from typing import override
-from typing import Type
 
 from django.contrib.auth import get_user_model
 from drf_spectacular.utils import extend_schema_field
@@ -27,10 +25,12 @@ class BlogCommentSerializer(TranslatableModelSerializer, BaseExpandSerializer):
     children = serializers.SerializerMethodField()
     user = PrimaryKeyRelatedField(queryset=User.objects.all())
     post = PrimaryKeyRelatedField(queryset=BlogPost.objects.all())
-    likes = PrimaryKeyRelatedField(queryset=User.objects.all(), many=True, required=False)
+    likes = PrimaryKeyRelatedField(
+        queryset=User.objects.all(), many=True, required=False
+    )
     translations = TranslatedFieldsFieldExtend(shared_model=BlogComment)
 
-    def get_children(self, obj: BlogComment) -> list[int]:  # noqa
+    def get_children(self, obj: BlogComment):
         if obj.get_children().exists():
             return list(obj.get_children().values_list("id", flat=True))
         return []
@@ -65,11 +65,13 @@ class BlogCommentSerializer(TranslatableModelSerializer, BaseExpandSerializer):
     @override
     def get_expand_fields(
         self,
-    ) -> Dict[str, Type[serializers.ModelSerializer]]:
+    ):
         user_account_serializer = importlib.import_module(
             "authentication.serializers"
         ).AuthenticationSerializer
-        blog_post_serializer = importlib.import_module("blog.serializers.post").BlogPostSerializer
+        blog_post_serializer = importlib.import_module(
+            "blog.serializers.post"
+        ).BlogPostSerializer
         return {
             "user": user_account_serializer,
             "post": blog_post_serializer,

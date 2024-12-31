@@ -5,14 +5,18 @@ from django.conf import settings
 from notification.enum import NotificationKindEnum
 from notification.models.notification import Notification
 
-available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+available_languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 
 
 class NotificationTranslationFactory(factory.django.DjangoModelFactory):
     language_code = factory.Iterator(available_languages)
     title = factory.Faker("sentence", nb_words=6)
     message = factory.Faker("paragraph")
-    master = factory.SubFactory("notification.factories.notification.NotificationFactory")
+    master = factory.SubFactory(
+        "notification.factories.notification.NotificationFactory"
+    )
 
     class Meta:
         model = apps.get_model("notification", "NotificationTranslation")
@@ -33,7 +37,8 @@ class NotificationFactory(factory.django.DjangoModelFactory):
             return
 
         translations = extracted or [
-            NotificationTranslationFactory(language_code=lang, master=self) for lang in available_languages
+            NotificationTranslationFactory(language_code=lang, master=self)
+            for lang in available_languages
         ]
 
         for translation in translations:

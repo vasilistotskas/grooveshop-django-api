@@ -31,8 +31,12 @@ class RandomPasswordGeneratorTest(TestCase):
         self.assertFalse(any(char in string.punctuation for char in password))
 
     def test_use_digits_and_special_chars(self):
-        password = generate_random_password(use_digits=True, use_special_chars=True)
-        self.assertTrue(any(char in string.digits + string.punctuation for char in password))
+        password = generate_random_password(
+            use_digits=True, use_special_chars=True
+        )
+        self.assertTrue(
+            any(char in string.digits + string.punctuation for char in password)
+        )
 
     def test_generate_multiple_passwords(self):
         passwords = [generate_random_password() for _ in range(10)]

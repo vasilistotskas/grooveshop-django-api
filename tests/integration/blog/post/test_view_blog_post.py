@@ -15,7 +15,9 @@ from blog.models.post import BlogPost
 from blog.serializers.post import BlogPostSerializer
 from user.factories.account import UserAccountFactory
 
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
 
@@ -276,6 +278,8 @@ class BlogPostViewSetTestCase(APITestCase):
 
         if response.data:
             first_related_post = response.data[0]
-            serializer = BlogPostSerializer(BlogPost.objects.get(id=first_related_post["id"]))
+            serializer = BlogPostSerializer(
+                BlogPost.objects.get(id=first_related_post["id"])
+            )
             expected_data = serializer.data
             self.assertEqual(first_related_post, expected_data)

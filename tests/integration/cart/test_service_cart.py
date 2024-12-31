@@ -1,15 +1,14 @@
 from django.contrib.auth import get_user_model
 from django.core.handlers.wsgi import WSGIRequest
-from django.test import RequestFactory
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 
-from cart.factories import CartFactory
-from cart.factories import CartItemFactory
-from cart.models import Cart
-from cart.models import CartItem
-from cart.service import CartService
-from cart.service import InvalidProcessCartOptionException
-from cart.service import ProcessCartOption
+from cart.factories import CartFactory, CartItemFactory
+from cart.models import Cart, CartItem
+from cart.service import (
+    CartService,
+    InvalidProcessCartOptionException,
+    ProcessCartOption,
+)
 from core.caches import cache_instance
 from product.factories.product import ProductFactory
 from product.models.product import Product
@@ -169,7 +168,9 @@ class CartServiceTest(TestCase):
 
         pre_login_cart = CartFactory(user=None, num_cart_items=0)
         pre_login_product = ProductFactory(num_images=0, num_reviews=0)
-        CartItemFactory(cart=pre_login_cart, product=pre_login_product, quantity=1)
+        CartItemFactory(
+            cart=pre_login_cart, product=pre_login_product, quantity=1
+        )
         cart_service.create_cart_item(self.product, 2)
 
         self.request.session = {"pre_log_in_cart_id": pre_login_cart.id}

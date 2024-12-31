@@ -10,10 +10,18 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AlterModelOptions(
             name="tag",
-            options={"ordering": ["sort_order"], "verbose_name": "Tag", "verbose_name_plural": "Tags"},
+            options={
+                "ordering": ["sort_order"],
+                "verbose_name": "Tag",
+                "verbose_name_plural": "Tags",
+            },
         ),
         migrations.AlterModelOptions(
             name="tagtranslation",
-            options={"default_permissions": (), "managed": True, "verbose_name": "Tag Translation"},
+            options={
+                "default_permissions": (),
+                "managed": True,
+                "verbose_name": "Tag Translation",
+            },
         ),
     ]

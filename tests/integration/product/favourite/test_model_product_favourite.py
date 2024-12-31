@@ -18,11 +18,17 @@ class ProductFavouriteModelTestCase(TestCase):
         self.product = ProductFactory(num_images=0, num_reviews=0)
 
     def test_fields(self):
-        favourite = ProductFavouriteFactory(user=self.user, product=self.product)
+        favourite = ProductFavouriteFactory(
+            user=self.user, product=self.product
+        )
         self.assertIsNotNone(favourite.id)
         self.assertEqual(favourite.user, self.user)
         self.assertEqual(favourite.product, self.product)
 
     def test_str_representation(self):
-        favourite = ProductFavouriteFactory(user=self.user, product=self.product)
-        self.assertEqual(str(favourite), f"{self.user.email} - {self.product.name}")
+        favourite = ProductFavouriteFactory(
+            user=self.user, product=self.product
+        )
+        self.assertEqual(
+            str(favourite), f"{self.user.email} - {self.product.name}"
+        )

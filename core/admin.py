@@ -1,5 +1,5 @@
 import csv
-import xml.etree.ElementTree as ET  # noqa
+import xml.etree.ElementTree as ET
 from typing import override
 
 from django.contrib import admin
@@ -9,12 +9,18 @@ from django.http import HttpResponse
 class ExportActionMixin:
     model = None
 
-    def export_csv(self, request, queryset) -> HttpResponse:
-        opts = self.model._meta  # noqa
+    def export_csv(self, request, queryset):
+        opts = self.model._meta
         response = HttpResponse(content_type="text/csv")
-        response["Content-Disposition"] = "attachment; filename={}.csv".format(opts.verbose_name)
+        response["Content-Disposition"] = "attachment; filename={}.csv".format(
+            opts.verbose_name
+        )
         writer = csv.writer(response)
-        fields = [field for field in opts.get_fields() if not field.many_to_many and not field.one_to_many]
+        fields = [
+            field
+            for field in opts.get_fields()
+            if not field.many_to_many and not field.one_to_many
+        ]
         # Write a first row with header information
         writer.writerow([field.verbose_name for field in fields])
         # Write data rows
@@ -28,9 +34,13 @@ class ExportActionMixin:
 
     export_csv.short_description = "Export selected to CSV"
 
-    def export_xml(self, request, queryset) -> HttpResponse:
-        opts = self.model._meta  # noqa
-        fields = [field for field in opts.get_fields() if not field.many_to_many and not field.one_to_many]
+    def export_xml(self, request, queryset):
+        opts = self.model._meta
+        fields = [
+            field
+            for field in opts.get_fields()
+            if not field.many_to_many and not field.one_to_many
+        ]
 
         root = ET.Element("{}s".format(opts.verbose_name))
         for obj in queryset:
@@ -41,12 +51,14 @@ class ExportActionMixin:
 
         xml_string = ET.tostring(root, encoding="utf-8").decode("utf-8")
         response = HttpResponse(xml_string, content_type="text/xml")
-        response["Content-Disposition"] = "attachment; filename={}.xml".format(opts.verbose_name)
+        response["Content-Disposition"] = "attachment; filename={}.xml".format(
+            opts.verbose_name
+        )
         return response
 
     export_xml.short_description = "Export selected to XML"
 
-    def get_export_formats(self) -> list[dict[str, str]]:
+    def get_export_formats(self):
         return [
             {"format": "csv", "label": "CSV"},
             {"format": "pdf", "label": "PDF"},
@@ -56,10 +68,10 @@ class ExportActionMixin:
 
 class ExportModelAdmin(ExportActionMixin, admin.ModelAdmin):
     @override
-    def get_export_formats(self) -> list[dict[str, str]]:
+    def get_export_formats(self):
         return super().get_export_formats()
 
-    def get_export_fields(self) -> list[dict[str, str]]:
+    def get_export_fields(self):
         fields = []
         opts = self.model.meta
 

@@ -13,24 +13,32 @@ from core.factories import CustomDjangoModelFactory
 
 fake = Faker()
 
-available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+available_languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 
 
 def get_or_create_category():
     if apps.get_model("blog", "BlogCategory").objects.exists():
-        return apps.get_model("blog", "BlogCategory").objects.order_by("?").first()
+        return (
+            apps.get_model("blog", "BlogCategory").objects.order_by("?").first()
+        )
     else:
-        category_factory_module = importlib.import_module("blog.factories.category")
-        category_factory_class = getattr(category_factory_module, "BlogCategoryFactory")
+        category_factory_module = importlib.import_module(
+            "blog.factories.category"
+        )
+        category_factory_class = category_factory_module.BlogCategoryFactory
         return category_factory_class.create()
 
 
 def get_or_create_author():
     if apps.get_model("blog", "BlogAuthor").objects.exists():
-        return apps.get_model("blog", "BlogAuthor").objects.order_by("?").first()
+        return (
+            apps.get_model("blog", "BlogAuthor").objects.order_by("?").first()
+        )
     else:
         author_factory_module = importlib.import_module("blog.factories.author")
-        author_factory_class = getattr(author_factory_module, "BlogAuthorFactory")
+        author_factory_class = author_factory_module.BlogAuthorFactory
         return author_factory_class.create()
 
 
@@ -91,7 +99,8 @@ class BlogPostFactory(CustomDjangoModelFactory):
             return
 
         translations = extracted or [
-            BlogPostTranslationFactory(language_code=lang, master=self) for lang in available_languages
+            BlogPostTranslationFactory(language_code=lang, master=self)
+            for lang in available_languages
         ]
 
         for translation in translations:

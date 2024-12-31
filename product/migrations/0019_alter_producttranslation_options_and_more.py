@@ -12,7 +12,10 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AlterModelOptions(
             name="producttranslation",
-            options={"verbose_name": "Product Translation", "verbose_name_plural": "Product Translations"},
+            options={
+                "verbose_name": "Product Translation",
+                "verbose_name_plural": "Product Translations",
+            },
         ),
         migrations.RemoveField(
             model_name="producttranslation",

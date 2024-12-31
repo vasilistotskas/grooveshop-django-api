@@ -1,14 +1,11 @@
 import importlib
-from typing import Dict
 from typing import override
-from typing import Type
 
 from djmoney.contrib.django_rest_framework import MoneyField
 from drf_spectacular.utils import extend_schema_field
 from measurement.measures import Weight
 from parler_rest.fields import TranslatedFieldsField
 from parler_rest.serializers import TranslatableModelSerializer
-from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
 from core.api.schema import generate_schema_multi_lang
@@ -32,7 +29,9 @@ class ProductSerializer(TranslatableModelSerializer, BaseExpandSerializer):
     final_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     discount_value = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     vat_value = MoneyField(max_digits=11, decimal_places=2, read_only=True)
-    weight = MeasurementSerializerField(measurement=Weight, required=False, allow_null=True)
+    weight = MeasurementSerializerField(
+        measurement=Weight, required=False, allow_null=True
+    )
 
     class Meta:
         model = Product
@@ -88,9 +87,11 @@ class ProductSerializer(TranslatableModelSerializer, BaseExpandSerializer):
     @override
     def get_expand_fields(
         self,
-    ) -> Dict[str, Type[serializers.ModelSerializer]]:
+    ):
         product_category_serializer = importlib.import_module(
             "product.serializers.category"
         ).ProductCategorySerializer
-        vat_serializer = importlib.import_module("vat.serializers").VatSerializer
+        vat_serializer = importlib.import_module(
+            "vat.serializers"
+        ).VatSerializer
         return {"category": product_category_serializer, "vat": vat_serializer}

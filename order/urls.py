@@ -1,7 +1,6 @@
 from django.urls import path
 
-from order.views.order import Checkout
-from order.views.order import OrderViewSet
+from order.views.order import Checkout, OrderViewSet
 
 urlpatterns = [
     path(

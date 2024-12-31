@@ -1,5 +1,4 @@
-from django.test import RequestFactory
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 from rest_framework.request import Request
 
 from core.pagination.cursor import CursorPaginator
@@ -18,7 +17,9 @@ class CursorPaginatorTest(TestCase):
         paginator = CursorPaginator()
         queryset = Product.objects.all()
 
-        request = Request(self.factory.get("/api/v1/products/?c=MA==&page_size=2"))
+        request = Request(
+            self.factory.get("/api/v1/products/?c=MA==&page_size=2")
+        )
 
         paginated_queryset = paginator.paginate_queryset(queryset, request)
 

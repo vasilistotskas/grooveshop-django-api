@@ -7,7 +7,9 @@ from django.test import TestCase
 from blog.factories.category import BlogCategoryFactory
 from blog.models.category import BlogCategory
 
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
@@ -31,5 +33,7 @@ class BlogCategoryModelTestCase(TestCase):
         self.assertEqual(self.category.post_count, 0)
 
     def test_main_image_path(self):
-        expected_filename = f"media/uploads/blog/{os.path.basename(self.category.image.name)}"
+        expected_filename = (
+            f"media/uploads/blog/{os.path.basename(self.category.image.name)}"
+        )
         self.assertEqual(self.category.main_image_path, expected_filename)

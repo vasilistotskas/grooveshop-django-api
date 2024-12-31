@@ -11,7 +11,9 @@ from product.models.review import ProductReview
 from product.serializers.review import ProductReviewSerializer
 from user.factories.account import UserAccountFactory
 
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
 
@@ -184,7 +186,9 @@ class ProductReviewViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(ProductReview.objects.filter(pk=self.product_review.pk).exists())
+        self.assertFalse(
+            ProductReview.objects.filter(pk=self.product_review.pk).exists()
+        )
 
     def test_destroy_invalid(self):
         invalid_product_review_pk = 999999

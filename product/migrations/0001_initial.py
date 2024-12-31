@@ -196,7 +196,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "search_vector",
-                    django.contrib.postgres.search.SearchVectorField(blank=True, null=True),
+                    django.contrib.postgres.search.SearchVectorField(
+                        blank=True, null=True
+                    ),
                 ),
             ],
             options={
@@ -319,7 +321,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
+                    models.CharField(
+                        db_index=True, max_length=15, verbose_name="Language"
+                    ),
                 ),
                 (
                     "name",
@@ -332,7 +336,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "description",
-                    tinymce.models.HTMLField(blank=True, null=True, verbose_name="Description"),
+                    tinymce.models.HTMLField(
+                        blank=True, null=True, verbose_name="Description"
+                    ),
                 ),
             ],
             options={
@@ -394,7 +400,9 @@ class Migration(migrations.Migration):
                 ("id", models.BigAutoField(primary_key=True, serialize=False)),
                 (
                     "image",
-                    models.ImageField(upload_to="uploads/products/", verbose_name="Image"),
+                    models.ImageField(
+                        upload_to="uploads/products/", verbose_name="Image"
+                    ),
                 ),
                 (
                     "thumbnail",
@@ -431,7 +439,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
+                    models.CharField(
+                        db_index=True, max_length=15, verbose_name="Language"
+                    ),
                 ),
                 (
                     "title",
@@ -469,7 +479,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "published_at",
-                    models.DateTimeField(blank=True, null=True, verbose_name="Published At"),
+                    models.DateTimeField(
+                        blank=True, null=True, verbose_name="Published At"
+                    ),
                 ),
                 (
                     "is_published",
@@ -537,7 +549,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
+                    models.CharField(
+                        db_index=True, max_length=15, verbose_name="Language"
+                    ),
                 ),
                 (
                     "name",
@@ -592,7 +606,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
+                    models.CharField(
+                        db_index=True, max_length=15, verbose_name="Language"
+                    ),
                 ),
                 (
                     "comment",

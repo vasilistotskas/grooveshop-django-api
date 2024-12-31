@@ -1,18 +1,14 @@
 import importlib
-from typing import Dict
 from typing import override
-from typing import Type
 
 from drf_spectacular.utils import extend_schema_field
 from parler_rest.fields import TranslatedFieldsField
 from parler_rest.serializers import TranslatableModelSerializer
-from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
 from core.api.schema import generate_schema_multi_lang
 from core.api.serializers import BaseExpandSerializer
-from slider.models import Slide
-from slider.models import Slider
+from slider.models import Slide, Slider
 
 
 @extend_schema_field(generate_schema_multi_lang(Slider))
@@ -79,8 +75,10 @@ class SlideSerializer(TranslatableModelSerializer, BaseExpandSerializer):
     @override
     def get_expand_fields(
         self,
-    ) -> Dict[str, Type[serializers.ModelSerializer]]:
-        slider_serializer = importlib.import_module("slider.serializers").SliderSerializer
+    ):
+        slider_serializer = importlib.import_module(
+            "slider.serializers"
+        ).SliderSerializer
         return {
             "slider": slider_serializer,
         }

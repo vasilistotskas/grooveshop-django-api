@@ -5,7 +5,9 @@ from blog.factories.post import BlogPostFactory
 from blog.factories.tag import BlogTagFactory
 from blog.models.tag import BlogTag
 
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
@@ -20,7 +22,10 @@ class BlogTagModelTestCase(TestCase):
         self.assertTrue(self.tag.active)
 
     def test_str_representation(self):
-        tag_name = self.tag.safe_translation_getter("name", any_language=True) or "Unnamed Tag"
+        tag_name = (
+            self.tag.safe_translation_getter("name", any_language=True)
+            or "Unnamed Tag"
+        )
         self.assertEqual(
             str(self.tag),
             f"{tag_name} ({'Active' if self.tag.active else 'Inactive'})",

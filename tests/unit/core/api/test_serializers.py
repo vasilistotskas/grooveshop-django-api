@@ -11,7 +11,9 @@ from product.models.product import Product
 from product.serializers.product import ProductSerializer
 from user.factories.account import UserAccountFactory
 
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
 
@@ -25,7 +27,9 @@ class TestBaseExpandSerializer(TestCase):
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
         self.product = ProductFactory(num_images=0, num_reviews=0)
-        self.product_favourite = ProductFavouriteFactory(user=self.user, product=self.product)
+        self.product_favourite = ProductFavouriteFactory(
+            user=self.user, product=self.product
+        )
         self.serializer = BaseExpandSerializer(instance=self.product_favourite)
         self.serializer.Meta.model = ProductFavourite
 

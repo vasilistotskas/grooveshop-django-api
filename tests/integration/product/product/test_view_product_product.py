@@ -20,8 +20,9 @@ from user.factories.account import UserAccountFactory
 from vat.factories import VatFactory
 from vat.models import Vat
 
-
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
 

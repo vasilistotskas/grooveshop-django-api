@@ -15,7 +15,9 @@ from product.models.image import ProductImage
 from product.models.product import Product
 from product.serializers.image import ProductImageSerializer
 
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
@@ -39,11 +41,13 @@ class ProductImageViewSetTestCase(APITestCase):
     def get_product_image_list_url():
         return reverse("product-image-list")
 
-    def _create_mock_image(self) -> SimpleUploadedFile:
+    def _create_mock_image(self):
         image = Image.new("RGB", size=(100, 100), color=(155, 0, 0))
         image_io = io.BytesIO()
         image.save(image_io, format="jpeg")
-        image_file = SimpleUploadedFile("mock_image.jpg", image_io.getvalue(), content_type="image/jpg")
+        image_file = SimpleUploadedFile(
+            "mock_image.jpg", image_io.getvalue(), content_type="image/jpg"
+        )
         return image_file
 
     def test_list(self):
@@ -51,8 +55,12 @@ class ProductImageViewSetTestCase(APITestCase):
         response = self.client.get(url)
         images = ProductImage.objects.all()
         serializer = ProductImageSerializer(images, many=True)
-        for response_item, serializer_item in zip(response.data["results"], serializer.data):
-            compare_serializer_and_response(serializer_item, response_item, ["image", "thumbnail"])
+        for response_item, serializer_item in zip(
+            response.data["results"], serializer.data, strict=False
+        ):
+            compare_serializer_and_response(
+                serializer_item, response_item, ["image", "thumbnail"]
+            )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -96,7 +104,9 @@ class ProductImageViewSetTestCase(APITestCase):
         response = self.client.get(url)
         product_image = ProductImage.objects.get(pk=self.product_image.id)
         serializer = ProductImageSerializer(product_image)
-        compare_serializer_and_response(serializer.data, response.data, ["image", "thumbnail"])
+        compare_serializer_and_response(
+            serializer.data, response.data, ["image", "thumbnail"]
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -167,7 +177,9 @@ class ProductImageViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(ProductImage.objects.filter(pk=self.product_image.id).exists())
+        self.assertFalse(
+            ProductImage.objects.filter(pk=self.product_image.id).exists()
+        )
 
     def test_destroy_invalid(self):
         invalid_product_image_id = 999999

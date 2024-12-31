@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from functools import cached_property
 from importlib import import_module
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
@@ -9,26 +10,33 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
-from rest_framework.permissions import AllowAny
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from blog.filters import BlogPostFilter
 from blog.models.post import BlogPost
 from blog.serializers.comment import BlogCommentSerializer
 from blog.serializers.post import BlogPostSerializer
-from blog.strategies.related_posts_strategy import RelatedPostsStrategy
-from blog.strategies.weighted_related_posts_strategy import WeightedRelatedPostsStrategy
+from blog.strategies.weighted_related_posts_strategy import (
+    WeightedRelatedPostsStrategy,
+)
 from core.api.throttling import BurstRateThrottle
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from core.utils.serializers import MultiSerializerMixin
 from core.utils.views import cache_methods
 
+if TYPE_CHECKING:
+    from blog.strategies.related_posts_strategy import RelatedPostsStrategy
+
 
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
-    queryset = BlogPost.objects.select_related("author", "category").prefetch_related("tags", "likes").all()
+    queryset = (
+        BlogPost.objects.select_related("author", "category")
+        .prefetch_related("tags", "likes")
+        .all()
+    )
     filter_backends = [
         DjangoFilterBackend,
         PascalSnakeCaseOrderingFilter,
@@ -50,7 +58,7 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
     }
 
     @cached_property
-    def related_posts_strategy(self) -> RelatedPostsStrategy:
+    def related_posts_strategy(self):
         strategies_with_weights: list[tuple[RelatedPostsStrategy, float]] = []
         for strategy_config in settings.RELATED_POSTS_STRATEGIES:
             strategy_path = strategy_config["strategy"]
@@ -62,9 +70,11 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
             strategies_with_weights.append((strategy_instance, weight))
 
         limit = getattr(settings, "RELATED_POSTS_LIMIT", 8)
-        return WeightedRelatedPostsStrategy(strategies_with_weights, limit=limit)
+        return WeightedRelatedPostsStrategy(
+            strategies_with_weights, limit=limit
+        )
 
-    def get_related_posts_strategy(self) -> RelatedPostsStrategy:
+    def get_related_posts_strategy(self):
         return self.related_posts_strategy
 
     @action(
@@ -73,7 +83,7 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
         permission_classes=[IsAuthenticated],
         throttle_classes=[BurstRateThrottle],
     )
-    def update_likes(self, request, pk=None) -> Response:
+    def update_likes(self, request, pk=None):
         if not request.user.is_authenticated:
             return Response(
                 {"detail": _("Authentication credentials were not provided.")},
@@ -88,7 +98,9 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
         else:
             post.likes.add(user)
         post.save()
-        serializer = self.get_serializer(post, context=self.get_serializer_context())
+        serializer = self.get_serializer(
+            post, context=self.get_serializer_context()
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(
@@ -96,7 +108,7 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
         methods=["POST"],
         permission_classes=[AllowAny],
     )
-    def update_view_count(self, request, pk=None) -> Response:
+    def update_view_count(self, request, pk=None):
         post = self.get_object()
         post.view_count += 1
         post.save()
@@ -108,7 +120,7 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
         methods=["GET"],
         permission_classes=[AllowAny],
     )
-    def comments(self, request, pk=None) -> Response:
+    def comments(self, request, pk=None):
         post: BlogPost = self.get_object()
         queryset = post.comments.all()
         parent_id = request.query_params.get("parent", None)
@@ -125,7 +137,7 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
         methods=["POST"],
         permission_classes=[IsAuthenticated],
     )
-    def liked_posts(self, request, *args, **kwargs) -> Response:
+    def liked_posts(self, request, *args, **kwargs):
         user = request.user
         post_ids = request.data.get("post_ids", [])
         if not isinstance(post_ids, list):
@@ -134,7 +146,9 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        liked_post_ids = BlogPost.objects.filter(likes=user, id__in=post_ids).values_list("id", flat=True)
+        liked_post_ids = BlogPost.objects.filter(
+            likes=user, id__in=post_ids
+        ).values_list("id", flat=True)
 
         return Response(list(liked_post_ids), status=status.HTTP_200_OK)
 
@@ -143,7 +157,7 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
         methods=["GET"],
         permission_classes=[AllowAny],
     )
-    def related_posts(self, request, pk=None) -> Response:
+    def related_posts(self, request, pk=None):
         post = self.get_object()
         strategy = self.get_related_posts_strategy()
         related_posts = strategy.get_related_posts(post)

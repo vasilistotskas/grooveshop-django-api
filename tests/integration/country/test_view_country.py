@@ -7,7 +7,9 @@ from country.factories import CountryFactory
 from country.models import Country
 from country.serializers import CountrySerializer
 
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
@@ -15,7 +17,13 @@ class CountryViewSetTestCase(APITestCase):
     country: Country = None
 
     def setUp(self):
-        self.country = CountryFactory(alpha_2="GR", alpha_3="GRC", iso_cc=301, phone_code=30, num_regions=0)
+        self.country = CountryFactory(
+            alpha_2="GR",
+            alpha_3="GRC",
+            iso_cc=301,
+            phone_code=30,
+            num_regions=0,
+        )
 
     @staticmethod
     def get_country_detail_url(pk):

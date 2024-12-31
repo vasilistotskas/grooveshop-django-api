@@ -13,7 +13,9 @@ from blog.models.post import BlogPost
 from blog.serializers.comment import BlogCommentSerializer
 from user.factories.account import UserAccountFactory
 
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
 
@@ -33,7 +35,9 @@ class BlogCommentViewSetTestCase(APITestCase):
             num_tags=0,
             num_comments=0,
         )
-        self.comment = BlogCommentFactory(is_approved=True, user=self.user, post=self.post)
+        self.comment = BlogCommentFactory(
+            is_approved=True, user=self.user, post=self.post
+        )
 
     @staticmethod
     def get_comment_detail_url(pk):
@@ -159,7 +163,9 @@ class BlogCommentViewSetTestCase(APITestCase):
     def test_partial_update_valid(self):
         payload = {
             "translations": {
-                default_language: {"content": f"Partial update with {default_language} language code"},
+                default_language: {
+                    "content": f"Partial update with {default_language} language code"
+                },
             },
         }
 
@@ -189,7 +195,9 @@ class BlogCommentViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(BlogComment.objects.filter(pk=self.comment.pk).exists())
+        self.assertFalse(
+            BlogComment.objects.filter(pk=self.comment.pk).exists()
+        )
 
     def test_destroy_invalid(self):
         invalid_comment_id = 9999

@@ -15,5 +15,5 @@ def validate_file_extension(value):
         ".tiff",
         ".tif",
     ]  # populate with the extensions that you allow / want
-    if not ext.lower() in valid_extensions:
+    if ext.lower() not in valid_extensions:
         raise ValidationError("Unsupported file extension.")

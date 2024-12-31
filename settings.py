@@ -1,8 +1,5 @@
-from datetime import datetime
-from datetime import timedelta
-from os import getenv
-from os import makedirs
-from os import path
+import datetime
+from os import getenv, makedirs, path
 from pathlib import Path
 
 import dotenv
@@ -10,8 +7,7 @@ from celery.schedules import crontab
 from corsheaders.defaults import (
     default_headers,
 )
-from csp.constants import SELF
-from csp.constants import UNSAFE_INLINE
+from csp.constants import SELF, UNSAFE_INLINE
 from django.utils.translation import gettext_lazy as _
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -32,7 +28,9 @@ SECRET_KEY = getenv("SECRET_KEY", "changeme")
 
 DEBUG = getenv("DEBUG", "True") == "True"
 
-DJANGO_ADMIN_FORCE_ALLAUTH = getenv("DJANGO_ADMIN_FORCE_ALLAUTH", "True") == "True"
+DJANGO_ADMIN_FORCE_ALLAUTH = (
+    getenv("DJANGO_ADMIN_FORCE_ALLAUTH", "True") == "True"
+)
 
 INTERNAL_IPS = [
     "127.0.0.1",
@@ -195,7 +193,7 @@ USE_I18N = getenv("USE_I18N", "True") == "True"
 USE_TZ = getenv("USE_TZ", "True") == "True"
 
 # Site info
-SITE_ID = int(getenv("SITE_ID", 1))
+SITE_ID = int(getenv("SITE_ID", "1"))
 
 LANGUAGES = [
     ("el", _("Greek")),
@@ -241,7 +239,9 @@ REST_FRAMEWORK = {
         "burst": None if DEBUG else "5/minute",
     },
     # Filtering
-    "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend"
+    ],
     # Schema
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     # Pagination
@@ -367,7 +367,7 @@ SOCIALACCOUNT_FORMS = {
     "signup": "allauth.socialaccount.forms.SignupForm",
 }
 
-ACCOUNT_CHANGE_EMAIL = True if DEBUG else False
+ACCOUNT_CHANGE_EMAIL = bool(DEBUG)
 ACCOUNT_USER_MODEL_USERNAME_FIELD = "username"
 ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_UNIQUE_EMAIL = True
@@ -409,7 +409,7 @@ REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
 
 DEFAULT_CACHE_KEY_PREFIX = getenv("DEFAULT_CACHE_KEY_PREFIX", "default")
 DEFAULT_CACHE_VERSION = int(getenv("DEFAULT_CACHE_VERSION", "1"))
-DEFAULT_CACHE_TTL = int(getenv("DEFAULT_CACHE_TTL", 60 * 60 * 2))
+DEFAULT_CACHE_TTL = int(getenv("DEFAULT_CACHE_TTL", "7200"))
 DISABLE_CACHE = getenv("DISABLE_CACHE", "False").lower() == "true"
 
 CACHES = {
@@ -505,7 +505,7 @@ CELERY_BEAT_SCHEDULE = {
     },
     "clear-all-cache": {
         "task": "core.tasks.clear_all_cache_task",
-        "schedule": timedelta(days=30),
+        "schedule": datetime.timedelta(days=30),
     },
     "clear-old-database-backups": {
         "task": "core.tasks.clear_old_database_backups",
@@ -585,11 +585,13 @@ CSRF_COOKIE_NAME = "csrftoken"
 CSRF_COOKIE_AGE = 60 * 60 * 24 * 7 * 52  # 1 year
 CSRF_COOKIE_DOMAIN = getenv("CSRF_COOKIE_DOMAIN", "localhost")
 CSRF_COOKIE_PATH = "/"
-CSRF_COOKIE_SECURE = not DEBUG  # Only send CSRF cookie over HTTPS when DEBUG is False
-CSRF_COOKIE_HTTPONLY = False  # Set to True to prevent JavaScript from reading the CSRF
-CSRF_COOKIE_SAMESITE = (
-    "Lax"  # 'Lax' or 'None'. Use 'None' only if necessary and ensure CSRF_COOKIE_SECURE is True
+CSRF_COOKIE_SECURE = (
+    not DEBUG
+)  # Only send CSRF cookie over HTTPS when DEBUG is False
+CSRF_COOKIE_HTTPONLY = (
+    False  # Set to True to prevent JavaScript from reading the CSRF
 )
+CSRF_COOKIE_SAMESITE = "Lax"  # 'Lax' or 'None'. Use 'None' only if necessary and ensure CSRF_COOKIE_SECURE is True
 CSRF_HEADER_NAME = "HTTP_X_CSRFTOKEN"
 
 # CSRF_TRUSTED_ORIGINS should include only the domains that are trusted to send POST requests to your application
@@ -616,7 +618,11 @@ if DEBUG:
 # CSP
 CONTENT_SECURITY_POLICY = {
     "DIRECTIVES": {
-        "default-src": [SELF, STATIC_BASE_URL, "https://static.cloudflareinsights.com"],
+        "default-src": [
+            SELF,
+            STATIC_BASE_URL,
+            "https://static.cloudflareinsights.com",
+        ],
         "style-src": [
             SELF,
             STATIC_BASE_URL,
@@ -657,7 +663,11 @@ CONTENT_SECURITY_POLICY = {
             "https://cdn.jsdelivr.net",
             "https://cdn.redoc.ly",
         ],
-        "connect-src": [SELF, STATIC_BASE_URL, "https://static.cloudflareinsights.com"],
+        "connect-src": [
+            SELF,
+            STATIC_BASE_URL,
+            "https://static.cloudflareinsights.com",
+        ],
         "font-src": [SELF, STATIC_BASE_URL, "https://fonts.gstatic.com"],
         "base-uri": [SELF],
         "form-action": [SELF],
@@ -675,7 +685,7 @@ CURRENCY_CHOICES = [("USD", "USD $"), ("EUR", "EUR €")]
 
 CONN_HEALTH_CHECKS = SYSTEM_ENV == "production"
 ATOMIC_REQUESTS = SYSTEM_ENV == "production"
-CONN_MAX_AGE = int(getenv("DJANGO_CONN_MAX_AGE", 30))
+CONN_MAX_AGE = int(getenv("DJANGO_CONN_MAX_AGE", "30"))
 INDEX_MAXIMUM_EXPR_COUNT = 8000
 
 DATABASES = {
@@ -728,16 +738,16 @@ MEILISEARCH = {
     "HTTPS": getenv("MEILI_HTTPS", "False") == "True",
     "HOST": getenv("MEILI_HOST", "localhost"),
     "MASTER_KEY": getenv("MEILI_MASTER_KEY", "changeme"),
-    "PORT": int(getenv("MEILI_PORT", 7700)),
-    "TIMEOUT": int(getenv("MEILI_TIMEOUT", 30)),
+    "PORT": int(getenv("MEILI_PORT", "7700")),
+    "TIMEOUT": int(getenv("MEILI_TIMEOUT", "30")),
     "CLIENT_AGENTS": None,
     "DEBUG": DEBUG,
     "SYNC": False,
     "OFFLINE": False,
 }
 
-SEED_DEFAULT_COUNT = int(getenv("SEED_DEFAULT_COUNT", 20))
-SEED_BATCH_SIZE = int(getenv("SEED_BATCH_SIZE", 10))
+SEED_DEFAULT_COUNT = int(getenv("SEED_DEFAULT_COUNT", "20"))
+SEED_BATCH_SIZE = int(getenv("SEED_BATCH_SIZE", "10"))
 
 EXTRA_SETTINGS_DEFAULTS = [
     {
@@ -747,7 +757,9 @@ EXTRA_SETTINGS_DEFAULTS = [
     },
 ]
 
-EMAIL_BACKEND = getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
+EMAIL_BACKEND = getenv(
+    "EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend"
+)
 EMAIL_HOST = getenv("EMAIL_HOST", "localhost")
 EMAIL_PORT = getenv("EMAIL_PORT", "25")
 EMAIL_HOST_USER = getenv("EMAIL_HOST_USER", "localhost@gmail.com")
@@ -758,7 +770,7 @@ ADMIN_EMAIL = getenv("ADMIN_EMAIL", "localhost@gmail.com")
 INFO_EMAIL = getenv("INFO_EMAIL", "localhost@gmail.com")
 
 REST_KNOX = {
-    "TOKEN_TTL": timedelta(days=20),
+    "TOKEN_TTL": datetime.timedelta(days=20),
     "AUTH_HEADER_PREFIX": "Bearer",
 }
 KNOX_TOKEN_MODEL = "knox.AuthToken"
@@ -771,7 +783,7 @@ MFA_TOTP_PERIOD = 30
 MFA_TOTP_DIGITS = 6
 MFA_SUPPORTED_TYPES = ["totp", "recovery_codes", "webauthn"]
 MFA_PASSKEY_LOGIN_ENABLED = True
-MFA_WEBAUTHN_ALLOW_INSECURE_ORIGIN = True if DEBUG else False
+MFA_WEBAUTHN_ALLOW_INSECURE_ORIGIN = bool(DEBUG)
 MFA_PASSKEY_SIGNUP_ENABLED = True
 
 PARLER_DEFAULT_LANGUAGE_CODE = "el"
@@ -805,7 +817,9 @@ ROSETTA_SHOW_AT_ADMIN_PANEL = True
 
 # Security Settings
 SECURE_SSL_REDIRECT = getenv("SECURE_SSL_REDIRECT", "False") == "True"
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https") if not DEBUG else None
+SECURE_PROXY_SSL_HEADER = (
+    ("HTTP_X_FORWARDED_PROTO", "https") if not DEBUG else None
+)
 SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 3600
 SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
 SECURE_HSTS_PRELOAD = not DEBUG
@@ -956,14 +970,14 @@ RELATED_POSTS_STRATEGIES = [
 RELATED_POSTS_LIMIT = 8
 
 # Logging
-timestamp = datetime.now().strftime("%d-%m-%Y")
+timestamp = datetime.datetime.now(tz=datetime.UTC).strftime("%d-%m-%Y")
 log_dir = path.join(BASE_DIR, "logs")
 makedirs(log_dir, exist_ok=True)
 
 django_log_file_path = path.join(log_dir, f"django_logs_{timestamp}.log")
 
 logging_level = getenv("LOGGING_LEVEL", "INFO")
-backup_count = int(getenv("LOG_BACKUP_COUNT", 30))
+backup_count = int(getenv("LOG_BACKUP_COUNT", "30"))
 
 LOGGING = {
     "version": 1,

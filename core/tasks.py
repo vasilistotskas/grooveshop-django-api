@@ -1,10 +1,6 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
+import datetime
 import os
 import time
-from datetime import datetime
-from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -18,7 +14,9 @@ from core import celery_app
 from core.logging import LogInfo
 
 User = get_user_model()
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 
 
 @celery_app.task
@@ -47,7 +45,7 @@ def clear_duplicate_history_task(excluded_fields=None, minutes=None):
         if minutes is not None:
             command_args.extend(["-m", str(minutes)])
         if excluded_fields:
-            command_args.extend(["--excluded_fields"] + excluded_fields)
+            command_args.extend(["--excluded_fields", *excluded_fields])
 
         command_args.append("--auto")
         management.call_command(*command_args)
@@ -98,17 +96,19 @@ def clear_carts_for_none_users_task(self):
 @celery_app.task
 def clear_log_files_task(days=30):
     from django.conf import settings
-    from os import path, remove, listdir
-    from datetime import datetime, timedelta
 
-    logs_path = path.join(settings.BASE_DIR, "logs")
-    files = listdir(logs_path)
+    logs_path = os.path.join(settings.BASE_DIR, "logs")
+    files = os.listdir(logs_path)
 
     for file in files:
-        file_path = path.join(logs_path, file)
-        file_modification_date = datetime.fromtimestamp(path.getmtime(file_path))
-        if datetime.now() - file_modification_date > timedelta(days=days):
-            remove(file_path)
+        file_path = os.path.join(logs_path, file)
+        file_modification_date = datetime.datetime.fromtimestamp(
+            os.path.getmtime(file_path), tz=datetime.UTC
+        )
+        if datetime.datetime.now(
+            tz=datetime.UTC
+        ) - file_modification_date > datetime.timedelta(days=days):
+            os.remove(file_path)
 
     message = f"Removed log files older than {days} days."
 
@@ -127,7 +127,7 @@ def clear_blacklisted_tokens_task(self):
 
 @celery_app.task
 def send_inactive_user_notifications():
-    cutoff_date = now() - timedelta(days=30)
+    cutoff_date = now() - datetime.timedelta(days=30)
     inactive_users = User.objects.filter(last_login__lt=cutoff_date)
 
     for user in inactive_users:
@@ -149,7 +149,9 @@ def send_inactive_user_notifications():
             html_message=message,
         )
 
-    return f"Sent re-engagement emails to {inactive_users.count()} inactive users."
+    return (
+        f"Sent re-engagement emails to {inactive_users.count()} inactive users."
+    )
 
 
 @celery_app.task
@@ -203,11 +205,15 @@ def clear_old_database_backups(days=30):
 
         try:
             date_str = "-".join(filename.split("-")[2:5])
-            file_date = datetime.strptime(date_str, "%Y-%m-%d")
+            file_date = datetime.datetime.strptime(
+                date_str, "%Y-%m-%d"
+            ).replace(tzinfo=datetime.timezone.utc)
         except ValueError:
             continue
 
-        if datetime.now() - file_date > timedelta(days=days):
+        if datetime.datetime.now(
+            tz=datetime.UTC
+        ) - file_date > datetime.timedelta(days=days):
             file_path = os.path.join(backups_path, filename)
             os.remove(file_path)
             deleted_files_count += 1
@@ -222,7 +228,7 @@ def optimize_images():
 
     from PIL import Image
 
-    for subdir, dirs, files in os.walk(images_path):
+    for subdir, _dirs, files in os.walk(images_path):
         for file in files:
             filepath = os.path.join(subdir, file)
             allowed_extensions = [".jpg", ".jpeg", ".png", ".webp"]

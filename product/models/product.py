@@ -9,12 +9,10 @@ from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Avg
-from django.db.models import F
+from django.db.models import Avg, F
 from django.templatetags.static import static
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
-from django.utils.safestring import SafeString
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
@@ -22,22 +20,21 @@ from djmoney.money import Money
 from measurement.measures import Weight
 from mptt.fields import TreeForeignKey
 from parler.fields import TranslationsForeignKey
-from parler.managers import TranslatableManager
-from parler.managers import TranslatableQuerySet
-from parler.models import TranslatableModel
-from parler.models import TranslatedFieldsModel
+from parler.managers import TranslatableManager, TranslatableQuerySet
+from parler.models import TranslatableModel, TranslatedFieldsModel
 from simple_history.models import HistoricalRecords
 from tinymce.models import HTMLField
 
 from core.fields.measurement import MeasurementField
-from core.models import MetaDataModel
-from core.models import SoftDeleteModel
-from core.models import SoftDeleteQuerySet
-from core.models import TimeStampMixinModel
-from core.models import UUIDModel
+from core.models import (
+    MetaDataModel,
+    SoftDeleteModel,
+    SoftDeleteQuerySet,
+    TimeStampMixinModel,
+    UUIDModel,
+)
 from core.units import WeightUnits
-from core.utils.generators import SlugifyConfig
-from core.utils.generators import unique_slugify
+from core.utils.generators import SlugifyConfig, unique_slugify
 from core.weight import zero_weight
 from meili.models import IndexMixin
 from product.enum.review import ReviewStatusEnum
@@ -46,6 +43,9 @@ from product.models.image import ProductImage
 from product.models.review import ProductReview
 from seo.models import SeoModel
 from tag.models.tagged_item import TaggedModel
+
+DISCOUNT_PERCENT_MIN = Decimal("0.0")
+DISCOUNT_PERCENT_MAX = Decimal("100.0")
 
 
 class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
@@ -60,10 +60,18 @@ class ProductManager(TranslatableManager):
 
 
 class Product(
-    SoftDeleteModel, TranslatableModel, TimeStampMixinModel, SeoModel, UUIDModel, MetaDataModel, TaggedModel
+    SoftDeleteModel,
+    TranslatableModel,
+    TimeStampMixinModel,
+    SeoModel,
+    UUIDModel,
+    MetaDataModel,
+    TaggedModel,
 ):
     id = models.BigAutoField(primary_key=True)
-    product_code = models.CharField(_("Product Code"), unique=True, max_length=100, default=uuid.uuid4)
+    product_code = models.CharField(
+        _("Product Code"), unique=True, max_length=100, default=uuid.uuid4
+    )
     category = TreeForeignKey(
         "product.ProductCategory",
         on_delete=models.SET_NULL,
@@ -118,9 +126,13 @@ class Product(
         indexes = [
             *MetaDataModel.Meta.indexes,
             *TimeStampMixinModel.Meta.indexes,
-            models.Index(fields=["product_code"], name="product_product_code_idx"),
+            models.Index(
+                fields=["product_code"], name="product_product_code_idx"
+            ),
             models.Index(fields=["slug"], name="product_slug_idx"),
-            models.Index(fields=["price", "stock"], name="product_price_stock_idx"),
+            models.Index(
+                fields=["price", "stock"], name="product_price_stock_idx"
+            ),
             BTreeIndex(fields=["price"]),
             BTreeIndex(fields=["stock"]),
             BTreeIndex(fields=["discount_percent"]),
@@ -132,7 +144,8 @@ class Product(
         return self.safe_translation_getter("name", any_language=True) or ""
 
     def __repr__(self):
-        return f"<Product {self.name} ({self.product_code})>"
+        name = self.safe_translation_getter("name", any_language=True) or ""
+        return f"<Product: {name} ({self.product_code})>"
 
     @override
     def save(self, *args, **kwargs):
@@ -152,16 +165,30 @@ class Product(
         super().clean()
         if self.discount_percent > 0 >= self.price.amount:
             raise ValidationError(
-                {"discount_percent": _("Discount percent cannot be greater than 0 if price is 0.")}
+                {
+                    "discount_percent": _(
+                        "Discount percent cannot be greater than 0 if price is 0."
+                    )
+                }
             )
 
-        if not 0.0 <= self.discount_percent <= 100.0:
-            raise ValidationError({"discount_percent": _("Discount percent must be between 0 and 100.")})
+        if (
+            not DISCOUNT_PERCENT_MIN
+            <= self.discount_percent
+            <= DISCOUNT_PERCENT_MAX
+        ):
+            raise ValidationError(
+                {
+                    "discount_percent": _(
+                        "Discount percent must be between 0 and 100."
+                    )
+                }
+            )
 
         if self.stock < 0:
             raise ValidationError({"stock": _("Stock cannot be negative.")})
 
-    def generate_unique_product_code(self) -> uuid.UUID:
+    def generate_unique_product_code(self):
         while True:
             unique_code = uuid.uuid4()
             if not self.objects.filter(product_code=unique_code).exists():
@@ -176,9 +203,9 @@ class Product(
     def decrement_stock(self, quantity: int):
         if quantity < 0:
             raise ValueError("Invalid quantity to decrement")
-        updated_rows = Product.objects.filter(id=self.id, stock__gte=quantity).update(
-            stock=F("stock") - quantity
-        )
+        updated_rows = Product.objects.filter(
+            id=self.id, stock__gte=quantity
+        ).update(stock=F("stock") - quantity)
         if not updated_rows:
             raise ValueError("Not enough stock to decrement")
         self.refresh_from_db()
@@ -192,60 +219,66 @@ class Product(
         self.changed_by = value
 
     @property
-    def discount_value(self) -> Money:
+    def discount_value(self):
         value = (self.price.amount * self.discount_percent) / 100
         return Money(value, settings.DEFAULT_CURRENCY)
 
     @property
-    def price_save_percent(self) -> Decimal:
+    def price_save_percent(self):
         if self.price.amount > 0:
             return (self.discount_value.amount / self.price.amount) * 100
         return Decimal(0)
 
     @property
-    def likes_count(self) -> int:
+    def likes_count(self):
         return ProductFavourite.objects.filter(product=self).count()
 
     @property
-    def review_average(self) -> float:
-        average = ProductReview.objects.filter(product=self).aggregate(avg=Avg("rate"))["avg"]
-        return float(average) if average is not None else 0.0
-
-    @property
-    def approved_review_average(self) -> float:
-        average = ProductReview.objects.filter(product=self, status=ReviewStatusEnum.TRUE).aggregate(
+    def review_average(self):
+        average = ProductReview.objects.filter(product=self).aggregate(
             avg=Avg("rate")
         )["avg"]
         return float(average) if average is not None else 0.0
 
     @property
-    def review_count(self) -> int:
+    def approved_review_average(self):
+        average = ProductReview.objects.filter(
+            product=self, status=ReviewStatusEnum.TRUE
+        ).aggregate(avg=Avg("rate"))["avg"]
+        return float(average) if average is not None else 0.0
+
+    @property
+    def review_count(self):
         return ProductReview.objects.filter(product=self).count()
 
     @property
-    def approved_review_count(self) -> int:
-        return ProductReview.objects.filter(product=self, status=ReviewStatusEnum.TRUE).count()
+    def approved_review_count(self):
+        return ProductReview.objects.filter(
+            product=self, status=ReviewStatusEnum.TRUE
+        ).count()
 
     @property
-    def vat_percent(self) -> Decimal | int:
+    def vat_percent(self):
         if self.vat:
             return self.vat.value
         return 0
 
     @property
-    def vat_value(self) -> Money:
+    def vat_value(self):
         if self.vat:
             value = (self.price.amount * self.vat.value) / 100
             return Money(value, settings.DEFAULT_CURRENCY)
         return Money(0, settings.DEFAULT_CURRENCY)
 
     @property
-    def final_price(self) -> Money:
+    def final_price(self):
         return self.price + self.vat_value - self.discount_value
 
     @property
-    def main_image_path(self) -> str:
-        product_image = ProductImage.objects.filter(product_id=self.id, is_main=True).first()
+    def main_image_path(self):
+        product_image = ProductImage.objects.filter(
+            product_id=self.id, is_main=True
+        ).first()
         if not product_image:
             return ""
         return f"media/uploads/products/{os.path.basename(product_image.image.name)}"
@@ -253,21 +286,31 @@ class Product(
     @property
     def image_tag(self):
         no_img_url = static("images/no_photo.jpg")
-        no_img_markup = mark_safe(f'<img src="{no_img_url}" width="100" height="100" />')
+        no_img_markup = mark_safe(
+            f'<img src="{no_img_url}" width="100" height="100" />'
+        )
         try:
             img = ProductImage.objects.get(product_id=self.id, is_main=True)
         except ProductImage.DoesNotExist:
             return no_img_markup
 
         if img.thumbnail:
-            return mark_safe('<img src="{}" width="100" height="100" />'.format(img.thumbnail.url))
+            return mark_safe(
+                '<img src="{}" width="100" height="100" />'.format(
+                    img.thumbnail.url
+                )
+            )
         elif img.image:
-            return mark_safe('<img src="{}" width="100" height="100" />'.format(img.image.url))
+            return mark_safe(
+                '<img src="{}" width="100" height="100" />'.format(
+                    img.image.url
+                )
+            )
         else:
             return no_img_markup
 
     @property
-    def colored_stock(self) -> SafeString | SafeString:
+    def colored_stock(self):
         if self.stock > 0:
             return format_html(
                 '<span style="color: #1bff00;">{}</span>',
@@ -280,15 +323,18 @@ class Product(
             )
 
     @property
-    def absolute_url(self) -> str:
+    def absolute_url(self):
         return f"/products/{self.id}/{self.slug}"
 
 
 class ProductTranslation(TranslatedFieldsModel, IndexMixin):
     master = TranslationsForeignKey(
-        "product.Product", on_delete=models.CASCADE, related_name="translations", null=True
+        "product.Product",
+        on_delete=models.CASCADE,
+        related_name="translations",
+        null=True,
     )
-    name = models.CharField(_("Name"), max_length=255, blank=True, null=True)
+    name = models.CharField(_("Name"), max_length=255, blank=True, default="")
     description = HTMLField(_("Description"), blank=True, null=True)
 
     class Meta:
@@ -318,7 +364,12 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "view_count",
             "category",
         )
-        sortable_fields = ("likes_count", "final_price", "view_count", "discount_percent")
+        sortable_fields = (
+            "likes_count",
+            "final_price",
+            "view_count",
+            "discount_percent",
+        )
         ranking_rules = [
             "words",
             "typo",

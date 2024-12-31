@@ -1,6 +1,8 @@
 from drf_spectacular.utils import extend_schema_field
-from parler_rest.serializers import TranslatableModelSerializer
-from parler_rest.serializers import TranslatedFieldsField
+from parler_rest.serializers import (
+    TranslatableModelSerializer,
+    TranslatedFieldsField,
+)
 
 from core.api.schema import generate_schema_multi_lang
 from core.api.serializers import BaseExpandSerializer

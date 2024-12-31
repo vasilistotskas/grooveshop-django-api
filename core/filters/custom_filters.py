@@ -12,6 +12,8 @@ class PascalSnakeCaseOrderingFilter(OrderingFilter):
 
         ordering = request.query_params.get(self.ordering_param)
         if ordering:
-            ordering = re.sub("([a-z])([A-Z])", r"\1_\2", ordering).lower().lstrip("_")
+            ordering = (
+                re.sub("([a-z])([A-Z])", r"\1_\2", ordering).lower().lstrip("_")
+            )
             return [term for term in ordering.split(",")]
         return self.get_default_ordering(view)

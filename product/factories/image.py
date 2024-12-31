@@ -6,15 +6,21 @@ from django.conf import settings
 
 from product.models.product import ProductImage
 
-available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+available_languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 
 
 def get_or_create_product():
     if apps.get_model("product", "Product").objects.exists():
-        return apps.get_model("product", "Product").objects.order_by("?").first()
+        return (
+            apps.get_model("product", "Product").objects.order_by("?").first()
+        )
     else:
-        product_factory_module = importlib.import_module("product.factories.product")
-        product_factory_class = getattr(product_factory_module, "ProductFactory")
+        product_factory_module = importlib.import_module(
+            "product.factories.product"
+        )
+        product_factory_class = product_factory_module.ProductFactory
         return product_factory_class.create()
 
 
@@ -55,7 +61,8 @@ class ProductImageFactory(factory.django.DjangoModelFactory):
             return
 
         translations = extracted or [
-            ProductImageTranslationFactory(language_code=lang, master=self) for lang in available_languages
+            ProductImageTranslationFactory(language_code=lang, master=self)
+            for lang in available_languages
         ]
 
         for translation in translations:

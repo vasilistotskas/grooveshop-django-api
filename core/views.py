@@ -7,14 +7,12 @@ from uuid import uuid4
 from allauth.headless.base.response import APIResponse
 from allauth.headless.mfa import response
 from allauth.headless.mfa.views import ManageTOTPView
-from allauth.mfa.adapter import DefaultMFAAdapter
-from allauth.mfa.adapter import get_adapter
+from allauth.mfa.adapter import DefaultMFAAdapter, get_adapter
 from allauth.mfa.totp.internal.auth import get_totp_secret
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
-from django.http import HttpResponse
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
@@ -66,11 +64,13 @@ def csp_report(request):
 @csrf_exempt
 @login_required
 def upload_image(request):
-    USE_AWS = os.getenv("USE_AWS", "False") == "True"  # noqa
+    USE_AWS = os.getenv("USE_AWS", "False") == "True"
 
     user = request.user
     if not user.is_superuser:
-        return JsonResponse({"Error Message": "You are not authorized to upload images"})
+        return JsonResponse(
+            {"Error Message": "You are not authorized to upload images"}
+        )
 
     if request.method != "POST":
         return JsonResponse({"Error Message": "Wrong request"})
@@ -89,9 +89,13 @@ def upload_image(request):
         sanitized_name = sanitize_filename(file_obj.name)
         image_path = storage.save(sanitized_name, file_obj)
         image_url = storage.url(image_path)
-        return JsonResponse({"message": "Image uploaded successfully", "location": image_url})
+        return JsonResponse(
+            {"message": "Image uploaded successfully", "location": image_url}
+        )
 
-    upload_dir = os.path.normpath(os.path.join(settings.MEDIA_ROOT, "uploads/tinymce"))
+    upload_dir = os.path.normpath(
+        os.path.join(settings.MEDIA_ROOT, "uploads/tinymce")
+    )
     if not os.path.exists(upload_dir):
         os.makedirs(upload_dir)
 
@@ -112,7 +116,8 @@ def upload_image(request):
 
         debug = os.getenv("DEBUG", "False") == "True"
         location = (
-            f"{settings.API_BASE_URL}{settings.MEDIA_URL}uploads/tinymce/" f"{sanitized_name}"
+            f"{settings.API_BASE_URL}{settings.MEDIA_URL}uploads/tinymce/"
+            f"{sanitized_name}"
             if debug
             else f"{settings.MEDIA_URL}uploads/tinymce/{sanitized_name}"
         )
@@ -140,7 +145,7 @@ class TOTPSvgNotFoundResponse(APIResponse):
 
 class ManageTOTPSvgView(ManageTOTPView):
     @override
-    def get(self, request, *args, **kwargs) -> APIResponse:
+    def get(self, request, *args, **kwargs):
         authenticator = self._get_authenticator()
         if not authenticator:
             adapter: DefaultMFAAdapter = get_adapter()

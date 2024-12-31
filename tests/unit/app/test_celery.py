@@ -1,12 +1,7 @@
+import datetime
 import os
-from datetime import datetime
-from datetime import timedelta
-from os import makedirs
-from os import path
-from os import remove
-from unittest.mock import AsyncMock
-from unittest.mock import Mock
-from unittest.mock import patch
+from os import makedirs, path, remove
+from unittest.mock import AsyncMock, Mock, patch
 
 from django.conf import settings
 from django.test import TestCase
@@ -52,7 +47,9 @@ class CeleryConfigTestCase(TestCase):
     @patch("core.celery.get_channel_layer")
     @patch("os.getenv")
     @patch.dict(os.environ, {"DEBUG": "True"})
-    def test_debug_task_notification_with_debug_true(self, mock_getenv, mock_get_channel_layer):
+    def test_debug_task_notification_with_debug_true(
+        self, mock_getenv, mock_get_channel_layer
+    ):
         mock_getenv.return_value = "True"
         mock_channel_layer = mock_get_channel_layer.return_value
         mock_channel_layer.group_send = AsyncMock()
@@ -80,7 +77,7 @@ class CeleryConfigTestCase(TestCase):
             },
         )
 
-    def tearDown(self) -> None:
+    def tearDown(self):
         celery.app = None
         celery.debug_task = None
         super().tearDown()
@@ -102,10 +99,12 @@ class CleanupLogFilesTaskTest(TestCase):
         with open(self.new_file, "w") as f:
             f.write("New file")
 
-        old_time = (datetime.now() - timedelta(days=31)).timestamp()
+        old_time = (
+            datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(days=31)
+        ).timestamp()
         os.utime(self.old_file, (old_time, old_time))
 
-    def tearDown(self) -> None:
+    def tearDown(self):
         if path.exists(self.old_file):
             remove(self.old_file)
         if path.exists(self.new_file):
@@ -119,14 +118,19 @@ class CleanupLogFilesTaskTest(TestCase):
         self.assertFalse(path.exists(self.old_file))
         self.assertTrue(path.exists(self.new_file))
 
-        mock_logger.info.assert_called_once_with("Removed log files older than 30 days.")
+        mock_logger.info.assert_called_once_with(
+            "Removed log files older than 30 days."
+        )
 
     def test_does_not_remove_recent_logs(self):
         recent_file = path.join(self.logs_path, "logs_01-01-2021.log")
         with open(recent_file, "w") as f:
             f.write("Recent file")
 
-        recent_time = (datetime.now() - timedelta(days=self.days - 1)).timestamp()
+        recent_time = (
+            datetime.datetime.now(tz=datetime.UTC)
+            - datetime.timedelta(days=self.days - 1)
+        ).timestamp()
         os.utime(recent_file, (recent_time, recent_time))
 
         clear_log_files_task(self.days)

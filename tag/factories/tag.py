@@ -4,8 +4,9 @@ from django.conf import settings
 
 from tag.models.tag import Tag
 
-
-available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+available_languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 
 
 class TagTranslationFactory(factory.django.DjangoModelFactory):
@@ -31,7 +32,8 @@ class TagFactory(factory.django.DjangoModelFactory):
             return
 
         translations = extracted or [
-            TagTranslationFactory(language_code=lang, master=self) for lang in available_languages
+            TagTranslationFactory(language_code=lang, master=self)
+            for lang in available_languages
         ]
 
         for translation in translations:

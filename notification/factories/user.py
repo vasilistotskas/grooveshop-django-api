@@ -16,17 +16,25 @@ def get_or_create_user():
         user = User.objects.order_by("?").first()
     else:
         user_factory_module = importlib.import_module("user.factories.account")
-        user_factory_class = getattr(user_factory_module, "UserAccountFactory")
+        user_factory_class = user_factory_module.UserAccountFactory
         user = user_factory_class.create()
     return user
 
 
 def get_or_create_notification():
     if apps.get_model("notification", "Notification").objects.exists():
-        return apps.get_model("notification", "Notification").objects.order_by("?").first()
+        return (
+            apps.get_model("notification", "Notification")
+            .objects.order_by("?")
+            .first()
+        )
     else:
-        notification_factory_module = importlib.import_module("notification.factories.notification")
-        notification_factory_class = getattr(notification_factory_module, "NotificationFactory")
+        notification_factory_module = importlib.import_module(
+            "notification.factories.notification"
+        )
+        notification_factory_class = (
+            notification_factory_module.NotificationFactory
+        )
         return notification_factory_class.create()
 
 
@@ -36,7 +44,11 @@ class NotificationUserFactory(factory.django.DjangoModelFactory):
     notification = factory.LazyFunction(get_or_create_notification)
     seen = factory.Faker("boolean")
     seen_at = factory.Maybe(
-        "seen", factory.Faker("date_time_this_year", tzinfo=timezone.get_current_timezone()), None
+        "seen",
+        factory.Faker(
+            "date_time_this_year", tzinfo=timezone.get_current_timezone()
+        ),
+        None,
     )
 
     class Meta:

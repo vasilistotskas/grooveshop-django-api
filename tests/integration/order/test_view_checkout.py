@@ -13,8 +13,7 @@ from product.factories.product import ProductFactory
 from product.models.product import Product
 from region.factories import RegionFactory
 from region.models import Region
-from user.enum.address import FloorChoicesEnum
-from user.enum.address import LocationChoicesEnum
+from user.enum.address import FloorChoicesEnum, LocationChoicesEnum
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()

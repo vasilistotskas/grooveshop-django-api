@@ -5,8 +5,7 @@ from typing import override
 from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
-from rest_framework.decorators import action
-from rest_framework.decorators import throttle_classes
+from rest_framework.decorators import action, throttle_classes
 from rest_framework.filters import SearchFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -51,7 +50,7 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
 
     @throttle_classes([BurstRateThrottle])
     @override
-    def create(self, request, *args, **kwargs) -> Response:
+    def create(self, request, *args, **kwargs):
         return super().create(request, *args, **kwargs)
 
     @action(
@@ -60,7 +59,7 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
         permission_classes=[IsAuthenticated],
         throttle_classes=[BurstRateThrottle],
     )
-    def user_blog_comment(self, request, *args, **kwargs) -> Response:
+    def user_blog_comment(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return Response(
                 {"detail": _("User is not authenticated")},
@@ -77,7 +76,9 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
             )
 
         try:
-            comment = BlogComment.objects.get(user=user_id, post=post_id, parent=None)
+            comment = BlogComment.objects.get(
+                user=user_id, post=post_id, parent=None
+            )
             serializer = self.get_serializer(comment)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -99,7 +100,7 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
         permission_classes=[IsAuthenticated],
         throttle_classes=[BurstRateThrottle],
     )
-    def update_likes(self, request, pk=None) -> Response:
+    def update_likes(self, request, pk=None):
         if not request.user.is_authenticated:
             return Response(
                 {"detail": _("Authentication credentials were not provided.")},
@@ -114,11 +115,13 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
         else:
             comment.likes.add(user)
         comment.save()
-        serializer = self.get_serializer(comment, context=self.get_serializer_context())
+        serializer = self.get_serializer(
+            comment, context=self.get_serializer_context()
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["GET"], throttle_classes=[BurstRateThrottle])
-    def replies(self, request, pk=None) -> Response:
+    def replies(self, request, pk=None):
         comment = self.get_object()
         if not comment.get_children().exists():
             return Response(
@@ -130,12 +133,16 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
         return self.paginate_and_serialize(queryset, request)
 
     @action(detail=True, methods=["GET"])
-    def post(self, request, pk=None) -> Response:
+    def post(self, request, pk=None):
         comment = self.get_object()
-        serializer = self.get_serializer(comment.post, context=self.get_serializer_context())
+        serializer = self.get_serializer(
+            comment.post, context=self.get_serializer_context()
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=["POST"], permission_classes=[IsAuthenticated])
+    @action(
+        detail=False, methods=["POST"], permission_classes=[IsAuthenticated]
+    )
     def liked_comments(self, request, *args, **kwargs):
         user = request.user
         comment_ids = request.data.get("comment_ids", [])
@@ -145,8 +152,8 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        liked_comment_ids = BlogComment.objects.filter(likes=user, id__in=comment_ids).values_list(
-            "id", flat=True
-        )
+        liked_comment_ids = BlogComment.objects.filter(
+            likes=user, id__in=comment_ids
+        ).values_list("id", flat=True)
 
         return Response(liked_comment_ids, status=status.HTTP_200_OK)

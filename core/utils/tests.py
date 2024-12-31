@@ -1,5 +1,4 @@
 import os
-from typing import List
 
 
 def get_filename_from_url(url):
@@ -8,7 +7,9 @@ def get_filename_from_url(url):
     return os.path.basename(url)
 
 
-def compare_serializer_and_response(serializer_data: dict, response_data: dict, fields: List[str]):
+def compare_serializer_and_response(
+    serializer_data: dict, response_data: dict, fields: list[str]
+):
     response_filenames = []
     serializer_filenames = []
     for field in fields:
@@ -20,8 +21,14 @@ def compare_serializer_and_response(serializer_data: dict, response_data: dict, 
         if serializer_filename is not None:
             serializer_filenames.append(serializer_filename)
 
-    response_data_filtered = {key: value for key, value in response_data.items() if key not in fields}
-    serializer_data_filtered = {key: value for key, value in serializer_data.items() if key not in fields}
+    response_data_filtered = {
+        key: value for key, value in response_data.items() if key not in fields
+    }
+    serializer_data_filtered = {
+        key: value
+        for key, value in serializer_data.items()
+        if key not in fields
+    }
     assert response_data_filtered == serializer_data_filtered
 
     assert response_filenames == serializer_filenames

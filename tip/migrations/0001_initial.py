@@ -91,7 +91,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
+                    models.CharField(
+                        db_index=True, max_length=15, verbose_name="Language"
+                    ),
                 ),
                 (
                     "title",
@@ -104,7 +106,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "content",
-                    tinymce.models.HTMLField(blank=True, null=True, verbose_name="Content"),
+                    tinymce.models.HTMLField(
+                        blank=True, null=True, verbose_name="Content"
+                    ),
                 ),
                 (
                     "url",

@@ -7,8 +7,7 @@ from django.db.models import Count
 from django.utils import timezone
 from faker import Faker
 
-from cart.models import Cart
-from cart.models import CartItem
+from cart.models import Cart, CartItem
 
 fake = Faker()
 
@@ -17,20 +16,28 @@ User = get_user_model()
 
 def get_or_create_user():
     if User.objects.exists():
-        user = User.objects.annotate(num_carts=Count("cart")).order_by("num_carts").first()
+        user = (
+            User.objects.annotate(num_carts=Count("cart"))
+            .order_by("num_carts")
+            .first()
+        )
     else:
         user_factory_module = importlib.import_module("user.factories.account")
-        user_factory_class = getattr(user_factory_module, "UserAccountFactory")
+        user_factory_class = user_factory_module.UserAccountFactory
         user = user_factory_class.create()
     return user
 
 
 def get_or_create_product():
     if apps.get_model("product", "Product").objects.exists():
-        return apps.get_model("product", "Product").objects.order_by("?").first()
+        return (
+            apps.get_model("product", "Product").objects.order_by("?").first()
+        )
     else:
-        product_factory_module = importlib.import_module("product.factories.product")
-        product_factory_class = getattr(product_factory_module, "ProductFactory")
+        product_factory_module = importlib.import_module(
+            "product.factories.product"
+        )
+        product_factory_class = product_factory_module.ProductFactory
         return product_factory_class.create()
 
 

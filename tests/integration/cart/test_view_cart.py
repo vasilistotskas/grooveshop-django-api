@@ -40,18 +40,23 @@ class CartViewSetTest(APITestCase):
         self.assertIn("last_activity", response.data)
 
     def test_update_cart(self):
-        response = self.client.put(self.detail_url, data=self.update_data, format="json")
+        response = self.client.put(
+            self.detail_url, data=self.update_data, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.cart.refresh_from_db()
         self.assertTrue(
-            self.cart.last_activity >= datetime.datetime(2023, 7, 26, 12, 0, tzinfo=datetime.timezone.utc)
+            self.cart.last_activity
+            >= datetime.datetime(2023, 7, 26, 12, 0, tzinfo=datetime.UTC)
         )
         self.assertIn("last_activity", response.data)
 
     def test_partial_update_cart(self):
         partial_data = {"user": self.user.pk}
-        response = self.client.patch(self.detail_url, data=partial_data, format="json")
+        response = self.client.patch(
+            self.detail_url, data=partial_data, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.cart.refresh_from_db()
@@ -85,7 +90,9 @@ class CartViewSetTest(APITestCase):
         session.pop("cart_id", None)
         session.save()
 
-        response = self.client.patch(self.detail_url, data=self.update_data, format="json")
+        response = self.client.patch(
+            self.detail_url, data=self.update_data, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
@@ -100,7 +107,9 @@ class CartViewSetTest(APITestCase):
 
         update_data = {}
 
-        response = self.client.patch(self.detail_url, data=update_data, format="json")
+        response = self.client.patch(
+            self.detail_url, data=update_data, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         anonymous_cart.refresh_from_db()
@@ -134,7 +143,9 @@ class CartViewSetTest(APITestCase):
         invalid_update_data = {
             "user": 9999,
         }
-        response = self.client.patch(self.detail_url, data=invalid_update_data, format="json")
+        response = self.client.patch(
+            self.detail_url, data=invalid_update_data, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("user", response.data)
@@ -143,7 +154,9 @@ class CartViewSetTest(APITestCase):
         extra_data = {
             "invalid_field": "should not be here",
         }
-        response = self.client.patch(self.detail_url, data=extra_data, format="json")
+        response = self.client.patch(
+            self.detail_url, data=extra_data, format="json"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.cart.refresh_from_db()

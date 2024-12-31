@@ -25,7 +25,9 @@ def get_or_create_tag():
 
 class TaggedItemFactory(factory.django.DjangoModelFactory):
     object_id = factory.SelfAttribute("content_object.id")
-    content_type = factory.LazyAttribute(lambda o: ContentType.objects.get_for_model(o.content_object))
+    content_type = factory.LazyAttribute(
+        lambda o: ContentType.objects.get_for_model(o.content_object)
+    )
 
     class Meta:
         exclude = ["content_object"]

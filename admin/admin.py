@@ -1,11 +1,9 @@
 from os import getenv
 
 from django import forms
-from django.contrib import admin
-from django.contrib import messages
+from django.contrib import admin, messages
 from django.core import management
-from django.shortcuts import redirect
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.urls import path
 from django.utils.translation import gettext_lazy as _
 
@@ -17,8 +15,10 @@ class ClearCacheForm(forms.Form):
     viewset_class = forms.ChoiceField(choices=[])
 
     def __init__(self, *args, **kwargs):
-        super(ClearCacheForm, self).__init__(*args, **kwargs)
-        choices = [(cls.__name__, cls.__name__) for cls in cache_methods_registry]
+        super().__init__(*args, **kwargs)
+        choices = [
+            (cls.__name__, cls.__name__) for cls in cache_methods_registry
+        ]
         self.fields["viewset_class"].choices = choices
 
 
@@ -30,8 +30,16 @@ class MyAdminSite(admin.AdminSite):
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
-            path("clear-cache/", self.admin_view(self.clear_cache_view), name="clear-cache"),
-            path("clear-site-cache/", self.admin_view(self.clear_site_cache_view), name="clear-site-cache"),
+            path(
+                "clear-cache/",
+                self.admin_view(self.clear_cache_view),
+                name="clear-cache",
+            ),
+            path(
+                "clear-site-cache/",
+                self.admin_view(self.clear_site_cache_view),
+                name="clear-site-cache",
+            ),
         ]
         return custom_urls + urls
 
@@ -65,14 +73,17 @@ class MyAdminSite(admin.AdminSite):
 
         if cache_keys:
             deleted_keys = 0
-            client = cache_instance._cache.get_client()  # noqa
+            client = cache_instance._cache.get_client()
             for key in cache_keys:
                 resp = client.delete(key)
                 if resp:
                     deleted_keys += 1
 
             if deleted_keys > 0:
-                messages.success(request, _("Deleted %d keys for %s") % (deleted_keys, class_name))
+                messages.success(
+                    request,
+                    _("Deleted %d keys for %s") % (deleted_keys, class_name),
+                )
             else:
                 messages.info(request, _("No keys found for %s") % class_name)
 

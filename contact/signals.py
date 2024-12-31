@@ -14,7 +14,11 @@ logger = logging.getLogger(__name__)
 def send_email_notification(sender, instance, created, **kwargs):
     if created:
         subject = f"New Contact Form Submission from {instance.name}"
-        message = f"Name: {instance.name}\n" f"Email: {instance.email}\n" f"Message: {instance.message}"
+        message = (
+            f"Name: {instance.name}\n"
+            f"Email: {instance.email}\n"
+            f"Message: {instance.message}"
+        )
         from_email = settings.DEFAULT_FROM_EMAIL
         recipient_list = [admin[1] for admin in getattr(settings, "ADMINS", [])]
 

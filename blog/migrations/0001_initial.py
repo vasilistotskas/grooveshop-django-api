@@ -59,7 +59,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
+                    models.CharField(
+                        db_index=True, max_length=15, verbose_name="Language"
+                    ),
                 ),
                 (
                     "bio",
@@ -139,7 +141,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
+                    models.CharField(
+                        db_index=True, max_length=15, verbose_name="Language"
+                    ),
                 ),
                 (
                     "name",
@@ -206,7 +210,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
+                    models.CharField(
+                        db_index=True, max_length=15, verbose_name="Language"
+                    ),
                 ),
                 (
                     "content",
@@ -245,7 +251,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "published_at",
-                    models.DateTimeField(blank=True, null=True, verbose_name="Published At"),
+                    models.DateTimeField(
+                        blank=True, null=True, verbose_name="Published At"
+                    ),
                 ),
                 (
                     "is_published",
@@ -390,7 +398,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
+                    models.CharField(
+                        db_index=True, max_length=15, verbose_name="Language"
+                    ),
                 ),
                 (
                     "name",
@@ -436,7 +446,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
+                    models.CharField(
+                        db_index=True, max_length=15, verbose_name="Language"
+                    ),
                 ),
                 (
                     "title",
@@ -458,7 +470,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "body",
-                    tinymce.models.HTMLField(blank=True, null=True, verbose_name="Body"),
+                    tinymce.models.HTMLField(
+                        blank=True, null=True, verbose_name="Body"
+                    ),
                 ),
                 (
                     "master",

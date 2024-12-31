@@ -1,6 +1,4 @@
-from typing import Dict
 from typing import override
-from typing import Type
 
 from rest_framework import serializers
 
@@ -19,19 +17,31 @@ class BaseExpandSerializer(serializers.ModelSerializer):
             self.expand = bool(expand_context)
 
         expand_fields_context = self.context.get("expand_fields", "")
-        self.expand_fields = set(expand_fields_context.split(",")) if expand_fields_context else set()
+        self.expand_fields = (
+            set(expand_fields_context.split(","))
+            if expand_fields_context
+            else set()
+        )
 
         self.expansion_path = self.context.get("expansion_path", [])
 
     @override
-    def to_representation(self, instance) -> Dict[str, any]:
+    def to_representation(self, instance):
         ret = super().to_representation(instance)
         request_language = (
-            self.context.get("request").query_params.get("language") if "request" in self.context else None
+            self.context.get("request").query_params.get("language")
+            if "request" in self.context
+            else None
         )
 
-        if request_language and "translations" in ret and request_language in ret["translations"]:
-            ret["translations"] = {request_language: ret["translations"][request_language]}
+        if (
+            request_language
+            and "translations" in ret
+            and request_language in ret["translations"]
+        ):
+            ret["translations"] = {
+                request_language: ret["translations"][request_language]
+            }
 
         if self.Meta.model.__name__ in self.expansion_path:
             return ret
@@ -43,7 +53,7 @@ class BaseExpandSerializer(serializers.ModelSerializer):
 
         return ret
 
-    def _expand_fields(self, instance, data: Dict[str, any]) -> Dict[str, any]:
+    def _expand_fields(self, instance, data: dict[str, any]):
         for field_name, serializer_class in self.get_expand_fields().items():
             if field_name in self.expansion_path or (
                 self.expand_fields and field_name not in self.expand_fields
@@ -62,7 +72,7 @@ class BaseExpandSerializer(serializers.ModelSerializer):
 
     def get_expand_fields(
         self,
-    ) -> Dict[str, Type[serializers.ModelSerializer]]:
+    ):
         return {}
 
 

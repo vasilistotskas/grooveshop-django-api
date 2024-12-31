@@ -14,22 +14,30 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="producttranslation",
             name="description",
-            field=tinymce.models.HTMLField(blank=True, null=True, verbose_name="Description"),
+            field=tinymce.models.HTMLField(
+                blank=True, null=True, verbose_name="Description"
+            ),
         ),
         migrations.AlterField(
             model_name="producttranslation",
             name="name",
-            field=models.CharField(blank=True, max_length=255, null=True, verbose_name="Name"),
+            field=models.CharField(
+                blank=True, max_length=255, null=True, verbose_name="Name"
+            ),
         ),
         migrations.AlterField(
             model_name="producttranslation",
             name="search_document",
-            field=models.TextField(blank=True, default="", verbose_name="Search Document"),
+            field=models.TextField(
+                blank=True, default="", verbose_name="Search Document"
+            ),
         ),
         migrations.AlterField(
             model_name="producttranslation",
             name="search_document_dirty",
-            field=models.BooleanField(default=False, verbose_name="Search Document Dirty"),
+            field=models.BooleanField(
+                default=False, verbose_name="Search Document Dirty"
+            ),
         ),
         migrations.AlterField(
             model_name="producttranslation",
@@ -41,6 +49,8 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="producttranslation",
             name="search_vector_dirty",
-            field=models.BooleanField(default=False, verbose_name="Search Vector Dirty"),
+            field=models.BooleanField(
+                default=False, verbose_name="Search Vector Dirty"
+            ),
         ),
     ]

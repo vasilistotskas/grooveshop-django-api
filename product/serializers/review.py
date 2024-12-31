@@ -1,13 +1,10 @@
 import importlib
-from typing import Dict
 from typing import override
-from typing import Type
 
 from django.contrib.auth import get_user_model
 from drf_spectacular.utils import extend_schema_field
 from parler_rest.fields import TranslatedFieldsField
 from parler_rest.serializers import TranslatableModelSerializer
-from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
 from core.api.schema import generate_schema_multi_lang
@@ -23,7 +20,9 @@ class TranslatedFieldsFieldExtend(TranslatedFieldsField):
     pass
 
 
-class ProductReviewSerializer(TranslatableModelSerializer, BaseExpandSerializer):
+class ProductReviewSerializer(
+    TranslatableModelSerializer, BaseExpandSerializer
+):
     translations = TranslatedFieldsFieldExtend(shared_model=ProductReview)
     product = PrimaryKeyRelatedField(queryset=Product.objects.all())
     user = PrimaryKeyRelatedField(queryset=User.objects.all())
@@ -55,11 +54,13 @@ class ProductReviewSerializer(TranslatableModelSerializer, BaseExpandSerializer)
     @override
     def get_expand_fields(
         self,
-    ) -> Dict[str, Type[serializers.ModelSerializer]]:
+    ):
         user_account_serializer = importlib.import_module(
             "authentication.serializers"
         ).AuthenticationSerializer
-        product_serializer = importlib.import_module("product.serializers.product").ProductSerializer
+        product_serializer = importlib.import_module(
+            "product.serializers.product"
+        ).ProductSerializer
         return {
             "user": user_account_serializer,
             "product": product_serializer,

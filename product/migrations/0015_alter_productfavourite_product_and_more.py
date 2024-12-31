@@ -34,7 +34,9 @@ class Migration(migrations.Migration):
             model_name="productimage",
             name="product",
             field=models.ForeignKey(
-                on_delete=django.db.models.deletion.CASCADE, related_name="images", to="product.product"
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="images",
+                to="product.product",
             ),
         ),
     ]

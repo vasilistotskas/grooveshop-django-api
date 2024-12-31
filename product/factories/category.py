@@ -8,14 +8,18 @@ from product.models.category import ProductCategory
 
 fake = Faker()
 
-available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+available_languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 
 
 class ProductCategoryTranslationFactory(factory.django.DjangoModelFactory):
     language_code = factory.Iterator(available_languages)
     name = factory.Faker("word")
     description = factory.Faker("paragraph")
-    master = factory.SubFactory("product.factories.category.ProductCategoryFactory")
+    master = factory.SubFactory(
+        "product.factories.category.ProductCategoryFactory"
+    )
 
     class Meta:
         model = apps.get_model("product", "ProductCategoryTranslation")

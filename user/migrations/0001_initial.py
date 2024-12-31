@@ -27,7 +27,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "last_login",
-                    models.DateTimeField(blank=True, null=True, verbose_name="last login"),
+                    models.DateTimeField(
+                        blank=True, null=True, verbose_name="last login"
+                    ),
                 ),
                 (
                     "is_superuser",
@@ -146,19 +148,27 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "twitter",
-                    models.URLField(blank=True, null=True, verbose_name="Twitter Profile"),
+                    models.URLField(
+                        blank=True, null=True, verbose_name="Twitter Profile"
+                    ),
                 ),
                 (
                     "linkedin",
-                    models.URLField(blank=True, null=True, verbose_name="LinkedIn Profile"),
+                    models.URLField(
+                        blank=True, null=True, verbose_name="LinkedIn Profile"
+                    ),
                 ),
                 (
                     "facebook",
-                    models.URLField(blank=True, null=True, verbose_name="Facebook Profile"),
+                    models.URLField(
+                        blank=True, null=True, verbose_name="Facebook Profile"
+                    ),
                 ),
                 (
                     "instagram",
-                    models.URLField(blank=True, null=True, verbose_name="Instagram Profile"),
+                    models.URLField(
+                        blank=True, null=True, verbose_name="Instagram Profile"
+                    ),
                 ),
                 (
                     "website",
@@ -166,11 +176,15 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "youtube",
-                    models.URLField(blank=True, null=True, verbose_name="Youtube Profile"),
+                    models.URLField(
+                        blank=True, null=True, verbose_name="Youtube Profile"
+                    ),
                 ),
                 (
                     "github",
-                    models.URLField(blank=True, null=True, verbose_name="Github Profile"),
+                    models.URLField(
+                        blank=True, null=True, verbose_name="Github Profile"
+                    ),
                 ),
                 (
                     "bio",

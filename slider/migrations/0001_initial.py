@@ -167,7 +167,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
+                    models.CharField(
+                        db_index=True, max_length=15, verbose_name="Language"
+                    ),
                 ),
                 (
                     "name",
@@ -258,7 +260,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "language_code",
-                    models.CharField(db_index=True, max_length=15, verbose_name="Language"),
+                    models.CharField(
+                        db_index=True, max_length=15, verbose_name="Language"
+                    ),
                 ),
                 (
                     "name",

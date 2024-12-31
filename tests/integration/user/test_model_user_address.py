@@ -1,12 +1,10 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from user.enum.address import FloorChoicesEnum
-from user.enum.address import LocationChoicesEnum
+from user.enum.address import FloorChoicesEnum, LocationChoicesEnum
 from user.factories.account import UserAccountFactory
 from user.factories.address import UserAddressFactory
 from user.models.address import UserAddress
-
 
 User = get_user_model()
 
@@ -49,7 +47,9 @@ class UserAddressModelTestCase(TestCase):
         self.assertEqual(self.address.country, None)
         self.assertEqual(self.address.region, None)
         self.assertEqual(self.address.floor, FloorChoicesEnum.FIRST_FLOOR.value)
-        self.assertEqual(self.address.location_type, LocationChoicesEnum.HOME.value)
+        self.assertEqual(
+            self.address.location_type, LocationChoicesEnum.HOME.value
+        )
         self.assertEqual(self.address.phone, "123-456-7890")
 
     def test_str_representation(self):

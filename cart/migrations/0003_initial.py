@@ -28,10 +28,14 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name="cartitem",
-            constraint=models.UniqueConstraint(fields=("cart", "product"), name="unique_cart_item"),
+            constraint=models.UniqueConstraint(
+                fields=("cart", "product"), name="unique_cart_item"
+            ),
         ),
         migrations.AddConstraint(
             model_name="cart",
-            constraint=models.UniqueConstraint(fields=("user",), name="unique_user_cart"),
+            constraint=models.UniqueConstraint(
+                fields=("user",), name="unique_user_cart"
+            ),
         ),
     ]

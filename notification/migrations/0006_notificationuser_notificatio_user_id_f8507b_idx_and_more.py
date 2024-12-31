@@ -17,7 +17,9 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="notificationuser",
-            index=models.Index(fields=["notification"], name="notificatio_notific_19025b_idx"),
+            index=models.Index(
+                fields=["notification"], name="notificatio_notific_19025b_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="notificationuser",

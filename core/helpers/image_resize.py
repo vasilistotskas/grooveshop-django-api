@@ -3,10 +3,10 @@ from typing import IO
 
 from django.core.files import File
 from PIL import Image
-from PIL._typing import StrOrBytesPath  # noqa
+from PIL._typing import StrOrBytesPath
 
 
-def make_thumbnail(fp: StrOrBytesPath | IO[bytes], size: tuple[float, float]) -> File:
+def make_thumbnail(fp: StrOrBytesPath | IO[bytes], size: tuple[float, float]):
     if fp:
         img = Image.open(fp)
         img.convert("RGB")

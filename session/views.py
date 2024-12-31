@@ -9,8 +9,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
-from rest_framework.decorators import api_view
-from rest_framework.decorators import permission_classes
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 
@@ -53,7 +52,9 @@ def active_users_count(request):
             if not user_data:
                 continue
         except Exception as exc:
-            LogInfo.error("Error retrieving cache data for key %s: %s", key, str(exc))
+            LogInfo.error(
+                "Error retrieving cache data for key %s: %s", key, str(exc)
+            )
             continue
 
         session_exists = UserSession.objects.filter(
@@ -68,5 +69,7 @@ def active_users_count(request):
             except UserSession.DoesNotExist:
                 continue
 
-    serializer = ActiveUsersCountSerializer({"active_users": len(active_user_ids)})
+    serializer = ActiveUsersCountSerializer(
+        {"active_users": len(active_user_ids)}
+    )
     return Response(serializer.data, status=status.HTTP_200_OK)

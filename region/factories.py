@@ -10,15 +10,19 @@ from region.models import Region
 
 fake = Faker()
 
-available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+available_languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 
 
 def get_or_create_country():
     if apps.get_model("country", "Country").objects.exists():
-        return apps.get_model("country", "Country").objects.order_by("?").first()
+        return (
+            apps.get_model("country", "Country").objects.order_by("?").first()
+        )
     else:
         country_factory_module = importlib.import_module("country.factories")
-        country_factory_class = getattr(country_factory_module, "CountryFactory")
+        country_factory_class = country_factory_module.CountryFactory
         return country_factory_class.create()
 
 
@@ -51,7 +55,10 @@ class RegionFactory(CustomDjangoModelFactory):
 
         translations = extracted or [
             RegionTranslationFactory(language_code=lang, master=self)
-            for lang in [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+            for lang in [
+                lang["code"]
+                for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+            ]
         ]
 
         for translation in translations:

@@ -24,24 +24,32 @@ class PascalSnakeCaseOrderingFilterTest(APITestCase):
     def test_get_ordering_pascal_case(self):
         request = self.create_request("CreatedAt")
         queryset = BlogPost.objects.all()
-        result = self.filter.get_ordering(request.renderer_context["request"], queryset, self.view)
+        result = self.filter.get_ordering(
+            request.renderer_context["request"], queryset, self.view
+        )
         self.assertEqual(result, ["created_at"])
 
     def test_get_ordering_mixed_case(self):
         request = self.create_request("CreatedAt,UpdatedAt")
         queryset = BlogPost.objects.all()
-        result = self.filter.get_ordering(request.renderer_context["request"], queryset, self.view)
+        result = self.filter.get_ordering(
+            request.renderer_context["request"], queryset, self.view
+        )
         self.assertEqual(result, ["created_at", "updated_at"])
 
     def test_get_ordering_snake_case(self):
         request = self.create_request("created_at,updated_at")
         queryset = BlogPost.objects.all()
-        result = self.filter.get_ordering(request.renderer_context["request"], queryset, self.view)
+        result = self.filter.get_ordering(
+            request.renderer_context["request"], queryset, self.view
+        )
         self.assertEqual(result, ["created_at", "updated_at"])
 
     def test_get_ordering_empty(self):
         request = self.create_request("")
         queryset = BlogPost.objects.all()
-        result = self.filter.get_ordering(request.renderer_context["request"], queryset, self.view)
+        result = self.filter.get_ordering(
+            request.renderer_context["request"], queryset, self.view
+        )
         default_ordering = self.filter.get_default_ordering(self.view)
         self.assertEqual(result, default_ordering)

@@ -1,7 +1,5 @@
 import importlib
-from typing import Dict
 from typing import override
-from typing import Type
 
 from django.contrib.auth import get_user_model
 from phonenumber_field.serializerfields import PhoneNumberField
@@ -56,12 +54,16 @@ class UserAddressSerializer(BaseExpandSerializer):
     @override
     def get_expand_fields(
         self,
-    ) -> Dict[str, Type[serializers.ModelSerializer]]:
+    ):
         user_account_serializer = importlib.import_module(
             "authentication.serializers"
         ).AuthenticationSerializer
-        country_serializer = importlib.import_module("country.serializers").CountrySerializer
-        region_serializer = importlib.import_module("region.serializers").RegionSerializer
+        country_serializer = importlib.import_module(
+            "country.serializers"
+        ).CountrySerializer
+        region_serializer = importlib.import_module(
+            "region.serializers"
+        ).RegionSerializer
         return {
             "user": user_account_serializer,
             "country": country_serializer,
@@ -72,6 +74,10 @@ class UserAddressSerializer(BaseExpandSerializer):
     def validate(self, data):
         if self.instance and "is_main" in data and data["is_main"]:
             user = data["user"]
-            if UserAddress.objects.filter(user=user, is_main=True).exclude(pk=self.instance.pk):
-                raise serializers.ValidationError("A main address already exists for this user")
+            if UserAddress.objects.filter(user=user, is_main=True).exclude(
+                pk=self.instance.pk
+            ):
+                raise serializers.ValidationError(
+                    "A main address already exists for this user"
+                )
         return data

@@ -13,6 +13,8 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="productimage",
             name="image",
-            field=core.fields.image.ImageAndSvgField(upload_to="uploads/products/", verbose_name="Image"),
+            field=core.fields.image.ImageAndSvgField(
+                upload_to="uploads/products/", verbose_name="Image"
+            ),
         ),
     ]

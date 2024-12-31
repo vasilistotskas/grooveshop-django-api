@@ -21,7 +21,10 @@ class Migration(migrations.Migration):
             model_name="slider",
             name="image",
             field=core.fields.image.ImageAndSvgField(
-                blank=True, null=True, upload_to="uploads/sliders/", verbose_name="Image"
+                blank=True,
+                null=True,
+                upload_to="uploads/sliders/",
+                verbose_name="Image",
             ),
         ),
     ]

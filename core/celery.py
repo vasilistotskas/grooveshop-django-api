@@ -1,17 +1,12 @@
-from __future__ import absolute_import
-from __future__ import unicode_literals
-
 import os
 
 from asgiref.sync import async_to_sync
-from celery import Celery
-from celery import shared_task
+from celery import Celery, shared_task
 from celery.signals import setup_logging
 from channels.layers import get_channel_layer
 
 from core.logging import LogInfo
 
-CELERY_LOGGER_NAME = "celery"
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
 

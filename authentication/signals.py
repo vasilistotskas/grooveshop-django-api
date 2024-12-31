@@ -9,35 +9,45 @@ from core.logging import LogInfo
 
 
 @receiver(user_signed_up)
-def populate_profile(sociallogin=None, user=None, **kwargs):  # noqa
+def populate_profile(sociallogin=None, user=None, **kwargs):
     if not sociallogin or not user:
         LogInfo.warning("No sociallogin or user passed to populate_profile")
         return
 
+    provider = sociallogin.account.provider
     picture_url = None
-    if sociallogin.account.provider == "facebook":
-        picture_url = "http://graph.facebook.com/" + sociallogin.account.uid + "/picture?type=large"
 
-    if sociallogin.account.provider == "google":
-        picture_url = sociallogin.account.extra_data["picture"]
-
-    if sociallogin.account.provider == "discord":
-        picture_url = (
-            f"https://cdn.discordapp.com/avatars/{sociallogin.account.extra_data.get('id')}"
-            f"/{sociallogin.account.extra_data.get('avatar')}.png"
-        )
-
-    if sociallogin.account.provider == "github":
-        picture_url = sociallogin.account.extra_data["avatar_url"]
+    match provider:
+        case "facebook":
+            picture_url = f"http://graph.facebook.com/{sociallogin.account.uid}/picture?type=large"
+        case "google":
+            picture_url = sociallogin.account.extra_data.get("picture")
+        case "discord":
+            avatar_id = sociallogin.account.extra_data.get("id")
+            avatar_hash = sociallogin.account.extra_data.get("avatar")
+            if avatar_id and avatar_hash:
+                picture_url = f"https://cdn.discordapp.com/avatars/{avatar_id}/{avatar_hash}.png"
+            else:
+                LogInfo.warning(
+                    "Missing avatar_id or avatar_hash for Discord provider"
+                )
+        case "github":
+            picture_url = sociallogin.account.extra_data.get("avatar_url")
+        case _:
+            LogInfo.warning(f"Unsupported provider: {provider}")
 
     if picture_url:
-        response = requests.get(picture_url)
+        try:
+            response = requests.get(picture_url, timeout=10)
+            response.raise_for_status()
+        except requests.RequestException as e:
+            LogInfo.error(f"Failed to retrieve image from {picture_url}: {e}")
+            return
 
-        if response.status_code == 200:
-            img_temp = NamedTemporaryFile(delete=True)
+        with NamedTemporaryFile(delete=True) as img_temp:
             img_temp.write(response.content)
             img_temp.flush()
-            user.image.save(
-                f"image_{user.first_name}_{user.last_name}_{user.pk}.jpg",
-                File(img_temp),
+            image_filename = (
+                f"image_{user.first_name}_{user.last_name}_{user.pk}.jpg"
             )
+            user.image.save(image_filename, File(img_temp))

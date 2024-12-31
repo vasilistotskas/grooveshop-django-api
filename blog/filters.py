@@ -4,8 +4,12 @@ from blog.models import BlogPost
 
 
 class BlogPostFilter(filters.FilterSet):
-    title = filters.CharFilter(field_name="translations__title", lookup_expr="icontains")
-    author_email = filters.CharFilter(field_name="author__user__email", lookup_expr="icontains")
+    title = filters.CharFilter(
+        field_name="translations__title", lookup_expr="icontains"
+    )
+    author_email = filters.CharFilter(
+        field_name="author__user__email", lookup_expr="icontains"
+    )
 
     class Meta:
         model = BlogPost

@@ -8,14 +8,11 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from parler.managers import TranslatableManager
-from parler.models import TranslatableModel
-from parler.models import TranslatedFields
+from parler.models import TranslatableModel, TranslatedFields
 
 from core.fields.image import ImageAndSvgField
 from core.helpers.image_resize import make_thumbnail
-from core.models import SortableModel
-from core.models import TimeStampMixinModel
-from core.models import UUIDModel
+from core.models import SortableModel, TimeStampMixinModel, UUIDModel
 
 
 class ProductImageManager(TranslatableManager):
@@ -23,7 +20,9 @@ class ProductImageManager(TranslatableManager):
         return self.get_queryset().filter(product=product, is_main=True).first()
 
 
-class ProductImage(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
+class ProductImage(
+    TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel
+):
     id = models.BigAutoField(primary_key=True)
     product = models.ForeignKey(
         "product.Product",
@@ -55,7 +54,9 @@ class ProductImage(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDMo
         ]
 
     def __str__(self):
-        product_name = self.product.safe_translation_getter("name", any_language=True)
+        product_name = self.product.safe_translation_getter(
+            "name", any_language=True
+        )
         main_status = "Main" if self.is_main else "Secondary"
         return f"{product_name} Image ({main_status})"
 
@@ -70,7 +71,9 @@ class ProductImage(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDMo
             old_instance = ProductImage.objects.filter(pk=self.pk).first()
 
         if self.is_main:
-            ProductImage.objects.filter(product=self.product, is_main=True).update(is_main=False)
+            ProductImage.objects.filter(
+                product=self.product, is_main=True
+            ).update(is_main=False)
 
             if old_instance and old_instance.image == self.image:
                 self.thumbnail = old_instance.thumbnail
@@ -82,7 +85,9 @@ class ProductImage(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDMo
     @override
     def clean(self):
         if self.is_main:
-            ProductImage.objects.filter(product=self.product, is_main=True).update(is_main=False)
+            ProductImage.objects.filter(
+                product=self.product, is_main=True
+            ).update(is_main=False)
         super().clean()
 
     def create_thumbnail(self):
@@ -93,7 +98,7 @@ class ProductImage(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDMo
             return None
 
     @property
-    def main_image_path(self) -> str:
+    def main_image_path(self):
         if self.image and hasattr(self.image, "name"):
             return f"media/uploads/products/{os.path.basename(self.image.name)}"
         return ""

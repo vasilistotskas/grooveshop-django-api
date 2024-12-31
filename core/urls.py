@@ -4,22 +4,22 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
-from django.urls import include
-from django.urls import path
-from django.urls import re_path
+from django.urls import include, path, re_path
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.views import SpectacularAPIView
-from drf_spectacular.views import SpectacularRedocView
-from drf_spectacular.views import SpectacularSwaggerView
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularRedocView,
+    SpectacularSwaggerView,
+)
 
-from core.api.views import health_check
-from core.api.views import redirect_to_frontend
-from core.views import csp_report
-from core.views import HomeView
-from core.views import ManageTOTPSvgView
-from core.views import robots_txt
-from core.views import upload_image
-
+from core.api.views import health_check, redirect_to_frontend
+from core.views import (
+    HomeView,
+    ManageTOTPSvgView,
+    csp_report,
+    robots_txt,
+    upload_image,
+)
 
 User = get_user_model()
 
@@ -35,7 +35,11 @@ urlpatterns += i18n_patterns(
     path(_("admin/"), admin.site.urls),
     path("upload_image", upload_image, name="upload_image"),
     path("accounts/", include("allauth.urls")),
-    path("account/provider/callback", redirect_to_frontend, name="provider-callback"),
+    path(
+        "account/provider/callback",
+        redirect_to_frontend,
+        name="provider-callback",
+    ),
     path("_allauth/", include("allauth.headless.urls")),
     path(
         "_allauth/app/v1/account/authenticators/totp/svg",
@@ -85,7 +89,8 @@ if bool(settings.ENABLE_DEBUG_TOOLBAR):
     except ImportError:
         warnings.warn(
             "The debug toolbar was not installed. Ignore the error. \
-            settings.py should already have warned the user about it."
+            settings.py should already have warned the user about it.",
+            stacklevel=2,
         )
     else:
         urlpatterns += [re_path(r"^__debug__/", include(debug_toolbar.urls))]  # type: ignore

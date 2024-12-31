@@ -8,10 +8,12 @@ from rest_framework.request import Request
 
 
 class TranslationsProcessingMixin:
+    EXPECTED_TRANSLATION_KEY_PARTS = 3
+
     @staticmethod
-    def process_translations_data(request: Request) -> Request:
+    def process_translations_data(request: Request):
         if request.content_type.startswith("multipart/form-data") and any(
-            key.startswith("translations.") for key in request.data.keys()
+            key.startswith("translations.") for key in request.data
         ):
             data = QueryDict(mutable=True)
             data.update(request.data)
@@ -20,9 +22,14 @@ class TranslationsProcessingMixin:
             for key, value in data.items():
                 if key.startswith("translations."):
                     parts = key.split(".")
-                    if len(parts) == 3:
+                    if (
+                        len(parts)
+                        == TranslationsProcessingMixin.EXPECTED_TRANSLATION_KEY_PARTS
+                    ):
                         lang_field, field_name = parts[1], parts[2]
-                        translations.setdefault(lang_field, {})[field_name] = value
+                        translations.setdefault(lang_field, {})[field_name] = (
+                            value
+                        )
 
             for key in list(data.keys()):
                 if key.startswith("translations."):
@@ -47,7 +54,9 @@ def cache_methods(timeout, methods, *, cache=None):
             func = getattr(cls, method_name)
             class_name = cls.__name__
             key_prefix = f"{class_name}_{method_name}"
-            cache_decorator = cache_page(timeout, cache=cache, key_prefix=key_prefix)
+            cache_decorator = cache_page(
+                timeout, cache=cache, key_prefix=key_prefix
+            )
             decorated_func = method_decorator(cache_decorator)(func)
             setattr(cls, method_name, decorated_func)
         if cls not in cache_methods_registry:

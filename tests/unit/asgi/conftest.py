@@ -1,15 +1,18 @@
 import pytest
-from asgiref.typing import ASGI3Application
-from asgiref.typing import ASGIReceiveCallable
-from asgiref.typing import ASGISendCallable
-from asgiref.typing import HTTPResponseBodyEvent
-from asgiref.typing import HTTPResponseStartEvent
-from asgiref.typing import Scope
+from asgiref.typing import (
+    ASGIReceiveCallable,
+    ASGISendCallable,
+    HTTPResponseBodyEvent,
+    HTTPResponseStartEvent,
+    Scope,
+)
 
 
 @pytest.fixture
-def asgi_app() -> ASGI3Application:
-    async def fake_app(scope: Scope, receive: ASGIReceiveCallable, send: ASGISendCallable) -> None:
+def asgi_app():
+    async def fake_app(
+        scope: Scope, receive: ASGIReceiveCallable, send: ASGISendCallable
+    ):
         await send(
             HTTPResponseStartEvent(
                 type="http.response.start",
@@ -18,14 +21,20 @@ def asgi_app() -> ASGI3Application:
                 trailers=False,
             )
         )
-        await send(HTTPResponseBodyEvent(type="http.response.body", body=b"", more_body=False))
+        await send(
+            HTTPResponseBodyEvent(
+                type="http.response.body", body=b"", more_body=False
+            )
+        )
 
     return fake_app
 
 
 @pytest.fixture
-def large_asgi_app() -> ASGI3Application:
-    async def fake_app(scope: Scope, receive: ASGIReceiveCallable, send: ASGISendCallable) -> None:
+def large_asgi_app():
+    async def fake_app(
+        scope: Scope, receive: ASGIReceiveCallable, send: ASGISendCallable
+    ):
         await send(
             HTTPResponseStartEvent(
                 type="http.response.start",
@@ -37,6 +46,10 @@ def large_asgi_app() -> ASGI3Application:
                 trailers=False,
             )
         )
-        await send(HTTPResponseBodyEvent(type="http.response.body", body=10000 * b"x", more_body=False))
+        await send(
+            HTTPResponseBodyEvent(
+                type="http.response.body", body=10000 * b"x", more_body=False
+            )
+        )
 
     return fake_app

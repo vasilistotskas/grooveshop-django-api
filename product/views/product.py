@@ -49,7 +49,7 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
         detail=True,
         methods=["POST"],
     )
-    def update_view_count(self, request, pk=None) -> Response:
+    def update_view_count(self, request, pk=None):
         post = self.get_object()
         post.view_count += 1
         post.save()
@@ -60,28 +60,34 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
         detail=True,
         methods=["GET"],
     )
-    def reviews(self, request, pk=None) -> Response:
+    def reviews(self, request, pk=None):
         product = self.get_object()
         reviews = product.reviews.all()
-        serializer = self.get_serializer(reviews, many=True, context=self.get_serializer_context())
+        serializer = self.get_serializer(
+            reviews, many=True, context=self.get_serializer_context()
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(
         detail=True,
         methods=["GET"],
     )
-    def images(self, request, pk=None) -> Response:
+    def images(self, request, pk=None):
         product = self.get_object()
         images = product.images.all()
-        serializer = self.get_serializer(images, many=True, context=self.get_serializer_context())
+        serializer = self.get_serializer(
+            images, many=True, context=self.get_serializer_context()
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(
         detail=True,
         methods=["GET"],
     )
-    def tags(self, request, pk=None) -> Response:
+    def tags(self, request, pk=None):
         product = self.get_object()
         tags = product.get_tags_for_object()
-        serializer = self.get_serializer(tags, many=True, context=self.get_serializer_context())
+        serializer = self.get_serializer(
+            tags, many=True, context=self.get_serializer_context()
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)

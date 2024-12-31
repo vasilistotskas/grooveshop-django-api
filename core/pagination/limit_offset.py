@@ -9,7 +9,7 @@ class LimitOffsetPaginator(pagination.LimitOffsetPagination):
     max_limit = 100
 
     @override
-    def get_paginated_response(self, data) -> Response:
+    def get_paginated_response(self, data):
         return Response(
             {
                 "links": {

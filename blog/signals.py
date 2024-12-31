@@ -9,14 +9,17 @@ from notification.enum import NotificationKindEnum
 from notification.models.notification import Notification
 from notification.models.user import NotificationUser
 
-
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 
 User = get_user_model()
 
 
 @receiver(m2m_changed, sender=BlogComment.likes.through)
-async def notify_comment_liked(sender, instance, action, reverse, pk_set, **kwargs):
+async def notify_comment_liked(
+    sender, instance, action, reverse, pk_set, **kwargs
+):
     if action == "post_add" and not reverse:
         post = await sync_to_async(lambda: instance.post)()
         user = await sync_to_async(lambda: instance.user)()
@@ -31,10 +34,14 @@ async def notify_comment_liked(sender, instance, action, reverse, pk_set, **kwar
                 )
 
                 for language in languages:
-                    await sync_to_async(notification.set_current_language)(language)
+                    await sync_to_async(notification.set_current_language)(
+                        language
+                    )
                     if language == "en":
                         await sync_to_async(setattr)(
-                            notification, "title", f"<a href='" f"{blog_post_url}'>Comment</a> Liked!"
+                            notification,
+                            "title",
+                            f"<a href='" f"{blog_post_url}'>Comment</a> Liked!",
                         )
                         await sync_to_async(setattr)(
                             notification,
@@ -43,17 +50,26 @@ async def notify_comment_liked(sender, instance, action, reverse, pk_set, **kwar
                             f"{liker_user.username if liker_user.username else liker_user.email}.",
                         )
                     elif language == "el":
-                        await sync_to_async(setattr)(
+                        await sync_to_async(
+                            setattr
+                        )(
                             notification,
                             "title",
-                            f"Το <a href=" f"'" f"{blog_post_url}'>σχόλιο</a> " f"σου πήρε like!",
+                            f"Το <a href="  # noqa: RUF001
+                            f"'"
+                            f"{blog_post_url}'>σχόλιο</a> "
+                            f"σου πήρε like!",  # noqa: RUF001
                         )
-                        await sync_to_async(setattr)(
+                        await sync_to_async(
+                            setattr
+                        )(
                             notification,
                             "message",
-                            f"Το σχόλιο σου άρεσε στον χρήστη "
+                            f"Το σχόλιο σου άρεσε στον χρήστη "  # noqa: RUF001
                             f"{liker_user.username if liker_user.username else liker_user.email}.",
                         )
                     await notification.asave()
 
-                await NotificationUser.objects.acreate(user=user, notification=notification)
+                await NotificationUser.objects.acreate(
+                    user=user, notification=notification
+                )

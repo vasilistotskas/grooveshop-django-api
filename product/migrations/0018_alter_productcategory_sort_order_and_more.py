@@ -12,11 +12,15 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="productcategory",
             name="sort_order",
-            field=models.IntegerField(editable=False, null=True, verbose_name="Sort Order"),
+            field=models.IntegerField(
+                editable=False, null=True, verbose_name="Sort Order"
+            ),
         ),
         migrations.AlterField(
             model_name="productimage",
             name="sort_order",
-            field=models.IntegerField(editable=False, null=True, verbose_name="Sort Order"),
+            field=models.IntegerField(
+                editable=False, null=True, verbose_name="Sort Order"
+            ),
         ),
     ]

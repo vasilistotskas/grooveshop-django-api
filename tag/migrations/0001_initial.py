@@ -24,12 +24,24 @@ class Migration(migrations.Migration):
                 (
                     "sort_order",
                     models.IntegerField(
-                        db_index=True, editable=False, null=True, verbose_name="Sort Order"
+                        db_index=True,
+                        editable=False,
+                        null=True,
+                        verbose_name="Sort Order",
                     ),
                 ),
-                ("created_at", models.DateTimeField(auto_now_add=True, verbose_name="Created At")),
-                ("updated_at", models.DateTimeField(auto_now=True, verbose_name="Updated At")),
-                ("uuid", models.UUIDField(default=uuid.uuid4, editable=False, unique=True)),
+                (
+                    "created_at",
+                    models.DateTimeField(auto_now_add=True, verbose_name="Created At"),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Updated At"),
+                ),
+                (
+                    "uuid",
+                    models.UUIDField(default=uuid.uuid4, editable=False, unique=True),
+                ),
                 ("id", models.BigAutoField(primary_key=True, serialize=False)),
                 ("active", models.BooleanField(default=True, verbose_name="Active")),
             ],
@@ -63,27 +75,46 @@ class Migration(migrations.Migration):
                 (
                     "id",
                     models.BigAutoField(
-                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
                     ),
                 ),
-                ("created_at", models.DateTimeField(auto_now_add=True, verbose_name="Created At")),
-                ("updated_at", models.DateTimeField(auto_now=True, verbose_name="Updated At")),
-                ("uuid", models.UUIDField(default=uuid.uuid4, editable=False, unique=True)),
+                (
+                    "created_at",
+                    models.DateTimeField(auto_now_add=True, verbose_name="Created At"),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Updated At"),
+                ),
+                (
+                    "uuid",
+                    models.UUIDField(default=uuid.uuid4, editable=False, unique=True),
+                ),
                 ("object_id", models.PositiveIntegerField()),
                 (
                     "content_type",
                     models.ForeignKey(
-                        on_delete=django.db.models.deletion.CASCADE, to="contenttypes.contenttype"
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="contenttypes.contenttype",
                     ),
                 ),
-                ("tag", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to="tag.tag")),
+                (
+                    "tag",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE, to="tag.tag"
+                    ),
+                ),
             ],
             options={
                 "verbose_name": "Tagged Item",
                 "verbose_name_plural": "Tagged Items",
                 "indexes": [
                     models.Index(
-                        fields=["content_type", "object_id"], name="tag_taggedi_content_cd6f88_idx"
+                        fields=["content_type", "object_id"],
+                        name="tag_taggedi_content_cd6f88_idx",
                     )
                 ],
             },
@@ -94,11 +125,24 @@ class Migration(migrations.Migration):
                 (
                     "id",
                     models.BigAutoField(
-                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
                     ),
                 ),
-                ("language_code", models.CharField(db_index=True, max_length=15, verbose_name="Language")),
-                ("label", models.CharField(blank=True, max_length=255, null=True, verbose_name="Label")),
+                (
+                    "language_code",
+                    models.CharField(
+                        db_index=True, max_length=15, verbose_name="Language"
+                    ),
+                ),
+                (
+                    "label",
+                    models.CharField(
+                        blank=True, max_length=255, null=True, verbose_name="Label"
+                    ),
+                ),
                 (
                     "master",
                     parler.fields.TranslationsForeignKey(

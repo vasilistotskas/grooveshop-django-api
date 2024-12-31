@@ -7,7 +7,9 @@ from django.contrib.auth import get_user_model
 
 from blog.models.author import BlogAuthor
 
-available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+available_languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 
 User = get_user_model()
 
@@ -17,7 +19,7 @@ def get_or_create_user():
         user = User.objects.order_by("?").first()
     else:
         user_factory_module = importlib.import_module("user.factories.account")
-        user_factory_class = getattr(user_factory_module, "UserAccountFactory")
+        user_factory_class = user_factory_module.UserAccountFactory
         user = user_factory_class.create()
     return user
 
@@ -47,7 +49,8 @@ class BlogAuthorFactory(factory.django.DjangoModelFactory):
             return
 
         translations = extracted or [
-            BlogAuthorTranslationFactory(language_code=lang, master=self) for lang in available_languages
+            BlogAuthorTranslationFactory(language_code=lang, master=self)
+            for lang in available_languages
         ]
 
         for translation in translations:

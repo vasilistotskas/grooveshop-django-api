@@ -23,14 +23,14 @@ class CursorPaginator(pagination.CursorPagination):
         super().paginate_queryset(queryset, request, view)
         return self.page
 
-    def get_total_pages(self) -> int:
+    def get_total_pages(self):
         total_pages = math.ceil(self.total_items / self.page_size)
         if self.total_items % self.page_size != 0:
             total_pages += 1
         return total_pages
 
     @override
-    def get_paginated_response(self, data) -> Response:
+    def get_paginated_response(self, data):
         return Response(
             {
                 "links": {

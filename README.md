@@ -138,7 +138,7 @@ This project is open-sourced under the MIT License. See the [LICENSE](LICENSE.md
 
 # Python Development Setup and Utilities
 
-## Python Version 3.13.0
+## Python Version 3.13.1
 
 ### Virtual Environment Management
 - **Install Virtualenv**:
@@ -214,13 +214,6 @@ This project is open-sourced under the MIT License. See the [LICENSE](LICENSE.md
   `strawberry server`
 - **Run with Project Schema**:
   `strawberry server core.graphql.schema:schema`
-
-### Anaconda for Environment Management
-- **Install Anaconda**: [Anaconda Installation Guide](https://docs.anaconda.com/anaconda/install/)
-- **Conda Environment Commands**:
-  - Create: `conda create --name <env_name> python=3.13.0`
-  - Activate/Deactivate: `conda activate <env_name>` and `conda deactivate`
-  - Create from YML: `conda env create -f environment.yml`
 
 ### Django REST Framework - Spectacular
 - **Generate API Schema**:

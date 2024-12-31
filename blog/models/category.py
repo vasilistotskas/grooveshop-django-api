@@ -8,18 +8,13 @@ from mptt.fields import TreeForeignKey
 from mptt.managers import TreeManager
 from mptt.models import MPTTModel
 from mptt.querysets import TreeQuerySet
-from parler.managers import TranslatableManager
-from parler.managers import TranslatableQuerySet
-from parler.models import TranslatableModel
-from parler.models import TranslatedFields
+from parler.managers import TranslatableManager, TranslatableQuerySet
+from parler.models import TranslatableModel, TranslatedFields
 
 from blog.models.post import BlogPost
 from core.fields.image import ImageAndSvgField
-from core.models import SortableModel
-from core.models import TimeStampMixinModel
-from core.models import UUIDModel
-from core.utils.generators import SlugifyConfig
-from core.utils.generators import unique_slugify
+from core.models import SortableModel, TimeStampMixinModel, UUIDModel
+from core.utils.generators import SlugifyConfig, unique_slugify
 
 
 class BlogCategoryQuerySet(TranslatableQuerySet, TreeQuerySet):
@@ -37,10 +32,14 @@ class BlogCategoryManager(TreeManager, TranslatableManager):
     _queryset_class = BlogCategoryQuerySet
 
 
-class BlogCategory(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel, MPTTModel):
+class BlogCategory(
+    TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel, MPTTModel
+):
     id = models.BigAutoField(primary_key=True)
     slug = models.SlugField(_("Slug"), max_length=255, unique=True)
-    image = ImageAndSvgField(_("Image"), upload_to="uploads/blog/", blank=True, null=True)
+    image = ImageAndSvgField(
+        _("Image"), upload_to="uploads/blog/", blank=True, null=True
+    )
     parent = TreeForeignKey(
         "self",
         blank=True,
@@ -68,14 +67,17 @@ class BlogCategory(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDMo
         order_insertion_by = ["sort_order"]
 
     def __init__(self, *args, **kwargs):
-        super(BlogCategory, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.sub_categories_list = None
 
     def __str__(self):
         if not hasattr(self, "_full_path"):
             self._full_path = " / ".join(
                 [
-                    k.safe_translation_getter("name", default="Unnamed", any_language=True) or "Unnamed"
+                    k.safe_translation_getter(
+                        "name", default="Unnamed", any_language=True
+                    )
+                    or "Unnamed"
                     for k in self.get_ancestors(include_self=True)
                 ]
             )
@@ -86,28 +88,32 @@ class BlogCategory(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDMo
         if not self.slug:
             config = SlugifyConfig(instance=self, title_field="name")
             self.slug = unique_slugify(config)
-        super(BlogCategory, self).save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
     @override
     def get_ordering_queryset(self):
-        return BlogCategory.objects.filter(parent=self.parent).get_descendants(include_self=True)
+        return BlogCategory.objects.filter(parent=self.parent).get_descendants(
+            include_self=True
+        )
 
     @property
-    def recursive_post_count(self) -> int:
-        return BlogPost.objects.filter(category__in=self.get_descendants(include_self=True)).count()
+    def recursive_post_count(self):
+        return BlogPost.objects.filter(
+            category__in=self.get_descendants(include_self=True)
+        ).count()
 
     @property
-    def absolute_url(self) -> str:
+    def absolute_url(self):
         return f"/blog/category/{self.id}/" + "/".join(
             [x["slug"] for x in self.get_ancestors(include_self=True).values()]
         )
 
     @property
-    def main_image_path(self) -> str:
+    def main_image_path(self):
         if self.image and hasattr(self.image, "name"):
             return f"media/uploads/blog/{os.path.basename(self.image.name)}"
         return ""
 
     @property
-    def post_count(self) -> int:
+    def post_count(self):
         return self.blog_posts.count()

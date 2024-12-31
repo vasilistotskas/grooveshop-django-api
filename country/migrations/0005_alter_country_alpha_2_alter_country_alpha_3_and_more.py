@@ -20,7 +20,8 @@ class Migration(migrations.Migration):
                 unique=True,
                 validators=[
                     django.core.validators.RegexValidator(
-                        message="Enter a valid 2-letter country code.", regex="^[A-Z]{2}$"
+                        message="Enter a valid 2-letter country code.",
+                        regex="^[A-Z]{2}$",
                     )
                 ],
                 verbose_name="Country Code Alpha 2",
@@ -34,7 +35,8 @@ class Migration(migrations.Migration):
                 unique=True,
                 validators=[
                     django.core.validators.RegexValidator(
-                        message="Enter a valid 3-letter country code.", regex="^[A-Z]{3}$"
+                        message="Enter a valid 3-letter country code.",
+                        regex="^[A-Z]{3}$",
                     )
                 ],
                 verbose_name="Country Code Alpha 3",
@@ -43,14 +45,20 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="country",
             name="sort_order",
-            field=models.IntegerField(editable=False, null=True, verbose_name="Sort Order"),
+            field=models.IntegerField(
+                editable=False, null=True, verbose_name="Sort Order"
+            ),
         ),
         migrations.AddIndex(
             model_name="country",
-            index=models.Index(fields=["alpha_2"], name="country_cou_alpha_2_398383_idx"),
+            index=models.Index(
+                fields=["alpha_2"], name="country_cou_alpha_2_398383_idx"
+            ),
         ),
         migrations.AddIndex(
             model_name="country",
-            index=models.Index(fields=["alpha_3"], name="country_cou_alpha_3_c813cd_idx"),
+            index=models.Index(
+                fields=["alpha_3"], name="country_cou_alpha_3_c813cd_idx"
+            ),
         ),
     ]

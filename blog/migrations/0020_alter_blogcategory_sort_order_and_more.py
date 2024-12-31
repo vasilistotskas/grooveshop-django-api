@@ -12,11 +12,15 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="blogcategory",
             name="sort_order",
-            field=models.IntegerField(editable=False, null=True, verbose_name="Sort Order"),
+            field=models.IntegerField(
+                editable=False, null=True, verbose_name="Sort Order"
+            ),
         ),
         migrations.AlterField(
             model_name="blogtag",
             name="sort_order",
-            field=models.IntegerField(editable=False, null=True, verbose_name="Sort Order"),
+            field=models.IntegerField(
+                editable=False, null=True, verbose_name="Sort Order"
+            ),
         ),
     ]

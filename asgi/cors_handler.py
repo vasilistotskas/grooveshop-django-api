@@ -1,17 +1,21 @@
 from fnmatch import fnmatchcase
 
-from asgiref.typing import ASGI3Application
-from asgiref.typing import ASGIReceiveCallable
-from asgiref.typing import ASGISendCallable
-from asgiref.typing import ASGISendEvent
-from asgiref.typing import HTTPResponseBodyEvent
-from asgiref.typing import HTTPResponseStartEvent
-from asgiref.typing import Scope
+from asgiref.typing import (
+    ASGI3Application,
+    ASGIReceiveCallable,
+    ASGISendCallable,
+    ASGISendEvent,
+    HTTPResponseBodyEvent,
+    HTTPResponseStartEvent,
+    Scope,
+)
 from django.conf import settings
 
 
-def cors_handler(application: ASGI3Application) -> ASGI3Application:
-    async def cors_wrapper(scope: Scope, receive: ASGIReceiveCallable, send: ASGISendCallable) -> None:
+def cors_handler(application: ASGI3Application):
+    async def cors_wrapper(
+        scope: Scope, receive: ASGIReceiveCallable, send: ASGISendCallable
+    ):
         if scope["type"] != "http":
             await application(scope, receive, send)
             return
@@ -32,7 +36,8 @@ def cors_handler(application: ASGI3Application) -> ASGI3Application:
                 (b"access-control-allow-credentials", b"true"),
                 (
                     b"access-control-allow-headers",
-                    b"Origin, Content-Type, Accept, Authorization, " b"Authorization-Bearer",
+                    b"Origin, Content-Type, Accept, Authorization, "
+                    b"Authorization-Bearer",
                 ),
                 (b"access-control-allow-methods", b"POST, OPTIONS"),
                 (b"access-control-max-age", b"600"),
@@ -53,10 +58,14 @@ def cors_handler(application: ASGI3Application) -> ASGI3Application:
                     trailers=False,
                 )
             )
-            await send(HTTPResponseBodyEvent(type="http.response.body", body=b"", more_body=False))
+            await send(
+                HTTPResponseBodyEvent(
+                    type="http.response.body", body=b"", more_body=False
+                )
+            )
         else:
 
-            async def send_with_origin(message: ASGISendEvent) -> None:
+            async def send_with_origin(message: ASGISendEvent):
                 if message["type"] == "http.response.start":
                     res_headers = [
                         (key, val)
@@ -68,9 +77,15 @@ def cors_handler(application: ASGI3Application) -> ASGI3Application:
                             b"vary",
                         }
                     ]
-                    res_headers.append((b"access-control-allow-credentials", b"true"))
+                    res_headers.append(
+                        (b"access-control-allow-credentials", b"true")
+                    )
                     vary_header = next(
-                        (val for key, val in message["headers"] if key.lower() == b"vary"),
+                        (
+                            val
+                            for key, val in message["headers"]
+                            if key.lower() == b"vary"
+                        ),
                         b"",
                     )
                     if origin_match:

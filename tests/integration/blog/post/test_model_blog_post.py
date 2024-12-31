@@ -13,7 +13,9 @@ from blog.models.category import BlogCategory
 from blog.models.post import BlogPost
 from user.factories.account import UserAccountFactory
 
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
 
@@ -47,7 +49,10 @@ class BlogPostModelTestCase(TestCase):
         self.assertTrue(default_storage.exists(self.post.image.path))
 
     def test_str_representation(self):
-        title = self.post.safe_translation_getter("title", any_language=True) or "Untitled"
+        title = (
+            self.post.safe_translation_getter("title", any_language=True)
+            or "Untitled"
+        )
         author_name = self.post.author.user.email if self.author else "Unknown"
         self.assertEqual(
             str(self.post),
@@ -55,7 +60,9 @@ class BlogPostModelTestCase(TestCase):
         )
 
     def test_main_image_path(self):
-        expected_filename = f"media/uploads/blog/{os.path.basename(self.post.image.name)}"
+        expected_filename = (
+            f"media/uploads/blog/{os.path.basename(self.post.image.name)}"
+        )
         self.assertEqual(self.post.main_image_path, expected_filename)
 
     def test_likes_count(self):

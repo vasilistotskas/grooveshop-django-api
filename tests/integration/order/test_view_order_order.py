@@ -17,8 +17,7 @@ from pay_way.models import PayWay
 from product.factories.product import ProductFactory
 from region.factories import RegionFactory
 from region.models import Region
-from user.enum.address import FloorChoicesEnum
-from user.enum.address import LocationChoicesEnum
+from user.enum.address import FloorChoicesEnum, LocationChoicesEnum
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()
@@ -54,8 +53,12 @@ class OrderViewSetTestCase(APITestCase):
         product_2.stock = 10
         product_2.save()
 
-        order_item1 = self.order.items.create(product_id=product_1.id, price=Decimal("50.00"), quantity=2)
-        order_item2 = self.order.items.create(product_id=product_2.id, price=Decimal("30.00"), quantity=3)
+        order_item1 = self.order.items.create(
+            product_id=product_1.id, price=Decimal("50.00"), quantity=2
+        )
+        order_item2 = self.order.items.create(
+            product_id=product_2.id, price=Decimal("30.00"), quantity=3
+        )
         self.order_items = [order_item1, order_item2]
 
     @staticmethod

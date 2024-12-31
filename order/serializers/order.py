@@ -9,9 +9,11 @@ from core.api.serializers import BaseExpandSerializer
 from country.serializers import CountrySerializer
 from order.models.item import OrderItem
 from order.models.order import Order
-from order.serializers.item import CheckoutItemSerializer
-from order.serializers.item import OrderItemCreateUpdateSerializer
-from order.serializers.item import OrderItemSerializer
+from order.serializers.item import (
+    CheckoutItemSerializer,
+    OrderItemCreateUpdateSerializer,
+    OrderItemSerializer,
+)
 from order.signals import order_created
 from pay_way.serializers import PayWaySerializer
 from product.models.product import Product
@@ -25,8 +27,12 @@ class OrderSerializer(BaseExpandSerializer):
     pay_way = serializers.SerializerMethodField("get_pay_way")
     paid_amount = MoneyField(max_digits=11, decimal_places=2, required=False)
     shipping_price = MoneyField(max_digits=11, decimal_places=2)
-    total_price_items = MoneyField(max_digits=11, decimal_places=2, read_only=True)
-    total_price_extra = MoneyField(max_digits=11, decimal_places=2, read_only=True)
+    total_price_items = MoneyField(
+        max_digits=11, decimal_places=2, read_only=True
+    )
+    total_price_extra = MoneyField(
+        max_digits=11, decimal_places=2, read_only=True
+    )
     phone = PhoneNumberField()
     mobile_phone = PhoneNumberField(required=False)
 
@@ -89,8 +95,12 @@ class OrderCreateUpdateSerializer(BaseExpandSerializer):
     items = OrderItemCreateUpdateSerializer(many=True)
     paid_amount = MoneyField(max_digits=11, decimal_places=2, required=False)
     shipping_price = MoneyField(max_digits=11, decimal_places=2)
-    total_price_items = MoneyField(max_digits=11, decimal_places=2, read_only=True)
-    total_price_extra = MoneyField(max_digits=11, decimal_places=2, read_only=True)
+    total_price_items = MoneyField(
+        max_digits=11, decimal_places=2, read_only=True
+    )
+    total_price_extra = MoneyField(
+        max_digits=11, decimal_places=2, read_only=True
+    )
     phone = PhoneNumberField()
     mobile_phone = PhoneNumberField(required=False)
 
@@ -147,7 +157,9 @@ class OrderCreateUpdateSerializer(BaseExpandSerializer):
             quantity = item_data["quantity"]
 
             if product.stock < quantity:
-                raise serializers.ValidationError(f"Product {product.name} does not have enough stock.")
+                raise serializers.ValidationError(
+                    f"Product {product.name} does not have enough stock."
+                )
 
         return data
 
@@ -167,8 +179,10 @@ class OrderCreateUpdateSerializer(BaseExpandSerializer):
 
             order_created.send(sender=Order, order=order)
 
-        except Product.DoesNotExist:
-            raise serializers.ValidationError("One or more products do not exist.")
+        except Product.DoesNotExist as err:
+            raise serializers.ValidationError(
+                "One or more products do not exist."
+            ) from err
 
         return order
 
@@ -189,8 +203,12 @@ class CheckoutSerializer(BaseExpandSerializer):
     items = CheckoutItemSerializer(many=True)
     paid_amount = MoneyField(max_digits=11, decimal_places=2, required=False)
     shipping_price = MoneyField(max_digits=11, decimal_places=2)
-    total_price_items = MoneyField(max_digits=11, decimal_places=2, read_only=True)
-    total_price_extra = MoneyField(max_digits=11, decimal_places=2, read_only=True)
+    total_price_items = MoneyField(
+        max_digits=11, decimal_places=2, read_only=True
+    )
+    total_price_extra = MoneyField(
+        max_digits=11, decimal_places=2, read_only=True
+    )
     phone = PhoneNumberField()
     mobile_phone = PhoneNumberField(required=False)
 
@@ -247,7 +265,9 @@ class CheckoutSerializer(BaseExpandSerializer):
             quantity = item_data["quantity"]
 
             if product.stock < quantity:
-                raise serializers.ValidationError(f"Product {product.name} does not have enough stock.")
+                raise serializers.ValidationError(
+                    f"Product {product.name} does not have enough stock."
+                )
 
         return data
 
@@ -268,7 +288,9 @@ class CheckoutSerializer(BaseExpandSerializer):
 
             order_created.send(sender=Order, order=order)
 
-        except Product.DoesNotExist:
-            raise serializers.ValidationError("One or more products do not exist.")
+        except Product.DoesNotExist as err:
+            raise serializers.ValidationError(
+                "One or more products do not exist."
+            ) from err
 
         return order

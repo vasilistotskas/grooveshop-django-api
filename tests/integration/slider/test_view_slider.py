@@ -10,8 +10,9 @@ from slider.factories import SliderFactory
 from slider.models import Slider
 from slider.serializers import SliderSerializer
 
-
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
@@ -34,8 +35,12 @@ class SliderViewSetTestCase(APITestCase):
         response = self.client.get(url)
         sliders = Slider.objects.all()
         serializer = SliderSerializer(sliders, many=True)
-        for response_item, serializer_item in zip(response.data["results"], serializer.data):
-            compare_serializer_and_response(serializer_item, response_item, ["video", "thumbnail"])
+        for response_item, serializer_item in zip(
+            response.data["results"], serializer.data, strict=False
+        ):
+            compare_serializer_and_response(
+                serializer_item, response_item, ["video", "thumbnail"]
+            )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -86,7 +91,9 @@ class SliderViewSetTestCase(APITestCase):
         response = self.client.get(url)
         slider = Slider.objects.get(pk=self.slider.pk)
         serializer = SliderSerializer(slider)
-        compare_serializer_and_response(serializer.data, response.data, ["video", "thumbnail"])
+        compare_serializer_and_response(
+            serializer.data, response.data, ["video", "thumbnail"]
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 

@@ -5,7 +5,6 @@ from allauth.headless.tokens.sessions import (
 )
 from knox.models import get_token_model
 
-
 AuthToken = get_token_model()
 
 

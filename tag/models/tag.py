@@ -5,12 +5,9 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from parler.managers import TranslatableManager
-from parler.models import TranslatableModel
-from parler.models import TranslatedFields
+from parler.models import TranslatableModel, TranslatedFields
 
-from core.models import SortableModel
-from core.models import TimeStampMixinModel
-from core.models import UUIDModel
+from core.models import SortableModel, TimeStampMixinModel, UUIDModel
 
 
 class ActiveBlogTagManager(TranslatableManager):
@@ -44,7 +41,10 @@ class Tag(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         ]
 
     def __str__(self):
-        tag_label = self.safe_translation_getter("label", any_language=True) or "Unnamed Label"
+        tag_label = (
+            self.safe_translation_getter("label", any_language=True)
+            or "Unnamed Label"
+        )
         return f"{tag_label} ({'Active' if self.active else 'Inactive'})"
 
     @override

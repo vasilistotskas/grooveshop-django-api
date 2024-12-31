@@ -11,7 +11,9 @@ from tip.factories import TipFactory
 from tip.models import Tip
 from tip.serializers import TipSerializer
 
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
@@ -37,8 +39,12 @@ class TipViewSetTestCase(APITestCase):
         response = self.client.get(url)
         tips = Tip.objects.all()
         serializer = TipSerializer(tips, many=True)
-        for response_item, serializer_item in zip(response.data["results"], serializer.data):
-            compare_serializer_and_response(serializer_item, response_item, ["icon"])
+        for response_item, serializer_item in zip(
+            response.data["results"], serializer.data, strict=False
+        ):
+            compare_serializer_and_response(
+                serializer_item, response_item, ["icon"]
+            )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -88,7 +94,9 @@ class TipViewSetTestCase(APITestCase):
         response = self.client.get(url)
         tip = Tip.objects.get(pk=self.tip.pk)
         serializer = TipSerializer(tip)
-        compare_serializer_and_response(serializer.data, response.data, ["icon"])
+        compare_serializer_and_response(
+            serializer.data, response.data, ["icon"]
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 

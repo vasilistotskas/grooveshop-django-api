@@ -5,7 +5,9 @@ from django.conf import settings
 from tip.enum.tip_enum import TipKindEnum
 from tip.models import Tip
 
-available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+available_languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 
 
 class TipTranslationFactory(factory.django.DjangoModelFactory):
@@ -40,7 +42,8 @@ class TipFactory(factory.django.DjangoModelFactory):
             return
 
         translations = extracted or [
-            TipTranslationFactory(language_code=lang, master=self) for lang in available_languages
+            TipTranslationFactory(language_code=lang, master=self)
+            for lang in available_languages
         ]
 
         for translation in translations:

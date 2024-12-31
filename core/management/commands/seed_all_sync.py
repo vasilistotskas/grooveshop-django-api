@@ -4,16 +4,13 @@ import pkgutil
 import time
 import traceback
 from types import ModuleType
-from typing import cast
-from typing import Optional
-from typing import TypeVar
+from typing import Optional, TypeVar, cast
 
 import factory
 from django.apps import apps
 from django.conf import settings
 from django.core.management.base import BaseCommand
-from django.db import IntegrityError
-from django.db import models
+from django.db import IntegrityError, models
 
 DEFAULT_COUNT = settings.SEED_DEFAULT_COUNT
 BATCH_SIZE = settings.SEED_BATCH_SIZE
@@ -38,7 +35,9 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        self.stdout.write(self.style.NOTICE("Starting the seeding process...\n"))
+        self.stdout.write(
+            self.style.NOTICE("Starting the seeding process...\n")
+        )
         start_total_time = time.time()
         count = options["count"]
         model_counts = self.parse_model_counts(options["model_counts"])
@@ -48,7 +47,7 @@ class Command(BaseCommand):
 
         initial_counts = self.get_initial_counts()
 
-        for model_name in model_counts.keys():
+        for model_name in model_counts:
             if model_name not in available_models:
                 self.stdout.write(
                     self.style.WARNING(
@@ -64,7 +63,11 @@ class Command(BaseCommand):
         for module_path in factory_modules:
             if isinstance(module_path, str):
                 result = self.process_module(
-                    module_path, model_counts, count, created_counts, factory_timings
+                    module_path,
+                    model_counts,
+                    count,
+                    created_counts,
+                    factory_timings,
                 )
                 if result:
                     success_messages.extend(result)
@@ -78,11 +81,17 @@ class Command(BaseCommand):
         self.stdout.write(self.style.NOTICE("Created instances summary:"))
         for factory_class, count in created_counts.items():
             timing = factory_timings.get(factory_class, 0)
-            self.stdout.write(self.style.SUCCESS(f"{factory_class:<30} : {count:<5} ({timing:.2f}s)"))
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"{factory_class:<30} : {count:<5} ({timing:.2f}s)"
+                )
+            )
 
         self.print_created_counts(initial_counts)
 
-        self.stdout.write(self.style.NOTICE(f"\nTotal seeding time: {total_time:.2f} seconds"))
+        self.stdout.write(
+            self.style.NOTICE(f"\nTotal seeding time: {total_time:.2f} seconds")
+        )
 
     def process_module(
         self,
@@ -91,23 +100,27 @@ class Command(BaseCommand):
         default_count: int,
         created_counts: dict[str, int],
         factory_timings: dict[str, float],
-    ) -> list[str]:
+    ):
         success_messages = []
         module = importlib.import_module(module_path)
         factory_classes = self.get_factory_classes(module)
         if not factory_classes:
             return success_messages
 
-        self.stdout.write(self.style.NOTICE(f"\nProcessing module: {module_path}"))
+        self.stdout.write(
+            self.style.NOTICE(f"\nProcessing module: {module_path}")
+        )
         try:
             for factory_class in factory_classes:
-                model_name = factory_class._meta.model.__name__  # noqa
+                model_name = factory_class._meta.model.__name__
                 if model_name.endswith("Translation"):
                     continue
                 model_count = model_counts.get(model_name, default_count)
 
                 self.stdout.write(
-                    self.style.NOTICE(f"Running factory: {factory_class.__name__} for {model_name}")
+                    self.style.NOTICE(
+                        f"Running factory: {factory_class.__name__} for {model_name}"
+                    )
                 )
 
                 start_time = time.time()
@@ -118,17 +131,21 @@ class Command(BaseCommand):
 
         except Exception as e:
             tb = traceback.format_exc()
-            error_message = f"Failed to seed using {module_path}: {str(e)}\n{tb}"
+            error_message = f"Failed to seed using {module_path}: {e!s}\n{tb}"
             self.stdout.write(self.style.ERROR(error_message))
             success_messages.append(self.style.ERROR(error_message))
 
         return success_messages
 
-    def create_records(self, factory_class: type[F], count: int, created_counts: dict[str, int]) -> int:
+    def create_records(
+        self, factory_class: type[F], count: int, created_counts: dict[str, int]
+    ):
         factory_name = factory_class.__name__
         created_counts[factory_name] = created_counts.get(factory_name, 0)
 
-        self.stdout.write(self.style.NOTICE(f"Creating {count} records using {factory_name}"))
+        self.stdout.write(
+            self.style.NOTICE(f"Creating {count} records using {factory_name}")
+        )
 
         instances = []
         for i in range(count):
@@ -144,8 +161,8 @@ class Command(BaseCommand):
 
             except Exception as e:
                 error_message = (
-                    f"Failed to create {factory_class._meta.model.__name__} instance "  # noqa
-                    f"{i + 1}/{count}: {str(e)}"
+                    f"Failed to create {factory_class._meta.model.__name__} instance "
+                    f"{i + 1}/{count}: {e!s}"
                 )
                 self.stdout.write(self.style.ERROR(error_message))
 
@@ -153,13 +170,17 @@ class Command(BaseCommand):
             self.save_batch(instances, factory_class)
             created_counts[factory_name] += len(instances)
 
-        self.stdout.write(self.style.NOTICE(f"Completed creating {count} records using {factory_name}"))
+        self.stdout.write(
+            self.style.NOTICE(
+                f"Completed creating {count} records using {factory_name}"
+            )
+        )
 
         return count
 
     @staticmethod
     def save_related_objects(instance: models.Model):
-        for field in instance._meta.get_fields():  # noqa
+        for field in instance._meta.get_fields():
             if field.is_relation and field.many_to_one:
                 related_instance = getattr(instance, field.name)
                 if related_instance and not related_instance.pk:
@@ -167,16 +188,22 @@ class Command(BaseCommand):
 
     def save_batch(self, instances: list[models.Model], factory_class: type[F]):
         try:
-            factory_class._meta.model.objects.bulk_create(instances, batch_size=BATCH_SIZE)  # noqa
-            self.stdout.write(self.style.NOTICE(f"Saved batch of {len(instances)} records."))
+            factory_class._meta.model.objects.bulk_create(
+                instances, batch_size=BATCH_SIZE
+            )
+            self.stdout.write(
+                self.style.NOTICE(f"Saved batch of {len(instances)} records.")
+            )
         except IntegrityError:
             for instance in instances:
                 try:
                     instance.save()
                 except IntegrityError as e:
-                    self.stdout.write(self.style.ERROR(f"Failed to save instance: {str(e)}"))
+                    self.stdout.write(
+                        self.style.ERROR(f"Failed to save instance: {e!s}")
+                    )
 
-    def parse_model_counts(self, model_counts_str: Optional[str]) -> dict[str, int]:
+    def parse_model_counts(self, model_counts_str: Optional[str]):
         if not model_counts_str:
             return {}
 
@@ -187,10 +214,12 @@ class Command(BaseCommand):
                 model_name, count = pair.split("=")
                 model_counts[model_name.strip()] = int(count.strip())
             except ValueError:
-                self.stdout.write(self.style.ERROR(f"Invalid format for model count: {pair}"))
+                self.stdout.write(
+                    self.style.ERROR(f"Invalid format for model count: {pair}")
+                )
         return model_counts
 
-    def find_factory_modules(self) -> list[str]:
+    def find_factory_modules(self):
         factory_modules = []
         for app in apps.get_app_configs():
             app_path = app.module.__path__[0]
@@ -201,14 +230,18 @@ class Command(BaseCommand):
                         factory_modules.append(module_path)
                 if "factories" in os.listdir(root):
                     factories_dir = os.path.join(root, "factories")
-                    for _, name, is_pkg in pkgutil.iter_modules([factories_dir]):
+                    for _, name, is_pkg in pkgutil.iter_modules(
+                        [factories_dir]
+                    ):
                         if not is_pkg:
-                            module_path = self.path_to_module(factories_dir, f"{name}.py")
+                            module_path = self.path_to_module(
+                                factories_dir, f"{name}.py"
+                            )
                             factory_modules.append(module_path)
         return factory_modules
 
     @staticmethod
-    def path_to_module(root: str, file: str) -> str:
+    def path_to_module(root: str, file: str):
         module_path = os.path.relpath(os.path.join(root, file))
         module_path = module_path.replace(os.sep, ".")
         if module_path.endswith(".py"):
@@ -216,29 +249,29 @@ class Command(BaseCommand):
         return module_path
 
     @staticmethod
-    def get_factory_classes(module: ModuleType) -> list[type[F]]:
+    def get_factory_classes(module: ModuleType):
         factory_classes = []
         for attr_name in dir(module):
             attr = getattr(module, attr_name)
             if hasattr(attr, "_meta") and hasattr(attr._meta, "model"):  # noqa
-                if attr._meta.model is not None and "Factory" in attr.__name__:  # noqa
+                if attr._meta.model is not None and "Factory" in attr.__name__:
                     factory_classes.append(cast(type[F], attr))
         return factory_classes
 
-    def get_available_models(self) -> list[str]:
+    def get_available_models(self):
         available_models = []
         factory_modules = self.find_factory_modules()
         for module_path in factory_modules:
             module = importlib.import_module(module_path)
             factory_classes = self.get_factory_classes(module)
             for factory_class in factory_classes:
-                model_name = factory_class._meta.model.__name__  # noqa
+                model_name = factory_class._meta.model.__name__
                 if not model_name.endswith("Translation"):
                     available_models.append(model_name)
         return available_models
 
     @staticmethod
-    def get_initial_counts() -> dict[str, int]:
+    def get_initial_counts():
         initial_counts = {}
         for model in apps.get_models():
             model_name = model.__name__
@@ -249,7 +282,9 @@ class Command(BaseCommand):
         return initial_counts
 
     def print_created_counts(self, initial_counts: dict[str, int]):
-        self.stdout.write(self.style.NOTICE("\nTotal records created in the database:"))
+        self.stdout.write(
+            self.style.NOTICE("\nTotal records created in the database:")
+        )
         for model in apps.get_models():
             model_name = model.__name__
             if model_name.endswith("Translation"):
@@ -258,4 +293,6 @@ class Command(BaseCommand):
             current_count = model.objects.count()
             created_count = current_count - initial_count
             if created_count > 0:
-                self.stdout.write(self.style.SUCCESS(f"{model_name:<30} : {created_count:<5}"))
+                self.stdout.write(
+                    self.style.SUCCESS(f"{model_name:<30} : {created_count:<5}")
+                )

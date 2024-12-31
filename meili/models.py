@@ -1,4 +1,4 @@
-from typing import Iterable
+from collections.abc import Iterable
 from typing import TypedDict
 
 from django.conf import settings
@@ -6,6 +6,7 @@ from django.db import models
 from meilisearch.models.task import TaskInfo
 
 from meili._client import client as _client
+from meili.dataclasses import MeiliIndexSettings
 from meili.querysets import IndexQuerySet
 
 
@@ -29,6 +30,9 @@ class IndexMixin(models.Model):
     meilisearch: IndexQuerySet
     _meilisearch: _Meili
 
+    class Meta:
+        abstract = True
+
     class MeiliMeta:
         displayed_fields: Iterable[str] = None
         searchable_fields: Iterable[str] = None
@@ -45,7 +49,7 @@ class IndexMixin(models.Model):
         index_name: str = None
         primary_key: str = "pk"
 
-    def __init_subclass__(cls) -> None:
+    def __init_subclass__(cls):
         index_name = getattr(cls.MeiliMeta, "index_name", cls.__name__)
         primary_key = getattr(cls.MeiliMeta, "primary_key", "pk")
         displayed_fields = getattr(cls.MeiliMeta, "displayed_fields", None)
@@ -77,8 +81,7 @@ class IndexMixin(models.Model):
                 tasks=[],
             )
         else:
-            _client.create_index(index_name, primary_key).with_settings(
-                index_name=index_name,
+            index_settings = MeiliIndexSettings(
                 displayed_fields=displayed_fields,
                 searchable_fields=searchable_fields,
                 filterable_fields=filterable_fields,
@@ -90,6 +93,10 @@ class IndexMixin(models.Model):
                 typo_tolerance=typo_tolerance,
                 faceting=faceting,
                 pagination=pagination,
+            )
+            _client.create_index(index_name, primary_key).with_settings(
+                index_name=index_name,
+                index_settings=index_settings,
             )
 
         cls._meilisearch = _Meili(
@@ -106,15 +113,16 @@ class IndexMixin(models.Model):
 
         cls.meilisearch = IndexQuerySet(cls)
 
-    def meili_filter(self) -> bool:  # noqa
+    def meili_filter(self):
         return True
 
     @classmethod
-    def get_additional_meili_fields(cls) -> dict:
+    def get_additional_meili_fields(cls):
         return {}
 
     def meili_serialize(self):
         from json import loads
+
         from django.core.serializers import serialize
 
         serialized_model = loads(
@@ -137,8 +145,5 @@ class IndexMixin(models.Model):
 
         return data
 
-    def meili_geo(self) -> MeiliGeo:
+    def meili_geo(self):
         raise ValueError("Model does not support geolocation")
-
-    class Meta:
-        abstract = True

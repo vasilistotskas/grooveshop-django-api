@@ -3,9 +3,11 @@ import json
 from django.test import TestCase
 from rest_framework import serializers
 
-from core.utils.serializers import flatten_dict_for_form_data
-from core.utils.serializers import MultiSerializerMixin
-from core.utils.serializers import TranslatedFieldExtended
+from core.utils.serializers import (
+    MultiSerializerMixin,
+    TranslatedFieldExtended,
+    flatten_dict_for_form_data,
+)
 
 
 class DummySerializer(serializers.Serializer):

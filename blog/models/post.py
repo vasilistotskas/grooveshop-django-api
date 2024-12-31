@@ -6,17 +6,13 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from parler.fields import TranslationsForeignKey
-from parler.models import TranslatableModel
-from parler.models import TranslatedFieldsModel
+from parler.models import TranslatableModel, TranslatedFieldsModel
 from tinymce.models import HTMLField
 
 from blog.enum.blog_post_enum import PostStatusEnum
 from core.fields.image import ImageAndSvgField
-from core.models import PublishableModel
-from core.models import TimeStampMixinModel
-from core.models import UUIDModel
-from core.utils.generators import SlugifyConfig
-from core.utils.generators import unique_slugify
+from core.models import PublishableModel, TimeStampMixinModel, UUIDModel
+from core.utils.generators import SlugifyConfig, unique_slugify
 from meili.models import IndexMixin
 from seo.models import SeoModel
 
@@ -30,15 +26,21 @@ class BlogPost(
 ):
     id = models.BigAutoField(primary_key=True)
     slug = models.SlugField(_("Slug"), max_length=255, unique=True)
-    image = ImageAndSvgField(_("Image"), upload_to="uploads/blog/", blank=True, null=True)
-    likes = models.ManyToManyField("user.UserAccount", related_name="liked_blog_posts", blank=True)
+    image = ImageAndSvgField(
+        _("Image"), upload_to="uploads/blog/", blank=True, null=True
+    )
+    likes = models.ManyToManyField(
+        "user.UserAccount", related_name="liked_blog_posts", blank=True
+    )
     category = models.ForeignKey(
         "blog.BlogCategory",
         related_name="blog_posts",
         on_delete=models.SET_NULL,
         null=True,
     )
-    tags = models.ManyToManyField("blog.BlogTag", related_name="blog_posts", blank=True)
+    tags = models.ManyToManyField(
+        "blog.BlogTag", related_name="blog_posts", blank=True
+    )
     author = models.ForeignKey(
         "blog.BlogAuthor",
         related_name="blog_posts",
@@ -69,7 +71,10 @@ class BlogPost(
         ]
 
     def __str__(self):
-        title = self.safe_translation_getter("title", any_language=True) or "Untitled"
+        title = (
+            self.safe_translation_getter("title", any_language=True)
+            or "Untitled"
+        )
         author_name = self.author.user.email if self.author else "Unknown"
         return f"{title} by {author_name}"
 
@@ -83,34 +88,39 @@ class BlogPost(
         super().save(*args, **kwargs)
 
     @property
-    def main_image_path(self) -> str:
+    def main_image_path(self):
         if self.image and hasattr(self.image, "name"):
             return f"media/uploads/blog/{os.path.basename(self.image.name)}"
         return ""
 
     @property
-    def likes_count(self) -> int:
+    def likes_count(self):
         return self.likes.count()
 
     @property
-    def comments_count(self) -> int:
+    def comments_count(self):
         return self.comments.count()
 
     @property
-    def tags_count(self) -> int:
+    def tags_count(self):
         return self.tags.filter(active=True).count()
 
     @property
-    def absolute_url(self) -> str:
+    def absolute_url(self):
         return f"/blog/post/{self.id}/{self.slug}"
 
 
 class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
     master = TranslationsForeignKey(
-        "blog.BlogPost", on_delete=models.CASCADE, related_name="translations", null=True
+        "blog.BlogPost",
+        on_delete=models.CASCADE,
+        related_name="translations",
+        null=True,
     )
-    title = models.CharField(_("Title"), max_length=255, blank=True, null=True)
-    subtitle = models.CharField(_("Subtitle"), max_length=255, blank=True, null=True)
+    title = models.CharField(_("Title"), max_length=255, blank=True, default="")
+    subtitle = models.CharField(
+        _("Subtitle"), max_length=255, blank=True, default=""
+    )
     body = HTMLField(_("Body"), blank=True, null=True)
 
     class Meta:
@@ -125,7 +135,15 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
         searchable_fields = ("id", "title", "subtitle", "body")
         displayed_fields = ("id", "title", "subtitle", "body", "language_code")
         sortable_fields = ("likes_count",)
-        ranking_rules = ["words", "typo", "proximity", "attribute", "sort", "likes_count:desc", "exactness"]
+        ranking_rules = [
+            "words",
+            "typo",
+            "proximity",
+            "attribute",
+            "sort",
+            "likes_count:desc",
+            "exactness",
+        ]
         synonyms = {
             "blog": ["article", "post"],
             "article": ["blog", "post"],

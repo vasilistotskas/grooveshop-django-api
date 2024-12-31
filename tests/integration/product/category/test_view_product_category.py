@@ -13,7 +13,9 @@ from product.factories.category import ProductCategoryFactory
 from product.models.category import ProductCategory
 from product.serializers.category import ProductCategorySerializer
 
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
 
@@ -36,11 +38,13 @@ class ProductCategoryViewSetTestCase(APITestCase):
     def get_product_category_list_url():
         return reverse("product-category-list")
 
-    def _create_mock_image(self) -> SimpleUploadedFile:
+    def _create_mock_image(self):
         image = Image.new("RGB", size=(100, 100), color=(155, 0, 0))
         image_io = io.BytesIO()
         image.save(image_io, format="jpeg")
-        image_file = SimpleUploadedFile("mock_image.jpg", image_io.getvalue(), content_type="image/jpg")
+        image_file = SimpleUploadedFile(
+            "mock_image.jpg", image_io.getvalue(), content_type="image/jpg"
+        )
         return image_file
 
     def test_list(self):
@@ -208,7 +212,9 @@ class ProductCategoryViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(ProductCategory.objects.filter(id=self.category.id).exists())
+        self.assertFalse(
+            ProductCategory.objects.filter(id=self.category.id).exists()
+        )
 
     def test_destroy_invalid(self):
         invalid_category_id = 999999
@@ -216,4 +222,6 @@ class ProductCategoryViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertTrue(ProductCategory.objects.filter(id=self.category.id).exists())
+        self.assertTrue(
+            ProductCategory.objects.filter(id=self.category.id).exists()
+        )

@@ -10,7 +10,9 @@ from blog.models.comment import BlogComment
 from blog.models.post import BlogPost
 from user.factories.account import UserAccountFactory
 
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 User = get_user_model()
@@ -25,8 +27,12 @@ class BlogCommentModelTestCase(TestCase):
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
         self.author = BlogAuthorFactory(user=self.user)
-        self.post = BlogPostFactory(author=self.author, num_tags=0, num_comments=0)
-        self.comment = BlogCommentFactory(is_approved=True, user=self.user, post=self.post)
+        self.post = BlogPostFactory(
+            author=self.author, num_tags=0, num_comments=0
+        )
+        self.comment = BlogCommentFactory(
+            is_approved=True, user=self.user, post=self.post
+        )
 
     def test_fields(self):
         self.assertTrue(self.comment.is_approved)

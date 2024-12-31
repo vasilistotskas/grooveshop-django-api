@@ -1,6 +1,5 @@
 import pytest
-from asgiref.typing import HTTPResponseBodyEvent
-from asgiref.typing import HTTPResponseStartEvent
+from asgiref.typing import HTTPResponseBodyEvent, HTTPResponseStartEvent
 
 from asgi.health_check import health_check
 
@@ -16,12 +15,16 @@ async def test_health_check():
                 trailers=False,
             )
         )
-        await send(HTTPResponseBodyEvent(type="http.response.body", body=b"app", more_body=False))
+        await send(
+            HTTPResponseBodyEvent(
+                type="http.response.body", body=b"app", more_body=False
+            )
+        )
 
-    async def receive() -> None:
+    async def receive():
         raise NotImplementedError()
 
-    async def send(event) -> None:
+    async def send(event):
         events.append(event)
 
     scope = {"type": "http", "path": "/not-health"}

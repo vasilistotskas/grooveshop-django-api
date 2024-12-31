@@ -11,7 +11,7 @@ class TestStorage(unittest.TestCase):
     @patch.dict(os.environ, {"SYSTEM_ENV": "dev"})
     def test_dev(self):
         reload(sys.modules["settings"])
-        from settings import STATIC_URL, MEDIA_URL
+        from settings import MEDIA_URL, STATIC_URL
 
         self.assertEqual(STATIC_URL, "/static/")
         self.assertEqual(MEDIA_URL, "/media/")
@@ -28,7 +28,7 @@ class TestStorage(unittest.TestCase):
     )
     def test_aws(self):
         reload(sys.modules["settings"])
-        from settings import STATIC_URL, MEDIA_URL
+        from settings import MEDIA_URL, STATIC_URL
 
         AWS_STORAGE_BUCKET_NAME = getenv("AWS_STORAGE_BUCKET_NAME")
         AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"

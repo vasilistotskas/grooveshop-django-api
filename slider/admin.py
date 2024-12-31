@@ -1,18 +1,16 @@
-from typing import List
 from typing import override
 
 import admin_thumbnails
 from django.contrib import admin
 from parler.admin import TranslatableAdmin
 
-from slider.models import Slide
-from slider.models import Slider
+from slider.models import Slide, Slider
 
 
 @admin_thumbnails.thumbnail("image")
 class SliderSlidesInline(admin.StackedInline):
     model = Slide
-    exclude: List[str] = []
+    exclude: list[str] = []
     readonly_fields = ("id", "thumbnail")
     extra = 0
 

@@ -1,16 +1,18 @@
-from asgiref.typing import ASGI3Application
-from asgiref.typing import ASGIReceiveCallable
-from asgiref.typing import ASGISendCallable
-from asgiref.typing import HTTPResponseBodyEvent
-from asgiref.typing import HTTPResponseStartEvent
-from asgiref.typing import Scope
+from asgiref.typing import (
+    ASGI3Application,
+    ASGIReceiveCallable,
+    ASGISendCallable,
+    HTTPResponseBodyEvent,
+    HTTPResponseStartEvent,
+    Scope,
+)
 from django.core.handlers.asgi import ASGIHandler
 
 
-def health_check(application: ASGI3Application | ASGIHandler, health_url: str) -> ASGI3Application:
+def health_check(application: ASGI3Application | ASGIHandler, health_url: str):
     async def health_check_wrapper(
         scope: Scope, receive: ASGIReceiveCallable, send: ASGISendCallable
-    ) -> None:
+    ):
         if scope.get("type") == "http" and scope.get("path") != health_url:
             await application(scope, receive, send)
             return
@@ -22,6 +24,10 @@ def health_check(application: ASGI3Application | ASGIHandler, health_url: str) -
                 trailers=False,
             )
         )
-        await send(HTTPResponseBodyEvent(type="http.response.body", body=b"", more_body=False))
+        await send(
+            HTTPResponseBodyEvent(
+                type="http.response.body", body=b"", more_body=False
+            )
+        )
 
     return health_check_wrapper

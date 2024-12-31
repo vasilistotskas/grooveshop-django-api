@@ -6,7 +6,9 @@ from blog.factories.author import BlogAuthorFactory
 from blog.models.author import BlogAuthor
 from user.factories.account import UserAccountFactory
 
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
 
@@ -17,7 +19,9 @@ class BlogAuthorModelTestCase(TestCase):
 
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
-        self.author = BlogAuthorFactory(user=self.user, website="http://example.com")
+        self.author = BlogAuthorFactory(
+            user=self.user, website="http://example.com"
+        )
 
     def test_fields(self):
         self.assertEqual(self.author.user, self.user)

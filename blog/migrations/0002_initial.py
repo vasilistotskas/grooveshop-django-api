@@ -28,7 +28,9 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="blogpost",
             name="tags",
-            field=models.ManyToManyField(blank=True, related_name="blog_post_tags", to="blog.blogtag"),
+            field=models.ManyToManyField(
+                blank=True, related_name="blog_post_tags", to="blog.blogtag"
+            ),
         ),
         migrations.AddField(
             model_name="blogcommenttranslation",
@@ -125,7 +127,9 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name="blogcomment",
-            constraint=models.UniqueConstraint(fields=("user", "post"), name="unique_blog_comment"),
+            constraint=models.UniqueConstraint(
+                fields=("user", "post"), name="unique_blog_comment"
+            ),
         ),
         migrations.AlterUniqueTogether(
             name="blogcategorytranslation",

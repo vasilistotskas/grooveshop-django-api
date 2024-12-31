@@ -17,7 +17,7 @@ class StaticStorage(S3Boto3Storage):
     @override
     def save(self, name, content, max_length=None):
         self.local_storage.save(name, content)
-        super().save(name, self.local_storage._open(name))  # noqa
+        super().save(name, self.local_storage._open(name))
         return name
 
 

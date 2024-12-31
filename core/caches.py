@@ -4,8 +4,7 @@ import os
 from os import getenv
 
 import redis
-from django.core.cache.backends.redis import RedisCache
-from django.core.cache.backends.redis import RedisCacheClient
+from django.core.cache.backends.redis import RedisCache, RedisCacheClient
 
 from core.logging import LogInfo
 
@@ -36,7 +35,7 @@ class CustomCache(RedisCache):
     def make_key(self, key, version=None):
         return key
 
-    def keys(self, search: str | None = None) -> list[str]:
+    def keys(self, search: str | None = None):
         try:
             pattern = self._make_pattern(search)
             LogInfo.info(f"Searching for keys with pattern: {pattern}")
@@ -50,7 +49,7 @@ class CustomCache(RedisCache):
             return []
 
     @staticmethod
-    def _make_pattern(search: str | None = None) -> str:
+    def _make_pattern(search: str | None = None):
         if search is None:
             return "*"
         return f"*{search}*"

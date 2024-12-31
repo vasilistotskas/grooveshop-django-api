@@ -1,4 +1,3 @@
-from typing import List
 from typing import override
 
 from django.contrib.postgres.indexes import GinIndex
@@ -8,10 +7,8 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from phonenumber_field.modelfields import PhoneNumberField
 
-from core.models import TimeStampMixinModel
-from core.models import UUIDModel
-from user.enum.address import FloorChoicesEnum
-from user.enum.address import LocationChoicesEnum
+from core.models import TimeStampMixinModel, UUIDModel
+from user.enum.address import FloorChoicesEnum, LocationChoicesEnum
 
 
 class UserAddress(TimeStampMixinModel, UUIDModel):
@@ -58,9 +55,11 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
         blank=True,
         default=None,
     )
-    phone = PhoneNumberField(_("Phone Number"), null=True, blank=True, default=None)
+    phone = PhoneNumberField(
+        _("Phone Number"), null=True, blank=True, default=None
+    )
     mobile_phone = PhoneNumberField(_("Mobile Phone Number"))
-    notes = models.CharField(_("Notes"), max_length=255, null=True, blank=True, default=None)
+    notes = models.CharField(_("Notes"), max_length=255, blank=True, default="")
     is_main = models.BooleanField(_("Is Main"), default=False)
 
     class Meta(TypedModelMeta):
@@ -89,28 +88,32 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
     @override
     def save(self, *args, **kwargs):
         if self.is_main:
-            UserAddress.objects.filter(user=self.user, is_main=True).exclude(pk=self.id).update(
-                is_main=False
-            )
+            UserAddress.objects.filter(user=self.user, is_main=True).exclude(
+                pk=self.id
+            ).update(is_main=False)
         super().save(*args, **kwargs)
 
     @override
     def clean(self):
         if self.is_main:
             main_count = (
-                UserAddress.objects.filter(user=self.user, is_main=True).exclude(pk=self.pk).count()
+                UserAddress.objects.filter(user=self.user, is_main=True)
+                .exclude(pk=self.pk)
+                .count()
             )
             if main_count > 0:
-                raise ValidationError(_("There can only be one main address per user."))
+                raise ValidationError(
+                    _("There can only be one main address per user.")
+                )
 
     @classmethod
-    def get_user_addresses(cls, user) -> List["UserAddress"]:
+    def get_user_addresses(cls, user):
         return cls.objects.filter(user=user)
 
     @classmethod
-    def get_main_address(cls, user) -> "UserAddress":
+    def get_main_address(cls, user):
         return cls.objects.filter(user=user, is_main=True).first()
 
     @classmethod
-    def get_user_address_count(cls, user) -> int:
+    def get_user_address_count(cls, user):
         return cls.objects.filter(user=user).count()

@@ -14,7 +14,10 @@ from region.models import Region
 from region.serializers import RegionSerializer
 
 
-@cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve", "get_regions_by_country_alpha_2"])
+@cache_methods(
+    settings.DEFAULT_CACHE_TTL,
+    methods=["list", "retrieve", "get_regions_by_country_alpha_2"],
+)
 class RegionViewSet(BaseModelViewSet):
     queryset = Region.objects.all()
     serializer_class = RegionSerializer
@@ -32,7 +35,7 @@ class RegionViewSet(BaseModelViewSet):
         detail=True,
         methods=["GET"],
     )
-    def get_regions_by_country_alpha_2(self, request, pk=None, *args, **kwargs) -> Response:
+    def get_regions_by_country_alpha_2(self, request, pk=None, *args, **kwargs):
         regions = Region.objects.filter(country__alpha_2=pk)
         serializer = self.get_serializer(regions, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)

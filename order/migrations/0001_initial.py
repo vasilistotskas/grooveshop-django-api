@@ -120,7 +120,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "customer_notes",
-                    models.TextField(blank=True, null=True, verbose_name="Customer Notes"),
+                    models.TextField(
+                        blank=True, null=True, verbose_name="Customer Notes"
+                    ),
                 ),
                 (
                     "status",
@@ -229,7 +231,9 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "price",
-                    djmoney.models.fields.MoneyField(decimal_places=2, max_digits=11, verbose_name="Price"),
+                    djmoney.models.fields.MoneyField(
+                        decimal_places=2, max_digits=11, verbose_name="Price"
+                    ),
                 ),
                 (
                     "quantity",

@@ -7,7 +7,9 @@ from django.test import TestCase
 from country.factories import CountryFactory
 from country.models import Country
 
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
@@ -15,7 +17,13 @@ class CountryModelTestCase(TestCase):
     country: Country = None
 
     def setUp(self):
-        self.country = CountryFactory(alpha_2="GR", alpha_3="GRC", iso_cc=300, phone_code=30, num_regions=0)
+        self.country = CountryFactory(
+            alpha_2="GR",
+            alpha_3="GRC",
+            iso_cc=300,
+            phone_code=30,
+            num_regions=0,
+        )
 
     def test_fields(self):
         self.assertEqual(self.country.alpha_2, "GR")
@@ -25,7 +33,9 @@ class CountryModelTestCase(TestCase):
         self.assertTrue(default_storage.exists(self.country.image_flag.path))
 
     def test_str_representation(self):
-        self.assertEqual(str(self.country), self.country.safe_translation_getter("name"))
+        self.assertEqual(
+            str(self.country), self.country.safe_translation_getter("name")
+        )
 
     def test_get_ordering_queryset(self):
         queryset = self.country.get_ordering_queryset()

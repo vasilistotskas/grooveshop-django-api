@@ -6,7 +6,7 @@ RE_HTML_TAGS = re.compile("<.*?>")
 RE_WHITESPACE_AND_PUNCTUATION = re.compile(r"[,.?!;:\'\"()\[\]]|\s+|\xa0")
 
 
-def preprocess_text(text: Optional[str]) -> str:
+def preprocess_text(text: Optional[str]):
     if not text:
         return ""
 

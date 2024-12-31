@@ -4,17 +4,21 @@ from typing import override
 
 from django import forms
 from django.conf import settings
-from django.core.validators import MaxValueValidator
-from django.core.validators import MinValueValidator
-from measurement.base import BidimensionalMeasure
-from measurement.base import MeasureBase
+from django.core.validators import MaxValueValidator, MinValueValidator
+from measurement.base import BidimensionalMeasure, MeasureBase
 
 from core.utils.measurement import get_measurement
 
 
 class MeasurementWidget(forms.MultiWidget):
     def __init__(
-        self, attrs=None, float_widget=None, unit_choices_widget=None, unit_choices=None, *args, **kwargs
+        self,
+        attrs=None,
+        float_widget=None,
+        unit_choices_widget=None,
+        unit_choices=None,
+        *args,
+        **kwargs,
     ):
         self.unit_choices = unit_choices
 
@@ -22,10 +26,12 @@ class MeasurementWidget(forms.MultiWidget):
             float_widget = forms.TextInput(attrs=attrs)
 
         if not unit_choices_widget:
-            unit_choices_widget = forms.Select(attrs=attrs, choices=unit_choices)
+            unit_choices_widget = forms.Select(
+                attrs=attrs, choices=unit_choices
+            )
 
         widgets = (float_widget, unit_choices_widget)
-        super(MeasurementWidget, self).__init__(widgets, attrs)
+        super().__init__(widgets, attrs)
 
     @override
     def decompress(self, value):
@@ -36,7 +42,9 @@ class MeasurementWidget(forms.MultiWidget):
                     magnitude, unit = literal_value
                 except (ValueError, SyntaxError):
                     literal_value = value
-                    magnitude, unit = [v.strip() for v in literal_value.split(" ")]
+                    magnitude, unit = [
+                        v.strip() for v in literal_value.split(" ")
+                    ]
                 return [float(magnitude), unit]
             elif isinstance(value, MeasureBase):
                 choice_units = set([u for u, n in self.unit_choices])
@@ -60,18 +68,19 @@ class MeasurementFormField(forms.MultiValueField):
         validators=None,
         bidimensional_separator=settings.MEASUREMENT_BIDIMENSIONAL_SEPARATOR,
         *args,
-        **kwargs
+        **kwargs,
     ):
         if not issubclass(measurement, (MeasureBase, BidimensionalMeasure)):
-            raise ValueError("%s must be a subclass of MeasureBase" % measurement)
+            raise ValueError(
+                "{} must be a subclass of MeasureBase".format(measurement)
+            )
 
         self.measurement = measurement
         if not unit_choices:
             if issubclass(measurement, BidimensionalMeasure):
                 assert isinstance(bidimensional_separator, str), (
-                    "Supplied bidimensional_separator for %s must be of string/unicode type;"
-                    " Instead got type %s"
-                    % (
+                    "Supplied bidimensional_separator for {} must be of string/unicode type;"
+                    " Instead got type {}".format(
                         measurement,
                         str(type(bidimensional_separator)),
                     )
@@ -79,9 +88,11 @@ class MeasurementFormField(forms.MultiValueField):
                 unit_choices = tuple(
                     (
                         (
-                            "{0}__{1}".format(primary, reference),
-                            "{0}{1}{2}".format(
-                                getattr(measurement.PRIMARY_DIMENSION, "LABELS", {}).get(primary, primary),
+                            "{}__{}".format(primary, reference),
+                            "{}{}{}".format(
+                                getattr(
+                                    measurement.PRIMARY_DIMENSION, "LABELS", {}
+                                ).get(primary, primary),
                                 bidimensional_separator,
                                 getattr(
                                     measurement.REFERENCE_DIMENSION,
@@ -98,7 +109,8 @@ class MeasurementFormField(forms.MultiValueField):
                 )
             else:
                 unit_choices = tuple(
-                    ((u, getattr(measurement, "LABELS", {}).get(u, u)) for u in measurement.get_units())
+                    (u, getattr(measurement, "LABELS", {}).get(u, u))
+                    for u in measurement.get_units()
                 )
 
         if validators is None:
@@ -106,13 +118,17 @@ class MeasurementFormField(forms.MultiValueField):
 
         if min_value is not None:
             if not isinstance(min_value, MeasureBase):
-                msg = '"min_value" must be a measure, got %s' % type(min_value)
+                msg = '"min_value" must be a measure, got {}'.format(
+                    type(min_value)
+                )
                 raise ValueError(msg)
             validators += [MinValueValidator(min_value)]
 
         if max_value is not None:
             if not isinstance(max_value, MeasureBase):
-                msg = '"max_value" must be a measure, got %s' % type(max_value)
+                msg = '"max_value" must be a measure, got {}'.format(
+                    type(max_value)
+                )
                 raise ValueError(msg)
             validators += [MaxValueValidator(max_value)]
 
@@ -127,7 +143,7 @@ class MeasurementFormField(forms.MultiValueField):
         }
         defaults.update(kwargs)
         fields = (float_field, choice_field)
-        super(MeasurementFormField, self).__init__(fields, validators=validators, *args, **defaults)
+        super().__init__(fields, *args, validators=validators, **defaults)
 
     def compress(self, data_list):
         if not data_list:

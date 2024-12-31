@@ -7,7 +7,9 @@ from blog.factories.category import BlogCategoryFactory
 from blog.models.category import BlogCategory
 from blog.serializers.category import BlogCategorySerializer
 
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
@@ -162,7 +164,9 @@ class BlogCategoryViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(BlogCategory.objects.filter(pk=self.category.pk).exists())
+        self.assertFalse(
+            BlogCategory.objects.filter(pk=self.category.pk).exists()
+        )
 
     def test_destroy_invalid(self):
         invalid_category_id = 9999

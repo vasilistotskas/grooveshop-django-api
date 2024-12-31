@@ -10,7 +10,9 @@ from region.factories import RegionFactory
 
 fake = Faker()
 
-available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+available_languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 
 
 class CountryTranslationFactory(factory.django.DjangoModelFactory):
@@ -57,7 +59,8 @@ class CountryFactory(CustomDjangoModelFactory):
             return
 
         translations = extracted or [
-            CountryTranslationFactory(language_code=lang, master=self) for lang in available_languages
+            CountryTranslationFactory(language_code=lang, master=self)
+            for lang in available_languages
         ]
 
         for translation in translations:

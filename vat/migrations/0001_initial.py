@@ -29,7 +29,9 @@ class Migration(migrations.Migration):
                 ("id", models.BigAutoField(primary_key=True, serialize=False)),
                 (
                     "value",
-                    models.DecimalField(decimal_places=1, max_digits=11, verbose_name="Value"),
+                    models.DecimalField(
+                        decimal_places=1, max_digits=11, verbose_name="Value"
+                    ),
                 ),
             ],
             options={

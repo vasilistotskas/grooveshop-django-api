@@ -22,7 +22,9 @@ from user.factories.account import UserAccountFactory
 from vat.factories import VatFactory
 from vat.models import Vat
 
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
 
@@ -98,20 +100,30 @@ class ProductModelTestCase(TestCase):
         self.product.save()
         self.product.refresh_from_db()
 
-        expected_discount_value = (self.product.price * self.product.discount_percent) / 100
+        expected_discount_value = (
+            self.product.price * self.product.discount_percent
+        ) / 100
         expected_vat_value = (self.product.price * self.vat.value) / 100
-        expected_final_price = self.product.price + expected_vat_value - expected_discount_value
-        expected_price_save_percent = (expected_discount_value / self.product.price) * 100
+        expected_final_price = (
+            self.product.price + expected_vat_value - expected_discount_value
+        )
+        expected_price_save_percent = (
+            expected_discount_value / self.product.price
+        ) * 100
 
         self.assertEqual(self.product.discount_value, expected_discount_value)
         self.assertEqual(self.product.vat_value, expected_vat_value)
         self.assertEqual(self.product.final_price, expected_final_price)
-        self.assertEqual(self.product.price_save_percent, expected_price_save_percent)
+        self.assertEqual(
+            self.product.price_save_percent, expected_price_save_percent
+        )
 
     def test_fields(self):
         self.assertEqual(self.product.product_code, "P123456")
         self.assertEqual(self.product.slug, "sample-product")
-        self.assertEqual(self.product.price, Money("100.00", settings.DEFAULT_CURRENCY))
+        self.assertEqual(
+            self.product.price, Money("100.00", settings.DEFAULT_CURRENCY)
+        )
         self.assertEqual(self.product.active, True)
         self.assertEqual(self.product.stock, 10)
         self.assertEqual(self.product.discount_percent, Decimal("50.0"))
@@ -120,7 +132,9 @@ class ProductModelTestCase(TestCase):
         self.assertEqual(self.product.weight, Decimal("5.00"))
 
     def test_str_representation(self):
-        self.assertEqual(str(self.product), self.product.safe_translation_getter("name"))
+        self.assertEqual(
+            str(self.product), self.product.safe_translation_getter("name")
+        )
 
     def test_likes_count(self):
         self.assertEqual(self.product.likes_count, 1)
@@ -150,22 +164,30 @@ class ProductModelTestCase(TestCase):
 
     def test_main_image_path(self):
         main_image = self.product.images.filter(is_main=True).first()
-        expected_filename = f"media/uploads/products/{os.path.basename(main_image.image.name)}"
+        expected_filename = (
+            f"media/uploads/products/{os.path.basename(main_image.image.name)}"
+        )
         self.assertEqual(self.product.main_image_path, expected_filename)
 
     def test_colored_stock_property(self):
         self.product.stock = 5
         self.assertEqual(
             self.product.colored_stock,
-            format_html('<span style="color: #1bff00;">{}</span>', self.product.stock),
+            format_html(
+                '<span style="color: #1bff00;">{}</span>', self.product.stock
+            ),
         )
 
         self.product.stock = 0
         self.assertEqual(
             self.product.colored_stock,
-            format_html('<span style="color: #ff0000;">{}</span>', self.product.stock),
+            format_html(
+                '<span style="color: #ff0000;">{}</span>', self.product.stock
+            ),
         )
 
     def test_absolute_url_property(self):
-        expected_absolute_url = f"/products/{self.product.id}/{self.product.slug}"
+        expected_absolute_url = (
+            f"/products/{self.product.id}/{self.product.slug}"
+        )
         self.assertEqual(self.product.absolute_url, expected_absolute_url)

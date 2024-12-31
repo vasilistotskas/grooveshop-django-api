@@ -14,7 +14,9 @@ class Migration(migrations.Migration):
             model_name="slide",
             name="slider",
             field=models.ForeignKey(
-                on_delete=django.db.models.deletion.CASCADE, related_name="slides", to="slider.slider"
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="slides",
+                to="slider.slider",
             ),
         ),
     ]

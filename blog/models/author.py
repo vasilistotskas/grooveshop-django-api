@@ -1,18 +1,18 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
-from parler.models import TranslatableModel
-from parler.models import TranslatedFields
+from parler.models import TranslatableModel, TranslatedFields
 
-from core.models import TimeStampMixinModel
-from core.models import UUIDModel
+from core.models import TimeStampMixinModel, UUIDModel
 
 
 class BlogAuthor(TranslatableModel, TimeStampMixinModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
     user = models.OneToOneField("user.UserAccount", on_delete=models.PROTECT)
-    website = models.URLField(_("Website"), blank=True, null=True)
-    translations = TranslatedFields(bio=models.TextField(_("Bio"), blank=True, null=True))
+    website = models.URLField(_("Website"), blank=True, default="")
+    translations = TranslatedFields(
+        bio=models.TextField(_("Bio"), blank=True, null=True)
+    )
 
     class Meta(TypedModelMeta):
         verbose_name = _("Blog Author")
@@ -27,9 +27,9 @@ class BlogAuthor(TranslatableModel, TimeStampMixinModel, UUIDModel):
         return f"{author_name} ({self.user.email})"
 
     @property
-    def number_of_posts(self) -> int:
+    def number_of_posts(self):
         return self.blog_posts.count()
 
     @property
-    def total_likes_received(self) -> int:
+    def total_likes_received(self):
         return sum([post.likes.count() for post in self.blog_posts.all()])

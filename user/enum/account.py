@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from enum import Enum
-from enum import unique
+from enum import Enum, unique
 
 
 @unique

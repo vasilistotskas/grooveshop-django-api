@@ -62,22 +62,18 @@ class BlogCategoryAdmin(TranslatableAdmin, DraggableMPTTAdmin):
             "slug": ("name",),
         }
 
-    def related_posts_count(self, instance):  # noqa
+    def related_posts_count(self, instance):
         return instance.posts_count
 
-    setattr(
-        related_posts_count,
-        "short_description",
-        _("Related posts (for this specific category)"),
+    related_posts_count.short_description = _(
+        "Related posts (for this specific category)"
     )
 
-    def related_posts_cumulative_count(self, instance):  # noqa
+    def related_posts_cumulative_count(self, instance):
         return instance.posts_cumulative_count
 
-    setattr(
-        related_posts_cumulative_count,
-        "short_description",
-        _("Related posts (in tree)"),
+    related_posts_cumulative_count.short_description = _(
+        "Related posts (in tree)"
     )
 
 

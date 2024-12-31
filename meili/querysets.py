@@ -1,8 +1,4 @@
-from typing import Literal
-from typing import NamedTuple
-from typing import Self
-from typing import Type
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, NamedTuple
 
 from meili._client import client
 
@@ -27,9 +23,9 @@ class Point(NamedTuple):
 
 
 class IndexQuerySet:
-    def __init__(self, model: Type["IndexMixin"]):
+    def __init__(self, model: type["IndexMixin"]):
         self.model = model
-        self.index = client.get_index(model._meilisearch["index_name"])  # noqa
+        self.index = client.get_index(model._meilisearch["index_name"])
         self.__offset = 0
         self.__limit = 20
         self.__filters: list[str] = []
@@ -62,10 +58,10 @@ class IndexQuerySet:
         else:
             raise TypeError("IndexQuerySet indices must be slices")
 
-    def count(self) -> int:
+    def count(self):
         return self.index.get_stats().number_of_documents
 
-    def paginate(self, limit: int, offset: int) -> Self:
+    def paginate(self, limit: int, offset: int):
         self.__limit = limit
         self.__offset = offset
         return self
@@ -79,83 +75,113 @@ class IndexQuerySet:
                 self.__sort.append(f"{geopoint}{field}:asc")
         return self
 
-    def filter(self, *geo_filters, **filters) -> Self:
+    def filter(self, *geo_filters, **filters):
+        self._apply_geo_filters(*geo_filters)
+        self._apply_regular_filters(**filters)
+        return self
+
+    def _apply_geo_filters(self, *geo_filters):
         for geo_filter in geo_filters:
-            if not self.model._meilisearch["supports_geo"]:  # noqa
-                raise TypeError(f"Model {self.model.__name__} does not support geo filters")
-            if not isinstance(geo_filter, (Radius, BoundingBox)):
+            if not self.model._meilisearch["supports_geo"]:
                 raise TypeError(
-                    f"Unnamed Argument must be of type Radius or BoundingBox, not {type(geo_filter)}"
+                    f"Model {self.model.__name__} does not support geo filters"
                 )
-            if isinstance(geo_filter, Radius):
-                self.__filters.append(
-                    f"_geoRadius({geo_filter.lat}, {geo_filter.lng}, {geo_filter.radius})"
-                )
-            elif isinstance(geo_filter, BoundingBox):
-                self.__filters.append(
-                    f"_geoBoundingBox([{geo_filter.top_right[0]},"
-                    f" {geo_filter.top_right[1]}], [{geo_filter.bottom_left[0]}, {geo_filter.bottom_left[1]}])"
-                )
-        for _filter, value in filters.items():
-            if "__" not in _filter or "__exact" in _filter:
-                if value == "" or (isinstance(value, list) and len(value) == 0) or value == {}:
-                    self.__filters.append(f"{_filter.split('__')[0]} IS EMPTY")
-                elif value is None:
-                    self.__filters.append(f"{_filter.split('__')[0]} IS NULL")
-                else:
+            match geo_filter:
+                case Radius(lat=lat, lng=lng, radius=radius):
+                    self.__filters.append(f"_geoRadius({lat}, {lng}, {radius})")
+                case BoundingBox(top_right=top_right, bottom_left=bottom_left):
                     self.__filters.append(
-                        f"{_filter.split('__')[0]} = '{value}'"
-                        if isinstance(value, str)
-                        else f"{_filter.split('__')[0]} = {value}"
+                        f"_geoBoundingBox([{top_right[0]}, {top_right[1]}], "
+                        f"[{bottom_left[0]}, {bottom_left[1]}])"
                     )
-            elif "__gte" in _filter:
+                case _:
+                    raise TypeError(
+                        f"Geo filter must be Radius or BoundingBox, not {type(geo_filter)}"
+                    )
+
+    def _apply_regular_filters(self, **filters):
+        for full_lookup, value in filters.items():
+            if "__" in full_lookup:
+                field, lookup = full_lookup.split("__", 1)
+            else:
+                field, lookup = full_lookup, "exact"
+
+            filter_expr = self._build_filter_expression(field, lookup, value)
+            self.__filters.append(filter_expr)
+
+    def _build_filter_expression(self, field: str, lookup: str, value) -> str:  # noqa: PLR0911, PLR0912
+        match lookup:
+            case "exact":
+                if (
+                    value == ""
+                    or (isinstance(value, list) and len(value) == 0)
+                    or value == {}
+                ):
+                    return f"{field} IS EMPTY"
+                elif value is None:
+                    return f"{field} IS NULL"
+                elif isinstance(value, str):
+                    return f"{field} = '{value}'"
+                else:
+                    return f"{field} = {value}"
+
+            case "gte":
                 if not isinstance(value, (int, float)):
-                    raise TypeError(f"Cannot compare {type(value)} with int or float")
-                self.__filters.append(f"{_filter.split('__')[0]} >= {value}")
-            elif "__gt" in _filter:
+                    raise TypeError(
+                        f"Cannot compare {type(value)} with int or float"
+                    )
+                return f"{field} >= {value}"
+
+            case "gt":
                 if not isinstance(value, (int, float)):
-                    raise TypeError(f"Cannot compare {type(value)} with int or float")
-                self.__filters.append(f"{_filter.split('__')[0]} > {value}")
-            elif "__lte" in _filter:
+                    raise TypeError(
+                        f"Cannot compare {type(value)} with int or float"
+                    )
+                return f"{field} > {value}"
+
+            case "lte":
                 if not isinstance(value, (int, float)):
-                    raise TypeError(f"Cannot compare {type(value)} with int or float")
-                self.__filters.append(f"{_filter.split('__')[0]} <= {value}")
-            elif "__lt" in _filter:
+                    raise TypeError(
+                        f"Cannot compare {type(value)} with int or float"
+                    )
+                return f"{field} <= {value}"
+
+            case "lt":
                 if not isinstance(value, (int, float)):
-                    raise TypeError(f"Cannot compare {type(value)} with int or float")
-                self.__filters.append(f"{_filter.split('__')[0]} < {value}")
-            elif "__in" in _filter:
+                    raise TypeError(
+                        f"Cannot compare {type(value)} with int or float"
+                    )
+                return f"{field} < {value}"
+
+            case "in":
                 if not isinstance(value, list):
                     raise TypeError(f"Cannot compare {type(value)} with list")
-                self.__filters.append(f"{_filter.split('__')[0]} IN {value}")
-            elif "__range" in _filter:
+                return f"{field} IN {value}"
+
+            case "range":
                 if not isinstance(value, (range, list, tuple)):
-                    raise TypeError(f"Cannot compare {type(value)} with range, list or tuple")
-                self.__filters.append(
-                    f"{_filter.split('__')[0]} {value[0]} TO {value[1]}"
-                    if not isinstance(value, range)
-                    else f"{_filter.split('__')[0]} {value.start} TO {value.stop}"
-                )
-            elif "__exists" in _filter:
+                    raise TypeError(
+                        f"Cannot compare {type(value)} with range, list or tuple"
+                    )
+                if isinstance(value, range):
+                    return f"{field} {value.start} TO {value.stop}"
+                else:
+                    return f"{field} {value[0]} TO {value[1]}"
+
+            case "exists":
                 if not isinstance(value, bool):
                     raise TypeError(f"Cannot compare {type(value)} with bool")
-                self.__filters.append(f"{_filter.split('__')[0]} {'NOT ' if not value else ''}EXISTS")
-            elif "__isnull" in _filter:
+                return f"{field} {'NOT ' if not value else ''}EXISTS"
+
+            case "isnull":
                 if not isinstance(value, bool):
                     raise TypeError(f"Cannot compare {type(value)} with bool")
-                self.__filters.append(f"{_filter.split('__')[0]} {'NOT ' if not value else ''}IS NULL")
+                return f"{field} {'NOT ' if not value else ''}IS NULL"
 
-        return self
+            case _:
+                raise ValueError(f"Unsupported filter lookup: {lookup}")
 
-    def matching_strategy(self, strategy: Literal["last", "all"]):
-        self.__matching_strategy = strategy
-        return self
-
-    def attributes_to_search_on(self, *attributes):
-        self.__attributes_to_search_on.append(*attributes)
-        return self
-
-    def search(self, q: str = "") -> dict:
+    def search(self, q: str = ""):
         results = self.index.search(
             q,
             {
@@ -180,8 +206,9 @@ class IndexQuerySet:
         )
 
         hits = results["hits"]
-
-        filtered_objects = self.model.objects.filter(pk__in=[hit["id"] for hit in hits])
+        filtered_objects = self.model.objects.filter(
+            pk__in=[hit["id"] for hit in hits]
+        )
 
         enriched_results = []
         for obj in filtered_objects:

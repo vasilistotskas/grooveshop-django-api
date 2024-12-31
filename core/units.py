@@ -101,7 +101,9 @@ def prepare_all_units_dict():
         ]
         for unit, _ in unit_choices
     }
-    return dict(measurement_dict, CHOICES=[(v, v) for v in measurement_dict.values()])
+    return dict(
+        measurement_dict, CHOICES=[(v, v) for v in measurement_dict.values()]
+    )
 
 
 MeasurementUnits = type("MeasurementUnits", (object,), prepare_all_units_dict())

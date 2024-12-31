@@ -6,20 +6,15 @@ from typing import override
 from celery import Celery
 from celery.exceptions import CeleryError
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.ciphers import algorithms
-from cryptography.hazmat.primitives.ciphers import Cipher
-from cryptography.hazmat.primitives.ciphers import modes
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from django.conf import settings
-from django.db import connection
-from django.db import DatabaseError
+from django.db import DatabaseError, connection
 from django.middleware.csrf import get_token
 from django.shortcuts import redirect
 from drf_spectacular.utils import extend_schema
-from redis import Redis
-from redis import RedisError
+from redis import Redis, RedisError
 from rest_framework import status
-from rest_framework.decorators import action
-from rest_framework.decorators import api_view
+from rest_framework.decorators import action, api_view
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -48,8 +43,12 @@ class ExpandModelViewSet(ModelViewSet):
     @override
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        context["expand"] = self.request.query_params.get("expand", "false").lower()
-        context["expand_fields"] = self.request.query_params.get("expand_fields", "")
+        context["expand"] = self.request.query_params.get(
+            "expand", "false"
+        ).lower()
+        context["expand_fields"] = self.request.query_params.get(
+            "expand_fields", ""
+        )
         return context
 
 
@@ -61,28 +60,40 @@ class PaginationModelViewSet(ModelViewSet):
             if self.pagination_class is None:
                 self._paginator = None
             else:
-                pagination_type = self.request.query_params.get("pagination_type", "").lower()
+                pagination_type = self.request.query_params.get(
+                    "pagination_type", ""
+                ).lower()
                 paginator_mapping = {
                     "page_number": PageNumberPaginator,
                     "limit_offset": LimitOffsetPaginator,
                     "cursor": CursorPaginator,
                 }
-                self._paginator = paginator_mapping.get(pagination_type, self.pagination_class)()  # noqa
+                self._paginator = paginator_mapping.get(
+                    pagination_type, self.pagination_class
+                )()
 
         return self._paginator
 
     def paginate_and_serialize(self, queryset, request, many=True):
-        pagination_param = request.query_params.get("pagination", "true").lower()
+        pagination_param = request.query_params.get(
+            "pagination", "true"
+        ).lower()
         if pagination_param == "false":
-            serializer = self.get_serializer(queryset, many=many, context=self.get_serializer_context())
+            serializer = self.get_serializer(
+                queryset, many=many, context=self.get_serializer_context()
+            )
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         page = self.paginate_queryset(queryset)
         if page is not None:
-            serializer = self.get_serializer(page, many=many, context=self.get_serializer_context())
+            serializer = self.get_serializer(
+                page, many=many, context=self.get_serializer_context()
+            )
             return self.get_paginated_response(serializer.data)
 
-        serializer = self.get_serializer(queryset, many=many, context=self.get_serializer_context())
+        serializer = self.get_serializer(
+            queryset, many=many, context=self.get_serializer_context()
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @override
@@ -95,7 +106,9 @@ class TranslationsModelViewSet(TranslationsProcessingMixin, ModelViewSet):
     @override
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        context["language"] = self.request.query_params.get("language", default_language)
+        context["language"] = self.request.query_params.get(
+            "language", default_language
+        )
         return context
 
     @override
@@ -113,7 +126,9 @@ class TranslationsModelViewSet(TranslationsProcessingMixin, ModelViewSet):
         return super().partial_update(request, *args, **kwargs)
 
 
-class BaseModelViewSet(ExpandModelViewSet, TranslationsModelViewSet, PaginationModelViewSet):
+class BaseModelViewSet(
+    ExpandModelViewSet, TranslationsModelViewSet, PaginationModelViewSet
+):
     metadata_class = Metadata
 
     @action(detail=False, methods=["GET"])
@@ -160,20 +175,24 @@ def health_check(request):
     return response
 
 
-def encrypt_token(token, SECRET_KEY):  # noqa
+def encrypt_token(token, SECRET_KEY):
     key = hashlib.sha256(SECRET_KEY.encode()).digest()
     nonce = os.urandom(16)
-    cipher = Cipher(algorithms.AES(key), modes.GCM(nonce), backend=default_backend())
+    cipher = Cipher(
+        algorithms.AES(key), modes.GCM(nonce), backend=default_backend()
+    )
     encryptor = cipher.encryptor()
     ciphertext = encryptor.update(token.encode()) + encryptor.finalize()
-    encrypted_token = base64.urlsafe_b64encode(nonce + encryptor.tag + ciphertext).decode("utf-8")
+    encrypted_token = base64.urlsafe_b64encode(
+        nonce + encryptor.tag + ciphertext
+    ).decode("utf-8")
     return encrypted_token
 
 
 def redirect_to_frontend(request, *args, **kwargs):
     from knox.models import get_token_model
 
-    AuthToken = get_token_model()  # noqa
+    AuthToken = get_token_model()
     user = request.user
 
     if user.is_authenticated:
@@ -184,7 +203,9 @@ def redirect_to_frontend(request, *args, **kwargs):
 
     frontend_url = settings.NUXT_BASE_URL
     redirect_path = "/account/provider/callback"
-    response = redirect(f"{frontend_url}{redirect_path}?encrypted_token={encrypted_token}")
+    response = redirect(
+        f"{frontend_url}{redirect_path}?encrypted_token={encrypted_token}"
+    )
 
     response.headers["X-Encrypted-Token"] = encrypted_token
 

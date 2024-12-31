@@ -51,7 +51,7 @@ class UserAddressViewSet(BaseModelViewSet):
     search_fields = ["id", "user", "country", "city", "street", "zipcode"]
 
     @override
-    def destroy(self, request, pk=None, *args, **kwargs) -> Response:
+    def destroy(self, request, pk=None, *args, **kwargs):
         address = self.get_object()
         if address.is_main:
             return Response(
@@ -62,8 +62,10 @@ class UserAddressViewSet(BaseModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["POST"], throttle_classes=[BurstRateThrottle])
-    def set_main(self, request, pk=None, *args, **kwargs) -> Response:
-        main_address = UserAddress.objects.filter(user=request.user, is_main=True)
+    def set_main(self, request, pk=None, *args, **kwargs):
+        main_address = UserAddress.objects.filter(
+            user=request.user, is_main=True
+        )
         if main_address.exists():
             main_address.update(is_main=False)
         address = self.get_object()

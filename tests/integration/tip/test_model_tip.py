@@ -8,7 +8,9 @@ from tip.enum.tip_enum import TipKindEnum
 from tip.factories import TipFactory
 from tip.models import Tip
 
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
@@ -38,5 +40,7 @@ class TipModelTestCase(TestCase):
         self.assertTrue(self.tip in queryset)
 
     def test_main_image_path(self):
-        expected_filename = f"media/uploads/tip/{os.path.basename(self.tip.icon.name)}"
+        expected_filename = (
+            f"media/uploads/tip/{os.path.basename(self.tip.icon.name)}"
+        )
         self.assertEqual(self.tip.main_image_path, expected_filename)

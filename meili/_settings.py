@@ -27,7 +27,7 @@ class _MeiliSettings:
     offline: bool
 
     @classmethod
-    def from_settings(cls) -> "_MeiliSettings":
+    def from_settings(cls):
         from django.conf import settings
 
         return cls(

@@ -1,7 +1,5 @@
 import importlib
-from typing import Dict
 from typing import override
-from typing import Type
 
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
@@ -15,7 +13,9 @@ User = get_user_model()
 
 class NotificationUserSerializer(BaseExpandSerializer):
     user = PrimaryKeyRelatedField(queryset=User.objects.all())
-    notification = PrimaryKeyRelatedField(queryset=NotificationUser.objects.all())
+    notification = PrimaryKeyRelatedField(
+        queryset=NotificationUser.objects.all()
+    )
 
     class Meta:
         model = NotificationUser
@@ -38,7 +38,7 @@ class NotificationUserSerializer(BaseExpandSerializer):
     @override
     def get_expand_fields(
         self,
-    ) -> Dict[str, Type[serializers.ModelSerializer]]:
+    ):
         user_account_serializer = importlib.import_module(
             "authentication.serializers"
         ).AuthenticationSerializer

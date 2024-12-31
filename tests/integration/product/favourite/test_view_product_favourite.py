@@ -78,7 +78,9 @@ class ProductFavouriteViewSetTestCase(APITestCase):
 
     def test_retrieve_invalid(self):
         invalid_product_favourite_id = 999999
-        url = self.get_product_favourite_detail_url(invalid_product_favourite_id)
+        url = self.get_product_favourite_detail_url(
+            invalid_product_favourite_id
+        )
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
@@ -130,11 +132,17 @@ class ProductFavouriteViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(ProductFavourite.objects.filter(pk=self.product_favourite.id).exists())
+        self.assertFalse(
+            ProductFavourite.objects.filter(
+                pk=self.product_favourite.id
+            ).exists()
+        )
 
     def test_destroy_invalid(self):
         invalid_product_favourite_id = 999999
-        url = self.get_product_favourite_detail_url(invalid_product_favourite_id)
+        url = self.get_product_favourite_detail_url(
+            invalid_product_favourite_id
+        )
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

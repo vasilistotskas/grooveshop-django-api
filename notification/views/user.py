@@ -8,16 +8,19 @@ from rest_framework.filters import SearchFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.api.views import ExpandModelViewSet
-from core.api.views import PaginationModelViewSet
+from core.api.views import ExpandModelViewSet, PaginationModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from core.utils.serializers import MultiSerializerMixin
 from notification.models.user import NotificationUser
-from notification.serializers.user import NotificationUserActionSerializer
-from notification.serializers.user import NotificationUserSerializer
+from notification.serializers.user import (
+    NotificationUserActionSerializer,
+    NotificationUserSerializer,
+)
 
 
-class NotificationUserViewSet(MultiSerializerMixin, ExpandModelViewSet, PaginationModelViewSet):
+class NotificationUserViewSet(
+    MultiSerializerMixin, ExpandModelViewSet, PaginationModelViewSet
+):
     queryset = NotificationUser.objects.all()
     filter_backends = [
         DjangoFilterBackend,
@@ -54,7 +57,9 @@ class NotificationUserViewSet(MultiSerializerMixin, ExpandModelViewSet, Paginati
 
         return Response({"count": count}, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=["POST"], permission_classes=[IsAuthenticated])
+    @action(
+        detail=False, methods=["POST"], permission_classes=[IsAuthenticated]
+    )
     def mark_all_as_seen(self, request):
         if request.user.is_anonymous:
             return Response(
@@ -65,7 +70,9 @@ class NotificationUserViewSet(MultiSerializerMixin, ExpandModelViewSet, Paginati
         self.queryset.filter(user=request.user, seen=False).update(seen=True)
         return Response({"success": True}, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=["POST"], permission_classes=[IsAuthenticated])
+    @action(
+        detail=False, methods=["POST"], permission_classes=[IsAuthenticated]
+    )
     def mark_all_as_unseen(self, request):
         if request.user.is_anonymous:
             return Response(
@@ -76,7 +83,9 @@ class NotificationUserViewSet(MultiSerializerMixin, ExpandModelViewSet, Paginati
         self.queryset.filter(user=request.user, seen=True).update(seen=False)
         return Response({"success": True}, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=["POST"], permission_classes=[IsAuthenticated])
+    @action(
+        detail=False, methods=["POST"], permission_classes=[IsAuthenticated]
+    )
     def mark_as_seen(self, request):
         if request.user.is_anonymous:
             return Response(
@@ -86,7 +95,9 @@ class NotificationUserViewSet(MultiSerializerMixin, ExpandModelViewSet, Paginati
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        notification_user_ids = serializer.validated_data.get("notification_user_ids")
+        notification_user_ids = serializer.validated_data.get(
+            "notification_user_ids"
+        )
 
         if not notification_user_ids:
             return Response(
@@ -94,10 +105,14 @@ class NotificationUserViewSet(MultiSerializerMixin, ExpandModelViewSet, Paginati
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        self.queryset.filter(id__in=notification_user_ids, user=request.user).update(seen=True)
+        self.queryset.filter(
+            id__in=notification_user_ids, user=request.user
+        ).update(seen=True)
         return Response({"success": True}, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=["POST"], permission_classes=[IsAuthenticated])
+    @action(
+        detail=False, methods=["POST"], permission_classes=[IsAuthenticated]
+    )
     def mark_as_unseen(self, request):
         if request.user.is_anonymous:
             return Response(
@@ -107,7 +122,9 @@ class NotificationUserViewSet(MultiSerializerMixin, ExpandModelViewSet, Paginati
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        notification_user_ids = serializer.validated_data.get("notification_user_ids")
+        notification_user_ids = serializer.validated_data.get(
+            "notification_user_ids"
+        )
 
         if not notification_user_ids:
             return Response(
@@ -115,5 +132,7 @@ class NotificationUserViewSet(MultiSerializerMixin, ExpandModelViewSet, Paginati
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        self.queryset.filter(id__in=notification_user_ids, user=request.user).update(seen=False)
+        self.queryset.filter(
+            id__in=notification_user_ids, user=request.user
+        ).update(seen=False)
         return Response({"success": True}, status=status.HTTP_200_OK)

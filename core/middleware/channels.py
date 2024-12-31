@@ -5,16 +5,15 @@ from urllib.parse import parse_qs
 from channels.db import database_sync_to_async
 from django.utils import timezone
 from knox.crypto import hash_token
-from knox.settings import CONSTANTS
-from knox.settings import knox_settings
+from knox.settings import CONSTANTS, knox_settings
 
 
 @database_sync_to_async
 def get_user(user_id):
-    from django.contrib.auth.models import AnonymousUser
     from django.contrib.auth import get_user_model
+    from django.contrib.auth.models import AnonymousUser
 
-    User = get_user_model()  # noqa
+    User = get_user_model()
 
     try:
         return User.objects.get(id=user_id)
@@ -41,7 +40,7 @@ class QueryAuthMiddleware:
         return await self.app(scope, receive, send)
 
 
-def QueryAuthMiddlewareStack(inner):  # noqa
+def QueryAuthMiddlewareStack(inner):
     return QueryAuthMiddleware(inner)
 
 
@@ -55,7 +54,9 @@ def authenticate_token(token):
     except AttributeError:
         return AnonymousUser()
 
-    for auth_token in get_token_model().objects.filter(token_key=token[: CONSTANTS.TOKEN_KEY_LENGTH]):
+    for auth_token in get_token_model().objects.filter(
+        token_key=token[: CONSTANTS.TOKEN_KEY_LENGTH]
+    ):
         if _cleanup_token(auth_token):
             continue
 
@@ -66,11 +67,15 @@ def authenticate_token(token):
         if compare_digest(digest, auth_token.digest):
             if knox_settings.AUTO_REFRESH and auth_token.expiry:
                 _renew_token(auth_token)
-            return auth_token.user if auth_token.user.is_active else AnonymousUser()
+            return (
+                auth_token.user
+                if auth_token.user.is_active
+                else AnonymousUser()
+            )
     return AnonymousUser()
 
 
-def _renew_token(auth_token) -> None:
+def _renew_token(auth_token):
     current_expiry = auth_token.expiry
     new_expiry = timezone.now() + knox_settings.TOKEN_TTL
     auth_token.expiry = new_expiry
@@ -79,11 +84,10 @@ def _renew_token(auth_token) -> None:
         auth_token.save(update_fields=("expiry",))
 
 
-def _cleanup_token(auth_token) -> bool:
-    if auth_token.expiry is not None:
-        if auth_token.expiry < timezone.now():
-            auth_token.delete()
-            return True
+def _cleanup_token(auth_token):
+    if auth_token.expiry is not None and auth_token.expiry < timezone.now():
+        auth_token.delete()
+        return True
     return False
 
 

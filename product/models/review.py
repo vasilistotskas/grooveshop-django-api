@@ -5,17 +5,15 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
-from parler.models import TranslatableModel
-from parler.models import TranslatedFields
+from parler.models import TranslatableModel, TranslatedFields
 
-from core.models import PublishableModel
-from core.models import TimeStampMixinModel
-from core.models import UUIDModel
-from product.enum.review import RateEnum
-from product.enum.review import ReviewStatusEnum
+from core.models import PublishableModel, TimeStampMixinModel, UUIDModel
+from product.enum.review import RateEnum, ReviewStatusEnum
 
 
-class ProductReview(TranslatableModel, TimeStampMixinModel, PublishableModel, UUIDModel):
+class ProductReview(
+    TranslatableModel, TimeStampMixinModel, PublishableModel, UUIDModel
+):
     id = models.BigAutoField(primary_key=True)
     product = models.ForeignKey(
         "product.Product",
@@ -34,13 +32,19 @@ class ProductReview(TranslatableModel, TimeStampMixinModel, PublishableModel, UU
         choices=ReviewStatusEnum,
         default=ReviewStatusEnum.NEW,
     )
-    translations = TranslatedFields(comment=models.TextField(_("Comment"), blank=True, null=True))
+    translations = TranslatedFields(
+        comment=models.TextField(_("Comment"), blank=True, null=True)
+    )
 
     class Meta(TypedModelMeta):
         verbose_name = _("Product Review")
         verbose_name_plural = _("Product Reviews")
         ordering = ["-created_at"]
-        constraints = [models.UniqueConstraint(fields=["product", "user"], name="unique_product_review")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["product", "user"], name="unique_product_review"
+            )
+        ]
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
             *PublishableModel.Meta.indexes,
@@ -50,11 +54,16 @@ class ProductReview(TranslatableModel, TimeStampMixinModel, PublishableModel, UU
 
     def __str__(self):
         comment_snippet = (
-            (self.safe_translation_getter("comment", any_language=True)[:50] + "...")
+            (
+                self.safe_translation_getter("comment", any_language=True)[:50]
+                + "..."
+            )
             if self.comment
             else "No Comment"
         )
-        return f"Review by {self.user.email} on {self.product}: {comment_snippet}"
+        return (
+            f"Review by {self.user.email} on {self.product}: {comment_snippet}"
+        )
 
     @override
     def clean(self):

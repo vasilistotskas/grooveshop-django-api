@@ -8,17 +8,12 @@ from mptt.fields import TreeForeignKey
 from mptt.managers import TreeManager
 from mptt.models import MPTTModel
 from mptt.querysets import TreeQuerySet
-from parler.managers import TranslatableManager
-from parler.managers import TranslatableQuerySet
-from parler.models import TranslatableModel
-from parler.models import TranslatedFields
+from parler.managers import TranslatableManager, TranslatableQuerySet
+from parler.models import TranslatableModel, TranslatedFields
 from tinymce.models import HTMLField
 
-from core.models import SortableModel
-from core.models import TimeStampMixinModel
-from core.models import UUIDModel
-from core.utils.generators import SlugifyConfig
-from core.utils.generators import unique_slugify
+from core.models import SortableModel, TimeStampMixinModel, UUIDModel
+from core.utils.generators import SlugifyConfig, unique_slugify
 from product.models.product import Product
 from seo.models import SeoModel
 
@@ -94,7 +89,7 @@ class ProductCategory(
         order_insertion_by = ["sort_order"]
 
     def __init__(self, *args, **kwargs):
-        super(ProductCategory, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.sub_categories_list = None
 
     def __str__(self):
@@ -112,36 +107,40 @@ class ProductCategory(
         if not self.slug:
             config = SlugifyConfig(instance=self, title_field="name")
             self.slug = unique_slugify(config)
-        super(ProductCategory, self).save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
     @override
     def get_ordering_queryset(self):
-        return ProductCategory.objects.filter(parent=self.parent).get_descendants(include_self=True)
+        return ProductCategory.objects.filter(
+            parent=self.parent
+        ).get_descendants(include_self=True)
 
     @property
-    def recursive_product_count(self) -> int:
-        return Product.objects.filter(category__in=self.get_descendants(include_self=True)).count()
+    def recursive_product_count(self):
+        return Product.objects.filter(
+            category__in=self.get_descendants(include_self=True)
+        ).count()
 
     @property
-    def absolute_url(self) -> str:
+    def absolute_url(self):
         return f"/product/category/{self.id}/" + "/".join(
             [x["slug"] for x in self.get_ancestors(include_self=True).values()]
         )
 
     @property
-    def category_menu_image_one_path(self) -> str:
+    def category_menu_image_one_path(self):
         if self.menu_image_one:
             return f"media/uploads/categories/{os.path.basename(self.menu_image_one.name)}"
         return ""
 
     @property
-    def category_menu_image_two_path(self) -> str:
+    def category_menu_image_two_path(self):
         if self.menu_image_two:
             return f"media/uploads/categories/{os.path.basename(self.menu_image_two.name)}"
         return ""
 
     @property
-    def category_menu_main_banner_path(self) -> str:
+    def category_menu_main_banner_path(self):
         if self.menu_main_banner:
             return f"media/uploads/categories/{os.path.basename(self.menu_main_banner.name)}"
         return ""

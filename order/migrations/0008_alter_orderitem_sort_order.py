@@ -12,6 +12,8 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="orderitem",
             name="sort_order",
-            field=models.IntegerField(editable=False, null=True, verbose_name="Sort Order"),
+            field=models.IntegerField(
+                editable=False, null=True, verbose_name="Sort Order"
+            ),
         ),
     ]

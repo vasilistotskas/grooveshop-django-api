@@ -9,13 +9,13 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from core.utils.tests import compare_serializer_and_response
-from slider.factories import SlideFactory
-from slider.factories import SliderFactory
-from slider.models import Slide
-from slider.models import Slider
+from slider.factories import SlideFactory, SliderFactory
+from slider.models import Slide, Slider
 from slider.serializers import SlideSerializer
 
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
@@ -47,8 +47,12 @@ class SlideViewSetTestCase(APITestCase):
         response = self.client.get(url)
         slides = Slide.objects.all()
         serializer = SlideSerializer(slides, many=True)
-        for response_item, serializer_item in zip(response.data["results"], serializer.data):
-            compare_serializer_and_response(serializer_item, response_item, ["thumbnail"])
+        for response_item, serializer_item in zip(
+            response.data["results"], serializer.data, strict=False
+        ):
+            compare_serializer_and_response(
+                serializer_item, response_item, ["thumbnail"]
+            )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -103,7 +107,9 @@ class SlideViewSetTestCase(APITestCase):
         response = self.client.get(url)
         slide = Slide.objects.get(pk=self.slide.pk)
         serializer = SlideSerializer(slide)
-        compare_serializer_and_response(serializer.data, response.data, ["thumbnail"])
+        compare_serializer_and_response(
+            serializer.data, response.data, ["thumbnail"]
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 

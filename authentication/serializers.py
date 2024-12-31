@@ -40,7 +40,8 @@ class AuthenticationSerializer(UserDetailsSerializer):
     phone = PhoneNumberField(required=False)
 
     class Meta(UserDetailsSerializer.Meta):
-        fields = UserDetailsSerializer.Meta.fields + (
+        fields = (
+            *UserDetailsSerializer.Meta.fields,
             "id",
             "email",
             "username",

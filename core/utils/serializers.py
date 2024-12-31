@@ -8,7 +8,7 @@ from rest_framework import serializers
 
 class TranslatedFieldExtended(TranslatedFieldsField):
     @override
-    def to_internal_value(self, data) -> dict:
+    def to_internal_value(self, data):
         if data is None:
             return {}
         if isinstance(data, str):
@@ -31,8 +31,10 @@ class TranslatedFieldExtended(TranslatedFieldsField):
         return result
 
 
-def flatten_dict_for_form_data(input_dict: dict, sep: str = "[{i}]") -> dict:
-    def __flatten(value: any, prefix: str, result_dict: dict, previous: str = "") -> dict:
+def flatten_dict_for_form_data(input_dict: dict, sep: str = "[{i}]"):
+    def __flatten(
+        value: any, prefix: str, result_dict: dict, previous: str = ""
+    ):
         if isinstance(value, dict):
             if previous == "dict":
                 prefix += "."
@@ -66,8 +68,12 @@ class MultiSerializerMixin:
     def get_serializer_class(self):
         if not hasattr(self, "serializers"):
             raise ImproperlyConfigured(
-                "%(cls)s is missing the serializer_classes attribute. Define "
-                "%(cls)s.serializer_classes, or override "
-                "%(cls)s.get_serializer_class()." % {"cls": self.__class__.__name__}
+                "{cls} is missing the serializer_classes attribute. Define "
+                "{cls}.serializer_classes, or override "
+                "{cls}.get_serializer_class().".format(
+                    cls=self.__class__.__name__
+                )
             )
-        return self.serializers.get(self.action, self.serializers.get("default"))
+        return self.serializers.get(
+            self.action, self.serializers.get("default")
+        )

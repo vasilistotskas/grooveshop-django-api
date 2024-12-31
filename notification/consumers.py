@@ -16,10 +16,14 @@ class NotificationConsumer(AsyncWebsocketConsumer):
                 await self.close()
             else:
                 self.group_name = f"user_{self.user.id}"
-                await self.channel_layer.group_add(self.group_name, self.channel_name)
+                await self.channel_layer.group_add(
+                    self.group_name, self.channel_name
+                )
 
                 if self.user.is_staff:
-                    await self.channel_layer.group_add("admins", self.channel_name)
+                    await self.channel_layer.group_add(
+                        "admins", self.channel_name
+                    )
 
                 await self.accept()
         except KeyError:
@@ -28,10 +32,14 @@ class NotificationConsumer(AsyncWebsocketConsumer):
     @override
     async def disconnect(self, close_code):
         if not self.user.is_anonymous:
-            await self.channel_layer.group_discard(self.group_name, self.channel_name)
+            await self.channel_layer.group_discard(
+                self.group_name, self.channel_name
+            )
 
             if self.user.is_staff:
-                await self.channel_layer.group_discard("admins", self.channel_name)
+                await self.channel_layer.group_discard(
+                    "admins", self.channel_name
+                )
 
     async def send_notification(self, event):
         await self.send(text_data=json.dumps(event))

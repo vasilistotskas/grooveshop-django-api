@@ -1,12 +1,9 @@
 import importlib
-from typing import Dict
 from typing import override
-from typing import Type
 
 from drf_spectacular.utils import extend_schema_field
 from parler_rest.fields import TranslatedFieldsField
 from parler_rest.serializers import TranslatableModelSerializer
-from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
 from core.api.schema import generate_schema_multi_lang
@@ -44,8 +41,10 @@ class RegionSerializer(TranslatableModelSerializer, BaseExpandSerializer):
     @override
     def get_expand_fields(
         self,
-    ) -> Dict[str, Type[serializers.ModelSerializer]]:
-        country_serializer = importlib.import_module("country.serializers").CountrySerializer
+    ):
+        country_serializer = importlib.import_module(
+            "country.serializers"
+        ).CountrySerializer
         return {
             "country": country_serializer,
         }

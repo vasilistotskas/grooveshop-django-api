@@ -52,16 +52,20 @@ class OrderModelTestCase(TestCase):
         )
 
     def test_total_price_items_with_items(self):
-        expected_total_price = sum(item.total_price.amount for item in self.order.items.all())
-        self.assertEqual(self.order.total_price_items.amount, expected_total_price)
+        expected_total_price = sum(
+            item.total_price.amount for item in self.order.items.all()
+        )
+        self.assertEqual(
+            self.order.total_price_items.amount, expected_total_price
+        )
 
     def test_total_price_extra_without_pay_way(self):
-        self.assertEqual(self.order.total_price_extra, self.order.shipping_price)
+        self.assertEqual(
+            self.order.total_price_extra, self.order.shipping_price
+        )
 
     def test_full_address(self):
-        expected_full_address = (
-            f"{self.order.street} {self.order.street_number}, {self.order.zipcode} {self.order.city}"
-        )
+        expected_full_address = f"{self.order.street} {self.order.street_number}, {self.order.zipcode} {self.order.city}"
         self.assertEqual(self.order.full_address, expected_full_address)
 
     def test_fields(self):
@@ -78,7 +82,9 @@ class OrderModelTestCase(TestCase):
             self.order.shipping_price,
             Money("10.00", settings.DEFAULT_CURRENCY),
         )
-        self.assertEqual(self.order.paid_amount, Money("0", settings.DEFAULT_CURRENCY))
+        self.assertEqual(
+            self.order.paid_amount, Money("0", settings.DEFAULT_CURRENCY)
+        )
 
     def test_str_representation(self):
         self.assertEqual(str(self.order), f"Order {self.order.id} - John Doe")

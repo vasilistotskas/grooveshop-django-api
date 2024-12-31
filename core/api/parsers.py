@@ -1,8 +1,10 @@
 from typing import override
 
-from djangorestframework_camel_case.parser import CamelCaseFormParser
-from djangorestframework_camel_case.parser import CamelCaseJSONParser
-from djangorestframework_camel_case.parser import CamelCaseMultiPartParser
+from djangorestframework_camel_case.parser import (
+    CamelCaseFormParser,
+    CamelCaseJSONParser,
+    CamelCaseMultiPartParser,
+)
 
 
 class NoUnderscoreBeforeNumberCamelCaseJSONParser(CamelCaseJSONParser):
@@ -36,7 +38,9 @@ class NoUnderscoreBeforeNumberCamelCaseFormParser(CamelCaseFormParser):
         )
 
 
-class NoUnderscoreBeforeNumberCamelCaseMultiPartParser(CamelCaseMultiPartParser):
+class NoUnderscoreBeforeNumberCamelCaseMultiPartParser(
+    CamelCaseMultiPartParser
+):
     @override
     def parse(self, stream, media_type=None, parser_context=None):
         return super().parse(

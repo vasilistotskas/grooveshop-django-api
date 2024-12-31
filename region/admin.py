@@ -1,6 +1,5 @@
 from django.contrib import admin
-from parler.admin import TranslatableAdmin
-from parler.admin import TranslatableTabularInline
+from parler.admin import TranslatableAdmin, TranslatableTabularInline
 
 from region.models import Region
 

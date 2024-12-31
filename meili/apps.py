@@ -13,25 +13,33 @@ class MeiliConfig(AppConfig):
         from meili.models import IndexMixin
 
         def add_model(**kwargs):
-            model: IndexMixin = kwargs["instance"]  # noqa
+            model: IndexMixin = kwargs["instance"]
             if model.meili_filter():
                 serialized = model.meili_serialize()
 
                 pk = (
                     model.pk
-                    if model._meilisearch["primary_key"] == "pk"  # noqa
+                    if model._meilisearch["primary_key"] == "pk"
                     else model._meta.get_field(
                         model._meilisearch["primary_key"]
-                    ).value_from_object(  # noqa  # noqa
-                        model
-                    )
+                    ).value_from_object(model)
                 )
 
-                geo = model.meili_geo() if model._meilisearch["supports_geo"] else None  # noqa
+                geo = (
+                    model.meili_geo()
+                    if model._meilisearch["supports_geo"]
+                    else None
+                )
                 if settings.MEILISEARCH.get("OFFLINE", False):
                     return
-                task = _client.get_index(model._meilisearch["index_name"]).add_documents(  # noqa
-                    [serialized | {"id": pk, "pk": model.pk} | ({"_geo": geo} if geo else {})]
+                task = _client.get_index(
+                    model._meilisearch["index_name"]
+                ).add_documents(
+                    [
+                        serialized
+                        | {"id": pk, "pk": model.pk}
+                        | ({"_geo": geo} if geo else {})
+                    ]
                 )
                 if settings.DEBUG:
                     finished = _client.wait_for_task(task.task_uid)
@@ -39,19 +47,21 @@ class MeiliConfig(AppConfig):
                         raise Exception(finished)
 
         def delete_model(**kwargs):
-            model: IndexMixin = kwargs["instance"]  # noqa
+            model: IndexMixin = kwargs["instance"]
             if model.meili_filter():
                 pk = (
-                    model._meta.get_field(model._meilisearch["primary_key"]).value_from_object(
-                        model
-                    )  # noqa  # noqa
-                    if model._meilisearch["primary_key"] != "pk"  # noqa
+                    model._meta.get_field(
+                        model._meilisearch["primary_key"]
+                    ).value_from_object(model)
+                    if model._meilisearch["primary_key"] != "pk"
                     else model.pk
                 )
 
                 if settings.MEILISEARCH.get("OFFLINE", False):
                     return
-                task = _client.get_index(model._meilisearch["index_name"]).delete_document(pk)  # noqa
+                task = _client.get_index(
+                    model._meilisearch["index_name"]
+                ).delete_document(pk)
                 if settings.DEBUG:
                     finished = _client.wait_for_task(task.task_uid)
                     if finished.status == "failed":

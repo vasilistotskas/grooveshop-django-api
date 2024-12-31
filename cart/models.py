@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from django.conf import settings
 from django.db import models
 from django.utils.timezone import now
@@ -7,8 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.money import Money
 
-from core.models import TimeStampMixinModel
-from core.models import UUIDModel
+from core.models import TimeStampMixinModel, UUIDModel
 
 
 class Cart(TimeStampMixinModel, UUIDModel):
@@ -42,40 +39,50 @@ class Cart(TimeStampMixinModel, UUIDModel):
         return self.items.prefetch_related("product").all()
 
     @property
-    def total_price(self) -> Money:
+    def total_price(self):
         total = sum(item.total_price.amount for item in self.get_items())
         return Money(total, settings.DEFAULT_CURRENCY)
 
     @property
-    def total_discount_value(self) -> Money:
-        total = sum(item.total_discount_value.amount for item in self.get_items())
+    def total_discount_value(self):
+        total = sum(
+            item.total_discount_value.amount for item in self.get_items()
+        )
         return Money(total, settings.DEFAULT_CURRENCY)
 
     @property
-    def total_vat_value(self) -> Money:
+    def total_vat_value(self):
         total = sum(item.vat_value.amount for item in self.get_items())
         return Money(total, settings.DEFAULT_CURRENCY)
 
     @property
-    def total_items(self) -> int:
+    def total_items(self):
         return sum(item.quantity for item in self.get_items())
 
     @property
-    def total_items_unique(self) -> int:
+    def total_items_unique(self):
         return self.items.count()
 
 
 class CartItem(TimeStampMixinModel, UUIDModel):
     id = models.BigAutoField(primary_key=True)
-    cart = models.ForeignKey("cart.Cart", related_name="items", on_delete=models.CASCADE)
-    product = models.ForeignKey("product.Product", related_name="cart_items", on_delete=models.CASCADE)
+    cart = models.ForeignKey(
+        "cart.Cart", related_name="items", on_delete=models.CASCADE
+    )
+    product = models.ForeignKey(
+        "product.Product", related_name="cart_items", on_delete=models.CASCADE
+    )
     quantity = models.PositiveIntegerField(_("Quantity"), default=1)
 
     class Meta:
         verbose_name = _("Cart Item")
         verbose_name_plural = _("Cart Items")
         ordering = ["-created_at"]
-        constraints = [models.UniqueConstraint(fields=["cart", "product"], name="unique_cart_item")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["cart", "product"], name="unique_cart_item"
+            )
+        ]
 
     def __str__(self):
         return (
@@ -85,41 +92,49 @@ class CartItem(TimeStampMixinModel, UUIDModel):
         )
 
     @property
-    def price(self) -> Money:
+    def price(self):
         return Money(self.product.price.amount, settings.DEFAULT_CURRENCY)
 
     @property
-    def final_price(self) -> Money:
+    def final_price(self):
         return Money(self.product.final_price.amount, settings.DEFAULT_CURRENCY)
 
     @property
-    def discount_value(self) -> Money:
-        return Money(self.product.discount_value.amount, settings.DEFAULT_CURRENCY)
+    def discount_value(self):
+        return Money(
+            self.product.discount_value.amount, settings.DEFAULT_CURRENCY
+        )
 
     @property
-    def price_save_percent(self) -> Decimal:
+    def price_save_percent(self):
         return self.product.price_save_percent
 
     @property
-    def discount_percent(self) -> Decimal:
+    def discount_percent(self):
         return self.product.discount_percent
 
     @property
-    def vat_percent(self) -> Decimal:
+    def vat_percent(self):
         return self.product.vat_percent
 
     @property
-    def vat_value(self) -> Money:
+    def vat_value(self):
         return self.product.vat_value
 
     @property
-    def total_price(self) -> Money:
-        return Money(self.quantity * self.product.final_price.amount, settings.DEFAULT_CURRENCY)
+    def total_price(self):
+        return Money(
+            self.quantity * self.product.final_price.amount,
+            settings.DEFAULT_CURRENCY,
+        )
 
     @property
-    def total_discount_value(self) -> Money:
-        return Money(self.quantity * self.product.discount_value.amount, settings.DEFAULT_CURRENCY)
+    def total_discount_value(self):
+        return Money(
+            self.quantity * self.product.discount_value.amount,
+            settings.DEFAULT_CURRENCY,
+        )
 
-    def update_quantity(self, quantity: int) -> None:
+    def update_quantity(self, quantity: int):
         self.quantity = quantity
         self.save()

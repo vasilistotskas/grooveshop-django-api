@@ -28,7 +28,9 @@ for app_dir in app_dirs:
         pass
 
     for migration_file in migration_files:
-        if migration_file.endswith("__init__.py") or migration_file.endswith("__pycache__"):
+        if migration_file.endswith("__init__.py") or migration_file.endswith(
+            "__pycache__"
+        ):
             continue
         os.remove(migration_file)
         print(f"Deleted: {migration_file} in {app_name}")

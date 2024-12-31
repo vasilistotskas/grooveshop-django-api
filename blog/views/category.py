@@ -4,7 +4,6 @@ from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
-from rest_framework.response import Response
 
 from blog.models.category import BlogCategory
 from blog.serializers.category import BlogCategorySerializer
@@ -15,7 +14,9 @@ from core.utils.serializers import MultiSerializerMixin
 from core.utils.views import cache_methods
 
 
-@cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve", "posts"])
+@cache_methods(
+    settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve", "posts"]
+)
 class BlogCategoryViewSet(MultiSerializerMixin, BaseModelViewSet):
     queryset = BlogCategory.objects.all()
     filter_backends = [
@@ -34,7 +35,7 @@ class BlogCategoryViewSet(MultiSerializerMixin, BaseModelViewSet):
     }
 
     @action(detail=True, methods=["GET"])
-    def posts(self, request, pk=None, *args, **kwargs) -> Response:
+    def posts(self, request, pk=None, *args, **kwargs):
         self.ordering_fields = [
             "created_at",
             "updated_at",

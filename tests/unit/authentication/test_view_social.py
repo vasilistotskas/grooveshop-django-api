@@ -15,8 +15,12 @@ class TestSocialAccountAdapter(TestCase):
         self.adapter = SocialAccountAdapter()
 
     @mock.patch.object(DefaultSocialAccountAdapter, "pre_social_login")
-    @mock.patch.object(SocialLogin, "is_existing", new_callable=mock.PropertyMock)
-    def test_pre_social_login_existent(self, mock_is_existing, mock_pre_social_login):
+    @mock.patch.object(
+        SocialLogin, "is_existing", new_callable=mock.PropertyMock
+    )
+    def test_pre_social_login_existent(
+        self, mock_is_existing, mock_pre_social_login
+    ):
         request = mock.Mock()
         sociallogin = SocialLogin()
         mock_is_existing.return_value = True
@@ -25,7 +29,9 @@ class TestSocialAccountAdapter(TestCase):
 
     @mock.patch.object(DefaultSocialAccountAdapter, "pre_social_login")
     @mock.patch.object(User.objects, "filter")
-    def test_pre_social_login_nonexistent(self, mock_filter, mock_pre_social_login):
+    def test_pre_social_login_nonexistent(
+        self, mock_filter, mock_pre_social_login
+    ):
         request = mock.Mock()
 
         mock_queryset = mock.Mock()
@@ -42,7 +48,9 @@ class TestSocialAccountAdapter(TestCase):
         mock_email_addresses.configure_mock(
             **{
                 "__iter__": mock.Mock(
-                    return_value=iter([mock.Mock(verified=True, email="test@example.com")])
+                    return_value=iter(
+                        [mock.Mock(verified=True, email="test@example.com")]
+                    )
                 )
             }
         )

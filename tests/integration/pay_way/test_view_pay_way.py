@@ -9,7 +9,9 @@ from pay_way.factories import PayWayFactory
 from pay_way.models import PayWay
 from pay_way.serializers import PayWaySerializer
 
-languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
@@ -36,8 +38,12 @@ class PayWayViewSetTestCase(APITestCase):
         response = self.client.get(url)
         pay_ways = PayWay.objects.all()
         serializer = PayWaySerializer(pay_ways, many=True)
-        for response_item, serializer_item in zip(response.data["results"], serializer.data):
-            compare_serializer_and_response(serializer_item, response_item, ["icon"])
+        for response_item, serializer_item in zip(
+            response.data["results"], serializer.data, strict=False
+        ):
+            compare_serializer_and_response(
+                serializer_item, response_item, ["icon"]
+            )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -85,7 +91,9 @@ class PayWayViewSetTestCase(APITestCase):
         response = self.client.get(url)
         pay_way = PayWay.objects.get(pk=self.pay_way.pk)
         serializer = PayWaySerializer(pay_way)
-        compare_serializer_and_response(serializer.data, response.data, ["icon"])
+        compare_serializer_and_response(
+            serializer.data, response.data, ["icon"]
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 

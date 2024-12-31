@@ -69,7 +69,7 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
         throttle_classes=[BurstRateThrottle],
         permission_classes=[IsAuthenticated],
     )
-    def user_product_review(self, request, *args, **kwargs) -> Response:
+    def user_product_review(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return Response(
                 {"detail": _("User is not authenticated")},
@@ -86,7 +86,9 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
             )
 
         try:
-            review = ProductReview.objects.get(user_id=user_id, product_id=product_id)
+            review = ProductReview.objects.get(
+                user_id=user_id, product_id=product_id
+            )
             serializer = self.get_serializer(review)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -103,7 +105,9 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
             )
 
     @action(detail=True, methods=["GET"])
-    def product(self, request, *args, **kwargs) -> Response:
+    def product(self, request, *args, **kwargs):
         product_review = self.get_object()
-        serializer = self.get_serializer(product_review.product, context=self.get_serializer_context())
+        serializer = self.get_serializer(
+            product_review.product, context=self.get_serializer_context()
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)

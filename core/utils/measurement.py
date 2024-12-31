@@ -1,15 +1,14 @@
-from typing import Type
+from typing import Optional
 
-from measurement.base import BidimensionalMeasure
-from measurement.base import MeasureBase
+from measurement.base import BidimensionalMeasure, MeasureBase
 
 
 def get_measurement(
-    measure: Type[MeasureBase | BidimensionalMeasure],
+    measure: type[MeasureBase | BidimensionalMeasure],
     value,
-    unit: str = None,
-    original_unit: str = None,
-) -> MeasureBase | BidimensionalMeasure:
+    unit: Optional[str] = None,
+    original_unit: Optional[str] = None,
+):
     unit = unit or measure.STANDARD_UNIT
 
     m = measure(**{unit: value})

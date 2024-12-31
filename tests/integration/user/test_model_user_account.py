@@ -21,10 +21,16 @@ class UserAccountModelTest(TestCase):
         self.user_name_generator = UserNameGenerator()
 
     def test_create_user_with_generated_username(self):
-        generated_username = self.user_name_generator.generate_username(self.user_data["email"])
-        user = UserAccountFactory(**self.user_data, username=generated_username, num_addresses=0)
+        generated_username = self.user_name_generator.generate_username(
+            self.user_data["email"]
+        )
+        user = UserAccountFactory(
+            **self.user_data, username=generated_username, num_addresses=0
+        )
         self.assertEqual(user.username, generated_username)
-        self.assertTrue(user.check_password(self.user_data["plain_password"]))  # Check the password
+        self.assertTrue(
+            user.check_password(self.user_data["plain_password"])
+        )  # Check the password
         self.assertEqual(user.first_name, self.user_data["first_name"])
         self.assertEqual(user.last_name, self.user_data["last_name"])
         self.assertEqual(user.phone, self.user_data["phone"])
@@ -34,8 +40,12 @@ class UserAccountModelTest(TestCase):
         self.assertFalse(user.is_superuser)
 
     def test_username_uniqueness(self):
-        generated_username1 = self.user_name_generator.generate_username("uniqueuser1@example.com")
-        generated_username2 = self.user_name_generator.generate_username("uniqueuser2@example.com")
+        generated_username1 = self.user_name_generator.generate_username(
+            "uniqueuser1@example.com"
+        )
+        generated_username2 = self.user_name_generator.generate_username(
+            "uniqueuser2@example.com"
+        )
         UserAccountFactory(
             email="uniqueuser1@example.com",
             username=generated_username1,

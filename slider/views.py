@@ -7,10 +7,8 @@ from rest_framework.filters import SearchFilter
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from core.utils.views import cache_methods
-from slider.models import Slide
-from slider.models import Slider
-from slider.serializers import SliderSerializer
-from slider.serializers import SlideSerializer
+from slider.models import Slide, Slider
+from slider.serializers import SliderSerializer, SlideSerializer
 
 
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])

@@ -8,7 +8,9 @@ from core.factories import CustomDjangoModelFactory
 
 fake = Faker()
 
-available_languages = [lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]]
+available_languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
 
 
 class BlogCategoryTranslationFactory(factory.django.DjangoModelFactory):
@@ -46,7 +48,8 @@ class BlogCategoryFactory(CustomDjangoModelFactory):
             return
 
         translations = extracted or [
-            BlogCategoryTranslationFactory(language_code=lang, master=self) for lang in available_languages
+            BlogCategoryTranslationFactory(language_code=lang, master=self)
+            for lang in available_languages
         ]
 
         for translation in translations:

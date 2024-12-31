@@ -1,23 +1,19 @@
 import decimal
 import importlib
-from typing import Any
-from typing import override
-from typing import Type
-from typing import TypedDict
+from typing import Any, TypedDict, override
 
 from drf_spectacular.utils import extend_schema_field
-from measurement.base import BidimensionalMeasure
-from measurement.base import MeasureBase
+from measurement.base import BidimensionalMeasure, MeasureBase
 from rest_framework import serializers
 
 from product.models import Product
 
 
-def is_valid_unit(unit_to_validate: str, measurement) -> bool:
+def is_valid_unit(unit_to_validate: str, measurement):
     return unit_to_validate in measurement.get_units()
 
 
-def is_valid_decimal(value_to_validate: str) -> bool:
+def is_valid_decimal(value_to_validate: str):
     try:
         decimal.Decimal(value_to_validate)
         return True
@@ -48,17 +44,26 @@ class MeasurementSerializerField(serializers.Field):
         "missing_keys": "Missing required keys. 'unit' and 'value' are required.",
     }
 
-    def __init__(self, measurement: Type[MeasureBase | BidimensionalMeasure], *args, **kwargs) -> None:
-        super(MeasurementSerializerField, self).__init__(*args, **kwargs)
+    def __init__(
+        self,
+        measurement: type[MeasureBase | BidimensionalMeasure],
+        *args,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
         self.measurement = measurement
 
     @override
-    def to_representation(self, obj: Any) -> Representation:
+    def to_representation(self, obj: Any):
         return {"unit": obj.unit, "value": obj.value}
 
     @override
-    def to_internal_value(self, data: Representation) -> MeasureBase | BidimensionalMeasure:
-        if not isinstance(data, dict) or "unit" not in data or "value" not in data:
+    def to_internal_value(self, data: Representation):
+        if (
+            not isinstance(data, dict)
+            or "unit" not in data
+            or "value" not in data
+        ):
             self.fail("missing_keys")
 
         unit = data["unit"]
@@ -82,7 +87,9 @@ class ContentObjectRelatedField(serializers.RelatedField):
     @override
     def to_representation(self, value):
         if isinstance(value, Product):
-            serializer = importlib.import_module("product.serializers.product").ProductSerializer(value)
+            serializer = importlib.import_module(
+                "product.serializers.product"
+            ).ProductSerializer(value)
         else:
             raise Exception("Unexpected type of object")
 

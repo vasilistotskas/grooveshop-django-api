@@ -5,18 +5,16 @@ from django.db.models.functions import Now
 from django.utils import timezone as tz
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
-from parler.models import TranslatableModel
-from parler.models import TranslatedFields
+from parler.models import TranslatableModel, TranslatedFields
 
-from core.models import TimeStampMixinModel
-from core.models import UUIDModel
+from core.models import TimeStampMixinModel, UUIDModel
 from notification.enum import NotificationKindEnum
 
 EXPIRATION_DAYS = 6 * 30
 
 
 class Notification(TranslatableModel, TimeStampMixinModel, UUIDModel):
-    link = models.URLField(_("Link"), blank=True, null=True)
+    link = models.URLField(_("Link"), blank=True, default="")
     kind = models.CharField(
         _("Kind"),
         max_length=250,
@@ -35,7 +33,10 @@ class Notification(TranslatableModel, TimeStampMixinModel, UUIDModel):
     )
 
     def __str__(self):
-        message_snippet = self.safe_translation_getter("title", any_language=True)[:50] + "..."
+        message_snippet = (
+            self.safe_translation_getter("title", any_language=True)[:50]
+            + "..."
+        )
         return f"{self.get_kind_display()}: {message_snippet}"
 
     class Meta(TypedModelMeta):
@@ -46,5 +47,5 @@ class Notification(TranslatableModel, TimeStampMixinModel, UUIDModel):
             *TimeStampMixinModel.Meta.indexes,
         ]
 
-    def is_expired(self) -> bool:
+    def is_expired(self):
         return self.expiry_date and tz.now() > self.expiry_date

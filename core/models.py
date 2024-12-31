@@ -1,18 +1,10 @@
 import uuid
-from typing import Any
-from typing import override
-from typing import TypeVar
+from typing import Any, TypeVar, override
 
-from django.contrib.postgres.indexes import BTreeIndex
-from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.indexes import BTreeIndex, GinIndex
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db import models
-from django.db import transaction
-from django.db.models import F
-from django.db.models import JSONField
-from django.db.models import Max
-from django.db.models import Q
-from django.db.models import QuerySet
+from django.db import models, transaction
+from django.db.models import F, JSONField, Max, Q
 from django.utils import timezone as tz
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -27,21 +19,21 @@ class SortableModel(models.Model):
             BTreeIndex(fields=["sort_order"], name="%(class)s_sort_order_idx"),
         ]
 
-    def get_ordering_queryset(self) -> QuerySet[Any]:
-        model_class = self.__class__
-        return model_class.objects.all()
-
-    @staticmethod
-    def get_max_sort_order(qs) -> int:
-        return qs.aggregate(Max("sort_order"))["sort_order__max"] or 0
-
     @override
-    def save(self, *args, **kwargs) -> None:
+    def save(self, *args, **kwargs):
         if self.pk is None:
             qs = self.get_ordering_queryset()
             existing_max = self.get_max_sort_order(qs)
             self.sort_order = 0 if existing_max is None else existing_max + 1
         super().save(*args, **kwargs)
+
+    def get_ordering_queryset(self):
+        model_class = self.__class__
+        return model_class.objects.all()
+
+    @staticmethod
+    def get_max_sort_order(qs):
+        return qs.aggregate(Max("sort_order"))["sort_order__max"] or 0
 
     def move_up(self):
         if self.sort_order > 0:
@@ -67,10 +59,12 @@ class SortableModel(models.Model):
 
     @transaction.atomic
     @override
-    def delete(self, *args, **kwargs) -> None:
+    def delete(self, *args, **kwargs):
         if self.sort_order is not None:
             qs = self.get_ordering_queryset()
-            qs.filter(sort_order__gt=self.sort_order).update(sort_order=F("sort_order") - 1)
+            qs.filter(sort_order__gt=self.sort_order).update(
+                sort_order=F("sort_order") - 1
+            )
         super().delete(*args, **kwargs)
 
 
@@ -106,7 +100,8 @@ class PublishedQuerySet(models.QuerySet[T]):
     def published(self):
         today = tz.now()
         return self.filter(
-            Q(published_at__lte=today, is_published=True) | Q(published_at__isnull=True, is_published=True)
+            Q(published_at__lte=today, is_published=True)
+            | Q(published_at__isnull=True, is_published=True)
         )
 
 
@@ -114,7 +109,9 @@ PublishableManager = models.Manager.from_queryset(PublishedQuerySet)
 
 
 class PublishableModel(models.Model):
-    published_at = models.DateTimeField(_("Published At"), null=True, blank=True)
+    published_at = models.DateTimeField(
+        _("Published At"), null=True, blank=True
+    )
     is_published = models.BooleanField(_("Is Published"), default=False)
 
     objects: Any = PublishableManager()
@@ -122,17 +119,25 @@ class PublishableModel(models.Model):
     class Meta(TypedModelMeta):
         abstract = True
         indexes = [
-            BTreeIndex(fields=["published_at"], name="%(class)s_published_at_idx"),
-            BTreeIndex(fields=["is_published"], name="%(class)s_is_published_idx"),
+            BTreeIndex(
+                fields=["published_at"], name="%(class)s_published_at_idx"
+            ),
+            BTreeIndex(
+                fields=["is_published"], name="%(class)s_is_published_idx"
+            ),
         ]
 
     @property
-    def is_visible(self) -> bool:
-        return self.is_published and (self.published_at is None or self.published_at <= tz.now())
+    def is_visible(self):
+        return self.is_published and (
+            self.published_at is None or self.published_at <= tz.now()
+        )
 
 
 class MetaDataModel(models.Model):
-    private_metadata = JSONField(blank=True, default=dict, encoder=DjangoJSONEncoder)
+    private_metadata = JSONField(
+        blank=True, default=dict, encoder=DjangoJSONEncoder
+    )
     metadata = JSONField(blank=True, default=dict, encoder=DjangoJSONEncoder)
 
     class Meta(TypedModelMeta):
@@ -150,7 +155,7 @@ class MetaDataModel(models.Model):
             self.metadata = {}
         super().save(*args, **kwargs)
 
-    def get_value_from_private_metadata(self, key: str, default: Any = None) -> Any:
+    def get_value_from_private_metadata(self, key: str, default: Any = None):
         return self.private_metadata.get(key, default)
 
     def store_value_in_private_metadata(self, items: dict):
@@ -167,7 +172,7 @@ class MetaDataModel(models.Model):
         if key in self.private_metadata:
             del self.private_metadata[key]
 
-    def get_value_from_metadata(self, key: str, default: Any = None) -> Any:
+    def get_value_from_metadata(self, key: str, default: Any = None):
         return self.metadata.get(key, default)
 
     def store_value_in_metadata(self, items: dict):
@@ -218,13 +223,17 @@ class SoftDeleteQuerySet(models.QuerySet):
 
 class SoftDeleteManager(models.Manager):
     def get_queryset(self):
-        return SoftDeleteQuerySet(self.model, using=self._db).exclude(is_deleted=True)
+        return SoftDeleteQuerySet(self.model, using=self._db).exclude(
+            is_deleted=True
+        )
 
     def all_with_deleted(self):
         return SoftDeleteQuerySet(self.model, using=self._db)
 
     def deleted_only(self):
-        return SoftDeleteQuerySet(self.model, using=self._db).filter(is_deleted=True)
+        return SoftDeleteQuerySet(self.model, using=self._db).filter(
+            is_deleted=True
+        )
 
 
 class SoftDeleteModel(SoftDeleteMixin, models.Model):

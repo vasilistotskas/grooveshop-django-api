@@ -3,6 +3,16 @@
 
 
 
+## v0.186.0 (2024-12-31)
+
+### Bug fixes
+
+* fix: poetry lock ([`3a20708`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a207084eac12749f802e32b22fcb1237d1203a3))
+
+### Features
+
+* feat: Bump Versions, replace flake8,black and isort with ruff ([`43eaa58`](https://github.com/vasilistotskas/grooveshop-django-api/commit/43eaa58c25de243b15221695cf023256444d1eee))
+
 ## v0.185.0 (2024-12-08)
 
 ### Bug fixes
@@ -10,6 +20,10 @@
 * fix: session test patch env values ([`5bc874d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5bc874d4a78624c409c1479754eeb709cfb901c2))
 
 * fix: remove qodana ([`2d06f0b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2d06f0bbfc98c86e9be67028af26371bb875e4a6))
+
+### Chores
+
+* chore(release): release version 0.185.0 [skip ci] ([`838b34c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/838b34cefa1f42520e7f4d9e4c578e97037d9611))
 
 ### Features
 

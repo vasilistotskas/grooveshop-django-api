@@ -1340,6 +1340,24 @@ python-dateutil = ">=2.4"
 typing-extensions = "*"
 
 [[package]]
+name = "fido2"
+version = "1.2.0"
+description = "FIDO2/WebAuthn library for implementing clients and servers."
+optional = false
+python-versions = "<4.0,>=3.8"
+groups = ["main"]
+files = [
+    {file = "fido2-1.2.0-py3-none-any.whl", hash = "sha256:f7c8ee62e359aa980a45773f9493965bb29ede1b237a9218169dbfe60c80e130"},
+    {file = "fido2-1.2.0.tar.gz", hash = "sha256:e39f95920122d64283fda5e5581d95a206e704fa42846bfa4662f86aa0d3333b"},
+]
+
+[package.dependencies]
+cryptography = ">=2.6,<35 || >35,<45"
+
+[package.extras]
+pcsc = ["pyscard (>=1.9,<3)"]
+
+[[package]]
 name = "filelock"
 version = "3.16.1"
 description = "A platform independent file lock."
@@ -3267,4 +3285,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<4.0.0"
-content-hash = "d8fdafa195d8b20019f33b48df4e6e09228cdbe35ad0d25d6906c37590666db5"
+content-hash = "6fcfba4050b236b7126952845f0c3d540646fb525b57a2cacca63c561e10d91a"

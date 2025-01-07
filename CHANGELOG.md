@@ -3,7 +3,17 @@
 
 
 
+## v0.187.1 (2025-01-07)
+
+### Bug fixes
+
+* fix: add missing lib ([`a086f70`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a086f7025cf65ef74393fd61e87b5a9ab5a962ac))
+
 ## v0.187.0 (2025-01-07)
+
+### Chores
+
+* chore(release): release version 0.187.0 [skip ci] ([`ce6a970`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ce6a9709d0c17d1bb111d329b5538c479f763b3b))
 
 ### Features
 

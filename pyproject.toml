@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "grooveshop-django-api"
-version = "0.187.2"
+version = "0.188.0"
 description = "GrooveShop Django Backend"
 license = "MIT"
 readme = ["README.md"]

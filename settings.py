@@ -315,7 +315,7 @@ SOCIALACCOUNT_PROVIDERS = {
             "secret": getenv("SOCIALACCOUNT_GITHUB_SECRET", ""),
             "key": "",
         },
-        "SCOPE": ["read:user", "user:email" "repo"],
+        "SCOPE": ["read:user", "user:email", "repo"],
         "VERIFIED_EMAIL": True,
     },
     "google": {

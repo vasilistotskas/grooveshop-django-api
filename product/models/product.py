@@ -92,7 +92,7 @@ class Product(
         _("Discount Percent"),
         max_digits=11,
         decimal_places=2,
-        default=Decimal(0.0),
+        default=Decimal("0.0"),
     )
     vat = models.ForeignKey(
         "vat.Vat",

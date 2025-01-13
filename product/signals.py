@@ -84,9 +84,7 @@ async def notify_product_price_lowered(
                 await sync_to_async(setattr)(
                     notification, "title", "Μείωση Τιμής!"
                 )
-                await sync_to_async(
-                    setattr
-                )(
+                await sync_to_async(setattr)(
                     notification,
                     "message",
                     f"Η τιμή του <a href='{product_url}'>{instance.name}</a> μειώθηκε"  # noqa: RUF001

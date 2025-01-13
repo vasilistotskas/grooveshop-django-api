@@ -41,7 +41,7 @@ async def notify_comment_liked(
                         await sync_to_async(setattr)(
                             notification,
                             "title",
-                            f"<a href='" f"{blog_post_url}'>Comment</a> Liked!",
+                            f"<a href='{blog_post_url}'>Comment</a> Liked!",
                         )
                         await sync_to_async(setattr)(
                             notification,
@@ -50,9 +50,7 @@ async def notify_comment_liked(
                             f"{liker_user.username if liker_user.username else liker_user.email}.",
                         )
                     elif language == "el":
-                        await sync_to_async(
-                            setattr
-                        )(
+                        await sync_to_async(setattr)(
                             notification,
                             "title",
                             f"Το <a href="  # noqa: RUF001
@@ -60,9 +58,7 @@ async def notify_comment_liked(
                             f"{blog_post_url}'>σχόλιο</a> "
                             f"σου πήρε like!",  # noqa: RUF001
                         )
-                        await sync_to_async(
-                            setattr
-                        )(
+                        await sync_to_async(setattr)(
                             notification,
                             "message",
                             f"Το σχόλιο σου άρεσε στον χρήστη "  # noqa: RUF001

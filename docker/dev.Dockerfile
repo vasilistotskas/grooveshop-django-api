@@ -1,5 +1,5 @@
 # pull official base image
-FROM python:3.13.1-slim-bookworm
+FROM python:3.13.2-slim-bookworm
 
 # set work directory
 WORKDIR /mnt/app

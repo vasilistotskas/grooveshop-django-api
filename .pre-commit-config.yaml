@@ -18,4 +18,4 @@ repos:
         pass_filenames: false
 
 default_language_version:
-  python: python3.13.1
+  python: python3.13.2

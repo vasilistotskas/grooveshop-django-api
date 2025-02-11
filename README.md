@@ -138,7 +138,7 @@ This project is open-sourced under the MIT License. See the [LICENSE](LICENSE.md
 
 # Python Development Setup and Utilities
 
-## Python Version 3.13.1
+## Python Version 3.13.2
 
 ### Virtual Environment Management
 - **Install Virtualenv**:

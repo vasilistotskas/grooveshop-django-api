@@ -116,18 +116,18 @@ files = [
 
 [[package]]
 name = "boto3"
-version = "1.36.18"
+version = "1.36.20"
 description = "The AWS SDK for Python"
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "boto3-1.36.18-py3-none-any.whl", hash = "sha256:084ff25af2d7bda3102d6367f5453e2e83f8cde1da73079ea144595b03cb9400"},
-    {file = "boto3-1.36.18.tar.gz", hash = "sha256:be8e32c34d7b103a64fafdd277fa1ec136733b4bbfc11dcfa597efa36a820b37"},
+    {file = "boto3-1.36.20-py3-none-any.whl", hash = "sha256:e132e31232ee107f1c187f566d96863a907433e5bdd8d8928effddd30a96242f"},
+    {file = "boto3-1.36.20.tar.gz", hash = "sha256:4a27ffc0543c2a429600542047f00c6a1e95270139d36d8cc636e9cc9a78b835"},
 ]
 
 [package.dependencies]
-botocore = ">=1.36.18,<1.37.0"
+botocore = ">=1.36.20,<1.37.0"
 jmespath = ">=0.7.1,<2.0.0"
 s3transfer = ">=0.11.0,<0.12.0"
 
@@ -136,14 +136,14 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.36.18"
+version = "1.36.20"
 description = "Low-level, data-driven core of boto 3."
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "botocore-1.36.18-py3-none-any.whl", hash = "sha256:7898d109affd9231c555e71fda88308c1da2db8d39e83d33eb8cb40ebf1ba82f"},
-    {file = "botocore-1.36.18.tar.gz", hash = "sha256:ddadafe460e91f11677720a2fcc3ea09c4abb914de2b000da7ba46b4c97da3d7"},
+    {file = "botocore-1.36.20-py3-none-any.whl", hash = "sha256:0110bf2208e4569659d0ccfca94baa4999501334397987b02712a94493cbf48b"},
+    {file = "botocore-1.36.20.tar.gz", hash = "sha256:3815a05518ff03a8dbc8d5a3c29b95889409a25ac87a282067f6e26fefb7c40a"},
 ]
 
 [package.dependencies]
@@ -944,14 +944,14 @@ files = [
 
 [[package]]
 name = "django-filter"
-version = "24.3"
+version = "25.1"
 description = "Django-filter is a reusable Django application for allowing users to filter querysets dynamically."
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "django_filter-24.3-py3-none-any.whl", hash = "sha256:c4852822928ce17fb699bcfccd644b3574f1a2d80aeb2b4ff4f16b02dd49dc64"},
-    {file = "django_filter-24.3.tar.gz", hash = "sha256:d8ccaf6732afd21ca0542f6733b11591030fa98669f8d15599b358e24a2cd9c3"},
+    {file = "django_filter-25.1-py3-none-any.whl", hash = "sha256:4fa48677cf5857b9b1347fed23e355ea792464e0fe07244d1fdfb8a806215b80"},
+    {file = "django_filter-25.1.tar.gz", hash = "sha256:1ec9eef48fa8da1c0ac9b411744b16c3f4c31176c867886e4c48da369c407153"},
 ]
 
 [package.dependencies]
@@ -1325,14 +1325,14 @@ doc = ["Sphinx", "sphinx-rtd-theme", "sphinxcontrib-spelling"]
 
 [[package]]
 name = "faker"
-version = "36.1.0"
+version = "36.1.1"
 description = "Faker is a Python package that generates fake data for you."
 optional = false
 python-versions = ">=3.9"
 groups = ["dev"]
 files = [
-    {file = "Faker-36.1.0-py3-none-any.whl", hash = "sha256:aa0b93487d3adf7cd89953d172e3df896cb7b35d8a5222c0da873edbe2f7adf5"},
-    {file = "faker-36.1.0.tar.gz", hash = "sha256:f40510350aecfe006f45cb3f8879b35e861367cf347f51a7f2ca2c0571fdcc0b"},
+    {file = "Faker-36.1.1-py3-none-any.whl", hash = "sha256:ad1f1be7fd692ec0256517404a9d7f007ab36ac5d4674082fa72404049725eaa"},
+    {file = "faker-36.1.1.tar.gz", hash = "sha256:7cb2bbd4c8f040e4a340ae4019e9a48b6cf1db6a71bda4e5a61d8d13b7bef28d"},
 ]
 
 [package.dependencies]
@@ -3269,4 +3269,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<4.0.0"
-content-hash = "abbcff858d56043c26c0c1524700c02bdffc495f20a5f2c8f6c8fd3593359db8"
+content-hash = "8ff3c75705b2eb21e8088d4e1ed0bed64d8afebc6c61a8bf9a074f132b194003"

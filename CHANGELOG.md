@@ -3,6 +3,22 @@
 
 
 
+## v0.191.0 (2025-02-15)
+
+### Bug fixes
+
+* fix: revert celery app ([`40c998a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/40c998ade7a4ddaec5727d80973e484aacd50fc5))
+
+* fix: ruff ([`2c1c671`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2c1c671a501e5129d2ff3a22d0eb20e0462fa838))
+
+* fix: ACCOUNT_AUTHENTICATION_METHOD  rename and celery import ([`73782c9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/73782c932a123f890eb7353318fec5773a4e9d38))
+
+### Features
+
+* feat: Bump Versions ([`868e1b0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/868e1b03fe705b7635fa4faa9dbed2942cf5a48f))
+
+* feat: Bump Versions, celery init change ([`2f7637e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2f7637e0c8a1e295fa7ad76424dd082552fcbdf0))
+
 ## v0.190.0 (2025-02-11)
 
 ### Features

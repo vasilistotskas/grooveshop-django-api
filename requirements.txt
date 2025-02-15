@@ -9,7 +9,7 @@ cryptography==44.0.1
 django==5.1.6
 django-admin-thumbnails==0.2.9
 django-allauth[mfa]==65.4.1
-django-csp==4.0b2
+django-csp==4.0b3
 django-dbbackup==4.2.1
 django-extra-settings==0.13.0
 django-celery-beat==2.7.0
@@ -41,8 +41,8 @@ gunicorn==23.0.0
 importlib-resources==6.5.2
 measurement==3.2.2
 meilisearch==0.33.1
-phonenumbers==8.13.54
-poetry==2.0.1
+phonenumbers==8.13.55
+poetry==2.1.0
 pip-upgrader==1.4.15
 pillow==11.1.0
 pre-commit==4.1.0

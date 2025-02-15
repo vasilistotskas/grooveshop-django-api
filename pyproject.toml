@@ -11,7 +11,7 @@ packages = [
 ]
 
 [build-system]
-requires = ["poetry>=2.0.0"]
+requires = ["poetry>=2.1.0"]
 build-backend = "poetry.masonry.api"
 
 [tool.poetry.dependencies]
@@ -25,7 +25,7 @@ cryptography = "44.0.1"
 django = "5.1.6"
 django-admin-thumbnails = "0.2.9"
 django-allauth = "65.4.1"
-django-csp = "4.0b2"
+django-csp = "4.0b3"
 django-dbbackup = "4.2.1"
 django-extra-settings = "0.13.0"
 django-celery-beat = "2.7.0"
@@ -51,7 +51,7 @@ gunicorn = "23.0.0"
 importlib-resources = "6.5.2"
 measurement = "3.2.2"
 meilisearch = "0.33.1"
-phonenumbers = "8.13.54"
+phonenumbers = "8.13.55"
 pillow = "11.1.0"
 psycopg = { version = "3.2.4", extras = ["binary", "pool"] }
 python-dotenv = "1.0.1"

@@ -3,6 +3,12 @@
 
 
 
+## v0.192.0 (2025-02-22)
+
+### Features
+
+* feat: Bump Versions ([`5bb3b89`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5bb3b899db2aa7be2f4606966e877b36567ad785))
+
 ## v0.191.0 (2025-02-15)
 
 ### Bug fixes

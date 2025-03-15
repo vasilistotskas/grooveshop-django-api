@@ -57,7 +57,7 @@ class CartService:
             yield from self.cart_items
 
     def _initialize_cart(self):
-        self.cart = self.get_cart()
+        self.cart = self.get_or_create_cart()
         self.cart_items = self.cart.get_items() if self.cart else []
         if self.cart:
             self.cart.refresh_last_activity()
@@ -82,18 +82,21 @@ class CartService:
                     f"Invalid option: {option}"
                 )
 
-    def get_cart(self):
-        cart_id = self.request.session.get("cart_id")
+    def get_or_create_cart(self):
         user = self.request.user
         if user.is_authenticated:
-            cart_qs = Cart.objects.filter(user=user)
-            cart = cart_qs.first()
+            cart, created = Cart.objects.get_or_create(user=user)
+            self.request.session["cart_id"] = cart.id
             return cart
-        elif cart_id:
-            cart_qs = Cart.objects.filter(id=cart_id)
-            cart = cart_qs.first()
+        else:
+            cart_id = self.request.session.get("cart_id")
+            cart = None
+            if cart_id:
+                cart = Cart.objects.filter(id=cart_id).first()
+            if not cart:
+                cart = Cart.objects.create()
+                self.request.session["cart_id"] = cart.id
             return cart
-        return None
 
     def merge_carts(self, pre_login_cart: Cart):
         for item in pre_login_cart.items.all():

@@ -46,7 +46,7 @@ class CartViewSet(BaseModelViewSet):
         return context
 
     def retrieve(self, request, *args, **kwargs):
-        cart = self.cart_service.get_cart()
+        cart = self.cart_service.get_or_create_cart()
         if not cart:
             return Response(status=status.HTTP_404_NOT_FOUND)
         serializer = self.get_serializer(cart)
@@ -54,7 +54,7 @@ class CartViewSet(BaseModelViewSet):
 
     @throttle_classes([BurstRateThrottle])
     def update(self, request, *args, **kwargs):
-        cart = self.cart_service.get_cart()
+        cart = self.cart_service.get_or_create_cart()
         if not cart:
             return Response(status=status.HTTP_404_NOT_FOUND)
         serializer = self.get_serializer(
@@ -70,7 +70,7 @@ class CartViewSet(BaseModelViewSet):
         return self.update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
-        cart = self.cart_service.get_cart()
+        cart = self.cart_service.get_or_create_cart()
         if cart:
             cart.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)

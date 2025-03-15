@@ -3,6 +3,14 @@
 
 
 
+## v0.193.1 (2025-03-15)
+
+### Bug fixes
+
+* fix: tests ([`4d67a9a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4d67a9ae9e0c7848303a85f5246ee1ac75290ca5))
+
+* fix: get_or_create_cart, github docker ([`4ae26a6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4ae26a62eabc49a9bc74095be1c99d938f3ec308))
+
 ## v0.193.0 (2025-03-15)
 
 ### Features

@@ -2,7 +2,7 @@ import sys
 
 from setuptools import setup
 
-__version__ = "0.192.0"
+__version__ = "0.193.0"
 
 setup(
     name="grooveshop-django-api",

@@ -1,3 +1,6 @@
+from decimal import Decimal
+from typing import Literal
+
 from django.conf import settings
 from django.db import models
 from django.utils.timezone import now
@@ -56,11 +59,11 @@ class Cart(TimeStampMixinModel, UUIDModel):
         return Money(total, settings.DEFAULT_CURRENCY)
 
     @property
-    def total_items(self):
+    def total_items(self) -> int | Literal[0]:
         return sum(item.quantity for item in self.get_items())
 
     @property
-    def total_items_unique(self):
+    def total_items_unique(self) -> int:
         return self.items.count()
 
 
@@ -92,44 +95,44 @@ class CartItem(TimeStampMixinModel, UUIDModel):
         )
 
     @property
-    def price(self):
+    def price(self) -> Money:
         return Money(self.product.price.amount, settings.DEFAULT_CURRENCY)
 
     @property
-    def final_price(self):
+    def final_price(self) -> Money:
         return Money(self.product.final_price.amount, settings.DEFAULT_CURRENCY)
 
     @property
-    def discount_value(self):
+    def discount_value(self) -> Money:
         return Money(
             self.product.discount_value.amount, settings.DEFAULT_CURRENCY
         )
 
     @property
-    def price_save_percent(self):
+    def price_save_percent(self) -> Decimal:
         return self.product.price_save_percent
 
     @property
-    def discount_percent(self):
+    def discount_percent(self) -> Decimal:
         return self.product.discount_percent
 
     @property
-    def vat_percent(self):
+    def vat_percent(self) -> Decimal:
         return self.product.vat_percent
 
     @property
-    def vat_value(self):
+    def vat_value(self) -> Money:
         return self.product.vat_value
 
     @property
-    def total_price(self):
+    def total_price(self) -> Money:
         return Money(
             self.quantity * self.product.final_price.amount,
             settings.DEFAULT_CURRENCY,
         )
 
     @property
-    def total_discount_value(self):
+    def total_discount_value(self) -> Money:
         return Money(
             self.quantity * self.product.discount_value.amount,
             settings.DEFAULT_CURRENCY,

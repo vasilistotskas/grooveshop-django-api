@@ -1,5 +1,6 @@
+import logging
 from collections.abc import Iterable
-from typing import TypedDict
+from typing import Any, TypedDict
 
 from django.conf import settings
 from django.db import models
@@ -8,6 +9,8 @@ from meilisearch.models.task import TaskInfo
 from meili._client import client as _client
 from meili.dataclasses import MeiliIndexSettings
 from meili.querysets import IndexQuerySet
+
+logger = logging.getLogger(__name__)
 
 
 class MeiliGeo(TypedDict):
@@ -24,6 +27,7 @@ class _Meili(TypedDict):
     sortable_fields: Iterable[str] | None
     supports_geo: bool
     tasks: list[TaskInfo]
+    include_pk_in_search: bool
 
 
 class IndexMixin(models.Model):
@@ -42,14 +46,15 @@ class IndexMixin(models.Model):
         stop_words: Iterable[str] = None
         synonyms: dict[str, list[str]] = None
         distinct_attribute: str = None
-        typo_tolerance: dict[str, any] = None
-        faceting: dict[str, any] = None
-        pagination: dict[str, any] = None
+        typo_tolerance: dict[str, Any] = None
+        faceting: dict[str, Any] = None
+        pagination: dict[str, Any] = None
         supports_geo: bool = False
         index_name: str = None
         primary_key: str = "pk"
+        include_pk_in_search: bool = False
 
-    def __init_subclass__(cls):
+    def __init_subclass__(cls) -> None:
         index_name = getattr(cls.MeiliMeta, "index_name", cls.__name__)
         primary_key = getattr(cls.MeiliMeta, "primary_key", "pk")
         displayed_fields = getattr(cls.MeiliMeta, "displayed_fields", None)
@@ -64,6 +69,9 @@ class IndexMixin(models.Model):
         faceting = getattr(cls.MeiliMeta, "faceting", None)
         pagination = getattr(cls.MeiliMeta, "pagination", None)
         supports_geo = getattr(cls.MeiliMeta, "supports_geo", False)
+        include_pk_in_search = getattr(
+            cls.MeiliMeta, "include_pk_in_search", False
+        )
 
         if supports_geo:
             filterable_fields = ("_geo",) + (filterable_fields or ())
@@ -78,6 +86,7 @@ class IndexMixin(models.Model):
                 filterable_fields=filterable_fields,
                 sortable_fields=sortable_fields,
                 supports_geo=supports_geo,
+                include_pk_in_search=include_pk_in_search,
                 tasks=[],
             )
         else:
@@ -94,10 +103,15 @@ class IndexMixin(models.Model):
                 faceting=faceting,
                 pagination=pagination,
             )
-            _client.create_index(index_name, primary_key).with_settings(
-                index_name=index_name,
-                index_settings=index_settings,
-            )
+
+            try:
+                _client.create_index(index_name, primary_key).with_settings(
+                    index_name=index_name,
+                    index_settings=index_settings,
+                )
+            except Exception as e:
+                logger.error(f"Failed to create index {index_name}: {e}")
+                pass
 
         cls._meilisearch = _Meili(
             primary_key=primary_key,
@@ -107,13 +121,14 @@ class IndexMixin(models.Model):
             filterable_fields=filterable_fields,
             sortable_fields=sortable_fields,
             supports_geo=supports_geo,
+            include_pk_in_search=include_pk_in_search,
             tasks=[task for task in _client.tasks],
         )
         _client.flush_tasks()
 
         cls.meilisearch = IndexQuerySet(cls)
 
-    def meili_filter(self):
+    def meili_filter(self) -> bool:
         return True
 
     @classmethod
@@ -143,7 +158,12 @@ class IndexMixin(models.Model):
             except AttributeError:
                 data[field_name] = None
 
+        if getattr(self.MeiliMeta, "include_pk_in_search", False):
+            data[self.MeiliMeta.primary_key] = self._meta.get_field(
+                self.MeiliMeta.primary_key
+            ).value_to_string(self)
+
         return data
 
-    def meili_geo(self):
+    def meili_geo(self) -> MeiliGeo:
         raise ValueError("Model does not support geolocation")

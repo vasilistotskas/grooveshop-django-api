@@ -97,19 +97,19 @@ class BlogCategory(
         )
 
     @property
-    def recursive_post_count(self):
+    def recursive_post_count(self) -> int:
         return BlogPost.objects.filter(
             category__in=self.get_descendants(include_self=True)
         ).count()
 
     @property
-    def absolute_url(self):
+    def absolute_url(self) -> str:
         return f"/blog/category/{self.id}/" + "/".join(
             [x["slug"] for x in self.get_ancestors(include_self=True).values()]
         )
 
     @property
-    def main_image_path(self):
+    def main_image_path(self) -> str:
         if self.image and hasattr(self.image, "name"):
             return f"media/uploads/blog/{os.path.basename(self.image.name)}"
         return ""

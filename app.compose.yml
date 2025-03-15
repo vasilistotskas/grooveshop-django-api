@@ -1,0 +1,148 @@
+x-common-envs: &common-envs
+  DB_HOST: db
+  REDIS_HOST: redis
+  MEILI_HOST: meilisearch
+  CELERY_BROKER_URL: amqp://guest:guest@rabbitmq:5672
+
+x-common-vols: &common-vols
+  - type: volume
+    source: staticfiles
+    target: /home/app/staticfiles
+  - type: volume
+    source: mediafiles
+    target: /home/app/mediafiles
+
+
+x-infra-service-condition: &infra-service-condition
+  db:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+  rabbitmq:
+    condition: service_healthy
+  meilisearch:
+    condition: service_healthy
+
+services:
+  backend-init:
+    container_name: backend-init
+    build:
+      context: .
+      dockerfile: ./dev.Dockerfile
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput"
+    env_file:
+      - ./.env
+    environment:
+      <<: *common-envs
+    volumes:
+      *common-vols
+    depends_on:
+      <<: *infra-service-condition
+    networks:
+      - grooveshop-backbone
+    restart: "no"
+  backend:
+    container_name: backend
+    user: 1000:1000
+    restart: always
+    build:
+      context: .
+      dockerfile: ./dev.Dockerfile
+    command: uvicorn asgi:application --host 0.0.0.0 --port 8000 --log-level debug
+    env_file:
+      - ./.env
+    environment:
+      <<: *common-envs
+    volumes:
+      *common-vols
+    depends_on:
+      <<: *infra-service-condition
+      backend-init:
+        condition: service_completed_successfully
+    ports:
+      - "8000:8000"
+    networks:
+      - grooveshop-backbone
+  celery_worker:
+    container_name: celery_worker
+    user: 1000:1000
+    restart: always
+    build:
+      context: .
+      dockerfile: ./dev.Dockerfile
+    command: >
+      celery --app core
+      worker
+      --max-memory-per-child=200000
+      --queues celery
+      --pool=prefork
+      --loglevel=debug
+    env_file:
+      - ./.env
+    environment:
+      <<: *common-envs
+    volumes:
+      *common-vols
+    depends_on:
+      <<: *infra-service-condition
+      backend-init:
+        condition: service_completed_successfully
+    networks:
+      - grooveshop-backbone
+  celery_beat:
+    container_name: celery_beat
+    user: 1000:1000
+    restart: always
+    build:
+      context: .
+      dockerfile: ./dev.Dockerfile
+    command: >
+      celery --app core
+      beat
+      --scheduler django_celery_beat.schedulers:DatabaseScheduler
+      --loglevel=info
+    env_file:
+      - ./.env
+    environment:
+      <<: *common-envs
+    volumes:
+      *common-vols
+    depends_on:
+      <<: *infra-service-condition
+      backend-init:
+        condition: service_completed_successfully
+    networks:
+      - grooveshop-backbone
+  celery_flower:
+    container_name: celery_flower
+    user: 1000:1000
+    restart: always
+    build:
+      context: .
+      dockerfile: ./dev.Dockerfile
+    command: >
+      celery --app core
+      flower
+      --address=0.0.0.0
+      --port=5555
+      --loglevel=info
+    ports:
+      - "5556:5555"
+    env_file:
+      - ./.env
+    environment:
+      <<: *common-envs
+    volumes:
+      *common-vols
+    depends_on:
+      <<: *infra-service-condition
+      backend-init:
+        condition: service_completed_successfully
+    networks:
+      - grooveshop-backbone
+
+volumes:
+  staticfiles:
+  mediafiles:

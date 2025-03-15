@@ -116,31 +116,31 @@ class ProductCategory(
         ).get_descendants(include_self=True)
 
     @property
-    def recursive_product_count(self):
+    def recursive_product_count(self) -> int:
         return Product.objects.filter(
             category__in=self.get_descendants(include_self=True)
         ).count()
 
     @property
-    def absolute_url(self):
+    def absolute_url(self) -> str:
         return f"/product/category/{self.id}/" + "/".join(
             [x["slug"] for x in self.get_ancestors(include_self=True).values()]
         )
 
     @property
-    def category_menu_image_one_path(self):
+    def category_menu_image_one_path(self) -> str:
         if self.menu_image_one:
             return f"media/uploads/categories/{os.path.basename(self.menu_image_one.name)}"
         return ""
 
     @property
-    def category_menu_image_two_path(self):
+    def category_menu_image_two_path(self) -> str:
         if self.menu_image_two:
             return f"media/uploads/categories/{os.path.basename(self.menu_image_two.name)}"
         return ""
 
     @property
-    def category_menu_main_banner_path(self):
+    def category_menu_main_banner_path(self) -> str:
         if self.menu_main_banner:
             return f"media/uploads/categories/{os.path.basename(self.menu_main_banner.name)}"
         return ""

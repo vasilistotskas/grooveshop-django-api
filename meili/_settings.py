@@ -12,6 +12,7 @@ class MeiliSettings(TypedDict):
     DEBUG: bool | None
     SYNC: bool | None
     OFFLINE: bool | None
+    DEFAULT_BATCH_SIZE: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,9 +26,10 @@ class _MeiliSettings:
     debug: bool
     sync: bool
     offline: bool
+    batch_size: int
 
     @classmethod
-    def from_settings(cls):
+    def from_settings(cls) -> "_MeiliSettings":
         from django.conf import settings
 
         return cls(
@@ -40,4 +42,5 @@ class _MeiliSettings:
             debug=settings.MEILISEARCH.get("DEBUG", settings.DEBUG),
             sync=settings.MEILISEARCH.get("SYNC", False),
             offline=settings.MEILISEARCH.get("OFFLINE", False),
+            batch_size=settings.MEILISEARCH.get("DEFAULT_BATCH_SIZE", 1000),
         )

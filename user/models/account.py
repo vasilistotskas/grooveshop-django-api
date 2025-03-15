@@ -28,12 +28,12 @@ class UserAccountManager(BaseUserManager):
     def create_user(self, email, password, **extra_fields):
         if not email:
             raise ValueError("Users must have an email address")
-        email: str = self.normalize_email(email)
+        new_email: str = self.normalize_email(email)
         username = extra_fields.pop(
             "username", None
-        ) or UserNameGenerator().generate_username(email)
+        ) or UserNameGenerator().generate_username(new_email)
         user: UserAccount = self.model(
-            email=email, username=username, **extra_fields
+            email=new_email, username=username, **extra_fields
         )
         user.set_password(password)
         user.save(using=self._db)
@@ -42,12 +42,12 @@ class UserAccountManager(BaseUserManager):
     def _create_user(self, email, password, **extra_fields):
         if not email:
             raise ValueError("Users must have an email address")
-        email: str = self.normalize_email(email)
+        new_email: str = self.normalize_email(email)
         username = extra_fields.pop(
             "username", None
-        ) or UserNameGenerator().generate_username(email)
+        ) or UserNameGenerator().generate_username(new_email)
         user: UserAccount = self.model(
-            email=email, username=username, **extra_fields
+            email=new_email, username=username, **extra_fields
         )
         user.set_password(password)
         user.save(using=self._db)
@@ -180,7 +180,7 @@ class UserAccount(
             return UserRole.USER
 
     @property
-    def main_image_path(self):
+    def main_image_path(self) -> str:
         if self.image and hasattr(self.image, "name"):
             return f"media/uploads/users/{os.path.basename(self.image.name)}"
         return ""

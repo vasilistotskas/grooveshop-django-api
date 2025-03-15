@@ -11,8 +11,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Avg, F
 from django.templatetags.static import static
-from django.utils.html import format_html
-from django.utils.safestring import mark_safe
+from django.utils.safestring import SafeString, mark_safe
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
@@ -188,19 +187,19 @@ class Product(
         if self.stock < 0:
             raise ValidationError({"stock": _("Stock cannot be negative.")})
 
-    def generate_unique_product_code(self):
+    def generate_unique_product_code(self) -> uuid.UUID:
         while True:
             unique_code = uuid.uuid4()
             if not self.objects.filter(product_code=unique_code).exists():
                 return unique_code
 
-    def increment_stock(self, quantity: int):
+    def increment_stock(self, quantity: int) -> None:
         if quantity < 0:
             raise ValueError("Quantity to increment must be non-negative")
         Product.objects.filter(id=self.id).update(stock=F("stock") + quantity)
         self.refresh_from_db()
 
-    def decrement_stock(self, quantity: int):
+    def decrement_stock(self, quantity: int) -> None:
         if quantity < 0:
             raise ValueError("Invalid quantity to decrement")
         updated_rows = Product.objects.filter(
@@ -219,63 +218,65 @@ class Product(
         self.changed_by = value
 
     @property
-    def discount_value(self):
+    def discount_value(self) -> Money:
         value = (self.price.amount * self.discount_percent) / 100
         return Money(value, settings.DEFAULT_CURRENCY)
 
     @property
-    def price_save_percent(self):
+    def price_save_percent(self) -> Decimal:
         if self.price.amount > 0:
-            return (self.discount_value.amount / self.price.amount) * 100
+            return Decimal(
+                (self.discount_value.amount / self.price.amount) * 100
+            )
         return Decimal(0)
 
     @property
-    def likes_count(self):
+    def likes_count(self) -> int:
         return ProductFavourite.objects.filter(product=self).count()
 
     @property
-    def review_average(self):
+    def review_average(self) -> float:
         average = ProductReview.objects.filter(product=self).aggregate(
             avg=Avg("rate")
         )["avg"]
         return float(average) if average is not None else 0.0
 
     @property
-    def approved_review_average(self):
+    def approved_review_average(self) -> float:
         average = ProductReview.objects.filter(
             product=self, status=ReviewStatusEnum.TRUE
         ).aggregate(avg=Avg("rate"))["avg"]
         return float(average) if average is not None else 0.0
 
     @property
-    def review_count(self):
+    def review_count(self) -> int:
         return ProductReview.objects.filter(product=self).count()
 
     @property
-    def approved_review_count(self):
+    def approved_review_count(self) -> int:
         return ProductReview.objects.filter(
             product=self, status=ReviewStatusEnum.TRUE
         ).count()
 
     @property
-    def vat_percent(self):
+    def vat_percent(self) -> Decimal:
         if self.vat:
             return self.vat.value
-        return 0
+        return Decimal(0)
 
     @property
-    def vat_value(self):
+    def vat_value(self) -> Money:
         if self.vat:
             value = (self.price.amount * self.vat.value) / 100
             return Money(value, settings.DEFAULT_CURRENCY)
         return Money(0, settings.DEFAULT_CURRENCY)
 
     @property
-    def final_price(self):
+    def final_price(self) -> Money:
         return self.price + self.vat_value - self.discount_value
 
     @property
-    def main_image_path(self):
+    def main_image_path(self) -> str:
         product_image = ProductImage.objects.filter(
             product_id=self.id, is_main=True
         ).first()
@@ -284,7 +285,7 @@ class Product(
         return f"media/uploads/products/{os.path.basename(product_image.image.name)}"
 
     @property
-    def image_tag(self):
+    def image_tag(self) -> SafeString:
         no_img_url = static("images/no_photo.jpg")
         no_img_markup = mark_safe(
             f'<img src="{no_img_url}" width="100" height="100" />'
@@ -310,20 +311,18 @@ class Product(
             return no_img_markup
 
     @property
-    def colored_stock(self):
+    def colored_stock(self) -> SafeString:
         if self.stock > 0:
-            return format_html(
-                '<span style="color: #1bff00;">{}</span>',
-                self.stock,
+            return mark_safe(
+                '<span style="color: #1bff00;">{}</span>'.format(self.stock)
             )
         else:
-            return format_html(
-                '<span style="color: #ff0000;">{}</span>',
-                self.stock,
+            return mark_safe(
+                '<span style="color: #ff0000;">{}</span>'.format(self.stock)
             )
 
     @property
-    def absolute_url(self):
+    def absolute_url(self) -> str:
         return f"/products/{self.id}/{self.slug}"
 
 

@@ -30,7 +30,7 @@ class BlogCommentSerializer(TranslatableModelSerializer, BaseExpandSerializer):
     )
     translations = TranslatedFieldsFieldExtend(shared_model=BlogComment)
 
-    def get_children(self, obj: BlogComment):
+    def get_children(self, obj: BlogComment) -> list:
         if obj.get_children().exists():
             return list(obj.get_children().values_list("id", flat=True))
         return []

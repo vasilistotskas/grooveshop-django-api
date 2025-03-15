@@ -1,5 +1,5 @@
 import uuid
-from typing import Any, TypeVar, override
+from typing import Any, override
 
 from django.contrib.postgres.indexes import BTreeIndex, GinIndex
 from django.core.serializers.json import DjangoJSONEncoder
@@ -93,10 +93,7 @@ class UUIDModel(models.Model):
         abstract = True
 
 
-T = TypeVar("T", bound="PublishableModel")
-
-
-class PublishedQuerySet(models.QuerySet[T]):
+class PublishedQuerySet(models.QuerySet):
     def published(self):
         today = tz.now()
         return self.filter(
@@ -114,7 +111,7 @@ class PublishableModel(models.Model):
     )
     is_published = models.BooleanField(_("Is Published"), default=False)
 
-    objects: Any = PublishableManager()
+    objects = PublishableManager()
 
     class Meta(TypedModelMeta):
         abstract = True
@@ -128,7 +125,7 @@ class PublishableModel(models.Model):
         ]
 
     @property
-    def is_visible(self):
+    def is_visible(self) -> bool:
         return self.is_published and (
             self.published_at is None or self.published_at <= tz.now()
         )

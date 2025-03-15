@@ -15,22 +15,26 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 @receiver(pre_social_login)
-def pre_social_login(sender, request, sociallogin: SocialLogin, **kwargs):
+def pre_social_login_signal(
+    sender, request, sociallogin: SocialLogin, **kwargs
+):
     pass
 
 
 @receiver(social_account_added)
-def on_social_account_added(sender, **kwargs):
+def social_account_added_signal(sender, **kwargs):
     pass
 
 
 @receiver(social_account_updated)
-def social_account_updated(sender, request, sociallogin: SocialLogin, **kwargs):
+def social_account_updated_signal(
+    sender, request, sociallogin: SocialLogin, **kwargs
+):
     pass
 
 
 @receiver(social_account_removed)
-def social_account_removed(
+def social_account_removed_signal(
     sender, request, socialaccount: SocialAccount, **kwargs
 ):
     pass

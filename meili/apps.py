@@ -9,8 +9,8 @@ class MeiliConfig(AppConfig):
         from django.conf import settings
         from django.db.models.signals import post_delete, post_save
 
-        from meili._client import client as _client
-        from meili.models import IndexMixin
+        from ._client import client as _client
+        from .models import IndexMixin
 
         def add_model(**kwargs):
             model: IndexMixin = kwargs["instance"]
@@ -18,11 +18,11 @@ class MeiliConfig(AppConfig):
                 serialized = model.meili_serialize()
 
                 pk = (
-                    model.pk
+                    model._meta.pk.value_to_string(model)
                     if model._meilisearch["primary_key"] == "pk"
                     else model._meta.get_field(
                         model._meilisearch["primary_key"]
-                    ).value_from_object(model)
+                    ).value_to_string(model)
                 )
 
                 geo = (
@@ -37,7 +37,10 @@ class MeiliConfig(AppConfig):
                 ).add_documents(
                     [
                         serialized
-                        | {"id": pk, "pk": model.pk}
+                        | {
+                            "id": pk,
+                            "pk": model._meta.pk.value_to_string(model),
+                        }
                         | ({"_geo": geo} if geo else {})
                     ]
                 )

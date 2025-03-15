@@ -1,0 +1,109 @@
+services:
+  db:
+    container_name: postgresql_db
+    image: postgres:16-alpine
+    restart: unless-stopped
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=devuser
+      - POSTGRES_PASSWORD=changeme
+      - POSTGRES_DB=devdb
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "sh -c 'pg_isready -U devuser -d devdb'" ]
+      start_period: 30s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - grooveshop-backbone
+
+  redis:
+    container_name: redis
+    image: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+      start_period: 30s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - grooveshop-backbone
+
+  pgadmin:
+    container_name: pgadmin4
+    image: dpage/pgadmin4
+    restart: unless-stopped
+    volumes:
+      - ./docker/pg/servers.json:/pgadmin4/servers.json
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=devuser@devuser.com
+      - PGADMIN_DEFAULT_PASSWORD=changeme
+      - PGADMIN_LISTEN_PORT=5050
+    ports:
+      - "5050:5050"
+    depends_on:
+      - db
+    networks:
+      - grooveshop-backbone
+
+  rabbitmq:
+    container_name: rabbitmq
+    image: rabbitmq:management
+    restart: unless-stopped
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      start_period: 30s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - grooveshop-backbone
+  meilisearch:
+    container_name: meilisearch
+    image: getmeili/meilisearch:v1.10
+    env_file:
+      - ./docker/meilisearch/.env
+    volumes:
+      - meilisearch:/meili_data
+    ports:
+      - "7700:7700"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://meilisearch:7700/health"]
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - grooveshop-backbone
+  redisinsight:
+    container_name: redisinsight
+    image: redislabs/redisinsight:latest
+    restart: unless-stopped
+    ports:
+      - '13333:8001'
+    depends_on:
+      - redis
+    networks:
+      - grooveshop-backbone
+
+volumes:
+  postgres_data:
+  service-media_stream:
+  meilisearch:
+    driver: local
+
+networks:
+  grooveshop-backbone:
+    driver: bridge

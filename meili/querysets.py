@@ -58,7 +58,7 @@ class IndexQuerySet:
         else:
             raise TypeError("IndexQuerySet indices must be slices")
 
-    def count(self):
+    def count(self) -> int:
         return self.index.get_stats().number_of_documents
 
     def paginate(self, limit: int, offset: int):
@@ -86,100 +86,105 @@ class IndexQuerySet:
                 raise TypeError(
                     f"Model {self.model.__name__} does not support geo filters"
                 )
-            match geo_filter:
-                case Radius(lat=lat, lng=lng, radius=radius):
-                    self.__filters.append(f"_geoRadius({lat}, {lng}, {radius})")
-                case BoundingBox(top_right=top_right, bottom_left=bottom_left):
-                    self.__filters.append(
-                        f"_geoBoundingBox([{top_right[0]}, {top_right[1]}], "
-                        f"[{bottom_left[0]}, {bottom_left[1]}])"
-                    )
-                case _:
-                    raise TypeError(
-                        f"Geo filter must be Radius or BoundingBox, not {type(geo_filter)}"
-                    )
+            if not isinstance(geo_filter, (Radius, BoundingBox)):
+                raise TypeError(
+                    f"Unnamed Argument must be of type Radius or BoundingBox, not {type(geo_filter)}"
+                )
+            if isinstance(geo_filter, Radius):
+                self.__filters.append(
+                    f"_geoRadius({geo_filter.lat}, {geo_filter.lng}, {geo_filter.radius})"
+                )
+            elif isinstance(geo_filter, BoundingBox):
+                self.__filters.append(
+                    f"_geoBoundingBox([{geo_filter.top_right[0]}, {geo_filter.top_right[1]}], [{geo_filter.bottom_left[0]}, {geo_filter.bottom_left[1]}])"
+                )
+        return self
 
     def _apply_regular_filters(self, **filters):
         for full_lookup, value in filters.items():
-            if "__" in full_lookup:
-                field, lookup = full_lookup.split("__", 1)
-            else:
-                field, lookup = full_lookup, "exact"
-
-            filter_expr = self._build_filter_expression(field, lookup, value)
-            self.__filters.append(filter_expr)
-
-    def _build_filter_expression(self, field: str, lookup: str, value) -> str:  # noqa: PLR0911, PLR0912
-        match lookup:
-            case "exact":
+            if "__" not in full_lookup or "__exact" in full_lookup:
                 if (
                     value == ""
                     or (isinstance(value, list) and len(value) == 0)
                     or value == {}
                 ):
-                    return f"{field} IS EMPTY"
+                    self.__filters.append(
+                        f"{full_lookup.split('__')[0]} IS EMPTY"
+                    )
                 elif value is None:
-                    return f"{field} IS NULL"
-                elif isinstance(value, str):
-                    return f"{field} = '{value}'"
+                    self.__filters.append(
+                        f"{full_lookup.split('__')[0]} IS NULL"
+                    )
                 else:
-                    return f"{field} = {value}"
-
-            case "gte":
+                    self.__filters.append(
+                        f"{full_lookup.split('__')[0]} = '{value}'"
+                        if isinstance(value, str)
+                        else f"{full_lookup.split('__')[0]} = {value}"
+                    )
+            elif "__gte" in full_lookup:
                 if not isinstance(value, (int, float)):
                     raise TypeError(
                         f"Cannot compare {type(value)} with int or float"
                     )
-                return f"{field} >= {value}"
-
-            case "gt":
+                self.__filters.append(
+                    f"{full_lookup.split('__')[0]} >= {value}"
+                )
+            elif "__gt" in full_lookup:
                 if not isinstance(value, (int, float)):
                     raise TypeError(
                         f"Cannot compare {type(value)} with int or float"
                     )
-                return f"{field} > {value}"
-
-            case "lte":
+                self.__filters.append(f"{full_lookup.split('__')[0]} > {value}")
+            elif "__lte" in full_lookup:
                 if not isinstance(value, (int, float)):
                     raise TypeError(
                         f"Cannot compare {type(value)} with int or float"
                     )
-                return f"{field} <= {value}"
-
-            case "lt":
+                self.__filters.append(
+                    f"{full_lookup.split('__')[0]} <= {value}"
+                )
+            elif "__lt" in full_lookup:
                 if not isinstance(value, (int, float)):
                     raise TypeError(
                         f"Cannot compare {type(value)} with int or float"
                     )
-                return f"{field} < {value}"
-
-            case "in":
+                self.__filters.append(f"{full_lookup.split('__')[0]} < {value}")
+            elif "__in" in full_lookup:
                 if not isinstance(value, list):
                     raise TypeError(f"Cannot compare {type(value)} with list")
-                return f"{field} IN {value}"
-
-            case "range":
+                self.__filters.append(
+                    f"{full_lookup.split('__')[0]} IN {value}"
+                )
+            elif "__range" in full_lookup:
                 if not isinstance(value, (range, list, tuple)):
                     raise TypeError(
                         f"Cannot compare {type(value)} with range, list or tuple"
                     )
-                if isinstance(value, range):
-                    return f"{field} {value.start} TO {value.stop}"
-                else:
-                    return f"{field} {value[0]} TO {value[1]}"
-
-            case "exists":
+                self.__filters.append(
+                    f"{full_lookup.split('__')[0]} {value[0]} TO {value[1]}"
+                    if not isinstance(value, range)
+                    else f"{full_lookup.split('__')[0]} {value.start} TO {value.stop}"
+                )
+            elif "__exists" in full_lookup:
                 if not isinstance(value, bool):
                     raise TypeError(f"Cannot compare {type(value)} with bool")
-                return f"{field} {'NOT ' if not value else ''}EXISTS"
-
-            case "isnull":
+                self.__filters.append(
+                    f"{full_lookup.split('__')[0]} {'NOT ' if not value else ''}EXISTS"
+                )
+            elif "__isnull" in full_lookup:
                 if not isinstance(value, bool):
                     raise TypeError(f"Cannot compare {type(value)} with bool")
-                return f"{field} {'NOT ' if not value else ''}IS NULL"
+                self.__filters.append(
+                    f"{full_lookup.split('__')[0]} {'NOT ' if not value else ''}IS NULL"
+                )
 
-            case _:
-                raise ValueError(f"Unsupported filter lookup: {lookup}")
+    def matching_strategy(self, strategy: Literal["last", "all"]):
+        self.__matching_strategy = strategy
+        return self
+
+    def attributes_to_search_on(self, *attributes):
+        self.__attributes_to_search_on.append(*attributes)
+        return self
 
     def search(self, q: str = ""):
         results = self.index.search(
@@ -205,9 +210,10 @@ class IndexQuerySet:
             },
         )
 
-        hits = results["hits"]
+        id_field = getattr(self.model.MeiliMeta, "primary_key", "id")
+        hits = results.get("hits", [])
         filtered_objects = self.model.objects.filter(
-            pk__in=[hit["id"] for hit in hits]
+            pk__in=[hit[id_field] for hit in hits]
         )
 
         enriched_results = []

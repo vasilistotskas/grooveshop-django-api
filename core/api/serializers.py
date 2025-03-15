@@ -1,4 +1,4 @@
-from typing import override
+from typing import Any, override
 
 from rest_framework import serializers
 
@@ -53,7 +53,7 @@ class BaseExpandSerializer(serializers.ModelSerializer):
 
         return ret
 
-    def _expand_fields(self, instance, data: dict[str, any]):
+    def _expand_fields(self, instance, data: dict[str, Any]):
         for field_name, serializer_class in self.get_expand_fields().items():
             if field_name in self.expansion_path or (
                 self.expand_fields and field_name not in self.expand_fields

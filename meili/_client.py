@@ -1,3 +1,5 @@
+from typing import Self
+
 from meilisearch.client import Client as _Client
 from meilisearch.models.task import Task
 from meilisearch.task import TaskInfo
@@ -76,14 +78,56 @@ class Client:
     def get_index(self, index_name: str):
         return self.client.index(index_name)
 
-    def wait_for_task(self, task_uid: int):
+    def wait_for_task(self, task_uid: int) -> Task | TaskInfo:
         task = self.client.wait_for_task(task_uid)
         return self._handle_sync(task)
 
     def get_indexes(self):
         return self.client.get_indexes()["results"]
 
-    def _handle_sync(self, task: Task | TaskInfo):
+    def update_display(self, index_name: str, attributes: list | None) -> Self:
+        if attributes is None:
+            return self
+        self._handle_sync(
+            self.client.index(index_name).update_displayed_attributes(
+                attributes
+            )
+        )
+        return self
+
+    def update_searchable(
+        self, index_name: str, attributes: list | None
+    ) -> Self:
+        if attributes is None:
+            return self
+        self._handle_sync(
+            self.client.index(index_name).update_searchable_attributes(
+                attributes
+            )
+        )
+        return self
+
+    def update_filterable(
+        self, index_name: str, attributes: list | None
+    ) -> Self:
+        if attributes is None:
+            return self
+        self._handle_sync(
+            self.client.index(index_name).update_filterable_attributes(
+                attributes
+            )
+        )
+        return self
+
+    def update_sortable(self, index_name: str, attributes: list | None) -> Self:
+        if attributes is None:
+            return self
+        self._handle_sync(
+            self.client.index(index_name).update_sortable_attributes(attributes)
+        )
+        return self
+
+    def _handle_sync(self, task: Task | TaskInfo) -> Task | TaskInfo:
         if self.is_sync:
             task = self.client.wait_for_task(task.task_uid)
             if task.status == "failed":

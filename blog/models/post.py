@@ -88,25 +88,25 @@ class BlogPost(
         super().save(*args, **kwargs)
 
     @property
-    def main_image_path(self):
+    def main_image_path(self) -> str:
         if self.image and hasattr(self.image, "name"):
             return f"media/uploads/blog/{os.path.basename(self.image.name)}"
         return ""
 
     @property
-    def likes_count(self):
+    def likes_count(self) -> int:
         return self.likes.count()
 
     @property
-    def comments_count(self):
+    def comments_count(self) -> int:
         return self.comments.count()
 
     @property
-    def tags_count(self):
+    def tags_count(self) -> int:
         return self.tags.filter(active=True).count()
 
     @property
-    def absolute_url(self):
+    def absolute_url(self) -> str:
         return f"/blog/post/{self.id}/{self.slug}"
 
 

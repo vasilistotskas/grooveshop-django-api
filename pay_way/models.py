@@ -59,14 +59,14 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         return PayWay.objects.all()
 
     @property
-    def icon_absolute_url(self):
+    def icon_absolute_url(self) -> str:
         icon: str = ""
         if self.icon and hasattr(self.icon, "url"):
             return settings.APP_BASE_URL + self.icon.url
         return icon
 
     @property
-    def icon_filename(self):
+    def icon_filename(self) -> str:
         if self.icon and hasattr(self.icon, "name"):
             return os.path.basename(self.icon.name)
         else:

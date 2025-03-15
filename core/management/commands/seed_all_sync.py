@@ -255,7 +255,7 @@ class Command(BaseCommand):
             attr = getattr(module, attr_name)
             if hasattr(attr, "_meta") and hasattr(attr._meta, "model"):  # noqa
                 if attr._meta.model is not None and "Factory" in attr.__name__:
-                    factory_classes.append(cast(type[F], attr))
+                    factory_classes.append(cast("type[F]", attr))
         return factory_classes
 
     def get_available_models(self):

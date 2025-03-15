@@ -31,6 +31,9 @@ class NotificationConsumer(AsyncWebsocketConsumer):
 
     @override
     async def disconnect(self, close_code):
+        if not self.user:
+            return
+
         if not self.user.is_anonymous:
             await self.channel_layer.group_discard(
                 self.group_name, self.channel_name

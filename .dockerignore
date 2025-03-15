@@ -11,6 +11,8 @@ __pycache__/
 
 # Docker
 docker-compose.yml
+app.compose.yml
+infra.compose.yml
 dev.Dockerfile
 Dockerfile
 

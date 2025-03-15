@@ -65,7 +65,7 @@ class Tip(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         return no_img_markup
 
     @property
-    def main_image_path(self):
+    def main_image_path(self) -> str:
         if self.icon and hasattr(self.icon, "name"):
             return f"media/uploads/tip/{os.path.basename(self.icon.name)}"
         return ""

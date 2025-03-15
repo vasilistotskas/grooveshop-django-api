@@ -99,9 +99,9 @@ class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel, MPTTModel):
         return f"Comment by {commenter}: {content}"
 
     @property
-    def likes_count(self):
+    def likes_count(self) -> int:
         return self.likes.count()
 
     @property
-    def replies_count(self):
+    def replies_count(self) -> int:
         return self.get_descendant_count()

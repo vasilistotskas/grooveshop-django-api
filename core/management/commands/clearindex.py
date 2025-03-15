@@ -1,4 +1,5 @@
 import sys
+from typing import cast
 
 from django.apps import apps
 from django.core.management.base import BaseCommand
@@ -18,12 +19,16 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         model = self._resolve_model(options["model"])
         index = _client.get_index(model._meilisearch["index_name"])
-        index.delete_all_documents()
+        task = index.delete_all_documents()
+        finished = _client.wait_for_task(task.task_uid)
+        if finished.status == "failed":
+            raise Exception(finished)
         self.stdout.write(self.style.SUCCESS(f"Cleared index for {model}"))
 
-    def _resolve_model(self, model: str):
+    def _resolve_model(self, model: str) -> type[IndexMixin]:
+        Model: type[IndexMixin]
         try:
-            Model = apps.get_model(model)
+            Model = cast("type[IndexMixin]", apps.get_model(model))
             if IndexMixin not in Model.__mro__:
                 raise ValueError("Model does not inherit from IndexMixin")
         except LookupError:

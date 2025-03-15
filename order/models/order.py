@@ -151,7 +151,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
             )
 
     @property
-    def total_price_items(self):
+    def total_price_items(self) -> Money:
         total = self.items.annotate(
             total_price_per_item=ExpressionWrapper(
                 F("price") * F("quantity"),
@@ -162,7 +162,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
         return Money(total or 0, settings.DEFAULT_CURRENCY)
 
     @property
-    def total_price_extra(self):
+    def total_price_extra(self) -> Money:
         payment_cost = Money(0, settings.DEFAULT_CURRENCY)
         if (
             self.pay_way
@@ -174,8 +174,8 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
         return self.shipping_price + payment_cost
 
     @property
-    def full_address(self):
+    def full_address(self) -> str:
         return f"{self.street} {self.street_number}, {self.zipcode} {self.city}"
 
-    def calculate_order_total_amount(self):
+    def calculate_order_total_amount(self) -> Money:
         return self.total_price_items + self.total_price_extra

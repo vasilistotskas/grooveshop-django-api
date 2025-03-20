@@ -3,6 +3,16 @@
 
 
 
+## v0.194.0 (2025-03-20)
+
+### Bug fixes
+
+* fix: Dockerfile staticfiles dir ([`bd8562b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bd8562b0f70026fc4ab0f0ffd71b54b78568a9df))
+
+### Features
+
+* feat: Bump Versions, fix Dockerfile staticfiles dir ([`8d94cee`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8d94cee97ac1df8cb083d469d114503dd4010edf))
+
 ## v0.193.1 (2025-03-15)
 
 ### Bug fixes

@@ -37,8 +37,8 @@ RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/app/wheels -r requir
 
 COPY --chown=app:app . .
 
-RUN mkdir -p ${APP_DIR}/staticfiles ${APP_DIR}/mediafiles \
-    && chown -R app:app ${APP_DIR}/staticfiles ${APP_DIR}/mediafiles
+RUN mkdir -p ${APP_DIR}/web/staticfiles ${APP_DIR}/web/mediafiles \
+    && chown -R app:app ${APP_DIR}/web/staticfiles ${APP_DIR}/web/mediafiles
 
 VOLUME ${APP_DIR}/staticfiles
 VOLUME ${APP_DIR}/mediafiles

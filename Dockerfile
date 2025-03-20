@@ -40,7 +40,7 @@ COPY --chown=app:app . .
 RUN mkdir -p ${APP_DIR}/web/staticfiles ${APP_DIR}/web/mediafiles \
     && chown -R app:app ${APP_DIR}/web/staticfiles ${APP_DIR}/web/mediafiles
 
-VOLUME ${APP_DIR}/staticfiles
-VOLUME ${APP_DIR}/mediafiles
+VOLUME ${APP_DIR}/web/staticfiles
+VOLUME ${APP_DIR}/web/mediafiles
 
 USER app

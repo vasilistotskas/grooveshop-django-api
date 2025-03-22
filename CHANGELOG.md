@@ -3,6 +3,12 @@
 
 
 
+## v0.194.1 (2025-03-22)
+
+### Bug fixes
+
+* fix: update dockerfile ([`d5d9956`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d5d99568629b2a3ec6ef357bb59bc3e87031cfba))
+
 ## v0.194.0 (2025-03-20)
 
 ### Bug fixes

@@ -3,25 +3,20 @@ ARG UID=1000
 ARG GID=1000
 ARG APP_DIR=/home/app
 
-FROM python:${PYTHON_VERSION}-slim-bookworm AS base
+FROM python:${PYTHON_VERSION}-alpine AS base
 ARG UID
 ARG GID
 ARG APP_DIR
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    gcc \
-    libpq-dev \
-    build-essential \
-    git && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get install -y --no-install-recommends gcc
 
 RUN pip install --upgrade pip
 
-RUN groupadd -g ${GID} app \
-    && useradd -m -u ${UID} -g app app \
-    && mkdir -p ${APP_DIR} \
-    && chown -R app:app ${APP_DIR}
+RUN addgroup -g ${GID} app && \
+    adduser -D -u ${UID} -G app app && \
+    mkdir -p ${APP_DIR} && \
+    chown -R app:app ${APP_DIR}
 
 WORKDIR ${APP_DIR}
 
@@ -37,8 +32,8 @@ RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/app/wheels -r requir
 
 COPY --chown=app:app . .
 
-RUN mkdir -p ${APP_DIR}/web/staticfiles ${APP_DIR}/web/mediafiles \
-    && chown -R app:app ${APP_DIR}/web/staticfiles ${APP_DIR}/web/mediafiles
+RUN mkdir -p ${APP_DIR}/web/staticfiles ${APP_DIR}/web/mediafiles && \
+    chown -R app:app ${APP_DIR}/web/staticfiles ${APP_DIR}/web/mediafiles
 
 VOLUME ${APP_DIR}/web/staticfiles
 VOLUME ${APP_DIR}/web/mediafiles

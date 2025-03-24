@@ -8,8 +8,8 @@ ARG UID
 ARG GID
 ARG APP_DIR
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc
+RUN apk update && \
+    apk add --no-cache gcc musl-dev
 
 RUN pip install --upgrade pip
 
@@ -22,8 +22,8 @@ WORKDIR ${APP_DIR}
 
 FROM base AS prod
 
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 COPY --chown=app:app ./requirements.txt .
 

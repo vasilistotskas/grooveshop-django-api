@@ -1,3 +1,2 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+  @import "tailwindcss" theme(static);
+  @custom-variant dark (&:where(.dark, .dark *));

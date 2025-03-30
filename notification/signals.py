@@ -3,7 +3,6 @@ from __future__ import annotations
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from notification.dataclasses import NotificationData
 from notification.models.user import NotificationUser
 from notification.tasks import send_notification_task
 
@@ -25,12 +24,12 @@ def handle_notification_created(
             for translation in translations_queryset
         }
 
-        send_notification_task.delay_on_commit(
-            NotificationData(
-                user_id=instance.user.id,
-                seen=instance.seen,
-                link=instance.notification.link,
-                kind=instance.notification.kind,
-                translations=translations,
-            )
-        )
+        data = {
+            "user_id": instance.user.id,
+            "seen": instance.seen,
+            "link": instance.notification.link,
+            "kind": instance.notification.kind,
+            "translations": translations,
+        }
+
+        send_notification_task.delay_on_commit(data)

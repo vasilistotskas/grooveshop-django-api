@@ -3,6 +3,16 @@
 
 
 
+## v0.195.0 (2025-03-30)
+
+### Bug fixes
+
+* fix: poetry lock ([`adfff33`](https://github.com/vasilistotskas/grooveshop-django-api/commit/adfff33c045a294620902ef56133fff221b9221e))
+
+### Features
+
+* feat: Bump Versions, tailwind 4, notifications fixes ([`dad42cb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dad42cb64f082dfbd6024756a23e920b7aec8dff))
+
 ## v0.194.2 (2025-03-24)
 
 ### Bug fixes

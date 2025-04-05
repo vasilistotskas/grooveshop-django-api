@@ -3,6 +3,12 @@
 
 
 
+## v0.196.1 (2025-04-05)
+
+### Bug fixes
+
+* fix: static url ([`8b876d3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8b876d39285870663858f7f186d35e46adda5885))
+
 ## v0.196.0 (2025-04-05)
 
 ### Bug fixes

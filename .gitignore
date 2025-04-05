@@ -127,3 +127,8 @@ node_modules
 
 # Notes
 NOTES.MD
+
+# AI
+.cursor
+.windsurfrules
+memory-bank

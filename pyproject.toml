@@ -1,86 +1,96 @@
-[tool.poetry]
+[project]
 name = "grooveshop-django-api"
 version = "0.195.1"
 description = "GrooveShop Django Backend"
 license = "MIT"
-readme = ["README.md"]
-repository = "https://github.com/vasilistotskas/grooveshop-django-api"
-authors = ["Vasilis Totskas"]
-packages = [
-    { include = "*", from = "." },
+readme = "README.md"
+requires-python = ">=3.11,<4.0.0"
+authors = [
+  { name = "Vasilis Totskas", email = "vassilistotskas@msn.com" }
+]
+dependencies = [
+  "asgiref==3.8.1",
+  "boto3==1.37.28",
+  "charset_normalizer==3.4.1",
+  "channels==4.2.2",
+  "channels-redis==4.2.1",
+  "cryptography==44.0.2",
+  "django==5.1.7",
+  "django-admin-thumbnails==0.2.9",
+  "django-allauth==65.7.0",
+  "django-csp==4.0b7",
+  "django-dbbackup==4.2.1",
+  "django-extra-settings==0.14.0",
+  "django-celery-beat==2.7.0",
+  "django-celery-results==2.5.1",
+  "django-cors-headers==4.7.0",
+  "django-simple-history==3.8.0",
+  "django-filter==25.1",
+  "django-money==3.5.3",
+  "django-mptt==0.17.0",
+  "django-parler==2.3.0",
+  "django-parler-rest==2.2.0",
+  "django-phonenumber-field==8.0.0",
+  "django-rosetta==0.10.2",
+  "django-rest-knox==5.0.2",
+  "django-storages==1.14.6",
+  "django-tinymce==4.1.0",
+  "djangorestframework==3.16.0",
+  "djangorestframework-camel-case==1.4.2",
+  "drf-spectacular==0.28.0",
+  "fido2==1.2.0",
+  "flower==2.0.1",
+  "gunicorn==23.0.0",
+  "importlib-resources==6.5.2",
+  "measurement==3.2.2",
+  "meilisearch==0.34.1",
+  "phonenumbers==9.0.2",
+  "pillow==11.2.0",
+  "psycopg[binary,pool] == 3.2.6",
+  "python-dotenv==1.1.0",
+  "qrcode==8.1",
+  "urllib3==2.3.0",
+  "uvicorn==0.34.0",
+  "celery[redis] >=5.4.0,<6.0.0"
 ]
 
+[project.urls]
+repository = "https://github.com/vasilistotskas/grooveshop-django-api"
+
+# ─────────────────────────────────────────────────────────
+# Dev (and other) dependency groups
+# ─────────────────────────────────────────────────────────
+[dependency-groups]
+dev = [
+    "coverage==7.8.0",
+    "djangorestframework-stubs==3.15.3",
+    "django-debug-toolbar==5.1.0",
+    "django-stubs==5.1.3",
+    "Faker==37.1.0",
+    "factory-boy==3.3.3",
+    "gitpython==3.1.44",
+    "types-setuptools==237.84.2.178",
+    "pre-commit==4.2.0",
+    "pip-upgrader==1.4.15",
+    "pylint==3.3.6",
+    "pyjwt==2.10.1",
+    "pytest==8.3.5",
+    "pytest-asyncio==0.26.0",
+    "python-semantic-release==9.21.0",
+    "pytest-django==4.11.1",
+    "ruff==0.11.4"
+]
+
+# ─────────────────────────────────────────────────────────
+# Build system requirements
+# ─────────────────────────────────────────────────────────
 [build-system]
-requires = ["poetry>=2.1.0"]
-build-backend = "poetry.masonry.api"
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
 
-[tool.poetry.dependencies]
-asgiref = "3.8.1"
-boto3 = "1.37.23"
-python = ">=3.11,<4.0.0"
-charset_normalizer = "3.4.1"
-channels = "4.2.2"
-channels-redis = "4.2.1"
-cryptography = "44.0.2"
-django = "5.1.7"
-django-admin-thumbnails = "0.2.9"
-django-allauth = "65.6.0"
-django-csp = "4.0b7"
-django-dbbackup = "4.2.1"
-django-extra-settings = "0.13.0"
-django-celery-beat = "2.7.0"
-django-celery-results = "2.5.1"
-django-cors-headers = "4.7.0"
-django-simple-history = "3.8.0"
-django-filter = "25.1"
-django-money = "3.5.3"
-django-mptt = "0.16.0"
-django-parler = "2.3.0"
-django-parler-rest = "2.2.0"
-django-phonenumber-field = "8.0.0"
-django-rosetta = "0.10.1"
-django-rest-knox = "5.0.2"
-django-storages = "1.14.5"
-django-tinymce = "4.1.0"
-djangorestframework = "3.16.0"
-djangorestframework-camel-case = "1.4.2"
-drf-spectacular = "0.28.0"
-fido2 = "1.2.0"
-flower = "2.0.1"
-gunicorn = "23.0.0"
-importlib-resources = "6.5.2"
-measurement = "3.2.2"
-meilisearch = "0.34.0"
-phonenumbers = "9.0.2"
-pillow = "11.1.0"
-psycopg = { version = "3.2.6", extras = ["binary", "pool"] }
-python-dotenv = "1.1.0"
-urllib3 = "2.3.0"
-uvicorn = "0.34.0"
-
-[tool.poetry.group.dev.dependencies]
-coverage = "7.7.1"
-djangorestframework-stubs = "3.15.3"
-django-debug-toolbar = "5.1.0"
-django-stubs = "5.1.3"
-Faker = "37.1.0"
-factory-boy = "3.3.3"
-gitpython = "3.1.44"
-types-setuptools = "78.1.0.20250329"
-pre-commit = "4.2.0"
-pip-upgrader = "1.4.15"
-pylint = "3.3.6"
-pyjwt = "2.10.1"
-pytest = "8.3.5"
-pytest-asyncio = "0.26.0"
-python-semantic-release = "9.21.0"
-pytest-django = "4.10.0"
-ruff = "0.11.2"
-
-[tool.poetry.dependencies.celery]
-version = ">=5.4.0,<6.0.0"
-extras = ["redis"]
-
+# ─────────────────────────────────────────────────────────
+# Coverage configuration
+# ─────────────────────────────────────────────────────────
 [tool.coverage.paths]
 source = ["*"]
 
@@ -112,14 +122,17 @@ exclude_lines = [
     "if getattr(self, 'swagger_fake_view', False):",
 ]
 
+# ─────────────────────────────────────────────────────────
+# Semantic release configuration
+# ─────────────────────────────────────────────────────────
 [tool.semantic_release]
-version_toml = ["pyproject.toml:tool.poetry.version"]
+version_toml = ["pyproject.toml:project.version"]
 version_variables = ["setup.py:__version__"]
 branch = "main"
 upload_to_pypi = false
 upload_to_release = true
 build_command = "pip install poetry && poetry build"
-commit_message = 'chore(release): release version {version} [skip ci]'
+commit_message = "chore(release): release version {version} [skip ci]"
 
 [tool.semantic_release.commit_parser_options]
 allowed_tags = [
@@ -149,18 +162,24 @@ dist_glob_patterns = ["dist/*", "dist_build/*"]
 template_dir = "templates"
 changelog_file = "CHANGELOG.md"
 
+# ─────────────────────────────────────────────────────────
+# Pytest configuration
+# ─────────────────────────────────────────────────────────
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "settings"
 python_files = ["test_*.py", "*_test.py", "testing/python/*.py"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 
+# ─────────────────────────────────────────────────────────
+# Mypy configuration
+# ─────────────────────────────────────────────────────────
 [tool.mypy]
 plugins = ["mypy_django_plugin.main"]
 python_version = 3.13
 warn_unused_configs = true
 check_untyped_defs = true
-exclude = ['venv', '.venv', 'tests']
+exclude = ["venv", ".venv", "tests"]
 
 [[tool.mypy.overrides]]
 module = "allauth.*"
@@ -237,56 +256,36 @@ ignore_missing_imports = true
 [tool.django-stubs]
 django_settings_module = "settings"
 
+# ─────────────────────────────────────────────────────────
+# Ruff configuration
+# ─────────────────────────────────────────────────────────
 [tool.ruff]
 line-length = 80
 exclude = ["**/migrations/**"]
 
 [tool.ruff.lint]
 select = [
-    # pycodestyle
-    "E",
-    # pyflakes,
-    "F",
-    # pyupgrade
-    "UP",
-    # flake8-bugbear
-    "B",
-    # flake8-simplify
-    "SIM",
-    # isort
-    "I",
-    # ruff specific
-    "RUF",
-    # type checking
-    "TC",
-    # pylint
-    "PL",
-    # django's stuff
-    "DJ",
-    # datetime
-    "DTZ",
-    # simplify lint
-    "SIM",
+    "E",    # pycodestyle
+    "F",    # pyflakes
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "I",    # isort
+    "RUF",  # ruff specific
+    "TC",   # type checking
+    "PL",   # pylint
+    "DJ",   # django
+    "DTZ",  # datetime
+    "SIM",  # simplify lint
 ]
 ignore = [
-    # I don't agree that Optional should be deprecated
-    "UP007",
-    # use f-string instead of .format
-    # I know they both exist, now shut up
-    "UP032",
-    # ok, ClassVar is great, but... no
-    # it's pedantic and messes up with Django too much
-    "RUF012",
-    # ruff should re-format long lines anyway, if possible
-    "E501",
-    # because this one is annoying
-    # if I want a lambda, I want a lambda
-    "E731",
-    # move type imports under TYPE_CHECKING
-    # ok, this one is a bit insane, sorry
-    "TC003",
-    # too many branches
-    "PLR0912"
+    "UP007",  # optional
+    "UP032",  # prefer f-string over .format
+    "RUF012", # optional
+    "E501",   # line length
+    "E731",   # lambda usage
+    "TC003",  # move type imports under TYPE_CHECKING
+    "PLR0912" # too many branches
 ]
 
 [tool.ruff.lint.pylint]

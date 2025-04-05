@@ -3,6 +3,21 @@
 
 
 
+## v0.196.0 (2025-04-05)
+
+### Bug fixes
+
+* fix: pyproject.toml ([`8609e78`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8609e789c00889c86d2dac3901daea7f56acc278))
+
+* fix: pyproject.toml ([`ca89963`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ca89963da0209dd8e9fac541a7fa8c3b325f0e9a))
+
+### Features
+
+* feat: Bump Versions
+
+- Add AI related files to .dockerignore and .gitignore
+- Update pyproject ([`c7a3e1e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c7a3e1e3a7df7de0d9b66bcdef6f0f403742097a))
+
 ## v0.195.1 (2025-03-31)
 
 ### Bug fixes

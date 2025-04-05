@@ -902,9 +902,9 @@ if USE_AWS:
     TINYMCE_JS_ROOT = f"https://{AWS_S3_CUSTOM_DOMAIN}/tinymce/"
 elif not DEBUG:
     STATIC_URL = f"{STATIC_BASE_URL}/static/"
-    STATIC_ROOT = path.join(BASE_DIR, "staticfiles")
+    STATIC_ROOT = path.join(BASE_DIR, "web", "staticfiles")
     MEDIA_URL = f"{STATIC_BASE_URL}/media/"
-    MEDIA_ROOT = path.join(BASE_DIR, "mediafiles")
+    MEDIA_ROOT = path.join(BASE_DIR, "web", "mediafiles")
     STORAGES = {
         "default": {
             "BACKEND": "django.core.files.storage.FileSystemStorage",

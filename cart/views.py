@@ -14,7 +14,7 @@ from cart.serializers import (
     CartItemSerializer,
     CartSerializer,
 )
-from cart.service import CartService
+from cart.services import CartService
 from core.api.throttling import BurstRateThrottle
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter

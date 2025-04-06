@@ -4,7 +4,7 @@ from django.test import RequestFactory, TestCase
 
 from cart.factories import CartFactory, CartItemFactory
 from cart.models import Cart, CartItem
-from cart.service import (
+from cart.services import (
     CartService,
     InvalidProcessCartOptionException,
     ProcessCartOption,

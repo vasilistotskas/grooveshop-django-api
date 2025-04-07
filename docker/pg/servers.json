@@ -5,9 +5,9 @@
             "Group": "Servers",
             "Host": "db",
             "Port": 5432,
-            "Username": "devuser",
-            "Password": "changeme",
-            "Db": "devdb",
+            "Username": "postgres",
+            "Password": "postgres",
+            "Db": "postgres",
             "SSLMode": "prefer",
             "MaintenanceDB": "postgres"
         }

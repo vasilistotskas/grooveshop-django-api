@@ -694,9 +694,9 @@ DATABASES = {
         "TIME_ZONE": getenv("TIME_ZONE", "Europe/Athens"),
         "ENGINE": "django.db.backends.postgresql",
         "HOST": getenv("DB_HOST", "db"),
-        "NAME": getenv("DB_NAME", "devdb"),
-        "USER": getenv("DB_USER", "devuser"),
-        "PASSWORD": getenv("DB_PASSWORD", "changeme"),
+        "NAME": getenv("DB_NAME", "postgres"),
+        "USER": getenv("DB_USER", "postgres"),
+        "PASSWORD": getenv("DB_PASSWORD", "postgres"),
         "PORT": getenv("DB_PORT", "5432"),
         "OPTIONS": {
             "pool": {

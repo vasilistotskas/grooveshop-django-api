@@ -1,8 +1,8 @@
 services:
   db:
     container_name: postgresql_db
-    image: postgres:16-alpine
-    restart: unless-stopped
+    image: postgres:17.2-alpine
+    restart: no
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     environment:
@@ -23,7 +23,7 @@ services:
   redis:
     container_name: redis
     image: redis
-    restart: unless-stopped
+    restart: no
     ports:
       - "6379:6379"
     healthcheck:
@@ -38,7 +38,7 @@ services:
   pgadmin:
     container_name: pgadmin4
     image: dpage/pgadmin4
-    restart: unless-stopped
+    restart: no
     volumes:
       - ./docker/pg/servers.json:/pgadmin4/servers.json
     environment:
@@ -55,7 +55,7 @@ services:
   rabbitmq:
     container_name: rabbitmq
     image: rabbitmq:management
-    restart: unless-stopped
+    restart: no
     environment:
       - RABBITMQ_DEFAULT_USER=guest
       - RABBITMQ_DEFAULT_PASS=guest
@@ -90,7 +90,7 @@ services:
   redisinsight:
     container_name: redisinsight
     image: redislabs/redisinsight:latest
-    restart: unless-stopped
+    restart: no
     ports:
       - '13333:8001'
     depends_on:

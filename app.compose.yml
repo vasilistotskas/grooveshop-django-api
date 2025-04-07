@@ -42,7 +42,7 @@ services:
       <<: *infra-service-condition
     networks:
       - grooveshop-backbone
-    restart: "no"
+    restart: no
   backend:
     container_name: backend
     user: 1000:1000
@@ -50,7 +50,7 @@ services:
     build:
       context: .
       dockerfile: ./dev.Dockerfile
-    command: uvicorn asgi:application --host 0.0.0.0 --port 8000 --log-level debug
+    command: uvicorn asgi:application --host 0.0.0.0 --port 8000 --reload
     env_file:
       - ./.env
     environment:
@@ -68,7 +68,6 @@ services:
   celery_worker:
     container_name: celery_worker
     user: 1000:1000
-    restart: always
     build:
       context: .
       dockerfile: ./dev.Dockerfile
@@ -94,7 +93,6 @@ services:
   celery_beat:
     container_name: celery_beat
     user: 1000:1000
-    restart: always
     build:
       context: .
       dockerfile: ./dev.Dockerfile
@@ -118,7 +116,6 @@ services:
   celery_flower:
     container_name: celery_flower
     user: 1000:1000
-    restart: always
     build:
       context: .
       dockerfile: ./dev.Dockerfile

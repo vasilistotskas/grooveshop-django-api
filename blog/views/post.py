@@ -15,6 +15,7 @@ from rest_framework.response import Response
 
 from blog.filters import BlogPostFilter
 from blog.models.post import BlogPost
+from blog.serializers.category import BlogCategorySerializer
 from blog.serializers.comment import BlogCommentSerializer
 from blog.serializers.post import BlogPostSerializer
 from blog.strategies.weighted_related_posts_strategy import (
@@ -55,6 +56,7 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
     serializers = {
         "default": BlogPostSerializer,
         "comments": BlogCommentSerializer,
+        "category": BlogCategorySerializer,
     }
 
     @cached_property

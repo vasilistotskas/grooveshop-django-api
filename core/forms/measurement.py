@@ -70,7 +70,7 @@ class MeasurementFormField(forms.MultiValueField):
         *args,
         **kwargs,
     ):
-        if not issubclass(measurement, (MeasureBase, BidimensionalMeasure)):
+        if not issubclass(measurement, MeasureBase | BidimensionalMeasure):
             raise ValueError(
                 "{} must be a subclass of MeasureBase".format(measurement)
             )

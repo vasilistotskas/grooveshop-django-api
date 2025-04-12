@@ -18,6 +18,7 @@ from authentication.serializers import (
 )
 from blog.serializers.comment import BlogCommentSerializer
 from blog.serializers.post import BlogPostSerializer
+from core.api.permissions import IsSelfOrAdmin
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from core.utils.serializers import MultiSerializerMixin
@@ -31,6 +32,7 @@ User = get_user_model()
 
 
 class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
+    permission_classes = [IsAuthenticated, IsSelfOrAdmin]
     filter_backends = [
         DjangoFilterBackend,
         PascalSnakeCaseOrderingFilter,
@@ -92,6 +94,12 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
                 )
 
         return queryset
+
+    @override
+    def get_object(self):
+        obj = super().get_object()
+        self.check_object_permissions(self.request, obj)
+        return obj
 
     @action(detail=True, methods=["GET"], permission_classes=[IsAuthenticated])
     def favourite_products(self, request, pk=None):

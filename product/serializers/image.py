@@ -1,12 +1,9 @@
-import importlib
-from typing import override
-
 from drf_spectacular.utils import extend_schema_field
 from parler_rest.serializers import TranslatableModelSerializer
+from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
 from core.api.schema import generate_schema_multi_lang
-from core.api.serializers import BaseExpandSerializer
 from core.utils.serializers import TranslatedFieldExtended
 from product.models.image import ProductImage
 from product.models.product import Product
@@ -17,7 +14,9 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
 
 
-class ProductImageSerializer(TranslatableModelSerializer, BaseExpandSerializer):
+class ProductImageSerializer(
+    TranslatableModelSerializer, serializers.ModelSerializer
+):
     product = PrimaryKeyRelatedField(queryset=Product.objects.all())
     translations = TranslatedFieldsFieldExtend(shared_model=ProductImage)
 
@@ -42,14 +41,3 @@ class ProductImageSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "uuid",
             "main_image_path",
         )
-
-    @override
-    def get_expand_fields(
-        self,
-    ):
-        product_serializer = importlib.import_module(
-            "product.serializers.product"
-        ).ProductSerializer
-        return {
-            "product": product_serializer,
-        }

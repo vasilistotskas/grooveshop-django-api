@@ -5,7 +5,6 @@ from drf_spectacular.utils import extend_schema_field
 from phonenumber_field.serializerfields import PhoneNumberField
 from rest_framework import serializers
 
-from core.api.serializers import BaseExpandSerializer
 from country.serializers import CountrySerializer
 from order.models.item import OrderItem
 from order.models.order import Order
@@ -20,7 +19,7 @@ from product.models.product import Product
 from region.serializers import RegionSerializer
 
 
-class OrderSerializer(BaseExpandSerializer):
+class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True)
     country = serializers.SerializerMethodField("get_country")
     region = serializers.SerializerMethodField("get_region")
@@ -91,7 +90,7 @@ class OrderSerializer(BaseExpandSerializer):
         )
 
 
-class OrderCreateUpdateSerializer(BaseExpandSerializer):
+class OrderCreateUpdateSerializer(serializers.ModelSerializer):
     items = OrderItemCreateUpdateSerializer(many=True)
     paid_amount = MoneyField(max_digits=11, decimal_places=2, required=False)
     shipping_price = MoneyField(max_digits=11, decimal_places=2)
@@ -199,7 +198,7 @@ class OrderCreateUpdateSerializer(BaseExpandSerializer):
         return super().update(instance, validated_data)
 
 
-class CheckoutSerializer(BaseExpandSerializer):
+class CheckoutSerializer(serializers.ModelSerializer):
     items = CheckoutItemSerializer(many=True)
     paid_amount = MoneyField(max_digits=11, decimal_places=2, required=False)
     shipping_price = MoneyField(max_digits=11, decimal_places=2)

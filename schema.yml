@@ -4,40 +4,6 @@ info:
   version: 1.0.0
   description: Grooveshop API description
 paths:
-  /api/v1/auth/session/active_users_count:
-    get:
-      operationId: api_v1_auth_session_active_users_count_retrieve
-      description: Returns the number of active users in the last hour.
-      tags:
-      - api
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ActiveUsersCount'
-          description: ''
-  /api/v1/auth/session/active_users_count{format}:
-    get:
-      operationId: api_v1_auth_session_active_users_count_formatted_retrieve
-      description: Returns the number of active users in the last hour.
-      parameters:
-      - in: path
-        name: format
-        schema:
-          type: string
-          enum:
-          - .json
-        required: true
-      tags:
-      - api
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ActiveUsersCount'
-          description: ''
   /api/v1/blog/author:
     get:
       operationId: api_v1_blog_author_list
@@ -8604,8 +8570,6 @@ paths:
           type: string
       tags:
       - api
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -8629,8 +8593,6 @@ paths:
             schema:
               $ref: '#/components/schemas/Authentication'
         required: true
-      security:
-      - {}
       responses:
         '201':
           content:
@@ -8683,8 +8645,6 @@ paths:
           type: string
       tags:
       - api
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -8716,8 +8676,6 @@ paths:
             schema:
               $ref: '#/components/schemas/Authentication'
         required: true
-      security:
-      - {}
       responses:
         '201':
           content:
@@ -8736,8 +8694,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -8767,8 +8723,6 @@ paths:
             schema:
               $ref: '#/components/schemas/Authentication'
         required: true
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -8797,8 +8751,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PatchedAuthentication'
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -8816,8 +8768,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - {}
       responses:
         '204':
           description: No response body
@@ -8839,8 +8789,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -8877,8 +8825,6 @@ paths:
             schema:
               $ref: '#/components/schemas/Authentication'
         required: true
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -8914,8 +8860,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PatchedAuthentication'
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -8940,8 +8884,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - {}
       responses:
         '204':
           description: No response body
@@ -8956,8 +8898,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -8983,8 +8923,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -9003,8 +8941,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -9030,8 +8966,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -9062,8 +8996,6 @@ paths:
             schema:
               $ref: '#/components/schemas/UsernameUpdate'
         required: true
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -9101,8 +9033,6 @@ paths:
             schema:
               $ref: '#/components/schemas/UsernameUpdate'
         required: true
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -9121,8 +9051,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -9148,8 +9076,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -9168,8 +9094,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -9195,8 +9119,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -9215,8 +9137,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -9242,8 +9162,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -9262,8 +9180,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -9289,8 +9205,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -9309,8 +9223,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -9336,8 +9248,6 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -10258,13 +10168,6 @@ paths:
           description: No response body
 components:
   schemas:
-    ActiveUsersCount:
-      type: object
-      properties:
-        activeUsers:
-          type: integer
-      required:
-      - activeUsers
     Authentication:
       type: object
       properties:

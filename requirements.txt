@@ -1,6 +1,6 @@
 asgiref==3.8.1
-boto3==1.37.28
-celery==5.4.0
+boto3==1.37.33
+celery==5.5.1
 channels==4.2.2
 channels-redis==4.2.1
 charset_normalizer==3.4.1
@@ -13,7 +13,7 @@ django-csp==4.0b7
 django-dbbackup==4.2.1
 django-extra-settings==0.14.0
 django-celery-beat==2.7.0
-django-celery-results==2.5.1
+django-celery-results==2.6.0
 django-cors-headers==4.7.0
 django-debug-toolbar==5.1.0
 django-simple-history==3.8.0
@@ -22,7 +22,7 @@ django-money==3.5.3
 django-mptt==0.17.0
 django-parler==2.3.0
 django-parler-rest==2.2.0
-django-phonenumber-field[phonenumberslite]==8.0.0
+django-phonenumber-field[phonenumberslite]==8.1.0
 django-rosetta==0.10.2
 django-rest-knox==5.0.2
 django-storages==1.14.6
@@ -42,7 +42,7 @@ importlib-resources==6.5.2
 types-setuptools==78.1.0.20250329
 measurement==3.2.2
 meilisearch==0.34.1
-phonenumbers==9.0.2
+phonenumbers==9.0.3
 poetry==2.1.2
 pip-upgrader==1.4.15
 pillow==11.2.0
@@ -57,7 +57,7 @@ python-semantic-release==9.21.0
 pytest==8.3.5
 pytest-asyncio==0.26.0
 pytest-django==4.11.1
-urllib3==2.3.0
+urllib3==2.4.0
 uvicorn[standard]==0.34.0
-ruff==0.11.4
+ruff==0.11.5
 qrcode==8.1

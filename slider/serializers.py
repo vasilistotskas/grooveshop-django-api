@@ -1,13 +1,10 @@
-import importlib
-from typing import override
-
 from drf_spectacular.utils import extend_schema_field
 from parler_rest.fields import TranslatedFieldsField
 from parler_rest.serializers import TranslatableModelSerializer
+from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
 from core.api.schema import generate_schema_multi_lang
-from core.api.serializers import BaseExpandSerializer
 from slider.models import Slide, Slider
 
 
@@ -21,7 +18,9 @@ class TranslatedFieldsFieldExtendSlide(TranslatedFieldsField):
     pass
 
 
-class SliderSerializer(TranslatableModelSerializer, BaseExpandSerializer):
+class SliderSerializer(
+    TranslatableModelSerializer, serializers.ModelSerializer
+):
     translations = TranslatedFieldsFieldExtendSlider(shared_model=Slider)
 
     class Meta:
@@ -44,7 +43,7 @@ class SliderSerializer(TranslatableModelSerializer, BaseExpandSerializer):
         )
 
 
-class SlideSerializer(TranslatableModelSerializer, BaseExpandSerializer):
+class SlideSerializer(TranslatableModelSerializer, serializers.ModelSerializer):
     translations = TranslatedFieldsFieldExtendSlide(shared_model=Slide)
     slider = PrimaryKeyRelatedField(queryset=Slider.objects.all())
 
@@ -71,14 +70,3 @@ class SlideSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "uuid",
             "main_image_path",
         )
-
-    @override
-    def get_expand_fields(
-        self,
-    ):
-        slider_serializer = importlib.import_module(
-            "slider.serializers"
-        ).SliderSerializer
-        return {
-            "slider": slider_serializer,
-        }

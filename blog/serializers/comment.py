@@ -1,6 +1,3 @@
-import importlib
-from typing import override
-
 from django.contrib.auth import get_user_model
 from drf_spectacular.utils import extend_schema_field
 from parler_rest.fields import TranslatedFieldsField
@@ -11,7 +8,6 @@ from rest_framework.relations import PrimaryKeyRelatedField
 from blog.models.comment import BlogComment
 from blog.models.post import BlogPost
 from core.api.schema import generate_schema_multi_lang
-from core.api.serializers import BaseExpandSerializer
 
 User = get_user_model()
 
@@ -21,7 +17,9 @@ class TranslatedFieldsFieldExtend(TranslatedFieldsField):
     pass
 
 
-class BlogCommentSerializer(TranslatableModelSerializer, BaseExpandSerializer):
+class BlogCommentSerializer(
+    TranslatableModelSerializer, serializers.ModelSerializer
+):
     children = serializers.SerializerMethodField()
     user = PrimaryKeyRelatedField(queryset=User.objects.all())
     post = PrimaryKeyRelatedField(queryset=BlogPost.objects.all())
@@ -61,19 +59,3 @@ class BlogCommentSerializer(TranslatableModelSerializer, BaseExpandSerializer):
             "likes_count",
             "replies_count",
         )
-
-    @override
-    def get_expand_fields(
-        self,
-    ):
-        user_account_serializer = importlib.import_module(
-            "authentication.serializers"
-        ).AuthenticationSerializer
-        blog_post_serializer = importlib.import_module(
-            "blog.serializers.post"
-        ).BlogPostSerializer
-        return {
-            "user": user_account_serializer,
-            "post": blog_post_serializer,
-            "likes": user_account_serializer,
-        }

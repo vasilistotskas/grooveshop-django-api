@@ -86,7 +86,7 @@ class IndexQuerySet:
                 raise TypeError(
                     f"Model {self.model.__name__} does not support geo filters"
                 )
-            if not isinstance(geo_filter, (Radius, BoundingBox)):
+            if not isinstance(geo_filter, Radius | BoundingBox):
                 raise TypeError(
                     f"Unnamed Argument must be of type Radius or BoundingBox, not {type(geo_filter)}"
                 )
@@ -122,7 +122,7 @@ class IndexQuerySet:
                         else f"{full_lookup.split('__')[0]} = {value}"
                     )
             elif "__gte" in full_lookup:
-                if not isinstance(value, (int, float)):
+                if not isinstance(value, int | float):
                     raise TypeError(
                         f"Cannot compare {type(value)} with int or float"
                     )
@@ -130,13 +130,13 @@ class IndexQuerySet:
                     f"{full_lookup.split('__')[0]} >= {value}"
                 )
             elif "__gt" in full_lookup:
-                if not isinstance(value, (int, float)):
+                if not isinstance(value, int | float):
                     raise TypeError(
                         f"Cannot compare {type(value)} with int or float"
                     )
                 self.__filters.append(f"{full_lookup.split('__')[0]} > {value}")
             elif "__lte" in full_lookup:
-                if not isinstance(value, (int, float)):
+                if not isinstance(value, int | float):
                     raise TypeError(
                         f"Cannot compare {type(value)} with int or float"
                     )
@@ -144,7 +144,7 @@ class IndexQuerySet:
                     f"{full_lookup.split('__')[0]} <= {value}"
                 )
             elif "__lt" in full_lookup:
-                if not isinstance(value, (int, float)):
+                if not isinstance(value, int | float):
                     raise TypeError(
                         f"Cannot compare {type(value)} with int or float"
                     )
@@ -156,7 +156,7 @@ class IndexQuerySet:
                     f"{full_lookup.split('__')[0]} IN {value}"
                 )
             elif "__range" in full_lookup:
-                if not isinstance(value, (range, list, tuple)):
+                if not isinstance(value, range | list | tuple):
                     raise TypeError(
                         f"Cannot compare {type(value)} with range, list or tuple"
                     )

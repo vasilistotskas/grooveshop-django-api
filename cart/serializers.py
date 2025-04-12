@@ -5,11 +5,10 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from cart.models import Cart, CartItem
-from core.api.serializers import BaseExpandSerializer
 from product.serializers.product import ProductSerializer
 
 
-class CartItemSerializer(BaseExpandSerializer):
+class CartItemSerializer(serializers.ModelSerializer):
     cart = serializers.SerializerMethodField()
     product = serializers.SerializerMethodField()
     price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
@@ -65,7 +64,7 @@ class CartItemSerializer(BaseExpandSerializer):
         )
 
 
-class CartItemCreateSerializer(BaseExpandSerializer):
+class CartItemCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = CartItem
         fields = ("id", "product", "quantity")
@@ -90,7 +89,7 @@ class CartItemCreateSerializer(BaseExpandSerializer):
         return cart_item
 
 
-class CartSerializer(BaseExpandSerializer):
+class CartSerializer(serializers.ModelSerializer):
     cart_items = serializers.SerializerMethodField()
     total_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     total_discount_value = MoneyField(

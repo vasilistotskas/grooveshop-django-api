@@ -8,7 +8,7 @@ from rest_framework.filters import SearchFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.api.views import ExpandModelViewSet, PaginationModelViewSet
+from core.api.views import PaginationModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from core.utils.serializers import MultiSerializerMixin
 from notification.models.user import NotificationUser
@@ -18,9 +18,7 @@ from notification.serializers.user import (
 )
 
 
-class NotificationUserViewSet(
-    MultiSerializerMixin, ExpandModelViewSet, PaginationModelViewSet
-):
+class NotificationUserViewSet(MultiSerializerMixin, PaginationModelViewSet):
     queryset = NotificationUser.objects.all()
     filter_backends = [
         DjangoFilterBackend,

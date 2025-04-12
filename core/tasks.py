@@ -207,7 +207,7 @@ def clear_old_database_backups(days=30):
             date_str = "-".join(filename.split("-")[2:5])
             file_date = datetime.datetime.strptime(
                 date_str, "%Y-%m-%d"
-            ).replace(tzinfo=datetime.timezone.utc)
+            ).replace(tzinfo=datetime.UTC)
         except ValueError:
             continue
 

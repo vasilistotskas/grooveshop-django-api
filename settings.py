@@ -92,7 +92,6 @@ LOCAL_APPS = [
     "country",
     "region",
     "pay_way",
-    "session",
     "cart",
     "notification",
     "authentication",

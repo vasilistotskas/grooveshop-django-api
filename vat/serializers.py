@@ -1,8 +1,9 @@
-from core.api.serializers import BaseExpandSerializer
+from rest_framework import serializers
+
 from vat.models import Vat
 
 
-class VatSerializer(BaseExpandSerializer):
+class VatSerializer(serializers.ModelSerializer):
     class Meta:
         model = Vat
         fields = (

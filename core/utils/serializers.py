@@ -42,7 +42,7 @@ def flatten_dict_for_form_data(input_dict: dict, sep: str = "[{i}]"):
             for key, v in value.items():
                 __flatten(v, prefix + key, result_dict, "dict")
 
-        elif isinstance(value, (list, tuple)):
+        elif isinstance(value, list | tuple):
             for i, v in enumerate(value):
                 __flatten(v, prefix + sep.format(i=i), result_dict)
         else:

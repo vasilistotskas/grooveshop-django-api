@@ -3,9 +3,9 @@ from parler_rest.serializers import (
     TranslatableModelSerializer,
     TranslatedFieldsField,
 )
+from rest_framework import serializers
 
 from core.api.schema import generate_schema_multi_lang
-from core.api.serializers import BaseExpandSerializer
 from country.models import Country
 
 
@@ -14,7 +14,9 @@ class TranslatedFieldsFieldExtend(TranslatedFieldsField):
     pass
 
 
-class CountrySerializer(TranslatableModelSerializer, BaseExpandSerializer):
+class CountrySerializer(
+    TranslatableModelSerializer, serializers.ModelSerializer
+):
     translations = TranslatedFieldsFieldExtend(shared_model=Country)
 
     class Meta:

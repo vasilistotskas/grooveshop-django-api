@@ -39,19 +39,6 @@ class Metadata(SimpleMetadata):
         return metadata
 
 
-class ExpandModelViewSet(ModelViewSet):
-    @override
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-        context["expand"] = self.request.query_params.get(
-            "expand", "false"
-        ).lower()
-        context["expand_fields"] = self.request.query_params.get(
-            "expand_fields", ""
-        )
-        return context
-
-
 class PaginationModelViewSet(ModelViewSet):
     @property
     @override
@@ -126,9 +113,7 @@ class TranslationsModelViewSet(TranslationsProcessingMixin, ModelViewSet):
         return super().partial_update(request, *args, **kwargs)
 
 
-class BaseModelViewSet(
-    ExpandModelViewSet, TranslationsModelViewSet, PaginationModelViewSet
-):
+class BaseModelViewSet(TranslationsModelViewSet, PaginationModelViewSet):
     metadata_class = Metadata
 
     @action(detail=False, methods=["GET"])
@@ -175,8 +160,8 @@ def health_check(request):
     return response
 
 
-def encrypt_token(token, SECRET_KEY):
-    key = hashlib.sha256(SECRET_KEY.encode()).digest()
+def encrypt_token(token: str, secret_key: str) -> str:
+    key = hashlib.sha256(secret_key.encode()).digest()
     nonce = os.urandom(16)
     cipher = Cipher(
         algorithms.AES(key), modes.GCM(nonce), backend=default_backend()

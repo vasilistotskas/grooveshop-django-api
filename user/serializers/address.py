@@ -1,4 +1,3 @@
-import importlib
 from typing import override
 
 from django.contrib.auth import get_user_model
@@ -6,7 +5,6 @@ from phonenumber_field.serializerfields import PhoneNumberField
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
-from core.api.serializers import BaseExpandSerializer
 from country.models import Country
 from region.models import Region
 from user.models.address import UserAddress
@@ -14,7 +12,7 @@ from user.models.address import UserAddress
 User = get_user_model()
 
 
-class UserAddressSerializer(BaseExpandSerializer):
+class UserAddressSerializer(serializers.ModelSerializer):
     user = PrimaryKeyRelatedField(queryset=User.objects.all())
     country = PrimaryKeyRelatedField(queryset=Country.objects.all())
     region = PrimaryKeyRelatedField(queryset=Region.objects.all())
@@ -50,25 +48,6 @@ class UserAddressSerializer(BaseExpandSerializer):
             "updated_at",
             "uuid",
         )
-
-    @override
-    def get_expand_fields(
-        self,
-    ):
-        user_account_serializer = importlib.import_module(
-            "authentication.serializers"
-        ).AuthenticationSerializer
-        country_serializer = importlib.import_module(
-            "country.serializers"
-        ).CountrySerializer
-        region_serializer = importlib.import_module(
-            "region.serializers"
-        ).RegionSerializer
-        return {
-            "user": user_account_serializer,
-            "country": country_serializer,
-            "region": region_serializer,
-        }
 
     @override
     def validate(self, data):

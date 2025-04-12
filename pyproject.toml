@@ -10,7 +10,7 @@ authors = [
 ]
 dependencies = [
   "asgiref==3.8.1",
-  "boto3==1.37.28",
+  "boto3==1.37.33",
   "charset_normalizer==3.4.1",
   "channels==4.2.2",
   "channels-redis==4.2.1",
@@ -22,7 +22,7 @@ dependencies = [
   "django-dbbackup==4.2.1",
   "django-extra-settings==0.14.0",
   "django-celery-beat==2.7.0",
-  "django-celery-results==2.5.1",
+  "django-celery-results==2.6.0",
   "django-cors-headers==4.7.0",
   "django-simple-history==3.8.0",
   "django-filter==25.1",
@@ -30,7 +30,7 @@ dependencies = [
   "django-mptt==0.17.0",
   "django-parler==2.3.0",
   "django-parler-rest==2.2.0",
-  "django-phonenumber-field==8.0.0",
+  "django-phonenumber-field==8.1.0",
   "django-rosetta==0.10.2",
   "django-rest-knox==5.0.2",
   "django-storages==1.14.6",
@@ -44,14 +44,14 @@ dependencies = [
   "importlib-resources==6.5.2",
   "measurement==3.2.2",
   "meilisearch==0.34.1",
-  "phonenumbers==9.0.2",
+  "phonenumbers==9.0.3",
   "pillow==11.2.0",
   "psycopg[binary,pool] == 3.2.6",
   "python-dotenv==1.1.0",
   "qrcode==8.1",
-  "urllib3==2.3.0",
+  "urllib3==2.4.0",
   "uvicorn==0.34.0",
-  "celery[redis] >=5.4.0,<6.0.0"
+  "celery[redis] >=5.5.1,<6.0.0"
 ]
 
 [project.urls]
@@ -78,7 +78,7 @@ dev = [
     "pytest-asyncio==0.26.0",
     "python-semantic-release==9.21.0",
     "pytest-django==4.11.1",
-    "ruff==0.11.4"
+    "ruff==0.11.5"
 ]
 
 # ─────────────────────────────────────────────────────────

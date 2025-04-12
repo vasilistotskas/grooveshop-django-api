@@ -1,11 +1,11 @@
 from djmoney.contrib.django_rest_framework import MoneyField
+from rest_framework import serializers
 
-from core.api.serializers import BaseExpandSerializer
 from order.models.item import OrderItem
 from product.serializers.product import ProductSerializer
 
 
-class OrderItemSerializer(BaseExpandSerializer):
+class OrderItemSerializer(serializers.ModelSerializer):
     product = ProductSerializer()
     price = MoneyField(max_digits=11, decimal_places=2)
     total_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
@@ -31,7 +31,7 @@ class OrderItemSerializer(BaseExpandSerializer):
         )
 
 
-class OrderItemCreateUpdateSerializer(BaseExpandSerializer):
+class OrderItemCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrderItem
         fields = (
@@ -42,7 +42,7 @@ class OrderItemCreateUpdateSerializer(BaseExpandSerializer):
         )
 
 
-class CheckoutItemSerializer(BaseExpandSerializer):
+class CheckoutItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrderItem
         fields = (

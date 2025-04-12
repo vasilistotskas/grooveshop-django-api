@@ -62,7 +62,6 @@ urlpatterns += i18n_patterns(
     path("api/v1/", include("blog.urls")),
     path("api/v1/", include("vat.urls")),
     path("api/v1/", include("pay_way.urls")),
-    path("api/v1/", include("session.urls")),
     path("api/v1/", include("cart.urls")),
     path("api/v1/", include("notification.urls")),
     path("api/v1/", include("contact.urls")),

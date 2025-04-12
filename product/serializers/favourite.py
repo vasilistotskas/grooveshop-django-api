@@ -1,17 +1,15 @@
-import importlib
-from typing import override
-
 from django.contrib.auth import get_user_model
+from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
-from core.api.serializers import BaseExpandSerializer
 from product.models.favourite import ProductFavourite
 from product.models.product import Product
+from product.serializers.product import ProductSerializer
 
 User = get_user_model()
 
 
-class ProductFavouriteSerializer(BaseExpandSerializer):
+class ProductFavouriteSerializer(serializers.ModelSerializer):
     user = PrimaryKeyRelatedField(queryset=User.objects.all(), many=False)
     product = PrimaryKeyRelatedField(queryset=Product.objects.all(), many=False)
 
@@ -31,17 +29,10 @@ class ProductFavouriteSerializer(BaseExpandSerializer):
             "uuid",
         )
 
-    @override
-    def get_expand_fields(
-        self,
-    ):
-        user_account_serializer = importlib.import_module(
-            "authentication.serializers"
-        ).AuthenticationSerializer
-        product_serializer = importlib.import_module(
-            "product.serializers.product"
-        ).ProductSerializer
-        return {
-            "user": user_account_serializer,
-            "product": product_serializer,
-        }
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+
+        if "product" in rep and instance.product:
+            rep["product"] = ProductSerializer(instance.product).data
+
+        return rep

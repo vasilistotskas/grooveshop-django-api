@@ -29,6 +29,14 @@ class BlogAuthor(TranslatableModel, TimeStampMixinModel, UUIDModel):
         return f"{author_name} ({self.user.email})"
 
     @property
+    def full_name(self) -> str:
+        return self.user.full_name
+
+    @property
+    def image(self) -> str:
+        return self.user.image
+
+    @property
     def number_of_posts(self) -> int:
         return self.blog_posts.count()
 

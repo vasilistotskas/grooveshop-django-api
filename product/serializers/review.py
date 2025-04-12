@@ -1,16 +1,14 @@
-import importlib
-from typing import override
-
 from django.contrib.auth import get_user_model
 from drf_spectacular.utils import extend_schema_field
 from parler_rest.fields import TranslatedFieldsField
 from parler_rest.serializers import TranslatableModelSerializer
-from rest_framework.relations import PrimaryKeyRelatedField
+from rest_framework import serializers
 
+from authentication.serializers import AuthenticationSerializer
 from core.api.schema import generate_schema_multi_lang
-from core.api.serializers import BaseExpandSerializer
 from product.models.product import Product
 from product.models.review import ProductReview
+from product.serializers.product import ProductSerializer
 
 User = get_user_model()
 
@@ -21,11 +19,11 @@ class TranslatedFieldsFieldExtend(TranslatedFieldsField):
 
 
 class ProductReviewSerializer(
-    TranslatableModelSerializer, BaseExpandSerializer
+    TranslatableModelSerializer, serializers.ModelSerializer
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=ProductReview)
-    product = PrimaryKeyRelatedField(queryset=Product.objects.all())
-    user = PrimaryKeyRelatedField(queryset=User.objects.all())
+    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
 
     class Meta:
         model = ProductReview
@@ -51,17 +49,13 @@ class ProductReviewSerializer(
             "uuid",
         )
 
-    @override
-    def get_expand_fields(
-        self,
-    ):
-        user_account_serializer = importlib.import_module(
-            "authentication.serializers"
-        ).AuthenticationSerializer
-        product_serializer = importlib.import_module(
-            "product.serializers.product"
-        ).ProductSerializer
-        return {
-            "user": user_account_serializer,
-            "product": product_serializer,
-        }
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+
+        if "product" in rep and instance.product:
+            rep["product"] = ProductSerializer(instance.product).data
+
+        if "user" in rep and instance.user:
+            rep["user"] = AuthenticationSerializer(instance.user).data
+
+        return rep

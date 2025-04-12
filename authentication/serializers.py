@@ -79,5 +79,6 @@ class AuthenticationSerializer(UserDetailsSerializer):
             "created_at",
             "updated_at",
             "uuid",
+            "full_name",
             "main_image_path",
         )

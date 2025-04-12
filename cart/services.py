@@ -64,7 +64,7 @@ class CartService:
 
     def process_cart(self, option: ProcessCartOption):
         pre_login_cart_id = self.request.session.get("pre_log_in_cart_id")
-        if isinstance(pre_login_cart_id, (int, str)):
+        if isinstance(pre_login_cart_id, int | str):
             pre_login_cart_id = int(pre_login_cart_id)
 
         match option:

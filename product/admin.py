@@ -7,6 +7,7 @@ from django.utils.translation import ngettext
 from mptt.admin import DraggableMPTTAdmin
 from parler.admin import TranslatableAdmin, TranslatableTabularInline
 from simple_history.admin import SimpleHistoryAdmin
+from unfold.admin import ModelAdmin
 
 from core.admin import ExportModelAdmin
 from product.models.category import ProductCategory
@@ -29,7 +30,7 @@ def category_update_action(category):
 
 
 @admin.register(ProductCategory)
-class CategoryAdmin(TranslatableAdmin, DraggableMPTTAdmin):
+class CategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
     mptt_indent_field = "translations__name"
     list_per_page = 10
     list_display = (
@@ -78,7 +79,7 @@ class CategoryAdmin(TranslatableAdmin, DraggableMPTTAdmin):
 
 
 @admin.register(ProductFavourite)
-class FavouriteAdmin(admin.ModelAdmin):
+class FavouriteAdmin(ModelAdmin):
     list_display = ["user", "product"]
 
 
@@ -91,7 +92,9 @@ class ProductImageInline(TranslatableTabularInline):
 
 
 @admin.register(Product)
-class ProductAdmin(TranslatableAdmin, ExportModelAdmin, SimpleHistoryAdmin):
+class ProductAdmin(
+    TranslatableAdmin, ExportModelAdmin, SimpleHistoryAdmin, ModelAdmin
+):
     list_display = [
         "id",
         "category",
@@ -131,7 +134,7 @@ class ProductAdmin(TranslatableAdmin, ExportModelAdmin, SimpleHistoryAdmin):
 
 
 @admin.register(ProductReview)
-class ReviewAdmin(TranslatableAdmin):
+class ReviewAdmin(ModelAdmin, TranslatableAdmin):
     list_display = ["comment", "status", "created_at"]
     list_filter = ["status"]
     actions = ["make_published", "make_unpublished"]

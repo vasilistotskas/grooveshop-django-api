@@ -4,6 +4,7 @@ from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 from mptt.admin import DraggableMPTTAdmin
 from parler.admin import TranslatableAdmin
+from unfold.admin import ModelAdmin
 
 from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
@@ -13,7 +14,7 @@ from blog.models.tag import BlogTag
 
 
 @admin.register(BlogAuthor)
-class BlogAuthorAdmin(TranslatableAdmin):
+class BlogAuthorAdmin(ModelAdmin, TranslatableAdmin):
     search_fields = (
         "user__email",
         "user__username",
@@ -23,7 +24,7 @@ class BlogAuthorAdmin(TranslatableAdmin):
 
 
 @admin.register(BlogTag)
-class BlogTagAdmin(TranslatableAdmin):
+class BlogTagAdmin(ModelAdmin, TranslatableAdmin):
     list_filter = ("active",)
     list_display = ("name", "active")
     list_editable = ("active",)
@@ -31,7 +32,7 @@ class BlogTagAdmin(TranslatableAdmin):
 
 
 @admin.register(BlogCategory)
-class BlogCategoryAdmin(TranslatableAdmin, DraggableMPTTAdmin):
+class BlogCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
     mptt_indent_field = "translations__name"
     list_per_page = 10
     list_display = (
@@ -78,7 +79,7 @@ class BlogCategoryAdmin(TranslatableAdmin, DraggableMPTTAdmin):
 
 
 @admin.register(BlogPost)
-class BlogPostAdmin(TranslatableAdmin):
+class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
     list_display = (
         "id",
         "title",
@@ -118,7 +119,7 @@ class BlogPostAdmin(TranslatableAdmin):
 
 
 @admin.register(BlogComment)
-class BlogCommentAdmin(TranslatableAdmin, DraggableMPTTAdmin):
+class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
     mptt_indent_field = "user"
     list_per_page = 10
     list_display = (

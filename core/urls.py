@@ -28,6 +28,7 @@ app_name = "core"
 urlpatterns = [
     path("robots.txt", robots_txt, name="robots_txt"),
     path("csp-report/", csp_report, name="csp-report"),
+    path("i18n/", include("django.conf.urls.i18n")),
 ]
 
 urlpatterns += i18n_patterns(

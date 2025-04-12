@@ -1,4 +1,5 @@
 from django.contrib import admin
+from unfold.admin import ModelAdmin
 
 from order.models.item import OrderItem
 from order.models.order import Order
@@ -12,7 +13,7 @@ class OrderItemLine(admin.TabularInline):
 
 
 @admin.register(Order)
-class OrderAdmin(admin.ModelAdmin):
+class OrderAdmin(ModelAdmin):
     list_display = [
         "user",
         "first_name",
@@ -43,6 +44,6 @@ class OrderAdmin(admin.ModelAdmin):
 
 
 @admin.register(OrderItem)
-class OrderItemAdmin(admin.ModelAdmin):
+class OrderItemAdmin(ModelAdmin):
     list_display = ["order", "product", "price", "quantity"]
     list_filter = ["order"]

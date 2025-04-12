@@ -7,7 +7,8 @@ from celery.schedules import crontab
 from corsheaders.defaults import (
     default_headers,
 )
-from csp.constants import SELF, UNSAFE_INLINE
+from csp.constants import SELF, UNSAFE_EVAL, UNSAFE_INLINE
+from django.templatetags.static import static
 from django.utils.translation import gettext_lazy as _
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -67,6 +68,10 @@ USE_X_FORWARDED_HOST = getenv("USE_X_FORWARDED_HOST", "False") == "True"
 
 # Django built-in apps
 DJANGO_APPS = [
+    "unfold",  # before django.contrib.admin
+    "unfold.contrib.filters",
+    "unfold.contrib.forms",
+    "unfold.contrib.simple_history",
     "admin.apps.MyAdminConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -194,11 +199,11 @@ USE_TZ = getenv("USE_TZ", "True") == "True"
 # Site info
 SITE_ID = int(getenv("SITE_ID", "1"))
 
-LANGUAGES = [
+LANGUAGES = (
     ("el", _("Greek")),
     ("en", _("English")),
     ("de", _("German")),
-]
+)
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -624,6 +629,7 @@ CONTENT_SECURITY_POLICY = {
         "style-src": [
             SELF,
             STATIC_BASE_URL,
+            UNSAFE_INLINE,
             "https://cdn.jsdelivr.net",
             "https://cdn.redoc.ly",
         ],
@@ -641,6 +647,7 @@ CONTENT_SECURITY_POLICY = {
             "https://static.cloudflareinsights.com",
             "https://cdn.jsdelivr.net",
             "https://cdn.redoc.ly",
+            UNSAFE_EVAL,
         ],
         "script-src-elem": [
             SELF,
@@ -649,6 +656,7 @@ CONTENT_SECURITY_POLICY = {
             "https://static.cloudflareinsights.com",
             "https://cdn.jsdelivr.net",
             "https://cdn.redoc.ly",
+            UNSAFE_EVAL,
         ],
         "worker-src": [
             SELF,
@@ -812,6 +820,48 @@ PHONENUMBER_DEFAULT_REGION = "GR"
 ROSETTA_MESSAGES_PER_PAGE = 25
 ROSETTA_ENABLE_TRANSLATION_SUGGESTIONS = True
 ROSETTA_SHOW_AT_ADMIN_PANEL = True
+
+UNFOLD = {
+    "SITE_TITLE": getenv("UNFOLD_SITE_TITLE", "GrooveShop Title"),
+    "SITE_HEADER": getenv("UNFOLD_SITE_HEADER", "GrooveShop Header"),
+    "SITE_SUBHEADER": getenv("UNFOLD_SITE_SUBHEADER", "GrooveShop SubHeader"),
+    "SITE_SYMBOL": "speed",
+    "SITE_ICON": {
+        "light": lambda request: static("icon-light.svg"),
+        "dark": lambda request: static("icon-dark.svg"),
+    },
+    "SITE_LOGO": {
+        "light": lambda request: static("logo-light.svg"),
+        "dark": lambda request: static("logo-dark.svg"),
+    },
+    "SITE_FAVICONS": [
+        {
+            "rel": "icon",
+            "sizes": "32x32",
+            "type": "image/svg+xml",
+            "href": lambda request: static("favicon/favicon.svg"),
+        },
+    ],
+    "COLORS": {
+        "primary": {
+            "50": "225 231 255",
+            "100": "198 211 255",
+            "200": "158 183 255",
+            "300": "117 153 255",
+            "400": "68  118 255",
+            "500": "0 61 255",
+            "600": "0 39 165",
+            "700": "0 31 131",
+            "800": "0 24 102",
+            "900": "0 16 67",
+            "950": "0 10 43",
+        },
+    },
+    "SHOW_LANGUAGES": True,
+    "STYLES": [
+        lambda request: static("css/styles.css"),
+    ],
+}
 
 # Security Settings
 SECURE_SSL_REDIRECT = getenv("SECURE_SSL_REDIRECT", "False") == "True"

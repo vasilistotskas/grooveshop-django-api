@@ -3,6 +3,7 @@ from typing import override
 import admin_thumbnails
 from django.contrib import admin
 from parler.admin import TranslatableAdmin
+from unfold.admin import ModelAdmin
 
 from slider.models import Slide, Slider
 
@@ -16,7 +17,7 @@ class SliderSlidesInline(admin.StackedInline):
 
 
 @admin.register(Slider)
-class SliderAdmin(TranslatableAdmin):
+class SliderAdmin(ModelAdmin, TranslatableAdmin):
     list_display = ["id", "title", "image_tag"]
     search_fields = ["id", "translations__title"]
     inlines = [SliderSlidesInline]
@@ -33,7 +34,7 @@ class SliderAdmin(TranslatableAdmin):
 
 
 @admin.register(Slide)
-class SlideAdmin(TranslatableAdmin):
+class SlideAdmin(ModelAdmin, TranslatableAdmin):
     list_display = ["id", "title", "image_tag"]
     search_fields = ["id", "translations__title", "slider__translations__name"]
     readonly_fields = ("image_tag", "thumbnail")

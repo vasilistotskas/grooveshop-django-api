@@ -1,11 +1,12 @@
 from django.contrib import admin
+from unfold.admin import ModelAdmin
 
 from user.models import UserAccount
 from user.models.address import UserAddress
 
 
 @admin.register(UserAccount)
-class UserAccountAdmin(admin.ModelAdmin):
+class UserAccountAdmin(ModelAdmin):
     list_display = [
         "email",
         "username",
@@ -27,7 +28,7 @@ class UserAccountAdmin(admin.ModelAdmin):
 
 
 @admin.register(UserAddress)
-class UserAddressAdmin(admin.ModelAdmin):
+class UserAddressAdmin(ModelAdmin):
     list_display = [
         "user",
         "title",

@@ -2,6 +2,7 @@ from django.apps import apps
 from django.contrib import admin
 from django.contrib.contenttypes.admin import GenericTabularInline
 from parler.admin import TranslatableAdmin
+from unfold.admin import ModelAdmin
 
 from tag.models.tag import Tag
 
@@ -13,5 +14,5 @@ class TagInLine(GenericTabularInline):
 
 
 @admin.register(Tag)
-class TagAdmin(TranslatableAdmin):
+class TagAdmin(ModelAdmin, TranslatableAdmin):
     search_fields = ["translations__label"]

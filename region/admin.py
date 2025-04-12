@@ -1,5 +1,6 @@
 from django.contrib import admin
 from parler.admin import TranslatableAdmin, TranslatableTabularInline
+from unfold.admin import ModelAdmin
 
 from region.models import Region
 
@@ -10,5 +11,5 @@ class RegionInline(TranslatableTabularInline):
 
 
 @admin.register(Region)
-class RegionAdmin(TranslatableAdmin):
+class RegionAdmin(ModelAdmin, TranslatableAdmin):
     search_fields = ["alpha", "country", "translations__name"]

@@ -1,12 +1,13 @@
 from typing import override
 
 from django.contrib import admin
+from unfold.admin import ModelAdmin
 
 from contact.models import Contact
 
 
 @admin.register(Contact)
-class ContactAdmin(admin.ModelAdmin):
+class ContactAdmin(ModelAdmin):
     list_display = ["name", "email", "message", "created_at"]
     list_filter = ["created_at"]
     search_fields = ["name", "email"]

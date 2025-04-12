@@ -3,6 +3,12 @@
 
 
 
+## v0.198.0 (2025-04-12)
+
+### Features
+
+* feat: unfold ([`8b60df4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8b60df42abe7d60de8a65b6440bbe4603d72fad6))
+
 ## v0.197.0 (2025-04-12)
 
 ### Chores

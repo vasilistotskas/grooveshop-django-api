@@ -3,6 +3,22 @@
 
 
 
+## v0.197.0 (2025-04-12)
+
+### Chores
+
+* chore: rename service to services ([`8a6c3a9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8a6c3a9114284d106b5887c6d30a7037bbc33189))
+
+### Continuous integration
+
+* ci: update pg defaults ([`bc4569a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bc4569a5713ebea28313ee249352469447466b01))
+
+* ci: Added ruff hook at `pre-commit-config`, lint fixes and cleanup compose.yml ([`0a3f1bf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0a3f1bf87b9cb1a1c1cbbe711141d028b5fb3aad))
+
+### Features
+
+* feat: Remove expand functionality ([`d859631`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d85963182925c9ab2183a87711b40913b0f7b344))
+
 ## v0.196.1 (2025-04-05)
 
 ### Bug fixes

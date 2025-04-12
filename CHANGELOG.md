@@ -3,6 +3,12 @@
 
 
 
+## v0.198.1 (2025-04-12)
+
+### Bug fixes
+
+* fix: revert tailwind ([`4ab08a8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4ab08a8d33b1ce0b27e2305b87a497c1d25f5944))
+
 ## v0.198.0 (2025-04-12)
 
 ### Features

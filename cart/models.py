@@ -1,3 +1,4 @@
+import uuid
 from decimal import Decimal
 from typing import Literal
 
@@ -26,6 +27,7 @@ class Cart(TimeStampMixinModel, UUIDModel):
         max_length=40,
         blank=True,
         help_text=_("Session key for guest users"),
+        default=uuid.uuid4,
     )
     last_activity = models.DateTimeField(_("Last Activity"), auto_now=True)
 

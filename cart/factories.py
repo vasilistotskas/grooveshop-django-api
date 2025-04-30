@@ -1,4 +1,5 @@
 import importlib
+import uuid
 
 import factory
 from django.apps import apps
@@ -72,7 +73,7 @@ def get_or_create_cart(is_guest=False):
 class CartFactory(factory.django.DjangoModelFactory):
     user = factory.LazyFunction(get_or_create_user)
     last_activity = factory.LazyFunction(timezone.now)
-    session_key = None
+    session_key = factory.LazyFunction(uuid.uuid4)
 
     class Meta:
         model = Cart

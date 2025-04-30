@@ -3,6 +3,31 @@
 
 
 
+## v1.0.0 (2025-04-30)
+
+### Bug fixes
+
+* fix: cart factory ([`8862002`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8862002c883232b9b8ceca732697c05f63b3ed69))
+
+* fix: cart session_key ([`1252e88`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1252e88af6e8dd07723cabc4f214da7e63013a26))
+
+* fix: cart session_key migration ([`0eafd57`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0eafd5760c726eb21532fa4529e8c5892706c313))
+
+* fix: ruff format ([`dbae591`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dbae5914485d5a12417d1c87dd1745fe5fbcc5c8))
+
+### Features
+
+* feat(core): implement guest cart functionality and system-wide improvements
+
+* cart: add session-based guest cart support with new session_key field
+* admin: integrate UnfoldAdminSite and optimize admin views
+* logging: replace custom LogInfo with Python logging module across multiple components
+* test: add comprehensive tests for guest cart functionality
+* build: upgrade multiple dependencies including poetry, django-unfold, and celery
+* docs: update API documentation and schema.yml for cart endpoints
+
+BREAKING CHANGE: Cart model schema updated with session_key field ([`eeec158`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eeec1586d473a77065abf15fdae31aa6e878ac93))
+
 ## v0.199.0 (2025-04-16)
 
 ### Features

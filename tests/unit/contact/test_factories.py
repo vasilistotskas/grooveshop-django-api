@@ -1,4 +1,3 @@
-import unittest
 from unittest.mock import patch
 
 import pytest
@@ -52,7 +51,7 @@ class TestContactFactory(TestCase):
 
         self.assertEqual(Contact.objects.filter(email=email).count(), 1)
 
-    @patch('contact.signals.send_mail')
+    @patch("contact.signals.send_mail")
     def test_contact_factory_mutes_signals(self, mock_send_mail):
         """Test that ContactFactory mutes the post_save signal."""
         ContactFactory()

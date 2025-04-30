@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
 from django.contrib.contenttypes.models import ContentType
 
@@ -40,9 +40,11 @@ class TestTaggedItemSerializer(unittest.TestCase):
         self.tagged_item.updated_at = "2023-01-01T00:00:00Z"
         self.tagged_item.uuid = "87654321-8765-4321-8765-432187654321"
 
-    @patch('tag.serializers.tag.TagSerializer')
-    @patch('core.serializers.ContentObjectRelatedField.to_representation')
-    def test_serializer_contains_expected_fields(self, mock_content_object_to_representation, mock_tag_serializer):
+    @patch("tag.serializers.tag.TagSerializer")
+    @patch("core.serializers.ContentObjectRelatedField.to_representation")
+    def test_serializer_contains_expected_fields(
+        self, mock_content_object_to_representation, mock_tag_serializer
+    ):
         """Test that the serializer contains the expected fields."""
         mock_tag_serializer.return_value.data = {
             "id": self.tag.id,
@@ -79,4 +81,7 @@ class TestTaggedItemSerializer(unittest.TestCase):
 
         self.assertEqual(data["tag"], mock_tag_serializer.return_value.data)
 
-        self.assertEqual(data["content_object"], mock_content_object_to_representation.return_value)
+        self.assertEqual(
+            data["content_object"],
+            mock_content_object_to_representation.return_value,
+        )

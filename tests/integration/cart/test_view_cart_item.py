@@ -42,7 +42,11 @@ class CartItemViewSetTest(APITestCase):
             "cart-item-detail", kwargs={"pk": self.cart_item.pk}
         )
 
-        self.create_data = {"product": self.product.pk, "quantity": 3}
+        self.create_data = {
+            "cart": self.cart.pk,
+            "product": self.product.pk,
+            "quantity": 3,
+        }
         self.update_data = {"quantity": 5}
 
         self.assertIsNotNone(self.cart, "Cart should not be None")
@@ -63,15 +67,24 @@ class CartItemViewSetTest(APITestCase):
         self.assertEqual(len(response.data["results"]), 1)
 
     def test_create_cart_item(self):
+        new_product = ProductFactory(num_images=0, num_reviews=0)
+        new_product.save()
+
+        create_data = {
+            "cart": self.cart.pk,
+            "product": new_product.pk,
+            "quantity": 3,
+        }
+
         response = self.client.post(
-            self.list_url, data=self.create_data, format="json"
+            self.list_url, data=create_data, format="json"
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(CartItem.objects.count(), 1)
+        self.assertEqual(CartItem.objects.count(), 2)
 
-        cart_item = CartItem.objects.get(product=self.product)
-        self.assertEqual(cart_item.quantity, 5)
+        cart_item = CartItem.objects.get(product=new_product)
+        self.assertEqual(cart_item.quantity, 3)
 
     def test_retrieve_cart_item(self):
         response = self.client.get(self.detail_url)

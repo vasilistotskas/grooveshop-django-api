@@ -1,3 +1,4 @@
+import logging
 import os
 
 from asgiref.sync import async_to_sync
@@ -5,9 +6,9 @@ from celery import Celery, shared_task
 from celery.signals import setup_logging
 from channels.layers import get_channel_layer
 
-from core.logging import LogInfo
-
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
+
+logger = logging.getLogger(__name__)
 
 
 @setup_logging.connect
@@ -33,7 +34,7 @@ def debug_task(self):
     debug = os.getenv("DEBUG", "True") == "True"
     if debug:
         print(f"Request: {self.request!r}")
-        LogInfo.debug(f"Request: {self.request!r}")
+        logger.debug(f"Request: {self.request!r}")
 
 
 @shared_task(bind=True, name="Debug Task Notification")
@@ -62,4 +63,4 @@ def debug_task_notification(self):
             },
         )
         print(f"Request: {self.request!r}, Notification sent.")
-        LogInfo.debug(f"Logger Request: {self.request!r}, Notification sent.")
+        logger.debug(f"Logger Request: {self.request!r}, Notification sent.")

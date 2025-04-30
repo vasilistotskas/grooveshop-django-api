@@ -28,33 +28,35 @@ class TestSocialAccountAdapter(TestCase):
         mock_pre_social_login.assert_not_called()
 
     @mock.patch.object(DefaultSocialAccountAdapter, "pre_social_login")
-    @mock.patch.object(User.objects, "filter")
-    def test_pre_social_login_nonexistent(
-        self, mock_filter, mock_pre_social_login
-    ):
+    def test_pre_social_login_nonexistent(self, mock_pre_social_login):
         request = mock.Mock()
 
-        mock_queryset = mock.Mock()
-
-        mock_user = mock.Mock()
-        mock_queryset.first.return_value = mock_user
-        mock_filter.return_value = mock_queryset
-
         sociallogin = mock.Mock()
-        sociallogin.is_existing = False
+
+        is_existing_property = mock.PropertyMock(return_value=False)
+        type(sociallogin).is_existing = is_existing_property
+
+        sociallogin.account = mock.Mock()
         sociallogin.account.extra_data = {"email": "test@example.com"}
 
-        mock_email_addresses = mock.Mock()
-        mock_email_addresses.configure_mock(
-            **{
-                "__iter__": mock.Mock(
-                    return_value=iter(
-                        [mock.Mock(verified=True, email="test@example.com")]
-                    )
-                )
-            }
-        )
-        sociallogin.email_addresses = mock_email_addresses
+        email = mock.Mock()
+        email.verified = True
+        email.email = "test@example.com"
+        sociallogin.email_addresses = [email]
 
-        self.adapter.pre_social_login(request, sociallogin)
-        sociallogin.connect.assert_called_once()
+        mock_user = mock.Mock()
+
+        mock_filter = mock.Mock()
+        mock_filter.first.return_value = mock_user
+
+        def side_effect(req, user):
+            pass
+
+        sociallogin.connect.side_effect = side_effect
+
+        with mock.patch.object(
+            User.objects, "filter", return_value=mock_filter
+        ):
+            self.adapter.pre_social_login(request, sociallogin)
+
+            sociallogin.connect.assert_called_once_with(request, mock_user)

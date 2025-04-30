@@ -1,3 +1,4 @@
+import logging
 from typing import Optional, Union, override
 
 from django.conf import settings
@@ -9,11 +10,10 @@ from django.contrib.postgres.search import (
 )
 from django.db.models import Expression
 
-from core.logging import LogInfo
+logger = logging.getLogger(__name__)
 
 
 class NoValidationSearchVectorCombinable(SearchVectorCombinable):
-    @override
     def _combine(self, other, connector, reversed):
         if not isinstance(other, NoValidationSearchVectorCombinable):
             raise TypeError(
@@ -85,7 +85,7 @@ class FlatConcat(Expression):
             and len(expressions) > self.max_expression_count
         ):
             if self.silent_drop_expression:
-                LogInfo.warning(
+                logger.warning(
                     "Maximum expression count exceed (%d out of %d)",
                     len(expressions),
                     self.max_expression_count,

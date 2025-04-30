@@ -9,6 +9,7 @@ from corsheaders.defaults import (
 )
 from csp.constants import SELF, UNSAFE_EVAL, UNSAFE_INLINE
 from django.templatetags.static import static
+from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -68,7 +69,7 @@ USE_X_FORWARDED_HOST = getenv("USE_X_FORWARDED_HOST", "False") == "True"
 
 # Django built-in apps
 DJANGO_APPS = [
-    "unfold",  # before django.contrib.admin
+    "unfold.apps.BasicAppConfig",
     "unfold.contrib.filters",
     "unfold.contrib.forms",
     "unfold.contrib.simple_history",
@@ -748,8 +749,8 @@ MEILISEARCH = {
     "TIMEOUT": int(getenv("MEILI_TIMEOUT", "30")),
     "CLIENT_AGENTS": None,
     "DEBUG": DEBUG,
-    "SYNC": False,
-    "OFFLINE": False,
+    "SYNC": DEBUG,
+    "OFFLINE": bool(getenv("MEILI_OFFLINE", "False")),
 }
 
 SEED_DEFAULT_COUNT = int(getenv("SEED_DEFAULT_COUNT", "20"))
@@ -860,6 +861,13 @@ UNFOLD = {
     "SHOW_LANGUAGES": True,
     "STYLES": [
         lambda request: static("css/styles.css"),
+    ],
+    "SITE_DROPDOWN": [
+        {
+            "icon": "diamond",
+            "title": _("Cache"),
+            "link": reverse_lazy("admin:clear-cache"),
+        },
     ],
 }
 

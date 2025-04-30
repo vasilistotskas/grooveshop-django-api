@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Callable
 from typing import override
 
@@ -6,7 +7,7 @@ from django.core.exceptions import ValidationError
 from django.db.models import Model
 from faker import Faker
 
-from core.logging import LogInfo
+logger = logging.getLogger(__name__)
 
 fake = Faker()
 
@@ -26,7 +27,7 @@ class UniqueFieldMixin:
             if not model.objects.filter(**{field_name: value}).exists():
                 return value
             attempts += 1
-        LogInfo.error(
+        logger.error(
             f"Failed to generate unique '{field_name}' for {model.__name__} after {max_attempts} attempts."
         )
         raise ValidationError(

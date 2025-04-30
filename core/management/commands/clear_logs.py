@@ -1,9 +1,10 @@
+import logging
 from os import listdir, path, remove
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
-from core.logging import LogInfo
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -23,13 +24,13 @@ class Command(BaseCommand):
                     warning_message = (
                         f"Could not delete file {file_path}: {e!s}"
                     )
-                    LogInfo.warning(warning_message)
+                    logger.warning(warning_message)
                     self.stdout.write(self.style.WARNING(warning_message))
 
             message = "Attempted to remove all log files."
-            LogInfo.info(message)
+            logger.info(message)
             self.stdout.write(self.style.SUCCESS(message))
         except Exception as e:
             error_message = f"Error while deleting log files: {e!s}"
-            LogInfo.error(error_message)
+            logger.error(error_message)
             self.stdout.write(self.style.ERROR(error_message))

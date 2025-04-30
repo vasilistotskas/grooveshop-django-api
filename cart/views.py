@@ -40,6 +40,28 @@ class CartViewSet(BaseModelViewSet):
         self.cart_service = CartService(request=request)
 
     @override
+    def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Cart.objects.none()
+
+        user = self.request.user
+
+        if user.is_staff:
+            return Cart.objects.all()
+        elif user.is_authenticated:
+            return Cart.objects.filter(user=user)
+        else:
+            session_key = self.request.session.session_key
+            if session_key:
+                return Cart.objects.filter(session_key=session_key)
+
+            cart_id = self.request.session.get("cart_id")
+            if cart_id:
+                return Cart.objects.filter(id=cart_id)
+
+        return Cart.objects.none()
+
+    @override
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context["cart"] = self.cart_service.cart
@@ -109,12 +131,15 @@ class CartItemViewSet(MultiSerializerMixin, BaseModelViewSet):
         if getattr(self, "swagger_fake_view", False):
             return CartItem.objects.none()
 
-        if self.cart_service.cart:
-            if self.request.user.is_anonymous:
-                cart_id = self.request.session.get("cart_id")
-                return CartItem.objects.filter(cart__id=cart_id)
-            return CartItem.objects.filter(cart__user=self.request.user)
-        return CartItem.objects.none()
+        user = self.request.user
+
+        if user.is_staff:
+            return CartItem.objects.all()
+
+        if not self.cart_service.cart:
+            return CartItem.objects.none()
+
+        return CartItem.objects.filter(cart=self.cart_service.cart)
 
     @override
     def get_serializer_context(self):
@@ -125,6 +150,9 @@ class CartItemViewSet(MultiSerializerMixin, BaseModelViewSet):
     @throttle_classes([BurstRateThrottle])
     @override
     def create(self, request, *args, **kwargs):
+        if not self.cart_service.cart:
+            self.cart_service.get_or_create_cart()
+
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
@@ -140,6 +168,15 @@ class CartItemViewSet(MultiSerializerMixin, BaseModelViewSet):
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
+
+        if instance.cart != self.cart_service.cart:
+            return Response(
+                {
+                    "detail": "You do not have permission to update this cart item."
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         serializer = self.get_serializer(
             instance, data=request.data, partial=partial
         )
@@ -156,5 +193,14 @@ class CartItemViewSet(MultiSerializerMixin, BaseModelViewSet):
     @override
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+
+        if instance.cart != self.cart_service.cart:
+            return Response(
+                {
+                    "detail": "You do not have permission to delete this cart item."
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)

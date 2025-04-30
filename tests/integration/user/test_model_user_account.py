@@ -11,7 +11,7 @@ class UserAccountModelTest(TestCase):
     def setUp(self):
         self.user_data = {
             "email": "testuser@example.com",
-            "plain_password": "testpassword",  # Use 'plain_password' as the key
+            "plain_password": "testpassword",
             "first_name": "John",
             "last_name": "Doe",
             "phone": "+1234567890",
@@ -28,9 +28,7 @@ class UserAccountModelTest(TestCase):
             **self.user_data, username=generated_username, num_addresses=0
         )
         self.assertEqual(user.username, generated_username)
-        self.assertTrue(
-            user.check_password(self.user_data["plain_password"])
-        )  # Check the password
+        self.assertTrue(user.check_password(self.user_data["plain_password"]))
         self.assertEqual(user.first_name, self.user_data["first_name"])
         self.assertEqual(user.last_name, self.user_data["last_name"])
         self.assertEqual(user.phone, self.user_data["phone"])

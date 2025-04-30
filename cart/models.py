@@ -21,6 +21,12 @@ class Cart(TimeStampMixinModel, UUIDModel):
         default=None,
         on_delete=models.CASCADE,
     )
+    session_key = models.CharField(
+        _("Session Key"),
+        max_length=40,
+        blank=True,
+        help_text=_("Session key for guest users"),
+    )
     last_activity = models.DateTimeField(_("Last Activity"), auto_now=True)
 
     class Meta(TypedModelMeta):
@@ -29,10 +35,20 @@ class Cart(TimeStampMixinModel, UUIDModel):
         ordering = ["-created_at"]
         constraints = [
             models.UniqueConstraint(fields=["user"], name="unique_user_cart"),
+            models.UniqueConstraint(
+                fields=["session_key"],
+                name="unique_session_cart",
+                condition=models.Q(session_key__isnull=False),
+            ),
         ]
 
     def __str__(self):
-        return f"Cart {self.user} - Items: {self.total_items} - Total: {self.total_price}"
+        if self.user:
+            return f"Cart for {self.user} - Items: {self.total_items} - Total: {self.total_price}"
+        elif self.session_key:
+            return f"Guest Cart ({self.session_key[:8]}...) - Items: {self.total_items} - Total: {self.total_price}"
+        else:
+            return f"Anonymous Cart {self.id} - Items: {self.total_items} - Total: {self.total_price}"
 
     def refresh_last_activity(self):
         self.last_activity = now()

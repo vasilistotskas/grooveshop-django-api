@@ -1,4 +1,7 @@
+import uuid
+
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from django.core.handlers.wsgi import WSGIRequest
 from django.test import RequestFactory, TestCase
 
@@ -182,3 +185,103 @@ class CartServiceTest(TestCase):
             [item.product for item in self.cart.items.all()],
             [self.product, pre_login_product],
         )
+
+
+class GuestCartServiceTest(TestCase):
+    factory: RequestFactory = None
+    request: WSGIRequest = None
+    session_key: str = None
+    product: Product = None
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.request = self.factory.get("/")
+        self.request.user = AnonymousUser()
+        self.session_key = str(uuid.uuid4())
+
+        self.request.session = {
+            "cart_id": None,
+            "pre_log_in_cart_id": None,
+        }
+
+        self.product = ProductFactory(num_images=0, num_reviews=0)
+
+    def test_get_or_create_cart_for_guest(self):
+        """Test that get_or_create_cart creates a cart for guest users."""
+        guest_cart = CartFactory(user=None, session_key=self.session_key)
+
+        self.request.session["cart_id"] = guest_cart.id
+
+        cart_service = CartService(request=self.request)
+        cart = cart_service.get_or_create_cart()
+
+        self.assertIsNotNone(cart)
+        self.assertIsNone(cart.user)
+        self.assertEqual(cart.id, guest_cart.id)
+        self.assertEqual(self.request.session.get("cart_id"), cart.id)
+
+    def test_create_cart_item_for_guest(self):
+        """Test that a guest user can add items to their cart."""
+        guest_cart = CartFactory(user=None, session_key=self.session_key)
+        self.request.session["cart_id"] = guest_cart.id
+
+        cart_service = CartService(request=self.request)
+        cart_item = cart_service.create_cart_item(self.product, 3)
+
+        self.assertEqual(cart_item.quantity, 3)
+        self.assertEqual(cart_item.product, self.product)
+        self.assertIsNone(cart_item.cart.user)
+        self.assertEqual(cart_item.cart.id, guest_cart.id)
+
+    def test_merge_guest_cart_to_user_cart(self):
+        """Test merging a guest cart into a user cart when logging in."""
+        guest_cart = CartFactory(user=None, session_key=self.session_key)
+
+        cart_item = CartItemFactory(
+            cart=guest_cart, product=self.product, quantity=2
+        )
+
+        self.assertEqual(cart_item.quantity, 2)
+        self.assertEqual(guest_cart.items.count(), 1)
+
+        user = UserAccountFactory(num_addresses=0)
+        self.request.user = user
+
+        user_cart = CartFactory(user=user)
+
+        self.request.session = {
+            "cart_id": user_cart.id,
+            "pre_log_in_cart_id": guest_cart.id,
+        }
+
+        cart_item.cart = user_cart
+        cart_item.save()
+
+        guest_cart.delete()
+
+        user_cart.refresh_from_db()
+        self.assertEqual(user_cart.user, user)
+        self.assertEqual(user_cart.items.count(), 1)
+        self.assertEqual(user_cart.items.first().product, self.product)
+        self.assertEqual(user_cart.items.first().quantity, 2)
+
+        self.assertFalse(Cart.objects.filter(id=guest_cart.id).exists())
+
+    def test_guest_cart_string_representation(self):
+        """Test the string representation of a guest cart service."""
+        guest_cart = CartFactory(user=None, session_key=self.session_key)
+        self.request.session["cart_id"] = guest_cart.id
+
+        cart_service = CartService(request=self.request)
+
+        self.assertTrue(str(cart_service).startswith("Cart Anonymous"))
+
+    def test_guest_cart_with_existing_session_key(self):
+        """Test that a guest cart is retrieved if it exists for the session key."""
+        existing_cart = CartFactory(user=None, session_key=self.session_key)
+
+        self.request.session["cart_id"] = existing_cart.id
+
+        cart_service = CartService(request=self.request)
+
+        self.assertEqual(cart_service.cart.id, existing_cart.id)

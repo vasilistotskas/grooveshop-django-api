@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib.contenttypes.fields import (
     GenericForeignKey,
     GenericRelation,
@@ -7,9 +9,10 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
-from core.logging import LogInfo
 from core.models import TimeStampMixinModel, UUIDModel
 from tag.models.tag import Tag
+
+logger = logging.getLogger(__name__)
 
 
 class TaggedItemManager(models.Manager):
@@ -72,17 +75,17 @@ class TaggedModel(models.Model):
                 tag.content_object = self
                 tag.save()
         except Exception as e:
-            LogInfo.error(f"Failed to add tag: {e}")
+            logger.error(f"Failed to add tag: {e}")
 
     def remove_tag(self, tag: TaggedItem):
         try:
             if isinstance(tag, TaggedItem):
                 tag.delete()
         except Exception as e:
-            LogInfo.error(f"Failed to remove tag: {e}")
+            logger.error(f"Failed to remove tag: {e}")
 
     def clear_tags(self):
         try:
             self.tags.all().delete()
         except Exception as e:
-            LogInfo.error(f"Failed to clear tags: {e}")
+            logger.error(f"Failed to clear tags: {e}")

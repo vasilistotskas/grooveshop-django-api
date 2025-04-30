@@ -1,4 +1,5 @@
 import datetime
+import logging
 import os
 import time
 
@@ -11,7 +12,8 @@ from django.template.loader import render_to_string
 from django.utils.timezone import now
 
 from core import celery_app
-from core.logging import LogInfo
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 languages = [
@@ -89,7 +91,7 @@ def clear_carts_for_none_users_task(self):
         null_carts.delete()
 
         message = f"Cleared {carts_count} null carts and {cart_items_count} related cart items."
-        LogInfo.info(message)
+        logger.info(message)
         return message
 
 
@@ -112,7 +114,7 @@ def clear_log_files_task(days=30):
 
     message = f"Removed log files older than {days} days."
 
-    LogInfo.info(message)
+    logger.info(message)
     return message
 
 
@@ -164,7 +166,7 @@ def monitor_system_health():
             cursor.fetchone()
 
     except Exception as e:
-        LogInfo.error(f"System health check failed: {e}")
+        logger.error(f"System health check failed: {e}")
 
         send_mail(
             subject="System Health Check Alert",
@@ -239,6 +241,6 @@ def optimize_images():
                 with Image.open(filepath) as img:
                     img.save(filepath, optimize=True, quality=85)
             except Exception as e:
-                LogInfo.error(f"Error optimizing image: {e}")
+                logger.error(f"Error optimizing image: {e}")
 
     return "Images optimized successfully."

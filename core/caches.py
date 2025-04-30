@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import logging
 import os
 from os import getenv
 
 import redis
 from django.core.cache.backends.redis import RedisCache, RedisCacheClient
 
-from core.logging import LogInfo
+logger = logging.getLogger(__name__)
 
 # Constants
 ONE_HOUR = 60 * 60
@@ -30,7 +31,7 @@ class CustomCache(RedisCache):
         try:
             self._cache.get_client().ping()
         except (redis.exceptions.ConnectionError, Exception) as exc:
-            LogInfo.error("Error connecting to cache: %s", str(exc))
+            logger.error("Error connecting to cache: %s", str(exc))
 
     def make_key(self, key, version=None):
         return key
@@ -38,14 +39,14 @@ class CustomCache(RedisCache):
     def keys(self, search: str | None = None):
         try:
             pattern = self._make_pattern(search)
-            LogInfo.info(f"Searching for keys with pattern: {pattern}")
+            logger.info(f"Searching for keys with pattern: {pattern}")
             cache_keys = list(self._cache.get_client().scan_iter(match=pattern))
             keys_with_prefix = [key.decode("utf-8") for key in cache_keys]
             keys_with_prefix.sort()
-            LogInfo.info(f"Found keys: {keys_with_prefix}")
+            logger.info(f"Found keys: {keys_with_prefix}")
             return keys_with_prefix
         except Exception as exc:
-            LogInfo.warning("Error getting cache keys: %s", str(exc))
+            logger.warning("Error getting cache keys: %s", str(exc))
             return []
 
     @staticmethod

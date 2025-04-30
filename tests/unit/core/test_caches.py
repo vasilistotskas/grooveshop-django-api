@@ -103,7 +103,6 @@ class CustomCacheTestCase(TestCase):
             "search_key3": "search_value3",
         }
         self.cache_instance.set_many(new_keys)
-        print("=== self.cache_instance.keys() === ", self.cache_instance.keys())
 
         keys = self.cache_instance.keys("search_key")
         self.assertEqual(

@@ -41,21 +41,51 @@ def get_or_create_product():
         return product_factory_class.create()
 
 
-def get_or_create_cart():
+def get_or_create_cart(is_guest=False):
     if apps.get_model("cart", "Cart").objects.exists():
+        if is_guest:
+            cart = (
+                apps.get_model("cart", "Cart")
+                .objects.filter(user__isnull=True)
+                .order_by("?")
+                .first()
+            )
+            if cart:
+                return cart
+        else:
+            cart = (
+                apps.get_model("cart", "Cart")
+                .objects.filter(user__isnull=False)
+                .order_by("?")
+                .first()
+            )
+            if cart:
+                return cart
+
         return apps.get_model("cart", "Cart").objects.order_by("?").first()
+    elif is_guest:
+        return CartFactory(is_guest=True)
     else:
-        return factory.SubFactory("cart.factories.CartFactory")
+        return CartFactory()
 
 
 class CartFactory(factory.django.DjangoModelFactory):
     user = factory.LazyFunction(get_or_create_user)
     last_activity = factory.LazyFunction(timezone.now)
+    session_key = None
 
     class Meta:
         model = Cart
         django_get_or_create = ("user",)
         skip_postgeneration_save = True
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        is_guest = kwargs.pop("is_guest", False)
+        if is_guest:
+            kwargs["user"] = None
+            kwargs["session_key"] = kwargs.get("session_key") or fake.uuid4()
+        return super()._create(model_class, *args, **kwargs)
 
     @factory.post_generation
     def num_cart_items(self, create, extracted, **kwargs):
@@ -74,3 +104,10 @@ class CartItemFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = CartItem
         django_get_or_create = ("cart", "product")
+
+    @classmethod
+    def _create(cls, model_class, *args, **kwargs):
+        is_guest = kwargs.pop("is_guest", False)
+        if is_guest and "cart" not in kwargs:
+            kwargs["cart"] = get_or_create_cart(is_guest=True)
+        return super()._create(model_class, *args, **kwargs)

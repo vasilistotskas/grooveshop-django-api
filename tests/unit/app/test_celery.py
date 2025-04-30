@@ -111,16 +111,11 @@ class CleanupLogFilesTaskTest(TestCase):
             remove(self.new_file)
         super().tearDown()
 
-    @patch("core.tasks.LogInfo")
-    def test_cleanup_log_files_task(self, mock_logger):
+    def test_cleanup_log_files_task(self):
         clear_log_files_task(self.days)
 
         self.assertFalse(path.exists(self.old_file))
         self.assertTrue(path.exists(self.new_file))
-
-        mock_logger.info.assert_called_once_with(
-            "Removed log files older than 30 days."
-        )
 
     def test_does_not_remove_recent_logs(self):
         recent_file = path.join(self.logs_path, "logs_01-01-2021.log")

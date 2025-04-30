@@ -105,11 +105,7 @@ class ProductAdmin(
         "image_tag",
         "likes_count",
     ]
-    history_list_display = ["price", "stock"]
-    search_fields = [
-        "id",
-        "product_code",
-    ]
+    search_fields = ["id", "product_code"]
     list_filter = ["category"]
     inlines = [ProductImageInline, TagInLine]
     readonly_fields = ("image_tag", "likes_count")
@@ -126,11 +122,6 @@ class ProductAdmin(
         return bool(obj.active)
 
     boolean_status.boolean = True
-
-    actions = [
-        "export_csv",
-        "export_xml",
-    ]
 
 
 @admin.register(ProductReview)

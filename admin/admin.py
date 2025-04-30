@@ -1,11 +1,10 @@
-from os import getenv
-
 from django import forms
-from django.contrib import admin, messages
+from django.contrib import messages
 from django.core import management
 from django.shortcuts import redirect, render
 from django.urls import path
 from django.utils.translation import gettext_lazy as _
+from unfold.sites import UnfoldAdminSite
 
 from core.caches import cache_instance
 from core.utils.views import cache_methods_registry
@@ -22,11 +21,7 @@ class ClearCacheForm(forms.Form):
         self.fields["viewset_class"].choices = choices
 
 
-class MyAdminSite(admin.AdminSite):
-    site_title = getenv("ADMIN_SITE_TITLE", "GrooveShop site admin")
-    site_header = getenv("ADMIN_SITE_HEADER", "GrooveShop administration")
-    index_title = getenv("ADMIN_INDEX_TITLE", "Site administration")
-
+class MyAdminSite(UnfoldAdminSite):
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [

@@ -10983,6 +10983,8 @@ components:
         id:
           type: integer
           readOnly: true
+        cart:
+          type: integer
         product:
           type: integer
         quantity:
@@ -10990,6 +10992,7 @@ components:
           maximum: 2147483647
           minimum: 0
       required:
+      - cart
       - id
       - product
     Checkout:

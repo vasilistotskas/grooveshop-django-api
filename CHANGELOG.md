@@ -3,6 +3,12 @@
 
 
 
+## v1.0.1 (2025-05-02)
+
+### Bug fixes
+
+* fix: cart migration ([`7f6b37d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7f6b37db08ed909026d9882ed9b4e6b8bf40f5dc))
+
 ## v1.0.0 (2025-04-30)
 
 ### Bug fixes

@@ -3,6 +3,12 @@
 
 
 
+## v1.1.0 (2025-05-05)
+
+### Features
+
+* feat: Bump Versions, Admin panel enhance ([`91125d2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/91125d2255f32c7a4fc4b48fc3f60a38248b241c))
+
 ## v1.0.1 (2025-05-02)
 
 ### Bug fixes

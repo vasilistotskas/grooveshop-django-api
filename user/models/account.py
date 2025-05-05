@@ -189,7 +189,7 @@ class UserAccount(
     def image_tag(self):
         if self.image and hasattr(self.image, "url"):
             return mark_safe(
-                '<img src="{}" height="50"/>'.format(self.image.url)
+                '<img src="{}" width="50" height="50"/>'.format(self.image.url)
             )
         else:
             return mark_safe(

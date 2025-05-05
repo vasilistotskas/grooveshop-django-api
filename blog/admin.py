@@ -5,7 +5,10 @@ from django.utils.translation import gettext_lazy as _
 from mptt.admin import DraggableMPTTAdmin
 from parler.admin import TranslatableAdmin
 from unfold.admin import ModelAdmin
+from unfold.decorators import action
+from unfold.enums import ActionVariant
 
+from blog.enum.blog_post_enum import PostStatusEnum
 from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
 from blog.models.comment import BlogComment
@@ -84,16 +87,28 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         "id",
         "title",
         "subtitle",
-        "slug",
+        "category",
+        "author",
+        "status",
+        "featured",
+        "view_count",
+        "likes_count_display",
+        "comments_count_display",
         "published_at",
         "is_published",
     )
     list_filter = (
         "is_published",
         "published_at",
+        "status",
+        "featured",
+        "category",
+        "author",
+        "tags",
     )
     list_editable = (
-        "slug",
+        "featured",
+        "status",
         "is_published",
     )
     search_fields = (
@@ -101,21 +116,97 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         "translations__subtitle",
         "slug",
         "translations__body",
+        "author__user__email",
+        "author__user__username",
     )
+    autocomplete_fields = ["category", "author", "tags"]
+    readonly_fields = ["view_count", "created_at", "updated_at", "id"]
+    filter_horizontal = ["tags"]
+    actions = [
+        "make_published",
+        "make_draft",
+        "mark_as_featured",
+        "unmark_as_featured",
+    ]
+    date_hierarchy = "published_at"
+    save_on_top = True
+    list_filter_submit = True
+
+    @action(
+        description=_("Mark selected posts as published"),
+        variant=ActionVariant.SUCCESS,
+        icon="publish",
+    )
+    def make_published(self, request, queryset):
+        updated = queryset.update(
+            is_published=True, status=PostStatusEnum.PUBLISHED
+        )
+        self.message_user(
+            request,
+            _("%(count)d posts were successfully marked as published.")
+            % {"count": updated},
+        )
+
+    @action(
+        description=_("Mark selected posts as draft"),
+        variant=ActionVariant.INFO,
+        icon="drafts",
+    )
+    def make_draft(self, request, queryset):
+        updated = queryset.update(
+            is_published=False, status=PostStatusEnum.DRAFT
+        )
+        self.message_user(
+            request,
+            _("%(count)d posts were successfully marked as draft.")
+            % {"count": updated},
+        )
+
+    @action(
+        description=_("Mark selected posts as featured"),
+        variant=ActionVariant.PRIMARY,
+        icon="star",
+    )
+    def mark_as_featured(self, request, queryset):
+        updated = queryset.update(featured=True)
+        self.message_user(
+            request,
+            _("%(count)d posts were successfully marked as featured.")
+            % {"count": updated},
+        )
+
+    @action(
+        description=_("Remove featured mark from selected posts"),
+        variant=ActionVariant.WARNING,
+        icon="star_border",
+    )
+    def unmark_as_featured(self, request, queryset):
+        updated = queryset.update(featured=False)
+        self.message_user(
+            request,
+            _("%(count)d posts were successfully unmarked as featured.")
+            % {"count": updated},
+        )
+
+    def likes_count_display(self, obj):
+        return obj.likes_count
+
+    likes_count_display.short_description = _("Likes")
+    likes_count_display.admin_order_field = "likes__count"
+
+    def comments_count_display(self, obj):
+        return obj.comments_count
+
+    comments_count_display.short_description = _("Comments")
+    comments_count_display.admin_order_field = "comments__count"
 
     @override
     def get_prepopulated_fields(self, request, obj=None):
         # can't use `prepopulated_fields = ..` because it breaks the admin validation
         # for translated fields. This is the official django-parler workaround.
         return {
-            "slug": (
-                "title",
-                "subtitle",
-            ),
+            "slug": ("title",),
         }
-
-    date_hierarchy = "published_at"
-    save_on_top = True
 
 
 @admin.register(BlogComment)

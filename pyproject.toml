@@ -10,11 +10,11 @@ authors = [
 ]
 dependencies = [
   "asgiref==3.8.1",
-  "boto3==1.38.4",
-  "charset_normalizer==3.4.1",
+  "boto3==1.38.8",
+  "charset_normalizer==3.4.2",
   "channels==4.2.2",
   "channels-redis==4.2.1",
-  "cryptography==44.0.2",
+  "cryptography==44.0.3",
   "django==5.2",
   "django-admin-thumbnails==0.2.9",
   "django-allauth==65.7.0",
@@ -47,9 +47,9 @@ dependencies = [
   "meilisearch==0.34.1",
   "phonenumbers==9.0.4",
   "pillow==11.2.1",
-  "psycopg[binary,pool] == 3.2.6",
+  "psycopg[binary,pool] == 3.2.7",
   "python-dotenv==1.1.0",
-  "qrcode==8.1",
+  "qrcode==8.2",
   "urllib3==2.4.0",
   "uvicorn==0.34.2",
   "celery[redis] >=5.5.2,<6.0.0"
@@ -70,23 +70,23 @@ dev = [
     "Faker==37.1.0",
     "factory-boy==3.3.3",
     "gitpython==3.1.44",
-    "types-setuptools==80.0.0.20250429",
+    "types-setuptools==80.3.0.20250505",
     "pre-commit==4.2.0",
     "pip-upgrader==1.4.15",
-    "pylint==3.3.6",
+    "pylint==3.3.7",
     "pyjwt==2.10.1",
     "pytest==8.3.5",
     "pytest-asyncio==0.26.0",
-    "python-semantic-release==9.21.0",
+    "python-semantic-release==9.21.1",
     "pytest-django==4.11.1",
-    "ruff==0.11.7"
+    "ruff==0.11.8"
 ]
 
 # ─────────────────────────────────────────────────────────
 # Build system requirements
 # ─────────────────────────────────────────────────────────
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core>=2.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 # ─────────────────────────────────────────────────────────

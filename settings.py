@@ -864,7 +864,7 @@ UNFOLD = {
     ],
     "SITE_DROPDOWN": [
         {
-            "icon": "diamond",
+            "icon": "cached",
             "title": _("Cache"),
             "link": reverse_lazy("admin:clear-cache"),
         },

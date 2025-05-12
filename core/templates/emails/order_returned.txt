@@ -1,0 +1,23 @@
+Dear {{ order.first_name }} {{ order.last_name }},
+
+We've received your returned items for order #{{ order.id }}. Thank you for letting us know about your return.
+
+Our team is now processing your return, and we'll keep you updated on the progress. If a refund is due, it will be processed once we've completed our inspection.
+
+Return Details:
+- Order #: {{ order.id }}
+- Return Date: {{ order.status_updated_at }}
+- Return Status: Processing
+
+What happens next:
+1. We will inspect the returned items
+2. Process your refund if applicable
+3. Send you a confirmation email once the refund is complete
+
+If you have any questions about your return or need any assistance, please don't hesitate to contact our customer service team.
+
+Thank you for your patience and for shopping with {{ site_name }}.
+
+Best regards,
+The {{ site_name }} Team
+{{ support_email }} 

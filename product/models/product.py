@@ -273,7 +273,19 @@ class Product(
 
     @property
     def final_price(self) -> Money:
-        return self.price + self.vat_value - self.discount_value
+        # Ensure all money objects use the same currency before arithmetic operations
+        price_currency = self.price.currency
+        vat_value = (
+            Money(self.vat_value.amount, price_currency)
+            if self.vat_value.currency != price_currency
+            else self.vat_value
+        )
+        discount_value = (
+            Money(self.discount_value.amount, price_currency)
+            if self.discount_value.currency != price_currency
+            else self.discount_value
+        )
+        return self.price + vat_value - discount_value
 
     @property
     def main_image_path(self) -> str:

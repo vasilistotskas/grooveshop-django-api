@@ -685,7 +685,7 @@ CONTENT_SECURITY_POLICY = {
 }
 
 # Currency
-DEFAULT_CURRENCY = "EUR"
+DEFAULT_CURRENCY = getenv("DEFAULT_CURRENCY", "EUR")
 BASE_CURRENCY = "EUR"
 CURRENCIES = ("USD", "EUR")
 CURRENCY_CHOICES = [("USD", "USD $"), ("EUR", "EUR €")]
@@ -760,7 +760,7 @@ EXTRA_SETTINGS_DEFAULTS = [
     {
         "name": "CHECKOUT_SHIPPING_PRICE",
         "type": "decimal",
-        "value": 3.0,
+        "value": 3.00,
     },
 ]
 
@@ -1087,3 +1087,18 @@ LOGGING = {
         },
     },
 }
+
+# PAYMENT SETTINGS
+STRIPE_API_KEY = "sk_test_example"
+STRIPE_WEBHOOK_SECRET = "whsec_example"
+PAYPAL_CLIENT_ID = "client_id_example"
+PAYPAL_CLIENT_SECRET = "client_secret_example"
+
+# SHIPPING SETTINGS
+FEDEX_API_KEY = "fedex_api_key_example"
+FEDEX_ACCOUNT_NUMBER = "fedex_account_number_example"
+UPS_API_KEY = "ups_api_key_example"
+UPS_ACCOUNT_NUMBER = "ups_account_number_example"
+
+# Free shipping threshold and default shipping cost
+FREE_SHIPPING_THRESHOLD = getenv("FREE_SHIPPING_THRESHOLD", "100")

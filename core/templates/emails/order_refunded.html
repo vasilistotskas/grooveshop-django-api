@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Refund Processed</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #4a4a4a;
+        }
+        .refund-details {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 15px 0;
+            background-color: #f9f9f9;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            font-weight: bold;
+            border-radius: 4px;
+            background-color: #ffd6e7;
+            color: #c41d7f;
+        }
+        .refund-box {
+            background-color: #fff1f0;
+            border: 1px solid #ffccc7;
+            border-left: 4px solid #ff7875;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 4px 4px 0;
+        }
+        .refund-amount {
+            font-size: 24px;
+            font-weight: bold;
+            color: #c41d7f;
+        }
+        .info-box {
+            background-color: #e6f7ff;
+            border: 1px solid #91d5ff;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Refund Processed Successfully</h1>
+    <p>Dear {{ order.first_name }} {{ order.last_name }},</p>
+    
+    <p>Good news! Your refund for order #{{ order.id }} has been processed successfully.</p>
+    
+    <div class="refund-box">
+        <p>Refund Amount: <span class="refund-amount">{{ order.paid_amount }}</span></p>
+    </div>
+    
+    <div class="refund-details">
+        <h2>Refund Details</h2>
+        <p><strong>Order Number:</strong> #{{ order.id }}</p>
+        <p><strong>Refund Date:</strong> {{ order.status_updated_at }}</p>
+        <p><strong>Payment Method:</strong> {{ order.payment_method }}</p>
+        <p><strong>Status:</strong> <span class="status-badge">Refunded</span></p>
+    </div>
+    
+    <div class="info-box">
+        <h3>When Will I Receive My Refund?</h3>
+        <p>The refunded amount should appear in your account within 3-5 business days, depending on your payment provider's processing time.</p>
+        <p>If you don't see the refund in your account after 5 business days, please check with your bank or payment provider before contacting us.</p>
+    </div>
+    
+    <p>Thank you for your patience throughout this process. We hope to have the opportunity to serve you again in the future.</p>
+    
+    <p>If you have any questions about your refund, please don't hesitate to contact our customer service team.</p>
+    
+    <p>
+        <strong>Best regards,</strong><br>
+        The {{ site_name }} Team<br>
+        <a href="mailto:{{ support_email }}">{{ support_email }}</a>
+    </p>
+</body>
+</html> 

@@ -1,0 +1,15 @@
+YOUR ORDER HAS BEEN CANCELED
+
+Your order #{{ order.id }} has been canceled as requested.
+
+ORDER DETAILS
+Date Ordered: {{ order.created_at }}
+Date Canceled: {{ order.status_updated_at }}
+
+{% if order.paid_amount %}
+Refund: Your payment of {{ order.paid_amount }} will be refunded to your original payment method within 3-5 business days.
+{% endif %}
+
+If you did not request this cancellation or have any questions, please contact our customer service immediately.
+
+We hope to see you again soon! 

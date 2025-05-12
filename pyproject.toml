@@ -297,7 +297,8 @@ ignore = [
     "E501",   # line length
     "E731",   # lambda usage
     "TC003",  # move type imports under TYPE_CHECKING
-    "PLR0912" # too many branches
+    "PLR0912", # too many branches
+    "PLR2004" # magic value
 ]
 
 [tool.ruff.lint.pylint]

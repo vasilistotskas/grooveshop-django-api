@@ -9,6 +9,10 @@ class OrderItemSerializer(serializers.ModelSerializer):
     product = ProductSerializer()
     price = MoneyField(max_digits=11, decimal_places=2)
     total_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
+    refunded_amount = MoneyField(
+        max_digits=11, decimal_places=2, read_only=True
+    )
+    net_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
 
     class Meta:
         model = OrderItem
@@ -17,17 +21,30 @@ class OrderItemSerializer(serializers.ModelSerializer):
             "price",
             "product",
             "quantity",
+            "original_quantity",
+            "is_refunded",
+            "refunded_quantity",
+            "net_quantity",
             "sort_order",
             "created_at",
             "updated_at",
             "uuid",
             "total_price",
+            "refunded_amount",
+            "net_price",
+            "notes",
         )
         read_only_fields = (
             "created_at",
             "updated_at",
             "uuid",
             "total_price",
+            "original_quantity",
+            "is_refunded",
+            "refunded_quantity",
+            "net_quantity",
+            "refunded_amount",
+            "net_price",
         )
 
 
@@ -39,7 +56,39 @@ class OrderItemCreateUpdateSerializer(serializers.ModelSerializer):
             "product",
             "price",
             "quantity",
+            "notes",
         )
+
+
+class OrderItemRefundSerializer(serializers.Serializer):
+    quantity = serializers.IntegerField(
+        min_value=1,
+        required=False,
+        help_text="Quantity to refund. If not provided, refunds all.",
+    )
+    reason = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=255,
+        help_text="Optional reason for the refund",
+    )
+
+    def validate(self, data):
+        item = self.context.get("item")
+        quantity = data.get("quantity")
+
+        if not item:
+            raise serializers.ValidationError(
+                "Order item is required for refund operation"
+            )
+
+        if quantity and quantity > item.quantity - item.refunded_quantity:
+            raise serializers.ValidationError(
+                f"Cannot refund more than the available quantity. "
+                f"Available: {item.quantity - item.refunded_quantity}"
+            )
+
+        return data
 
 
 class CheckoutItemSerializer(serializers.ModelSerializer):
@@ -49,3 +98,23 @@ class CheckoutItemSerializer(serializers.ModelSerializer):
             "product",
             "quantity",
         )
+
+    def validate_quantity(self, value: int) -> int:
+        if value <= 0:
+            raise serializers.ValidationError(
+                "Quantity must be a positive number."
+            )
+        return value
+
+    def validate(self, data: dict) -> dict:
+        product = data.get("product")
+        quantity = data.get("quantity")
+
+        if hasattr(product, "stock") and product.stock < quantity:
+            raise serializers.ValidationError(
+                {
+                    "quantity": f"Not enough stock available. Only {product.stock} remaining."
+                }
+            )
+
+        return data

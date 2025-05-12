@@ -1,10 +1,12 @@
 from typing import override
 
+from django.utils import timezone
 from djmoney.contrib.django_rest_framework import MoneyField
 from drf_spectacular.utils import extend_schema_field
 from phonenumber_field.serializerfields import PhoneNumberField
 from rest_framework import serializers
 
+from authentication.serializers import AuthenticationSerializer
 from country.serializers import CountrySerializer
 from order.models.item import OrderItem
 from order.models.order import Order
@@ -34,6 +36,9 @@ class OrderSerializer(serializers.ModelSerializer):
     )
     phone = PhoneNumberField()
     mobile_phone = PhoneNumberField(required=False)
+    status_display = serializers.SerializerMethodField("get_status_display")
+    can_be_canceled = serializers.BooleanField(read_only=True)
+    is_paid = serializers.BooleanField(read_only=True)
 
     @extend_schema_field(CountrySerializer)
     def get_country(self, order):
@@ -46,6 +51,9 @@ class OrderSerializer(serializers.ModelSerializer):
     @extend_schema_field(PayWaySerializer)
     def get_pay_way(self, order):
         return PayWaySerializer(order.pay_way).data
+
+    def get_status_display(self, order):
+        return order.get_status_display()
 
     class Meta:
         model = Order
@@ -60,6 +68,8 @@ class OrderSerializer(serializers.ModelSerializer):
             "street_number",
             "pay_way",
             "status",
+            "status_display",
+            "status_updated_at",
             "first_name",
             "last_name",
             "email",
@@ -79,6 +89,11 @@ class OrderSerializer(serializers.ModelSerializer):
             "total_price_items",
             "total_price_extra",
             "full_address",
+            "payment_id",
+            "payment_status",
+            "payment_method",
+            "can_be_canceled",
+            "is_paid",
         )
         read_only_fields = (
             "created_at",
@@ -87,6 +102,65 @@ class OrderSerializer(serializers.ModelSerializer):
             "total_price_items",
             "total_price_extra",
             "full_address",
+            "status_updated_at",
+            "payment_id",
+            "payment_status",
+            "payment_method",
+            "status_display",
+            "can_be_canceled",
+            "is_paid",
+        )
+
+
+class OrderDetailSerializer(OrderSerializer):
+    """Detailed order serializer with additional information."""
+
+    user = AuthenticationSerializer(read_only=True)
+    tracking_info = serializers.SerializerMethodField("get_tracking_info")
+    time_since_order = serializers.SerializerMethodField("get_time_since_order")
+
+    def get_tracking_info(self, order):
+        if order.tracking_number and order.shipping_carrier:
+            return {
+                "tracking_number": order.tracking_number,
+                "shipping_carrier": order.shipping_carrier,
+            }
+        return None
+
+    def get_time_since_order(self, order):
+        if not order.created_at:
+            return "Unknown"
+
+        delta = timezone.now() - order.created_at
+        minutes = delta.seconds // 60
+        hours = minutes // 60
+        minutes = minutes % 60
+
+        if hours > 0:
+            return f"{hours} hours, {minutes} minutes"
+        else:
+            return f"{minutes} minutes"
+
+    class Meta(OrderSerializer.Meta):
+        fields = (
+            *OrderSerializer.Meta.fields,
+            "tracking_info",
+            "tracking_number",
+            "shipping_carrier",
+            "time_since_order",
+            "customer_full_name",
+            "is_completed",
+            "is_canceled",
+        )
+        read_only_fields = (
+            *OrderSerializer.Meta.read_only_fields,
+            "tracking_info",
+            "tracking_number",
+            "shipping_carrier",
+            "time_since_order",
+            "customer_full_name",
+            "is_completed",
+            "is_canceled",
         )
 
 
@@ -102,6 +176,9 @@ class OrderCreateUpdateSerializer(serializers.ModelSerializer):
     )
     phone = PhoneNumberField()
     mobile_phone = PhoneNumberField(required=False)
+    payment_id = serializers.CharField(required=False)
+    payment_status = serializers.CharField(required=False)
+    payment_method = serializers.CharField(required=False)
 
     class Meta:
         model = Order
@@ -135,6 +212,11 @@ class OrderCreateUpdateSerializer(serializers.ModelSerializer):
             "total_price_items",
             "total_price_extra",
             "full_address",
+            "payment_id",
+            "payment_status",
+            "payment_method",
+            "tracking_number",
+            "shipping_carrier",
         )
         read_only_fields = (
             "created_at",
@@ -143,6 +225,7 @@ class OrderCreateUpdateSerializer(serializers.ModelSerializer):
             "total_price_items",
             "total_price_extra",
             "full_address",
+            "status_updated_at",
         )
 
     @override
@@ -210,6 +293,8 @@ class CheckoutSerializer(serializers.ModelSerializer):
     )
     phone = PhoneNumberField()
     mobile_phone = PhoneNumberField(required=False)
+    payment_id = serializers.CharField(required=False)
+    payment_method = serializers.CharField(required=False)
 
     class Meta:
         model = Order
@@ -243,6 +328,8 @@ class CheckoutSerializer(serializers.ModelSerializer):
             "total_price_items",
             "total_price_extra",
             "full_address",
+            "payment_id",
+            "payment_method",
         )
         read_only_fields = (
             "created_at",
@@ -280,7 +367,6 @@ class CheckoutSerializer(serializers.ModelSerializer):
             for item_data in items_data:
                 product = item_data.get("product")
 
-                # Set the price of the product to the final price
                 item_data["price"] = product.final_price
 
                 OrderItem.objects.create(order=order, **item_data)

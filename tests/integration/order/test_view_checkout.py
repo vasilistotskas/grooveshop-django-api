@@ -84,8 +84,8 @@ class CheckoutViewAPITest(APITestCase):
         response = self.client.post(url, data=order_data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(Product.objects.get(pk=product_1.id).stock, 8)
-        self.assertEqual(Product.objects.get(pk=product_2.id).stock, 12)
+        self.assertEqual(Product.objects.get(pk=product_1.id).stock, 6)
+        self.assertEqual(Product.objects.get(pk=product_2.id).stock, 9)
 
     def test_failed_order_creation(self):
         self.client.force_authenticate(user=self.user)

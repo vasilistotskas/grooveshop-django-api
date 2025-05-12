@@ -1,0 +1,38 @@
+Dear {{ order.first_name }} {{ order.last_name }},
+
+Your order #{{ order.id }} has been updated.
+
+New Status: {{ status }}
+
+Order Details:
+- Order Date: {{ order.created_at }}
+- Total Amount: {{ order.total_price }}
+
+This status means: 
+{% if status == "PENDING" %}
+Your order has been received and is awaiting payment processing.
+{% elif status == "PROCESSING" %}
+Your payment has been confirmed and we're preparing your order.
+{% elif status == "SHIPPED" %}
+Your order has been shipped and is on its way to you.
+{% elif status == "DELIVERED" %}
+Your order has been delivered to your shipping address.
+{% elif status == "COMPLETED" %}
+Your order has been completed successfully. Thank you for shopping with us!
+{% elif status == "CANCELED" %}
+Your order has been canceled. If you didn't request this, please contact us.
+{% elif status == "RETURNED" %}
+Your return has been received and is being processed.
+{% elif status == "REFUNDED" %}
+Your refund has been processed and should appear in your account soon.
+{% else %}
+Your order status has been updated.
+{% endif %}
+
+If you have any questions about your order, please contact our customer service team.
+
+Thank you for shopping with {{ site_name }}!
+
+Best regards,
+The {{ site_name }} Team
+{{ support_email }} 

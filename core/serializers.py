@@ -9,11 +9,38 @@ from rest_framework import serializers
 from product.models import Product
 
 
-def is_valid_unit(unit_to_validate: str, measurement):
-    return unit_to_validate in measurement.get_units()
+def is_valid_unit(
+    unit_to_validate: str, measurement: type[MeasureBase | BidimensionalMeasure]
+) -> bool:
+    if issubclass(measurement, BidimensionalMeasure):
+        if "__" in unit_to_validate:
+            primary_unit, reference_unit = unit_to_validate.split("__")
+            primary_units = (
+                measurement.PRIMARY_DIMENSION.get_units()
+                if hasattr(measurement, "PRIMARY_DIMENSION")
+                else {}
+            )
+            reference_units = (
+                measurement.REFERENCE_DIMENSION.get_units()
+                if hasattr(measurement, "REFERENCE_DIMENSION")
+                else {}
+            )
+            return (
+                primary_unit in primary_units
+                and reference_unit in reference_units
+            )
+        else:
+            # Handle special cases like "mph", "kph" that don't use the "__" format
+            # These are common in bidimensional measures but need special handling
+            # This is a simplified approach - in a full implementation we might check against known aliases
+            special_units = ["mph", "kph", "mps", "fps"]
+            return unit_to_validate in special_units
+    elif hasattr(measurement, "get_units"):
+        return unit_to_validate in measurement.get_units()
+    return False
 
 
-def is_valid_decimal(value_to_validate: str):
+def is_valid_decimal(value_to_validate: str) -> bool:
     try:
         decimal.Decimal(value_to_validate)
         return True
@@ -54,8 +81,18 @@ class MeasurementSerializerField(serializers.Field):
         self.measurement = measurement
 
     @override
-    def to_representation(self, obj: Any):
-        return {"unit": obj.unit, "value": obj.value}
+    def to_representation(self, obj: Any) -> Representation:
+        if hasattr(obj, "unit") and hasattr(obj, "value"):
+            return {"unit": obj.unit, "value": obj.value}
+        elif isinstance(obj, decimal.Decimal | float | int):
+            return {
+                "value": float(obj),
+                "unit": self.measurement.STANDARD_UNIT
+                if hasattr(self.measurement, "STANDARD_UNIT")
+                else "unknown",
+            }
+        else:
+            return {"value": str(obj), "unit": "unknown"}
 
     @override
     def to_internal_value(self, data: Representation):

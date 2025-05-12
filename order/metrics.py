@@ -145,16 +145,16 @@ class OrderMetrics:
             created_at__gte=start_date,
             created_at__lte=end_date,
             status=OrderStatusEnum.COMPLETED.value,
-            total_currency=currency,
+            paid_amount_currency=currency,
         )
 
         orders_by_day = {}
         for order in query:
             day = order.created_at.strftime("%Y-%m-%d")
             if day in orders_by_day:
-                orders_by_day[day] += order.total.amount
+                orders_by_day[day] += order.paid_amount.amount
             else:
-                orders_by_day[day] = order.total.amount
+                orders_by_day[day] = order.paid_amount.amount
 
         all_days = date_range(start_date.date(), end_date.date())
         return {
@@ -171,7 +171,8 @@ class OrderMetrics:
         currency: str = "USD",
     ) -> Decimal:
         query = Order.objects.filter(
-            status=OrderStatusEnum.COMPLETED.value, total_currency=currency
+            status=OrderStatusEnum.COMPLETED.value,
+            paid_amount_currency=currency,
         )
 
         if start_date:
@@ -179,7 +180,7 @@ class OrderMetrics:
         if end_date:
             query = query.filter(created_at__lte=end_date)
 
-        result = query.aggregate(avg_value=Avg("total"))
+        result = query.aggregate(avg_value=Avg("paid_amount"))
         avg_value = result.get("avg_value", 0)
         return avg_value if avg_value else Decimal("0")
 
@@ -251,10 +252,10 @@ class OrderMetrics:
         if end_date:
             query = query.filter(created_at__lte=end_date)
 
-        query = query.exclude(shipping_date__isnull=True)
+        query = query.exclude(status_updated_at__isnull=True)
 
         durations = [
-            (order.shipping_date - order.created_at) for order in query
+            (order.status_updated_at - order.created_at) for order in query
         ]
         if not durations:
             return None
@@ -300,14 +301,32 @@ class OrderMetrics:
         if end_date:
             query = query.filter(created_at__lte=end_date)
 
-        payment_counts = query.values("pay_way__name").annotate(
-            count=Count("id")
-        )
-        return {
-            item["pay_way__name"]: item["count"]
-            for item in payment_counts
-            if item["pay_way__name"]
-        }
+        # PayWay uses django-parler for translations, so we need to annotate the name differently
+        payment_counts = query.values("pay_way_id").annotate(count=Count("id"))
+
+        # Build a dictionary of payment method counts
+        result = {}
+        for item in payment_counts:
+            pay_way_id = item["pay_way_id"]
+            count = item["count"]
+            if pay_way_id is not None:
+                from pay_way.models import PayWay
+
+                try:
+                    pay_way = PayWay.objects.get(id=pay_way_id)
+                    pay_way_name = (
+                        pay_way.safe_translation_getter(
+                            "name", any_language=True
+                        )
+                        or "Unknown"
+                    )
+                    result[pay_way_name] = count
+                except PayWay.DoesNotExist:
+                    result[f"Unknown ({pay_way_id})"] = count
+            else:
+                result["None"] = count
+
+        return result
 
     @staticmethod
     def get_order_status_transition_times() -> dict[str, timedelta]:

@@ -3,8 +3,8 @@ from django.utils.translation import gettext_lazy as _
 
 
 class NotificationKindEnum(models.TextChoices):
-    ERROR = "error", _("Error")
-    SUCCESS = "success", _("Success")
-    INFO = "info", _("Info")
-    WARNING = "warning", _("Warning")
-    DANGER = "danger", _("Danger")
+    ERROR = "ERROR", _("Error")
+    SUCCESS = "SUCCESS", _("Success")
+    INFO = "INFO", _("Info")
+    WARNING = "WARNING", _("Warning")
+    DANGER = "DANGER", _("Danger")

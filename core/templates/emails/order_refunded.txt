@@ -18,4 +18,4 @@ If you have any questions about your refund, please don't hesitate to contact ou
 
 Best regards,
 The {{ site_name }} Team
-{{ support_email }} 
+{{ support_email }}

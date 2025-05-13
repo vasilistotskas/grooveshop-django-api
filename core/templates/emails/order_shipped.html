@@ -30,12 +30,12 @@
 <body>
     <h1>Your Order Has Shipped</h1>
     <p>Good news! Your order #{{ order.id }} has been shipped and is on its way to you.</p>
-    
+
     <div class="shipping-details">
         <h2>Shipping Information</h2>
         <p><strong>Carrier:</strong> {{ carrier }}</p>
         <p class="tracking-info">Tracking Number: {{ tracking_number }}</p>
-        
+
         <h3>Delivery Address</h3>
         <p>
             {{ order.first_name }} {{ order.last_name }}<br>
@@ -44,11 +44,11 @@
             {{ order.country }}
         </p>
     </div>
-    
+
     <p>You can track your package using the tracking number above on the carrier's website.</p>
-    
+
     <p>If you have any questions about your shipment, please contact our customer service.</p>
-    
+
     <p>Thank you for shopping with us!</p>
 </body>
-</html> 
+</html>

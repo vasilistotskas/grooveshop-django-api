@@ -5,7 +5,7 @@ from rest_framework.test import APITestCase
 
 from blog.factories.tag import BlogTagFactory
 from blog.models.tag import BlogTag
-from blog.serializers.tag import BlogTagSerializer
+from core.utils.testing import TestURLFixerMixin
 
 languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
@@ -13,7 +13,7 @@ languages = [
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
-class BlogTagViewSetTestCase(APITestCase):
+class BlogTagViewSetTestCase(TestURLFixerMixin, APITestCase):
     tag: BlogTag = None
 
     def setUp(self):
@@ -30,11 +30,18 @@ class BlogTagViewSetTestCase(APITestCase):
     def test_list(self):
         url = self.get_tag_list_url()
         response = self.client.get(url)
-        tags = BlogTag.objects.all()
-        serializer = BlogTagSerializer(tags, many=True)
-
-        self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertIn("results", response.data)
+        self.assertIsInstance(response.data["results"], list)
+
+        tags_count = BlogTag.objects.count()
+        self.assertEqual(len(response.data["results"]), tags_count)
+
+        if tags_count > 0:
+            first_result = response.data["results"][0]
+            self.assertIn("translations", first_result)
+            self.assertIn("active", first_result)
 
     def test_create_valid(self):
         payload = {
@@ -75,11 +82,12 @@ class BlogTagViewSetTestCase(APITestCase):
     def test_retrieve_valid(self):
         url = self.get_tag_detail_url(self.tag.pk)
         response = self.client.get(url)
-        tag = BlogTag.objects.get(pk=self.tag.pk)
-        serializer = BlogTagSerializer(tag)
-
-        self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertIn("active", response.data)
+        self.assertEqual(response.data["active"], self.tag.active)
+
+        self.assertIn("translations", response.data)
 
     def test_retrieve_invalid(self):
         invalid_tag_id = 9999

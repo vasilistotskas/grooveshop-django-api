@@ -47,18 +47,18 @@
 <body>
     <h1>Return Received</h1>
     <p>Dear {{ order.first_name }} {{ order.last_name }},</p>
-    
+
     <p>We've received your returned items for order #{{ order.id }}. Thank you for letting us know about your return.</p>
-    
+
     <div class="order-details">
         <h2>Return Details</h2>
         <p><strong>Order Number:</strong> #{{ order.id }}</p>
         <p><strong>Return Date:</strong> {{ order.status_updated_at }}</p>
         <p><strong>Status:</strong> <span class="status-badge">Return Processing</span></p>
     </div>
-    
+
     <p>Our team is now processing your return, and we'll keep you updated on the progress. If a refund is due, it will be processed once we've completed our inspection.</p>
-    
+
     <h3>Return Process</h3>
     <ol class="return-steps">
         <li class="active">Return received by our warehouse</li>
@@ -66,17 +66,17 @@
         <li>Refund processing (if applicable)</li>
         <li>Refund confirmation sent</li>
     </ol>
-    
+
     <p>The inspection process typically takes 3-5 business days. You'll receive a notification once your refund has been processed.</p>
-    
+
     <p>If you have any questions about your return or need any assistance, please don't hesitate to contact our customer service team.</p>
-    
+
     <p>Thank you for your patience and for shopping with {{ site_name }}.</p>
-    
+
     <p>
         <strong>Best regards,</strong><br>
         The {{ site_name }} Team<br>
         <a href="mailto:{{ support_email }}">{{ support_email }}</a>
     </p>
 </body>
-</html> 
+</html>

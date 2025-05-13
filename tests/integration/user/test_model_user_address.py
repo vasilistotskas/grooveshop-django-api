@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from user.enum.address import FloorChoicesEnum, LocationChoicesEnum
+from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from user.factories.account import UserAccountFactory
 from user.factories.address import UserAddressFactory
 from user.models.address import UserAddress

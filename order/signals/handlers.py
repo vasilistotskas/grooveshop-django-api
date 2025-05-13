@@ -4,6 +4,7 @@ from typing import Any
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
+from order.enum.document_type_enum import OrderDocumentTypeEnum
 from order.enum.status_enum import OrderStatusEnum
 from order.models.item import OrderItem
 from order.models.order import Order
@@ -94,7 +95,6 @@ def handle_order_status_changed(
 
     send_order_status_update_email.delay(order.id, new_status)
 
-    # Trigger appropriate status-specific signals
     if new_status == OrderStatusEnum.SHIPPED.value:
         order_shipped.send(sender=sender, order=order)
 
@@ -338,7 +338,7 @@ def handle_order_completed(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
     try:
-        if order.document_type == "INVOICE":
+        if order.document_type == OrderDocumentTypeEnum.INVOICE.value:
             task = generate_order_invoice.delay(order.id)
             logger.info(
                 f"Invoice generation queued for order {order.id} (task_id: {task.id})"

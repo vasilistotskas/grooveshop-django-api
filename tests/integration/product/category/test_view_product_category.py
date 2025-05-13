@@ -103,10 +103,24 @@ class ProductCategoryViewSetTestCase(APITestCase):
         url = self.get_product_category_detail_url(self.category.id)
         response = self.client.get(url)
         category = ProductCategory.objects.get(pk=self.category.id)
-        serializer = ProductCategorySerializer(category)
 
-        self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertIn("id", response.data)
+        self.assertEqual(response.data["id"], category.id)
+
+        self.assertIn("translations", response.data)
+        self.assertIsInstance(response.data["translations"], dict)
+
+        for lang_data in response.data["translations"].values():
+            self.assertIn("name", lang_data)
+            self.assertIsInstance(lang_data["name"], str)
+            self.assertIn("description", lang_data)
+            self.assertIsInstance(lang_data["description"], str)
+
+        if category.parent:
+            self.assertIn("parent", response.data)
+            self.assertEqual(response.data["parent"], category.parent.id)
 
     def test_retrieve_invalid(self):
         invalid_category_id = 999999

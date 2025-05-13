@@ -31,8 +31,6 @@ class PaymentProvider(ABC):
 
 
 class StripePaymentProvider(PaymentProvider):
-    """Stripe payment integration"""
-
     def __init__(self):
         self.api_key = settings.STRIPE_API_KEY
         self.webhook_secret = settings.STRIPE_WEBHOOK_SECRET
@@ -155,7 +153,6 @@ class StripePaymentProvider(PaymentProvider):
 
 class PayPalPaymentProvider(PaymentProvider):
     def __init__(self):
-        """Initialize with API credentials from settings"""
         self.client_id = settings.PAYPAL_CLIENT_ID
         self.client_secret = settings.PAYPAL_CLIENT_SECRET
 
@@ -249,7 +246,6 @@ class PayPalPaymentProvider(PaymentProvider):
 
 
 def get_payment_provider(provider_name: str) -> PaymentProvider:
-    """Factory function to get the appropriate payment provider"""
     providers = {
         "stripe": StripePaymentProvider,
         "paypal": PayPalPaymentProvider,

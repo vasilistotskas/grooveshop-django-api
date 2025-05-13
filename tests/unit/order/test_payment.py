@@ -12,10 +12,7 @@ from order.payment import (
 
 
 class PaymentModuleTestCase(TestCase):
-    """Test case for the payment module."""
-
     def test_payment_status_enum(self):
-        """Test the PaymentStatus enum."""
         self.assertEqual(PaymentStatusEnum.PENDING.value, "PENDING")
         self.assertEqual(PaymentStatusEnum.PROCESSING.value, "PROCESSING")
         self.assertEqual(PaymentStatusEnum.COMPLETED.value, "COMPLETED")
@@ -28,7 +25,6 @@ class PaymentModuleTestCase(TestCase):
 
     @mock.patch("order.payment.settings")
     def test_stripe_payment_provider_init(self, mock_settings):
-        """Test initializing the StripePaymentProvider."""
         mock_settings.STRIPE_API_KEY = "test_api_key"
         mock_settings.STRIPE_WEBHOOK_SECRET = "test_webhook_secret"
 
@@ -39,7 +35,6 @@ class PaymentModuleTestCase(TestCase):
 
     @mock.patch("order.payment.settings")
     def test_paypal_payment_provider_init(self, mock_settings):
-        """Test initializing the PayPalPaymentProvider."""
         mock_settings.PAYPAL_CLIENT_ID = "test_client_id"
         mock_settings.PAYPAL_CLIENT_SECRET = "test_client_secret"
 
@@ -50,7 +45,6 @@ class PaymentModuleTestCase(TestCase):
 
     @mock.patch("order.payment.logger")
     def test_stripe_process_payment(self, mock_logger):
-        """Test processing a payment with Stripe."""
         provider = StripePaymentProvider()
         amount = Money(amount=Decimal("100.00"), currency="USD")
         order_id = "test_order_id"
@@ -68,7 +62,6 @@ class PaymentModuleTestCase(TestCase):
 
     @mock.patch("order.payment.logger")
     def test_paypal_process_payment(self, mock_logger):
-        """Test processing a payment with PayPal."""
         provider = PayPalPaymentProvider()
         amount = Money(amount=Decimal("100.00"), currency="USD")
         order_id = "test_order_id"
@@ -86,7 +79,6 @@ class PaymentModuleTestCase(TestCase):
 
     @mock.patch("order.payment.logger")
     def test_stripe_refund_payment(self, mock_logger):
-        """Test refunding a payment with Stripe."""
         provider = StripePaymentProvider()
         payment_id = "test_payment_id"
         amount = Money(amount=Decimal("50.00"), currency="USD")
@@ -103,7 +95,6 @@ class PaymentModuleTestCase(TestCase):
 
     @mock.patch("order.payment.logger")
     def test_stripe_get_payment_status(self, mock_logger):
-        """Test getting payment status from Stripe."""
         provider = StripePaymentProvider()
         payment_id = "test_payment_id"
 
@@ -117,14 +108,11 @@ class PaymentModuleTestCase(TestCase):
         mock_logger.info.assert_called_once()
 
     def test_get_payment_provider(self):
-        """Test getting a payment provider by name."""
-        # Test getting a valid provider
         provider = get_payment_provider("stripe")
         self.assertIsInstance(provider, StripePaymentProvider)
 
         provider = get_payment_provider("paypal")
         self.assertIsInstance(provider, PayPalPaymentProvider)
 
-        # Test getting an invalid provider
         with self.assertRaises(ValueError):
             get_payment_provider("invalid_provider")

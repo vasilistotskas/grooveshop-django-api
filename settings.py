@@ -44,7 +44,7 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 22500
 SERIALIZATION_MODULES = {"json": "djmoney.serializers"}
 
 if DEBUG:
-    import socket  # only if you haven't already imported this
+    import socket
 
     hostname, aliaslist, ips = socket.gethostbyname_ex(socket.gethostname())
     INTERNAL_IPS = [ip[: ip.rfind(".")] + ".1" for ip in ips] + [
@@ -59,11 +59,10 @@ MEDIA_STREAM_BASE_URL = getenv("MEDIA_STREAM_BASE_URL", "http://localhost:3003")
 STATIC_BASE_URL = getenv("STATIC_BASE_URL", "http://localhost:8000")
 CSP_STATIC_BASE_URL = getenv("STATIC_BASE_URL", "http://localhost:8000")
 
-ALLOWED_HOSTS = []  # Start with an empty list
+ALLOWED_HOSTS = []
 
-# Add any additional hosts from the environment variable
 additional_hosts = getenv("ALLOWED_HOSTS", "*").split(",")
-ALLOWED_HOSTS.extend(filter(None, additional_hosts))  # Filter out empty strings
+ALLOWED_HOSTS.extend(filter(None, additional_hosts))
 
 USE_X_FORWARDED_HOST = getenv("USE_X_FORWARDED_HOST", "False") == "True"
 
@@ -141,7 +140,6 @@ THIRD_PARTY_APPS = [
     "csp",
 ]
 
-# Combine all apps together for the INSTALLED_APPS setting
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
@@ -859,9 +857,6 @@ UNFOLD = {
         },
     },
     "SHOW_LANGUAGES": True,
-    "STYLES": [
-        lambda request: static("css/styles.css"),
-    ],
     "SITE_DROPDOWN": [
         {
             "icon": "cached",

@@ -64,7 +64,6 @@ class OrderItemFactory(factory.django.DjangoModelFactory):
 
     @classmethod
     def create_with_refund(cls, **kwargs):
-        """Create an order item that has been partially or fully refunded."""
         item = cls.create(**kwargs)
         quantity = item.quantity
         refund_qty = random.randint(1, quantity)
@@ -77,22 +76,12 @@ class OrderItemFactory(factory.django.DjangoModelFactory):
     def create_batch_for_order(
         cls, order, count=None, product_count=None, **kwargs
     ):
-        """
-        Create multiple items for a single order with diverse products.
-
-        Args:
-            order: The order to create items for
-            count: Number of items to create
-            product_count: Number of unique products to use (defaults to count)
-            **kwargs: Additional attributes for the items
-        """
         if count is None:
             count = random.randint(1, 5)
 
         if product_count is None or product_count > count:
             product_count = count
 
-        # Get unique products
         products = []
         if apps.get_model("product", "Product").objects.exists():
             products = list(
@@ -102,7 +91,6 @@ class OrderItemFactory(factory.django.DjangoModelFactory):
             )
 
         if len(products) < product_count:
-            # Create additional products as needed
             product_factory_module = importlib.import_module(
                 "product.factories.product"
             )
@@ -110,7 +98,6 @@ class OrderItemFactory(factory.django.DjangoModelFactory):
             for _ in range(product_count - len(products)):
                 products.append(product_factory_class.create())
 
-        # Create items with the products
         items = []
         for i in range(count):
             product_index = i % len(products)

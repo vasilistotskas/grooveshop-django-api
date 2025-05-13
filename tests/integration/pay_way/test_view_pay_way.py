@@ -36,15 +36,13 @@ class PayWayViewSetTestCase(APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        # Check that we have at least one pay_way in the response
         self.assertGreaterEqual(len(response.data["results"]), 1)
 
-        # Find our pay_way in the results by looking for its key attributes
         found = False
         for item in response.data["results"]:
             if item["active"] == self.pay_way.active:
                 cost = item["cost"]
-                if isinstance(cost, dict):  # Money object serialized as dict
+                if isinstance(cost, dict):
                     self.assertAlmostEqual(
                         float(cost["amount"]),
                         float(self.pay_way.cost.amount),
@@ -53,7 +51,7 @@ class PayWayViewSetTestCase(APITestCase):
                     self.assertEqual(
                         cost["currency"], str(self.pay_way.cost.currency)
                     )
-                else:  # Maybe it's a Decimal directly
+                else:
                     self.assertAlmostEqual(
                         float(cost), float(self.pay_way.cost.amount), places=2
                     )
@@ -106,23 +104,21 @@ class PayWayViewSetTestCase(APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        # Verify the key fields in the response
         self.assertEqual(response.data["active"], self.pay_way.active)
 
-        # Handle Money fields
         cost = response.data["cost"]
-        if isinstance(cost, dict):  # Money object serialized as dict
+        if isinstance(cost, dict):
             self.assertAlmostEqual(
                 float(cost["amount"]), float(self.pay_way.cost.amount), places=2
             )
             self.assertEqual(cost["currency"], str(self.pay_way.cost.currency))
-        else:  # Maybe it's a Decimal directly
+        else:
             self.assertAlmostEqual(
                 float(cost), float(self.pay_way.cost.amount), places=2
             )
 
         free_amount = response.data["free_for_order_amount"]
-        if isinstance(free_amount, dict):  # Money object serialized as dict
+        if isinstance(free_amount, dict):
             self.assertAlmostEqual(
                 float(free_amount["amount"]),
                 float(self.pay_way.free_for_order_amount.amount),
@@ -132,7 +128,7 @@ class PayWayViewSetTestCase(APITestCase):
                 free_amount["currency"],
                 str(self.pay_way.free_for_order_amount.currency),
             )
-        else:  # Maybe it's a Decimal directly
+        else:
             self.assertAlmostEqual(
                 float(free_amount),
                 float(self.pay_way.free_for_order_amount.amount),

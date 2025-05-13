@@ -45,6 +45,11 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
         "tags": TagSerializer,
     }
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        # Use the new queryset methods to apply all annotations
+        return queryset.with_all_annotations()
+
     @action(
         detail=True,
         methods=["POST"],

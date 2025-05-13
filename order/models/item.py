@@ -40,7 +40,7 @@ class OrderItemQuerySet(models.QuerySet):
         first_item = self.first()
         if first_item and hasattr(first_item, "price"):
             return Money(amount=total, currency=first_item.price.currency)
-        return Money(amount=0, currency="USD")  # Default fallback
+        return Money(amount=0, currency="USD")
 
 
 class OrderItemManager(models.Manager):
@@ -111,7 +111,7 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
         if (
             hasattr(self.product, "stock")
             and self.quantity > self.product.stock
-            and not self.pk  # Only check on create, not update
+            and not self.pk
         ):
             raise ValidationError(
                 _("The quantity exceeds the available stock.")

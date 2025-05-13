@@ -1,7 +1,3 @@
-"""
-Unit tests for order notifications.
-"""
-
 from unittest import TestCase
 from unittest.mock import MagicMock, Mock, patch
 
@@ -19,17 +15,12 @@ from order.notifications import (
 
 
 class OrderNotificationTestCase(TestCase):
-    """Test case for order notifications."""
-
     def setUp(self):
-        """Set up test data."""
-        # Create a mock user
         self.user = Mock()
         self.user.id = 1
         self.user.email = "customer@example.com"
         self.user.is_authenticated = True
 
-        # Create a mock order
         self.order = Mock(spec=Order)
         self.order.id = 1
         self.order.uuid = "test-uuid-1234"
@@ -42,7 +33,6 @@ class OrderNotificationTestCase(TestCase):
         self.order.updated_at = timezone.now()
         self.order.total = Money("135.00", "USD")
 
-        # Set up mock items
         item1 = Mock()
         item1.product = Mock()
         item1.product.name = "Test Product 1"
@@ -64,53 +54,39 @@ class OrderNotificationTestCase(TestCase):
         "order.notifications.OrderNotificationManager.send_order_confirmation"
     )
     def test_send_order_confirmation(self, mock_send):
-        """Test sending order confirmation notification."""
-        # Call the function
         send_order_confirmation(self.order)
 
-        # Verify notification was sent
         mock_send.assert_called_once_with(self.order)
 
     @patch("order.notifications.OrderNotificationManager.send_order_shipped")
     def test_send_order_shipped_notification(self, mock_send):
-        """Test sending order shipped notification."""
-        # Set up shipping information
         self.order.tracking_number = "TRACK123456"
         self.order.shipping_carrier = "FedEx"
 
-        # Call the function
         send_order_shipped_notification(self.order)
 
-        # Verify notification was sent
         mock_send.assert_called_once_with(
             self.order, tracking_number="TRACK123456", carrier="FedEx"
         )
 
     @patch("order.notifications.OrderNotificationManager.send_order_delivered")
     def test_send_order_delivered_notification(self, mock_send):
-        """Test sending order delivered notification."""
-        # Call the function
         send_order_delivered_notification(self.order)
 
-        # Verify notification was sent
         mock_send.assert_called_once_with(self.order)
 
     @patch("order.notifications.EmailNotifier")
     @patch("order.notifications.SMSNotifier")
     def test_notification_manager_with_email(self, mock_sms, mock_email):
-        """Test notification manager sending emails."""
-        # Set up mock notifiers
         mock_email_instance = Mock()
         mock_email.return_value = mock_email_instance
 
         mock_sms_instance = Mock()
         mock_sms.return_value = mock_sms_instance
 
-        # Create a manager instance and send notification
         manager = OrderNotificationManager()
         manager.send_order_confirmation(self.order)
 
-        # Verify email notifier was used
         mock_email_instance.send_order_confirmation.assert_called_once_with(
             self.order
         )
@@ -118,26 +94,19 @@ class OrderNotificationTestCase(TestCase):
     @patch("order.notifications.EmailNotifier")
     @patch("order.notifications.SMSNotifier")
     def test_notification_manager_with_sms(self, mock_sms, mock_email):
-        """Test notification manager sending SMS."""
-        # Set up mock notifiers
         mock_email_instance = Mock()
         mock_email.return_value = mock_email_instance
 
         mock_sms_instance = Mock()
         mock_sms.return_value = mock_sms_instance
 
-        # Set up phone number
         self.order.phone = "+12025550179"
 
-        # Create a manager instance and send notification
         manager = OrderNotificationManager()
         manager.send_order_shipped(
             self.order, tracking_number="TRACK123", carrier="UPS"
         )
 
-        # Verify SMS notifier was used
         mock_sms_instance.send_order_shipped.assert_called_once_with(
             self.order, tracking_number="TRACK123", carrier="UPS"
         )
-
-    # Signal handler tests removed - these are covered in integration tests

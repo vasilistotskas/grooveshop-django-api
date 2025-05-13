@@ -14,10 +14,7 @@ from order.shipping import (
 
 
 class ShippingMethodTypeTestCase(TestCase):
-    """Test case for the ShippingMethodType enum."""
-
     def test_shipping_method_type_enum(self):
-        """Test the ShippingMethodType enum values."""
         self.assertEqual(ShippingMethodType.STANDARD.value, "STANDARD")
         self.assertEqual(ShippingMethodType.EXPRESS.value, "EXPRESS")
         self.assertEqual(ShippingMethodType.NEXT_DAY.value, "NEXT_DAY")
@@ -29,10 +26,7 @@ class ShippingMethodTypeTestCase(TestCase):
 
 
 class ShippingOptionTestCase(TestCase):
-    """Test case for the ShippingOption class."""
-
     def test_shipping_option_creation(self):
-        """Test creating a ShippingOption."""
         option = ShippingOption(
             id="test_id",
             name="Test Option",
@@ -57,7 +51,6 @@ class ShippingOptionTestCase(TestCase):
         self.assertEqual(option.description, "Test description")
 
     def test_estimated_delivery_date(self):
-        """Test the estimated delivery date calculations."""
         option = ShippingOption(
             id="test_id",
             name="Test Option",
@@ -69,20 +62,15 @@ class ShippingOptionTestCase(TestCase):
             carrier_service_code="TEST_CODE",
         )
 
-        # The estimated delivery dates should be calculated based on the current date
         min_date = option.estimated_delivery_date_min
         max_date = option.estimated_delivery_date_max
 
-        # The max date should be 2 days after the min date (5 - 3 = 2)
         self.assertEqual((max_date - min_date).days, 2)
 
 
 @mock.patch("order.shipping.settings")
 class FedExCarrierTestCase(TestCase):
-    """Test case for the FedExCarrier class."""
-
     def setUp(self):
-        # Use mock objects instead of real database objects
         self.from_country = mock.MagicMock()
         self.from_country.alpha_2 = "US"
         self.to_country = mock.MagicMock()
@@ -97,7 +85,6 @@ class FedExCarrierTestCase(TestCase):
         }
 
     def test_init(self, mock_settings):
-        """Test initializing the FedExCarrier."""
         mock_settings.FEDEX_API_KEY = "test_api_key"
         mock_settings.FEDEX_ACCOUNT_NUMBER = "test_account_number"
 
@@ -108,7 +95,6 @@ class FedExCarrierTestCase(TestCase):
 
     @mock.patch("order.shipping.logger")
     def test_get_shipping_options_domestic(self, mock_logger, mock_settings):
-        """Test getting domestic shipping options from FedEx."""
         carrier = FedExCarrier()
 
         options = carrier.get_shipping_options(
@@ -120,7 +106,6 @@ class FedExCarrierTestCase(TestCase):
             to_postal_code="12345",
         )
 
-        # Check that we got the expected options
         self.assertEqual(len(options), 3)
         self.assertEqual(options[0].carrier, "FedEx")
         self.assertEqual(options[0].method_type, ShippingMethodType.STANDARD)
@@ -133,7 +118,6 @@ class FedExCarrierTestCase(TestCase):
     def test_get_shipping_options_international(
         self, mock_logger, mock_settings
     ):
-        """Test getting international shipping options from FedEx."""
         carrier = FedExCarrier()
         international_country = mock.MagicMock()
         international_country.alpha_2 = "GB"
@@ -147,7 +131,6 @@ class FedExCarrierTestCase(TestCase):
             to_postal_code="SW1A 1AA",
         )
 
-        # Check that we got the expected options
         self.assertEqual(len(options), 1)
         self.assertEqual(options[0].carrier, "FedEx")
         self.assertEqual(
@@ -161,8 +144,6 @@ class FedExCarrierTestCase(TestCase):
     def test_create_shipment(
         self, mock_logger, mock_create_shipment, mock_settings
     ):
-        """Test creating a shipment with FedEx."""
-        # Setup the mock to return a successful shipment
         mock_create_shipment.return_value = (
             True,
             {
@@ -199,7 +180,6 @@ class FedExCarrierTestCase(TestCase):
 
     @mock.patch("order.shipping.logger")
     def test_get_tracking_info(self, mock_logger, mock_settings):
-        """Test getting tracking information from FedEx."""
         carrier = FedExCarrier()
         tracking_number = "FEDEX123456789"
 
@@ -214,10 +194,7 @@ class FedExCarrierTestCase(TestCase):
 
 
 class ShippingServiceTestCase(TestCase):
-    """Test case for the ShippingService class."""
-
     def setUp(self):
-        # Use mock objects instead of real database objects
         self.from_country = mock.MagicMock()
         self.from_country.alpha_2 = "US"
         self.to_country = mock.MagicMock()
@@ -233,8 +210,6 @@ class ShippingServiceTestCase(TestCase):
 
     @mock.patch("order.shipping.get_shipping_carrier")
     def test_get_available_shipping_options(self, mock_get_carrier):
-        """Test getting available shipping options."""
-        # Mock the carriers to return some options
         fedex_carrier = mock.MagicMock()
         fedex_options = [
             ShippingOption(
@@ -278,16 +253,13 @@ class ShippingServiceTestCase(TestCase):
             to_postal_code="12345",
         )
 
-        # We should get options from both carriers
         self.assertEqual(len(options), 2)
 
-        # The options should be sorted by price
         self.assertEqual(options[0].name, "UPS Ground")
         self.assertEqual(options[1].name, "FedEx Ground")
 
     @mock.patch("order.shipping.get_shipping_carrier")
     def test_create_shipment(self, mock_get_carrier):
-        """Test creating a shipment."""
         carrier = mock.MagicMock()
         carrier.create_shipment.return_value = (
             True,
@@ -308,7 +280,6 @@ class ShippingServiceTestCase(TestCase):
 
     @mock.patch("order.shipping.get_shipping_carrier")
     def test_get_tracking_info(self, mock_get_carrier):
-        """Test getting tracking information."""
         carrier = mock.MagicMock()
         carrier.get_tracking_info.return_value = {
             "tracking_number": "TEST123",
@@ -326,10 +297,7 @@ class ShippingServiceTestCase(TestCase):
 
 
 class GetShippingCarrierTestCase(TestCase):
-    """Test case for the get_shipping_carrier function."""
-
     def test_get_valid_carrier(self):
-        """Test getting a valid shipping carrier."""
         carrier = get_shipping_carrier("fedex")
         self.assertIsInstance(carrier, FedExCarrier)
 
@@ -337,6 +305,5 @@ class GetShippingCarrierTestCase(TestCase):
         self.assertIsInstance(carrier, UPSCarrier)
 
     def test_get_invalid_carrier(self):
-        """Test getting an invalid shipping carrier."""
         with self.assertRaises(ValueError):
             get_shipping_carrier("invalid_carrier")

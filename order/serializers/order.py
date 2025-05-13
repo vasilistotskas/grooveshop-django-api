@@ -6,7 +6,6 @@ from drf_spectacular.utils import extend_schema_field
 from phonenumber_field.serializerfields import PhoneNumberField
 from rest_framework import serializers
 
-from authentication.serializers import AuthenticationSerializer
 from country.serializers import CountrySerializer
 from order.models.item import OrderItem
 from order.models.order import Order
@@ -41,18 +40,18 @@ class OrderSerializer(serializers.ModelSerializer):
     is_paid = serializers.BooleanField(read_only=True)
 
     @extend_schema_field(CountrySerializer)
-    def get_country(self, order):
+    def get_country(self, order: Order):
         return CountrySerializer(order.country).data
 
     @extend_schema_field(RegionSerializer)
-    def get_region(self, order):
+    def get_region(self, order: Order):
         return RegionSerializer(order.region).data
 
     @extend_schema_field(PayWaySerializer)
-    def get_pay_way(self, order):
+    def get_pay_way(self, order: Order):
         return PayWaySerializer(order.pay_way).data
 
-    def get_status_display(self, order):
+    def get_status_display(self, order: Order) -> str:
         return order.get_status_display()
 
     class Meta:
@@ -113,13 +112,10 @@ class OrderSerializer(serializers.ModelSerializer):
 
 
 class OrderDetailSerializer(OrderSerializer):
-    """Detailed order serializer with additional information."""
-
-    user = AuthenticationSerializer(read_only=True)
     tracking_info = serializers.SerializerMethodField("get_tracking_info")
     time_since_order = serializers.SerializerMethodField("get_time_since_order")
 
-    def get_tracking_info(self, order):
+    def get_tracking_info(self, order: Order) -> dict | None:
         if order.tracking_number and order.shipping_carrier:
             return {
                 "tracking_number": order.tracking_number,
@@ -127,7 +123,7 @@ class OrderDetailSerializer(OrderSerializer):
             }
         return None
 
-    def get_time_since_order(self, order):
+    def get_time_since_order(self, order: Order) -> str:
         if not order.created_at:
             return "Unknown"
 
@@ -250,12 +246,42 @@ class OrderCreateUpdateSerializer(serializers.ModelSerializer):
         items_data = validated_data.pop("items")
 
         try:
+            # Convert decimal values to Money objects if they aren't already
+            if "paid_amount" in validated_data and not hasattr(
+                validated_data["paid_amount"], "currency"
+            ):
+                from django.conf import settings
+                from djmoney.money import Money
+
+                validated_data["paid_amount"] = Money(
+                    validated_data["paid_amount"], settings.DEFAULT_CURRENCY
+                )
+
+            if "shipping_price" in validated_data and not hasattr(
+                validated_data["shipping_price"], "currency"
+            ):
+                from django.conf import settings
+                from djmoney.money import Money
+
+                validated_data["shipping_price"] = Money(
+                    validated_data["shipping_price"], settings.DEFAULT_CURRENCY
+                )
+
             order = Order.objects.create(**validated_data)
 
             for item_data in items_data:
                 product = item_data.get("product")
 
-                item_data["price"] = product.final_price
+                # Ensure price is a Money object
+                if not hasattr(item_data.get("price"), "currency"):
+                    from django.conf import settings
+                    from djmoney.money import Money
+
+                    item_data["price"] = Money(
+                        item_data["price"], settings.DEFAULT_CURRENCY
+                    )
+                else:
+                    item_data["price"] = product.final_price
 
                 OrderItem.objects.create(order=order, **item_data)
 

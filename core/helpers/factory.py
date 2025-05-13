@@ -9,20 +9,6 @@ _factory_cache = {}
 def get_or_create_instance(
     app_label, model_name, factory_module_path, factory_class_name
 ):
-    """
-    Retrieve a random instance of the specified model if it exists.
-
-    Otherwise, create a new instance using the specified factory.
-
-    Args:
-        app_label (str): The Django app label.
-        model_name (str): The name of the model.
-        factory_module_path (str): The dot-path to the factory module.
-        factory_class_name (str): The name of the factory class.
-
-    Returns
-        models.Model: An instance of the specified model.
-    """
     try:
         Model = apps.get_model(app_label, model_name)
     except LookupError as err:

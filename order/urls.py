@@ -46,7 +46,6 @@ urlpatterns = [
         OrderViewSet.as_view({"get": "my_orders"}),
         name="order-my-orders",
     ),
-    # Order Item endpoints
     path(
         "order-items",
         OrderItemViewSet.as_view({"get": "list"}),

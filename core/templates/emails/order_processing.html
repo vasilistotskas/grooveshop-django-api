@@ -49,18 +49,18 @@
 <body>
     <h1>Your Order is Being Processed</h1>
     <p>Dear {{ order.first_name }} {{ order.last_name }},</p>
-    
+
     <p>Great news! Your order #{{ order.id }} is now being processed.</p>
-    
+
     <div class="order-details">
         <h2>Order Details</h2>
         <p><strong>Order Date:</strong> {{ order.created_at }}</p>
         <p><strong>Order Total:</strong> {{ order.total_price }}</p>
         <p><strong>Status:</strong> <span class="status-badge">Processing</span></p>
     </div>
-    
+
     <p>This means your payment has been confirmed and our team is preparing your items for shipment. You'll receive another notification when your order has been shipped.</p>
-    
+
     <h3>What Happens Next?</h3>
     <ul class="processing-steps">
         <li>Payment confirmed</li>
@@ -69,17 +69,17 @@
         <li>Shipping</li>
         <li>Delivery</li>
     </ul>
-    
+
     <p>Estimated time for processing: <strong>1-2 business days</strong>.</p>
-    
+
     <p>If you have any questions about your order, please contact our customer service team.</p>
-    
+
     <p>Thank you for shopping with {{ site_name }}!</p>
-    
+
     <p>
         <strong>Best regards,</strong><br>
         The {{ site_name }} Team<br>
         <a href="mailto:{{ support_email }}">{{ support_email }}</a>
     </p>
 </body>
-</html> 
+</html>

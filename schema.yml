@@ -3109,6 +3109,8 @@ paths:
   /api/v1/checkout:
     post:
       operationId: api_v1_checkout_create
+      description: Process a checkout and create a new order
+      summary: Create a new order via checkout
       tags:
       - api
       requestBody:
@@ -3126,7 +3128,7 @@ paths:
       security:
       - {}
       responses:
-        '200':
+        '201':
           content:
             application/json:
               schema:
@@ -4133,6 +4135,8 @@ paths:
   /api/v1/order:
     get:
       operationId: api_v1_order_list
+      description: Returns a list of all orders with pagination
+      summary: List all orders
       parameters:
       - name: ordering
         required: false
@@ -4152,6 +4156,26 @@ paths:
         description: Number of results to return per page.
         schema:
           type: integer
+      - in: query
+        name: paymentStatus
+        schema:
+          type: string
+          enum:
+          - CANCELED
+          - COMPLETED
+          - FAILED
+          - PARTIALLY_REFUNDED
+          - PENDING
+          - PROCESSING
+          - REFUNDED
+        description: |-
+          * `PENDING` - Pending
+          * `PROCESSING` - Processing
+          * `COMPLETED` - Completed
+          * `FAILED` - Failed
+          * `REFUNDED` - Refunded
+          * `PARTIALLY_REFUNDED` - Partially Refunded
+          * `CANCELED` - Canceled
       - name: search
         required: false
         in: query
@@ -4164,14 +4188,22 @@ paths:
           type: string
           enum:
           - CANCELED
-          - PAID_AND_SENT
+          - COMPLETED
+          - DELIVERED
           - PENDING
-          - SENT
+          - PROCESSING
+          - REFUNDED
+          - RETURNED
+          - SHIPPED
         description: |-
-          * `SENT` - Sent
-          * `PAID_AND_SENT` - Paid and Sent
-          * `CANCELED` - Canceled
           * `PENDING` - Pending
+          * `PROCESSING` - Processing
+          * `SHIPPED` - Shipped
+          * `DELIVERED` - Delivered
+          * `COMPLETED` - Completed
+          * `CANCELED` - Canceled
+          * `RETURNED` - Returned
+          * `REFUNDED` - Refunded
       - in: query
         name: userId
         schema:
@@ -4179,8 +4211,6 @@ paths:
           nullable: true
       tags:
       - api
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -4204,8 +4234,6 @@ paths:
             schema:
               $ref: '#/components/schemas/OrderCreateUpdate'
         required: true
-      security:
-      - {}
       responses:
         '201':
           content:
@@ -4213,9 +4241,87 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrderCreateUpdate'
           description: ''
+  /api/v1/order-items:
+    get:
+      operationId: api_v1_order_items_list
+      description: List all order items associated with the authenticated user's orders.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: pageSize
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - order-items
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedOrderItemList'
+          description: ''
+  /api/v1/order-items/{id}:
+    get:
+      operationId: api_v1_order_items_retrieve
+      description: Retrieve a specific order item by ID.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - order-items
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderItem'
+          description: ''
+  /api/v1/order-items/{id}/refund:
+    post:
+      operationId: api_v1_order_items_refund_create
+      description: Process a refund for an order item.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - order-items
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OrderItem'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OrderItem'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderItem'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderItem'
+          description: ''
   /api/v1/order/{id}:
     get:
       operationId: api_v1_order_retrieve
+      description: Get detailed information about a specific order
+      summary: Retrieve an order by ID
       parameters:
       - in: path
         name: id
@@ -4224,14 +4330,12 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - {}
       responses:
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Order'
+                $ref: '#/components/schemas/OrderDetail'
           description: ''
     put:
       operationId: api_v1_order_update
@@ -4255,8 +4359,6 @@ paths:
             schema:
               $ref: '#/components/schemas/OrderCreateUpdate'
         required: true
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -4285,8 +4387,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PatchedOrderCreateUpdate'
-      security:
-      - {}
       responses:
         '200':
           content:
@@ -4304,14 +4404,192 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - {}
       responses:
         '204':
           description: No response body
+  /api/v1/order/{id}/add-tracking:
+    post:
+      operationId: api_v1_order_add_tracking_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OrderDetail'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OrderDetail'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderDetail'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetail'
+          description: ''
+  /api/v1/order/{id}/cancel:
+    post:
+      operationId: api_v1_order_cancel_create
+      description: Cancel an existing order and restore product stock
+      summary: Cancel an order
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OrderDetail'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OrderDetail'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderDetail'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetail'
+          description: ''
+  /api/v1/order/{id}/update-status:
+    post:
+      operationId: api_v1_order_update_status_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OrderDetail'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OrderDetail'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderDetail'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetail'
+          description: ''
+  /api/v1/order/my-orders:
+    get:
+      operationId: api_v1_order_my_orders_list
+      description: Returns a list of the authenticated user's orders
+      summary: List current user's orders
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: pageSize
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: paymentStatus
+        schema:
+          type: string
+          enum:
+          - CANCELED
+          - COMPLETED
+          - FAILED
+          - PARTIALLY_REFUNDED
+          - PENDING
+          - PROCESSING
+          - REFUNDED
+        description: |-
+          * `PENDING` - Pending
+          * `PROCESSING` - Processing
+          * `COMPLETED` - Completed
+          * `FAILED` - Failed
+          * `REFUNDED` - Refunded
+          * `PARTIALLY_REFUNDED` - Partially Refunded
+          * `CANCELED` - Canceled
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+          enum:
+          - CANCELED
+          - COMPLETED
+          - DELIVERED
+          - PENDING
+          - PROCESSING
+          - REFUNDED
+          - RETURNED
+          - SHIPPED
+        description: |-
+          * `PENDING` - Pending
+          * `PROCESSING` - Processing
+          * `SHIPPED` - Shipped
+          * `DELIVERED` - Delivered
+          * `COMPLETED` - Completed
+          * `CANCELED` - Canceled
+          * `RETURNED` - Returned
+          * `REFUNDED` - Refunded
+      - in: query
+        name: userId
+        schema:
+          type: integer
+          nullable: true
+      tags:
+      - api
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedOrderList'
+          description: ''
   /api/v1/order/uuid/{uuid}:
     get:
       operationId: api_v1_order_uuid_retrieve
+      description: Get detailed information about a specific order using its UUID
+      summary: Retrieve an order by UUID
       parameters:
       - in: path
         name: uuid
@@ -4321,14 +4599,12 @@ paths:
         required: true
       tags:
       - api
-      security:
-      - {}
       responses:
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Order'
+                $ref: '#/components/schemas/OrderDetail'
           description: ''
   /api/v1/pay_way:
     get:
@@ -10178,7 +10454,7 @@ components:
         email:
           type: string
           format: email
-          title: Email Address
+          title: Διεύθυνση ηλεκτρονικού ταχυδρομείου
           maxLength: 254
         firstName:
           type: string
@@ -11107,6 +11383,10 @@ components:
         fullAddress:
           type: string
           readOnly: true
+        paymentId:
+          type: string
+        paymentMethod:
+          type: string
       required:
       - city
       - createdAt
@@ -11246,10 +11526,18 @@ components:
       enum:
       - RECEIPT
       - INVOICE
+      - PROFORMA
+      - SHIPPING_LABEL
+      - RETURN_LABEL
+      - CREDIT_NOTE
       type: string
       description: |-
         * `RECEIPT` - Receipt
         * `INVOICE` - Invoice
+        * `PROFORMA` - Proforma Invoice
+        * `SHIPPING_LABEL` - Shipping Label
+        * `RETURN_LABEL` - Return Label
+        * `CREDIT_NOTE` - Credit Note
     FloorEnum:
       enum:
       - 0
@@ -11448,6 +11736,14 @@ components:
           readOnly: true
         status:
           $ref: '#/components/schemas/OrderStatusEnum'
+        statusDisplay:
+          type: string
+          readOnly: true
+        statusUpdatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
         firstName:
           type: string
           maxLength: 255
@@ -11524,7 +11820,24 @@ components:
         fullAddress:
           type: string
           readOnly: true
+        paymentId:
+          type: string
+          readOnly: true
+        paymentStatus:
+          allOf:
+          - $ref: '#/components/schemas/PaymentStatusEnum'
+          readOnly: true
+        paymentMethod:
+          type: string
+          readOnly: true
+        canBeCanceled:
+          type: boolean
+          readOnly: true
+        isPaid:
+          type: boolean
+          readOnly: true
       required:
+      - canBeCanceled
       - city
       - country
       - createdAt
@@ -11532,12 +11845,18 @@ components:
       - firstName
       - fullAddress
       - id
+      - isPaid
       - items
       - lastName
       - payWay
+      - paymentId
+      - paymentMethod
+      - paymentStatus
       - phone
       - region
       - shippingPrice
+      - statusDisplay
+      - statusUpdatedAt
       - street
       - streetNumber
       - totalPriceExtra
@@ -11657,6 +11976,18 @@ components:
         fullAddress:
           type: string
           readOnly: true
+        paymentId:
+          type: string
+        paymentStatus:
+          type: string
+        paymentMethod:
+          type: string
+        trackingNumber:
+          type: string
+          maxLength: 255
+        shippingCarrier:
+          type: string
+          maxLength: 255
       required:
       - city
       - createdAt
@@ -11673,6 +12004,204 @@ components:
       - totalPriceExtra
       - totalPriceItems
       - updatedAt
+      - uuid
+      - zipcode
+    OrderDetail:
+      type: object
+      description: Detailed order serializer with additional information.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        user:
+          allOf:
+          - $ref: '#/components/schemas/Authentication'
+          readOnly: true
+        country:
+          allOf:
+          - $ref: '#/components/schemas/Country'
+          readOnly: true
+        region:
+          allOf:
+          - $ref: '#/components/schemas/Region'
+          readOnly: true
+        floor:
+          oneOf:
+          - $ref: '#/components/schemas/FloorEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        locationType:
+          oneOf:
+          - $ref: '#/components/schemas/LocationTypeEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        street:
+          type: string
+          maxLength: 255
+        streetNumber:
+          type: string
+          maxLength: 255
+        payWay:
+          allOf:
+          - $ref: '#/components/schemas/PayWay'
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/OrderStatusEnum'
+        statusDisplay:
+          type: string
+          readOnly: true
+        statusUpdatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        firstName:
+          type: string
+          maxLength: 255
+        lastName:
+          type: string
+          maxLength: 255
+        email:
+          type: string
+          format: email
+          maxLength: 255
+        zipcode:
+          type: string
+          maxLength: 255
+        place:
+          type: string
+          maxLength: 255
+        city:
+          type: string
+          maxLength: 255
+        phone:
+          type: string
+        mobilePhone:
+          type: string
+        customerNotes:
+          type: string
+        paidAmount:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        shippingPrice:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        documentType:
+          $ref: '#/components/schemas/DocumentTypeEnum'
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        totalPriceItems:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        totalPriceExtra:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        fullAddress:
+          type: string
+          readOnly: true
+        paymentId:
+          type: string
+          readOnly: true
+        paymentStatus:
+          allOf:
+          - $ref: '#/components/schemas/PaymentStatusEnum'
+          readOnly: true
+        paymentMethod:
+          type: string
+          readOnly: true
+        canBeCanceled:
+          type: boolean
+          readOnly: true
+        isPaid:
+          type: boolean
+          readOnly: true
+        trackingInfo:
+          type: object
+          additionalProperties: {}
+          nullable: true
+          readOnly: true
+        trackingNumber:
+          type: string
+          readOnly: true
+        shippingCarrier:
+          type: string
+          readOnly: true
+        timeSinceOrder:
+          type: string
+          readOnly: true
+        customerFullName:
+          type: string
+          readOnly: true
+        isCompleted:
+          type: boolean
+          readOnly: true
+        isCanceled:
+          type: boolean
+          readOnly: true
+      required:
+      - canBeCanceled
+      - city
+      - country
+      - createdAt
+      - customerFullName
+      - email
+      - firstName
+      - fullAddress
+      - id
+      - isCanceled
+      - isCompleted
+      - isPaid
+      - items
+      - lastName
+      - payWay
+      - paymentId
+      - paymentMethod
+      - paymentStatus
+      - phone
+      - region
+      - shippingCarrier
+      - shippingPrice
+      - statusDisplay
+      - statusUpdatedAt
+      - street
+      - streetNumber
+      - timeSinceOrder
+      - totalPriceExtra
+      - totalPriceItems
+      - trackingInfo
+      - trackingNumber
+      - updatedAt
+      - user
       - uuid
       - zipcode
     OrderItem:
@@ -11694,6 +12223,19 @@ components:
           type: integer
           maximum: 2147483647
           minimum: -2147483648
+        originalQuantity:
+          type: integer
+          readOnly: true
+          nullable: true
+        isRefunded:
+          type: boolean
+          readOnly: true
+        refundedQuantity:
+          type: integer
+          readOnly: true
+        netQuantity:
+          type: integer
+          readOnly: true
         sortOrder:
           type: integer
           readOnly: true
@@ -11718,11 +12260,35 @@ components:
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
+        refundedAmount:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        netPrice:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        notes:
+          type: string
       required:
       - createdAt
       - id
+      - isRefunded
+      - netPrice
+      - netQuantity
+      - originalQuantity
       - price
       - product
+      - refundedAmount
+      - refundedQuantity
       - sortOrder
       - totalPrice
       - updatedAt
@@ -11746,22 +12312,32 @@ components:
           type: integer
           maximum: 2147483647
           minimum: -2147483648
+        notes:
+          type: string
       required:
       - id
       - price
       - product
     OrderStatusEnum:
       enum:
-      - SENT
-      - PAID_AND_SENT
-      - CANCELED
       - PENDING
+      - PROCESSING
+      - SHIPPED
+      - DELIVERED
+      - COMPLETED
+      - CANCELED
+      - RETURNED
+      - REFUNDED
       type: string
       description: |-
-        * `SENT` - Sent
-        * `PAID_AND_SENT` - Paid and Sent
-        * `CANCELED` - Canceled
         * `PENDING` - Pending
+        * `PROCESSING` - Processing
+        * `SHIPPED` - Shipped
+        * `DELIVERED` - Delivered
+        * `COMPLETED` - Completed
+        * `CANCELED` - Canceled
+        * `RETURNED` - Returned
+        * `REFUNDED` - Refunded
     PaginatedAuthenticationList:
       type: object
       required:
@@ -11946,6 +12522,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Country'
+    PaginatedOrderItemList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
     PaginatedOrderList:
       type: object
       required:
@@ -12255,7 +12854,7 @@ components:
         email:
           type: string
           format: email
-          title: Email Address
+          title: Διεύθυνση ηλεκτρονικού ταχυδρομείου
           maxLength: 254
         firstName:
           type: string
@@ -13087,6 +13686,18 @@ components:
         fullAddress:
           type: string
           readOnly: true
+        paymentId:
+          type: string
+        paymentStatus:
+          type: string
+        paymentMethod:
+          type: string
+        trackingNumber:
+          type: string
+          maxLength: 255
+        shippingCarrier:
+          type: string
+          maxLength: 255
     PatchedPayWay:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -13965,6 +14576,24 @@ components:
       - translations
       - updatedAt
       - uuid
+    PaymentStatusEnum:
+      enum:
+      - PENDING
+      - PROCESSING
+      - COMPLETED
+      - FAILED
+      - REFUNDED
+      - PARTIALLY_REFUNDED
+      - CANCELED
+      type: string
+      description: |-
+        * `PENDING` - Pending
+        * `PROCESSING` - Processing
+        * `COMPLETED` - Completed
+        * `FAILED` - Failed
+        * `REFUNDED` - Refunded
+        * `PARTIALLY_REFUNDED` - Partially Refunded
+        * `CANCELED` - Canceled
     Product:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.

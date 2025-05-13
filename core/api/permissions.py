@@ -5,11 +5,6 @@ from rest_framework.permissions import BasePermission
 
 
 class IsSelfOrAdmin(BasePermission):
-    """
-    Custom permission to only allow users to access their own account.
-    Admins can access any account.
-    """
-
     message = _("You do not have permission to access this account.")
 
     @override

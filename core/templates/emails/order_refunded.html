@@ -53,13 +53,13 @@
 <body>
     <h1>Refund Processed Successfully</h1>
     <p>Dear {{ order.first_name }} {{ order.last_name }},</p>
-    
+
     <p>Good news! Your refund for order #{{ order.id }} has been processed successfully.</p>
-    
+
     <div class="refund-box">
         <p>Refund Amount: <span class="refund-amount">{{ order.paid_amount }}</span></p>
     </div>
-    
+
     <div class="refund-details">
         <h2>Refund Details</h2>
         <p><strong>Order Number:</strong> #{{ order.id }}</p>
@@ -67,21 +67,21 @@
         <p><strong>Payment Method:</strong> {{ order.payment_method }}</p>
         <p><strong>Status:</strong> <span class="status-badge">Refunded</span></p>
     </div>
-    
+
     <div class="info-box">
         <h3>When Will I Receive My Refund?</h3>
         <p>The refunded amount should appear in your account within 3-5 business days, depending on your payment provider's processing time.</p>
         <p>If you don't see the refund in your account after 5 business days, please check with your bank or payment provider before contacting us.</p>
     </div>
-    
+
     <p>Thank you for your patience throughout this process. We hope to have the opportunity to serve you again in the future.</p>
-    
+
     <p>If you have any questions about your refund, please don't hesitate to contact our customer service team.</p>
-    
+
     <p>
         <strong>Best regards,</strong><br>
         The {{ site_name }} Team<br>
         <a href="mailto:{{ support_email }}">{{ support_email }}</a>
     </p>
 </body>
-</html> 
+</html>

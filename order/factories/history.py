@@ -13,27 +13,18 @@ User = get_user_model()
 
 
 def get_fake_useragent():
-    """Generate realistic browser user agent strings."""
     browser_types = [
-        # Chrome on Windows
         f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{random.randint(80, 120)}.0.{random.randint(1000, 9999)}.{random.randint(100, 999)} Safari/537.36",
-        # Firefox on Windows
         f"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:{random.randint(70, 110)}.0) Gecko/20100101 Firefox/{random.randint(70, 110)}.0",
-        # Safari on macOS
         f"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_{random.randint(13, 15)}_{random.randint(1, 7)}) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/{random.randint(13, 16)}.{random.randint(0, 9)} Safari/605.1.15",
-        # Edge on Windows
         f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{random.randint(80, 120)}.0.{random.randint(1000, 9999)}.{random.randint(100, 999)} Edg/{random.randint(80, 120)}.0.{random.randint(100, 999)}.{random.randint(10, 99)}",
-        # Mobile Chrome on Android
         f"Mozilla/5.0 (Linux; Android {random.randint(9, 13)}; SM-G{random.randint(900, 999)}U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{random.randint(80, 120)}.0.{random.randint(1000, 9999)}.{random.randint(100, 999)} Mobile Safari/537.36",
-        # Mobile Safari on iOS
         f"Mozilla/5.0 (iPhone; CPU iPhone OS {random.randint(13, 16)}_{random.randint(0, 6)} like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/{random.randint(13, 16)}.0 Mobile/15E148 Safari/604.1",
     ]
     return random.choice(browser_types)
 
 
 class OrderHistoryFactory(factory.django.DjangoModelFactory):
-    """Factory for creating OrderHistory instances with realistic data."""
-
     order = factory.SubFactory("order.factories.order.OrderFactory")
     user = factory.LazyFunction(
         lambda: User.objects.order_by("?").first()
@@ -71,7 +62,6 @@ class OrderHistoryFactory(factory.django.DjangoModelFactory):
 
     @factory.post_generation
     def set_change_type_specific_data(self, create, extracted, **kwargs):
-        """Set appropriate data based on change_type after creation."""
         if not create:
             return
 
@@ -119,7 +109,6 @@ class OrderHistoryFactory(factory.django.DjangoModelFactory):
 
     @classmethod
     def create_status_change(cls, order=None, **kwargs):
-        """Create a history entry for a status change."""
         old_status = kwargs.pop(
             "old_status",
             random.choice([choice[0] for choice in OrderStatusEnum.choices]),
@@ -145,7 +134,6 @@ class OrderHistoryFactory(factory.django.DjangoModelFactory):
 
     @classmethod
     def create_payment_update(cls, order=None, **kwargs):
-        """Create a history entry for a payment update."""
         old_payment_status = kwargs.pop(
             "old_payment_status",
             random.choice([choice[0] for choice in PaymentStatusEnum.choices]),
@@ -166,7 +154,6 @@ class OrderHistoryFactory(factory.django.DjangoModelFactory):
 
     @classmethod
     def create_note(cls, order=None, note=None, **kwargs):
-        """Create a history entry for a note."""
         if not note:
             note = fake.paragraph()
 
@@ -181,7 +168,6 @@ class OrderHistoryFactory(factory.django.DjangoModelFactory):
 
     @classmethod
     def create_for_order(cls, order, count=None, **kwargs):
-        """Create multiple history entries for a specific order."""
         if count is None:
             count = random.randint(1, 5)
 
@@ -193,8 +179,6 @@ class OrderHistoryFactory(factory.django.DjangoModelFactory):
 
 
 class OrderItemHistoryFactory(factory.django.DjangoModelFactory):
-    """Factory for creating OrderItemHistory instances with realistic data."""
-
     order_item = factory.SubFactory("order.factories.item.OrderItemFactory")
     user = factory.LazyFunction(
         lambda: User.objects.order_by("?").first()
@@ -224,7 +208,6 @@ class OrderItemHistoryFactory(factory.django.DjangoModelFactory):
 
     @factory.post_generation
     def set_change_type_specific_data(self, create, extracted, **kwargs):
-        """Set appropriate data based on change_type after creation."""
         if not create:
             return
 
@@ -262,7 +245,6 @@ class OrderItemHistoryFactory(factory.django.DjangoModelFactory):
 
     @classmethod
     def create_quantity_change(cls, order_item=None, **kwargs):
-        """Create a history entry for a quantity change."""
         old_quantity = kwargs.pop("old_quantity", random.randint(1, 5))
         new_quantity = kwargs.pop("new_quantity", random.randint(1, 5))
 
@@ -280,7 +262,6 @@ class OrderItemHistoryFactory(factory.django.DjangoModelFactory):
 
     @classmethod
     def create_price_update(cls, order_item=None, **kwargs):
-        """Create a history entry for a price update."""
         old_price = kwargs.pop(
             "old_price",
             f"${random.randint(10, 100)}.{random.randint(0, 99):02d}",
@@ -301,7 +282,6 @@ class OrderItemHistoryFactory(factory.django.DjangoModelFactory):
 
     @classmethod
     def create_refund(cls, order_item=None, refund_quantity=None, **kwargs):
-        """Create a history entry for a refund."""
         if not refund_quantity:
             if order_item:
                 refund_quantity = random.randint(1, order_item.quantity)
@@ -319,7 +299,6 @@ class OrderItemHistoryFactory(factory.django.DjangoModelFactory):
 
     @classmethod
     def create_for_order_item(cls, order_item, count=None, **kwargs):
-        """Create multiple history entries for a specific order item."""
         if count is None:
             count = random.randint(1, 3)
 

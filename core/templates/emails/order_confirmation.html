@@ -40,12 +40,12 @@
 <body>
     <h1>Order Confirmation</h1>
     <p>Thank you for your order!</p>
-    
+
     <div class="order-details">
         <h2>Order #{{ order.id }}</h2>
         <p><strong>Date:</strong> {{ order.created_at }}</p>
         <p><strong>Status:</strong> {{ order.status }}</p>
-        
+
         <h3>Shipping Address</h3>
         <p>
             {{ order.first_name }} {{ order.last_name }}<br>
@@ -54,7 +54,7 @@
             {{ order.country }}
         </p>
     </div>
-    
+
     <h3>Order Items</h3>
     <table class="order-items">
         <thead>
@@ -76,15 +76,15 @@
             {% endfor %}
         </tbody>
     </table>
-    
+
     <div class="totals">
         <p><strong>Subtotal:</strong> {{ order.total_price_items }}</p>
         <p><strong>Shipping:</strong> {{ order.shipping_price }}</p>
         <p><strong>Total:</strong> {{ order.total_price }}</p>
     </div>
-    
+
     <p>If you have any questions about your order, please contact our customer service.</p>
-    
+
     <p>Thank you for shopping with us!</p>
 </body>
-</html> 
+</html>

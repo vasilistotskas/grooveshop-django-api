@@ -67,7 +67,6 @@ urlpatterns = [
         UserAccountViewSet.as_view({"post": "change_username"}),
         name="user-account-change-username",
     ),
-    # Address
     path(
         "user/address",
         UserAddressViewSet.as_view({"get": "list", "post": "create"}),

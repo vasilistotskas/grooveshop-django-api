@@ -9,7 +9,19 @@ from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Avg, F
+from django.db.models import (
+    Avg,
+    Case,
+    Count,
+    DecimalField,
+    F,
+    FloatField,
+    OuterRef,
+    Subquery,
+    Value,
+    When,
+)
+from django.db.models.functions import Coalesce
 from django.templatetags.static import static
 from django.utils.safestring import SafeString, mark_safe
 from django.utils.translation import gettext_lazy as _
@@ -51,11 +63,149 @@ class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
     def exclude_deleted(self):
         return self.exclude(is_deleted=True)
 
+    def with_discount_value(self):
+        """Add discount_value annotation to queryset"""
+        return self.annotate(
+            discount_value_amount=F("price")
+            * F("discount_percent")
+            / Value(100, output_field=DecimalField())
+        )
+
+    def with_vat_value(self):
+        """Add VAT value annotation to queryset"""
+        return self.annotate(
+            vat_value_amount=Case(
+                When(
+                    vat__isnull=False,
+                    then=F("price")
+                    * F("vat__value")
+                    / Value(100, output_field=DecimalField()),
+                ),
+                default=Value(0, output_field=DecimalField()),
+            )
+        )
+
+    def with_final_price(self):
+        """Add final_price annotation to queryset"""
+        queryset = self.with_discount_value().with_vat_value()
+        return queryset.annotate(
+            final_price_amount=F("price")
+            + F("vat_value_amount")
+            - F("discount_value_amount")
+        )
+
+    def with_price_save_percent(self):
+        """Add price_save_percent annotation to queryset"""
+        queryset = self.with_discount_value()
+        return queryset.annotate(
+            price_save_percent_field=Case(
+                When(
+                    price__gt=0,
+                    then=F("discount_value_amount")
+                    / F("price")
+                    * Value(100, output_field=DecimalField()),
+                ),
+                default=Value(0, output_field=DecimalField()),
+            )
+        )
+
+    def with_likes_count(self):
+        """Add likes_count annotation to queryset"""
+        from product.models.favourite import ProductFavourite
+
+        likes_subquery = (
+            ProductFavourite.objects.filter(product_id=OuterRef("pk"))
+            .values("product_id")
+            .annotate(count=Count("id"))
+            .values("count")
+        )
+
+        return self.annotate(
+            likes_count_field=Coalesce(Subquery(likes_subquery), Value(0))
+        )
+
+    def with_review_average(self):
+        """Add review_average annotation to queryset"""
+        from product.models.review import ProductReview
+
+        reviews_avg_subquery = (
+            ProductReview.objects.filter(product_id=OuterRef("pk"))
+            .values("product_id")
+            .annotate(
+                avg=Coalesce(Avg("rate"), Value(0, output_field=FloatField()))
+            )
+            .values("avg")
+        )
+
+        return self.annotate(
+            review_average_field=Coalesce(
+                Subquery(reviews_avg_subquery),
+                Value(0, output_field=FloatField()),
+            )
+        )
+
+    def with_approved_review_average(self):
+        """Add approved_review_average annotation to queryset"""
+        from product.enum.review import ReviewStatusEnum
+        from product.models.review import ProductReview
+
+        approved_reviews_avg_subquery = (
+            ProductReview.objects.filter(
+                product_id=OuterRef("pk"), status=ReviewStatusEnum.TRUE
+            )
+            .values("product_id")
+            .annotate(
+                avg=Coalesce(Avg("rate"), Value(0, output_field=FloatField()))
+            )
+            .values("avg")
+        )
+
+        return self.annotate(
+            approved_review_average_field=Coalesce(
+                Subquery(approved_reviews_avg_subquery),
+                Value(0, output_field=FloatField()),
+            )
+        )
+
+    def with_all_annotations(self):
+        """Apply all annotations to queryset"""
+        return (
+            self.with_final_price()
+            .with_price_save_percent()
+            .with_likes_count()
+            .with_review_average()
+            .with_approved_review_average()
+        )
+
 
 class ProductManager(TranslatableManager):
     @override
     def get_queryset(self):
         return ProductQuerySet(self.model, using=self._db).exclude_deleted()
+
+    def with_discount_value(self):
+        return self.get_queryset().with_discount_value()
+
+    def with_vat_value(self):
+        return self.get_queryset().with_vat_value()
+
+    def with_final_price(self):
+        return self.get_queryset().with_final_price()
+
+    def with_price_save_percent(self):
+        return self.get_queryset().with_price_save_percent()
+
+    def with_likes_count(self):
+        return self.get_queryset().with_likes_count()
+
+    def with_review_average(self):
+        return self.get_queryset().with_review_average()
+
+    def with_approved_review_average(self):
+        return self.get_queryset().with_approved_review_average()
+
+    def with_all_annotations(self):
+        return self.get_queryset().with_all_annotations()
 
 
 class Product(
@@ -273,7 +423,6 @@ class Product(
 
     @property
     def final_price(self) -> Money:
-        # Ensure all money objects use the same currency before arithmetic operations
         price_currency = self.price.currency
         vat_value = (
             Money(self.vat_value.amount, price_currency)

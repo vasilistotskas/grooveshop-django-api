@@ -41,32 +41,32 @@
 <body>
     <h1>Complete Your Order</h1>
     <p>Dear {{ order.first_name }} {{ order.last_name }},</p>
-    
+
     <div class="reminder-box">
         <p><strong>We noticed that your order #{{ order.id }} placed on {{ order.created_at }} is still in pending status.</strong></p>
     </div>
-    
+
     <div class="order-details">
         <h2>Order Details</h2>
         <p><strong>Order Date:</strong> {{ order.created_at }}</p>
         <p><strong>Order Total:</strong> {{ order.total_price }}</p>
         <p><strong>Status:</strong> Pending</p>
     </div>
-    
+
     <p>To complete your purchase, please finalize your payment. If you've already completed payment, please disregard this message as it may take some time for our system to update.</p>
-    
+
     <p>You can view your order status by logging into your account on our website.</p>
-    
+
     <a href="{{ site_url }}" class="cta-button">Go to Your Account</a>
-    
+
     <p>If you're experiencing any issues with your payment or have questions about your order, please don't hesitate to contact our customer service team.</p>
-    
+
     <p>Thank you for shopping with {{ site_name }}!</p>
-    
+
     <p>
         <strong>Best regards,</strong><br>
         The {{ site_name }} Team<br>
         <a href="mailto:{{ support_email }}">{{ support_email }}</a>
     </p>
 </body>
-</html> 
+</html>

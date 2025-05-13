@@ -301,10 +301,8 @@ class OrderMetrics:
         if end_date:
             query = query.filter(created_at__lte=end_date)
 
-        # PayWay uses django-parler for translations, so we need to annotate the name differently
         payment_counts = query.values("pay_way_id").annotate(count=Count("id"))
 
-        # Build a dictionary of payment method counts
         result = {}
         for item in payment_counts:
             pay_way_id = item["pay_way_id"]

@@ -11,11 +11,11 @@ from djmoney.money import Money
 from faker import Faker
 from phonenumber_field.phonenumber import PhoneNumber
 
+from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from order.enum.document_type_enum import OrderDocumentTypeEnum
 from order.enum.status_enum import OrderStatusEnum, PaymentStatusEnum
 from order.factories.item import OrderItemFactory
 from order.models.order import Order
-from user.enum.address import FloorChoicesEnum, LocationChoicesEnum
 
 fake = Faker()
 
@@ -66,7 +66,6 @@ def get_or_create_pay_way():
 
 
 def generate_tracking_number():
-    """Generate a realistic tracking number."""
     carriers = ["FEDEX", "UPS", "USPS", "DHL"]
     carrier = random.choice(carriers)
 
@@ -82,9 +81,9 @@ def generate_tracking_number():
 
 
 def generate_payment_data(status=None):
-    """Generate realistic payment data based on status."""
     payment_methods = ["CREDIT_CARD", "PAYPAL", "BANK_TRANSFER", "STRIPE"]
     payment_method = random.choice(payment_methods)
+    payment_id: str = ""
 
     if payment_method == "CREDIT_CARD":
         payment_id = f"CC-{fake.numerify('###-###-###')}"
@@ -95,9 +94,8 @@ def generate_payment_data(status=None):
     elif payment_method == "STRIPE":
         payment_id = f"pi_{fake.lexify('?' * 24)}"
 
-    # Default to a random payment status if not specified
     if not status:
-        if random.randint(1, 10) > 2:  # 80% chance of being completed
+        if random.randint(1, 10) > 2:
             status = PaymentStatusEnum.COMPLETED
         else:
             status = random.choice(
@@ -120,9 +118,11 @@ class OrderFactory(factory.django.DjangoModelFactory):
     country = factory.LazyFunction(get_or_create_country)
     region = factory.LazyFunction(get_or_create_region)
     pay_way = factory.LazyFunction(get_or_create_pay_way)
-    floor = factory.Iterator(FloorChoicesEnum.choices, getter=lambda x: x[0])
-    location_type = factory.Iterator(
-        LocationChoicesEnum.choices, getter=lambda x: x[0]
+    floor = factory.LazyFunction(
+        lambda: random.choice([s[0] for s in FloorChoicesEnum.choices])
+    )
+    location_type = factory.LazyFunction(
+        lambda: random.choice([s[0] for s in LocationChoicesEnum.choices])
     )
     email = factory.Faker("email")
     first_name = factory.Faker("first_name")
@@ -162,8 +162,8 @@ class OrderFactory(factory.django.DjangoModelFactory):
             "USD",
         )
     )
-    document_type = factory.Iterator(
-        OrderDocumentTypeEnum.choices, getter=lambda x: x[0]
+    document_type = factory.LazyFunction(
+        lambda: random.choice([s[0] for s in OrderDocumentTypeEnum.choices])
     )
     paid_amount = factory.LazyFunction(
         lambda: Money(
@@ -219,25 +219,17 @@ class OrderFactory(factory.django.DjangoModelFactory):
         if extracted:
             OrderItemFactory.create_batch(extracted, order=self)
         else:
-            # By default, create 1-5 items
             count = random.randint(1, 5)
             OrderItemFactory.create_batch_for_order(order=self, count=count)
 
     @classmethod
     def create_with_consistent_status_data(cls, status=None, **kwargs):
-        """
-        Create an order with data that is consistent with its status.
-
-        This ensures that orders in specific states have appropriate data for that state,
-        such as tracking numbers for shipped orders and payment data for paid orders.
-        """
         if status is None:
             status = random.choice([s[0] for s in OrderStatusEnum.choices])
 
         now = timezone.now()
         data = {"status": status, "status_updated_at": now, **kwargs}
 
-        # Set appropriate payment data based on status
         if status in [
             OrderStatusEnum.COMPLETED,
             OrderStatusEnum.SHIPPED,
@@ -256,19 +248,17 @@ class OrderFactory(factory.django.DjangoModelFactory):
                 "USD",
             )
         elif status == OrderStatusEnum.CANCELED:
-            # For canceled orders, payment may have failed or been canceled
             payment_status = random.choice(
                 [
                     PaymentStatusEnum.FAILED,
                     PaymentStatusEnum.CANCELED,
-                    "",  # Sometimes no payment was attempted
+                    "",
                 ]
             )
             if payment_status:
                 payment_data = generate_payment_data(payment_status)
                 data.update(payment_data)
         elif status == OrderStatusEnum.REFUNDED:
-            # Refunded orders must have been paid first
             payment_data = generate_payment_data(PaymentStatusEnum.REFUNDED)
             data.update(payment_data)
             data["paid_amount"] = Money(
@@ -282,7 +272,6 @@ class OrderFactory(factory.django.DjangoModelFactory):
                 "USD",
             )
 
-        # Add tracking information for shipped/delivered orders
         if status in [OrderStatusEnum.SHIPPED, OrderStatusEnum.DELIVERED]:
             tracking_number = generate_tracking_number()
             carrier = (
@@ -293,13 +282,11 @@ class OrderFactory(factory.django.DjangoModelFactory):
             data["tracking_number"] = tracking_number
             data["shipping_carrier"] = carrier
 
-        # Create the order and its items
         order = cls.create(**data)
         return order
 
     @classmethod
     def create_pending_order(cls, **kwargs):
-        """Create a pending order awaiting payment."""
         return cls.create_with_consistent_status_data(
             status=OrderStatusEnum.PENDING,
             payment_status=PaymentStatusEnum.PENDING,
@@ -308,7 +295,6 @@ class OrderFactory(factory.django.DjangoModelFactory):
 
     @classmethod
     def create_processing_order(cls, **kwargs):
-        """Create an order being processed (payment complete, preparing for shipping)."""
         return cls.create_with_consistent_status_data(
             status=OrderStatusEnum.PROCESSING,
             payment_status=PaymentStatusEnum.COMPLETED,
@@ -317,38 +303,32 @@ class OrderFactory(factory.django.DjangoModelFactory):
 
     @classmethod
     def create_shipped_order(cls, **kwargs):
-        """Create an order that has been shipped with tracking info."""
         return cls.create_with_consistent_status_data(
             status=OrderStatusEnum.SHIPPED, **kwargs
         )
 
     @classmethod
     def create_completed_order(cls, **kwargs):
-        """Create a completed order (delivered and finalized)."""
         return cls.create_with_consistent_status_data(
             status=OrderStatusEnum.COMPLETED, **kwargs
         )
 
     @classmethod
     def create_canceled_order(cls, **kwargs):
-        """Create a canceled order."""
         return cls.create_with_consistent_status_data(
             status=OrderStatusEnum.CANCELED, **kwargs
         )
 
     @classmethod
     def create_refunded_order(cls, **kwargs):
-        """Create a refunded order with associated refunded items."""
         order = cls.create_with_consistent_status_data(
             status=OrderStatusEnum.REFUNDED,
             payment_status=PaymentStatusEnum.REFUNDED,
             **kwargs,
         )
 
-        # If the order has items, mark some or all as refunded
         if hasattr(order, "items") and order.items.exists():
             items = list(order.items.all())
-            # Select a subset of items to refund (or all of them)
             refund_all = random.choice([True, False])
             items_to_refund = (
                 items
@@ -357,12 +337,10 @@ class OrderFactory(factory.django.DjangoModelFactory):
             )
 
             for item in items_to_refund:
-                # Either full or partial refund
                 full_refund = random.choice([True, False])
                 if full_refund or item.quantity == 1:
                     refund_qty = item.quantity
                 else:
-                    # Handle the case where quantity is 1
                     refund_qty = random.randint(1, max(1, item.quantity - 1))
 
                 item.refunded_quantity = refund_qty

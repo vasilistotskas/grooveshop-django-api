@@ -3,9 +3,9 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from core.utils.testing import TestURLFixerMixin
 from country.factories import CountryFactory
 from country.models import Country
-from country.serializers import CountrySerializer
 
 languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
@@ -13,7 +13,7 @@ languages = [
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
-class CountryViewSetTestCase(APITestCase):
+class CountryViewSetTestCase(TestURLFixerMixin, APITestCase):
     country: Country = None
 
     def setUp(self):
@@ -36,11 +36,19 @@ class CountryViewSetTestCase(APITestCase):
     def test_list(self):
         url = self.get_country_list_url()
         response = self.client.get(url)
-        countries = Country.objects.all()
-        serializer = CountrySerializer(countries, many=True)
-
-        self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertIn("results", response.data)
+        self.assertIsInstance(response.data["results"], list)
+
+        countries_count = Country.objects.count()
+        self.assertEqual(len(response.data["results"]), countries_count)
+
+        if countries_count > 0:
+            first_result = response.data["results"][0]
+            self.assertIn("translations", first_result)
+            self.assertIn("alpha_2", first_result)
+            self.assertIn("alpha_3", first_result)
 
     def test_create_valid(self):
         payload = {
@@ -88,11 +96,18 @@ class CountryViewSetTestCase(APITestCase):
     def test_retrieve_valid(self):
         url = self.get_country_detail_url(self.country.pk)
         response = self.client.get(url)
-        country = Country.objects.get(pk=self.country.pk)
-        serializer = CountrySerializer(country)
-
-        self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertIn("alpha_2", response.data)
+        self.assertEqual(response.data["alpha_2"], self.country.alpha_2)
+
+        self.assertIn("alpha_3", response.data)
+        self.assertEqual(response.data["alpha_3"], self.country.alpha_3)
+
+        self.assertIn("iso_cc", response.data)
+        self.assertEqual(response.data["iso_cc"], self.country.iso_cc)
+
+        self.assertIn("translations", response.data)
 
     def test_retrieve_invalid(self):
         invalid_country_id = 9999

@@ -1,7 +1,3 @@
-"""
-Unit tests for order history models.
-"""
-
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
@@ -13,19 +9,13 @@ from order.models.history import OrderHistory, OrderItemHistory
 
 
 class OrderHistoryTestCase(TestCase):
-    """Test case for the OrderHistory model."""
-
     def setUp(self):
-        """Set up test data."""
-        # Create a mock order
         self.order = Mock()
         self.order.id = 1
 
-        # Create a mock user
         self.user = Mock()
         self.user.id = 42
 
-        # Create a mock request
         self.request = Mock(spec=HttpRequest)
         self.request.META = {
             "REMOTE_ADDR": "127.0.0.1",
@@ -34,12 +24,9 @@ class OrderHistoryTestCase(TestCase):
 
     @patch("order.models.history.OrderHistory.objects.create")
     def test_log_status_change(self, mock_create):
-        """Test logging a status change."""
-        # Set up return value
         history_entry = Mock(spec=OrderHistory)
         mock_create.return_value = history_entry
 
-        # Call the method
         result = OrderHistory.log_status_change(
             order=self.order,
             previous_status=OrderStatusEnum.PENDING,
@@ -48,10 +35,8 @@ class OrderHistoryTestCase(TestCase):
             request=self.request,
         )
 
-        # Check the result
         self.assertEqual(result, history_entry)
 
-        # Verify create was called with correct arguments
         mock_create.assert_called_once_with(
             order=self.order,
             user=self.user,
@@ -65,16 +50,12 @@ class OrderHistoryTestCase(TestCase):
 
     @patch("order.models.history.OrderHistory.objects.create")
     def test_log_payment_update(self, mock_create):
-        """Test logging a payment update."""
-        # Set up test data
         previous_value = {"paid_amount": {"amount": 0, "currency": "USD"}}
         new_value = {"paid_amount": {"amount": 100, "currency": "USD"}}
 
-        # Set up return value
         history_entry = Mock(spec=OrderHistory)
         mock_create.return_value = history_entry
 
-        # Call the method
         result = OrderHistory.log_payment_update(
             order=self.order,
             previous_value=previous_value,
@@ -83,10 +64,8 @@ class OrderHistoryTestCase(TestCase):
             request=self.request,
         )
 
-        # Check the result
         self.assertEqual(result, history_entry)
 
-        # Verify create was called with correct arguments
         mock_create.assert_called_once_with(
             order=self.order,
             user=self.user,
@@ -100,16 +79,12 @@ class OrderHistoryTestCase(TestCase):
 
     @patch("order.models.history.OrderHistory.objects.create")
     def test_log_payment_update_with_money_object(self, mock_create):
-        """Test logging a payment update with Money objects that need serialization."""
-        # Set up test data with a Money object
         previous_value = {"paid_amount": Money("0.00", "USD")}
         new_value = {"paid_amount": Money("100.00", "USD")}
 
-        # Set up return value
         history_entry = Mock(spec=OrderHistory)
         mock_create.return_value = history_entry
 
-        # Call the method
         result = OrderHistory.log_payment_update(
             order=self.order,
             previous_value=previous_value,
@@ -117,11 +92,8 @@ class OrderHistoryTestCase(TestCase):
             user=self.user,
         )
 
-        # Check the result
         self.assertEqual(result, history_entry)
 
-        # Verify create was called with correct arguments
-        # The Money objects should have been converted to strings
         mock_create.assert_called_once()
         call_kwargs = mock_create.call_args.kwargs
         self.assertEqual(call_kwargs["order"], self.order)
@@ -137,16 +109,12 @@ class OrderHistoryTestCase(TestCase):
 
     @patch("order.models.history.OrderHistory.objects.create")
     def test_log_shipping_update(self, mock_create):
-        """Test logging a shipping update."""
-        # Set up test data
         previous_value = {"tracking_number": None, "carrier": None}
         new_value = {"tracking_number": "TRACK123", "carrier": "FedEx"}
 
-        # Set up return value
         history_entry = Mock(spec=OrderHistory)
         mock_create.return_value = history_entry
 
-        # Call the method
         result = OrderHistory.log_shipping_update(
             order=self.order,
             previous_value=previous_value,
@@ -155,10 +123,8 @@ class OrderHistoryTestCase(TestCase):
             request=self.request,
         )
 
-        # Check the result
         self.assertEqual(result, history_entry)
 
-        # Verify create was called with correct arguments
         mock_create.assert_called_once_with(
             order=self.order,
             user=self.user,
@@ -172,23 +138,17 @@ class OrderHistoryTestCase(TestCase):
 
     @patch("order.models.history.OrderHistory.objects.create")
     def test_log_note(self, mock_create):
-        """Test logging a note."""
-        # Set up test data
         note = "This is a test note"
 
-        # Set up return value
         history_entry = Mock(spec=OrderHistory)
         mock_create.return_value = history_entry
 
-        # Call the method
         result = OrderHistory.log_note(
             order=self.order, note=note, user=self.user, request=self.request
         )
 
-        # Check the result
         self.assertEqual(result, history_entry)
 
-        # Verify create was called with correct arguments - we update this to match the actual implementation
         mock_create.assert_called_once_with(
             order=self.order,
             user=self.user,
@@ -201,19 +161,15 @@ class OrderHistoryTestCase(TestCase):
 
     @patch("order.models.history.OrderHistory.objects.create")
     def test_log_refund(self, mock_create):
-        """Test logging a refund."""
-        # Set up test data
         refund_data = {
             "amount": {"amount": 50, "currency": "USD"},
             "reason": "Customer request",
             "transaction_id": "refund_123",
         }
 
-        # Set up return value
         history_entry = Mock(spec=OrderHistory)
         mock_create.return_value = history_entry
 
-        # Call the method
         result = OrderHistory.log_refund(
             order=self.order,
             refund_data=refund_data,
@@ -221,10 +177,8 @@ class OrderHistoryTestCase(TestCase):
             request=self.request,
         )
 
-        # Check the result
         self.assertEqual(result, history_entry)
 
-        # Verify create was called with correct arguments - update this to match the implementation
         mock_create.assert_called_once_with(
             order=self.order,
             user=self.user,
@@ -237,28 +191,20 @@ class OrderHistoryTestCase(TestCase):
 
 
 class OrderItemHistoryTestCase(TestCase):
-    """Test case for the OrderItemHistory model."""
-
     def setUp(self):
-        """Set up test data."""
-        # Create a mock order item
         self.order_item = Mock()
         self.order_item.id = 1
         self.order_item.product = Mock()
         self.order_item.product.name = "Test Product"
 
-        # Create a mock user
         self.user = Mock()
         self.user.id = 42
 
     @patch("order.models.history.OrderItemHistory.objects.create")
     def test_log_quantity_change(self, mock_create):
-        """Test logging a quantity change."""
-        # Set up return value
         history_entry = Mock(spec=OrderItemHistory)
         mock_create.return_value = history_entry
 
-        # Call the method
         result = OrderItemHistory.log_quantity_change(
             order_item=self.order_item,
             previous_quantity=1,
@@ -267,10 +213,8 @@ class OrderItemHistoryTestCase(TestCase):
             reason="Customer request",
         )
 
-        # Check the result
         self.assertEqual(result, history_entry)
 
-        # Verify create was called with correct arguments
         mock_create.assert_called_once_with(
             order_item=self.order_item,
             user=self.user,
@@ -282,16 +226,12 @@ class OrderItemHistoryTestCase(TestCase):
 
     @patch("order.models.history.OrderItemHistory.objects.create")
     def test_log_price_update(self, mock_create):
-        """Test logging a price update."""
-        # Set up test data
         previous_price = Money("50.00", "USD")
         new_price = Money("45.00", "USD")
 
-        # Set up return value
         history_entry = Mock(spec=OrderItemHistory)
         mock_create.return_value = history_entry
 
-        # Call the method
         result = OrderItemHistory.log_price_update(
             order_item=self.order_item,
             previous_price=previous_price,
@@ -300,29 +240,22 @@ class OrderItemHistoryTestCase(TestCase):
             reason="Price adjustment",
         )
 
-        # Check the result
         self.assertEqual(result, history_entry)
 
-        # Verify create was called with correct arguments
         mock_create.assert_called_once()
         call_kwargs = mock_create.call_args.kwargs
         self.assertEqual(call_kwargs["order_item"], self.order_item)
         self.assertEqual(call_kwargs["user"], self.user)
         self.assertEqual(call_kwargs["change_type"], "PRICE")
-        # Update the assertion to match the actual formatting in the implementation
         self.assertIn("Price updated from", call_kwargs["description"])
 
     @patch("order.models.history.OrderItemHistory.objects.create")
     def test_log_refund(self, mock_create):
-        """Test logging an item refund."""
-        # Set up mock price for order item
         self.order_item.price = Money("50.00", "USD")
 
-        # Set up return value
         history_entry = Mock(spec=OrderItemHistory)
         mock_create.return_value = history_entry
 
-        # Call the method
         result = OrderItemHistory.log_refund(
             order_item=self.order_item,
             refund_quantity=1,
@@ -330,15 +263,12 @@ class OrderItemHistoryTestCase(TestCase):
             reason="Damaged item",
         )
 
-        # Check the result
         self.assertEqual(result, history_entry)
 
-        # Verify create was called with correct arguments
         mock_create.assert_called_once()
         call_kwargs = mock_create.call_args.kwargs
         self.assertEqual(call_kwargs["order_item"], self.order_item)
         self.assertEqual(call_kwargs["user"], self.user)
         self.assertEqual(call_kwargs["change_type"], "REFUND")
         self.assertEqual(call_kwargs["new_value"]["refund_quantity"], 1)
-        # Remove assertion that checks for 'reason' key which isn't included in the actual implementation
         self.assertIn("refund_amount", call_kwargs["new_value"])

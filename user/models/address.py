@@ -7,8 +7,8 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from phonenumber_field.modelfields import PhoneNumberField
 
+from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from core.models import TimeStampMixinModel, UUIDModel
-from user.enum.address import FloorChoicesEnum, LocationChoicesEnum
 
 
 class UserAddress(TimeStampMixinModel, UUIDModel):
@@ -41,19 +41,19 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
         default=None,
         on_delete=models.SET_NULL,
     )
-    floor = models.PositiveSmallIntegerField(
+    floor = models.CharField(
         _("Floor"),
+        max_length=50,
         choices=FloorChoicesEnum,
-        null=True,
         blank=True,
-        default=None,
+        default="",
     )
-    location_type = models.PositiveSmallIntegerField(
+    location_type = models.CharField(
         _("Location Type"),
+        max_length=100,
         choices=LocationChoicesEnum,
-        null=True,
         blank=True,
-        default=None,
+        default="",
     )
     phone = PhoneNumberField(
         _("Phone Number"), null=True, blank=True, default=None

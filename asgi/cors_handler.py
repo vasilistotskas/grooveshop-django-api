@@ -19,12 +19,10 @@ def cors_handler(application: ASGI3Application):
         if scope["type"] != "http":
             await application(scope, receive, send)
             return
-        # determine the origin of the request
         request_origin: str = ""
         for header, value in scope.get("headers", []):
             if header == b"origin":
                 request_origin = value.decode("latin1")
-        # if the origin is allowed, add the appropriate CORS headers
         origin_match = False
         if request_origin:
             for allowed_origin in settings.CORS_ALLOWED_ORIGINS:

@@ -13,10 +13,10 @@ from djmoney.models.fields import MoneyField
 from djmoney.money import Money
 from phonenumber_field.modelfields import PhoneNumberField
 
+from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from core.models import SoftDeleteModel, TimeStampMixinModel, UUIDModel
 from order.enum.document_type_enum import OrderDocumentTypeEnum
 from order.enum.status_enum import OrderStatusEnum, PaymentStatusEnum
-from user.enum.address import FloorChoicesEnum, LocationChoicesEnum
 
 
 class OrderQuerySet(models.QuerySet):
@@ -124,10 +124,18 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
         blank=True,
     )
     floor = models.CharField(
-        max_length=50, choices=FloorChoicesEnum, blank=True, default=""
+        _("Floor"),
+        max_length=50,
+        choices=FloorChoicesEnum,
+        blank=True,
+        default="",
     )
     location_type = models.CharField(
-        max_length=100, choices=LocationChoicesEnum, blank=True, default=""
+        _("Location Type"),
+        max_length=100,
+        choices=LocationChoicesEnum,
+        blank=True,
+        default="",
     )
     email = models.EmailField(_("Email"), max_length=255)
     first_name = models.CharField(_("First Name"), max_length=255)

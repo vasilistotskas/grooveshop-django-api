@@ -1,8 +1,9 @@
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.test import APITestCase
+from rest_framework.test import APIClient, APITestCase
 
+from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from country.factories import CountryFactory
 from country.models import Country
 from order.enum.status_enum import OrderStatusEnum
@@ -13,7 +14,6 @@ from product.factories.product import ProductFactory
 from product.models.product import Product
 from region.factories import RegionFactory
 from region.models import Region
-from user.enum.address import FloorChoicesEnum, LocationChoicesEnum
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()
@@ -26,12 +26,11 @@ class CheckoutViewAPITest(APITestCase):
     region: Region = None
 
     def setUp(self):
+        self.client = APIClient()
         self.user = UserAccountFactory(num_addresses=0)
-        self.pay_way = PayWayFactory()
         self.country = CountryFactory(num_regions=0)
-        self.region = RegionFactory(
-            country=self.country,
-        )
+        self.region = RegionFactory(country=self.country)
+        self.pay_way = PayWayFactory()
 
     @staticmethod
     def get_checkout_url():
@@ -39,15 +38,8 @@ class CheckoutViewAPITest(APITestCase):
 
     def test_successful_order_creation(self):
         self.client.force_authenticate(user=self.user)
-        products = ProductFactory.create_batch(2, num_images=0, num_reviews=0)
-
-        product_1 = products[0]
-        product_1.stock = 10
-        product_1.save()
-
-        product_2 = products[1]
-        product_2.stock = 15
-        product_2.save()
+        product_1 = ProductFactory.create(stock=20, num_images=0, num_reviews=0)
+        product_2 = ProductFactory.create(stock=20, num_images=0, num_reviews=0)
 
         order_data = {
             "user": self.user.id,
@@ -84,25 +76,21 @@ class CheckoutViewAPITest(APITestCase):
         response = self.client.post(url, data=order_data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(Product.objects.get(pk=product_1.id).stock, 6)
-        self.assertEqual(Product.objects.get(pk=product_2.id).stock, 9)
+        self.assertEqual(Product.objects.get(pk=product_1.id).stock, 16)
+        self.assertEqual(Product.objects.get(pk=product_2.id).stock, 14)
 
     def test_failed_order_creation(self):
         self.client.force_authenticate(user=self.user)
-        products = ProductFactory.create_batch(2, num_images=0, num_reviews=0)
-
-        product_3 = products[0]
-        product_3.stock = 10
-        product_3.save()
-
-        product_4 = products[1]
-        product_4.stock = 15
-        product_4.save()
+        product_3 = ProductFactory.create(stock=10, num_images=0, num_reviews=0)
+        product_4 = ProductFactory.create(stock=15, num_images=0, num_reviews=0)
 
         order_data = {
             "user_id": self.user.id,
             "items": [
-                {"product": product_3.id, "quantity": 15},
+                {
+                    "product": product_3.id,
+                    "quantity": 15,
+                },
                 {"product": product_4.id, "quantity": 3},
             ],
             "pay_way": self.pay_way.id,

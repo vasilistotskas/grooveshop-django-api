@@ -145,7 +145,9 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
             "update",
             "partial_update",
             "destroy",
-        ] or self.action in ["add_tracking", "update_status"]:
+        ]:
+            permission_classes = [IsSelfOrAdmin]
+        elif self.action in ["add_tracking", "update_status"]:
             permission_classes = [IsAdminUser]
         else:
             permission_classes = [IsAuthenticated]
@@ -224,7 +226,7 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    @action(detail=False, methods=["GET"], permission_classes=[IsAuthenticated])
+    @action(detail=False, methods=["GET"])
     def my_orders(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             raise NotAuthenticated(

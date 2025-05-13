@@ -37,7 +37,6 @@ class TranslationsProcessingMixin:
 
             data["translations"] = translations
 
-            # Update the request data
             request._full_data = data
 
         return request

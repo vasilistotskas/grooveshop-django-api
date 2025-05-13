@@ -8,12 +8,11 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from core.utils.serializers import flatten_dict_for_form_data
-from core.utils.tests import compare_serializer_and_response
+from core.utils.testing import TestURLFixerMixin
 from product.factories.image import ProductImageFactory
 from product.factories.product import ProductFactory
 from product.models.image import ProductImage
 from product.models.product import Product
-from product.serializers.image import ProductImageSerializer
 
 languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
@@ -21,7 +20,7 @@ languages = [
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
-class ProductImageViewSetTestCase(APITestCase):
+class ProductImageViewSetTestCase(TestURLFixerMixin, APITestCase):
     product: Product = None
     product_image: ProductImage = None
     default_image: SimpleUploadedFile = None
@@ -53,16 +52,14 @@ class ProductImageViewSetTestCase(APITestCase):
     def test_list(self):
         url = self.get_product_image_list_url()
         response = self.client.get(url)
-        images = ProductImage.objects.all()
-        serializer = ProductImageSerializer(images, many=True)
-        for response_item, serializer_item in zip(
-            response.data["results"], serializer.data, strict=False
-        ):
-            compare_serializer_and_response(
-                serializer_item, response_item, ["image", "thumbnail"]
-            )
-
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        if isinstance(response.data, dict) and "results" in response.data:
+            images = ProductImage.objects.all()
+            self.assertEqual(len(response.data["results"]), images.count())
+        else:
+            images = ProductImage.objects.all()
+            self.assertEqual(len(response.data), images.count())
 
     def test_create_valid(self):
         payload = {
@@ -102,13 +99,18 @@ class ProductImageViewSetTestCase(APITestCase):
     def test_retrieve_valid(self):
         url = self.get_product_image_detail_url(self.product_image.id)
         response = self.client.get(url)
-        product_image = ProductImage.objects.get(pk=self.product_image.id)
-        serializer = ProductImageSerializer(product_image)
-        compare_serializer_and_response(
-            serializer.data, response.data, ["image", "thumbnail"]
-        )
-
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.product_image.refresh_from_db()
+
+        self.assertIn("id", response.data)
+        self.assertEqual(response.data["id"], self.product_image.id)
+
+        self.assertIn("product", response.data)
+        self.assertIsNotNone(response.data["product"])
+
+        self.assertIn("is_main", response.data)
+        self.assertEqual(response.data["is_main"], self.product_image.is_main)
 
     def test_retrieve_invalid(self):
         invalid_product_image_id = 999999

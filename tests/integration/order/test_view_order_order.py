@@ -3,10 +3,11 @@ from decimal import Decimal
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.urls import reverse
-from moneyed import Money
+from djmoney.money import Money
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from country.factories import CountryFactory
 from country.models import Country
 from order.enum.status_enum import OrderStatusEnum
@@ -19,7 +20,6 @@ from pay_way.models import PayWay
 from product.factories.product import ProductFactory
 from region.factories import RegionFactory
 from region.models import Region
-from user.enum.address import FloorChoicesEnum, LocationChoicesEnum
 
 User = get_user_model()
 
@@ -32,12 +32,8 @@ class OrderViewSetTestCase(APITestCase):
     order_items: list[OrderItem] = None
 
     def setUp(self):
-        """
-        Set up test data for each test method.
-        """
         super().setUp()
 
-        # Set up users
         self.user = User.objects.create_user(
             username="testuser",
             email="testuser@example.com",
@@ -51,12 +47,10 @@ class OrderViewSetTestCase(APITestCase):
             is_superuser=True,
         )
 
-        # Set up related models
         self.pay_way = PayWayFactory()
         self.country = CountryFactory()
         self.region = RegionFactory(country=self.country)
 
-        # Create an order with items
         self.order = OrderFactory(
             user=self.user,
             status=OrderStatusEnum.PENDING.value,
@@ -76,8 +70,6 @@ class OrderViewSetTestCase(APITestCase):
             )
             self.order_items.append(item)
 
-        # Force authenticate the client with admin user for most tests
-        # (except the unauthenticated test which will clear this)
         self.client.force_authenticate(user=self.admin_user)
 
     @staticmethod
@@ -89,7 +81,6 @@ class OrderViewSetTestCase(APITestCase):
         return reverse("order-list")
 
     def test_list(self):
-        """Test listing orders."""
         self.client.force_authenticate(user=self.admin_user)
         url = self.get_order_list_url()
         response = self.client.get(url)
@@ -98,7 +89,6 @@ class OrderViewSetTestCase(APITestCase):
         self.assertEqual(response.data["results"], serializer.data)
 
     def test_create_valid(self):
-        """Test creating an order."""
         self.client.force_authenticate(user=self.admin_user)
         payload = {
             "user": self.user.id,
@@ -142,7 +132,6 @@ class OrderViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_create_invalid(self):
-        """Test creating an order with invalid data."""
         self.client.force_authenticate(user=self.admin_user)
         payload = {
             "user": "invalid_user_id",
@@ -182,7 +171,6 @@ class OrderViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_retrieve_valid(self):
-        """Test retrieving an order."""
         self.client.force_authenticate(user=self.admin_user)
         url = self.get_order_detail_url(self.order.id)
         response = self.client.get(url)
@@ -193,7 +181,6 @@ class OrderViewSetTestCase(APITestCase):
         self.assertEqual(response.data, serializer.data)
 
     def test_retrieve_invalid(self):
-        """Test retrieving an invalid order."""
         self.client.force_authenticate(user=self.admin_user)
         invalid_order_id = 999999
         url = self.get_order_detail_url(invalid_order_id)
@@ -201,8 +188,11 @@ class OrderViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_update_valid(self):
-        """Test updating an order."""
         self.client.force_authenticate(user=self.admin_user)
+
+        self.order.status = OrderStatusEnum.PROCESSING.value
+        self.order.save()
+
         payload = {
             "user": self.user.id,
             "pay_way": self.pay_way.id,
@@ -238,10 +228,13 @@ class OrderViewSetTestCase(APITestCase):
 
         url = self.get_order_detail_url(self.order.id)
         response = self.client.put(url, data=payload, format="json")
+
+        if response.status_code != status.HTTP_200_OK:
+            print(f"Response data: {response.data}")
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_update_invalid(self):
-        """Test updating an order with invalid data."""
         self.client.force_authenticate(user=self.admin_user)
         payload = {
             "user": "invalid_user_id",
@@ -281,7 +274,6 @@ class OrderViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_partial_update_valid(self):
-        """Test partially updating an order."""
         self.client.force_authenticate(user=self.admin_user)
         payload = {
             "status": OrderStatusEnum.SHIPPED.value,
@@ -292,7 +284,6 @@ class OrderViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_partial_update_invalid(self):
-        """Test partially updating an order with invalid data."""
         self.client.force_authenticate(user=self.admin_user)
         payload = {
             "status": "invalid_status",
@@ -303,7 +294,6 @@ class OrderViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_destroy_valid(self):
-        """Test destroying an order."""
         self.client.force_authenticate(user=self.admin_user)
         url = self.get_order_detail_url(self.order.id)
         response = self.client.delete(url)
@@ -311,7 +301,6 @@ class OrderViewSetTestCase(APITestCase):
         self.assertFalse(Order.objects.filter(id=self.order.id).exists())
 
     def test_destroy_invalid(self):
-        """Test destroying an invalid order."""
         self.client.force_authenticate(user=self.admin_user)
         invalid_order_id = 999999
         url = self.get_order_detail_url(invalid_order_id)

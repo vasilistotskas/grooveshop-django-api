@@ -47,11 +47,8 @@ urlpatterns += i18n_patterns(
         ManageTOTPSvgView.as_api_view(client="app"),
         name="manage_totp_svg",
     ),
-    # rosetta
     path("rosetta/", include("rosetta.urls")),
-    # admin html editor
     path("tinymce/", include("tinymce.urls")),
-    # api
     path("api/v1/", include("product.urls")),
     path("api/v1/", include("order.urls")),
     path("api/v1/", include("user.urls")),

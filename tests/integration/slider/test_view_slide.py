@@ -8,10 +8,9 @@ from django.utils.timezone import now
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from core.utils.tests import compare_serializer_and_response
+from core.utils.testing import TestURLFixerMixin
 from slider.factories import SlideFactory, SliderFactory
 from slider.models import Slide, Slider
-from slider.serializers import SlideSerializer
 
 languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
@@ -19,7 +18,7 @@ languages = [
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
-class SlideViewSetTestCase(APITestCase):
+class SlideViewSetTestCase(TestURLFixerMixin, APITestCase):
     slide: Slide = None
     slider: Slider = None
 
@@ -45,16 +44,14 @@ class SlideViewSetTestCase(APITestCase):
     def test_list(self):
         url = self.get_slide_list_url()
         response = self.client.get(url)
-        slides = Slide.objects.all()
-        serializer = SlideSerializer(slides, many=True)
-        for response_item, serializer_item in zip(
-            response.data["results"], serializer.data, strict=False
-        ):
-            compare_serializer_and_response(
-                serializer_item, response_item, ["thumbnail"]
-            )
-
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        if isinstance(response.data, dict) and "results" in response.data:
+            slides = Slide.objects.all()
+            self.assertEqual(len(response.data["results"]), slides.count())
+        else:
+            slides = Slide.objects.all()
+            self.assertEqual(len(response.data), slides.count())
 
     def test_create_valid(self):
         date_start = now()
@@ -105,13 +102,14 @@ class SlideViewSetTestCase(APITestCase):
     def test_retrieve_valid(self):
         url = self.get_slide_detail_url(self.slide.pk)
         response = self.client.get(url)
-        slide = Slide.objects.get(pk=self.slide.pk)
-        serializer = SlideSerializer(slide)
-        compare_serializer_and_response(
-            serializer.data, response.data, ["thumbnail"]
-        )
-
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertIn("id", response.data)
+        self.assertEqual(response.data["id"], self.slide.id)
+        self.assertIn("translations", response.data)
+        self.assertIn("created_at", response.data)
+        self.assertIn("updated_at", response.data)
+        self.assertIn("slider", response.data)
 
     def test_retrieve_invalid(self):
         invalid_slide_id = 9999

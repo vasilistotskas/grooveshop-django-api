@@ -15,8 +15,6 @@ from core.admin import ExportActionMixin
 
 
 class MockModel(models.Model):
-    """Test model for admin export tests."""
-
     name = models.CharField(max_length=100)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.TextField()
@@ -30,8 +28,6 @@ class MockModel(models.Model):
 
 
 class MockTranslatableModel(TranslatableModel):
-    """Test translatable model for admin export tests."""
-
     code = models.CharField(max_length=50)
 
     class Meta:
@@ -43,18 +39,13 @@ class MockTranslatableModel(TranslatableModel):
 
 
 class MockParlerMeta:
-    """Mock _parler_meta for testing."""
-
     @staticmethod
     def get_translated_fields():
         return ["title", "description"]
 
 
 class ExportActionMixinTest(TestCase):
-    """Test cases for ExportActionMixin."""
-
     def setUp(self):
-        """Set up test environment."""
         self.mixin = ExportActionMixin()
         self.mixin.model = MockModel
 
@@ -126,7 +117,6 @@ class ExportActionMixinTest(TestCase):
 
     @override_settings(LANGUAGES=[("en", "English"), ("fr", "French")])
     def test_export_csv_standard_model(self):
-        """Test export_csv method with a standard model."""
         self.mixin.model._meta = MagicMock()
         self.mixin.model._meta.verbose_name = "test_model"
 
@@ -179,7 +169,6 @@ class ExportActionMixinTest(TestCase):
 
     @override_settings(LANGUAGES=[("en", "English"), ("fr", "French")])
     def test_export_csv_translatable_model(self):
-        """Test export_csv method with a translatable model."""
         self.mixin.model = MockTranslatableModel
         self.mixin.model._meta = MagicMock()
         self.mixin.model._meta.verbose_name = "test_translatable_model"
@@ -217,7 +206,6 @@ class ExportActionMixinTest(TestCase):
         self.assertEqual(rows[1][4], "French Description")
 
     def test_add_base_fields_to_xml(self):
-        """Test _add_base_fields_to_xml method."""
         root = ET.Element("root")
         obj_element = ET.SubElement(root, "test_model")
 
@@ -243,7 +231,6 @@ class ExportActionMixinTest(TestCase):
 
     @override_settings(LANGUAGES=[("en", "English"), ("fr", "French")])
     def test_add_translated_fields_to_xml(self):
-        """Test _add_translated_fields_to_xml method."""
         root = ET.Element("root")
         obj_element = ET.SubElement(root, "test_translatable_model")
 
@@ -271,7 +258,6 @@ class ExportActionMixinTest(TestCase):
         )
 
     def test_generate_xml_response(self):
-        """Test _generate_xml_response method."""
         root = ET.Element("test_models")
         model = ET.SubElement(root, "test_model")
         name = ET.SubElement(model, "name")
@@ -300,7 +286,6 @@ class ExportActionMixinTest(TestCase):
 
     @patch("core.admin.xml.dom.minidom.parseString")
     def test_generate_xml_response_fallback(self, mock_parseString):
-        """Test _generate_xml_response method with pretty-print fallback."""
         mock_parseString.side_effect = Exception("XML parsing error")
 
         root = ET.Element("test_models")
@@ -325,7 +310,6 @@ class ExportActionMixinTest(TestCase):
 
     @override_settings(LANGUAGES=[("en", "English"), ("fr", "French")])
     def test_export_xml_standard_model(self):
-        """Test export_xml method with a standard model."""
         self.mixin.model._meta = MagicMock()
         self.mixin.model._meta.verbose_name = "test_model"
 
@@ -364,7 +348,6 @@ class ExportActionMixinTest(TestCase):
 
     @override_settings(LANGUAGES=[("en", "English"), ("fr", "French")])
     def test_export_xml_translatable_model(self):
-        """Test export_xml method with a translatable model."""
         self.mixin.model = MockTranslatableModel
         self.mixin.model._meta = MagicMock()
         self.mixin.model._meta.verbose_name = "test_translatable_model"
@@ -402,7 +385,6 @@ class ExportActionMixinTest(TestCase):
         self.assertEqual(en_trans.find("./title").text, "English Title")
 
     def test_export_xml_empty_queryset(self):
-        """Test export_xml method with an empty queryset."""
         self.queryset.__bool__.return_value = False
 
         response = self.mixin.export_xml(self.request, self.queryset)
@@ -411,7 +393,6 @@ class ExportActionMixinTest(TestCase):
 
     @patch("core.admin.ET.tostring")
     def test_export_xml_error_handling(self, mock_tostring):
-        """Test export_xml method error handling."""
         mock_tostring.side_effect = Exception("XML generation error")
 
         self.mixin.model._meta = MagicMock()
@@ -436,7 +417,6 @@ class ExportActionMixinTest(TestCase):
         )
 
     def test_get_export_formats(self):
-        """Test get_export_formats method."""
         formats = self.mixin.get_export_formats()
 
         self.assertEqual(len(formats), 2)

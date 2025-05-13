@@ -21,7 +21,6 @@ from seo.models import SeoModel
 class CategoryQuerySet(TranslatableQuerySet, TreeQuerySet):
     @override
     def as_manager(cls):
-        # make sure creating managers from querysets works.
         manager = CategoryManager.from_queryset(cls)()
         manager._built_with_as_manager = True
         return manager

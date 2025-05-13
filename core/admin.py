@@ -59,7 +59,6 @@ class ExportActionMixin:
         ]
 
     def export_csv(self, request: HttpRequest, queryset: QuerySet):
-        """Exports the selected queryset to a CSV file."""
         opts = self.model._meta
         model_verbose_name_str = str(opts.verbose_name)
         response = HttpResponse(content_type="text/csv; charset=utf-8")
@@ -308,7 +307,6 @@ class ExportActionMixin:
             )
 
     def get_export_formats(self) -> list:
-        """Returns available export formats."""
         return [
             {"format": "csv", "label": "CSV"},
             {"format": "xml", "label": "XML"},

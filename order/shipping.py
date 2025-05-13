@@ -31,8 +31,8 @@ class ShippingOption:
     name: str
     method_type: ShippingMethodType
     price: Money
-    estimated_delivery_min: int  # days
-    estimated_delivery_max: int  # days
+    estimated_delivery_min: int
+    estimated_delivery_max: int
     carrier: str
     carrier_service_code: str
     description: Optional[str] = None

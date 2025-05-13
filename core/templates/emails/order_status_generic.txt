@@ -8,7 +8,7 @@ Order Details:
 - Order Date: {{ order.created_at }}
 - Total Amount: {{ order.total_price }}
 
-This status means: 
+This status means:
 {% if status == "PENDING" %}
 Your order has been received and is awaiting payment processing.
 {% elif status == "PROCESSING" %}
@@ -35,4 +35,4 @@ Thank you for shopping with {{ site_name }}!
 
 Best regards,
 The {{ site_name }} Team
-{{ support_email }} 
+{{ support_email }}

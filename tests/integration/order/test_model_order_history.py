@@ -9,13 +9,10 @@ from product.factories.product import ProductFactory
 
 
 class OrderHistoryModelTestCase(TestCase):
-    """Test case for the OrderHistory model."""
-
     def setUp(self):
         self.order = OrderFactory()
 
     def test_log_status_change(self):
-        """Test logging status changes."""
         previous_status = "PENDING"
         new_status = "PROCESSING"
 
@@ -37,7 +34,6 @@ class OrderHistoryModelTestCase(TestCase):
         )
 
     def test_log_payment_update(self):
-        """Test logging payment updates."""
         previous_value = {"payment_id": "prev123", "status": "pending"}
         new_value = {"payment_id": "new456", "status": "completed"}
 
@@ -52,7 +48,6 @@ class OrderHistoryModelTestCase(TestCase):
         self.assertIn("Payment information updated", history_entry.description)
 
     def test_log_shipping_update(self):
-        """Test logging shipping updates."""
         previous_value = None
         new_value = {
             "tracking_number": "TRACK123",
@@ -70,7 +65,6 @@ class OrderHistoryModelTestCase(TestCase):
         self.assertIn("Shipping information updated", history_entry.description)
 
     def test_log_note(self):
-        """Test logging notes."""
         note = "This is a test note about the order"
 
         history_entry = OrderHistory.log_note(order=self.order, note=note)
@@ -81,7 +75,6 @@ class OrderHistoryModelTestCase(TestCase):
         self.assertIn("Note added to order", history_entry.description)
 
     def test_log_refund(self):
-        """Test logging refunds."""
         refund_data = {
             "amount": "50.00",
             "currency": "USD",
@@ -99,8 +92,6 @@ class OrderHistoryModelTestCase(TestCase):
 
 
 class OrderItemHistoryModelTestCase(TestCase):
-    """Test case for the OrderItemHistory model."""
-
     def setUp(self):
         self.order = OrderFactory()
         self.product = ProductFactory()
@@ -111,7 +102,6 @@ class OrderItemHistoryModelTestCase(TestCase):
         )
 
     def test_log_quantity_change(self):
-        """Test logging quantity changes."""
         previous_quantity = 2
         new_quantity = 3
 
@@ -133,7 +123,6 @@ class OrderItemHistoryModelTestCase(TestCase):
         )
 
     def test_log_price_update(self):
-        """Test logging price updates."""
         previous_price = Money(amount=Decimal("50.00"), currency="USD")
         new_price = Money(amount=Decimal("60.00"), currency="USD")
 
@@ -157,7 +146,6 @@ class OrderItemHistoryModelTestCase(TestCase):
         )
 
     def test_log_refund(self):
-        """Test logging refunds."""
         refund_quantity = 1
 
         history_entry = OrderItemHistory.log_refund(

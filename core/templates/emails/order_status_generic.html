@@ -40,18 +40,18 @@
 <body>
     <h1>Order Status Update</h1>
     <p>Dear {{ order.first_name }} {{ order.last_name }},</p>
-    
+
     <p>Your order #{{ order.id }} has been updated.</p>
-    
+
     <div class="order-details">
         <h2>Order Details</h2>
         <p><strong>Order Date:</strong> {{ order.created_at }}</p>
         <p><strong>Order Total:</strong> {{ order.total_price }}</p>
         <p>
-            <strong>New Status:</strong> 
+            <strong>New Status:</strong>
             <span class="status-badge status-{{ status|lower }}">{{ status }}</span>
         </p>
-        
+
         <h3>What This Means</h3>
         <p>
             {% if status == "PENDING" %}
@@ -75,15 +75,15 @@
             {% endif %}
         </p>
     </div>
-    
+
     <p>If you have any questions about your order, please contact our customer service team.</p>
-    
+
     <p>Thank you for shopping with {{ site_name }}!</p>
-    
+
     <p>
         <strong>Best regards,</strong><br>
         The {{ site_name }} Team<br>
         <a href="mailto:{{ support_email }}">{{ support_email }}</a>
     </p>
 </body>
-</html> 
+</html>

@@ -9,6 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from core.api.permissions import IsSelfOrAdmin
+from order.enum.status_enum import OrderStatusEnum
 from order.models.item import OrderItem
 from order.serializers.item import (
     OrderItemRefundSerializer,
@@ -35,6 +36,9 @@ class OrderItemViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated, IsSelfOrAdmin]
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return OrderItem.objects.none()
+
         user = self.request.user
         return (
             OrderItem.objects.filter(order__user=user)
@@ -61,9 +65,9 @@ class OrderItemViewSet(viewsets.ReadOnlyModelViewSet):
         order_item = self.get_object()
 
         if order_item.order.status not in [
-            "DELIVERED",
-            "COMPLETED",
-            "RETURNED",
+            OrderStatusEnum.DELIVERED,
+            OrderStatusEnum.COMPLETED,
+            OrderStatusEnum.RETURNED,
         ]:
             raise DRFValidationError(
                 {"detail": _("This order is not in a refundable state.")}

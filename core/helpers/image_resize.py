@@ -24,8 +24,8 @@ def make_thumbnail(fp: StrOrBytesPath | IO[bytes], size: tuple[float, float]):
         else:
             img.save(thumb_io, "JPEG", quality=95)
 
-        # Construct the File object for the thumbnail
-        thumbnail_name = fp.name.split("/")[-1]  # Extract the filename
+        thumbnail_name = fp.name.split("/")[-1]
         thumbnail = File(thumb_io, name=thumbnail_name)
 
         return thumbnail
+    return None

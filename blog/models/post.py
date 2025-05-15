@@ -11,7 +11,6 @@ from parler.managers import TranslatableManager, TranslatableQuerySet
 from parler.models import TranslatableModel, TranslatedFieldsModel
 from tinymce.models import HTMLField
 
-from blog.enum.blog_post_enum import PostStatusEnum
 from core.fields.image import ImageAndSvgField
 from core.models import PublishableModel, TimeStampMixinModel, UUIDModel
 from core.utils.generators import SlugifyConfig, unique_slugify
@@ -86,12 +85,6 @@ class BlogPost(
         on_delete=models.SET_NULL,
         null=True,
     )
-    status = models.CharField(
-        _("Status"),
-        max_length=20,
-        choices=PostStatusEnum,
-        default=PostStatusEnum.DRAFT,
-    )
     featured = models.BooleanField(_("Featured"), default=False)
     view_count = models.PositiveBigIntegerField(_("View Count"), default=0)
 
@@ -105,15 +98,10 @@ class BlogPost(
             *TimeStampMixinModel.Meta.indexes,
             *PublishableModel.Meta.indexes,
             BTreeIndex(fields=["view_count"], name="blog_post_view_count_ix"),
-            BTreeIndex(fields=["status"], name="blog_post_status_ix"),
             BTreeIndex(fields=["featured"], name="blog_post_featured_ix"),
             BTreeIndex(fields=["category"], name="blog_post_category_ix"),
             BTreeIndex(fields=["author"], name="blog_post_author_ix"),
             BTreeIndex(fields=["slug"], name="blog_post_slug_ix"),
-            BTreeIndex(
-                fields=["status", "featured"],
-                name="blog_post_status_featured_ix",
-            ),
         ]
 
     def __str__(self):

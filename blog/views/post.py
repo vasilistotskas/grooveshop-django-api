@@ -49,12 +49,12 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
         "created_at",
         "updated_at",
         "published_at",
+        "is_published",
         "view_count",
         "likes_count",
         "comments_count",
         "tags_count",
         "featured",
-        "status",
     ]
     ordering = ["-created_at"]
     filterset_class = BlogPostFilter

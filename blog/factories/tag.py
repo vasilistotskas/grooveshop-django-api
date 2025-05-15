@@ -20,7 +20,7 @@ class BlogTagTranslationFactory(factory.django.DjangoModelFactory):
 
 
 class BlogTagFactory(factory.django.DjangoModelFactory):
-    active = factory.Faker("boolean")
+    active = factory.Faker("boolean", chance_of_getting_true=90)
 
     class Meta:
         model = BlogTag

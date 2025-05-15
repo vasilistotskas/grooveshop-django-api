@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.db.models import Count
 from django.utils.html import format_html
+from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin
 
 from order.enum.status_enum import OrderStatusEnum
@@ -161,17 +162,17 @@ class OrderAdmin(ModelAdmin):
     def customer_name(self, obj):
         return f"{obj.first_name} {obj.last_name}"
 
-    customer_name.short_description = "Customer"
+    customer_name.short_description = _("Customer Name")
 
     def created_display(self, obj):
         return obj.created_at.strftime("%Y-%m-%d %H:%M")
 
-    created_display.short_description = "Created"
+    created_display.short_description = _("Created")
 
     def item_count(self, obj):
         return obj.item_count
 
-    item_count.short_description = "Items"
+    item_count.short_description = _("Items")
     item_count.admin_order_field = "item_count"
 
     def status_badge(self, obj):
@@ -195,7 +196,7 @@ class OrderAdmin(ModelAdmin):
             obj.get_status_display(),
         )
 
-    status_badge.short_description = "Status"
+    status_badge.short_description = _("Status")
 
     def mark_as_processing(self, request, queryset):
         for order in queryset:
@@ -204,24 +205,30 @@ class OrderAdmin(ModelAdmin):
                     order, OrderStatusEnum.PROCESSING
                 )
                 self.message_user(
-                    request, f"Order #{order.id} marked as processing"
+                    request,
+                    _("Order %(order_id)s marked as processing")
+                    % {"order_id": order.id},
                 )
             except ValueError as e:
                 self.message_user(request, f"Error: {e!s}", level="error")
 
-    mark_as_processing.short_description = "Mark selected orders as processing"
+    mark_as_processing.short_description = _(
+        "Mark selected orders as processing"
+    )
 
     def mark_as_shipped(self, request, queryset):
         for order in queryset:
             try:
                 OrderService.update_order_status(order, OrderStatusEnum.SHIPPED)
                 self.message_user(
-                    request, f"Order #{order.id} marked as shipped"
+                    request,
+                    _("Order %(order_id)s marked as shipped")
+                    % {"order_id": order.id},
                 )
             except ValueError as e:
                 self.message_user(request, f"Error: {e!s}", level="error")
 
-    mark_as_shipped.short_description = "Mark selected orders as shipped"
+    mark_as_shipped.short_description = _("Mark selected orders as shipped")
 
     def mark_as_delivered(self, request, queryset):
         for order in queryset:
@@ -230,12 +237,14 @@ class OrderAdmin(ModelAdmin):
                     order, OrderStatusEnum.DELIVERED
                 )
                 self.message_user(
-                    request, f"Order #{order.id} marked as delivered"
+                    request,
+                    _("Order %(order_id)s marked as delivered")
+                    % {"order_id": order.id},
                 )
             except ValueError as e:
                 self.message_user(request, f"Error: {e!s}", level="error")
 
-    mark_as_delivered.short_description = "Mark selected orders as delivered"
+    mark_as_delivered.short_description = _("Mark selected orders as delivered")
 
     def mark_as_completed(self, request, queryset):
         for order in queryset:
@@ -244,24 +253,28 @@ class OrderAdmin(ModelAdmin):
                     order, OrderStatusEnum.COMPLETED
                 )
                 self.message_user(
-                    request, f"Order #{order.id} marked as completed"
+                    request,
+                    _("Order %(order_id)s marked as completed")
+                    % {"order_id": order.id},
                 )
             except ValueError as e:
                 self.message_user(request, f"Error: {e!s}", level="error")
 
-    mark_as_completed.short_description = "Mark selected orders as completed"
+    mark_as_completed.short_description = _("Mark selected orders as completed")
 
     def mark_as_canceled(self, request, queryset):
         for order in queryset:
             try:
                 OrderService.cancel_order(order)
                 self.message_user(
-                    request, f"Order #{order.id} canceled and stock restored"
+                    request,
+                    _("Order %(order_id)s marked as canceled")
+                    % {"order_id": order.id},
                 )
             except ValueError as e:
                 self.message_user(request, f"Error: {e!s}", level="error")
 
-    mark_as_canceled.short_description = (
+    mark_as_canceled.short_description = _(
         "Cancel selected orders and restore stock"
     )
 
@@ -284,14 +297,14 @@ class OrderItemAdmin(ModelAdmin):
         url = f"/admin/order/order/{obj.order.id}/change/"
         return format_html('<a href="{}">{}</a>', url, obj.order)
 
-    order_link.short_description = "Order"
+    order_link.short_description = _("Order")
 
     def product_name(self, obj):
         return obj.product.safe_translation_getter("name", any_language=True)
 
-    product_name.short_description = "Product"
+    product_name.short_description = _("Product")
 
     def total_price(self, obj):
         return obj.total_price
 
-    total_price.short_description = "Total"
+    total_price.short_description = _("Total")

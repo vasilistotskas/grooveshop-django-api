@@ -98,7 +98,6 @@ class BlogPostViewSetTestCase(TestURLFixerMixin, APITestCase):
             "likes": [],
             "tags": [],
             "author": self.author.id,
-            "status": "DRAFT",
             "translations": {},
         }
 
@@ -165,7 +164,6 @@ class BlogPostViewSetTestCase(TestURLFixerMixin, APITestCase):
             "category": self.category.id,
             "likes": [],
             "tags": [],
-            "status": "PUBLISHED",
             "translations": {},
         }
 
@@ -189,7 +187,6 @@ class BlogPostViewSetTestCase(TestURLFixerMixin, APITestCase):
     def test_update_invalid(self):
         payload = {
             "author": "invalid_author_id",
-            "status": "invalid_status",
             "translations": {
                 "invalid_lang_code": {
                     "content": "Translation for invalid language code",

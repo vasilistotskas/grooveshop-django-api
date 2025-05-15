@@ -25,7 +25,6 @@ class BlogPostFilter(filters.FilterSet):
         lookup_expr="gte",
         label="Minimum Tags Count",
     )
-    status = filters.CharFilter(field_name="status", lookup_expr="exact")
     featured = filters.BooleanFilter(field_name="featured", lookup_expr="exact")
     min_view_count = filters.NumberFilter(
         field_name="view_count", lookup_expr="gte", label="Minimum View Count"
@@ -40,7 +39,6 @@ class BlogPostFilter(filters.FilterSet):
             "author",
             "title",
             "author_email",
-            "status",
             "featured",
             "min_likes",
             "min_comments",

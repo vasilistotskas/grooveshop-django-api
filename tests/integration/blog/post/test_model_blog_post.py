@@ -34,7 +34,6 @@ class BlogPostModelTestCase(TestCase):
             slug="test-post",
             author=self.author,
             category=self.category,
-            status="DRAFT",
             featured=True,
             view_count=0,
             num_tags=0,
@@ -43,7 +42,6 @@ class BlogPostModelTestCase(TestCase):
 
     def test_fields(self):
         self.assertEqual(self.post.slug, "test-post")
-        self.assertEqual(self.post.status, "DRAFT")
         self.assertEqual(self.post.featured, True)
         self.assertEqual(self.post.view_count, 0)
         self.assertTrue(default_storage.exists(self.post.image.path))

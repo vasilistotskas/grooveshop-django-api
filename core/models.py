@@ -124,6 +124,12 @@ class PublishableModel(models.Model):
             ),
         ]
 
+    @override
+    def save(self, *args, **kwargs):
+        if self.is_published and self.published_at is None:
+            self.published_at = tz.now()
+        super().save(*args, **kwargs)
+
     @property
     def is_visible(self) -> bool:
         return self.is_published and (

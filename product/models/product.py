@@ -64,7 +64,6 @@ class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
         return self.exclude(is_deleted=True)
 
     def with_discount_value(self):
-        """Add discount_value annotation to queryset"""
         return self.annotate(
             discount_value_amount=F("price")
             * F("discount_percent")
@@ -72,7 +71,6 @@ class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
         )
 
     def with_vat_value(self):
-        """Add VAT value annotation to queryset"""
         return self.annotate(
             vat_value_amount=Case(
                 When(
@@ -86,7 +84,6 @@ class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
         )
 
     def with_final_price(self):
-        """Add final_price annotation to queryset"""
         queryset = self.with_discount_value().with_vat_value()
         return queryset.annotate(
             final_price_amount=F("price")
@@ -95,7 +92,6 @@ class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
         )
 
     def with_price_save_percent(self):
-        """Add price_save_percent annotation to queryset"""
         queryset = self.with_discount_value()
         return queryset.annotate(
             price_save_percent_field=Case(
@@ -110,7 +106,6 @@ class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
         )
 
     def with_likes_count(self):
-        """Add likes_count annotation to queryset"""
         from product.models.favourite import ProductFavourite
 
         likes_subquery = (
@@ -125,7 +120,6 @@ class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
         )
 
     def with_review_average(self):
-        """Add review_average annotation to queryset"""
         from product.models.review import ProductReview
 
         reviews_avg_subquery = (
@@ -145,7 +139,6 @@ class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
         )
 
     def with_approved_review_average(self):
-        """Add approved_review_average annotation to queryset"""
         from product.enum.review import ReviewStatusEnum
         from product.models.review import ProductReview
 
@@ -168,7 +161,6 @@ class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
         )
 
     def with_all_annotations(self):
-        """Apply all annotations to queryset"""
         return (
             self.with_final_price()
             .with_price_save_percent()
@@ -275,18 +267,21 @@ class Product(
         indexes = [
             *MetaDataModel.Meta.indexes,
             *TimeStampMixinModel.Meta.indexes,
-            models.Index(
-                fields=["product_code"], name="product_product_code_idx"
+            BTreeIndex(
+                fields=["price", "stock"], name="product_price_stock_ix"
             ),
-            models.Index(fields=["slug"], name="product_slug_idx"),
-            models.Index(
-                fields=["price", "stock"], name="product_price_stock_idx"
+            BTreeIndex(fields=["product_code"], name="product_product_code_ix"),
+            BTreeIndex(fields=["slug"], name="product_slug_ix"),
+            BTreeIndex(fields=["price"], name="product_price_ix"),
+            BTreeIndex(fields=["stock"], name="product_stock_ix"),
+            BTreeIndex(fields=["discount_percent"], name="product_discount_ix"),
+            BTreeIndex(fields=["view_count"], name="product_view_count_ix"),
+            BTreeIndex(fields=["weight"], name="product_weight_ix"),
+            BTreeIndex(fields=["active"], name="product_active_ix"),
+            BTreeIndex(fields=["category"], name="product_category_ix"),
+            BTreeIndex(
+                fields=["active", "price"], name="product_active_price_ix"
             ),
-            BTreeIndex(fields=["price"]),
-            BTreeIndex(fields=["stock"]),
-            BTreeIndex(fields=["discount_percent"]),
-            BTreeIndex(fields=["view_count"]),
-            BTreeIndex(fields=["weight"]),
         ]
 
     def __str__(self):

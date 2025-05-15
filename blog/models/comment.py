@@ -1,5 +1,6 @@
 from typing import override
 
+from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -80,6 +81,10 @@ class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel, MPTTModel):
         ordering = ["-created_at"]
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
+            BTreeIndex(fields=["is_approved"]),
+            BTreeIndex(fields=["post"]),
+            BTreeIndex(fields=["user"]),
+            BTreeIndex(fields=["parent"]),
         ]
 
     class MPTTMeta:

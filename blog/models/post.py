@@ -3,9 +3,11 @@ from typing import override
 
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
+from django.db.models import Count
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from parler.fields import TranslationsForeignKey
+from parler.managers import TranslatableManager, TranslatableQuerySet
 from parler.models import TranslatableModel, TranslatedFieldsModel
 from tinymce.models import HTMLField
 
@@ -15,6 +17,43 @@ from core.models import PublishableModel, TimeStampMixinModel, UUIDModel
 from core.utils.generators import SlugifyConfig, unique_slugify
 from meili.models import IndexMixin
 from seo.models import SeoModel
+
+
+class BlogPostQuerySet(TranslatableQuerySet):
+    def with_likes_count(self):
+        return self.annotate(likes_count_field=Count("likes", distinct=True))
+
+    def with_comments_count(self):
+        return self.annotate(
+            comments_count_field=Count("comments", distinct=True)
+        )
+
+    def with_tags_count(self):
+        return self.annotate(
+            tags_count_field=Count(
+                "tags", distinct=True, filter=models.Q(tags__active=True)
+            )
+        )
+
+    def with_all_annotations(self):
+        return self.with_likes_count().with_comments_count().with_tags_count()
+
+
+class BlogPostManager(TranslatableManager):
+    def get_queryset(self):
+        return BlogPostQuerySet(self.model, using=self._db)
+
+    def with_likes_count(self):
+        return self.get_queryset().with_likes_count()
+
+    def with_comments_count(self):
+        return self.get_queryset().with_comments_count()
+
+    def with_tags_count(self):
+        return self.get_queryset().with_tags_count()
+
+    def with_all_annotations(self):
+        return self.get_queryset().with_all_annotations()
 
 
 class BlogPost(
@@ -56,6 +95,8 @@ class BlogPost(
     featured = models.BooleanField(_("Featured"), default=False)
     view_count = models.PositiveBigIntegerField(_("View Count"), default=0)
 
+    objects = BlogPostManager()
+
     class Meta(TypedModelMeta):
         verbose_name = _("Blog Post")
         verbose_name_plural = _("Blog Posts")
@@ -63,11 +104,16 @@ class BlogPost(
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
             *PublishableModel.Meta.indexes,
-            BTreeIndex(fields=["view_count"]),
-            BTreeIndex(fields=["status"]),
-            BTreeIndex(fields=["featured"]),
-            BTreeIndex(fields=["category"]),
-            BTreeIndex(fields=["author"]),
+            BTreeIndex(fields=["view_count"], name="blog_post_view_count_ix"),
+            BTreeIndex(fields=["status"], name="blog_post_status_ix"),
+            BTreeIndex(fields=["featured"], name="blog_post_featured_ix"),
+            BTreeIndex(fields=["category"], name="blog_post_category_ix"),
+            BTreeIndex(fields=["author"], name="blog_post_author_ix"),
+            BTreeIndex(fields=["slug"], name="blog_post_slug_ix"),
+            BTreeIndex(
+                fields=["status", "featured"],
+                name="blog_post_status_featured_ix",
+            ),
         ]
 
     def __str__(self):

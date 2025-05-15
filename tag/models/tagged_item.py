@@ -5,6 +5,7 @@ from django.contrib.contenttypes.fields import (
     GenericRelation,
 )
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -35,7 +36,13 @@ class TaggedItem(TimeStampMixinModel, UUIDModel):
         verbose_name = _("Tagged Item")
         verbose_name_plural = _("Tagged Items")
         indexes = [
-            models.Index(fields=["content_type", "object_id"]),
+            *TimeStampMixinModel.Meta.indexes,
+            BTreeIndex(
+                fields=["content_type", "object_id"],
+                name="tagged_item_content_obj_ix",
+            ),
+            BTreeIndex(fields=["tag"], name="tagged_item_tag_ix"),
+            BTreeIndex(fields=["object_id"], name="tagged_item_object_id_ix"),
         ]
 
 

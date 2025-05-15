@@ -1,6 +1,7 @@
 import os
 from typing import override
 
+from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -61,6 +62,8 @@ class BlogCategory(
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
             *SortableModel.Meta.indexes,
+            BTreeIndex(fields=["slug"], name="blog_category_slug_ix"),
+            BTreeIndex(fields=["parent"], name="blog_category_parent_ix"),
         ]
 
     class MPTTMeta:

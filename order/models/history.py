@@ -1,3 +1,4 @@
+from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -72,8 +73,15 @@ class OrderHistory(TimeStampMixinModel, UUIDModel):
         ordering = ["-created_at"]
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
-            models.Index(fields=["order", "change_type"]),
-            models.Index(fields=["order", "-created_at"]),
+            BTreeIndex(
+                fields=["order", "change_type"],
+                name="ord_hist_ord_chtype_ix",
+            ),
+            BTreeIndex(
+                fields=["order", "-created_at"],
+                name="ord_hist_ord_crtd_ix",
+            ),
+            BTreeIndex(fields=["change_type"], name="ord_hist_chtype_ix"),
         ]
 
     def __str__(self):
@@ -255,7 +263,14 @@ class OrderItemHistory(TimeStampMixinModel, UUIDModel):
         ordering = ["-created_at"]
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
-            models.Index(fields=["order_item", "-created_at"]),
+            BTreeIndex(
+                fields=["order_item", "-created_at"],
+                name="ord_item_hist_item_created_ix",
+            ),
+            BTreeIndex(
+                fields=["change_type"],
+                name="ord_item_hist_change_type_ix",
+            ),
         ]
 
     def __str__(self):

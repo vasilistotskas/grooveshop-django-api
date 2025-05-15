@@ -1,5 +1,6 @@
 from typing import override
 
+from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -34,7 +35,7 @@ class ProductFavourite(TimeStampMixinModel, UUIDModel):
     class Meta(TypedModelMeta):
         verbose_name = _("Product Favourite")
         verbose_name_plural = _("Product Favourites")
-        ordering = ["-updated_at"]
+        ordering = ["-created_at"]
         constraints = [
             models.UniqueConstraint(
                 fields=["user", "product"], name="unique_product_favourite"
@@ -42,6 +43,8 @@ class ProductFavourite(TimeStampMixinModel, UUIDModel):
         ]
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
+            BTreeIndex(fields=["user"], name="product_favourite_user_ix"),
+            BTreeIndex(fields=["product"], name="product_favourite_product_ix"),
         ]
 
     def __str__(self):

@@ -50,7 +50,10 @@ class ProductImage(
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
             *SortableModel.Meta.indexes,
-            BTreeIndex(fields=["product", "is_main"]),
+            BTreeIndex(
+                fields=["product", "is_main"],
+                name="prod_img_product_is_main_ix",
+            ),
         ]
 
     def __str__(self):

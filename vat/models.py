@@ -38,7 +38,7 @@ class Vat(TimeStampMixinModel, UUIDModel):
         ordering = ["-created_at"]
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
-            BTreeIndex(fields=["value"]),
+            BTreeIndex(fields=["value"], name="vat_value_ix"),
         ]
         constraints = [
             CheckConstraint(

@@ -1,6 +1,7 @@
 from decimal import Decimal
 from typing import override
 
+from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import F, Sum
@@ -93,8 +94,10 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
             *SortableModel.Meta.indexes,
-            models.Index(fields=["product"]),
-            models.Index(fields=["is_refunded"]),
+            BTreeIndex(fields=["product"], name="order_item_product_ix"),
+            BTreeIndex(
+                fields=["is_refunded"], name="order_item_is_refunded_ix"
+            ),
         ]
 
     def __str__(self):

@@ -48,8 +48,18 @@ class ProductReview(
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
             *PublishableModel.Meta.indexes,
-            BTreeIndex(fields=["status"]),
-            BTreeIndex(fields=["rate"]),
+            BTreeIndex(fields=["status"], name="product_review_status_ix"),
+            BTreeIndex(fields=["rate"], name="product_review_rate_ix"),
+            BTreeIndex(fields=["product"], name="product_review_product_ix"),
+            BTreeIndex(fields=["user"], name="product_review_user_ix"),
+            BTreeIndex(
+                fields=["product", "status"],
+                name="prod_rev_product_status_ix",
+            ),
+            BTreeIndex(
+                fields=["product", "rate"],
+                name="prod_rev_product_rate_ix",
+            ),
         ]
 
     def __str__(self):

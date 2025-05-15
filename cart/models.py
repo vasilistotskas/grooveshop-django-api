@@ -3,6 +3,7 @@ from decimal import Decimal
 from typing import Literal
 
 from django.conf import settings
+from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
@@ -35,6 +36,12 @@ class Cart(TimeStampMixinModel, UUIDModel):
         verbose_name = _("Cart")
         verbose_name_plural = _("Carts")
         ordering = ["-created_at"]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+            BTreeIndex(fields=["user"], name="cart_user_ix"),
+            BTreeIndex(fields=["session_key"], name="cart_session_key_ix"),
+            BTreeIndex(fields=["last_activity"], name="cart_last_activity_ix"),
+        ]
         constraints = [
             models.UniqueConstraint(fields=["user"], name="unique_user_cart"),
             models.UniqueConstraint(
@@ -99,6 +106,12 @@ class CartItem(TimeStampMixinModel, UUIDModel):
         verbose_name = _("Cart Item")
         verbose_name_plural = _("Cart Items")
         ordering = ["-created_at"]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+            BTreeIndex(fields=["cart"], name="cart_item_cart_ix"),
+            BTreeIndex(fields=["product"], name="cart_item_product_ix"),
+            BTreeIndex(fields=["quantity"], name="cart_item_quantity_ix"),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=["cart", "product"], name="unique_cart_item"

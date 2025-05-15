@@ -205,24 +205,46 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
         ordering = ["-created_at"]
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
-            BTreeIndex(fields=["status"]),
-            BTreeIndex(fields=["document_type"]),
-            BTreeIndex(fields=["status_updated_at"]),
-            BTreeIndex(fields=["payment_status"]),
+            BTreeIndex(fields=["status"], name="order_status_ix"),
+            BTreeIndex(fields=["document_type"], name="order_doc_type_ix"),
+            BTreeIndex(
+                fields=["status_updated_at"], name="order_status_upd_ix"
+            ),
+            BTreeIndex(
+                fields=["payment_status"], name="order_payment_status_ix"
+            ),
+            BTreeIndex(fields=["user"], name="order_user_ix"),
+            BTreeIndex(fields=["pay_way"], name="order_pay_way_ix"),
+            BTreeIndex(fields=["country"], name="order_country_ix"),
+            BTreeIndex(fields=["region"], name="order_region_ix"),
+            BTreeIndex(fields=["user", "status"], name="order_user_status_ix"),
+            BTreeIndex(
+                fields=["status", "payment_status"],
+                name="order_status_payment_ix",
+            ),
+            BTreeIndex(
+                fields=["tracking_number"], name="order_tracking_num_ix"
+            ),
+            BTreeIndex(fields=["payment_id"], name="order_payment_id_ix"),
             GinIndex(
-                name="order_search_gin",
-                fields=[
-                    "first_name",
-                    "last_name",
-                    "email",
-                    "phone",
-                    "mobile_phone",
-                    "street",
-                    "city",
-                    "zipcode",
-                    "place",
-                ],
-                opclasses=["gin_trgm_ops"] * 9,
+                name="order_name_search_ix",
+                fields=["first_name", "last_name"],
+                opclasses=["gin_trgm_ops"] * 2,
+            ),
+            GinIndex(
+                name="order_email_search_ix",
+                fields=["email"],
+                opclasses=["gin_trgm_ops"],
+            ),
+            GinIndex(
+                name="order_address_street_ix",
+                fields=["street"],
+                opclasses=["gin_trgm_ops"],
+            ),
+            GinIndex(
+                name="order_address_location_ix",
+                fields=["city", "place"],
+                opclasses=["gin_trgm_ops"] * 2,
             ),
         ]
 

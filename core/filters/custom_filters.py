@@ -5,14 +5,17 @@ from rest_framework.filters import OrderingFilter
 
 
 class PascalSnakeCaseOrderingFilter(OrderingFilter):
-    # Map property names to annotated field names
     field_name_mapping = {
+        # Product fields
         "discount_value": "discount_value_amount",
         "final_price": "final_price_amount",
         "price_save_percent": "price_save_percent_field",
         "review_average": "review_average_field",
         "approved_review_average": "approved_review_average_field",
         "likes_count": "likes_count_field",
+        # Blog post fields
+        "comments_count": "comments_count_field",
+        "tags_count": "tags_count_field",
     }
 
     @override
@@ -22,12 +25,10 @@ class PascalSnakeCaseOrderingFilter(OrderingFilter):
 
         ordering = request.query_params.get(self.ordering_param)
         if ordering:
-            # Convert camelCase or PascalCase to snake_case
             ordering = (
                 re.sub("([a-z])([A-Z])", r"\1_\2", ordering).lower().lstrip("_")
             )
 
-            # Map virtual fields to annotated fields
             ordering_terms = []
             for term in ordering.split(","):
                 stripped_term = term.lstrip("-")

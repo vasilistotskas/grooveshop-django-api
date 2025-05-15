@@ -48,7 +48,11 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
             *SortableModel.Meta.indexes,
-            BTreeIndex(fields=["active"]),
+            BTreeIndex(fields=["active"], name="pay_way_active_ix"),
+            BTreeIndex(fields=["cost"], name="pay_way_cost_ix"),
+            BTreeIndex(
+                fields=["free_for_order_amount"], name="pay_way_free_order_ix"
+            ),
         ]
 
     def __str__(self):

@@ -135,7 +135,7 @@ jobs:
           MEILI_ENV: production
         run: |
           coverage run --rcfile=.coveragerc --source='.' -m pytest && coverage report
-        timeout-minutes: 5
+        timeout-minutes: 15
 
       - name: Upload coverage to Coveralls
         if: matrix.db == 'postgres'

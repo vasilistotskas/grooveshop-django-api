@@ -110,7 +110,6 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
         elif self.action in ["add_tracking", "update_status"]:
             permission_classes = [IsAdminUser]
         elif self.action == "create":
-            # Allow anonymous users for checkout
             permission_classes = []
         else:
             permission_classes = [IsAuthenticated]

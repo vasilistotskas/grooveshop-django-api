@@ -2,6 +2,7 @@ from django.urls import path
 
 from order.views.item import OrderItemViewSet
 from order.views.order import OrderViewSet
+from order.views.payment_view import OrderPaymentViewSet
 
 urlpatterns = [
     path(
@@ -45,6 +46,21 @@ urlpatterns = [
         "order/my-orders",
         OrderViewSet.as_view({"get": "my_orders"}),
         name="order-my-orders",
+    ),
+    path(
+        "order/<int:pk>/process-payment",
+        OrderPaymentViewSet.as_view({"post": "process_payment"}),
+        name="order-process-payment",
+    ),
+    path(
+        "order/<int:pk>/payment-status",
+        OrderPaymentViewSet.as_view({"get": "check_payment_status"}),
+        name="order-payment-status",
+    ),
+    path(
+        "order/<int:pk>/refund",
+        OrderPaymentViewSet.as_view({"post": "refund_payment"}),
+        name="order-refund",
     ),
     path(
         "order-items",

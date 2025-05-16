@@ -31,6 +31,35 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     icon = models.ImageField(
         _("Icon"), upload_to="uploads/pay_way/", blank=True, null=True
     )
+    provider_code = models.CharField(
+        _("Provider Code"),
+        max_length=50,
+        blank=True,
+        default="",
+        help_text=_(
+            "Code used to identify the payment provider in the system (e.g., 'stripe', 'paypal')"
+        ),
+    )
+    is_online_payment = models.BooleanField(
+        _("Is Online Payment"),
+        default=False,
+        help_text=_("Whether this payment method is processed online"),
+    )
+    requires_confirmation = models.BooleanField(
+        _("Requires Confirmation"),
+        default=False,
+        help_text=_(
+            "Whether this payment method requires manual confirmation (e.g., bank transfer)"
+        ),
+    )
+    configuration = models.JSONField(
+        _("Provider Configuration"),
+        blank=True,
+        null=True,
+        help_text=_(
+            "Provider-specific configuration (API keys, webhooks, etc.)"
+        ),
+    )
     translations = TranslatedFields(
         name=models.CharField(
             _("Name"),
@@ -38,7 +67,16 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
             blank=True,
             null=True,
             choices=PayWayEnum,
-        )
+        ),
+        description=models.TextField(_("Description"), blank=True, null=True),
+        instructions=models.TextField(
+            _("Payment Instructions"),
+            blank=True,
+            null=True,
+            help_text=_(
+                "Instructions for the customer on how to complete payment (e.g., bank transfer details)"
+            ),
+        ),
     )
 
     class Meta(TypedModelMeta):
@@ -53,6 +91,8 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
             BTreeIndex(
                 fields=["free_for_order_amount"], name="pay_way_free_order_ix"
             ),
+            BTreeIndex(fields=["provider_code"], name="pay_way_provider_ix"),
+            BTreeIndex(fields=["is_online_payment"], name="pay_way_online_ix"),
         ]
 
     def __str__(self):

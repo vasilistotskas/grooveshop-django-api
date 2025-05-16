@@ -6,7 +6,6 @@ from django.db import transaction
 from django.db.models import QuerySet
 from django.utils import timezone
 from djmoney.money import Money
-from extra_settings.models import Setting
 
 from order.enum.status_enum import OrderStatusEnum
 from order.models.item import OrderItem
@@ -105,18 +104,21 @@ class OrderService:
                         f"Available: {product.stock}, Requested: {quantity}"
                     )
 
+                # Create a copy of the item data to avoid modifying the original
+                item_to_create = item_data.copy()
+
+                # Always use the product's price, but ensure currency matches the order
                 product_price = product.final_price
                 if product_price.currency != target_currency:
-                    item_data["price"] = Money(
+                    item_to_create["price"] = Money(
                         product_price.amount, target_currency
                     )
                 else:
-                    item_data["price"] = product_price
+                    item_to_create["price"] = product_price
 
-                OrderItem.objects.create(order=order, **item_data)
+                OrderItem.objects.create(order=order, **item_to_create)
 
-                product.stock -= quantity
-                product.save(update_fields=["stock"])
+                # Stock reduction is handled in the OrderItem post_save signal
 
             order.paid_amount = order.calculate_order_total_amount()
             order.save(update_fields=["paid_amount"])
@@ -271,16 +273,16 @@ class OrderService:
         country_id: Optional[int] = None,
         region_id: Optional[int] = None,
     ) -> Money:
-        from django.conf import settings
+        from extra_settings.models import Setting
 
         base_shipping_cost = Setting.get(
             "CHECKOUT_SHIPPING_PRICE", default=3.00
         )
-        free_shipping_threshold = getattr(
-            settings, "FREE_SHIPPING_THRESHOLD", 50.00
+        free_shipping_threshold = Setting.get(
+            "FREE_SHIPPING_THRESHOLD", default=50.00
         )
 
-        if order_value.amount >= int(free_shipping_threshold):
+        if order_value.amount >= float(free_shipping_threshold):
             return Money(0, order_value.currency)
 
         shipping_cost = float(base_shipping_cost)

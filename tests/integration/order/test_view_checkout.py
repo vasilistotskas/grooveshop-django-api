@@ -34,7 +34,7 @@ class CheckoutViewAPITest(APITestCase):
 
     @staticmethod
     def get_checkout_url():
-        return reverse("checkout")
+        return reverse("order-list")
 
     def test_successful_order_creation(self):
         self.client.force_authenticate(user=self.user)
@@ -59,7 +59,7 @@ class CheckoutViewAPITest(APITestCase):
             "phone": "2101234567",
             "mobile_phone": "6912345678",
             "customer_notes": "Test notes",
-            "shipping_price": 10.00,
+            "shipping_price": {"amount": "10.00", "currency": "USD"},
             "items": [
                 {
                     "product": product_1.id,
@@ -75,9 +75,19 @@ class CheckoutViewAPITest(APITestCase):
         url = self.get_checkout_url()
         response = self.client.post(url, data=order_data, format="json")
 
+        if response.status_code != status.HTTP_201_CREATED:
+            print(f"Response status: {response.status_code}")
+            print(f"Response data: {response.data}")
+
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(Product.objects.get(pk=product_1.id).stock, 16)
-        self.assertEqual(Product.objects.get(pk=product_2.id).stock, 14)
+
+        # Refresh the products from the database
+        product_1.refresh_from_db()
+        product_2.refresh_from_db()
+
+        # Check that the stock has been reduced by the ordered quantity
+        self.assertEqual(product_1.stock, 20 - 2)  # Initial 20 minus ordered 2
+        self.assertEqual(product_2.stock, 20 - 3)  # Initial 20 minus ordered 3
 
     def test_failed_order_creation(self):
         self.client.force_authenticate(user=self.user)

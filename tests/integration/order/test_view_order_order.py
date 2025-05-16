@@ -112,12 +112,10 @@ class OrderViewSetTestCase(APITestCase):
             "items": [
                 {
                     "product": self.order_items[0].product.id,
-                    "price": Decimal("50.00"),
                     "quantity": 2,
                 },
                 {
                     "product": self.order_items[1].product.id,
-                    "price": Decimal("30.00"),
                     "quantity": 3,
                 },
             ],
@@ -155,12 +153,10 @@ class OrderViewSetTestCase(APITestCase):
             "items": [
                 {
                     "product": "invalid_product_id",
-                    "price": "invalid_price",
                     "quantity": "invalid_quantity",
                 },
                 {
                     "product": "invalid_product_id",
-                    "price": "invalid_price",
                     "quantity": "invalid_quantity",
                 },
             ],
@@ -215,12 +211,10 @@ class OrderViewSetTestCase(APITestCase):
             "items": [
                 {
                     "product": self.order_items[0].product.id,
-                    "price": Decimal("50.00"),
                     "quantity": 2,
                 },
                 {
                     "product": self.order_items[1].product.id,
-                    "price": Decimal("30.00"),
                     "quantity": 3,
                 },
             ],
@@ -258,12 +252,10 @@ class OrderViewSetTestCase(APITestCase):
             "items": [
                 {
                     "product": "invalid_product_id",
-                    "price": "invalid_price",
                     "quantity": "invalid_quantity",
                 },
                 {
                     "product": "invalid_product_id",
-                    "price": "invalid_price",
                     "quantity": "invalid_quantity",
                 },
             ],

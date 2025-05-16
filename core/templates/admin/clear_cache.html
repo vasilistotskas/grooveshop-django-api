@@ -21,7 +21,7 @@
     <h1 class="hidden">{% trans "Clear Cache" %}</h1>
     {% component "unfold/components/container.html" %}
         <div class="grid gap-2 mt-8 space-y-8">
-            <div class="bg-white shadow-lg rounded-lg p-6 dark:bg-gray-800 dark:text-white">
+            <div class="bg-white shadow-lg rounded-lg p-6 dark:bg-base-800 dark:text-white">
                 {% component "unfold/components/title.html" with class="text-2xl font-bold mb-4" %}
                     {% trans "Clear Cache by Class" %}
                 {% endcomponent %}
@@ -29,7 +29,7 @@
                     {% csrf_token %}
                     <div class="grid gap-2">
                         <label for="id_viewset_class" class="block text-sm font-medium text-gray-700 dark:text-gray-300">{% trans "Select ViewSet class to clear cache" %}:</label>
-                        <select name="viewset_class" id="id_viewset_class" class="w-full p-2 rounded-md border border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500">
+                        <select name="viewset_class" id="id_viewset_class" class="w-full p-2 rounded-md border border-gray-300 dark:bg-base-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500">
                             {% for value, label in form.viewset_class.field.choices %}
                                 <option value="{{ value }}">{{ label }}</option>
                             {% endfor %}
@@ -40,7 +40,7 @@
                     {% endcomponent %}
                 </form>
             </div>
-            <div class="bg-white shadow-lg rounded-lg p-6 dark:bg-gray-800 dark:text-white">
+            <div class="bg-white shadow-lg rounded-lg p-6 dark:bg-base-800 dark:text-white">
                 {% component "unfold/components/title.html" with class="text-2xl font-bold mb-4" %}
                     {% trans "Clear Entire Site Cache" %}
                 {% endcomponent %}

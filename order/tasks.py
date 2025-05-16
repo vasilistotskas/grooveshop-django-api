@@ -22,8 +22,8 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
             "order": order,
             "items": order.items.all(),
             "site_name": getattr(settings, "SITE_NAME", "Our Shop"),
-            "support_email": getattr(
-                settings, "SUPPORT_EMAIL", "support@example.com"
+            "info_email": getattr(
+                settings, "INFO_EMAIL", "support@example.com"
             ),
             "site_url": getattr(settings, "SITE_URL", "https://example.com"),
         }
@@ -43,9 +43,7 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
             text_content,
             getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@example.com"),
             [order.email],
-            reply_to=[
-                getattr(settings, "SUPPORT_EMAIL", "support@example.com")
-            ],
+            reply_to=[getattr(settings, "INFO_EMAIL", "support@example.com")],
         )
         msg.attach_alternative(html_content, "text/html")
 
@@ -103,8 +101,8 @@ def send_order_status_update_email(
             "order": order,
             "status": status,
             "site_name": getattr(settings, "SITE_NAME", "Our Shop"),
-            "support_email": getattr(
-                settings, "SUPPORT_EMAIL", "support@example.com"
+            "info_email": getattr(
+                settings, "INFO_EMAIL", "support@example.com"
             ),
             "site_url": getattr(settings, "SITE_URL", "https://example.com"),
         }
@@ -135,9 +133,7 @@ def send_order_status_update_email(
             text_content,
             getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@example.com"),
             [order.email],
-            reply_to=[
-                getattr(settings, "SUPPORT_EMAIL", "support@example.com")
-            ],
+            reply_to=[getattr(settings, "INFO_EMAIL", "support@example.com")],
         )
         msg.attach_alternative(html_content, "text/html")
 
@@ -199,8 +195,8 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
             "tracking_number": order.tracking_number,
             "carrier": order.shipping_carrier,
             "site_name": getattr(settings, "SITE_NAME", "Our Shop"),
-            "support_email": getattr(
-                settings, "SUPPORT_EMAIL", "support@example.com"
+            "info_email": getattr(
+                settings, "INFO_EMAIL", "support@example.com"
             ),
             "site_url": getattr(settings, "SITE_URL", "https://example.com"),
         }
@@ -216,9 +212,7 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
             text_content,
             getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@example.com"),
             [order.email],
-            reply_to=[
-                getattr(settings, "SUPPORT_EMAIL", "support@example.com")
-            ],
+            reply_to=[getattr(settings, "INFO_EMAIL", "support@example.com")],
         )
         msg.attach_alternative(html_content, "text/html")
 
@@ -310,7 +304,7 @@ def check_pending_orders() -> int:
             context = {
                 "order": order,
                 "site_name": settings.SITE_NAME,
-                "support_email": settings.SUPPORT_EMAIL,
+                "info_email": settings.INFO_EMAIL,
                 "site_url": settings.SITE_URL,
             }
 
@@ -329,7 +323,7 @@ def check_pending_orders() -> int:
                 text_content,
                 settings.DEFAULT_FROM_EMAIL,
                 [order.email],
-                reply_to=[settings.SUPPORT_EMAIL],
+                reply_to=[settings.INFO_EMAIL],
             )
             msg.attach_alternative(html_content, "text/html")
 

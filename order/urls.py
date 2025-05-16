@@ -1,7 +1,7 @@
 from django.urls import path
 
 from order.views.item import OrderItemViewSet
-from order.views.order import Checkout, OrderViewSet
+from order.views.order import OrderViewSet
 
 urlpatterns = [
     path(
@@ -60,10 +60,5 @@ urlpatterns = [
         "order-items/<int:pk>/refund",
         OrderItemViewSet.as_view({"post": "refund"}),
         name="order-item-refund",
-    ),
-    path(
-        "checkout",
-        Checkout.as_view(),
-        name="checkout",
     ),
 ]

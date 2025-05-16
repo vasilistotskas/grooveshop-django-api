@@ -54,10 +54,29 @@ class OrderItemCreateUpdateSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "product",
-            "price",
             "quantity",
             "notes",
         )
+
+    def validate_quantity(self, value: int) -> int:
+        if value <= 0:
+            raise serializers.ValidationError(
+                "Quantity must be a positive number."
+            )
+        return value
+
+    def validate(self, data: dict) -> dict:
+        product = data.get("product")
+        quantity = data.get("quantity")
+
+        if product and hasattr(product, "stock") and product.stock < quantity:
+            raise serializers.ValidationError(
+                {
+                    "quantity": f"Not enough stock available. Only {product.stock} remaining."
+                }
+            )
+
+        return data
 
 
 class OrderItemRefundSerializer(serializers.Serializer):
@@ -86,35 +105,6 @@ class OrderItemRefundSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 f"Cannot refund more than the available quantity. "
                 f"Available: {item.quantity - item.refunded_quantity}"
-            )
-
-        return data
-
-
-class CheckoutItemSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = OrderItem
-        fields = (
-            "product",
-            "quantity",
-        )
-
-    def validate_quantity(self, value: int) -> int:
-        if value <= 0:
-            raise serializers.ValidationError(
-                "Quantity must be a positive number."
-            )
-        return value
-
-    def validate(self, data: dict) -> dict:
-        product = data.get("product")
-        quantity = data.get("quantity")
-
-        if hasattr(product, "stock") and product.stock < quantity:
-            raise serializers.ValidationError(
-                {
-                    "quantity": f"Not enough stock available. Only {product.stock} remaining."
-                }
             )
 
         return data

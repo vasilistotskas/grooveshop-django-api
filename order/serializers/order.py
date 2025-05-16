@@ -10,7 +10,6 @@ from country.serializers import CountrySerializer
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.serializers.item import (
-    CheckoutItemSerializer,
     OrderItemCreateUpdateSerializer,
     OrderItemSerializer,
 )
@@ -224,6 +223,16 @@ class OrderCreateUpdateSerializer(serializers.ModelSerializer):
             "status_updated_at",
         )
 
+    def to_internal_value(self, data):
+        if (
+            isinstance(data.get("shipping_price"), dict)
+            and "amount" in data["shipping_price"]
+        ):
+            data = data.copy()
+            data["shipping_price"] = data["shipping_price"]["amount"]
+
+        return super().to_internal_value(data)
+
     @override
     def validate(self, data):
         super().validate(data)
@@ -236,8 +245,24 @@ class OrderCreateUpdateSerializer(serializers.ModelSerializer):
 
             if product.stock < quantity:
                 raise serializers.ValidationError(
-                    f"Product {product.name} does not have enough stock."
+                    {
+                        "items": [
+                            {
+                                "quantity": f"Not enough stock available for {product.name}. Available: {product.stock}"
+                            }
+                        ]
+                    }
                 )
+
+        if "shipping_price" in data and data["shipping_price"] is not None:
+            shipping_currency = data["shipping_price"].currency
+
+            for item_data in items_data:
+                product = item_data["product"]
+                if product.price.currency != shipping_currency:
+                    raise serializers.ValidationError(
+                        f"Currency mismatch: shipping is in {shipping_currency} but product {product.name} is in {product.price.currency}"
+                    )
 
         return data
 
@@ -246,7 +271,6 @@ class OrderCreateUpdateSerializer(serializers.ModelSerializer):
         items_data = validated_data.pop("items")
 
         try:
-            # Convert decimal values to Money objects if they aren't already
             if "paid_amount" in validated_data and not hasattr(
                 validated_data["paid_amount"], "currency"
             ):
@@ -271,19 +295,12 @@ class OrderCreateUpdateSerializer(serializers.ModelSerializer):
 
             for item_data in items_data:
                 product = item_data.get("product")
+                item_to_create = item_data.copy()
+                item_to_create["price"] = product.price
+                OrderItem.objects.create(order=order, **item_to_create)
 
-                # Ensure price is a Money object
-                if not hasattr(item_data.get("price"), "currency"):
-                    from django.conf import settings
-                    from djmoney.money import Money
-
-                    item_data["price"] = Money(
-                        item_data["price"], settings.DEFAULT_CURRENCY
-                    )
-                else:
-                    item_data["price"] = product.final_price
-
-                OrderItem.objects.create(order=order, **item_data)
+            order.paid_amount = order.calculate_order_total_amount()
+            order.save(update_fields=["paid_amount"])
 
             order_created.send(sender=Order, order=order)
 
@@ -302,106 +319,9 @@ class OrderCreateUpdateSerializer(serializers.ModelSerializer):
             instance.items.all().delete()
 
             for item_data in items_data:
-                OrderItem.objects.create(order=instance, **item_data)
+                product = item_data.get("product")
+                item_to_create = item_data.copy()
+                item_to_create["price"] = product.price
+                OrderItem.objects.create(order=instance, **item_to_create)
 
         return super().update(instance, validated_data)
-
-
-class CheckoutSerializer(serializers.ModelSerializer):
-    items = CheckoutItemSerializer(many=True)
-    paid_amount = MoneyField(max_digits=11, decimal_places=2, required=False)
-    shipping_price = MoneyField(max_digits=11, decimal_places=2)
-    total_price_items = MoneyField(
-        max_digits=11, decimal_places=2, read_only=True
-    )
-    total_price_extra = MoneyField(
-        max_digits=11, decimal_places=2, read_only=True
-    )
-    phone = PhoneNumberField()
-    mobile_phone = PhoneNumberField(required=False)
-    payment_id = serializers.CharField(required=False)
-    payment_method = serializers.CharField(required=False)
-
-    class Meta:
-        model = Order
-        fields = (
-            "id",
-            "user",
-            "country",
-            "region",
-            "floor",
-            "location_type",
-            "street",
-            "street_number",
-            "pay_way",
-            "status",
-            "first_name",
-            "last_name",
-            "email",
-            "zipcode",
-            "place",
-            "city",
-            "phone",
-            "mobile_phone",
-            "paid_amount",
-            "customer_notes",
-            "items",
-            "shipping_price",
-            "document_type",
-            "created_at",
-            "updated_at",
-            "uuid",
-            "total_price_items",
-            "total_price_extra",
-            "full_address",
-            "payment_id",
-            "payment_method",
-        )
-        read_only_fields = (
-            "created_at",
-            "updated_at",
-            "uuid",
-            "total_price_items",
-            "total_price_extra",
-            "full_address",
-        )
-
-    @override
-    def validate(self, data):
-        super().validate(data)
-
-        items_data = data.get("items", [])
-
-        for item_data in items_data:
-            product = item_data["product"]
-            quantity = item_data["quantity"]
-
-            if product.stock < quantity:
-                raise serializers.ValidationError(
-                    f"Product {product.name} does not have enough stock."
-                )
-
-        return data
-
-    @override
-    def create(self, validated_data):
-        items_data = validated_data.pop("items")
-
-        try:
-            order = Order.objects.create(**validated_data)
-
-            for item_data in items_data:
-                product = item_data.get("product")
-
-                item_data["price"] = product.final_price
-
-                OrderItem.objects.create(order=order, **item_data)
-
-            order_created.send(sender=Order, order=order)
-
-        except Product.DoesNotExist as err:
-            raise serializers.ValidationError(
-                "One or more products do not exist."
-            ) from err
-
-        return order

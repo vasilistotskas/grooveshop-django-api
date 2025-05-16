@@ -208,7 +208,6 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
     list_display = (
         "id",
         "title",
-        "subtitle",
         "category",
         "author",
         "featured",

@@ -16,4 +16,4 @@ Thank you for shopping with {{ site_name }}!
 
 Best regards,
 The {{ site_name }} Team
-{{ support_email }}
+{{ info_email }}

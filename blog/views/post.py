@@ -43,13 +43,11 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
         PascalSnakeCaseOrderingFilter,
         SearchFilter,
     ]
-    filterset_fields = ["id", "tags", "slug", "author"]
     ordering_fields = [
         "id",
         "created_at",
         "updated_at",
         "published_at",
-        "is_published",
         "view_count",
         "likes_count",
         "comments_count",

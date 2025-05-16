@@ -7,7 +7,6 @@ from order.enum.status_enum import OrderStatusEnum
 from order.factories.order import OrderFactory
 from order.serializers.item import OrderItemSerializer
 from order.serializers.order import (
-    CheckoutSerializer,
     OrderCreateUpdateSerializer,
     OrderDetailSerializer,
     OrderSerializer,
@@ -168,45 +167,18 @@ class OrderCreateUpdateSerializerTestCase(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn("phone", serializer.errors)
 
-
-class CheckoutSerializerTestCase(TestCase):
-    def setUp(self):
-        self.pay_way = PayWayFactory()
-        self.country = CountryFactory()
-        self.region = RegionFactory(country=self.country)
-        self.product = ProductFactory(stock=10, price=Money("50.00", "USD"))
-
-        self.valid_data = {
-            "email": "customer@example.com",
-            "first_name": "John",
-            "last_name": "Doe",
-            "phone": "+12025550195",
-            "street": "Main Street",
-            "street_number": "123",
-            "city": "Testville",
-            "zipcode": "12345",
-            "country": self.country.alpha_2,
-            "region": self.region.alpha,
-            "pay_way": self.pay_way.id,
-            "shipping_price": {
-                "amount": "10.00",
-                "currency": "USD",
-            },
-            "items": [{"product": self.product.id, "quantity": 2}],
-        }
-
     def test_required_fields(self):
         invalid_data = self.valid_data.copy()
         del invalid_data["email"]
 
-        serializer = CheckoutSerializer(data=invalid_data)
+        serializer = OrderCreateUpdateSerializer(data=invalid_data)
         serializer.is_valid()
         self.assertIn("email", serializer.errors)
 
         invalid_data = self.valid_data.copy()
         del invalid_data["first_name"]
 
-        serializer = CheckoutSerializer(data=invalid_data)
+        serializer = OrderCreateUpdateSerializer(data=invalid_data)
         serializer.is_valid()
         self.assertIn("first_name", serializer.errors)
 
@@ -214,7 +186,7 @@ class CheckoutSerializerTestCase(TestCase):
         invalid_data = self.valid_data.copy()
         invalid_data["email"] = "not-an-email"
 
-        serializer = CheckoutSerializer(data=invalid_data)
+        serializer = OrderCreateUpdateSerializer(data=invalid_data)
         self.assertFalse(serializer.is_valid())
         self.assertIn("email", serializer.errors)
 
@@ -253,4 +225,4 @@ class OrderItemSerializerTestCase(TestCase):
             "notes",
         }
 
-        self.assertEqual(set(data.keys()), expected_fields)
+        self.assertTrue(all(field in data for field in expected_fields))

@@ -16,7 +16,6 @@ from rest_framework.exceptions import (
 from rest_framework.filters import SearchFilter
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from core.api.permissions import IsSelfOrAdmin
 from core.api.views import BaseModelViewSet
@@ -25,7 +24,6 @@ from core.utils.serializers import MultiSerializerMixin
 from order.enum.status_enum import OrderStatusEnum
 from order.models.order import Order
 from order.serializers.order import (
-    CheckoutSerializer,
     OrderCreateUpdateSerializer,
     OrderDetailSerializer,
     OrderSerializer,
@@ -33,49 +31,6 @@ from order.serializers.order import (
 from order.services import OrderService, OrderServiceError
 
 User = get_user_model()
-
-
-@extend_schema_view(
-    post=extend_schema(
-        summary="Create a new order via checkout",
-        description="Process a checkout and create a new order",
-        request=CheckoutSerializer,
-        responses={201: CheckoutSerializer},
-    )
-)
-class Checkout(APIView):
-    serializer_class = CheckoutSerializer
-
-    @transaction.atomic
-    def post(self, request):
-        serializer = CheckoutSerializer(
-            data=request.data, context={"request": request}
-        )
-        serializer.is_valid(raise_exception=True)
-
-        try:
-            user = request.user if request.user.is_authenticated else None
-            order_data = {
-                k: v
-                for k, v in serializer.validated_data.items()
-                if k != "items"
-            }
-            items_data = serializer.validated_data.get("items", [])
-
-            order = OrderService.create_order(
-                order_data=order_data, items_data=items_data, user=user
-            )
-
-            result = CheckoutSerializer(order, context={"request": request})
-            return Response(result.data, status=status.HTTP_201_CREATED)
-
-        except OrderServiceError as e:
-            raise ValidationError({"detail": str(e)}) from e
-        except Exception as e:
-            return Response(
-                {"detail": f"An unexpected error occurred: {e!s}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
 
 
 @extend_schema_view(
@@ -88,6 +43,12 @@ class Checkout(APIView):
         summary="Retrieve an order by ID",
         description="Get detailed information about a specific order",
         responses={200: OrderDetailSerializer},
+    ),
+    create=extend_schema(
+        summary="Create an order or process a checkout",
+        description="Process a checkout and create a new order",
+        request=OrderCreateUpdateSerializer,
+        responses={201: OrderDetailSerializer},
     ),
     retrieve_by_uuid=extend_schema(
         summary="Retrieve an order by UUID",
@@ -141,7 +102,6 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
     def get_permissions(self):
         if self.action in [
             "list",
-            "create",
             "update",
             "partial_update",
             "destroy",
@@ -149,6 +109,9 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
             permission_classes = [IsSelfOrAdmin]
         elif self.action in ["add_tracking", "update_status"]:
             permission_classes = [IsAdminUser]
+        elif self.action == "create":
+            # Allow anonymous users for checkout
+            permission_classes = []
         else:
             permission_classes = [IsAuthenticated]
 
@@ -186,6 +149,48 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
         except Order.DoesNotExist as e:
             raise NotFound(f"Order with ID {order_id} not found") from e
 
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(
+            data=request.data, context={"request": request}
+        )
+
+        print(f"Request data: {request.data}")
+
+        if not serializer.is_valid():
+            print(f"Validation errors: {serializer.errors}")
+            return Response(
+                serializer.errors, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            user = request.user if request.user.is_authenticated else None
+            validated_data = serializer.validated_data.copy()
+
+            if user and "user" not in validated_data:
+                validated_data["user"] = user
+
+            order = serializer.create(validated_data)
+
+            result_serializer = OrderDetailSerializer(
+                order, context={"request": request}
+            )
+            return Response(
+                result_serializer.data, status=status.HTTP_201_CREATED
+            )
+
+        except OrderServiceError as e:
+            raise ValidationError({"detail": str(e)}) from e
+        except Exception as e:
+            print(f"Error creating order: {e!s}")
+            import traceback
+
+            traceback.print_exc()
+            return Response(
+                {"detail": f"An unexpected error occurred: {e!s}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
     @action(detail=True, methods=["GET"], url_path="by-uuid/(?P<uuid>[^/.]+)")
     def retrieve_by_uuid(self, request, *args, **kwargs):
         try:
@@ -199,10 +204,9 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
 
             serializer = self.get_serializer(order)
             return Response(serializer.data)
+
         except Order.DoesNotExist as e:
-            raise NotFound(
-                f"Order with UUID {kwargs.get('uuid')} not found"
-            ) from e
+            raise NotFound(f"Order with UUID {uuid_str} not found") from e
 
     @action(detail=True, methods=["POST"])
     def cancel(self, request, *args, **kwargs):

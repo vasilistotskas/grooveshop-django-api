@@ -58,7 +58,7 @@ class OrderTasksTestCase(TestCase):
         mock_render.side_effect = ["Email content", "HTML content"]
 
         mock_settings.SITE_NAME = "GrooveShop"
-        mock_settings.SUPPORT_EMAIL = "support@example.com"
+        mock_settings.INFO_EMAIL = "support@example.com"
         mock_settings.SITE_URL = "http://example.com"
         mock_settings.DEFAULT_FROM_EMAIL = "no-reply@example.com"
 
@@ -81,7 +81,7 @@ class OrderTasksTestCase(TestCase):
         mock_get.side_effect = Order.DoesNotExist()
 
         mock_settings.SITE_NAME = "GrooveShop"
-        mock_settings.SUPPORT_EMAIL = "support@example.com"
+        mock_settings.INFO_EMAIL = "support@example.com"
         mock_settings.SITE_URL = "http://example.com"
 
         result = send_order_confirmation_email(999)
@@ -106,7 +106,7 @@ class OrderTasksTestCase(TestCase):
         mock_render.side_effect = ["Email content", "HTML content"]
 
         mock_settings.SITE_NAME = "GrooveShop"
-        mock_settings.SUPPORT_EMAIL = "support@example.com"
+        mock_settings.INFO_EMAIL = "support@example.com"
         mock_settings.SITE_URL = "http://example.com"
         mock_settings.DEFAULT_FROM_EMAIL = "no-reply@example.com"
 
@@ -128,7 +128,7 @@ class OrderTasksTestCase(TestCase):
         self, mock_settings, mock_get
     ):
         mock_settings.SITE_NAME = "GrooveShop"
-        mock_settings.SUPPORT_EMAIL = "support@example.com"
+        mock_settings.INFO_EMAIL = "support@example.com"
         mock_settings.SITE_URL = "http://example.com"
 
         mock_get.return_value = self.order
@@ -179,7 +179,7 @@ class OrderTasksTestCase(TestCase):
         mock_email.return_value = mock_email_instance
 
         mock_settings.SITE_NAME = "GrooveShop"
-        mock_settings.SUPPORT_EMAIL = "support@example.com"
+        mock_settings.INFO_EMAIL = "support@example.com"
         mock_settings.SITE_URL = "http://example.com"
         mock_settings.DEFAULT_FROM_EMAIL = "no-reply@example.com"
 

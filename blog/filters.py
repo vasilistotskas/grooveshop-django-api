@@ -26,6 +26,9 @@ class BlogPostFilter(filters.FilterSet):
         label="Minimum Tags Count",
     )
     featured = filters.BooleanFilter(field_name="featured", lookup_expr="exact")
+    is_published = filters.BooleanFilter(
+        field_name="is_published", lookup_expr="exact"
+    )
     min_view_count = filters.NumberFilter(
         field_name="view_count", lookup_expr="gte", label="Minimum View Count"
     )

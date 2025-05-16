@@ -27,7 +27,6 @@ class CheckoutAPITestCase(APITestCase):
         self.region = RegionFactory(country=self.country)
         self.pay_way = PayWayFactory()
 
-        # Create products with the same currency
         self.product1 = ProductFactory.create(
             stock=20, num_images=0, num_reviews=0
         )
@@ -35,7 +34,6 @@ class CheckoutAPITestCase(APITestCase):
             stock=15, num_images=0, num_reviews=0
         )
 
-        # Ensure the currency is the same as what we'll use in shipping_price
         self.currency = str(self.product1.price.currency)
 
         self.checkout_url = reverse("order-list")
@@ -73,27 +71,18 @@ class CheckoutAPITestCase(APITestCase):
         self.product1.refresh_from_db()
         self.product2.refresh_from_db()
 
-        # Stock is reduced by the ordered quantity
-        self.assertEqual(
-            self.product1.stock, 20 - 2
-        )  # Initial 20 minus ordered 2
-        self.assertEqual(
-            self.product2.stock, 15 - 1
-        )  # Initial 15 minus ordered 1
+        self.assertEqual(self.product1.stock, 20 - 2)
+        self.assertEqual(self.product2.stock, 15 - 1)
 
-        # Signal is called at least once (may be called twice due to how the test is set up)
         self.assertTrue(mock_signal.called)
 
     def test_checkout_insufficient_stock(self):
-        # Create a product with limited stock for this test
         product_limited = ProductFactory.create(
             stock=5, num_images=0, num_reviews=0
         )
 
         data = self.checkout_data.copy()
-        data["items"] = [
-            {"product": product_limited.id, "quantity": 10}
-        ]  # Exceeds stock
+        data["items"] = [{"product": product_limited.id, "quantity": 10}]
 
         response = self.client.post(
             self.checkout_url,
@@ -104,7 +93,6 @@ class CheckoutAPITestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("items", response.data)
 
-        # Verify stock hasn't changed
         product_limited.refresh_from_db()
         self.assertEqual(product_limited.stock, 5)
 

@@ -104,10 +104,8 @@ class OrderService:
                         f"Available: {product.stock}, Requested: {quantity}"
                     )
 
-                # Create a copy of the item data to avoid modifying the original
                 item_to_create = item_data.copy()
 
-                # Always use the product's price, but ensure currency matches the order
                 product_price = product.final_price
                 if product_price.currency != target_currency:
                     item_to_create["price"] = Money(
@@ -117,8 +115,6 @@ class OrderService:
                     item_to_create["price"] = product_price
 
                 OrderItem.objects.create(order=order, **item_to_create)
-
-                # Stock reduction is handled in the OrderItem post_save signal
 
             order.paid_amount = order.calculate_order_total_amount()
             order.save(update_fields=["paid_amount"])

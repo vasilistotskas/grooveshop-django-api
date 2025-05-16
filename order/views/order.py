@@ -155,10 +155,7 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
             data=request.data, context={"request": request}
         )
 
-        print(f"Request data: {request.data}")
-
         if not serializer.is_valid():
-            print(f"Validation errors: {serializer.errors}")
             return Response(
                 serializer.errors, status=status.HTTP_400_BAD_REQUEST
             )

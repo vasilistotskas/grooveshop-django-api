@@ -124,9 +124,6 @@ class OrderViewSetTestCase(APITestCase):
         url = self.get_order_list_url()
         response = self.client.post(url, data=payload, format="json")
 
-        if response.status_code != status.HTTP_201_CREATED:
-            print(f"Response data: {response.data}")
-
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_create_invalid(self):
@@ -222,9 +219,6 @@ class OrderViewSetTestCase(APITestCase):
 
         url = self.get_order_detail_url(self.order.id)
         response = self.client.put(url, data=payload, format="json")
-
-        if response.status_code != status.HTTP_200_OK:
-            print(f"Response data: {response.data}")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 

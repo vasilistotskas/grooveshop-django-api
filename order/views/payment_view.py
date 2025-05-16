@@ -1,21 +1,17 @@
 import logging
-from typing import Any
 
-from django.conf import settings
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
-from order.enum.status_enum import PaymentStatusEnum
 from order.models import Order
 from pay_way.models import PayWay
 from pay_way.services import PayWayService
-
 
 logger = logging.getLogger(__name__)
 
@@ -24,51 +20,54 @@ class OrderPaymentViewSet(GenericViewSet):
     def get_permissions(self):
         if self.action == "refund_payment":
             return [IsAdminUser()]
-        
+
         # For other actions, no permission classes required
         # We'll validate access to the order in the method
         return []
-    
+
     def check_order_permission(self, request, order):
         if request.user.is_authenticated and request.user.is_staff:
             return True
-        
+
         if request.user.is_authenticated and order.user_id == request.user.id:
             return True
-        
+
         if not request.user.is_authenticated:
             if not order.user_id:
-                request.session[f'order_{order.uuid}'] = True
+                request.session[f"order_{order.uuid}"] = True
                 return True
-            
-            if request.session.get(f'order_{order.uuid}'):
+
+            if request.session.get(f"order_{order.uuid}"):
                 return True
-                
+
         return False
-    
-    @action(detail=True, methods=["post"], url_path="process-payment")
-    def process_payment(self, request: HttpRequest, pk: str = None) -> Response:
-        order = get_object_or_404(Order, pk=pk)
-        
+
+    def _validate_process(
+        self, request: HttpRequest, order: Order
+    ) -> Response | None:
         if not self.check_order_permission(request, order):
             return Response(
-                {"detail": _("You do not have permission to process payment for this order.")},
+                {
+                    "detail": _(
+                        "You do not have permission to process payment for this order."
+                    )
+                },
                 status=status.HTTP_403_FORBIDDEN,
             )
-        
+
         if order.is_paid:
             return Response(
                 {"detail": _("This order has already been paid.")},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
         pay_way_id = request.data.get("pay_way_id")
         if not pay_way_id:
             return Response(
                 {"detail": _("Payment method is required.")},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
         try:
             pay_way = PayWay.objects.get(id=pay_way_id, active=True)
         except PayWay.DoesNotExist:
@@ -76,90 +75,107 @@ class OrderPaymentViewSet(GenericViewSet):
                 {"detail": _("Invalid payment method.")},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
         order.pay_way = pay_way
         order.save(update_fields=["pay_way"])
-        
+        return None
+
+    @action(detail=True, methods=["post"], url_path="process-payment")
+    def process_payment(self, request: HttpRequest, pk: str) -> Response:
+        order = get_object_or_404(Order, pk=pk)
+
+        validation_error = self._validate_process(request, order)
+        if validation_error:
+            return validation_error
+
         payment_data = request.data.get("payment_data", {})
-        
         try:
             success, response_data = PayWayService.process_payment(
-                pay_way=pay_way,
-                order=order,
-                **payment_data
+                pay_way=order.pay_way, order=order, **payment_data
             )
-            
             if not success:
                 logger.error(
-                    f"Payment processing failed for order {order.id}",
+                    "Payment processing failed for order %s",
+                    order.id,
                     extra={
                         "order_id": order.id,
-                        "pay_way": pay_way.id,
+                        "pay_way": order.pay_way.id,
                         "error": response_data.get("error", "Unknown error"),
                     },
                 )
                 return Response(
-                    {"detail": _("Payment processing failed."), "error": response_data.get("error")},
+                    {
+                        "detail": _("Payment processing failed."),
+                        "error": response_data.get("error"),
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            
+
             return Response(
                 {
                     "detail": _("Payment processing initiated."),
                     "order_id": order.id,
                     "payment_status": order.payment_status,
                     "payment_id": response_data.get("payment_id", ""),
-                    "requires_confirmation": pay_way.requires_confirmation,
-                    "is_online_payment": pay_way.is_online_payment,
+                    "requires_confirmation": order.pay_way.requires_confirmation,
+                    "is_online_payment": order.pay_way.is_online_payment,
                     "provider_data": {
-                        k: v for k, v in response_data.items()
+                        k: v
+                        for k, v in response_data.items()
                         if k not in ["payment_id", "status", "error"]
                     },
                 }
             )
-            
-        except Exception as e:
+
+        except Exception:
             logger.exception(
-                f"Exception during payment processing for order {order.id}",
-                extra={
-                    "order_id": order.id,
-                    "pay_way": pay_way.id,
-                    "error": str(e),
-                },
+                "Exception during payment processing for order %s",
+                order.id,
+                extra={"order_id": order.id, "pay_way": order.pay_way.id},
             )
             return Response(
-                {"detail": _("An error occurred while processing the payment.")},
+                {
+                    "detail": _(
+                        "An error occurred while processing the payment."
+                    )
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-    
+
     @action(detail=True, methods=["get"], url_path="payment-status")
-    def check_payment_status(self, request: HttpRequest, pk: str = None) -> Response:
+    def check_payment_status(
+        self, request: HttpRequest, pk: str | None = None
+    ) -> Response:
         order = get_object_or_404(Order, pk=pk)
-        
+
         if not self.check_order_permission(request, order):
             return Response(
-                {"detail": _("You do not have permission to check payment status for this order.")},
+                {
+                    "detail": _(
+                        "You do not have permission to check payment status for this order."
+                    )
+                },
                 status=status.HTTP_403_FORBIDDEN,
             )
-        
+
         if not order.pay_way:
             return Response(
                 {"detail": _("This order has no payment method selected.")},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
         if not order.payment_id:
             return Response(
                 {"detail": _("This order has no associated payment.")},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
         try:
             payment_status, status_data = PayWayService.check_payment_status(
                 pay_way=order.pay_way,
                 order=order,
             )
-            
+
             return Response(
                 {
                     "order_id": order.id,
@@ -168,7 +184,7 @@ class OrderPaymentViewSet(GenericViewSet):
                     "status_details": status_data,
                 }
             )
-            
+
         except Exception as e:
             logger.exception(
                 f"Exception checking payment status for order {order.id}",
@@ -178,41 +194,48 @@ class OrderPaymentViewSet(GenericViewSet):
                 },
             )
             return Response(
-                {"detail": _("An error occurred while checking the payment status.")},
+                {
+                    "detail": _(
+                        "An error occurred while checking the payment status."
+                    )
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-    
+
     @action(detail=True, methods=["post"], url_path="refund")
-    def refund_payment(self, request: HttpRequest, pk: str = None) -> Response:
+    def refund_payment(
+        self, request: HttpRequest, pk: str | None = None
+    ) -> Response:
         order = get_object_or_404(Order, pk=pk)
-        
+
         if not order.is_paid:
             return Response(
                 {"detail": _("This order has not been paid yet.")},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
         if not order.pay_way:
             return Response(
                 {"detail": _("This order has no payment method selected.")},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
+
         amount = None
         if "amount" in request.data and "currency" in request.data:
             from djmoney.money import Money
+
             amount = Money(
                 amount=request.data.get("amount"),
                 currency=request.data.get("currency"),
             )
-        
+
         try:
             success, refund_data = PayWayService.refund_payment(
                 pay_way=order.pay_way,
                 order=order,
                 amount=amount,
             )
-            
+
             if not success:
                 logger.error(
                     f"Payment refund failed for order {order.id}",
@@ -222,10 +245,13 @@ class OrderPaymentViewSet(GenericViewSet):
                     },
                 )
                 return Response(
-                    {"detail": _("Payment refund failed."), "error": refund_data.get("error")},
+                    {
+                        "detail": _("Payment refund failed."),
+                        "error": refund_data.get("error"),
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            
+
             return Response(
                 {
                     "detail": _("Payment refund initiated."),
@@ -235,7 +261,7 @@ class OrderPaymentViewSet(GenericViewSet):
                     "refund_details": refund_data,
                 }
             )
-            
+
         except Exception as e:
             logger.exception(
                 f"Exception during payment refund for order {order.id}",
@@ -247,4 +273,4 @@ class OrderPaymentViewSet(GenericViewSet):
             return Response(
                 {"detail": _("An error occurred while processing the refund.")},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            ) 
+            )

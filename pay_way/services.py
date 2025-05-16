@@ -1,7 +1,6 @@
 import logging
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
-from django.conf import settings
 from djmoney.money import Money
 
 from order.enum.status_enum import PaymentStatusEnum
@@ -37,13 +36,22 @@ class PayWayService:
                 "currency": order.total_price.currency,
                 "provider": pay_way.provider_code or "offline",
             }
-            
+
             if not pay_way.requires_confirmation:
-                order.payment_method = pay_way.safe_translation_getter("name", any_language=True) or ""
+                order.payment_method = (
+                    pay_way.safe_translation_getter("name", any_language=True)
+                    or ""
+                )
                 order.payment_status = PaymentStatusEnum.PENDING
                 order.payment_id = payment_data["payment_id"]
-                order.save(update_fields=["payment_method", "payment_status", "payment_id"])
-                
+                order.save(
+                    update_fields=[
+                        "payment_method",
+                        "payment_status",
+                        "payment_id",
+                    ]
+                )
+
             return True, payment_data
 
         provider = PayWayService.get_provider_for_pay_way(pay_way)
@@ -51,21 +59,25 @@ class PayWayService:
             return False, {"error": "Payment provider not available"}
 
         success, payment_data = provider.process_payment(
-            amount=order.total_price,
-            order_id=str(order.id),
-            **kwargs
+            amount=order.total_price, order_id=str(order.id), **kwargs
         )
 
         if success:
-            order.payment_method = pay_way.safe_translation_getter("name", any_language=True) or ""
-            order.payment_status = payment_data.get("status", PaymentStatusEnum.PROCESSING)
+            order.payment_method = (
+                pay_way.safe_translation_getter("name", any_language=True) or ""
+            )
+            order.payment_status = payment_data.get(
+                "status", PaymentStatusEnum.PROCESSING
+            )
             order.payment_id = payment_data.get("payment_id", "")
-            order.save(update_fields=["payment_method", "payment_status", "payment_id"])
+            order.save(
+                update_fields=["payment_method", "payment_status", "payment_id"]
+            )
 
             if order.payment_status == PaymentStatusEnum.COMPLETED:
                 order.mark_as_paid(
                     payment_id=payment_data.get("payment_id", ""),
-                    payment_method=order.payment_method
+                    payment_method=order.payment_method,
                 )
 
         return success, payment_data
@@ -75,28 +87,35 @@ class PayWayService:
         pay_way: PayWay, order: Order
     ) -> tuple[PaymentStatusEnum, dict[str, Any]]:
         if not order.payment_id:
-            return PaymentStatusEnum.PENDING, {"error": "No payment ID found for order"}
+            return PaymentStatusEnum.PENDING, {
+                "error": "No payment ID found for order"
+            }
 
         if not pay_way.is_online_payment:
             return order.payment_status, {
                 "status": order.payment_status,
                 "provider": "offline",
-                "manual_check_required": pay_way.requires_confirmation
+                "manual_check_required": pay_way.requires_confirmation,
             }
 
         provider = PayWayService.get_provider_for_pay_way(pay_way)
         if not provider:
-            return PaymentStatusEnum.PENDING, {"error": "Payment provider not available"}
+            return PaymentStatusEnum.PENDING, {
+                "error": "Payment provider not available"
+            }
 
         status, status_data = provider.get_payment_status(order.payment_id)
-        
+
         if status != order.payment_status:
             order.payment_status = status
             order.save(update_fields=["payment_status"])
-            
+
             if status == PaymentStatusEnum.COMPLETED:
-                order.mark_as_paid(payment_id=order.payment_id, payment_method=order.payment_method)
-        
+                order.mark_as_paid(
+                    payment_id=order.payment_id,
+                    payment_method=order.payment_method,
+                )
+
         return status, status_data
 
     @staticmethod
@@ -114,7 +133,7 @@ class PayWayService:
                     "amount": str(amount.amount),
                     "currency": amount.currency,
                     "provider": "manual",
-                    "note": "Manual refund process required"
+                    "note": "Manual refund process required",
                 }
             else:
                 refund_info = {
@@ -122,24 +141,24 @@ class PayWayService:
                     "status": PaymentStatusEnum.PENDING,
                     "amount": "full refund",
                     "provider": "manual",
-                    "note": "Manual refund process required"
+                    "note": "Manual refund process required",
                 }
-            
+
             order.payment_status = PaymentStatusEnum.REFUNDED
             order.status = "REFUNDED"
             order.save(update_fields=["payment_status", "status"])
-            
+
             return True, refund_info
-        
+
         provider = PayWayService.get_provider_for_pay_way(pay_way)
         if not provider:
             return False, {"error": "Payment provider not available"}
-            
+
         success, refund_data = provider.refund_payment(order.payment_id, amount)
-        
+
         if success:
             order.payment_status = PaymentStatusEnum.REFUNDED
             order.status = "REFUNDED"
             order.save(update_fields=["payment_status", "status"])
-            
-        return success, refund_data 
+
+        return success, refund_data

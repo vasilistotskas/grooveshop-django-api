@@ -1,17 +1,17 @@
 import pytest
 from django.conf import settings
-from django.db import connection, reset_queries
 from django.core.cache import cache
+from django.db import connection, reset_queries
 from django.test.utils import TestContextDecorator
 
 settings.PASSWORD_HASHERS = [
-    'django.contrib.auth.hashers.MD5PasswordHasher',
+    "django.contrib.auth.hashers.MD5PasswordHasher",
 ]
 
 settings.MEILI_OFFLINE = True
 
-settings.DATABASES['default']['ATOMIC_REQUESTS'] = False
-settings.DATABASES['default']['AUTOCOMMIT'] = True
+settings.DATABASES["default"]["ATOMIC_REQUESTS"] = False
+settings.DATABASES["default"]["AUTOCOMMIT"] = True
 
 settings.CELERY_TASK_ALWAYS_EAGER = True
 settings.CELERY_TASK_EAGER_PROPAGATES = True
@@ -29,11 +29,13 @@ class DisableLoggingContext(TestContextDecorator):
 
     def enable(self):
         import logging
+
         self.previous_level = logging.root.manager.disable
         logging.disable(logging.CRITICAL)
 
     def disable(self):
         import logging
+
         if self.previous_level is not None:
             logging.disable(self.previous_level)
             self.previous_level = None
@@ -66,6 +68,7 @@ def reset_db_queries():
 @pytest.fixture(autouse=True)
 def _django_clear_site_cache():
     from django.contrib.sites.models import Site
+
     Site.objects.clear_cache()
 
 
@@ -95,8 +98,13 @@ def count_queries():
 
         def __exit__(self, exc_type, exc_val, exc_tb):
             self.query_count = len(connection.queries)
-            if self.max_queries is not None and self.query_count > self.max_queries:
-                pytest.fail(f"Too many queries: {self.query_count} > {self.max_queries}")
+            if (
+                self.max_queries is not None
+                and self.query_count > self.max_queries
+            ):
+                pytest.fail(
+                    f"Too many queries: {self.query_count} > {self.max_queries}"
+                )
             connection.force_debug_cursor = False
 
     return QueryCounter
@@ -112,7 +120,9 @@ class QueryCountAssertionMixin:
             reset_queries()
             func(*args, **kwargs) if func else None
             queries = len(conn.queries)
-            assert queries <= num, f"Expected a maximum of {num} queries, but {queries} were performed"
+            assert queries <= num, (
+                f"Expected a maximum of {num} queries, but {queries} were performed"
+            )
         finally:
             conn.force_debug_cursor = old_debug_cursor
 
@@ -125,7 +135,9 @@ class QueryCountAssertionMixin:
             reset_queries()
             func(*args, **kwargs) if func else None
             queries = len(conn.queries)
-            assert queries == num, f"Expected exactly {num} queries, but {queries} were performed"
+            assert queries == num, (
+                f"Expected exactly {num} queries, but {queries} were performed"
+            )
         finally:
             conn.force_debug_cursor = old_debug_cursor
 

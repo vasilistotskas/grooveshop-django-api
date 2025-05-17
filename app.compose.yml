@@ -30,8 +30,8 @@ services:
       context: .
       dockerfile: ./dev.Dockerfile
     command: >
-      sh -c "python manage.py migrate &&
-             python manage.py collectstatic --noinput"
+      uv run python manage.py migrate &&
+      uv run python manage.py collectstatic --noinput
     env_file:
       - ./.env
     environment:
@@ -50,7 +50,12 @@ services:
     build:
       context: .
       dockerfile: ./dev.Dockerfile
-    command: uvicorn asgi:application --host 0.0.0.0 --port 8000 --reload
+    command: >
+      uv --no-cache run uvicorn
+      asgi:application
+      --host 0.0.0.0
+      --port 8000
+      --reload
     env_file:
       - ./.env
     environment:
@@ -72,7 +77,8 @@ services:
       context: .
       dockerfile: ./dev.Dockerfile
     command: >
-      celery --app core
+      uv --no-cache run celery
+      --app core
       worker
       --max-memory-per-child=200000
       --queues celery
@@ -97,7 +103,8 @@ services:
       context: .
       dockerfile: ./dev.Dockerfile
     command: >
-      celery --app core
+      uv --no-cache run celery
+      --app core
       beat
       --scheduler django_celery_beat.schedulers:DatabaseScheduler
       --loglevel=info
@@ -120,7 +127,8 @@ services:
       context: .
       dockerfile: ./dev.Dockerfile
     command: >
-      celery --app core
+      uv --no-cache run celery
+      --app core
       flower
       --address=0.0.0.0
       --port=5555

@@ -1,41 +1,47 @@
 ARG PYTHON_VERSION=3.13.2
+ARG ALPINE_VERSION=3.21
+ARG UV_VERSION=0.7.5
+ARG UV_IMAGE=ghcr.io/astral-sh/uv:${UV_VERSION}
 ARG UID=1000
 ARG GID=1000
-ARG APP_DIR=/home/app
+ARG APP_PATH=/home/app
 
-FROM python:${PYTHON_VERSION}-alpine AS base
+FROM $UV_IMAGE AS uv
+
+FROM python:${PYTHON_VERSION}-alpine${ALPINE_VERSION} AS builder
+ARG UV_IMAGE
+ARG APP_PATH
+COPY --from=uv /uv /uvx /bin/
+WORKDIR ${APP_PATH}
+COPY pyproject.toml .
+COPY uv.lock .
+
+RUN mkdir -p ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles \
+    && chown -R appuser:appgroup ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles \
+
+RUN uv sync --frozen --no-install-project --no-editable
+ADD . .
+RUN uv sync --frozen --no-editable
+ENTRYPOINT []
+
+FROM python:${PYTHON_VERSION}-alpine${ALPINE_VERSION} AS production
 ARG UID
 ARG GID
-ARG APP_DIR
+ARG APP_PATH
+RUN addgroup -g ${GID} -S app && adduser -u ${UID} -S app -G app
+RUN mkdir ${APP_PATH} && chown app:app ${APP_PATH}
+USER app
+WORKDIR ${APP_PATH}
+COPY --from=builder --chown=app:app ${APP_PATH} .
 
-RUN apk update && \
-    apk add --no-cache gcc musl-dev
+CMD [".venv/bin/uvicorn", "asgi:application", "--host", "0.0.0.0", "--port", "8000"]
 
-RUN pip install --upgrade pip
+FROM production AS production_cicd
+USER root
 
-RUN addgroup -g ${GID} app && \
-    adduser -D -u ${UID} -G app app && \
-    mkdir -p ${APP_DIR} && \
-    chown -R app:app ${APP_DIR}
-
-WORKDIR ${APP_DIR}
-
-FROM base AS prod
-
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-
-COPY --chown=app:app ./requirements.txt .
-
-RUN pip install -r requirements.txt
-RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/app/wheels -r requirements.txt
-
-COPY --chown=app:app . .
-
-RUN mkdir -p ${APP_DIR}/web/staticfiles ${APP_DIR}/web/mediafiles && \
-    chown -R app:app ${APP_DIR}/web/staticfiles ${APP_DIR}/web/mediafiles
-
-VOLUME ${APP_DIR}/web/staticfiles
-VOLUME ${APP_DIR}/web/mediafiles
+RUN apk add --no-cache \
+    docker-cli \
+    docker-compose \
+    git
 
 USER app

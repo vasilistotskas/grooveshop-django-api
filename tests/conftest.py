@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 from django.conf import settings
 from django.core.cache import cache
@@ -16,8 +18,6 @@ settings.DATABASES["default"]["AUTOCOMMIT"] = True
 settings.CELERY_TASK_ALWAYS_EAGER = True
 settings.CELERY_TASK_EAGER_PROPAGATES = True
 settings.DEBUG = False
-
-import logging
 
 logging.disable(logging.WARNING)
 

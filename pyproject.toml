@@ -84,20 +84,6 @@ dev = [
     "ruff==0.11.9"
 ]
 
-# ─────────────────────────────────────────────────────────
-# Build system requirements
-# ─────────────────────────────────────────────────────────
-[build-system]
-requires = ["poetry-core>=2.0.0"]
-build-backend = "poetry.core.masonry.api"
-
-# ─────────────────────────────────────────────────────────
-# Poetry configuration
-# ─────────────────────────────────────────────────────────
-[tool.poetry]
-packages = [
-    { include = "*", from = "." },
-]
 
 # ─────────────────────────────────────────────────────────
 # Coverage configuration
@@ -142,7 +128,7 @@ version_variables = ["setup.py:__version__"]
 branch = "main"
 upload_to_pypi = false
 upload_to_release = true
-build_command = "pip install poetry && poetry build"
+build_command = "pip install uv && uv build"
 commit_message = "chore(release): release version {version} [skip ci]"
 
 [tool.semantic_release.commit_parser_options]

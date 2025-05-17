@@ -3,6 +3,12 @@
 
 
 
+## v1.4.6 (2025-05-17)
+
+### Bug fixes
+
+* fix: ci ([`a3643bd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a3643bd6f9f9031707e131d98f16759508c17eeb))
+
 ## v1.4.5 (2025-05-17)
 
 ### Bug fixes

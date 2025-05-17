@@ -1,6 +1,6 @@
 import sys
 
-from setuptools import setup
+from setuptools import find_packages, setup
 
 __version__ = "1.3.0"
 
@@ -10,6 +10,8 @@ setup(
     description="GrooveShop Setup",
     author="Vasilis Totskas",
     author_email="vassilistotskas@msn.com",
+    packages=find_packages(),
+    include_package_data=True,
 )
 
 try:

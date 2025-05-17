@@ -50,6 +50,7 @@ services:
     build:
       context: .
       dockerfile: ./dev.Dockerfile
+      target: default
     command: >
       uv --no-cache run uvicorn
       asgi:application
@@ -76,6 +77,7 @@ services:
     build:
       context: .
       dockerfile: ./dev.Dockerfile
+      target: default
     command: >
       uv --no-cache run celery
       --app core
@@ -102,6 +104,7 @@ services:
     build:
       context: .
       dockerfile: ./dev.Dockerfile
+      target: default
     command: >
       uv --no-cache run celery
       --app core
@@ -126,6 +129,7 @@ services:
     build:
       context: .
       dockerfile: ./dev.Dockerfile
+      target: default
     command: >
       uv --no-cache run celery
       --app core

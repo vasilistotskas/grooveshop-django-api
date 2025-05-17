@@ -29,7 +29,7 @@ ARG UID
 ARG GID
 ARG APP_PATH
 RUN addgroup -g ${GID} -S app && adduser -u ${UID} -S app -G app
-RUN mkdir ${APP_PATH} && chown app:app ${APP_PATH}
+RUN mkdir -p ${APP_PATH} && chown app:app ${APP_PATH}
 USER app
 WORKDIR ${APP_PATH}
 COPY --from=builder --chown=app:app ${APP_PATH} .

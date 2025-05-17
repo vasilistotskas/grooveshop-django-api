@@ -93,9 +93,8 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install apprise braintree coverage coveralls
+          uv sync --locked --all-extras
+          uv add apprise braintree coverage coveralls
 
       - name: Run migrations
         run: |
@@ -160,9 +159,6 @@ jobs:
         with:
           python-version-file: ".python-version"
 
-      - name: Install latest pip
-        run: python -m pip install --upgrade pip
-
       - name: Clear dist_build directory
         run: rm -rf dist_build/
 
@@ -173,10 +169,10 @@ jobs:
           github_token: ${{ secrets.DJANGO_TOKEN }}
 
       - name: Install pypa/build
-        run: python3 -m pip install build --user
+        run: uv add build --user
 
       - name: Build a binary wheel and a source tarball
-        run: python3 -m build --sdist --wheel --outdir dist_build/
+        run: uv run -m build --sdist --wheel --outdir dist_build/
 
       - uses: actions/upload-artifact@v4
         with:

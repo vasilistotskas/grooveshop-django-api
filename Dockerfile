@@ -16,8 +16,7 @@ WORKDIR ${APP_PATH}
 COPY pyproject.toml .
 COPY uv.lock .
 
-RUN mkdir -p ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles \
-    && chown -R app:app ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles
+RUN mkdir -p ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles
 
 RUN uv sync --frozen --no-install-project --no-editable
 ADD . .
@@ -33,6 +32,9 @@ RUN mkdir -p ${APP_PATH} && chown app:app ${APP_PATH}
 USER app
 WORKDIR ${APP_PATH}
 COPY --from=builder --chown=app:app ${APP_PATH} .
+
+RUN mkdir -p ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles && \
+    chown -R app:app ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles
 
 CMD [".venv/bin/uvicorn", "asgi:application", "--host", "0.0.0.0", "--port", "8000"]
 

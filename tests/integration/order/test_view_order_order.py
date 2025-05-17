@@ -59,7 +59,7 @@ class OrderViewSetTestCase(APITestCase):
             region=self.region,
         )
 
-        products = ProductFactory.create_batch(2, num_images=0, num_reviews=0)
+        products = ProductFactory.create_batch(2, num_images=0, num_reviews=0, stock=20)
         self.order_items = []
 
         for i, product in enumerate(products):

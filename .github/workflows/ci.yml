@@ -133,7 +133,7 @@ jobs:
 
       - name: Upload coverage to Coveralls
         if: matrix.db == 'postgres'
-        run: coveralls --service=github
+        run: uv run coveralls --service=github
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

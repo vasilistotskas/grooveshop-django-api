@@ -1,6 +1,6 @@
 [project]
 name = "grooveshop-django-api"
-version = "1.4.2"
+version = "1.4.3"
 description = "GrooveShop Django Backend"
 license = "MIT"
 readme = "README.md"

@@ -30,7 +30,7 @@ class BlogPostFilterTestCase(APITestCase):
             category=self.category1,
             is_published=True,
             featured=True,
-            view_count=1000,
+            view_count=5000,
         )
         self.popular_post.tags.set([self.tag1, self.tag2, self.tag3])
 

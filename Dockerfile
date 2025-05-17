@@ -17,7 +17,7 @@ COPY pyproject.toml .
 COPY uv.lock .
 
 RUN mkdir -p ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles \
-    && chown -R appuser:appgroup ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles \
+    && chown -R appuser:appgroup ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles
 
 RUN uv sync --frozen --no-install-project --no-editable
 ADD . .

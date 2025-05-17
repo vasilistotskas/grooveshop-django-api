@@ -104,8 +104,8 @@ jobs:
 
       - name: Run migrations
         run: |
-          python manage.py makemigrations
-          python manage.py migrate
+          uv run python manage.py makemigrations
+          uv run python manage.py migrate
         env:
           DB: ${{ matrix.db }}
           DB_PORT: ${{ matrix.db_port }}
@@ -127,7 +127,7 @@ jobs:
           MEILI_MASTER_KEY: ${{ secrets.MEILI_MASTER_KEY }}
           MEILI_ENV: production
         run: |
-          coverage run --rcfile=.coveragerc --source='.' -m pytest && coverage report
+          coverage run --rcfile=.coveragerc --source='.' -m uv run pytest && coverage report
         timeout-minutes: 15
 
       - name: Upload coverage to Coveralls

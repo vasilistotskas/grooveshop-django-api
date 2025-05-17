@@ -13,7 +13,6 @@ class TestMFAAdapter(unittest.TestCase):
     def test_get_public_key_credential_rp_entity_with_env_var(
         self, mock_getenv
     ):
-        """Test that the method returns the correct dictionary when the environment variable is set."""
         mock_getenv.return_value = "example.com"
 
         result = self.adapter.get_public_key_credential_rp_entity()
@@ -34,7 +33,6 @@ class TestMFAAdapter(unittest.TestCase):
     def test_get_public_key_credential_rp_entity_with_default(
         self, mock_getenv
     ):
-        """Test that the method returns the correct dictionary when the environment variable is not set."""
         mock_getenv.return_value = None
 
         result = self.adapter.get_public_key_credential_rp_entity()

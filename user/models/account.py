@@ -9,7 +9,7 @@ from django.contrib.auth.models import (
     PermissionsMixin,
 )
 from django.contrib.auth.validators import UnicodeUsernameValidator
-from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.indexes import BTreeIndex, GinIndex
 from django.db import models
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
@@ -146,20 +146,26 @@ class UserAccount(
         ordering = ["-created_at"]
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
+            BTreeIndex(fields=["email"], name="user_account_email_ix"),
+            BTreeIndex(fields=["username"], name="user_account_username_ix"),
+            BTreeIndex(fields=["is_active"], name="user_account_is_active_ix"),
+            BTreeIndex(fields=["is_staff"], name="user_account_is_staff_ix"),
+            BTreeIndex(fields=["country"], name="user_account_country_ix"),
+            BTreeIndex(fields=["region"], name="user_account_region_ix"),
             GinIndex(
-                name="user_account_trgm_idx",
-                fields=[
-                    "email",
-                    "username",
-                    "first_name",
-                    "last_name",
-                    "phone",
-                    "city",
-                    "zipcode",
-                    "address",
-                    "place",
-                ],
-                opclasses=["gin_trgm_ops"] * 9,
+                name="user_account_identity_gin_ix",
+                fields=["email", "username"],
+                opclasses=["gin_trgm_ops"] * 2,
+            ),
+            GinIndex(
+                name="user_account_name_gin_ix",
+                fields=["first_name", "last_name"],
+                opclasses=["gin_trgm_ops"] * 2,
+            ),
+            GinIndex(
+                name="user_account_location_gin_ix",
+                fields=["city", "zipcode", "address", "place"],
+                opclasses=["gin_trgm_ops"] * 4,
             ),
         ]
 

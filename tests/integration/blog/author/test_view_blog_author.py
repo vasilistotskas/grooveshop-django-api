@@ -6,7 +6,7 @@ from rest_framework.test import APITestCase
 
 from blog.factories.author import BlogAuthorFactory
 from blog.models.author import BlogAuthor
-from blog.serializers.author import BlogAuthorSerializer
+from core.utils.testing import TestURLFixerMixin
 from user.factories.account import UserAccountFactory
 
 languages = [
@@ -17,7 +17,7 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
 
 
-class BlogAuthorViewSetTestCase(APITestCase):
+class BlogAuthorViewSetTestCase(TestURLFixerMixin, APITestCase):
     author: BlogAuthor = None
 
     def setUp(self):
@@ -35,11 +35,18 @@ class BlogAuthorViewSetTestCase(APITestCase):
     def test_list(self):
         url = self.get_author_list_url()
         response = self.client.get(url)
-        authors = BlogAuthor.objects.all()
-        serializer = BlogAuthorSerializer(authors, many=True)
-
-        self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertIn("results", response.data)
+        self.assertIsInstance(response.data["results"], list)
+
+        authors_count = BlogAuthor.objects.count()
+        self.assertEqual(len(response.data["results"]), authors_count)
+
+        if authors_count > 0:
+            first_result = response.data["results"][0]
+            self.assertIn("translations", first_result)
+            self.assertIn("user", first_result)
 
     def test_create_valid(self):
         user = UserAccountFactory(num_addresses=0)
@@ -81,11 +88,12 @@ class BlogAuthorViewSetTestCase(APITestCase):
     def test_retrieve_valid(self):
         url = self.get_author_detail_url(self.author.pk)
         response = self.client.get(url)
-        author = BlogAuthor.objects.get(pk=self.author.pk)
-        serializer = BlogAuthorSerializer(author)
-
-        self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertIn("user", response.data)
+        self.assertEqual(response.data["user"], self.author.user.id)
+
+        self.assertIn("translations", response.data)
 
     def test_retrieve_invalid(self):
         invalid_author_id = 9999

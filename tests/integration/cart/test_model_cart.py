@@ -137,7 +137,6 @@ class GuestCartModelTestCase(TestCase):
         self.assertEqual(self.cart.total_items_unique, 2)
 
     def test_create_guest_cart(self):
-        """Test creating a cart for a guest user with a session key."""
         session_key = str(uuid.uuid4())
         cart = Cart.objects.create(session_key=session_key)
         self.assertIsNotNone(cart)
@@ -145,7 +144,6 @@ class GuestCartModelTestCase(TestCase):
         self.assertEqual(cart.session_key, session_key)
 
     def test_add_item_to_guest_cart(self):
-        """Test adding an item to a guest cart."""
         session_key = str(uuid.uuid4())
         cart = Cart.objects.create(session_key=session_key)
         product = ProductFactory(num_images=0, num_reviews=0)

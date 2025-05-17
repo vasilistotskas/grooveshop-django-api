@@ -9,6 +9,16 @@ from measurement.base import BidimensionalMeasure, MeasureBase
 
 from core.utils.measurement import get_measurement
 
+try:
+    from unfold.widgets import (
+        UnfoldAdminSelectWidget,
+        UnfoldAdminTextInputWidget,
+    )
+
+    UNFOLD_AVAILABLE = True
+except ImportError:
+    UNFOLD_AVAILABLE = False
+
 
 class MeasurementWidget(forms.MultiWidget):
     def __init__(
@@ -23,12 +33,20 @@ class MeasurementWidget(forms.MultiWidget):
         self.unit_choices = unit_choices
 
         if not float_widget:
-            float_widget = forms.TextInput(attrs=attrs)
+            if UNFOLD_AVAILABLE:
+                float_widget = UnfoldAdminTextInputWidget(attrs=attrs)
+            else:
+                float_widget = forms.TextInput(attrs=attrs)
 
         if not unit_choices_widget:
-            unit_choices_widget = forms.Select(
-                attrs=attrs, choices=unit_choices
-            )
+            if UNFOLD_AVAILABLE:
+                unit_choices_widget = UnfoldAdminSelectWidget(
+                    attrs=attrs, choices=unit_choices
+                )
+            else:
+                unit_choices_widget = forms.Select(
+                    attrs=attrs, choices=unit_choices
+                )
 
         widgets = (float_widget, unit_choices_widget)
         super().__init__(widgets, attrs)

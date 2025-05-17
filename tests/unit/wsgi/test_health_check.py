@@ -13,7 +13,6 @@ class TestHealthCheck(unittest.TestCase):
         self.mock_start_response = Mock()
 
     def test_health_check_path(self):
-        """Test that the health check path returns a 200 OK response."""
         environ = {"PATH_INFO": self.health_url}
         response = self.wrapped_app(environ, self.mock_start_response)
 
@@ -26,7 +25,6 @@ class TestHealthCheck(unittest.TestCase):
         self.mock_app.assert_not_called()
 
     def test_non_health_check_path(self):
-        """Test that non-health check paths are passed to the original app."""
         environ = {"PATH_INFO": "/some/other/path/"}
         response = self.wrapped_app(environ, self.mock_start_response)
 

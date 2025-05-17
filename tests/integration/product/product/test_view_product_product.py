@@ -280,3 +280,125 @@ class ProductViewSetTestCase(APITestCase):
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_ordering_by_discount_value(self):
+        ProductFactory(price=200, discount_percent=5)
+        ProductFactory(price=100, discount_percent=20)
+
+        url = f"{self.get_product_list_url()}?ordering=discount_value"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data["results"]
+
+        discount_values = [product["discount_value"] for product in results]
+        self.assertEqual(sorted(discount_values), discount_values)
+
+        url = f"{self.get_product_list_url()}?ordering=-discount_value"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data["results"]
+
+        discount_values = [product["discount_value"] for product in results]
+        self.assertEqual(sorted(discount_values, reverse=True), discount_values)
+
+    def test_ordering_by_final_price(self):
+        ProductFactory(price=150, discount_percent=10)
+        ProductFactory(price=200, discount_percent=5)
+
+        url = f"{self.get_product_list_url()}?ordering=final_price"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data["results"]
+
+        final_prices = [product["final_price"] for product in results]
+        self.assertEqual(sorted(final_prices), final_prices)
+
+        url = f"{self.get_product_list_url()}?ordering=-final_price"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data["results"]
+
+        final_prices = [product["final_price"] for product in results]
+        self.assertEqual(sorted(final_prices, reverse=True), final_prices)
+
+    def test_ordering_by_review_average(self):
+        product2 = ProductFactory()
+        product3 = ProductFactory()
+
+        ProductReviewFactory(product=product2, rate=3, status="True")
+        ProductReviewFactory(product=product2, rate=4, status="True")
+        ProductReviewFactory(product=product3, rate=5, status="True")
+
+        url = f"{self.get_product_list_url()}?ordering=review_average"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data["results"]
+
+        review_averages = [product["review_average"] for product in results]
+        self.assertEqual(sorted(review_averages), review_averages)
+
+        url = f"{self.get_product_list_url()}?ordering=-review_average"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data["results"]
+
+        review_averages = [product["review_average"] for product in results]
+        self.assertEqual(sorted(review_averages, reverse=True), review_averages)
+
+    def test_ordering_by_likes_count(self):
+        product2 = ProductFactory()
+        product3 = ProductFactory()
+
+        user2 = UserAccountFactory(num_addresses=0)
+        user3 = UserAccountFactory(num_addresses=0)
+
+        ProductFavouriteFactory(product=product2, user=user2)
+
+        ProductFavouriteFactory(product=product3, user=user2)
+        ProductFavouriteFactory(product=product3, user=user3)
+
+        url = f"{self.get_product_list_url()}?ordering=likes_count"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data["results"]
+
+        likes_counts = [product["likes_count"] for product in results]
+        self.assertEqual(sorted(likes_counts), likes_counts)
+
+        url = f"{self.get_product_list_url()}?ordering=-likes_count"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data["results"]
+
+        likes_counts = [product["likes_count"] for product in results]
+        self.assertEqual(sorted(likes_counts, reverse=True), likes_counts)
+
+    def test_filter_by_price_range(self):
+        ProductFactory(price=150, discount_percent=0)
+        ProductFactory(price=250, discount_percent=0)
+
+        url = f"{self.get_product_list_url()}?min_final_price=200"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data["results"]
+
+        for product in results:
+            self.assertGreaterEqual(float(product["final_price"]), 200)
+
+        url = f"{self.get_product_list_url()}?max_final_price=200"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data["results"]
+
+        for product in results:
+            self.assertLessEqual(float(product["final_price"]), 200)
+
+        url = f"{self.get_product_list_url()}?min_final_price=100&max_final_price=200"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data["results"]
+
+        for product in results:
+            price = float(product["final_price"])
+            self.assertGreaterEqual(price, 100)
+            self.assertLessEqual(price, 200)

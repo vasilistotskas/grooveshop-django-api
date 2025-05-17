@@ -1,0 +1,19 @@
+Dear {{ order.first_name }} {{ order.last_name }},
+
+We noticed that your order #{{ order.id }} placed on {{ order.created_at }} is still in pending status.
+
+Order Details:
+- Total Amount: {{ order.total_price }}
+- Status: Pending
+
+To complete your purchase, please finalize your payment. If you've already completed payment, please disregard this message as it may take some time for our system to update.
+
+You can view your order status by logging into your account on our website.
+
+If you're experiencing any issues with your payment or have questions about your order, please don't hesitate to contact our customer service team.
+
+Thank you for shopping with {{ site_name }}!
+
+Best regards,
+The {{ site_name }} Team
+{{ info_email }}

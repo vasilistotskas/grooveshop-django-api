@@ -3,21 +3,11 @@ from blog.strategies.related_posts_strategy import RelatedPostsStrategy
 
 
 class WeightedRelatedPostsStrategy(RelatedPostsStrategy):
-    """
-    Aggregator strategy that combines multiple strategies based on assigned weights.
-    """
-
     def __init__(
         self,
         strategies_with_weights: list[tuple[RelatedPostsStrategy, float]],
         limit: int = 8,
     ):
-        """
-        Initialize with a list of strategies and their respective weights.
-
-        :param strategies_with_weights: List of tuples containing (strategy_instance, weight).
-        :param limit: Total number of related posts to retrieve.
-        """
         self.strategies_with_weights = strategies_with_weights
         self.limit = limit
 

@@ -44,7 +44,7 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 22500
 SERIALIZATION_MODULES = {"json": "djmoney.serializers"}
 
 if DEBUG:
-    import socket  # only if you haven't already imported this
+    import socket
 
     hostname, aliaslist, ips = socket.gethostbyname_ex(socket.gethostname())
     INTERNAL_IPS = [ip[: ip.rfind(".")] + ".1" for ip in ips] + [
@@ -59,11 +59,10 @@ MEDIA_STREAM_BASE_URL = getenv("MEDIA_STREAM_BASE_URL", "http://localhost:3003")
 STATIC_BASE_URL = getenv("STATIC_BASE_URL", "http://localhost:8000")
 CSP_STATIC_BASE_URL = getenv("STATIC_BASE_URL", "http://localhost:8000")
 
-ALLOWED_HOSTS = []  # Start with an empty list
+ALLOWED_HOSTS = []
 
-# Add any additional hosts from the environment variable
 additional_hosts = getenv("ALLOWED_HOSTS", "*").split(",")
-ALLOWED_HOSTS.extend(filter(None, additional_hosts))  # Filter out empty strings
+ALLOWED_HOSTS.extend(filter(None, additional_hosts))
 
 USE_X_FORWARDED_HOST = getenv("USE_X_FORWARDED_HOST", "False") == "True"
 
@@ -141,14 +140,13 @@ THIRD_PARTY_APPS = [
     "csp",
 ]
 
-# Combine all apps together for the INSTALLED_APPS setting
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "csp.middleware.CSPMiddleware",
@@ -372,7 +370,7 @@ SOCIALACCOUNT_FORMS = {
     "signup": "allauth.socialaccount.forms.SignupForm",
 }
 
-ACCOUNT_CHANGE_EMAIL = bool(DEBUG)
+ACCOUNT_CHANGE_EMAIL = DEBUG
 ACCOUNT_USER_MODEL_USERNAME_FIELD = "username"
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
 ACCOUNT_UNIQUE_EMAIL = True
@@ -555,21 +553,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://media-stream-service:80",
     "http://localhost:1337",
 ]
-CORS_ORIGIN_ALLOW_ALL = getenv("CORS_ORIGIN_ALLOW_ALL", "True") == "True"
-CORS_ALLOW_ALL_ORIGINS = getenv("CORS_ALLOW_ALL_ORIGINS", "True") == "True"
+CORS_ALLOW_ALL_ORIGINS = DEBUG
 CORS_ALLOW_CREDENTIALS = True
-CORS_ORIGIN_WHITELIST = [
-    APP_BASE_URL,
-    API_BASE_URL,
-    NUXT_BASE_URL,
-    MEDIA_STREAM_BASE_URL,
-    STATIC_BASE_URL,
-    f"https://{AWS_S3_CUSTOM_DOMAIN}",
-    "http://backend-service:80",
-    "http://frontend-nuxt-service:80",
-    "http://media-stream-service:80",
-    "http://localhost:1337",
-]
 CORS_ALLOW_METHODS = [
     "DELETE",
     "GET",
@@ -684,8 +669,17 @@ CONTENT_SECURITY_POLICY = {
     },
 }
 
+# Security Settings
+SECURE_SSL_REDIRECT = getenv("SECURE_SSL_REDIRECT", "False") == "True"
+SECURE_PROXY_SSL_HEADER = (
+    ("HTTP_X_FORWARDED_PROTO", "https") if not DEBUG else None
+)
+SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 3600
+SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
+SECURE_HSTS_PRELOAD = not DEBUG
+
 # Currency
-DEFAULT_CURRENCY = "EUR"
+DEFAULT_CURRENCY = getenv("DEFAULT_CURRENCY", "EUR")
 BASE_CURRENCY = "EUR"
 CURRENCIES = ("USD", "EUR")
 CURRENCY_CHOICES = [("USD", "USD $"), ("EUR", "EUR €")]
@@ -760,7 +754,12 @@ EXTRA_SETTINGS_DEFAULTS = [
     {
         "name": "CHECKOUT_SHIPPING_PRICE",
         "type": "decimal",
-        "value": 3.0,
+        "value": 3.00,
+    },
+    {
+        "name": "FREE_SHIPPING_THRESHOLD",
+        "type": "decimal",
+        "value": 50.00,
     },
 ]
 
@@ -790,7 +789,7 @@ MFA_TOTP_PERIOD = 30
 MFA_TOTP_DIGITS = 6
 MFA_SUPPORTED_TYPES = ["totp", "recovery_codes", "webauthn"]
 MFA_PASSKEY_LOGIN_ENABLED = True
-MFA_WEBAUTHN_ALLOW_INSECURE_ORIGIN = bool(DEBUG)
+MFA_WEBAUTHN_ALLOW_INSECURE_ORIGIN = DEBUG
 MFA_PASSKEY_SIGNUP_ENABLED = True
 
 PARLER_DEFAULT_LANGUAGE_CODE = "el"
@@ -859,9 +858,6 @@ UNFOLD = {
         },
     },
     "SHOW_LANGUAGES": True,
-    "STYLES": [
-        lambda request: static("css/styles.css"),
-    ],
     "SITE_DROPDOWN": [
         {
             "icon": "cached",
@@ -870,15 +866,6 @@ UNFOLD = {
         },
     ],
 }
-
-# Security Settings
-SECURE_SSL_REDIRECT = getenv("SECURE_SSL_REDIRECT", "False") == "True"
-SECURE_PROXY_SSL_HEADER = (
-    ("HTTP_X_FORWARDED_PROTO", "https") if not DEBUG else None
-)
-SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 3600
-SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
-SECURE_HSTS_PRELOAD = not DEBUG
 
 SESSION_CACHE_ALIAS = "default"
 SESSION_COOKIE_NAME = "sessionid"
@@ -1087,3 +1074,15 @@ LOGGING = {
         },
     },
 }
+
+# PAYMENT SETTINGS
+STRIPE_API_KEY = "sk_test_example"
+STRIPE_WEBHOOK_SECRET = "whsec_example"
+PAYPAL_CLIENT_ID = "client_id_example"
+PAYPAL_CLIENT_SECRET = "client_secret_example"
+
+# SHIPPING SETTINGS
+FEDEX_API_KEY = "fedex_api_key_example"
+FEDEX_ACCOUNT_NUMBER = "fedex_account_number_example"
+UPS_API_KEY = "ups_api_key_example"
+UPS_ACCOUNT_NUMBER = "ups_account_number_example"

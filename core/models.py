@@ -16,7 +16,7 @@ class SortableModel(models.Model):
     class Meta(TypedModelMeta):
         abstract = True
         indexes = [
-            BTreeIndex(fields=["sort_order"], name="%(class)s_sort_order_idx"),
+            BTreeIndex(fields=["sort_order"], name="%(class)s_sort_order_ix"),
         ]
 
     @override
@@ -75,8 +75,8 @@ class TimeStampMixinModel(models.Model):
     class Meta(TypedModelMeta):
         abstract = True
         indexes = [
-            BTreeIndex(fields=["created_at"], name="%(class)s_created_at_idx"),
-            BTreeIndex(fields=["updated_at"], name="%(class)s_updated_at_idx"),
+            BTreeIndex(fields=["created_at"], name="%(class)s_created_at_ix"),
+            BTreeIndex(fields=["updated_at"], name="%(class)s_updated_at_ix"),
         ]
 
     def get_duration_since_created(self):
@@ -117,12 +117,18 @@ class PublishableModel(models.Model):
         abstract = True
         indexes = [
             BTreeIndex(
-                fields=["published_at"], name="%(class)s_published_at_idx"
+                fields=["published_at"], name="%(class)s_published_at_ix"
             ),
             BTreeIndex(
-                fields=["is_published"], name="%(class)s_is_published_idx"
+                fields=["is_published"], name="%(class)s_is_published_ix"
             ),
         ]
+
+    @override
+    def save(self, *args, **kwargs):
+        if self.is_published and self.published_at is None:
+            self.published_at = tz.now()
+        super().save(*args, **kwargs)
 
     @property
     def is_visible(self) -> bool:
@@ -139,8 +145,8 @@ class MetaDataModel(models.Model):
 
     class Meta(TypedModelMeta):
         indexes = [
-            GinIndex(fields=["private_metadata"], name="%(class)s_p_meta_idx"),
-            GinIndex(fields=["metadata"], name="%(class)s_meta_idx"),
+            GinIndex(fields=["private_metadata"], name="%(class)s_p_meta_ix"),
+            GinIndex(fields=["metadata"], name="%(class)s_meta_ix"),
         ]
         abstract = True
 

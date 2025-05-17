@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db.models import Avg
 from django.test import TestCase
 from django.utils.html import format_html
 from djmoney.money import Money
@@ -191,3 +192,213 @@ class ProductModelTestCase(TestCase):
             f"/products/{self.product.id}/{self.product.slug}"
         )
         self.assertEqual(self.product.absolute_url, expected_absolute_url)
+
+
+class ProductQuerySetTestCase(TestCase):
+    def setUp(self):
+        self.vat = VatFactory(value=Decimal("10.0"))
+
+        self.product1 = ProductFactory(
+            price=Decimal("100.00"),
+            discount_percent=Decimal("20.0"),
+            vat=self.vat,
+            stock=10,
+            active=True,
+        )
+
+        ProductReviewFactory(
+            product=self.product1, rate=5, status=ReviewStatusEnum.TRUE
+        )
+        ProductReviewFactory(
+            product=self.product1, rate=3, status=ReviewStatusEnum.TRUE
+        )
+        ProductReviewFactory(
+            product=self.product1, rate=4, status=ReviewStatusEnum.FALSE
+        )
+
+        user1 = UserAccountFactory(num_addresses=0)
+        user2 = UserAccountFactory(num_addresses=0)
+        ProductFavouriteFactory(product=self.product1, user=user1)
+        ProductFavouriteFactory(product=self.product1, user=user2)
+
+        self.product2 = ProductFactory(
+            price=Decimal("0.00"),
+            discount_percent=Decimal("0.0"),
+            vat=None,
+            stock=0,
+            active=False,
+        )
+
+        self.product3 = ProductFactory(
+            price=Decimal("50.00"),
+            discount_percent=Decimal("10.0"),
+            vat=None,
+            stock=5,
+            active=True,
+        )
+
+    def test_queryset_with_discount_value(self):
+        queryset = Product.objects.with_discount_value()
+        product1 = queryset.get(id=self.product1.id)
+        product2 = queryset.get(id=self.product2.id)
+
+        expected_discount_value1 = (
+            self.product1.price.amount * self.product1.discount_percent
+        ) / 100
+        expected_discount_value2 = (
+            self.product2.price.amount * self.product2.discount_percent
+        ) / 100
+
+        self.assertEqual(
+            product1.discount_value_amount, expected_discount_value1
+        )
+        self.assertEqual(
+            product2.discount_value_amount, expected_discount_value2
+        )
+
+    def test_queryset_with_vat_value(self):
+        queryset = Product.objects.with_vat_value()
+        product1 = queryset.get(id=self.product1.id)
+        product2 = queryset.get(id=self.product2.id)
+        product3 = queryset.get(id=self.product3.id)
+
+        expected_vat_value1 = (
+            self.product1.price.amount * self.vat.value
+        ) / 100
+        expected_vat_value2 = Decimal("0.00")
+        expected_vat_value3 = Decimal("0.00")
+
+        self.assertEqual(product1.vat_value_amount, expected_vat_value1)
+        self.assertEqual(product2.vat_value_amount, expected_vat_value2)
+        self.assertEqual(product3.vat_value_amount, expected_vat_value3)
+
+    def test_queryset_with_final_price(self):
+        queryset = Product.objects.with_final_price()
+        product1 = queryset.get(id=self.product1.id)
+
+        expected_discount_value = (
+            self.product1.price.amount * self.product1.discount_percent
+        ) / 100
+        expected_vat_value = (self.product1.price.amount * self.vat.value) / 100
+        expected_final_price = (
+            self.product1.price.amount
+            + expected_vat_value
+            - expected_discount_value
+        )
+
+        self.assertEqual(product1.final_price_amount, expected_final_price)
+
+    def test_queryset_with_price_save_percent(self):
+        queryset = Product.objects.with_price_save_percent()
+        product1 = queryset.get(id=self.product1.id)
+        product2 = queryset.get(id=self.product2.id)
+
+        expected_discount_value1 = (
+            self.product1.price.amount * self.product1.discount_percent
+        ) / 100
+        expected_price_save_percent1 = (
+            expected_discount_value1 / self.product1.price.amount
+        ) * 100
+
+        self.assertEqual(
+            product1.price_save_percent_field, expected_price_save_percent1
+        )
+        self.assertEqual(product2.price_save_percent_field, Decimal("0"))
+
+    def test_queryset_with_likes_count(self):
+        queryset = Product.objects.with_likes_count()
+        product1 = queryset.get(id=self.product1.id)
+        product2 = queryset.get(id=self.product2.id)
+
+        self.assertEqual(product1.likes_count_field, 2)
+        self.assertEqual(product2.likes_count_field, 0)
+
+    def test_queryset_with_review_average(self):
+        queryset = Product.objects.with_review_average()
+        product1 = queryset.get(id=self.product1.id)
+        product2 = queryset.get(id=self.product2.id)
+
+        actual_avg = ProductReview.objects.filter(
+            product=self.product1
+        ).aggregate(avg=Avg("rate"))["avg"]
+
+        self.assertEqual(product1.review_average_field, actual_avg)
+        self.assertEqual(product2.review_average_field, 0)
+
+    def test_queryset_with_approved_review_average(self):
+        queryset = Product.objects.with_approved_review_average()
+        product1 = queryset.get(id=self.product1.id)
+        product2 = queryset.get(id=self.product2.id)
+
+        actual_avg = ProductReview.objects.filter(
+            product=self.product1, status=ReviewStatusEnum.TRUE
+        ).aggregate(avg=Avg("rate"))["avg"]
+
+        self.assertEqual(product1.approved_review_average_field, actual_avg)
+        self.assertEqual(product2.approved_review_average_field, 0)
+
+    def test_queryset_with_all_annotations(self):
+        queryset = Product.objects.with_all_annotations()
+        product1 = queryset.get(id=self.product1.id)
+
+        self.assertTrue(hasattr(product1, "discount_value_amount"))
+        self.assertTrue(hasattr(product1, "vat_value_amount"))
+        self.assertTrue(hasattr(product1, "final_price_amount"))
+        self.assertTrue(hasattr(product1, "price_save_percent_field"))
+        self.assertTrue(hasattr(product1, "likes_count_field"))
+        self.assertTrue(hasattr(product1, "review_average_field"))
+        self.assertTrue(hasattr(product1, "approved_review_average_field"))
+
+    def test_annotations_match_property_values(self):
+        queryset = Product.objects.with_all_annotations()
+        product1 = queryset.get(id=self.product1.id)
+
+        product_instance = Product.objects.get(id=self.product1.id)
+
+        self.assertEqual(
+            product1.discount_value_amount,
+            product_instance.discount_value.amount,
+        )
+        self.assertEqual(
+            product1.final_price_amount, product_instance.final_price.amount
+        )
+        self.assertEqual(
+            product1.price_save_percent_field,
+            product_instance.price_save_percent,
+        )
+        self.assertEqual(
+            product1.likes_count_field, product_instance.likes_count
+        )
+        self.assertEqual(
+            product1.review_average_field, product_instance.review_average
+        )
+        self.assertEqual(
+            product1.approved_review_average_field,
+            product_instance.approved_review_average,
+        )
+
+    def test_ordering_with_annotations(self):
+        ProductFactory(
+            price=Decimal("200.00"), discount_percent=Decimal("30.0")
+        )
+        ProductFactory(
+            price=Decimal("300.00"), discount_percent=Decimal("10.0")
+        )
+
+        products_by_discount = list(
+            Product.objects.with_discount_value().order_by(
+                "-discount_value_amount"
+            )
+        )
+        self.assertTrue(
+            products_by_discount[0].discount_value_amount
+            >= products_by_discount[1].discount_value_amount
+        )
+
+        products_by_price = list(
+            Product.objects.with_final_price().order_by("-final_price_amount")
+        )
+        self.assertTrue(
+            products_by_price[0].final_price_amount
+            >= products_by_price[1].final_price_amount
+        )

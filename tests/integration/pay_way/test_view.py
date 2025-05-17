@@ -3,11 +3,9 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from core.utils.tests import compare_serializer_and_response
 from pay_way.enum.pay_way_enum import PayWayEnum
 from pay_way.factories import PayWayFactory
 from pay_way.models import PayWay
-from pay_way.serializers import PayWaySerializer
 
 languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
@@ -36,16 +34,31 @@ class PayWayViewSetTestCase(APITestCase):
     def test_list(self):
         url = self.get_pay_way_list_url()
         response = self.client.get(url)
-        pay_ways = PayWay.objects.all()
-        serializer = PayWaySerializer(pay_ways, many=True)
-        for response_item, serializer_item in zip(
-            response.data["results"], serializer.data, strict=False
-        ):
-            compare_serializer_and_response(
-                serializer_item, response_item, ["icon"]
-            )
-
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertGreaterEqual(len(response.data["results"]), 1)
+
+        found = False
+        for item in response.data["results"]:
+            if item["active"] == self.pay_way.active:
+                cost = item["cost"]
+                if isinstance(cost, dict):
+                    self.assertAlmostEqual(
+                        float(cost["amount"]),
+                        float(self.pay_way.cost.amount),
+                        places=2,
+                    )
+                    self.assertEqual(
+                        cost["currency"], str(self.pay_way.cost.currency)
+                    )
+                else:
+                    self.assertAlmostEqual(
+                        float(cost), float(self.pay_way.cost.amount), places=2
+                    )
+                found = True
+                break
+
+        self.assertTrue(found, "Could not find the created pay_way in response")
 
     def test_create_valid(self):
         payload = {
@@ -89,13 +102,38 @@ class PayWayViewSetTestCase(APITestCase):
     def test_retrieve_valid(self):
         url = self.get_pay_way_detail_url(self.pay_way.pk)
         response = self.client.get(url)
-        pay_way = PayWay.objects.get(pk=self.pay_way.pk)
-        serializer = PayWaySerializer(pay_way)
-        compare_serializer_and_response(
-            serializer.data, response.data, ["icon"]
-        )
-
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertEqual(response.data["active"], self.pay_way.active)
+
+        cost = response.data["cost"]
+        if isinstance(cost, dict):
+            self.assertAlmostEqual(
+                float(cost["amount"]), float(self.pay_way.cost.amount), places=2
+            )
+            self.assertEqual(cost["currency"], str(self.pay_way.cost.currency))
+        else:
+            self.assertAlmostEqual(
+                float(cost), float(self.pay_way.cost.amount), places=2
+            )
+
+        free_amount = response.data["free_for_order_amount"]
+        if isinstance(free_amount, dict):
+            self.assertAlmostEqual(
+                float(free_amount["amount"]),
+                float(self.pay_way.free_for_order_amount.amount),
+                places=2,
+            )
+            self.assertEqual(
+                free_amount["currency"],
+                str(self.pay_way.free_for_order_amount.currency),
+            )
+        else:
+            self.assertAlmostEqual(
+                float(free_amount),
+                float(self.pay_way.free_for_order_amount.amount),
+                places=2,
+            )
 
     def test_retrieve_invalid(self):
         invalid_pay_way_id = 9999

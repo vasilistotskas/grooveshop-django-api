@@ -1,4 +1,5 @@
 import importlib
+from datetime import timedelta
 
 import factory
 from django.apps import apps
@@ -175,7 +176,7 @@ class SlideFactory(factory.django.DjangoModelFactory):
     show_button = factory.Faker("boolean")
     date_start = factory.LazyFunction(timezone.now)
     date_end = factory.LazyFunction(
-        lambda: timezone.now() + timezone.timedelta(days=180)
+        lambda: timezone.now() + timedelta(days=180)
     )
     image = factory.django.ImageField(
         filename="slide_image.jpg",

@@ -1,5 +1,6 @@
 from typing import override
 
+from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils import timezone as tz
 from django.utils.translation import gettext_lazy as _
@@ -43,9 +44,10 @@ class NotificationUser(TimeStampMixinModel, UUIDModel):
         ]
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
-            models.Index(fields=["user"]),
-            models.Index(fields=["notification"]),
-            models.Index(fields=["seen"]),
+            BTreeIndex(fields=["user"], name="not_user_user_ix"),
+            BTreeIndex(fields=["notification"], name="not_user_notif_ix"),
+            BTreeIndex(fields=["seen"], name="not_user_seen_ix"),
+            BTreeIndex(fields=["seen_at"], name="not_user_seen_at_ix"),
         ]
 
     @override

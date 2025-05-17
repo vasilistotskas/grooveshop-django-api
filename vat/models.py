@@ -9,7 +9,6 @@ from django_stubs_ext.db.models import TypedModelMeta
 
 from core.models import TimeStampMixinModel, UUIDModel
 
-# Define constants at the module level
 MIN_VAT_VALUE = Decimal("0.0")
 MAX_VAT_VALUE = Decimal("100.0")
 
@@ -39,7 +38,7 @@ class Vat(TimeStampMixinModel, UUIDModel):
         ordering = ["-created_at"]
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
-            BTreeIndex(fields=["value"]),
+            BTreeIndex(fields=["value"], name="vat_value_ix"),
         ]
         constraints = [
             CheckConstraint(

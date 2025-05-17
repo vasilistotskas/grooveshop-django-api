@@ -1,31 +1,96 @@
-from typing import override
+from functools import cached_property
+from typing import Any, Optional, cast, override
 
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex, GinIndex
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import models
-from django.db.models import ExpressionWrapper, F, Sum
+from django.db.models import ExpressionWrapper, F, QuerySet, Sum
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
 from djmoney.money import Money
 from phonenumber_field.modelfields import PhoneNumberField
 
+from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from core.models import SoftDeleteModel, TimeStampMixinModel, UUIDModel
 from order.enum.document_type_enum import OrderDocumentTypeEnum
-from order.enum.status_enum import OrderStatusEnum
-from user.enum.address import FloorChoicesEnum, LocationChoicesEnum
+from order.enum.status_enum import OrderStatusEnum, PaymentStatusEnum
+
+
+class OrderQuerySet(models.QuerySet):
+    def with_total_amounts(self) -> QuerySet:
+        return self.annotate(
+            items_total=Sum(
+                ExpressionWrapper(
+                    F("items__price") * F("items__quantity"),
+                    output_field=MoneyField(max_digits=11, decimal_places=2),
+                )
+            )
+        )
+
+    def pending(self) -> QuerySet:
+        return self.filter(status=OrderStatusEnum.PENDING)
+
+    def processing(self) -> QuerySet:
+        return self.filter(status=OrderStatusEnum.PROCESSING)
+
+    def shipped(self) -> QuerySet:
+        return self.filter(status=OrderStatusEnum.SHIPPED)
+
+    def delivered(self) -> QuerySet:
+        return self.filter(status=OrderStatusEnum.DELIVERED)
+
+    def completed(self) -> QuerySet:
+        return self.filter(status=OrderStatusEnum.COMPLETED)
+
+    def canceled(self) -> QuerySet:
+        return self.filter(status=OrderStatusEnum.CANCELED)
+
+    def returned(self) -> QuerySet:
+        return self.filter(status=OrderStatusEnum.RETURNED)
+
+    def refunded(self) -> QuerySet:
+        return self.filter(status=OrderStatusEnum.REFUNDED)
 
 
 class OrderManager(models.Manager):
-    def get_queryset(self):
-        return (
-            super()
-            .get_queryset()
+    def get_queryset(self) -> OrderQuerySet:
+        return cast(
+            "OrderQuerySet",
+            OrderQuerySet(self.model, using=self._db)
             .select_related("user", "pay_way", "country", "region")
-            .exclude(is_deleted=True)
+            .prefetch_related("items", "items__product")
+            .exclude(is_deleted=True),
         )
+
+    def with_total_amounts(self) -> QuerySet:
+        return self.get_queryset().with_total_amounts()
+
+    def pending(self) -> QuerySet:
+        return self.get_queryset().pending()
+
+    def processing(self) -> QuerySet:
+        return self.get_queryset().processing()
+
+    def shipped(self) -> QuerySet:
+        return self.get_queryset().shipped()
+
+    def delivered(self) -> QuerySet:
+        return self.get_queryset().delivered()
+
+    def completed(self) -> QuerySet:
+        return self.get_queryset().completed()
+
+    def canceled(self) -> QuerySet:
+        return self.get_queryset().canceled()
+
+    def returned(self) -> QuerySet:
+        return self.get_queryset().returned()
+
+    def refunded(self) -> QuerySet:
+        return self.get_queryset().refunded()
 
 
 class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
@@ -59,10 +124,18 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
         blank=True,
     )
     floor = models.CharField(
-        max_length=50, choices=FloorChoicesEnum, blank=True, default=""
+        _("Floor"),
+        max_length=50,
+        choices=FloorChoicesEnum,
+        blank=True,
+        default="",
     )
     location_type = models.CharField(
-        max_length=100, choices=LocationChoicesEnum, blank=True, default=""
+        _("Location Type"),
+        max_length=100,
+        choices=LocationChoicesEnum,
+        blank=True,
+        default="",
     )
     email = models.EmailField(_("Email"), max_length=255)
     first_name = models.CharField(_("First Name"), max_length=255)
@@ -101,6 +174,28 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
         null=True,
         default=0,
     )
+    status_updated_at = models.DateTimeField(
+        _("Status Updated At"), auto_now=False, null=True, blank=True
+    )
+    payment_id = models.CharField(
+        _("Payment ID"), max_length=255, blank=True, default=""
+    )
+    payment_status = models.CharField(
+        _("Payment Status"),
+        max_length=50,
+        blank=True,
+        choices=PaymentStatusEnum,
+        default=PaymentStatusEnum.PENDING,
+    )
+    payment_method = models.CharField(
+        _("Payment Method"), max_length=50, blank=True, default=""
+    )
+    tracking_number = models.CharField(
+        _("Tracking Number"), max_length=255, blank=True, default=""
+    )
+    shipping_carrier = models.CharField(
+        _("Shipping Carrier"), max_length=255, blank=True, default=""
+    )
 
     objects = OrderManager()
 
@@ -110,72 +205,210 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
         ordering = ["-created_at"]
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
-            BTreeIndex(fields=["status"]),
-            BTreeIndex(fields=["document_type"]),
+            BTreeIndex(fields=["status"], name="order_status_ix"),
+            BTreeIndex(fields=["document_type"], name="order_doc_type_ix"),
+            BTreeIndex(
+                fields=["status_updated_at"], name="order_status_upd_ix"
+            ),
+            BTreeIndex(
+                fields=["payment_status"], name="order_payment_status_ix"
+            ),
+            BTreeIndex(fields=["user"], name="order_user_ix"),
+            BTreeIndex(fields=["pay_way"], name="order_pay_way_ix"),
+            BTreeIndex(fields=["country"], name="order_country_ix"),
+            BTreeIndex(fields=["region"], name="order_region_ix"),
+            BTreeIndex(fields=["user", "status"], name="order_user_status_ix"),
+            BTreeIndex(
+                fields=["status", "payment_status"],
+                name="order_status_payment_ix",
+            ),
+            BTreeIndex(
+                fields=["tracking_number"], name="order_tracking_num_ix"
+            ),
+            BTreeIndex(fields=["payment_id"], name="order_payment_id_ix"),
             GinIndex(
-                name="order_search_gin",
-                fields=[
-                    "first_name",
-                    "last_name",
-                    "email",
-                    "phone",
-                    "mobile_phone",
-                    "street",
-                    "city",
-                    "zipcode",
-                    "place",
-                ],
-                opclasses=["gin_trgm_ops"] * 9,
+                name="order_name_search_ix",
+                fields=["first_name", "last_name"],
+                opclasses=["gin_trgm_ops"] * 2,
+            ),
+            GinIndex(
+                name="order_email_search_ix",
+                fields=["email"],
+                opclasses=["gin_trgm_ops"],
+            ),
+            GinIndex(
+                name="order_address_street_ix",
+                fields=["street"],
+                opclasses=["gin_trgm_ops"],
+            ),
+            GinIndex(
+                name="order_address_location_ix",
+                fields=["city", "place"],
+                opclasses=["gin_trgm_ops"] * 2,
             ),
         ]
 
-    def __str__(self):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._original_status = self.status
+
+    def __str__(self) -> str:
         return f"Order {self.id} - {self.first_name} {self.last_name}"
 
     @override
-    def clean(self):
-        try:
-            validate_email(self.email)
-        except ValidationError as err:
-            raise ValidationError(
-                {"email": _("Invalid email address.")}
-            ) from err
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        from django.utils import timezone
 
-        if self.mobile_phone and self.mobile_phone == self.phone:
-            raise ValidationError(
-                {
-                    "mobile_phone": _(
-                        "Mobile phone number cannot be the same as phone number."
-                    )
-                }
-            )
+        if (
+            self.pk
+            and hasattr(self, "_original_status")
+            and self.status != self._original_status
+        ):
+            self.status_updated_at = timezone.now()
+
+        if (
+            not self.email
+            and self.user_id is not None
+            and hasattr(self, "user")
+            and self.user is not None
+        ):
+            self.email = self.user.email
+
+        super().save(*args, **kwargs)
+        self._original_status = self.status
+
+    @override
+    def clean(self) -> None:
+        errors: dict[str, list[str]] = {}
+
+        if self.email:
+            try:
+                validate_email(self.email)
+            except ValidationError:
+                errors["email"] = [_("Enter a valid email address.")]
+
+        if not self.zipcode:
+            errors["zipcode"] = [_("Zipcode is required.")]
+
+        required_address_fields = ["street", "street_number", "city"]
+        missing_fields = [
+            field
+            for field in required_address_fields
+            if not getattr(self, field)
+        ]
+
+        if missing_fields:
+            errors["address"] = [
+                _("Street, street number, and city are required.")
+            ]
+
+        if errors:
+            raise ValidationError(errors)
 
     @property
     def total_price_items(self) -> Money:
-        total = self.items.annotate(
-            total_price_per_item=ExpressionWrapper(
-                F("price") * F("quantity"),
-                output_field=MoneyField(max_digits=11, decimal_places=2),
-            )
-        ).aggregate(total_price=Sum("total_price_per_item"))["total_price"]
+        from django.db.models import F, Sum
 
-        return Money(total or 0, settings.DEFAULT_CURRENCY)
+        items_total = self.items.aggregate(
+            total=Sum(F("price") * F("quantity"))
+        ).get("total")
+
+        if not items_total:
+            default_currency = getattr(settings, "DEFAULT_CURRENCY", "USD")
+            if self.shipping_price:
+                return Money(0, self.shipping_price.currency)
+            return Money(0, default_currency)
+
+        first_item = self.items.first()
+        currency = (
+            first_item.price.currency
+            if first_item
+            else getattr(settings, "DEFAULT_CURRENCY", "USD")
+        )
+
+        return Money(amount=items_total, currency=currency)
 
     @property
     def total_price_extra(self) -> Money:
-        payment_cost = Money(0, settings.DEFAULT_CURRENCY)
-        if (
-            self.pay_way
-            and self.total_price_items.amount
-            <= self.pay_way.free_for_order_amount.amount
-        ):
-            payment_cost = self.pay_way.cost
-
-        return self.shipping_price + payment_cost
+        return self.shipping_price
 
     @property
     def full_address(self) -> str:
         return f"{self.street} {self.street_number}, {self.zipcode} {self.city}"
 
+    @property
+    def customer_full_name(self) -> str:
+        return f"{self.first_name} {self.last_name}"
+
+    @property
+    def is_paid(self) -> bool:
+        return bool(
+            (
+                self.payment_status
+                and self.payment_status == PaymentStatusEnum.COMPLETED
+            )
+            or (self.paid_amount and self.paid_amount.amount > 0)
+        )
+
+    @property
+    def can_be_canceled(self) -> bool:
+        cancellable_statuses = [
+            OrderStatusEnum.PENDING,
+            OrderStatusEnum.PROCESSING,
+        ]
+        return self.status in cancellable_statuses
+
+    @property
+    def is_completed(self) -> bool:
+        return self.status == OrderStatusEnum.COMPLETED
+
+    @property
+    def is_canceled(self) -> bool:
+        return self.status == OrderStatusEnum.CANCELED
+
+    @cached_property
+    def total_price(self) -> Money:
+        items_total = self.total_price_items
+        extras_total = self.total_price_extra
+
+        if items_total.currency != extras_total.currency:
+            raise ValueError(
+                f"Items and extras have different currencies: {items_total.currency} and {extras_total.currency}"
+            )
+
+        return Money(
+            items_total.amount + extras_total.amount, items_total.currency
+        )
+
     def calculate_order_total_amount(self) -> Money:
-        return self.total_price_items + self.total_price_extra
+        return self.total_price
+
+    def mark_as_paid(
+        self,
+        payment_id: Optional[str] = None,
+        payment_method: Optional[str] = None,
+    ) -> None:
+        self.payment_status = PaymentStatusEnum.COMPLETED
+        if payment_id:
+            self.payment_id = payment_id
+        if payment_method:
+            self.payment_method = payment_method
+
+        if not self.paid_amount or self.paid_amount.amount == 0:
+            self.paid_amount = self.calculate_order_total_amount()
+
+        self.save(
+            update_fields=[
+                "payment_status",
+                "payment_id",
+                "payment_method",
+                "paid_amount",
+            ]
+        )
+
+    def add_tracking_info(
+        self, tracking_number: str, shipping_carrier: str
+    ) -> None:
+        self.tracking_number = tracking_number
+        self.shipping_carrier = shipping_carrier
+        self.save(update_fields=["tracking_number", "shipping_carrier"])

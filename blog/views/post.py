@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from functools import cached_property
 from importlib import import_module
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
@@ -43,12 +43,16 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
         PascalSnakeCaseOrderingFilter,
         SearchFilter,
     ]
-    filterset_fields = ["id", "tags", "slug", "author"]
     ordering_fields = [
         "id",
         "created_at",
         "updated_at",
         "published_at",
+        "view_count",
+        "likes_count",
+        "comments_count",
+        "tags_count",
+        "featured",
     ]
     ordering = ["-created_at"]
     filterset_class = BlogPostFilter
@@ -58,6 +62,11 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
         "comments": BlogCommentSerializer,
         "category": BlogCategorySerializer,
     }
+
+    @override
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return queryset.with_all_annotations()
 
     @cached_property
     def related_posts_strategy(self):

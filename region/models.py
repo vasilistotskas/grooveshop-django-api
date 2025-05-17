@@ -1,5 +1,6 @@
 from typing import override
 
+from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -26,6 +27,8 @@ class Region(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
             *SortableModel.Meta.indexes,
+            BTreeIndex(fields=["alpha"], name="region_alpha_ix"),
+            BTreeIndex(fields=["country"], name="region_country_ix"),
         ]
 
     def __str__(self):

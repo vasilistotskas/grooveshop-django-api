@@ -1,17 +1,21 @@
 import importlib
+import random
+from datetime import timedelta
 
 import factory
 from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.db.models import Count
+from django.utils import timezone
+from djmoney.money import Money
 from faker import Faker
 from phonenumber_field.phonenumber import PhoneNumber
 
+from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from order.enum.document_type_enum import OrderDocumentTypeEnum
-from order.enum.status_enum import OrderStatusEnum
+from order.enum.status_enum import OrderStatusEnum, PaymentStatusEnum
 from order.factories.item import OrderItemFactory
 from order.models.order import Order
-from user.enum.address import FloorChoicesEnum, LocationChoicesEnum
 
 fake = Faker()
 
@@ -61,14 +65,64 @@ def get_or_create_pay_way():
         return pay_way_factory_class.create()
 
 
+def generate_tracking_number():
+    carriers = ["FEDEX", "UPS", "USPS", "DHL"]
+    carrier = random.choice(carriers)
+
+    if carrier == "FEDEX":
+        return f"FEDEX-{fake.numerify('###########')}"
+    elif carrier == "UPS":
+        return f"1Z{fake.bothify('???#########')}"
+    elif carrier == "USPS":
+        return f"9{fake.numerify('############')}US"
+    elif carrier == "DHL":
+        return f"DHL-{fake.numerify('##########')}"
+    return None
+
+
+def generate_payment_data(status=None):
+    payment_methods = ["CREDIT_CARD", "PAYPAL", "BANK_TRANSFER", "STRIPE"]
+    payment_method = random.choice(payment_methods)
+    payment_id: str = ""
+
+    if payment_method == "CREDIT_CARD":
+        payment_id = f"CC-{fake.numerify('###-###-###')}"
+    elif payment_method == "PAYPAL":
+        payment_id = f"PP-{fake.numerify('##########')}"
+    elif payment_method == "BANK_TRANSFER":
+        payment_id = f"BT-{fake.numerify('######')}"
+    elif payment_method == "STRIPE":
+        payment_id = f"pi_{fake.lexify('?' * 24)}"
+
+    if not status:
+        if random.randint(1, 10) > 2:
+            status = PaymentStatusEnum.COMPLETED
+        else:
+            status = random.choice(
+                [
+                    PaymentStatusEnum.PENDING,
+                    PaymentStatusEnum.PROCESSING,
+                    PaymentStatusEnum.FAILED,
+                ]
+            )
+
+    return {
+        "payment_id": payment_id,
+        "payment_method": payment_method,
+        "payment_status": status,
+    }
+
+
 class OrderFactory(factory.django.DjangoModelFactory):
     user = factory.LazyFunction(get_or_create_user)
     country = factory.LazyFunction(get_or_create_country)
     region = factory.LazyFunction(get_or_create_region)
     pay_way = factory.LazyFunction(get_or_create_pay_way)
-    floor = factory.Iterator(FloorChoicesEnum.choices, getter=lambda x: x[0])
-    location_type = factory.Iterator(
-        LocationChoicesEnum.choices, getter=lambda x: x[0]
+    floor = factory.LazyFunction(
+        lambda: random.choice([s[0] for s in FloorChoicesEnum.choices])
+    )
+    location_type = factory.LazyFunction(
+        lambda: random.choice([s[0] for s in LocationChoicesEnum.choices])
     )
     email = factory.Faker("email")
     first_name = factory.Faker("first_name")
@@ -77,23 +131,79 @@ class OrderFactory(factory.django.DjangoModelFactory):
     street_number = factory.Faker("building_number")
     city = factory.Faker("city")
     zipcode = factory.Faker("postcode")
-    place = factory.Faker("secondary_address")
+    place = factory.LazyFunction(
+        lambda: fake.secondary_address() if random.randint(1, 10) > 5 else ""
+    )
     phone = factory.LazyAttribute(
         lambda _: PhoneNumber.from_string(fake.phone_number(), region="US")
     )
     mobile_phone = factory.LazyAttribute(
         lambda _: PhoneNumber.from_string(fake.phone_number(), region="US")
+        if random.randint(1, 10) > 3
+        else None
     )
-    customer_notes = factory.Faker("text", max_nb_chars=200)
-    status = factory.Iterator(OrderStatusEnum.choices, getter=lambda x: x[0])
-    shipping_price = factory.Faker(
-        "pydecimal", left_digits=2, right_digits=2, positive=True
+    customer_notes = factory.LazyFunction(
+        lambda: fake.paragraph(nb_sentences=2)
+        if random.randint(1, 10) > 7
+        else ""
     )
-    document_type = factory.Iterator(
-        OrderDocumentTypeEnum.choices, getter=lambda x: x[0]
+    status = factory.LazyFunction(
+        lambda: random.choice([s[0] for s in OrderStatusEnum.choices])
     )
-    paid_amount = factory.Faker(
-        "pydecimal", left_digits=3, right_digits=2, positive=True
+    shipping_price = factory.LazyFunction(
+        lambda: Money(
+            fake.pydecimal(
+                left_digits=2,
+                right_digits=2,
+                min_value=5,
+                max_value=20,
+                positive=True,
+            ),
+            "USD",
+        )
+    )
+    document_type = factory.LazyFunction(
+        lambda: random.choice([s[0] for s in OrderDocumentTypeEnum.choices])
+    )
+    paid_amount = factory.LazyFunction(
+        lambda: Money(
+            fake.pydecimal(
+                left_digits=3,
+                right_digits=2,
+                min_value=10,
+                max_value=99,
+                positive=True,
+            ),
+            "USD",
+        )
+        if random.randint(1, 10) > 3
+        else Money(0, "USD")
+    )
+    payment_status = factory.LazyFunction(
+        lambda: random.choice([s[0] for s in PaymentStatusEnum.choices])
+    )
+    payment_id = factory.LazyFunction(
+        lambda: f"payment_{fake.uuid4()}" if random.randint(1, 10) > 3 else ""
+    )
+    payment_method = factory.LazyFunction(
+        lambda: random.choice(
+            ["CREDIT_CARD", "PAYPAL", "BANK_TRANSFER", "STRIPE"]
+        )
+        if random.randint(1, 10) > 3
+        else ""
+    )
+    tracking_number = factory.LazyFunction(
+        lambda: generate_tracking_number() if random.randint(1, 10) > 5 else ""
+    )
+    shipping_carrier = factory.LazyFunction(
+        lambda: random.choice(["FEDEX", "UPS", "USPS", "DHL"])
+        if random.randint(1, 10) > 5
+        else ""
+    )
+    status_updated_at = factory.LazyFunction(
+        lambda: timezone.now() - timedelta(days=random.randint(0, 30))
+        if random.randint(1, 10) > 3
+        else None
     )
 
     class Meta:
@@ -108,3 +218,133 @@ class OrderFactory(factory.django.DjangoModelFactory):
 
         if extracted:
             OrderItemFactory.create_batch(extracted, order=self)
+        else:
+            count = random.randint(1, 5)
+            OrderItemFactory.create_batch_for_order(order=self, count=count)
+
+    @classmethod
+    def create_with_consistent_status_data(cls, status=None, **kwargs):
+        if status is None:
+            status = random.choice([s[0] for s in OrderStatusEnum.choices])
+
+        now = timezone.now()
+        data = {"status": status, "status_updated_at": now, **kwargs}
+
+        if status in [
+            OrderStatusEnum.COMPLETED,
+            OrderStatusEnum.SHIPPED,
+            OrderStatusEnum.DELIVERED,
+        ]:
+            payment_data = generate_payment_data(PaymentStatusEnum.COMPLETED)
+            data.update(payment_data)
+            data["paid_amount"] = Money(
+                fake.pydecimal(
+                    left_digits=3,
+                    right_digits=2,
+                    min_value=10,
+                    max_value=99,
+                    positive=True,
+                ),
+                "USD",
+            )
+        elif status == OrderStatusEnum.CANCELED:
+            payment_status = random.choice(
+                [
+                    PaymentStatusEnum.FAILED,
+                    PaymentStatusEnum.CANCELED,
+                    "",
+                ]
+            )
+            if payment_status:
+                payment_data = generate_payment_data(payment_status)
+                data.update(payment_data)
+        elif status == OrderStatusEnum.REFUNDED:
+            payment_data = generate_payment_data(PaymentStatusEnum.REFUNDED)
+            data.update(payment_data)
+            data["paid_amount"] = Money(
+                fake.pydecimal(
+                    left_digits=3,
+                    right_digits=2,
+                    min_value=10,
+                    max_value=99,
+                    positive=True,
+                ),
+                "USD",
+            )
+
+        if status in [OrderStatusEnum.SHIPPED, OrderStatusEnum.DELIVERED]:
+            tracking_number = generate_tracking_number()
+            carrier = (
+                tracking_number.split("-")[0]
+                if "-" in tracking_number
+                else random.choice(["FEDEX", "UPS", "USPS", "DHL"])
+            )
+            data["tracking_number"] = tracking_number
+            data["shipping_carrier"] = carrier
+
+        order = cls.create(**data)
+        return order
+
+    @classmethod
+    def create_pending_order(cls, **kwargs):
+        return cls.create_with_consistent_status_data(
+            status=OrderStatusEnum.PENDING,
+            payment_status=PaymentStatusEnum.PENDING,
+            **kwargs,
+        )
+
+    @classmethod
+    def create_processing_order(cls, **kwargs):
+        return cls.create_with_consistent_status_data(
+            status=OrderStatusEnum.PROCESSING,
+            payment_status=PaymentStatusEnum.COMPLETED,
+            **kwargs,
+        )
+
+    @classmethod
+    def create_shipped_order(cls, **kwargs):
+        return cls.create_with_consistent_status_data(
+            status=OrderStatusEnum.SHIPPED, **kwargs
+        )
+
+    @classmethod
+    def create_completed_order(cls, **kwargs):
+        return cls.create_with_consistent_status_data(
+            status=OrderStatusEnum.COMPLETED, **kwargs
+        )
+
+    @classmethod
+    def create_canceled_order(cls, **kwargs):
+        return cls.create_with_consistent_status_data(
+            status=OrderStatusEnum.CANCELED, **kwargs
+        )
+
+    @classmethod
+    def create_refunded_order(cls, **kwargs):
+        order = cls.create_with_consistent_status_data(
+            status=OrderStatusEnum.REFUNDED,
+            payment_status=PaymentStatusEnum.REFUNDED,
+            **kwargs,
+        )
+
+        if hasattr(order, "items") and order.items.exists():
+            items = list(order.items.all())
+            refund_all = random.choice([True, False])
+            items_to_refund = (
+                items
+                if refund_all
+                else random.sample(items, random.randint(1, len(items)))
+            )
+
+            for item in items_to_refund:
+                full_refund = random.choice([True, False])
+                if full_refund or item.quantity == 1:
+                    refund_qty = item.quantity
+                else:
+                    refund_qty = random.randint(1, max(1, item.quantity - 1))
+
+                item.refunded_quantity = refund_qty
+                item.is_refunded = refund_qty == item.quantity
+                item.save()
+
+        return order

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Your Order Has Shipped</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #4a4a4a;
+        }
+        .shipping-details {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 15px 0;
+            background-color: #f9f9f9;
+        }
+        .tracking-info {
+            font-weight: bold;
+            font-size: 1.1em;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Your Order Has Shipped</h1>
+    <p>Good news! Your order #{{ order.id }} has been shipped and is on its way to you.</p>
+
+    <div class="shipping-details">
+        <h2>Shipping Information</h2>
+        <p><strong>Carrier:</strong> {{ carrier }}</p>
+        <p class="tracking-info">Tracking Number: {{ tracking_number }}</p>
+
+        <h3>Delivery Address</h3>
+        <p>
+            {{ order.first_name }} {{ order.last_name }}<br>
+            {{ order.street }} {{ order.street_number }}<br>
+            {{ order.city }}, {{ order.zipcode }}<br>
+            {{ order.country }}
+        </p>
+    </div>
+
+    <p>You can track your package using the tracking number above on the carrier's website.</p>
+
+    <p>If you have any questions about your shipment, please contact our customer service.</p>
+
+    <p>Thank you for shopping with us!</p>
+</body>
+</html>

@@ -8,7 +8,6 @@ from product.views.product import ProductViewSet
 from product.views.review import ProductReviewViewSet
 
 urlpatterns = [
-    # Product
     path(
         "product",
         ProductViewSet.as_view({"get": "list", "post": "create"}),
@@ -46,7 +45,6 @@ urlpatterns = [
         ProductViewSet.as_view({"get": "tags"}),
         name="product-tags",
     ),
-    # Category
     path(
         "product/category",
         ProductCategoryViewSet.as_view({"get": "list", "post": "create"}),
@@ -64,7 +62,6 @@ urlpatterns = [
         ),
         name="product-category-detail",
     ),
-    # Favourite
     path(
         "product/favourite",
         ProductFavouriteViewSet.as_view({"get": "list", "post": "create"}),
@@ -92,7 +89,6 @@ urlpatterns = [
         ProductFavouriteViewSet.as_view({"get": "product"}),
         name="product-favourite-product",
     ),
-    # Review
     path(
         "product/review",
         ProductReviewViewSet.as_view({"get": "list", "post": "create"}),
@@ -120,7 +116,6 @@ urlpatterns = [
         ProductReviewViewSet.as_view({"get": "product"}),
         name="product-review-product",
     ),
-    # Images
     path(
         "product/image",
         ProductImageViewSet.as_view({"get": "list", "post": "create"}),

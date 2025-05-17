@@ -1,6 +1,7 @@
 import os
 from typing import override
 
+from django.contrib.postgres.indexes import BTreeIndex
 from django.core.validators import RegexValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -54,8 +55,10 @@ class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
             *SortableModel.Meta.indexes,
-            models.Index(fields=["alpha_2"]),
-            models.Index(fields=["alpha_3"]),
+            BTreeIndex(fields=["alpha_2"], name="country_alpha_2_ix"),
+            BTreeIndex(fields=["alpha_3"], name="country_alpha_3_ix"),
+            BTreeIndex(fields=["iso_cc"], name="country_iso_cc_ix"),
+            BTreeIndex(fields=["phone_code"], name="country_phone_code_ix"),
         ]
 
     def __str__(self):

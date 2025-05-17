@@ -5,7 +5,6 @@ from django.apps import apps
 from django.conf import settings
 from faker import Faker
 
-from blog.enum.blog_post_enum import PostStatusEnum
 from blog.factories.comment import BlogCommentFactory
 from blog.factories.tag import BlogTagFactory
 from blog.models.post import BlogPost
@@ -67,7 +66,7 @@ class BlogPostFactory(CustomDjangoModelFactory):
     )
     category = factory.LazyFunction(get_or_create_category)
     author = factory.LazyFunction(get_or_create_author)
-    status = factory.Iterator(PostStatusEnum.choices, getter=lambda x: x[0])
+    is_published = factory.Faker("boolean")
     featured = factory.Faker("boolean")
     view_count = factory.Faker("random_int", min=0, max=1000)
 

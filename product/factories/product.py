@@ -64,7 +64,7 @@ class ProductFactory(CustomDjangoModelFactory):
         "pydecimal", left_digits=4, right_digits=2, positive=True
     )
     active = factory.Faker("boolean")
-    stock = factory.Faker("random_int", min=0, max=100)
+    stock = factory.Faker("random_int", min=1, max=100)
     discount_percent = factory.Faker(
         "pydecimal", left_digits=2, right_digits=2, positive=True, max_value=100
     )

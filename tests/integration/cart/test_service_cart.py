@@ -207,7 +207,6 @@ class GuestCartServiceTest(TestCase):
         self.product = ProductFactory(num_images=0, num_reviews=0)
 
     def test_get_or_create_cart_for_guest(self):
-        """Test that get_or_create_cart creates a cart for guest users."""
         guest_cart = CartFactory(user=None, session_key=self.session_key)
 
         self.request.session["cart_id"] = guest_cart.id
@@ -221,7 +220,6 @@ class GuestCartServiceTest(TestCase):
         self.assertEqual(self.request.session.get("cart_id"), cart.id)
 
     def test_create_cart_item_for_guest(self):
-        """Test that a guest user can add items to their cart."""
         guest_cart = CartFactory(user=None, session_key=self.session_key)
         self.request.session["cart_id"] = guest_cart.id
 
@@ -234,7 +232,6 @@ class GuestCartServiceTest(TestCase):
         self.assertEqual(cart_item.cart.id, guest_cart.id)
 
     def test_merge_guest_cart_to_user_cart(self):
-        """Test merging a guest cart into a user cart when logging in."""
         guest_cart = CartFactory(user=None, session_key=self.session_key)
 
         cart_item = CartItemFactory(
@@ -268,7 +265,6 @@ class GuestCartServiceTest(TestCase):
         self.assertFalse(Cart.objects.filter(id=guest_cart.id).exists())
 
     def test_guest_cart_string_representation(self):
-        """Test the string representation of a guest cart service."""
         guest_cart = CartFactory(user=None, session_key=self.session_key)
         self.request.session["cart_id"] = guest_cart.id
 
@@ -277,7 +273,6 @@ class GuestCartServiceTest(TestCase):
         self.assertTrue(str(cart_service).startswith("Cart Anonymous"))
 
     def test_guest_cart_with_existing_session_key(self):
-        """Test that a guest cart is retrieved if it exists for the session key."""
         existing_cart = CartFactory(user=None, session_key=self.session_key)
 
         self.request.session["cart_id"] = existing_cart.id

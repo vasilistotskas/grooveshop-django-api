@@ -1,3 +1,4 @@
+from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -26,5 +27,5 @@ class Contact(
         verbose_name_plural = _("Contacts")
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["email"]),
+            BTreeIndex(fields=["email"], name="contact_email_ix"),
         ]

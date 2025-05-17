@@ -1,0 +1,26 @@
+ORDER CONFIRMATION
+
+Thank you for your order!
+
+Order #{{ order.id }}
+Date: {{ order.created_at }}
+Status: {{ order.status }}
+
+SHIPPING ADDRESS
+{{ order.first_name }} {{ order.last_name }}
+{{ order.street }} {{ order.street_number }}
+{{ order.city }}, {{ order.zipcode }}
+{{ order.country }}
+
+ORDER ITEMS
+{% for item in items %}
+{{ item.product.name }} - {{ item.quantity }} x {{ item.price }} = {{ item.get_total_price }}
+{% endfor %}
+
+Subtotal: {{ order.total_price_items }}
+Shipping: {{ order.shipping_price }}
+Total: {{ order.total_price }}
+
+If you have any questions about your order, please contact our customer service.
+
+Thank you for shopping with us!

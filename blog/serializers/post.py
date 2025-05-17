@@ -38,7 +38,6 @@ class BlogPostSerializer(
             "category",
             "tags",
             "author",
-            "status",
             "featured",
             "view_count",
             "is_published",

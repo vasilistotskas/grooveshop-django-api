@@ -45,7 +45,6 @@ class TestTaggedItemSerializer(unittest.TestCase):
     def test_serializer_contains_expected_fields(
         self, mock_content_object_to_representation, mock_tag_serializer
     ):
-        """Test that the serializer contains the expected fields."""
         mock_tag_serializer.return_value.data = {
             "id": self.tag.id,
             "translations": {"en": {"label": "Test Tag"}},

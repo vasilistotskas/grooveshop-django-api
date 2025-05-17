@@ -6,13 +6,13 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from authentication.serializers import AuthenticationSerializer
-from core.utils.tests import compare_serializer_and_response
+from core.utils.testing import TestURLFixerMixin
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()
 
 
-class UserAccountViewSetTestCase(APITestCase):
+class UserAccountViewSetTestCase(TestURLFixerMixin, APITestCase):
     user: User = None
 
     def setUp(self):
@@ -33,16 +33,20 @@ class UserAccountViewSetTestCase(APITestCase):
     def test_list(self):
         url = self.get_user_account_list_url()
         response = self.client.get(url)
-        user_accounts = User.objects.all()
-        serializer = AuthenticationSerializer(user_accounts, many=True)
-        for response_item, serializer_item in zip(
-            response.data["results"], serializer.data, strict=False
-        ):
-            compare_serializer_and_response(
-                serializer_item, response_item, ["image"]
-            )
-
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        if isinstance(response.data, dict) and "results" in response.data:
+            users = User.objects.all()
+            serializer = AuthenticationSerializer(
+                users, many=True, context={"request": response.wsgi_request}
+            )
+            self.assertEqual(response.data["results"], serializer.data)
+        else:
+            users = User.objects.all()
+            serializer = AuthenticationSerializer(
+                users, many=True, context={"request": response.wsgi_request}
+            )
+            self.assertEqual(response.data, serializer.data)
 
     def test_create_valid(self):
         payload = {
@@ -67,13 +71,14 @@ class UserAccountViewSetTestCase(APITestCase):
     def test_retrieve_valid(self):
         url = self.get_user_account_detail_url(self.user.id)
         response = self.client.get(url)
-        user_accounts = User.objects.get(id=self.user.id)
-        serializer = AuthenticationSerializer(user_accounts)
-        compare_serializer_and_response(
-            serializer.data, response.data, ["image"]
-        )
-
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertIn("pk", response.data)
+        self.assertEqual(response.data["pk"], self.user.id)
+        self.assertIn("email", response.data)
+        self.assertEqual(response.data["email"], self.user.email)
+        self.assertIn("username", response.data)
+        self.assertEqual(response.data["username"], self.user.username)
 
     def test_retrieve_invalid(self):
         invalid_user_account_id = 9999

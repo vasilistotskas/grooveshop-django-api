@@ -37,7 +37,8 @@ class Tag(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
             *SortableModel.Meta.indexes,
-            BTreeIndex(fields=["active"]),
+            BTreeIndex(fields=["active"], name="tag_active_ix"),
+            BTreeIndex(fields=["id"], name="tag_id_ix"),
         ]
 
     def __str__(self):

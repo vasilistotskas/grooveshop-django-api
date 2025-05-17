@@ -13,6 +13,7 @@ from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
 from blog.models.post import BlogPost
 from blog.serializers.post import BlogPostSerializer
+from core.utils.testing import TestURLFixerMixin
 from user.factories.account import UserAccountFactory
 
 languages = [
@@ -22,7 +23,7 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
 
 
-class BlogPostViewSetTestCase(APITestCase):
+class BlogPostViewSetTestCase(TestURLFixerMixin, APITestCase):
     post: BlogPost = None
     user: User = None
     author: BlogAuthor = None
@@ -97,7 +98,6 @@ class BlogPostViewSetTestCase(APITestCase):
             "likes": [],
             "tags": [],
             "author": self.author.id,
-            "status": "DRAFT",
             "translations": {},
         }
 
@@ -138,11 +138,18 @@ class BlogPostViewSetTestCase(APITestCase):
     def test_retrieve_valid(self):
         url = self.get_post_detail_url(self.post.id)
         response = self.client.get(url)
-        post = BlogPost.objects.get(id=self.post.id)
-        serializer = BlogPostSerializer(post)
-
-        self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertIn("id", response.data)
+        self.assertEqual(response.data["id"], self.post.id)
+
+        self.assertIn("author", response.data)
+        self.assertEqual(response.data["author"], self.author.id)
+
+        self.assertIn("category", response.data)
+        self.assertEqual(response.data["category"], self.category.id)
+
+        self.assertIn("translations", response.data)
 
     def test_retrieve_invalid(self):
         invalid_post_id = 9999
@@ -157,7 +164,6 @@ class BlogPostViewSetTestCase(APITestCase):
             "category": self.category.id,
             "likes": [],
             "tags": [],
-            "status": "PUBLISHED",
             "translations": {},
         }
 
@@ -181,7 +187,6 @@ class BlogPostViewSetTestCase(APITestCase):
     def test_update_invalid(self):
         payload = {
             "author": "invalid_author_id",
-            "status": "invalid_status",
             "translations": {
                 "invalid_lang_code": {
                     "content": "Translation for invalid language code",

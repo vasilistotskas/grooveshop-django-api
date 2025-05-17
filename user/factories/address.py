@@ -1,10 +1,11 @@
 import importlib
+import random
 
 import factory
 from django.apps import apps
 from django.contrib.auth import get_user_model
 
-from user.enum.address import FloorChoicesEnum, LocationChoicesEnum
+from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from user.models.address import UserAddress
 
 User = get_user_model()
@@ -51,9 +52,11 @@ class UserAddressFactory(factory.django.DjangoModelFactory):
     zipcode = factory.Faker("postcode")
     country = factory.LazyFunction(get_or_create_country)
     region = factory.LazyFunction(get_or_create_region)
-    floor = factory.Iterator([choice.value for choice in FloorChoicesEnum])
-    location_type = factory.Iterator(
-        [choice.value for choice in LocationChoicesEnum]
+    floor = factory.LazyFunction(
+        lambda: random.choice([s[0] for s in FloorChoicesEnum.choices])
+    )
+    location_type = factory.LazyFunction(
+        lambda: random.choice([s[0] for s in LocationChoicesEnum.choices])
     )
     phone = factory.Faker("phone_number")
     mobile_phone = factory.Faker("phone_number")

@@ -15,9 +15,6 @@ class PascalSnakeCaseOrderingFilterTest(APITestCase):
         self.filter = PascalSnakeCaseOrderingFilter()
 
     def create_request(self, ordering_value):
-        """
-        Helper method to create a request object with the desired query parameter.
-        """
         url = reverse("blog-post-list")
         return self.client.get(url, {"ordering": ordering_value})
 

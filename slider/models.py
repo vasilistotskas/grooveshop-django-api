@@ -126,8 +126,10 @@ class Slide(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
             *SortableModel.Meta.indexes,
-            BTreeIndex(fields=["date_start"]),
-            BTreeIndex(fields=["date_end"]),
+            BTreeIndex(
+                fields=["date_start"], name="slider_slide_date_start_ix"
+            ),
+            BTreeIndex(fields=["date_end"], name="slider_slide_date_end_ix"),
         ]
 
     def __str__(self):

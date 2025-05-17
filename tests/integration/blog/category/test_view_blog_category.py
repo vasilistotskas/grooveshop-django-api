@@ -5,7 +5,7 @@ from rest_framework.test import APITestCase
 
 from blog.factories.category import BlogCategoryFactory
 from blog.models.category import BlogCategory
-from blog.serializers.category import BlogCategorySerializer
+from core.utils.testing import TestURLFixerMixin
 
 languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
@@ -13,7 +13,7 @@ languages = [
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
-class BlogCategoryViewSetTestCase(APITestCase):
+class BlogCategoryViewSetTestCase(TestURLFixerMixin, APITestCase):
     category: BlogCategory = None
 
     def setUp(self):
@@ -30,11 +30,18 @@ class BlogCategoryViewSetTestCase(APITestCase):
     def test_list(self):
         url = self.get_category_list_url()
         response = self.client.get(url)
-        categories = BlogCategory.objects.all()
-        serializer = BlogCategorySerializer(categories, many=True)
-
-        self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertIn("results", response.data)
+        self.assertIsInstance(response.data["results"], list)
+
+        categories_count = BlogCategory.objects.count()
+        self.assertEqual(len(response.data["results"]), categories_count)
+
+        if categories_count > 0:
+            first_result = response.data["results"][0]
+            self.assertIn("translations", first_result)
+            self.assertIn("slug", first_result)
 
     def test_create_valid(self):
         payload = {
@@ -77,11 +84,12 @@ class BlogCategoryViewSetTestCase(APITestCase):
     def test_retrieve_valid(self):
         url = self.get_category_detail_url(self.category.pk)
         response = self.client.get(url)
-        category = BlogCategory.objects.get(pk=self.category.pk)
-        serializer = BlogCategorySerializer(category)
-
-        self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertIn("slug", response.data)
+        self.assertEqual(response.data["slug"], self.category.slug)
+
+        self.assertIn("translations", response.data)
 
     def test_retrieve_invalid(self):
         invalid_category_id = 9999

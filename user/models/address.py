@@ -1,14 +1,14 @@
 from typing import override
 
-from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.indexes import BTreeIndex, GinIndex
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from phonenumber_field.modelfields import PhoneNumberField
 
+from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from core.models import TimeStampMixinModel, UUIDModel
-from user.enum.address import FloorChoicesEnum, LocationChoicesEnum
 
 
 class UserAddress(TimeStampMixinModel, UUIDModel):
@@ -41,19 +41,19 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
         default=None,
         on_delete=models.SET_NULL,
     )
-    floor = models.PositiveSmallIntegerField(
+    floor = models.CharField(
         _("Floor"),
+        max_length=50,
         choices=FloorChoicesEnum,
-        null=True,
         blank=True,
-        default=None,
+        default="",
     )
-    location_type = models.PositiveSmallIntegerField(
+    location_type = models.CharField(
         _("Location Type"),
+        max_length=100,
         choices=LocationChoicesEnum,
-        null=True,
         blank=True,
-        default=None,
+        default="",
     )
     phone = PhoneNumberField(
         _("Phone Number"), null=True, blank=True, default=None
@@ -65,7 +65,7 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
     class Meta(TypedModelMeta):
         verbose_name = _("User Address")
         verbose_name_plural = _("User Addresses")
-        ordering = ["-is_main", "-created_at"]
+        ordering = ["-is_main"]
         constraints = [
             models.UniqueConstraint(
                 fields=["user", "is_main"],
@@ -75,8 +75,12 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
         ]
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
+            BTreeIndex(fields=["user"], name="user_address_user_ix"),
+            BTreeIndex(fields=["is_main"], name="user_address_is_main_ix"),
+            BTreeIndex(fields=["country"], name="user_address_country_ix"),
+            BTreeIndex(fields=["region"], name="user_address_region_ix"),
             GinIndex(
-                name="address_search_gin",
+                name="user_address_search_gin",
                 fields=["title", "first_name", "last_name", "city"],
                 opclasses=["gin_trgm_ops"] * 4,
             ),

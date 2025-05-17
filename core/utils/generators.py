@@ -40,10 +40,8 @@ def unique_slugify(config: SlugifyConfig):
     while attempt < config.max_attempts:
         lookup = {f"{config.slug_field}__iexact": slug}
         if not ModelClass.objects.filter(**lookup).exists():
-            setattr(
-                config.instance, config.slug_field, slug
-            )  # Set slug on instance
-            return slug  # Unique slug found
+            setattr(config.instance, config.slug_field, slug)
+            return slug
 
         slug = f"{base_slug}-{config.random_string_generator(config.size)}"
         attempt += 1

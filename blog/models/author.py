@@ -1,5 +1,6 @@
 from typing import Literal
 
+from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -22,6 +23,7 @@ class BlogAuthor(TranslatableModel, TimeStampMixinModel, UUIDModel):
         ordering = ["-created_at"]
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
+            BTreeIndex(fields=["user"], name="blog_author_user_ix"),
         ]
 
     def __str__(self):

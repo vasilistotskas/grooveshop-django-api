@@ -3,6 +3,14 @@
 
 
 
+## v1.4.1 (2025-05-17)
+
+### Bug fixes
+
+* fix: uv sync ([`b03c255`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b03c255a097941da345114bece91a85c92e0c5eb))
+
+* fix: ci ([`84bc944`](https://github.com/vasilistotskas/grooveshop-django-api/commit/84bc944ef11e0955d765d914fc0b633dc136c552))
+
 ## v1.4.0 (2025-05-17)
 
 ### Bug fixes

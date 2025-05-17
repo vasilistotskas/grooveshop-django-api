@@ -3,6 +3,34 @@
 
 
 
+## v1.4.0 (2025-05-17)
+
+### Bug fixes
+
+* fix: find_packages at setup.py ([`e13e7aa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e13e7aa3f90c014e2b274f98d618ee406f964617))
+
+* fix: ruff format ([`1f8d547`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1f8d54744b4372c14beaae743470fa1c078ded43))
+
+* fix(tests): increase stock at order test ([`8806e37`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8806e372d6e17a361d48b727d8a1759d4ed0a578))
+
+* fix: ci ([`5548e1b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5548e1b91d286027042317aa237d789cb59ac1fc))
+
+* fix: ci ([`5b4372e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5b4372e498abb85e7f6f77a45122c6d1afd74c55))
+
+* fix: ci ([`d1fdfd5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d1fdfd575a818ee5354d558880b7d94490c98916))
+
+* fix: ci ([`a3121ed`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a3121ed9f7fbe76893be9529f55a0e5560efa8c2))
+
+* fix: ci ([`38948aa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/38948aa22e4a9fd0c45da051f517de51c22bdc71))
+
+* fix: ci ([`6565aee`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6565aee50410eabcba1ae229514d3ed7a8f31753))
+
+* fix: add python-version file ([`0997afc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0997afc595d758b706dead787acf436059f20576))
+
+### Features
+
+* feat: replace poetry with uv ([`683bfb6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/683bfb6671695e90fe9d0d6832f002d916c2ed2e))
+
 ## v1.3.0 (2025-05-17)
 
 ### Features

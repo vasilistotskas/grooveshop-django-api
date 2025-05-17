@@ -30,7 +30,6 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
             {
                 "fields": (
                     "active",
-                    "sort_order",
                     "icon",
                 ),
             },

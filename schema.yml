@@ -1482,9 +1482,41 @@ paths:
         schema:
           type: string
       - in: query
+        name: category
+        schema:
+          type: integer
+      - in: query
+        name: featured
+        schema:
+          type: boolean
+      - in: query
         name: id
         schema:
           type: integer
+      - in: query
+        name: isPublished
+        schema:
+          type: boolean
+      - in: query
+        name: minComments
+        schema:
+          type: number
+        description: Minimum Comments Count
+      - in: query
+        name: minLikes
+        schema:
+          type: number
+        description: Minimum Likes Count
+      - in: query
+        name: minTags
+        schema:
+          type: number
+        description: Minimum Tags Count
+      - in: query
+        name: minViewCount
+        schema:
+          type: integer
+        description: Minimum View Count
       - name: ordering
         required: false
         in: query
@@ -1573,6 +1605,14 @@ paths:
         name: authorEmail
         schema:
           type: string
+      - in: query
+        name: category
+        schema:
+          type: integer
+      - in: query
+        name: featured
+        schema:
+          type: boolean
       - in: path
         name: format
         schema:
@@ -1584,6 +1624,30 @@ paths:
         name: id
         schema:
           type: integer
+      - in: query
+        name: isPublished
+        schema:
+          type: boolean
+      - in: query
+        name: minComments
+        schema:
+          type: number
+        description: Minimum Comments Count
+      - in: query
+        name: minLikes
+        schema:
+          type: number
+        description: Minimum Likes Count
+      - in: query
+        name: minTags
+        schema:
+          type: number
+        description: Minimum Tags Count
+      - in: query
+        name: minViewCount
+        schema:
+          type: integer
+        description: Minimum View Count
       - name: ordering
         required: false
         in: query
@@ -3106,34 +3170,6 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/checkout:
-    post:
-      operationId: api_v1_checkout_create
-      description: Process a checkout and create a new order
-      summary: Create a new order via checkout
-      tags:
-      - api
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/Checkout'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/Checkout'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Checkout'
-        required: true
-      security:
-      - {}
-      responses:
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Checkout'
-          description: ''
   /api/v1/contact:
     post:
       operationId: api_v1_contact_create
@@ -4220,6 +4256,8 @@ paths:
           description: ''
     post:
       operationId: api_v1_order_create
+      description: Process a checkout and create a new order
+      summary: Create an order or process a checkout
       tags:
       - api
       requestBody:
@@ -4239,7 +4277,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OrderCreateUpdate'
+                $ref: '#/components/schemas/OrderDetail'
           description: ''
   /api/v1/order-items:
     get:
@@ -4469,6 +4507,48 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrderDetail'
           description: ''
+  /api/v1/order/{id}/payment-status:
+    get:
+      operationId: api_v1_order_payment_status_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      responses:
+        '200':
+          description: No response body
+  /api/v1/order/{id}/process-payment:
+    post:
+      operationId: api_v1_order_process_payment_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      responses:
+        '200':
+          description: No response body
+  /api/v1/order/{id}/refund:
+    post:
+      operationId: api_v1_order_refund_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - api
+      responses:
+        '200':
+          description: No response body
   /api/v1/order/{id}/update-status:
     post:
       operationId: api_v1_order_update_status_create
@@ -4786,14 +4866,42 @@ paths:
         name: category
         schema:
           type: string
+        description: Category
+      - in: query
+        name: maxDiscount
+        schema:
+          type: number
+        description: Maximum Discount Value
       - in: query
         name: maxFinalPrice
         schema:
           type: number
+        description: Maximum Final Price
+      - in: query
+        name: minApprovedReviewAverage
+        schema:
+          type: number
+        description: Minimum Approved Review Average
+      - in: query
+        name: minDiscount
+        schema:
+          type: number
+        description: Minimum Discount Value
       - in: query
         name: minFinalPrice
         schema:
           type: number
+        description: Minimum Final Price
+      - in: query
+        name: minLikes
+        schema:
+          type: number
+        description: Minimum Likes Count
+      - in: query
+        name: minReviewAverage
+        schema:
+          type: number
+        description: Minimum Review Average
       - name: ordering
         required: false
         in: query
@@ -4862,6 +4970,7 @@ paths:
         name: category
         schema:
           type: string
+        description: Category
       - in: path
         name: format
         schema:
@@ -4870,13 +4979,40 @@ paths:
           - .json
         required: true
       - in: query
+        name: maxDiscount
+        schema:
+          type: number
+        description: Maximum Discount Value
+      - in: query
         name: maxFinalPrice
         schema:
           type: number
+        description: Maximum Final Price
+      - in: query
+        name: minApprovedReviewAverage
+        schema:
+          type: number
+        description: Minimum Approved Review Average
+      - in: query
+        name: minDiscount
+        schema:
+          type: number
+        description: Minimum Discount Value
       - in: query
         name: minFinalPrice
         schema:
           type: number
+        description: Minimum Final Price
+      - in: query
+        name: minLikes
+        schema:
+          type: number
+        description: Minimum Likes Count
+      - in: query
+        name: minReviewAverage
+        schema:
+          type: number
+        description: Minimum Review Average
       - name: ordering
         required: false
         in: query
@@ -9547,26 +9683,25 @@ paths:
       - in: query
         name: floor
         schema:
-          type: integer
-          nullable: true
+          type: string
           enum:
-          - 0
-          - 1
-          - 2
-          - 3
-          - 4
-          - 5
-          - 6
-          - 7
+          - BASEMENT
+          - FIFTH_FLOOR
+          - FIRST_FLOOR
+          - FOURTH_FLOOR
+          - GROUND_FLOOR
+          - SECOND_FLOOR
+          - SIXTH_FLOOR_PLUS
+          - THIRD_FLOOR
         description: |-
-          * `0` - Basement
-          * `1` - Ground Floor
-          * `2` - First Floor
-          * `3` - Second Floor
-          * `4` - Third Floor
-          * `5` - Fourth Floor
-          * `6` - Fifth Floor
-          * `7` - Sixth Floor Plus
+          * `BASEMENT` - Basement
+          * `GROUND_FLOOR` - Ground Floor
+          * `FIRST_FLOOR` - First Floor
+          * `SECOND_FLOOR` - Second Floor
+          * `THIRD_FLOOR` - Third Floor
+          * `FOURTH_FLOOR` - Fourth Floor
+          * `FIFTH_FLOOR` - Fifth Floor
+          * `SIXTH_FLOOR_PLUS` - Sixth Floor Plus
       - in: query
         name: id
         schema:
@@ -9578,16 +9713,15 @@ paths:
       - in: query
         name: locationType
         schema:
-          type: integer
-          nullable: true
+          type: string
           enum:
-          - 0
-          - 1
-          - 2
+          - HOME
+          - OFFICE
+          - OTHER
         description: |-
-          * `0` - Αρχική
-          * `1` - Office
-          * `2` - Other
+          * `HOME` - Αρχική
+          * `OFFICE` - Office
+          * `OTHER` - Other
       - name: ordering
         required: false
         in: query
@@ -9672,26 +9806,25 @@ paths:
       - in: query
         name: floor
         schema:
-          type: integer
-          nullable: true
+          type: string
           enum:
-          - 0
-          - 1
-          - 2
-          - 3
-          - 4
-          - 5
-          - 6
-          - 7
+          - BASEMENT
+          - FIFTH_FLOOR
+          - FIRST_FLOOR
+          - FOURTH_FLOOR
+          - GROUND_FLOOR
+          - SECOND_FLOOR
+          - SIXTH_FLOOR_PLUS
+          - THIRD_FLOOR
         description: |-
-          * `0` - Basement
-          * `1` - Ground Floor
-          * `2` - First Floor
-          * `3` - Second Floor
-          * `4` - Third Floor
-          * `5` - Fourth Floor
-          * `6` - Fifth Floor
-          * `7` - Sixth Floor Plus
+          * `BASEMENT` - Basement
+          * `GROUND_FLOOR` - Ground Floor
+          * `FIRST_FLOOR` - First Floor
+          * `SECOND_FLOOR` - Second Floor
+          * `THIRD_FLOOR` - Third Floor
+          * `FOURTH_FLOOR` - Fourth Floor
+          * `FIFTH_FLOOR` - Fifth Floor
+          * `SIXTH_FLOOR_PLUS` - Sixth Floor Plus
       - in: path
         name: format
         schema:
@@ -9710,16 +9843,15 @@ paths:
       - in: query
         name: locationType
         schema:
-          type: integer
-          nullable: true
+          type: string
           enum:
-          - 0
-          - 1
-          - 2
+          - HOME
+          - OFFICE
+          - OTHER
         description: |-
-          * `0` - Αρχική
-          * `1` - Office
-          * `2` - Other
+          * `HOME` - Αρχική
+          * `OFFICE` - Office
+          * `OTHER` - Other
       - name: ordering
         required: false
         in: query
@@ -10868,8 +11000,6 @@ components:
             type: integer
         author:
           type: integer
-        status:
-          $ref: '#/components/schemas/BlogPostStatusEnum'
         featured:
           type: boolean
         viewCount:
@@ -10996,16 +11126,6 @@ components:
       - rankingScore
       - subtitle
       - title
-    BlogPostStatusEnum:
-      enum:
-      - DRAFT
-      - PUBLISHED
-      - ARCHIVED
-      type: string
-      description: |-
-        * `DRAFT` - Draft
-        * `PUBLISHED` - Published
-        * `ARCHIVED` - Archived
     BlogTag:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -11271,151 +11391,6 @@ components:
       - cart
       - id
       - product
-    Checkout:
-      type: object
-      properties:
-        id:
-          type: integer
-          readOnly: true
-        user:
-          type: integer
-          nullable: true
-        country:
-          type: string
-          title: Country Code Alpha 2
-          nullable: true
-        region:
-          type: string
-          title: Region Code
-          nullable: true
-        floor:
-          oneOf:
-          - $ref: '#/components/schemas/FloorEnum'
-          - $ref: '#/components/schemas/BlankEnum'
-        locationType:
-          oneOf:
-          - $ref: '#/components/schemas/LocationTypeEnum'
-          - $ref: '#/components/schemas/BlankEnum'
-        street:
-          type: string
-          maxLength: 255
-        streetNumber:
-          type: string
-          maxLength: 255
-        payWay:
-          type: integer
-          nullable: true
-        status:
-          $ref: '#/components/schemas/OrderStatusEnum'
-        firstName:
-          type: string
-          maxLength: 255
-        lastName:
-          type: string
-          maxLength: 255
-        email:
-          type: string
-          format: email
-          maxLength: 255
-        zipcode:
-          type: string
-          maxLength: 255
-        place:
-          type: string
-          maxLength: 255
-        city:
-          type: string
-          maxLength: 255
-        phone:
-          type: string
-        mobilePhone:
-          type: string
-        paidAmount:
-          type: number
-          format: double
-          maximum: 1000000000
-          minimum: -1000000000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
-        customerNotes:
-          type: string
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/CheckoutItem'
-        shippingPrice:
-          type: number
-          format: double
-          maximum: 1000000000
-          minimum: -1000000000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
-        documentType:
-          $ref: '#/components/schemas/DocumentTypeEnum'
-        createdAt:
-          type: string
-          format: date-time
-          readOnly: true
-        updatedAt:
-          type: string
-          format: date-time
-          readOnly: true
-        uuid:
-          type: string
-          format: uuid
-          readOnly: true
-        totalPriceItems:
-          type: number
-          format: double
-          maximum: 1000000000
-          minimum: -1000000000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
-          readOnly: true
-        totalPriceExtra:
-          type: number
-          format: double
-          maximum: 1000000000
-          minimum: -1000000000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
-          readOnly: true
-        fullAddress:
-          type: string
-          readOnly: true
-        paymentId:
-          type: string
-        paymentMethod:
-          type: string
-      required:
-      - city
-      - createdAt
-      - email
-      - firstName
-      - fullAddress
-      - id
-      - items
-      - lastName
-      - phone
-      - shippingPrice
-      - street
-      - streetNumber
-      - totalPriceExtra
-      - totalPriceItems
-      - updatedAt
-      - uuid
-      - zipcode
-    CheckoutItem:
-      type: object
-      properties:
-        product:
-          type: integer
-        quantity:
-          type: integer
-          maximum: 2147483647
-          minimum: -2147483648
-      required:
-      - product
     Contact:
       type: object
       properties:
@@ -11540,23 +11515,24 @@ components:
         * `CREDIT_NOTE` - Credit Note
     FloorEnum:
       enum:
-      - 0
-      - 1
-      - 2
-      - 3
-      - 4
-      - 5
-      - 6
-      - 7
+      - BASEMENT
+      - GROUND_FLOOR
+      - FIRST_FLOOR
+      - SECOND_FLOOR
+      - THIRD_FLOOR
+      - FOURTH_FLOOR
+      - FIFTH_FLOOR
+      - SIXTH_FLOOR_PLUS
+      type: string
       description: |-
-        * `0` - Basement
-        * `1` - Ground Floor
-        * `2` - First Floor
-        * `3` - Second Floor
-        * `4` - Third Floor
-        * `5` - Fourth Floor
-        * `6` - Fifth Floor
-        * `7` - Sixth Floor Plus
+        * `BASEMENT` - Basement
+        * `GROUND_FLOOR` - Ground Floor
+        * `FIRST_FLOOR` - First Floor
+        * `SECOND_FLOOR` - Second Floor
+        * `THIRD_FLOOR` - Third Floor
+        * `FOURTH_FLOOR` - Fourth Floor
+        * `FIFTH_FLOOR` - Fifth Floor
+        * `SIXTH_FLOOR_PLUS` - Sixth Floor Plus
     HealthCheckResponse:
       type: object
       properties:
@@ -11572,13 +11548,14 @@ components:
       - redis
     LocationTypeEnum:
       enum:
-      - 0
-      - 1
-      - 2
+      - HOME
+      - OFFICE
+      - OTHER
+      type: string
       description: |-
-        * `0` - Αρχική
-        * `1` - Office
-        * `2` - Other
+        * `HOME` - Αρχική
+        * `OFFICE` - Office
+        * `OTHER` - Other
     Notification:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -11640,18 +11617,18 @@ components:
       - uuid
     NotificationKindEnum:
       enum:
-      - error
-      - success
-      - info
-      - warning
-      - danger
+      - ERROR
+      - SUCCESS
+      - INFO
+      - WARNING
+      - DANGER
       type: string
       description: |-
-        * `error` - Error
-        * `success` - Success
-        * `info` - Info
-        * `warning` - Warning
-        * `danger` - Danger
+        * `ERROR` - Error
+        * `SUCCESS` - Success
+        * `INFO` - Info
+        * `WARNING` - Warning
+        * `DANGER` - Danger
     NotificationUser:
       type: object
       properties:
@@ -11696,9 +11673,6 @@ components:
             type: integer
       required:
       - notificationUserIds
-    NullEnum:
-      enum:
-      - null
     Order:
       type: object
       properties:
@@ -12008,15 +11982,13 @@ components:
       - zipcode
     OrderDetail:
       type: object
-      description: Detailed order serializer with additional information.
       properties:
         id:
           type: integer
           readOnly: true
         user:
-          allOf:
-          - $ref: '#/components/schemas/Authentication'
-          readOnly: true
+          type: integer
+          nullable: true
         country:
           allOf:
           - $ref: '#/components/schemas/Country'
@@ -12201,7 +12173,6 @@ components:
       - trackingInfo
       - trackingNumber
       - updatedAt
-      - user
       - uuid
       - zipcode
     OrderItem:
@@ -12301,13 +12272,6 @@ components:
           readOnly: true
         product:
           type: integer
-        price:
-          type: number
-          format: double
-          maximum: 1000000000
-          minimum: -1000000000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
         quantity:
           type: integer
           maximum: 2147483647
@@ -12316,7 +12280,6 @@ components:
           type: string
       required:
       - id
-      - price
       - product
     OrderStatusEnum:
       enum:
@@ -13218,8 +13181,6 @@ components:
             type: integer
         author:
           type: integer
-        status:
-          $ref: '#/components/schemas/BlogPostStatusEnum'
         featured:
           type: boolean
         viewCount:
@@ -13710,15 +13671,27 @@ components:
               properties:
                 name:
                   type: string
+                description:
+                  type: string
+                instructions:
+                  type: string
             en:
               type: object
               properties:
                 name:
                   type: string
+                description:
+                  type: string
+                instructions:
+                  type: string
             de:
               type: object
               properties:
                 name:
+                  type: string
+                description:
+                  type: string
+                instructions:
                   type: string
         id:
           type: integer
@@ -14432,19 +14405,13 @@ components:
           title: Zip Code
           maxLength: 255
         floor:
-          nullable: true
-          minimum: 0
-          maximum: 32767
           oneOf:
           - $ref: '#/components/schemas/FloorEnum'
-          - $ref: '#/components/schemas/NullEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         locationType:
-          nullable: true
-          minimum: 0
-          maximum: 32767
           oneOf:
           - $ref: '#/components/schemas/LocationTypeEnum'
-          - $ref: '#/components/schemas/NullEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         phone:
           type: string
         mobilePhone:
@@ -14510,15 +14477,27 @@ components:
               properties:
                 name:
                   type: string
+                description:
+                  type: string
+                instructions:
+                  type: string
             en:
               type: object
               properties:
                 name:
                   type: string
+                description:
+                  type: string
+                instructions:
+                  type: string
             de:
               type: object
               properties:
                 name:
+                  type: string
+                description:
+                  type: string
+                instructions:
                   type: string
         id:
           type: integer
@@ -15507,19 +15486,13 @@ components:
           title: Zip Code
           maxLength: 255
         floor:
-          nullable: true
-          minimum: 0
-          maximum: 32767
           oneOf:
           - $ref: '#/components/schemas/FloorEnum'
-          - $ref: '#/components/schemas/NullEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         locationType:
-          nullable: true
-          minimum: 0
-          maximum: 32767
           oneOf:
           - $ref: '#/components/schemas/LocationTypeEnum'
-          - $ref: '#/components/schemas/NullEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         phone:
           type: string
         mobilePhone:

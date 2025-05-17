@@ -3,6 +3,12 @@
 
 
 
+## v1.3.0 (2025-05-17)
+
+### Features
+
+* feat: compile messages and api schema, ci release check to run only at main branch and pay way admin fix ([`7229ca6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7229ca60ab5bec0bf71b293bfcf736095a1ff096))
+
 ## v1.2.0 (2025-05-17)
 
 ### Bug fixes

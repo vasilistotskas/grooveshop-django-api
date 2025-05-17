@@ -182,7 +182,7 @@ jobs:
           github_token: ${{ secrets.DJANGO_TOKEN }}
 
       - name: Install pypa/build
-        run: uv add build --user
+        run: uv add build
 
       - name: Build a binary wheel and a source tarball
         run: uv run -m build --sdist --wheel --outdir dist_build/

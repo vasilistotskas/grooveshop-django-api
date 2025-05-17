@@ -112,11 +112,11 @@ class OrderViewSetTestCase(APITestCase):
             "items": [
                 {
                     "product": self.order_items[0].product.id,
-                    "quantity": 2,
+                    "quantity": 1,
                 },
                 {
                     "product": self.order_items[1].product.id,
-                    "quantity": 3,
+                    "quantity": 1,
                 },
             ],
         }
@@ -208,11 +208,11 @@ class OrderViewSetTestCase(APITestCase):
             "items": [
                 {
                     "product": self.order_items[0].product.id,
-                    "quantity": 2,
+                    "quantity": 1,
                 },
                 {
                     "product": self.order_items[1].product.id,
-                    "quantity": 3,
+                    "quantity": 1,
                 },
             ],
         }

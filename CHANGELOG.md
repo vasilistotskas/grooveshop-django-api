@@ -3,6 +3,52 @@
 
 
 
+## v1.2.0 (2025-05-17)
+
+### Bug fixes
+
+* fix(tests): Increase popular_post view count ([`bc2a42f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bc2a42f2ff2f2c99c71be84df63dd0c693bd3f58))
+
+* fix: pre-commit run ([`8430ba7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8430ba79fef9350e46180415df78ffc9c8f936d3))
+
+* fix: pre commit run ([`c869e28`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c869e2849d74ecefd79c9328cd8a50492b15ea00))
+
+* fix: remove useless comments and prints, test fixes ([`392d802`](https://github.com/vasilistotskas/grooveshop-django-api/commit/392d80239082cf0d6faffd88d06841feaf31e325))
+
+* fix: metrics update ([`b5109b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5109b5a1e6057f733db39f1ad308db6d305a698))
+
+### Chores
+
+* chore: update poetry lock ([`afd5f4d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/afd5f4d3a74b7a0f81d06d4456756a5e3aba9cfe))
+
+### Continuous integration
+
+* ci: Increase testing timeout ([`bfb27a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bfb27a18fed2f3822742ae23f151075b521bcc07))
+
+### Features
+
+* feat: Improve tests performance 8s->2s ([`d79a99d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d79a99d46e7fb1791d0983650e4f1fee0e5aefe7))
+
+* feat: Pay way app improved ([`27442f1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/27442f11043b7e81ddf7636e7b31b23a43350275))
+
+* feat: Rewrite order, general improvements
+
+- SUPPORT_EMAIL rename to INFO_EMAIL ([`199eec0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/199eec08384ad1ebd705d61ce862894cf5f69571))
+
+* feat: Remove `status` field from blog post, factory and admin panel fixes ([`d21076a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d21076a91af5f49367067e6a521a87c315d32d6c))
+
+* feat: Update model indexes and blog post filters ([`1ae899e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1ae899e57929118156973c9e015510f3a2125b54))
+
+* feat: progress ([`479b813`](https://github.com/vasilistotskas/grooveshop-django-api/commit/479b813df7844b3f7cf1265f81bad570653b3f89))
+
+* feat: Init prototype ([`89f3915`](https://github.com/vasilistotskas/grooveshop-django-api/commit/89f391566a2e311204a35a8c132ddff0711b3f17))
+
+### Unknown
+
+* Merge pull request #2 from vasilistotskas/order
+
+Order ([`34a0a29`](https://github.com/vasilistotskas/grooveshop-django-api/commit/34a0a29c5f2dbfc750190e9a78ba8e8f2f02e7fc))
+
 ## v1.1.0 (2025-05-05)
 
 ### Features

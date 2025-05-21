@@ -38,8 +38,8 @@ class BlogPostFilterTestCase(APITestCase):
             user = UserAccountFactory(num_addresses=0)
             self.popular_post.likes.add(user)
 
-        for _i in range(10):
-            BlogCommentFactory(post=self.popular_post)
+        for _i in range(20):
+            BlogCommentFactory(post=self.popular_post, is_approved=True)
 
         self.average_post = BlogPostFactory(
             author=self.author,

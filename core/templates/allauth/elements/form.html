@@ -1,0 +1,26 @@
+{% load allauth %}
+<form
+{% if attrs.id %}id="{{ attrs.id }}"{% endif %}
+{% if attrs.enctype %}enctype="{{ attrs.enctype }}"{% endif %}
+method="{{ attrs.method|default:'post' }}"
+action="{{ attrs.action|default:'' }}"
+class="{% if 'bg-white' in attrs.tags %}bg-white{% endif %} {% if 'shadow-md' in attrs.tags %}shadow-md{% endif %} {% if 'rounded-lg' in attrs.tags %}rounded-lg{% endif %} {% if 'p-6' in attrs.tags %}p-6{% endif %} {% if 'space-y-4' in attrs.tags %}space-y-4{% endif %} {{ attrs.class }}"
+>
+    {% if attrs.form.errors %}
+    <div class="mb-4 p-4 rounded-md bg-red-50 border border-red-200">
+        <div class="text-sm text-red-600">
+            {% if attrs.form.non_field_errors %}
+                {% for error in attrs.form.non_field_errors %}
+                    <p>{{ error }}</p>
+                {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% slot body %}{% endslot %}
+
+    <div class="{% if 'space-y-4' in attrs.tags %}mt-6{% endif %}">
+        {% slot actions %}{% endslot %}
+    </div>
+</form>

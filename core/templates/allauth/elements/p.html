@@ -1,0 +1,2 @@
+{% load allauth %}
+<p class="text-base {% if 'text-sm' in attrs.tags %}text-sm{% endif %} {% if 'text-gray-600' in attrs.tags %}text-gray-600{% endif %} {% if 'mb-6' in attrs.tags %}mb-6{% endif %} {{ attrs.class }}">{% slot %}{% endslot %}</p>

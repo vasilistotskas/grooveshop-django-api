@@ -1,0 +1,2 @@
+{% load allauth %}
+<h1 class="text-3xl font-bold text-gray-900 {% if 'text-2xl' in attrs.tags %}text-2xl{% endif %} {% if 'mb-4' in attrs.tags %}mb-4{% endif %} {{ attrs.class }}">{% slot %}{% endslot %}</h1>

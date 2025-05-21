@@ -1,3 +1,4 @@
+from allauth.account.views import login
 from django import forms
 from django.contrib import messages
 from django.core import management
@@ -22,6 +23,9 @@ class ClearCacheForm(forms.Form):
 
 
 class MyAdminSite(UnfoldAdminSite):
+    def login(self, request, extra_context=None):
+        return login(request)
+
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [

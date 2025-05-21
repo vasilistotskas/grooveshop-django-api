@@ -1,0 +1,54 @@
+{% load allauth %}
+{% if not attrs.unlabeled %}
+    {{ attrs.form.as_p }}
+{% else %}
+    {% for field in attrs.form %}
+        <div class="{% if 'space-y-4' in attrs.tags %}mb-4{% endif %}">
+            {{ field }}
+            {% if field.errors %}
+                <div class="mt-1 text-sm text-red-600">
+                    {% for error in field.errors %}
+                        <p>{{ error }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            {% if field.help_text %}
+                <p class="mt-1 text-sm text-gray-500">{{ field.help_text }}</p>
+            {% endif %}
+        </div>
+    {% endfor %}
+{% endif %}
+
+<style>
+    /* Style Django form widgets with Tailwind classes */
+    input[type="text"],
+    input[type="password"],
+    input[type="email"],
+    input[type="number"],
+    input[type="url"],
+    input[type="tel"],
+    select,
+    textarea {
+        @apply w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500;
+    }
+
+    input[type="checkbox"],
+    input[type="radio"] {
+        @apply h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500;
+    }
+
+    /* Style p tags within forms */
+    form p {
+        @apply mb-4;
+    }
+
+    /* Style error lists */
+    .errorlist {
+        @apply mt-1 text-sm text-red-600 list-none p-0;
+    }
+
+    /* Style labels */
+    label {
+        @apply block text-sm font-medium text-gray-700 mb-1;
+    }
+</style>

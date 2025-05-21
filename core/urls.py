@@ -25,6 +25,8 @@ User = get_user_model()
 
 app_name = "core"
 
+admin.autodiscover()
+
 urlpatterns = [
     path("robots.txt", robots_txt, name="robots_txt"),
     path("csp-report/", csp_report, name="csp-report"),

@@ -1,0 +1,14 @@
+{% load allauth %}
+<{% if attrs.href %}a href="{{ attrs.href }}"{% else %}button{% endif %}
+{% if attrs.form %}form="{{ attrs.form }}"{% endif %}
+{% if attrs.id %}id="{{ attrs.id }}"{% endif %}
+{% if attrs.name %}name="{{ attrs.name }}"{% endif %}
+{% if attrs.value %}value="{{ attrs.value }}"{% endif %}
+{% if attrs.type %}type="{{ attrs.type }}"{% endif %}
+class="px-4 py-2 font-semibold rounded transition duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2
+{% if 'w-full' in attrs.tags %}w-full{% endif %}
+{% if 'bg-blue-600' in attrs.tags %}bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500{% else %}bg-gray-200 hover:bg-gray-300 text-gray-800 focus:ring-gray-400{% endif %}
+{{ attrs.class }}"
+>
+{% slot %}{% endslot %}
+</{% if attrs.href %}a{% else %}button{% endif %}>

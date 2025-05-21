@@ -20,11 +20,26 @@ class PayWayViewSet(BaseModelViewSet):
         PascalSnakeCaseOrderingFilter,
         SearchFilter,
     ]
-    filterset_fields = ["active", "cost", "free_for_order_amount"]
+    filterset_fields = [
+        "active",
+        "cost",
+        "free_for_order_amount",
+        "provider_code",
+        "is_online_payment",
+        "requires_confirmation",
+    ]
     ordering_fields = [
         "cost",
         "free_for_order_amount",
         "created_at",
+        "provider_code",
+        "is_online_payment",
+        "requires_confirmation",
+        "sort_order",
     ]
     ordering = ["-created_at"]
-    search_fields = []
+    search_fields = [
+        "provider_code",
+        "translations__name",
+        "translations__description",
+    ]

@@ -119,6 +119,8 @@ THIRD_PARTY_APPS = [
     "drf_spectacular",
     "djmoney",
     "phonenumber_field",
+    "channels",
+    "channels_redis",
     "allauth",
     "allauth.account",
     "allauth.headless",
@@ -185,6 +187,7 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 WSGI_APPLICATION = "wsgi.application"
+ASGI_APPLICATION = "asgi.application"
 
 # User Model
 AUTH_USER_MODEL = "user.UserAccount"
@@ -393,7 +396,6 @@ ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE = False
 LOGIN_REDIRECT_URL = NUXT_BASE_URL + "/account"
 USERSESSIONS_TRACK_ACTIVITY = True
 
-HEADLESS_ONLY = True
 HEADLESS_TOKEN_STRATEGY = "core.api.tokens.SessionTokenStrategy"
 HEADLESS_FRONTEND_URLS = {
     "account_confirm_email": f"{NUXT_BASE_URL}/account/verify-email/{{key}}",

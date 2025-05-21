@@ -29,7 +29,6 @@ class UserAdmin(ModelAdmin):
         "phone",
         "country",
         "region",
-        "image_tag",
         "is_active",
         "is_staff",
     ]

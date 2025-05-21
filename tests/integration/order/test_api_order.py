@@ -164,7 +164,7 @@ class OrderViewSetTestCase(APITestCase):
         self.cancel_order_url = reverse(
             "order-cancel", kwargs={"pk": self.order1.pk}
         )
-        self.add_tracking_url = reverse(
+        self.add_tracking = reverse(
             "order-add-tracking", kwargs={"pk": self.order1.pk}
         )
         self.update_status_url = reverse(
@@ -235,7 +235,7 @@ class OrderViewSetTestCase(APITestCase):
         }
 
         response = self.client.post(
-            self.add_tracking_url,
+            self.add_tracking,
             data=json.dumps(tracking_data),
             content_type="application/json",
         )

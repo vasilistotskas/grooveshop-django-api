@@ -3,6 +3,7 @@ import random
 import factory
 from django.apps import apps
 from django.conf import settings
+from factory.fuzzy import FuzzyDecimal
 from faker import Faker
 
 from pay_way.enum.pay_way_enum import PayWayEnum
@@ -75,12 +76,8 @@ def generate_provider_data():
 
 class PayWayFactory(factory.django.DjangoModelFactory):
     active = factory.Faker("boolean")
-    cost = factory.Faker(
-        "pydecimal", left_digits=3, right_digits=2, positive=True
-    )
-    free_for_order_amount = factory.Faker(
-        "pydecimal", left_digits=3, right_digits=2, positive=True
-    )
+    cost = FuzzyDecimal(3, 10, 2)
+    free_for_order_amount = FuzzyDecimal(100, 200, 2)
     icon = factory.django.ImageField(
         filename="pay_way_icon.jpg",
         color=factory.Faker("color"),

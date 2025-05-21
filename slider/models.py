@@ -3,8 +3,6 @@ import os
 from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.templatetags.static import static
-from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
@@ -55,26 +53,6 @@ class Slider(TranslatableModel, TimeStampMixinModel, UUIDModel):
         if self.image and hasattr(self.image, "name"):
             return f"media/uploads/sliders/{os.path.basename(self.image.name)}"
         return ""
-
-    @property
-    def image_tag(self):
-        no_img_url = static("images/no_photo.jpg")
-        no_img_markup = mark_safe(
-            f'<img src="{no_img_url}" width="100" height="100" />'
-        )
-        if self.thumbnail:
-            return mark_safe(
-                '<img src="{}" width="100" height="100" />'.format(
-                    self.thumbnail.url
-                )
-            )
-        elif self.image:
-            return mark_safe(
-                '<img src="{}" width="100" height="100" />'.format(
-                    self.image.url
-                )
-            )
-        return no_img_markup
 
 
 class Slide(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
@@ -152,23 +130,3 @@ class Slide(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         if self.image and hasattr(self.image, "name"):
             return f"media/uploads/slides/{os.path.basename(self.image.name)}"
         return ""
-
-    @property
-    def image_tag(self):
-        no_img_url = static("images/no_photo.jpg")
-        no_img_markup = mark_safe(
-            f'<img src="{no_img_url}" width="100" height="100" />'
-        )
-        if self.thumbnail:
-            return mark_safe(
-                '<img src="{}" width="100" height="100" />'.format(
-                    self.thumbnail.url
-                )
-            )
-        elif self.image:
-            return mark_safe(
-                '<img src="{}" width="100" height="100" />'.format(
-                    self.image.url
-                )
-            )
-        return no_img_markup

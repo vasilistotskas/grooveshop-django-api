@@ -253,7 +253,6 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         "likes_count_display",
         "comments_count_display",
         "tags_count_display",
-        "image_tag",
     ]
     filter_horizontal = ["tags"]
     actions = [

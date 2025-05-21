@@ -22,7 +22,6 @@ from django.db.models import (
     When,
 )
 from django.db.models.functions import Coalesce
-from django.templatetags.static import static
 from django.utils.safestring import SafeString, mark_safe
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -439,32 +438,6 @@ class Product(
         if not product_image:
             return ""
         return f"media/uploads/products/{os.path.basename(product_image.image.name)}"
-
-    @property
-    def image_tag(self) -> SafeString:
-        no_img_url = static("images/no_photo.jpg")
-        no_img_markup = mark_safe(
-            f'<img src="{no_img_url}" width="100" height="100" />'
-        )
-        try:
-            img = ProductImage.objects.get(product_id=self.id, is_main=True)
-        except ProductImage.DoesNotExist:
-            return no_img_markup
-
-        if img.thumbnail:
-            return mark_safe(
-                '<img src="{}" width="100" height="100" />'.format(
-                    img.thumbnail.url
-                )
-            )
-        elif img.image:
-            return mark_safe(
-                '<img src="{}" width="100" height="100" />'.format(
-                    img.image.url
-                )
-            )
-        else:
-            return no_img_markup
 
     @property
     def colored_stock(self) -> SafeString:

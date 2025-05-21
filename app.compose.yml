@@ -1,4 +1,5 @@
 x-common-envs: &common-envs
+  UVICORN_RELOAD: true
   DB_HOST: db
   REDIS_HOST: redis
   MEILI_HOST: meilisearch
@@ -47,6 +48,7 @@ services:
     container_name: backend
     user: 1000:1000
     restart: always
+    tty: true
     build:
       context: .
       dockerfile: ./dev.Dockerfile
@@ -57,6 +59,7 @@ services:
       --host 0.0.0.0
       --port 8000
       --reload
+      --log-level debug
     env_file:
       - ./.env
     environment:

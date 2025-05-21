@@ -18,10 +18,10 @@ class SliderSlidesInline(admin.StackedInline):
 
 @admin.register(Slider)
 class SliderAdmin(ModelAdmin, TranslatableAdmin):
-    list_display = ["id", "title", "image_tag"]
+    list_display = ["id", "title"]
     search_fields = ["id", "translations__title"]
     inlines = [SliderSlidesInline]
-    readonly_fields = ("image_tag", "thumbnail")
+    readonly_fields = ("thumbnail",)
     actions = [""]
 
     @override
@@ -33,7 +33,7 @@ class SliderAdmin(ModelAdmin, TranslatableAdmin):
 
 @admin.register(Slide)
 class SlideAdmin(ModelAdmin, TranslatableAdmin):
-    list_display = ["id", "title", "image_tag"]
+    list_display = ["id", "title"]
     search_fields = ["id", "translations__title", "slider__translations__name"]
-    readonly_fields = ("image_tag", "thumbnail")
+    readonly_fields = ("thumbnail",)
     actions = [""]

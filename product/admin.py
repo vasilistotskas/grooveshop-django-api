@@ -170,7 +170,6 @@ class ProductAdmin(
         "display_likes_count",
         "display_review_average",
         "display_weight",
-        "image_tag",
     ]
     search_fields = ["id", "product_code", "translations__name"]
     list_filter = [
@@ -187,7 +186,6 @@ class ProductAdmin(
     ]
     inlines = [ProductImageInline, TagInLine]
     readonly_fields = (
-        "image_tag",
         "likes_count",
         "display_final_price",
         "display_discount_value",

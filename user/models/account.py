@@ -11,7 +11,6 @@ from django.contrib.auth.models import (
 from django.contrib.auth.validators import UnicodeUsernameValidator
 from django.contrib.postgres.indexes import BTreeIndex, GinIndex
 from django.db import models
-from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from phonenumber_field.modelfields import PhoneNumberField
@@ -190,16 +189,3 @@ class UserAccount(
         if self.image and hasattr(self.image, "name"):
             return f"media/uploads/users/{os.path.basename(self.image.name)}"
         return ""
-
-    @property
-    def image_tag(self):
-        if self.image and hasattr(self.image, "url"):
-            return mark_safe(
-                '<img src="{}" width="50" height="50"/>'.format(self.image.url)
-            )
-        else:
-            return mark_safe(
-                '<img src="{}" height="50"/>'.format(
-                    "/static/images/default.png"
-                )
-            )

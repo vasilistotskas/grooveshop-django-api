@@ -35,6 +35,10 @@ class PayWaySerializer(
             "uuid",
             "icon_absolute_url",
             "icon_filename",
+            "provider_code",
+            "is_online_payment",
+            "requires_confirmation",
+            "configuration",
         )
         read_only_fields = (
             "created_at",

@@ -3,6 +3,12 @@
 
 
 
+## v1.5.0 (2025-05-21)
+
+### Features
+
+* feat: Remove `image_tag`, docker updates ([`e0cb53e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e0cb53edcf7195f2d4d72a3deb2ca297ce99badd))
+
 ## v1.4.6 (2025-05-17)
 
 ### Bug fixes

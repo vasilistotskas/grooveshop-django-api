@@ -50,7 +50,6 @@ async def run_app(app: ASGI3Application, scope: HTTPScope):
     return events
 
 
-@pytest.mark.asyncio
 async def test_access_control_header_preflight(
     asgi_app: ASGI3Application, settings
 ):
@@ -83,7 +82,6 @@ async def test_access_control_header_preflight(
     ]
 
 
-@pytest.mark.asyncio
 async def test_access_control_header_simple(
     asgi_app: ASGI3Application, settings
 ):
@@ -124,7 +122,6 @@ async def test_access_control_header_simple(
         (["https://*.example.org"], "https://api.example.org"),
     ],
 )
-@pytest.mark.asyncio
 async def test_access_control_allowed_origins(
     asgi_app, settings, allowed_origins, origin
 ):
@@ -152,7 +149,6 @@ async def test_access_control_allowed_origins(
         (["https://*.example.org"], "https://apiexample.com"),
     ],
 )
-@pytest.mark.asyncio
 async def test_access_control_disallowed_origins(
     asgi_app, settings, allowed_origins, origin
 ):
@@ -167,7 +163,6 @@ async def test_access_control_disallowed_origins(
     ) not in events[0]["headers"]
 
 
-@pytest.mark.asyncio
 async def test_non_http_scope(asgi_app: ASGI3Application):
     non_http_scope = {"type": "websocket", "path": "/ws"}
     events = []

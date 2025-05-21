@@ -1,13 +1,11 @@
 from unittest.mock import patch
 
-import pytest
 from django.test import TestCase
 
 from contact.factories import ContactFactory
 from contact.models import Contact
 
 
-@pytest.mark.django_db
 class TestContactFactory(TestCase):
     def test_contact_factory_creates_contact(self):
         contact = ContactFactory()

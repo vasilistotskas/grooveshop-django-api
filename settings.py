@@ -68,6 +68,7 @@ USE_X_FORWARDED_HOST = getenv("USE_X_FORWARDED_HOST", "False") == "True"
 
 # Django built-in apps
 DJANGO_APPS = [
+    "daphne",
     "unfold.apps.BasicAppConfig",
     "unfold.contrib.filters",
     "unfold.contrib.forms",
@@ -119,8 +120,6 @@ THIRD_PARTY_APPS = [
     "drf_spectacular",
     "djmoney",
     "phonenumber_field",
-    "channels",
-    "channels_redis",
     "allauth",
     "allauth.account",
     "allauth.headless",

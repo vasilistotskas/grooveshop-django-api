@@ -21,8 +21,7 @@ User = get_user_model()
 class OrderSerializerTestCase(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
-            username="testuser",
-            email="test@example.com",
+            email="test1@example.com",
             password="testpassword",
         )
 
@@ -51,8 +50,7 @@ class OrderSerializerTestCase(TestCase):
 class OrderDetailSerializerTestCase(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
-            username="testuser",
-            email="test@example.com",
+            email="test2@example.com",
             password="testpassword",
         )
 
@@ -94,8 +92,7 @@ class OrderDetailSerializerTestCase(TestCase):
 class OrderCreateUpdateSerializerTestCase(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
-            username="testuser",
-            email="test@example.com",
+            email="test3@example.com",
             password="testpassword",
         )
 

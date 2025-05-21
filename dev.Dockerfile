@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
          --home   ${APP_PATH} \
          --shell  /bin/bash \
          appuser \
-    && mkdir -p ${APP_PATH}/.cache/uv \
+    && mkdir -p ${APP_PATH}/.cache/uv ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles \
     && chown -R appuser:appgroup ${APP_PATH} \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -32,33 +32,28 @@ COPY --chown=appuser:appgroup --from=uv /uv /uvx /bin/
 
 WORKDIR ${APP_PATH}
 
-COPY pyproject.toml uv.lock ./
+COPY --chown=appuser:appgroup pyproject.toml uv.lock ./
 
-RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+RUN --mount=type=cache,target=${APP_PATH}/.cache/uv,uid=${UID},gid=${GID} \
     uv sync --frozen --no-install-project --no-editable
 
-COPY . .
-RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-editable
+COPY --chown=appuser:appgroup . .
 
-RUN chown -R appuser:appgroup . .
-
-RUN mkdir -p ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles \
-    && chown -R appuser:appgroup ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles
+RUN --mount=type=cache,target=${APP_PATH}/.cache/uv,uid=${UID},gid=${GID} \
+    uv sync --frozen --no-editable
 
 FROM base AS default
 
 USER appuser
 
-CMD ["uv", "run", "uvicorn", "asgi:application", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uv", "run", "python", "manage.py", "runserver", "0.0.0.0:8000"]
 
 FROM base AS cicd
-
+USER root
 RUN apt-get update && apt-get install -y --no-install-recommends \
     docker-compose \
     docker.io \
     git \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    && apt-get clean && rm -rf /var/lib/apt/lists/* \
 
 USER appuser

@@ -132,9 +132,9 @@ This project is open-sourced under the MIT License. See the [LICENSE](LICENSE.md
 
 ## Uvicorn
 
-### Running the ASGI Application
+### Running the Daphne ASGI Application
 - **Start Uvicorn for ASGI applications**:
-  `uvicorn asgi:application --port 8000 --workers 4 --log-level debug --reload`
+  `python manage.py runserver 0.0.0.0:8000`
 
 # Python Development Setup and Utilities
 

@@ -4,7 +4,7 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
-from django.urls import include, path, re_path
+from django.urls import include, path
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.views import (
     SpectacularAPIView,
@@ -90,7 +90,9 @@ if bool(settings.ENABLE_DEBUG_TOOLBAR):
             stacklevel=2,
         )
     else:
-        urlpatterns += [re_path(r"^__debug__/", include(debug_toolbar.urls))]  # type: ignore
+        urlpatterns += [
+            path("__debug__/", include(debug_toolbar.urls)),
+        ]
 
 if bool(settings.DEBUG) or settings.SYSTEM_ENV in ["dev", "ci"]:
     urlpatterns += static(

@@ -1,10 +1,8 @@
-import pytest
 from asgiref.typing import HTTPResponseBodyEvent, HTTPResponseStartEvent
 
 from asgi.health_check import health_check
 
 
-@pytest.mark.asyncio
 async def test_health_check():
     async def app(scope, receive, send):
         await send(

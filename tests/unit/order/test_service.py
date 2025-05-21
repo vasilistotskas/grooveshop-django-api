@@ -60,13 +60,10 @@ class OrderServiceTestCase(TestCase):
     @patch("order.signals.order_created.send")
     @patch("order.models.order.Order.objects.create")
     @patch("order.models.item.OrderItem.objects.create")
-    @patch("django.db.transaction.atomic")
     def test_create_order(
-        self, mock_transaction, mock_create_item, mock_create_order, mock_signal
+        self, mock_create_item, mock_create_order, mock_signal
     ):
         mock_create_order.return_value = self.order
-        mock_transaction.__enter__ = Mock(return_value=None)
-        mock_transaction.__exit__ = Mock(return_value=None)
 
         self.order.shipping_price = Money("10.00", "USD")
 
@@ -92,8 +89,7 @@ class OrderServiceTestCase(TestCase):
         )
         self.order.save.assert_called_once_with(update_fields=["paid_amount"])
 
-    @patch("django.db.transaction.atomic")
-    def test_create_order_insufficient_stock(self, mock_transaction):
+    def test_create_order_insufficient_stock(self):
         self.product1.stock = 1
 
         original_create_order = OrderService.create_order
@@ -124,8 +120,7 @@ class OrderServiceTestCase(TestCase):
             )
 
     @patch("order.signals.order_status_changed.send")
-    @patch("django.db.transaction.atomic")
-    def test_update_order_status_valid(self, mock_transaction, mock_signal):
+    def test_update_order_status_valid(self, mock_signal):
         self.order.status = OrderStatusEnum.PENDING
 
         OrderService.update_order_status(self.order, OrderStatusEnum.PROCESSING)
@@ -134,8 +129,7 @@ class OrderServiceTestCase(TestCase):
 
         mock_signal.assert_called_once()
 
-    @patch("django.db.transaction.atomic")
-    def test_update_order_status_invalid(self, mock_transaction):
+    def test_update_order_status_invalid(self):
         self.order.status = OrderStatusEnum.PENDING
 
         with self.assertRaises(ValueError) as context:
@@ -163,8 +157,7 @@ class OrderServiceTestCase(TestCase):
         self.assertEqual(result, mock_orders)
 
     @patch("order.signals.order_canceled.send")
-    @patch("django.db.transaction.atomic")
-    def test_cancel_order(self, mock_transaction, mock_signal):
+    def test_cancel_order(self, mock_signal):
         self.order.status = OrderStatusEnum.PENDING
         self.order.can_be_canceled = True
 

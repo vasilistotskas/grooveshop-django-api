@@ -1,10 +1,7 @@
-import logging
-
 import pytest
 from django.conf import settings
 from django.core.cache import cache
 from django.db import connection, reset_queries
-from django.test.utils import TestContextDecorator
 
 settings.PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.MD5PasswordHasher",
@@ -19,43 +16,11 @@ settings.CELERY_TASK_ALWAYS_EAGER = True
 settings.CELERY_TASK_EAGER_PROPAGATES = True
 settings.DEBUG = False
 
-logging.disable(logging.WARNING)
-
-
-class DisableLoggingContext(TestContextDecorator):
-    def __init__(self):
-        super().__init__()
-        self.previous_level = None
-
-    def enable(self):
-        import logging
-
-        self.previous_level = logging.root.manager.disable
-        logging.disable(logging.CRITICAL)
-
-    def disable(self):
-        import logging
-
-        if self.previous_level is not None:
-            logging.disable(self.previous_level)
-            self.previous_level = None
-
-
-@pytest.fixture(autouse=True)
-def disable_logging():
-    with DisableLoggingContext():
-        yield
-
 
 @pytest.fixture(autouse=True)
 def clear_caches():
     yield
     cache.clear()
-
-
-@pytest.fixture(autouse=True)
-def enable_db_access_for_all_tests(db):
-    pass
 
 
 @pytest.fixture(autouse=True)

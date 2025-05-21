@@ -36,7 +36,7 @@ COPY --from=builder --chown=app:app ${APP_PATH} .
 RUN mkdir -p ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles && \
     chown -R app:app ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles
 
-CMD [".venv/bin/uvicorn", "asgi:application", "--host", "0.0.0.0", "--port", "8000"]
+CMD [".venv/bin/python", "manage.py", "runserver", "0.0.0.0:8000"]
 
 FROM production AS production_cicd
 USER root

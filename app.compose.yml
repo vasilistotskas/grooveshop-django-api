@@ -54,12 +54,7 @@ services:
       dockerfile: ./dev.Dockerfile
       target: default
     command: >
-      uv --no-cache run uvicorn
-      asgi:application
-      --host 0.0.0.0
-      --port 8000
-      --reload
-      --log-level debug
+      uv --no-cache run python manage.py runserver 0.0.0.0:8000
     env_file:
       - ./.env
     environment:

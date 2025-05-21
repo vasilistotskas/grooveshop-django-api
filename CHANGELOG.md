@@ -3,6 +3,16 @@
 
 
 
+## v1.6.0 (2025-05-21)
+
+### Bug fixes
+
+* fix: test fix ([`b05c890`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b05c8904c76346510e610553bff309b5053a0083))
+
+### Features
+
+* feat: Use django daphne ([`fcb1cf7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fcb1cf74d79baa5c1670a0260a0356f5c9532041))
+
 ## v1.5.0 (2025-05-21)
 
 ### Features

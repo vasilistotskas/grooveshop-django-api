@@ -16,10 +16,10 @@ WORKDIR ${APP_PATH}
 COPY pyproject.toml .
 COPY uv.lock .
 
-RUN mkdir -p ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles
+RUN mkdir -p ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles && \
+    uv sync --frozen --no-install-project --no-editable
 
-RUN uv sync --frozen --no-install-project --no-editable
-ADD . .
+COPY . .
 RUN uv sync --frozen --no-editable
 ENTRYPOINT []
 
@@ -27,8 +27,11 @@ FROM python:${PYTHON_VERSION}-alpine${ALPINE_VERSION} AS production
 ARG UID
 ARG GID
 ARG APP_PATH
-RUN addgroup -g ${GID} -S app && adduser -u ${UID} -S app -G app
-RUN mkdir -p ${APP_PATH} && chown app:app ${APP_PATH}
+RUN addgroup -g ${GID} -S app && \
+    adduser -u ${UID} -S app -G app && \
+    mkdir -p ${APP_PATH} && \
+    chown app:app ${APP_PATH}
+
 USER app
 WORKDIR ${APP_PATH}
 COPY --from=builder --chown=app:app ${APP_PATH} .

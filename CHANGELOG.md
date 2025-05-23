@@ -3,6 +3,12 @@
 
 
 
+## v1.8.1 (2025-05-23)
+
+### Bug fixes
+
+* fix: remove [build-system] ([`c5806a0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c5806a0cbbae01000283a77af027d39fb8dc6063))
+
 ## v1.8.0 (2025-05-23)
 
 ### Features

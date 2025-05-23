@@ -301,7 +301,7 @@ class ExportActionMixin:
             messages.error(request, error_message)
             logger.error(f"XML Export Error: {e}\n{error_details}")
             return HttpResponse(
-                f"Error generating XML file. Please contact support. Details: {e}",
+                "Error generating XML file. Please contact support.",
                 status=500,
                 content_type="text/plain",
             )

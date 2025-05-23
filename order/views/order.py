@@ -209,8 +209,8 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
             )
             return Response(
                 {
-                    "detail": _("An unexpected error occurred: {error}").format(
-                        error=str(e)
+                    "detail": _(
+                        "An error occurred while processing your request."
                     )
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,

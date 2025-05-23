@@ -3,6 +3,12 @@
 
 
 
+## v1.8.0 (2025-05-23)
+
+### Features
+
+* feat: Update `pyproject.toml` and `ci.yml` fix ([`3c0aa56`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3c0aa5695f4dcde8c2aa890ea43d5c1dc7f48c03))
+
 ## v1.7.1 (2025-05-23)
 
 ### Bug fixes

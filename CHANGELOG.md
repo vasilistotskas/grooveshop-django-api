@@ -3,6 +3,12 @@
 
 
 
+## v1.7.1 (2025-05-23)
+
+### Bug fixes
+
+* fix: error exposure ([`839993b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/839993b71c6160104cbafb3691b3f984a1847bd8))
+
 ## v1.7.0 (2025-05-23)
 
 ### Features

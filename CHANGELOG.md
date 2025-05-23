@@ -3,6 +3,14 @@
 
 
 
+## v1.7.0 (2025-05-23)
+
+### Features
+
+* feat: remove `thumbnail` fields, ImageAndSvgField refactor, github ci permissions added, remove useless stuff, ([`14c440e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/14c440ed8f85726a16cbaa821baea33e4c6136c2))
+
+* feat: Optimize Dockerfile ([`d20369f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d20369f8415ad2ff6af74a0120e062fa33f86c80))
+
 ## v1.6.0 (2025-05-21)
 
 ### Bug fixes

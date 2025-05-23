@@ -42,12 +42,6 @@ class ProductImageFactory(factory.django.DjangoModelFactory):
         width=1280,
         height=720,
     )
-    thumbnail = factory.django.ImageField(
-        filename="product_thumbnail.jpg",
-        color=factory.Faker("color"),
-        width=640,
-        height=360,
-    )
     is_main = factory.Faker("boolean")
 
     class Meta:

@@ -76,12 +76,6 @@ class SliderFactory(factory.django.DjangoModelFactory):
         width=1920,
         height=1080,
     )
-    thumbnail = factory.django.ImageField(
-        filename="slider_thumbnail.jpg",
-        color=factory.Faker("color"),
-        width=1280,
-        height=720,
-    )
     video = factory.django.FileField(filename="slider_video.mp4")
 
     class Meta:
@@ -183,12 +177,6 @@ class SlideFactory(factory.django.DjangoModelFactory):
         color=factory.Faker("color"),
         width=1920,
         height=1080,
-    )
-    thumbnail = factory.django.ImageField(
-        filename="slide_thumbnail.jpg",
-        color=factory.Faker("color"),
-        width=1280,
-        height=720,
     )
 
     class Meta:

@@ -40,6 +40,7 @@ INTERNAL_IPS = [
 ]
 
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 22500
+FILE_UPLOAD_MAX_MEMORY_SIZE = 2621440
 
 SERIALIZATION_MODULES = {"json": "djmoney.serializers"}
 
@@ -475,10 +476,6 @@ CELERY_BEAT_SCHEDULE = {
     "backup-database": {
         "task": "core.tasks.backup_database",
         "schedule": crontab(hour="7", minute="0"),
-    },
-    "optimize-images": {
-        "task": "core.tasks.optimize_images",
-        "schedule": crontab(hour="3", minute="30", day_of_week="sunday"),
     },
     "clear-duplicate-history": {
         "task": "core.tasks.clear_duplicate_history_task",

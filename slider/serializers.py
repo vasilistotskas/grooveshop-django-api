@@ -28,7 +28,6 @@ class SliderSerializer(
         fields = (
             "id",
             "translations",
-            "thumbnail",
             "video",
             "created_at",
             "updated_at",
@@ -57,7 +56,6 @@ class SlideSerializer(TranslatableModelSerializer, serializers.ModelSerializer):
             "show_button",
             "date_start",
             "date_end",
-            "thumbnail",
             "sort_order",
             "created_at",
             "updated_at",

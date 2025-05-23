@@ -11,8 +11,7 @@ from slider.models import Slide, Slider
 @admin_thumbnails.thumbnail("image")
 class SliderSlidesInline(admin.StackedInline):
     model = Slide
-    exclude: list[str] = []
-    readonly_fields = ("id", "thumbnail")
+    readonly_fields = ("id",)
     extra = 0
 
 
@@ -21,7 +20,6 @@ class SliderAdmin(ModelAdmin, TranslatableAdmin):
     list_display = ["id", "title"]
     search_fields = ["id", "translations__title"]
     inlines = [SliderSlidesInline]
-    readonly_fields = ("thumbnail",)
     actions = [""]
 
     @override
@@ -35,5 +33,4 @@ class SliderAdmin(ModelAdmin, TranslatableAdmin):
 class SlideAdmin(ModelAdmin, TranslatableAdmin):
     list_display = ["id", "title"]
     search_fields = ["id", "translations__title", "slider__translations__name"]
-    readonly_fields = ("thumbnail",)
     actions = [""]

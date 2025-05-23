@@ -99,7 +99,6 @@ class FavouriteAdmin(ModelAdmin):
 @admin_thumbnails.thumbnail("image")
 class ProductImageInline(TranslatableTabularInline):
     model = ProductImage
-    exclude = ["thumbnail"]
     readonly_fields = ("id",)
     extra = 1
 
@@ -169,7 +168,6 @@ class ProductAdmin(
         "boolean_status",
         "display_likes_count",
         "display_review_average",
-        "display_weight",
     ]
     search_fields = ["id", "product_code", "translations__name"]
     list_filter = [
@@ -198,10 +196,7 @@ class ProductAdmin(
     actions = [
         "make_active",
         "make_inactive",
-        "apply_10_percent_discount",
         "clear_discount",
-        "increase_stock_by_10",
-        "decrease_stock_by_10",
     ]
     list_filter_submit = True
     list_filter_sheet = True
@@ -276,11 +271,6 @@ class ProductAdmin(
         "approved_review_average_field"
     )
 
-    def display_weight(self, obj):
-        return str(obj.weight)
-
-    display_weight.short_description = _("Weight")
-
     @action(
         description=_("Activate selected products"),
         variant=ActionVariant.SUCCESS,
@@ -318,28 +308,6 @@ class ProductAdmin(
         )
 
     @action(
-        description=_("Apply 10%% discount to selected products"),
-        variant=ActionVariant.SUCCESS,
-        icon="attach_money",
-    )
-    def apply_10_percent_discount(self, request, queryset):
-        for product in queryset:
-            product.discount_percent = 10.0
-            product.save()
-
-        updated = queryset.count()
-        self.message_user(
-            request,
-            ngettext(
-                _("%d product was updated with 10%% discount."),
-                _("%d products were updated with 10%% discount."),
-                updated,
-            )
-            % updated,
-            messages.SUCCESS,
-        )
-
-    @action(
         description=_("Clear discount from selected products"),
         variant=ActionVariant.WARNING,
         icon="cancel",
@@ -356,68 +324,6 @@ class ProductAdmin(
             % updated,
             messages.SUCCESS,
         )
-
-    @action(
-        description=_("Increase stock by 10 for selected products"),
-        variant=ActionVariant.SUCCESS,
-        icon="add",
-    )
-    def increase_stock_by_10(self, request, queryset):
-        for product in queryset:
-            product.increment_stock(10)
-
-        updated = queryset.count()
-        self.message_user(
-            request,
-            ngettext(
-                _("Added 10 items to stock for %d product."),
-                _("Added 10 items to stock for %d products."),
-                updated,
-            )
-            % updated,
-            messages.SUCCESS,
-        )
-
-    @action(
-        description=_("Decrease stock by 10 for selected products"),
-        variant=ActionVariant.WARNING,
-        icon="remove",
-    )
-    def decrease_stock_by_10(self, request, queryset):
-        error_products = []
-        success_count = 0
-
-        for product in queryset:
-            try:
-                product.decrement_stock(10)
-                success_count += 1
-            except ValueError:
-                error_products.append(
-                    product.safe_translation_getter("name", any_language=True)
-                    or str(product.id)
-                )
-
-        if success_count:
-            self.message_user(
-                request,
-                ngettext(
-                    _("Removed 10 items from stock for %d product."),
-                    _("Removed 10 items from stock for %d products."),
-                    success_count,
-                )
-                % success_count,
-                messages.SUCCESS,
-            )
-
-        if error_products:
-            self.message_user(
-                request,
-                _(
-                    "Could not decrease stock for these products (insufficient stock): %s"
-                )
-                % ", ".join(error_products),
-                messages.ERROR,
-            )
 
 
 @admin.register(ProductReview)

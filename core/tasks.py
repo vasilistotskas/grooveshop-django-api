@@ -222,25 +222,3 @@ def clear_old_database_backups(days=30):
 
     message = f"Deleted {deleted_files_count} database backup files older than {days} days."
     return message
-
-
-@celery_app.task
-def optimize_images():
-    images_path = os.path.join(settings.BASE_DIR, "static", "images")
-
-    from PIL import Image
-
-    for subdir, _dirs, files in os.walk(images_path):
-        for file in files:
-            filepath = os.path.join(subdir, file)
-            allowed_extensions = [".jpg", ".jpeg", ".png", ".webp"]
-            if not any(filepath.endswith(ext) for ext in allowed_extensions):
-                continue
-
-            try:
-                with Image.open(filepath) as img:
-                    img.save(filepath, optimize=True, quality=85)
-            except Exception as e:
-                logger.error(f"Error optimizing image: {e}")
-
-    return "Images optimized successfully."

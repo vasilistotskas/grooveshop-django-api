@@ -1,10 +1,9 @@
-import io
+import os
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
-from PIL import Image
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -39,11 +38,18 @@ class ProductCategoryViewSetTestCase(APITestCase):
         return reverse("product-category-list")
 
     def _create_mock_image(self):
-        image = Image.new("RGB", size=(100, 100), color=(155, 0, 0))
-        image_io = io.BytesIO()
-        image.save(image_io, format="jpeg")
+        image_path = os.path.join(settings.STATIC_ROOT, "images", "default.png")
+
+        if not os.path.exists(image_path):
+            image_path = os.path.join(
+                settings.BASE_DIR, "static", "images", "default.png"
+            )
+
+        with open(image_path, "rb") as f:
+            image_data = f.read()
+
         image_file = SimpleUploadedFile(
-            "mock_image.jpg", image_io.getvalue(), content_type="image/jpg"
+            name="test_image.png", content=image_data, content_type="image/png"
         )
         return image_file
 

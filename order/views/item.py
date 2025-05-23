@@ -102,7 +102,24 @@ class OrderItemViewSet(viewsets.ReadOnlyModelViewSet):
                 }
             )
         except ValidationError as e:
-            raise DRFValidationError({"detail": str(e)}) from e
+            import logging
+
+            logger = logging.getLogger(__name__)
+
+            logger.error(
+                f"Validation error during refund: {e!s}",
+                extra={
+                    "order_item_id": order_item.id,
+                    "user_id": request.user.id,
+                },
+            )
+            raise DRFValidationError(
+                {
+                    "detail": _(
+                        "A validation error occurred while processing the refund. Please check your input and try again."
+                    )
+                }
+            ) from e
         except Exception as e:
             import logging
 

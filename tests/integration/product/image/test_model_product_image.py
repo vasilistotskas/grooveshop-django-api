@@ -48,11 +48,6 @@ class ProductImageModelTestCase(TestCase):
         self.assertTrue(self.product_image in queryset)
         self.assertEqual(queryset.first(), self.product_image)
 
-    def test_save(self):
-        self.assertTrue(
-            default_storage.exists(self.product_image.thumbnail.path)
-        )
-
     def test_main_image_path(self):
         expected_filename = f"media/uploads/products/{os.path.basename(self.product_image.image.name)}"
         self.assertEqual(self.product_image.main_image_path, expected_filename)

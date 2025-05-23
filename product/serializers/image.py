@@ -27,7 +27,6 @@ class ProductImageSerializer(
             "id",
             "product",
             "image",
-            "thumbnail",
             "is_main",
             "sort_order",
             "created_at",

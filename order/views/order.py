@@ -3,6 +3,7 @@ import uuid
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import status
@@ -35,34 +36,36 @@ User = get_user_model()
 
 @extend_schema_view(
     list=extend_schema(
-        summary="List all orders",
-        description="Returns a list of all orders with pagination",
+        summary=_("List all orders"),
+        description=_("Returns a list of all orders with pagination"),
         responses={200: OrderSerializer(many=True)},
     ),
     retrieve=extend_schema(
-        summary="Retrieve an order by ID",
-        description="Get detailed information about a specific order",
+        summary=_("Retrieve an order by ID"),
+        description=_("Get detailed information about a specific order"),
         responses={200: OrderDetailSerializer},
     ),
     create=extend_schema(
-        summary="Create an order or process a checkout",
-        description="Process a checkout and create a new order",
+        summary=_("Create an order or process a checkout"),
+        description=_("Process a checkout and create a new order"),
         request=OrderCreateUpdateSerializer,
         responses={201: OrderDetailSerializer},
     ),
     retrieve_by_uuid=extend_schema(
-        summary="Retrieve an order by UUID",
-        description="Get detailed information about a specific order using its UUID",
+        summary=_("Retrieve an order by UUID"),
+        description=_(
+            "Get detailed information about a specific order using its UUID"
+        ),
         responses={200: OrderDetailSerializer},
     ),
     cancel=extend_schema(
-        summary="Cancel an order",
-        description="Cancel an existing order and restore product stock",
+        summary=_("Cancel an order"),
+        description=_("Cancel an existing order and restore product stock"),
         responses={200: OrderDetailSerializer},
     ),
     my_orders=extend_schema(
-        summary="List current user's orders",
-        description="Returns a list of the authenticated user's orders",
+        summary=_("List current user's orders"),
+        description=_("Returns a list of the authenticated user's orders"),
         responses={200: OrderSerializer(many=True)},
     ),
 )
@@ -124,7 +127,7 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
 
         if obj.user_id != request.user.id:
             raise PermissionDenied(
-                "You do not have permission to access this order."
+                _("You do not have permission to access this order.")
             )
 
     def get_object(self):
@@ -146,7 +149,11 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
 
             return OrderService.get_order_by_id(int(order_id))
         except Order.DoesNotExist as e:
-            raise NotFound(f"Order with ID {order_id} not found") from e
+            raise NotFound(
+                _("Order with ID {order_id} not found").format(
+                    order_id=order_id
+                )
+            ) from e
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
@@ -176,33 +183,55 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
             )
 
         except OrderServiceError as e:
-            raise ValidationError({"detail": str(e)}) from e
-        except Exception as e:
-            print(f"Error creating order: {e!s}")
-            import traceback
+            import logging
 
-            traceback.print_exc()
+            logger = logging.getLogger(__name__)
+
+            logger.error(
+                "Error creating order: %s",
+                str(e),
+            )
+            raise ValidationError(
+                {
+                    "detail": _(
+                        "An error occurred while processing your request."
+                    )
+                }
+            ) from e
+        except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+
+            logger.error(
+                "Error creating order: %s",
+                str(e),
+            )
             return Response(
-                {"detail": f"An unexpected error occurred: {e!s}"},
+                {
+                    "detail": _("An unexpected error occurred: {error}").format(
+                        error=str(e)
+                    )
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     @action(detail=True, methods=["GET"], url_path="by-uuid/(?P<uuid>[^/.]+)")
     def retrieve_by_uuid(self, request, *args, **kwargs):
+        uuid_str = kwargs.get("uuid")
+        if not uuid_str:
+            raise NotFound(_("UUID parameter is required"))
+
         try:
-            uuid_str = kwargs.get("uuid")
-            if not uuid_str:
-                raise NotFound("UUID parameter is required")
-
             order = OrderService.get_order_by_uuid(uuid_str)
-
-            self.check_object_permissions(request, order)
-
-            serializer = self.get_serializer(order)
-            return Response(serializer.data)
-
         except Order.DoesNotExist as e:
-            raise NotFound(f"Order with UUID {uuid_str} not found") from e
+            raise NotFound(
+                _("Order with UUID {uuid} not found").format(uuid=uuid_str)
+            ) from e
+
+        self.check_object_permissions(request, order)
+        serializer = self.get_serializer(order)
+        return Response(serializer.data)
 
     @action(detail=True, methods=["POST"])
     def cancel(self, request, *args, **kwargs):
@@ -211,7 +240,7 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
         user = request.user
         if not user.is_staff and (not order.user or order.user.id != user.id):
             raise PermissionDenied(
-                "You do not have permission to cancel this order"
+                _("You do not have permission to cancel this order")
             )
 
         try:
@@ -219,10 +248,30 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
             serializer = self.get_serializer(canceled_order)
             return Response(serializer.data)
         except OrderServiceError as e:
-            raise ValidationError({"detail": str(e)}) from e
+            import logging
+
+            logger = logging.getLogger(__name__)
+
+            logger.error(f"Error canceling order: {e}")
+            raise ValidationError(
+                {
+                    "detail": _(
+                        "An error occurred while processing your request."
+                    )
+                }
+            ) from e
         except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+
+            logger.error(
+                "Error canceling order: %s",
+                str(e),
+            )
+
             return Response(
-                {"detail": f"An unexpected error occurred: {e!s}"},
+                {"detail": _("An unexpected error occurred")},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -230,7 +279,7 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
     def my_orders(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             raise NotAuthenticated(
-                "Authentication is required to view your orders"
+                _("Authentication is required to view your orders")
             )
 
         user_orders = OrderService.get_user_orders(request.user.id)
@@ -250,19 +299,19 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
         order = self.get_object()
 
         if not request.user.is_staff:
-            raise PermissionDenied("Only staff can add tracking information")
+            raise PermissionDenied(_("Only staff can add tracking information"))
 
         tracking_number = request.data.get("tracking_number")
         shipping_carrier = request.data.get("shipping_carrier")
 
         if not tracking_number:
             raise ValidationError(
-                {"tracking_number": "Tracking number is required"}
+                {"tracking_number": _("Tracking number is required")}
             )
 
         if not shipping_carrier:
             raise ValidationError(
-                {"shipping_carrier": "Shipping carrier is required"}
+                {"shipping_carrier": _("Shipping carrier is required")}
             )
 
         try:
@@ -297,10 +346,29 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
             return Response(serializer.data)
 
         except OrderServiceError as e:
-            raise ValidationError({"detail": str(e)}) from e
+            import logging
+
+            logger = logging.getLogger(__name__)
+
+            logger.error(f"Error adding tracking information: {e}")
+            raise ValidationError(
+                {
+                    "detail": _(
+                        "An error occurred while processing your request."
+                    )
+                }
+            ) from e
         except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+
+            logger.error(
+                "Error adding tracking information: %s",
+                str(e),
+            )
             return Response(
-                {"detail": f"An unexpected error occurred: {e!s}"},
+                {"detail": _("An unexpected error occurred")},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -309,11 +377,11 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
         order = self.get_object()
 
         if not request.user.is_staff:
-            raise PermissionDenied("Only staff can update order status")
+            raise PermissionDenied(_("Only staff can update order status"))
 
         status_value = request.data.get("status")
         if not status_value:
-            raise ValidationError({"status": "Status is required"})
+            raise ValidationError({"status": _("Status is required")})
 
         try:
             OrderService.update_order_status(order, status_value)
@@ -323,13 +391,41 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
             serializer = self.get_serializer(order)
             return Response(serializer.data)
         except ValueError as e:
-            return Response(
-                {"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST
-            )
+            import logging
+
+            logger = logging.getLogger(__name__)
+
+            logger.error(f"Error updating order status: {e}")
+            raise ValidationError(
+                {
+                    "detail": _(
+                        "An error occurred while processing your request."
+                    )
+                }
+            ) from e
         except OrderServiceError as e:
-            raise ValidationError({"detail": str(e)}) from e
+            import logging
+
+            logger = logging.getLogger(__name__)
+
+            logger.error(f"Error updating order status: {e}")
+            raise ValidationError(
+                {
+                    "detail": _(
+                        "An error occurred while processing your request."
+                    )
+                }
+            ) from e
         except Exception as e:
+            import logging
+
+            logger = logging.getLogger(__name__)
+
+            logger.error(
+                "Error updating order status: %s",
+                str(e),
+            )
             return Response(
-                {"detail": f"An unexpected error occurred: {e!s}"},
+                {"detail": _("An unexpected error occurred")},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )

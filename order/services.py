@@ -5,6 +5,7 @@ from django.conf import settings
 from django.db import transaction
 from django.db.models import QuerySet
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
 
 from order.enum.status_enum import OrderStatusEnum
@@ -90,18 +91,28 @@ class OrderService:
 
                 if not product:
                     raise ProductNotFoundError(
-                        "Product is required for order items"
+                        _("Product is required for order items")
                     )
 
                 if quantity <= 0:
                     raise InvalidOrderDataError(
-                        f"Invalid quantity {quantity} for product {getattr(product, 'id', 'unknown')}"
+                        _(
+                            "Invalid quantity {quantity} for product {product_id}"
+                        ).format(
+                            quantity=quantity,
+                            product_id=getattr(product, "id", _("unknown")),
+                        )
                     )
 
                 if product.stock < quantity:
                     raise InsufficientStockError(
-                        f"Product {product.name or product.id} does not have enough stock. "
-                        f"Available: {product.stock}, Requested: {quantity}"
+                        _(
+                            "Product {product_name} does not have enough stock. Available: {available}, Requested: {requested}"
+                        ).format(
+                            product_name=product.name or product.id,
+                            available=product.stock,
+                            requested=quantity,
+                        )
                     )
 
                 item_to_create = item_data.copy()
@@ -138,14 +149,18 @@ class OrderService:
             logger.error(
                 f"Unexpected error creating order: {e!s}", exc_info=True
             )
-            raise InvalidOrderDataError(f"Failed to create order: {e!s}") from e
+            raise InvalidOrderDataError(
+                _("Failed to create order: {error}").format(error=str(e))
+            ) from e
 
     @classmethod
     @transaction.atomic
     def update_order_status(cls, order: Order, new_status: str) -> Order:
         try:
             if not new_status:
-                raise InvalidStatusTransitionError("New status cannot be empty")
+                raise InvalidStatusTransitionError(
+                    _("New status cannot be empty")
+                )
 
             if order.status == new_status:
                 logger.info(f"Order {order.id} status is already {new_status}")
@@ -175,9 +190,14 @@ class OrderService:
             }
 
             if new_status not in allowed_transitions.get(order.status, []):
-                error_message = (
-                    f"Cannot transition from {order.status} to {new_status}. "
-                    f"Allowed transitions: {allowed_transitions.get(order.status, [])}"
+                error_message = _(
+                    "Cannot transition from {old_status} to {new_status}. Allowed transitions: {allowed_transitions}"
+                ).format(
+                    old_status=order.status,
+                    new_status=new_status,
+                    allowed_transitions=allowed_transitions.get(
+                        order.status, []
+                    ),
                 )
                 logger.warning(
                     f"Invalid status transition for order {order.id}: {error_message}"
@@ -224,10 +244,9 @@ class OrderService:
     @transaction.atomic
     def cancel_order(cls, order: Order) -> Order:
         if not order.can_be_canceled:
-            error_message = (
-                f"Order in status {order.status} cannot be canceled. "
-                f"Only orders in PENDING or PROCESSING status can be canceled."
-            )
+            error_message = _(
+                "Order in status {status} cannot be canceled. Only orders in PENDING or PROCESSING status can be canceled."
+            ).format(status=order.status)
             logger.warning(f"Cannot cancel order {order.id}: {error_message}")
             raise ValueError(error_message)
 
@@ -260,7 +279,9 @@ class OrderService:
             logger.error(
                 f"Error canceling order {order.id}: {e!s}", exc_info=True
             )
-            raise ValueError(f"Failed to cancel order: {e!s}") from e
+            raise ValueError(
+                _("Failed to cancel order: {error}").format(error=str(e))
+            ) from e
 
     @classmethod
     def calculate_shipping_cost(

@@ -1,6 +1,7 @@
 from typing import override
 
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 from djmoney.contrib.django_rest_framework import MoneyField
 from drf_spectacular.utils import extend_schema_field
 from phonenumber_field.serializerfields import PhoneNumberField
@@ -248,7 +249,12 @@ class OrderCreateUpdateSerializer(serializers.ModelSerializer):
                     {
                         "items": [
                             {
-                                "quantity": f"Not enough stock available for {product.name}. Available: {product.stock}"
+                                "quantity": _(
+                                    "Not enough stock available for {product_name}. Available: {product_stock}"
+                                ).format(
+                                    product_name=product.name,
+                                    product_stock=product.stock,
+                                )
                             }
                         ]
                     }
@@ -261,7 +267,15 @@ class OrderCreateUpdateSerializer(serializers.ModelSerializer):
                 product = item_data["product"]
                 if product.price.currency != shipping_currency:
                     raise serializers.ValidationError(
-                        f"Currency mismatch: shipping is in {shipping_currency} but product {product.name} is in {product.price.currency}"
+                        {
+                            "shipping_price": _(
+                                "Currency mismatch: shipping is in {shipping_currency} but product {product_name} is in {product_currency}"
+                            ).format(
+                                shipping_currency=shipping_currency,
+                                product_name=product.name,
+                                product_currency=product.price.currency,
+                            )
+                        }
                     )
 
         return data
@@ -306,7 +320,7 @@ class OrderCreateUpdateSerializer(serializers.ModelSerializer):
 
         except Product.DoesNotExist as err:
             raise serializers.ValidationError(
-                "One or more products do not exist."
+                _("One or more products do not exist.")
             ) from err
 
         return order

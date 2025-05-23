@@ -11,7 +11,6 @@ from parler.managers import TranslatableManager
 from parler.models import TranslatableModel, TranslatedFields
 
 from core.fields.image import ImageAndSvgField
-from core.helpers.image_resize import make_thumbnail
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
 
 
@@ -30,12 +29,6 @@ class ProductImage(
         on_delete=models.CASCADE,
     )
     image = ImageAndSvgField(_("Image"), upload_to="uploads/products/")
-    thumbnail = models.ImageField(
-        _("Thumbnail"),
-        upload_to="uploads/products/thumbnails/",
-        blank=True,
-        null=True,
-    )
     is_main = models.BooleanField(_("Is Main"), default=False)
     translations = TranslatedFields(
         title=models.CharField(_("Title"), max_length=50, blank=True, null=True)
@@ -68,37 +61,12 @@ class ProductImage(
         return self.product.images.all()
 
     @override
-    def save(self, *args, **kwargs):
-        old_instance = None
-        if self.pk:
-            old_instance = ProductImage.objects.filter(pk=self.pk).first()
-
-        if self.is_main:
-            ProductImage.objects.filter(
-                product=self.product, is_main=True
-            ).update(is_main=False)
-
-            if old_instance and old_instance.image == self.image:
-                self.thumbnail = old_instance.thumbnail
-            else:
-                self.thumbnail = self.create_thumbnail()
-
-        super().save(*args, **kwargs)
-
-    @override
     def clean(self):
         if self.is_main:
             ProductImage.objects.filter(
                 product=self.product, is_main=True
             ).update(is_main=False)
         super().clean()
-
-    def create_thumbnail(self):
-        try:
-            return make_thumbnail(self.image, (100, 100))
-        except Exception as e:
-            print("Error while creating thumbnail: ", e)
-            return None
 
     @property
     def main_image_path(self) -> str:

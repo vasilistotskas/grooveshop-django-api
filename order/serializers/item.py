@@ -1,3 +1,4 @@
+from django.utils.translation import gettext_lazy as _
 from djmoney.contrib.django_rest_framework import MoneyField
 from rest_framework import serializers
 
@@ -61,7 +62,7 @@ class OrderItemCreateUpdateSerializer(serializers.ModelSerializer):
     def validate_quantity(self, value: int) -> int:
         if value <= 0:
             raise serializers.ValidationError(
-                "Quantity must be a positive number."
+                _("Quantity must be a positive number.")
             )
         return value
 
@@ -72,7 +73,11 @@ class OrderItemCreateUpdateSerializer(serializers.ModelSerializer):
         if product and hasattr(product, "stock") and product.stock < quantity:
             raise serializers.ValidationError(
                 {
-                    "quantity": f"Not enough stock available. Only {product.stock} remaining."
+                    "quantity": _(
+                        "Not enough stock available. Only {product_stock} remaining."
+                    ).format(
+                        product_stock=product.stock,
+                    )
                 }
             )
 
@@ -83,13 +88,13 @@ class OrderItemRefundSerializer(serializers.Serializer):
     quantity = serializers.IntegerField(
         min_value=1,
         required=False,
-        help_text="Quantity to refund. If not provided, refunds all.",
+        help_text=_("Quantity to refund. If not provided, refunds all."),
     )
     reason = serializers.CharField(
         required=False,
         allow_blank=True,
         max_length=255,
-        help_text="Optional reason for the refund",
+        help_text=_("Optional reason for the refund"),
     )
 
     def validate(self, data):
@@ -98,13 +103,16 @@ class OrderItemRefundSerializer(serializers.Serializer):
 
         if not item:
             raise serializers.ValidationError(
-                "Order item is required for refund operation"
+                _("Order item is required for refund operation")
             )
 
         if quantity and quantity > item.quantity - item.refunded_quantity:
             raise serializers.ValidationError(
-                f"Cannot refund more than the available quantity. "
-                f"Available: {item.quantity - item.refunded_quantity}"
+                _(
+                    "Cannot refund more than the available quantity. Available: {available_quantity}"
+                ).format(
+                    available_quantity=item.quantity - item.refunded_quantity
+                )
             )
 
         return data

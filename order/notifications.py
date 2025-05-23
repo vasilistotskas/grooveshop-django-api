@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from django.conf import settings
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
+from django.utils.translation import gettext_lazy as _
 
 from order.models.order import Order
 
@@ -32,7 +33,7 @@ class NotifierInterface(ABC):
 
 class EmailNotifier(NotifierInterface):
     def send_order_confirmation(self, order: Order) -> bool:
-        subject = f"Order Confirmation #{order.id}"
+        subject = _("Order Confirmation #{order_id}").format(order_id=order.id)
         context = {
             "order": order,
             "items": order.items.all(),
@@ -61,7 +62,9 @@ class EmailNotifier(NotifierInterface):
     def send_order_shipped(
         self, order: Order, tracking_number: str, carrier: str
     ) -> bool:
-        subject = f"Your Order #{order.id} Has Shipped"
+        subject = _("Your Order #{order_id} Has Shipped").format(
+            order_id=order.id
+        )
         context = {
             "order": order,
             "tracking_number": tracking_number,
@@ -85,7 +88,9 @@ class EmailNotifier(NotifierInterface):
             return False
 
     def send_order_delivered(self, order: Order) -> bool:
-        subject = f"Your Order #{order.id} Has Been Delivered"
+        subject = _("Your Order #{order_id} Has Been Delivered").format(
+            order_id=order.id
+        )
         context = {
             "order": order,
         }
@@ -107,7 +112,9 @@ class EmailNotifier(NotifierInterface):
             return False
 
     def send_order_canceled(self, order: Order) -> bool:
-        subject = f"Your Order #{order.id} Has Been Canceled"
+        subject = _("Your Order #{order_id} Has Been Canceled").format(
+            order_id=order.id
+        )
         context = {
             "order": order,
         }
@@ -134,12 +141,13 @@ class SMSNotifier(NotifierInterface):
         if not order.phone:
             return False
 
-        message = f"Thank you for your order #{order.id}. "
-        message += f"Your order total is {order.total_price}. "
-        message += "We'll notify you when your order ships."
+        message = _(
+            "Thank you for your order #{order_id}. Your order total is {total_price}. We'll notify you when your order ships."
+        ).format(order_id=order.id, total_price=order.total_price)
 
         try:
             # Call SMS provider API here
+            print(message)
             return True
         except Exception as e:
             logger.error(f"Failed to send order confirmation SMS: {e!s}")
@@ -151,13 +159,15 @@ class SMSNotifier(NotifierInterface):
         if not order.phone:
             return False
 
-        message = f"Your order #{order.id} has shipped! "
-        message += (
-            f"Track it with {carrier} using tracking number {tracking_number}."
+        message = _(
+            "Your order #{order_id} has shipped! Track it with {carrier} using tracking number {tracking_number}."
+        ).format(
+            order_id=order.id, carrier=carrier, tracking_number=tracking_number
         )
 
         try:
             # Call SMS provider API here
+            print(message)
             return True
         except Exception as e:
             logger.error(f"Failed to send order shipped SMS: {e!s}")
@@ -167,11 +177,13 @@ class SMSNotifier(NotifierInterface):
         if not order.phone:
             return False
 
-        message = f"Your order #{order.id} has been delivered! "
-        message += "Thank you for shopping with us."
+        message = _(
+            "Your order #{order_id} has been delivered! Thank you for shopping with us."
+        ).format(order_id=order.id)
 
         try:
             # Call SMS provider API here
+            print(message)
             return True
         except Exception as e:
             logger.error(f"Failed to send order delivered SMS: {e!s}")
@@ -181,11 +193,13 @@ class SMSNotifier(NotifierInterface):
         if not order.phone:
             return False
 
-        message = f"Your order #{order.id} has been canceled. "
-        message += "Please contact customer service if you have any questions."
+        message = _(
+            "Your order #{order_id} has been canceled. Please contact customer service if you have any questions."
+        ).format(order_id=order.id)
 
         try:
             # Call SMS provider API here
+            print(message)
             return True
         except Exception as e:
             logger.error(f"Failed to send order canceled SMS: {e!s}")

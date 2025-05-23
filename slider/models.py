@@ -17,12 +17,6 @@ class Slider(TranslatableModel, TimeStampMixinModel, UUIDModel):
     image = ImageAndSvgField(
         _("Image"), upload_to="uploads/sliders/", blank=True, null=True
     )
-    thumbnail = models.ImageField(
-        _("Thumbnail"),
-        upload_to="uploads/sliders/thumbnails/",
-        blank=True,
-        null=True,
-    )
     video = models.FileField(
         _("Video"), upload_to="uploads/sliders/videos/", null=True, blank=True
     )
@@ -73,12 +67,6 @@ class Slide(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     date_end = models.DateTimeField(_("Date End"), auto_now_add=False)
     image = ImageAndSvgField(
         _("Image"), upload_to="uploads/slides/", blank=True, null=True
-    )
-    thumbnail = models.ImageField(
-        _("Thumbnail"),
-        upload_to="uploads/slides/thumbnails/",
-        blank=True,
-        null=True,
     )
     translations = TranslatedFields(
         name=models.CharField(_("Name"), max_length=50, blank=True, null=True),

@@ -4,7 +4,7 @@ from django.test import TestCase
 from measurement.measures import Distance, Temperature, Weight
 from rest_framework import serializers
 
-from core.serializers import MeasurementSerializerField
+from core.api.serializers import MeasurementSerializerField
 
 
 class MeasurementSerializerFieldTest(TestCase):

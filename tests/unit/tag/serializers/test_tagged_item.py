@@ -41,7 +41,7 @@ class TestTaggedItemSerializer(unittest.TestCase):
         self.tagged_item.uuid = "87654321-8765-4321-8765-432187654321"
 
     @patch("tag.serializers.tag.TagSerializer")
-    @patch("core.serializers.ContentObjectRelatedField.to_representation")
+    @patch("core.api.serializers.ContentObjectRelatedField.to_representation")
     def test_serializer_contains_expected_fields(
         self, mock_content_object_to_representation, mock_tag_serializer
     ):

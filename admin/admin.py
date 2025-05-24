@@ -63,7 +63,7 @@ class MyAdminSite(UnfoldAdminSite):
         cache_keys = cache_instance.keys(class_name)
 
         if not cache_keys:
-            messages.info(request, _("No keys found for %s") % class_name)
+            messages.info(request, _("No keys found for %(class_name)s"))
             return
 
         if cache_keys:
@@ -77,10 +77,10 @@ class MyAdminSite(UnfoldAdminSite):
             if deleted_keys > 0:
                 messages.success(
                     request,
-                    _("Deleted %d keys for %s") % (deleted_keys, class_name),
+                    _("Deleted %(deleted_keys)s keys for %(class_name)s"),
                 )
             else:
-                messages.info(request, _("No keys found for %s") % class_name)
+                messages.info(request, _("No keys found for %(class_name)s"))
 
     def clear_site_cache_view(self, request):
         self.clear_site_cache()

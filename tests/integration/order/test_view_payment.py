@@ -9,7 +9,7 @@ from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
 
 from order.enum.status_enum import PaymentStatusEnum
 from order.factories.order import OrderFactory
-from order.views.payment_view import OrderPaymentViewSet
+from order.views.payment import OrderPaymentViewSet
 from pay_way.factories import PayWayFactory
 
 User = get_user_model()
@@ -104,7 +104,7 @@ class OrderPaymentViewSetTestCase(TestCase):
         force_authenticate(request, user=self.user)
 
         with mock.patch(
-            "order.views.payment_view.PayWayService.process_payment"
+            "order.views.payment.PayWayService.process_payment"
         ) as mock_process_payment:
             mock_process_payment.return_value = (
                 True,
@@ -141,7 +141,7 @@ class OrderPaymentViewSetTestCase(TestCase):
         view = OrderPaymentViewSet.as_view({"post": "process_payment"})
 
         with mock.patch(
-            "order.views.payment_view.PayWayService.process_payment"
+            "order.views.payment.PayWayService.process_payment"
         ) as mock_process_payment:
             mock_process_payment.return_value = (
                 True,
@@ -203,7 +203,7 @@ class OrderPaymentViewSetTestCase(TestCase):
         force_authenticate(request, user=self.admin_user)
 
         with mock.patch(
-            "order.views.payment_view.PayWayService.process_payment"
+            "order.views.payment.PayWayService.process_payment"
         ) as mock_process:
             mock_process.return_value = (True, {"payment_id": "test"})
             response = view(request, pk=self.user_order.pk)
@@ -225,7 +225,7 @@ class OrderPaymentViewSetTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("already been paid", response.data["detail"])
 
-    @mock.patch("order.views.payment_view.PayWayService.check_payment_status")
+    @mock.patch("order.views.payment.PayWayService.check_payment_status")
     def test_check_payment_status(self, mock_check_status):
         mock_check_status.return_value = (
             PaymentStatusEnum.COMPLETED,
@@ -277,7 +277,7 @@ class OrderPaymentViewSetTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("no associated payment", response.data["detail"])
 
-    @mock.patch("order.views.payment_view.PayWayService.refund_payment")
+    @mock.patch("order.views.payment.PayWayService.refund_payment")
     @mock.patch(
         "order.models.order.Order.is_paid", new_callable=mock.PropertyMock
     )
@@ -329,7 +329,7 @@ class OrderPaymentViewSetTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    @mock.patch("order.views.payment_view.PayWayService.refund_payment")
+    @mock.patch("order.views.payment.PayWayService.refund_payment")
     @mock.patch(
         "order.models.order.Order.is_paid", new_callable=mock.PropertyMock
     )

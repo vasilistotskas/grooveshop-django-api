@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from core.serializers import ContentObjectRelatedField
+from core.api.serializers import ContentObjectRelatedField
 from tag.models import TaggedItem
 from tag.serializers.tag import TagSerializer
 

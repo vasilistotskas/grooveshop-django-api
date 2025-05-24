@@ -111,6 +111,7 @@ class CartSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "user",
+            "session_key",
             "total_price",
             "total_discount_value",
             "total_vat_value",
@@ -123,6 +124,7 @@ class CartSerializer(serializers.ModelSerializer):
             "last_activity",
         )
         read_only_fields = (
+            "session_key",
             "total_price",
             "total_discount_value",
             "total_vat_value",

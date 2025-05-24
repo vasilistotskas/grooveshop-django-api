@@ -2,7 +2,7 @@ from django.urls import path
 
 from order.views.item import OrderItemViewSet
 from order.views.order import OrderViewSet
-from order.views.payment_view import OrderPaymentViewSet
+from order.views.payment import OrderPaymentViewSet
 
 urlpatterns = [
     path(

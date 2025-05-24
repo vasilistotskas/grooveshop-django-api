@@ -7,7 +7,7 @@ from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
 from core.api.schema import generate_schema_multi_lang
-from core.serializers import MeasurementSerializerField
+from core.api.serializers import MeasurementSerializerField
 from product.models.category import ProductCategory
 from product.models.product import Product
 from vat.models import Vat

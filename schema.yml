@@ -4510,6 +4510,8 @@ paths:
   /api/v1/order/{id}/payment-status:
     get:
       operationId: api_v1_order_payment_status_retrieve
+      description: Retrieves the current payment status for the specified order.
+      summary: Check payment status
       parameters:
       - in: path
         name: id
@@ -4520,10 +4522,35 @@ paths:
       - api
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentStatusResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /api/v1/order/{id}/process-payment:
     post:
       operationId: api_v1_order_process_payment_create
+      description: Initiates payment processing for the specified order using the
+        provided payment method.
+      summary: Process payment for an order
       parameters:
       - in: path
         name: id
@@ -4532,12 +4559,48 @@ paths:
         required: true
       tags:
       - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProcessPaymentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProcessPaymentRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProcessPaymentRequest'
+        required: true
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessPaymentResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /api/v1/order/{id}/refund:
     post:
       operationId: api_v1_order_refund_create
+      description: Initiates a refund for the specified order. Requires admin permissions.
+      summary: Refund payment
       parameters:
       - in: path
         name: id
@@ -4546,9 +4609,36 @@ paths:
         required: true
       tags:
       - api
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RefundRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RefundRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefundRequest'
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefundResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
   /api/v1/order/{id}/update-status:
     post:
       operationId: api_v1_order_update_status_create
@@ -4702,6 +4792,10 @@ paths:
         name: freeForOrderAmount
         schema:
           type: number
+      - in: query
+        name: isOnlinePayment
+        schema:
+          type: boolean
       - name: ordering
         required: false
         in: query
@@ -4720,6 +4814,14 @@ paths:
         description: Number of results to return per page.
         schema:
           type: integer
+      - in: query
+        name: providerCode
+        schema:
+          type: string
+      - in: query
+        name: requiresConfirmation
+        schema:
+          type: boolean
       - name: search
         required: false
         in: query
@@ -11201,6 +11303,10 @@ components:
         user:
           type: integer
           nullable: true
+        sessionKey:
+          type: string
+          readOnly: true
+          description: Session key for guest users
         totalPrice:
           type: number
           format: double
@@ -11261,6 +11367,7 @@ components:
       - createdAt
       - id
       - lastActivity
+      - sessionKey
       - totalDiscountValue
       - totalItems
       - totalItemsUnique
@@ -11513,6 +11620,15 @@ components:
         * `SHIPPING_LABEL` - Shipping Label
         * `RETURN_LABEL` - Return Label
         * `CREDIT_NOTE` - Credit Note
+    ErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+        error:
+          type: string
+      required:
+      - detail
     FloorEnum:
       enum:
       - BASEMENT
@@ -13301,6 +13417,10 @@ components:
         user:
           type: integer
           nullable: true
+        sessionKey:
+          type: string
+          readOnly: true
+          description: Session key for guest users
         totalPrice:
           type: number
           format: double
@@ -13738,6 +13858,22 @@ components:
         iconFilename:
           type: string
           readOnly: true
+        providerCode:
+          type: string
+          description: Code used to identify the payment provider in the system (e.g.,
+            'stripe', 'paypal')
+          maxLength: 50
+        isOnlinePayment:
+          type: boolean
+          description: Whether this payment method is processed online
+        requiresConfirmation:
+          type: boolean
+          description: Whether this payment method requires manual confirmation (e.g.,
+            bank transfer)
+        configuration:
+          nullable: true
+          title: Provider Configuration
+          description: Provider-specific configuration (API keys, webhooks, etc.)
     PatchedProduct:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -14029,10 +14165,6 @@ components:
           type: string
           format: uri
           title: Εικόνα
-        thumbnail:
-          type: string
-          format: uri
-          nullable: true
         isMain:
           type: boolean
         sortOrder:
@@ -14229,10 +14361,6 @@ components:
         dateEnd:
           type: string
           format: date-time
-        thumbnail:
-          type: string
-          format: uri
-          nullable: true
         sortOrder:
           type: integer
           readOnly: true
@@ -14295,10 +14423,6 @@ components:
                   type: string
                 description:
                   type: string
-        thumbnail:
-          type: string
-          format: uri
-          nullable: true
         video:
           type: string
           format: uri
@@ -14544,6 +14668,22 @@ components:
         iconFilename:
           type: string
           readOnly: true
+        providerCode:
+          type: string
+          description: Code used to identify the payment provider in the system (e.g.,
+            'stripe', 'paypal')
+          maxLength: 50
+        isOnlinePayment:
+          type: boolean
+          description: Whether this payment method is processed online
+        requiresConfirmation:
+          type: boolean
+          description: Whether this payment method requires manual confirmation (e.g.,
+            bank transfer)
+        configuration:
+          nullable: true
+          title: Provider Configuration
+          description: Provider-specific configuration (API keys, webhooks, etc.)
       required:
       - cost
       - createdAt
@@ -14573,6 +14713,61 @@ components:
         * `REFUNDED` - Refunded
         * `PARTIALLY_REFUNDED` - Partially Refunded
         * `CANCELED` - Canceled
+    PaymentStatusResponse:
+      type: object
+      properties:
+        orderId:
+          type: integer
+        paymentStatus:
+          type: string
+        isPaid:
+          type: boolean
+        statusDetails:
+          type: object
+          additionalProperties: {}
+      required:
+      - isPaid
+      - orderId
+      - paymentStatus
+      - statusDetails
+    ProcessPaymentRequest:
+      type: object
+      properties:
+        payWayId:
+          type: integer
+          description: ID of the payment method to use
+        paymentData:
+          type: object
+          additionalProperties: {}
+          description: Additional payment data required by the payment provider
+      required:
+      - payWayId
+    ProcessPaymentResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+        orderId:
+          type: integer
+        paymentStatus:
+          type: string
+        paymentId:
+          type: string
+        requiresConfirmation:
+          type: boolean
+        isOnlinePayment:
+          type: boolean
+        providerData:
+          type: object
+          additionalProperties: {}
+      required:
+      - detail
+      - isOnlinePayment
+      - orderId
+      - paymentId
+      - paymentStatus
+      - providerData
+      - requiresConfirmation
     Product:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -14908,10 +15103,6 @@ components:
           type: string
           format: uri
           title: Εικόνα
-        thumbnail:
-          type: string
-          format: uri
-          nullable: true
         isMain:
           type: boolean
         sortOrder:
@@ -15098,6 +15289,41 @@ components:
         * `8` - Eight
         * `9` - Nine
         * `10` - Ten
+    RefundRequest:
+      type: object
+      properties:
+        amount:
+          type: number
+          format: double
+          maximum: 100000000
+          minimum: -100000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: Refund amount (optional, defaults to full refund)
+        currency:
+          type: string
+          description: Currency code (required if amount is specified)
+          maxLength: 3
+    RefundResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+        orderId:
+          type: integer
+        paymentStatus:
+          type: string
+        refundId:
+          type: string
+        refundDetails:
+          type: object
+          additionalProperties: {}
+      required:
+      - detail
+      - orderId
+      - paymentStatus
+      - refundDetails
+      - refundId
     Region:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -15223,10 +15449,6 @@ components:
         dateEnd:
           type: string
           format: date-time
-        thumbnail:
-          type: string
-          format: uri
-          nullable: true
         sortOrder:
           type: integer
           readOnly: true
@@ -15300,10 +15522,6 @@ components:
                   type: string
                 description:
                   type: string
-        thumbnail:
-          type: string
-          format: uri
-          nullable: true
         video:
           type: string
           format: uri

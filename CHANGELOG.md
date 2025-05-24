@@ -3,6 +3,12 @@
 
 
 
+## v1.9.0 (2025-05-24)
+
+### Features
+
+* feat: `ci.yml` build wheel with `--installer uv`, added `session_key` at cart serializer, app structure improvements, payment api view serializers implemented ([`a32a366`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a32a36626787a5ca50bb2b4d33752f317f88eef3))
+
 ## v1.8.1 (2025-05-23)
 
 ### Bug fixes

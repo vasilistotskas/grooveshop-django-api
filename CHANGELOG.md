@@ -3,6 +3,12 @@
 
 
 
+## v1.10.0 (2025-05-31)
+
+### Features
+
+* feat: Update user address API view, Cart refactor to use headers instead of session, Remove `@override` decorators, update API docs, blog API filters, ([`d73fa58`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d73fa5899cfb1dd14db761ec0a1e948ba2c4bc55))
+
 ## v1.9.0 (2025-05-24)
 
 ### Features
@@ -163,12 +169,6 @@
 
 * feat: Init prototype ([`89f3915`](https://github.com/vasilistotskas/grooveshop-django-api/commit/89f391566a2e311204a35a8c132ddff0711b3f17))
 
-### Unknown
-
-* Merge pull request #2 from vasilistotskas/order
-
-Order ([`34a0a29`](https://github.com/vasilistotskas/grooveshop-django-api/commit/34a0a29c5f2dbfc750190e9a78ba8e8f2f02e7fc))
-
 ## v1.1.0 (2025-05-05)
 
 ### Features
@@ -200,9 +200,9 @@ Order ([`34a0a29`](https://github.com/vasilistotskas/grooveshop-django-api/commi
 * cart: add session-based guest cart support with new session_key field
 * admin: integrate UnfoldAdminSite and optimize admin views
 * logging: replace custom LogInfo with Python logging module across multiple components
-* test: add comprehensive tests for guest cart functionality
-* build: upgrade multiple dependencies including poetry, django-unfold, and celery
-* docs: update API documentation and schema.yml for cart endpoints
+test: add comprehensive tests for guest cart functionality
+build: upgrade multiple dependencies including poetry, django-unfold, and celery
+docs: update API documentation and schema.yml for cart endpoints
 
 BREAKING CHANGE: Cart model schema updated with session_key field ([`eeec158`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eeec1586d473a77065abf15fdae31aa6e878ac93))
 
@@ -327,7 +327,7 @@ BREAKING CHANGE: Cart model schema updated with session_key field ([`eeec158`](h
 
 * fix: ruff ([`2c1c671`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2c1c671a501e5129d2ff3a22d0eb20e0462fa838))
 
-* fix: ACCOUNT_AUTHENTICATION_METHOD  rename and celery import ([`73782c9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/73782c932a123f890eb7353318fec5773a4e9d38))
+* fix: ACCOUNT_AUTHENTICATION_METHOD rename and celery import ([`73782c9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/73782c932a123f890eb7353318fec5773a4e9d38))
 
 ### Features
 
@@ -425,7 +425,7 @@ BREAKING CHANGE: Cart model schema updated with session_key field ([`eeec158`](h
 
 ### Refactoring
 
-* refactor(cache): `CustomCache`  class improved ([`d387782`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d387782c63ce5f9638e6443489e8a5b81a8d6b6d))
+* refactor(cache): `CustomCache` class improved ([`d387782`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d387782c63ce5f9638e6443489e8a5b81a8d6b6d))
 
 ## v0.179.3 (2024-11-16)
 
@@ -549,10 +549,6 @@ BREAKING CHANGE: Cart model schema updated with session_key field ([`eeec158`](h
 
 ### Unknown
 
-* Merge pull request #1 from vasilistotskas/qodana-automation-402410151
-
-Add qodana CI checks ([`aa3ec82`](https://github.com/vasilistotskas/grooveshop-django-api/commit/aa3ec822a36e28b9f6cea74dea739a6e1c69a340))
-
 * Add github workflow file ([`7576a20`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7576a20e4c88e0fd8d23e1b44b055c1148197be3))
 
 * Add qodana.yaml file ([`5e1a6e6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5e1a6e6b8f744e7c00491ec04e4eee057e9542e8))
@@ -601,7 +597,7 @@ Add qodana CI checks ([`aa3ec82`](https://github.com/vasilistotskas/grooveshop-d
 
 ### Bug fixes
 
-* fix: remove unused `django.contrib.humanize` and CSRF_COOKIE_SAMESITE  set to `lax` ([`c814b1e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c814b1e87e745591e30068cb49ba7e8b4c6cebe4))
+* fix: remove unused `django.contrib.humanize` and CSRF_COOKIE_SAMESITE set to `lax` ([`c814b1e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c814b1e87e745591e30068cb49ba7e8b4c6cebe4))
 
 ## v0.162.1 (2024-09-18)
 
@@ -625,13 +621,13 @@ Add qodana CI checks ([`aa3ec82`](https://github.com/vasilistotskas/grooveshop-d
 
 ### Bug fixes
 
-* fix: production STATIC_URL  and MEDIA_URL  fix ([`5e0c650`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5e0c6506e2ba79947a60af3d1c7504cf5dec927f))
+* fix: production STATIC_URL and MEDIA_URL fix ([`5e0c650`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5e0c6506e2ba79947a60af3d1c7504cf5dec927f))
 
 ## v0.161.4 (2024-09-18)
 
 ### Bug fixes
 
-* fix: SECURE_SSL_REDIRECT  to false for now ([`c4bf5fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c4bf5fddfb9e682df8da1f5d5b93354ba7f48fa5))
+* fix: SECURE_SSL_REDIRECT to false for now ([`c4bf5fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c4bf5fddfb9e682df8da1f5d5b93354ba7f48fa5))
 
 ### Unknown
 
@@ -681,7 +677,7 @@ Add qodana CI checks ([`aa3ec82`](https://github.com/vasilistotskas/grooveshop-d
 
 ### Features
 
-* feat: set CSRF_COOKIE_SAMESITE  to `None` ([`bce89e0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bce89e011fd0cd87743819c64da651665958eafd))
+* feat: set CSRF_COOKIE_SAMESITE to `None` ([`bce89e0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bce89e011fd0cd87743819c64da651665958eafd))
 
 ## v0.159.0 (2024-09-17)
 
@@ -938,7 +934,7 @@ Add qodana CI checks ([`aa3ec82`](https://github.com/vasilistotskas/grooveshop-d
 * feat: More at Description
 
 - Factory for model improvements
-- Factory seed command refactor, `sync` and `async`  commands available
+- Factory seed command refactor, `sync` and `async` commands available
 - Bump Versions ([`6d7fdb0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6d7fdb0bebe1dae633b4c4ff0462fd0a90c8f28b))
 
 ## v0.137.0 (2024-07-26)
@@ -1055,22 +1051,9 @@ Add qodana CI checks ([`aa3ec82`](https://github.com/vasilistotskas/grooveshop-d
 
 * feat: add "django.contrib.humanize" and app improvements ([`691d196`](https://github.com/vasilistotskas/grooveshop-django-api/commit/691d196ba495559c678cc6d7c8c486d223dc67b5))
 
-* feat: remove `dj-rest-auth`  and `django-otp`  to use `django-allauth` new headless api ([`e51ccf2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e51ccf2b084a039b980b9046d871b3f5d9226ae2))
+* feat: remove `dj-rest-auth` and `django-otp` to use `django-allauth` new headless api ([`e51ccf2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e51ccf2b084a039b980b9046d871b3f5d9226ae2))
 
 ### Unknown
-
-* Merge branch 'feature/headless-allauth'
-
-# Conflicts: Resolved
-#	poetry.lock
-#	pyproject.toml
-#	requirements.txt ([`66c7f41`](https://github.com/vasilistotskas/grooveshop-django-api/commit/66c7f41329f89b1ddf6179fbd663d0acb183f813))
-
-* Merge branch 'main' into feature/headless-allauth
-
-# Conflicts: Resolved
-#	core/urls.py
-#	poetry.lock ([`06de6f1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/06de6f11af3ad71967bf07e253c274e800c647b0))
 
 * Update README.md ([`03894b0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/03894b0fe1074cd81d94fa5637536725d5e36ce4))
 
@@ -1106,7 +1089,7 @@ Add qodana CI checks ([`aa3ec82`](https://github.com/vasilistotskas/grooveshop-d
 
 ### Bug fixes
 
-* fix: add ordering_fields  at blog category posts ([`92c20ce`](https://github.com/vasilistotskas/grooveshop-django-api/commit/92c20ce2e7cc55babceb886013c4cae7d5159055))
+* fix: add ordering_fields at blog category posts ([`92c20ce`](https://github.com/vasilistotskas/grooveshop-django-api/commit/92c20ce2e7cc55babceb886013c4cae7d5159055))
 
 ## v0.124.0 (2024-05-18)
 
@@ -1198,7 +1181,7 @@ Add qodana CI checks ([`aa3ec82`](https://github.com/vasilistotskas/grooveshop-d
 
 ### Features
 
-* feat: Remove `app`  module, move `settings.py` in root ([`c773a3b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c773a3b21446a0ad0135fb89a59c31ecc30b292c))
+* feat: Remove `app` module, move `settings.py` in root ([`c773a3b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c773a3b21446a0ad0135fb89a59c31ecc30b292c))
 
 ## v0.113.0 (2024-04-26)
 
@@ -1404,7 +1387,7 @@ Add qodana CI checks ([`aa3ec82`](https://github.com/vasilistotskas/grooveshop-d
 
 ### Features
 
-* feat: Paginators remove, now have option to ask for a pagination type from query string,  useless extented api view methods removed ([`49bf512`](https://github.com/vasilistotskas/grooveshop-django-api/commit/49bf512825d8d1066a11cd7c6a4669961f84e38a))
+* feat: Paginators remove, now have option to ask for a pagination type from query string, useless extented api view methods removed ([`49bf512`](https://github.com/vasilistotskas/grooveshop-django-api/commit/49bf512825d8d1066a11cd7c6a4669961f84e38a))
 
 ## v0.93.1 (2024-03-27)
 
@@ -1528,7 +1511,7 @@ Add qodana CI checks ([`aa3ec82`](https://github.com/vasilistotskas/grooveshop-d
 
 ### Features
 
-* feat: `blog_post_comments`, `blog_liked_posts` and `blog_liked_comments` added in user details API view,  get blog article comments api endpoint and method names correction ([`7feb1d9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7feb1d90bfa69b9f33eefcd9c8d139e33c6fdada))
+* feat: `blog_post_comments`, `blog_liked_posts` and `blog_liked_comments` added in user details API view, get blog article comments api endpoint and method names correction ([`7feb1d9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7feb1d90bfa69b9f33eefcd9c8d139e33c6fdada))
 
 ## v0.78.0 (2024-03-07)
 
@@ -1588,7 +1571,7 @@ Add qodana CI checks ([`aa3ec82`](https://github.com/vasilistotskas/grooveshop-d
 
 ### Features
 
-* feat: API serializers with `get_expand_fields` imports using `importlib`,  BaseExpandSerializer logic improvement, BlogComment model use `MPTTModel`. ([`62d9591`](https://github.com/vasilistotskas/grooveshop-django-api/commit/62d9591600a1fe22dfe41e21ded1c96ecfc00a6a))
+* feat: API serializers with `get_expand_fields` imports using `importlib`, BaseExpandSerializer logic improvement, BlogComment model use `MPTTModel`. ([`62d9591`](https://github.com/vasilistotskas/grooveshop-django-api/commit/62d9591600a1fe22dfe41e21ded1c96ecfc00a6a))
 
 ## v0.69.0 (2024-02-14)
 
@@ -2094,7 +2077,7 @@ Add qodana CI checks ([`aa3ec82`](https://github.com/vasilistotskas/grooveshop-d
 
 * feat: More at `Description`
 
-- ci github actions test using pytest.
+ci github actions test using pytest.
 - asgi and wsgi refactor and improved.
 - versions bump. ([`a761994`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a7619946e1487c6218fe285c1a876f08ff5c8512))
 
@@ -2145,10 +2128,6 @@ Add qodana CI checks ([`aa3ec82`](https://github.com/vasilistotskas/grooveshop-d
 * fix(docker.yml): Update dockerfile path and add cache. ([`349cc26`](https://github.com/vasilistotskas/grooveshop-django-api/commit/349cc26b2c6b4a9e61af5f333fe0f8f00e9d1da1))
 
 ## v0.36.2 (2023-10-30)
-
-### Unknown
-
-* Merge branch 'main' of github.com:vasilistotskas/grooveshop-django-api ([`fc5bb9c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc5bb9c1d9b83166b1af97719abd0c273bc1010d))
 
 ## v0.36.1 (2023-10-30)
 
@@ -2272,7 +2251,7 @@ More fixes and improvements. ([`8d4ff27`](https://github.com/vasilistotskas/groo
 
 - Authentication improvement. `signal` receive after social account signed up to populate account image.
 - Authentication new API endpoint `is_user_registered` based on email.
-- Authentication `AuthenticationAllAuthPasswordResetForm` method overriding  `AllAuthPasswordResetForm` to change domain.
+- Authentication `AuthenticationAllAuthPasswordResetForm` method overriding `AllAuthPasswordResetForm` to change domain.
 - postgres in `ci.yml` version bump from `13` to `16`.
 - More lint and general fixes. ([`53cc219`](https://github.com/vasilistotskas/grooveshop-django-api/commit/53cc219b05856d48abc1f39cf8f733d51a20cfa6))
 
@@ -2283,7 +2262,7 @@ More fixes and improvements. ([`8d4ff27`](https://github.com/vasilistotskas/groo
 * feat: More at `Description`
 
 - `Versions bump`: Django, coverage, pylint, charset_normalizer, urllib3, rich, django-redis remove,
--     `psycopg2-binary` remove and replace with fresher and recommended `psycopg[binary]`
+- `psycopg2-binary` remove and replace with fresher and recommended `psycopg[binary]`
 - User auth account adapter override
 - Model constraints to modern way
 - Migrations update ([`e3d1703`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e3d170381c44c2570f027b9b6d48816d6d4add61))
@@ -2892,13 +2871,9 @@ Plus minor fixes ([`5220477`](https://github.com/vasilistotskas/grooveshop-djang
 
 * chore(LICENSE.md): Added ([`e532056`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e532056405ebd7703f8fa24fd3c464fa94a75381))
 
-### Unknown
+### Features
 
-* 0.2.2
-
-Automatically generated by python-semantic-release ([`c68403a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c68403a0aaf29441f3020dda1e9beaeb3cc5bff3))
-
-*  feat(Localization): Implement multi language support in app, admin and API
+* feat(Localization): Implement multi language support in app, admin and API
 
 * New libs
 django-rosetta UI to update locales in path /rosetta.
@@ -2908,6 +2883,12 @@ django-parler/django-parler-rest for multi language models/serializers and API.
 django-admin makemessages -l <locale>
 django-admin makemessages --all --ignore=env
 django-admin compilemessages --ignore=env ([`e926e53`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e926e5310141e73799e09fbc6633537a4a2be8ec))
+
+### Unknown
+
+* 0.2.2
+
+Automatically generated by python-semantic-release ([`c68403a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c68403a0aaf29441f3020dda1e9beaeb3cc5bff3))
 
 ## v0.2.1 (2023-07-07)
 

@@ -1,5 +1,3 @@
-from typing import override
-
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -38,6 +36,5 @@ class Region(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         region_name = self.safe_translation_getter("name", any_language=True)
         return f"{region_name}, {country_name}"
 
-    @override
     def get_ordering_queryset(self):
         return Region.objects.all()

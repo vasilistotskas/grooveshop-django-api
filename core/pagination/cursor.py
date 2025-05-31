@@ -1,5 +1,4 @@
 import math
-from typing import override
 
 from rest_framework import pagination
 from rest_framework.response import Response
@@ -16,7 +15,6 @@ class CursorPaginator(pagination.CursorPagination):
     has_next = False
     has_previous = False
 
-    @override
     def paginate_queryset(self, queryset, request, view=None):
         self.total_items = queryset.count()
         self.total_pages = self.get_total_pages()
@@ -29,7 +27,6 @@ class CursorPaginator(pagination.CursorPagination):
             total_pages += 1
         return total_pages
 
-    @override
     def get_paginated_response(self, data):
         return Response(
             {

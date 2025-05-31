@@ -9,7 +9,7 @@ from django.core import management
 from django.core.mail import send_mail
 from django.db import transaction
 from django.template.loader import render_to_string
-from django.utils.timezone import now
+from django.utils import timezone
 
 from core import celery_app
 
@@ -104,12 +104,14 @@ def clear_log_files_task(days=30):
 
     for file in files:
         file_path = os.path.join(logs_path, file)
+        file_timestamp = os.path.getmtime(file_path)
         file_modification_date = datetime.datetime.fromtimestamp(
-            os.path.getmtime(file_path), tz=datetime.UTC
+            file_timestamp, tz=datetime.UTC
         )
-        if datetime.datetime.now(
-            tz=datetime.UTC
-        ) - file_modification_date > datetime.timedelta(days=days):
+
+        if timezone.now() - file_modification_date > datetime.timedelta(
+            days=days
+        ):
             os.remove(file_path)
 
     message = f"Removed log files older than {days} days."
@@ -129,13 +131,13 @@ def clear_blacklisted_tokens_task(self):
 
 @celery_app.task
 def send_inactive_user_notifications():
-    cutoff_date = now() - datetime.timedelta(days=30)
+    cutoff_date = timezone.now() - datetime.timedelta(days=30)
     inactive_users = User.objects.filter(last_login__lt=cutoff_date)
 
     for user in inactive_users:
         mail_subject = "We miss you!"
         message = render_to_string(
-            "inactive_user_email_template.html",
+            "emails/inactive_user_email_template.html",
             {
                 "user": user,
                 "app_base_url": settings.NUXT_BASE_URL,
@@ -209,13 +211,11 @@ def clear_old_database_backups(days=30):
             date_str = "-".join(filename.split("-")[2:5])
             file_date = datetime.datetime.strptime(
                 date_str, "%Y-%m-%d"
-            ).replace(tzinfo=datetime.UTC)
+            ).astimezone()
         except ValueError:
             continue
 
-        if datetime.datetime.now(
-            tz=datetime.UTC
-        ) - file_date > datetime.timedelta(days=days):
+        if timezone.now() - file_date > datetime.timedelta(days=days):
             file_path = os.path.join(backups_path, filename)
             os.remove(file_path)
             deleted_files_count += 1

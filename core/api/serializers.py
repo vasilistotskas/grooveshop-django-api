@@ -1,6 +1,6 @@
 import decimal
 import importlib
-from typing import Any, TypedDict, override
+from typing import Any, TypedDict
 
 from drf_spectacular.utils import extend_schema_field
 from measurement.base import BidimensionalMeasure, MeasureBase
@@ -54,7 +54,6 @@ class Representation(TypedDict):
 
 
 class ContentObjectRelatedField(serializers.RelatedField):
-    @override
     def to_representation(self, value):
         if isinstance(value, Product):
             serializer = importlib.import_module(
@@ -125,7 +124,6 @@ class MeasurementSerializerField(serializers.Field):
         super().__init__(*args, **kwargs)
         self.measurement = measurement
 
-    @override
     def to_representation(self, obj: Any) -> Representation:
         if hasattr(obj, "unit") and hasattr(obj, "value"):
             return {"unit": obj.unit, "value": obj.value}
@@ -139,7 +137,6 @@ class MeasurementSerializerField(serializers.Field):
         else:
             return {"value": str(obj), "unit": "unknown"}
 
-    @override
     def to_internal_value(self, data: Representation):
         if (
             not isinstance(data, dict)

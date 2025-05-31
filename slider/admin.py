@@ -1,5 +1,3 @@
-from typing import override
-
 import admin_thumbnails
 from django.contrib import admin
 from parler.admin import TranslatableAdmin
@@ -22,7 +20,6 @@ class SliderAdmin(ModelAdmin, TranslatableAdmin):
     inlines = [SliderSlidesInline]
     actions = [""]
 
-    @override
     def get_prepopulated_fields(self, request, obj=None):
         return {
             "title": ("name",),

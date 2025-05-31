@@ -3,7 +3,7 @@ from datetime import timedelta
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.db.models.functions import Now
-from django.utils import timezone as tz
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel, TranslatedFields
@@ -53,4 +53,4 @@ class Notification(TranslatableModel, TimeStampMixinModel, UUIDModel):
         ]
 
     def is_expired(self):
-        return self.expiry_date and tz.now() > self.expiry_date
+        return self.expiry_date and timezone.now() > self.expiry_date

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import xml.etree.ElementTree as ET
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.core import validators
@@ -37,7 +37,6 @@ class ImageAndSvgField(ImageField):
         self.max_file_size = max_file_size
         super().__init__(*args, **kwargs)
 
-    @override
     def to_python(self, data: File | None):
         if data is None:
             return None

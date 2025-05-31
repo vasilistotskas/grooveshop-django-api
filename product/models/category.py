@@ -1,5 +1,4 @@
 import os
-from typing import override
 
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
@@ -20,7 +19,6 @@ from seo.models import SeoModel
 
 
 class CategoryQuerySet(TranslatableQuerySet, TreeQuerySet):
-    @override
     def as_manager(cls):
         manager = CategoryManager.from_queryset(cls)()
         manager._built_with_as_manager = True
@@ -104,14 +102,12 @@ class ProductCategory(
             )
         return self._full_path
 
-    @override
     def save(self, *args, **kwargs):
         if not self.slug:
             config = SlugifyConfig(instance=self, title_field="name")
             self.slug = unique_slugify(config)
         super().save(*args, **kwargs)
 
-    @override
     def get_ordering_queryset(self):
         return ProductCategory.objects.filter(
             parent=self.parent

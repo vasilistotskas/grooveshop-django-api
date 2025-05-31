@@ -1,5 +1,4 @@
 import json
-from typing import override
 
 from django.core.exceptions import ImproperlyConfigured
 from parler_rest.fields import TranslatedFieldsField
@@ -7,7 +6,6 @@ from rest_framework import serializers
 
 
 class TranslatedFieldExtended(TranslatedFieldsField):
-    @override
     def to_internal_value(self, data):
         if data is None:
             return {}

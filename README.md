@@ -55,6 +55,7 @@ The Django applications within this project include:
 - **Message Broker**: Redis
 - **Server Setup**: Uvicorn (ASGI), Gunicorn (WSGI)
 - **Containerization**: Docker
+- **Package & Project Management**: UV
 
 ## Setup
 
@@ -140,21 +141,6 @@ This project is open-sourced under the MIT License. See the [LICENSE](LICENSE.md
 
 ## Python Version 3.13.2
 
-### Virtual Environment Management
-- **Install Virtualenv**:
-  `pip install virtualenv`
-- **Create Virtual Environment**:
-  `virtualenv <env_name>`
-- **Activate Virtual Environment**:
-  - Unix/Linux: `source <env_name>/bin/activate`
-  - Windows: `<env_name>\Scripts\activate`
-- **Deactivate Virtual Environment**:
-  `deactivate`
-- **Install Requirements**:
-  `pip install -r requirements.txt`
-- **Install Environment-Specific Requirements**:
-  `pip install -r requirements/<env_name>.txt`
-
 ### Django Commands
 - **Install Django**:
   `pip install django`
@@ -185,39 +171,15 @@ This project is open-sourced under the MIT License. See the [LICENSE](LICENSE.md
 ### Code Formatting and Linting
 - **Navigate to Source Directory**:
   `cd src`
-- **Pre-commit and Black Formatting**:
-  - Install pre-commit hooks: `pre-commit install`
-  - Run pre-commit hooks: `pre-commit run --all-files`
-  - Format code with Black: `black .`
-
-### Poetry for Dependency Management
-- **Install Poetry**:
-  Unix/Linux: `curl -sSL https://install.python-poetry.org | python3 -`
-  Windows: `(Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -`
-- **Manage Projects and Dependencies**:
-  - Create a new project: `poetry new <project_name>`
-  - Install dependencies: `poetry install`
-  - Add or remove a dependency: `poetry add <dependency_name>` and `poetry remove <dependency_name>`
-  - Update a specific dependency or lock file: `poetry update <dependency_name>` and `poetry lock`
-  - Run a script: `poetry run <script_name>`
-  - Enter virtual environment shell: `poetry shell`
-
-### How to auto pip-upgrade requirements.txt
-- **Using pip-upgrader**:
-- **Run pip-upgrader**:
-  `pip-upgrade`
-
-### Strawberry GraphQL
-- **Install Strawberry**:
-  `pip install strawberry-graphql`
-- **Run Strawberry Server**:
-  `strawberry server`
-- **Run with Project Schema**:
-  `strawberry server core.graphql.schema:schema`
+- **Pre-commit and Ruff Formatting**:
+  - Install pre-commit hooks: `uv run pre-commit install`
+  - Run pre-commit hooks: `uv run pre-commit run --all-files`
+  - Check and Fix code with Ruff: `uv run ruff check --fix`
+  - Format code with Ruff: `uv run ruff format`
 
 ### Django REST Framework - Spectacular
 - **Generate API Schema**:
-  `python manage.py spectacular --color --file schema.yml`
+  `uv run python manage.py spectacular --color --file schema.yml`
 
 # Git Command Usage
 

@@ -33,27 +33,27 @@ urlpatterns = [
         name="order-cancel",
     ),
     path(
-        "order/<int:pk>/add-tracking",
+        "order/<int:pk>/add_tracking",
         OrderViewSet.as_view({"post": "add_tracking"}),
         name="order-add-tracking",
     ),
     path(
-        "order/<int:pk>/update-status",
+        "order/<int:pk>/update_status",
         OrderViewSet.as_view({"post": "update_status"}),
         name="order-update-status",
     ),
     path(
-        "order/my-orders",
+        "order/my_orders",
         OrderViewSet.as_view({"get": "my_orders"}),
         name="order-my-orders",
     ),
     path(
-        "order/<int:pk>/process-payment",
+        "order/<int:pk>/process_payment",
         OrderPaymentViewSet.as_view({"post": "process_payment"}),
         name="order-process-payment",
     ),
     path(
-        "order/<int:pk>/payment-status",
+        "order/<int:pk>/payment_status",
         OrderPaymentViewSet.as_view({"get": "check_payment_status"}),
         name="order-payment-status",
     ),

@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import Any, Optional, cast, override
+from typing import Any, Optional, cast
 
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex, GinIndex
@@ -255,7 +255,6 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
     def __str__(self) -> str:
         return f"Order {self.id} - {self.first_name} {self.last_name}"
 
-    @override
     def save(self, *args: Any, **kwargs: Any) -> None:
         from django.utils import timezone
 
@@ -277,7 +276,6 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
         super().save(*args, **kwargs)
         self._original_status = self.status
 
-    @override
     def clean(self) -> None:
         errors: dict[str, list[str]] = {}
 

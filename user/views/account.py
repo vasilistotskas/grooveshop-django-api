@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import override
-
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
@@ -55,7 +53,6 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         "change_username": UsernameUpdateSerializer,
     }
 
-    @override
     def get_queryset(self):
         match self.action:
             case "favourite_products":
@@ -95,13 +92,12 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
 
         return queryset
 
-    @override
     def get_object(self):
         obj = super().get_object()
         self.check_object_permissions(self.request, obj)
         return obj
 
-    @action(detail=True, methods=["GET"], permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=["GET"])
     def favourite_products(self, request, pk=None):
         self.filterset_fields = ["id"]
         self.ordering_fields = [
@@ -118,7 +114,7 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)
 
-    @action(detail=True, methods=["GET"], permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=["GET"])
     def orders(self, request, pk=None):
         self.ordering_fields = ["created_at", "updated_at", "status"]
         self.filterset_fields = ["status"]
@@ -127,7 +123,7 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)
 
-    @action(detail=True, methods=["GET"], permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=["GET"])
     def product_reviews(self, request, pk=None):
         self.filterset_fields = ["id", "product_id", "status"]
         self.ordering_fields = [
@@ -144,7 +140,7 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)
 
-    @action(detail=True, methods=["GET"], permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=["GET"])
     def addresses(self, request, pk=None):
         self.filterset_fields = [
             "id",
@@ -171,7 +167,7 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)
 
-    @action(detail=True, methods=["GET"], permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=["GET"])
     def blog_post_comments(self, request, pk=None):
         self.filterset_fields = ["id", "post", "parent", "is_approved"]
         self.ordering_fields = ["id", "post", "created_at"]
@@ -180,7 +176,7 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)
 
-    @action(detail=True, methods=["GET"], permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=["GET"])
     def liked_blog_posts(self, request, pk=None):
         self.filterset_fields = ["id", "tags", "slug", "author"]
         self.ordering_fields = [
@@ -195,7 +191,7 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)
 
-    @action(detail=True, methods=["GET"], permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=["GET"])
     def notifications(self, request, pk=None):
         self.filterset_fields = ["seen", "notification__kind"]
         self.ordering_fields = ["created_at", "seen_at"]
@@ -204,7 +200,7 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)
 
-    @action(detail=True, methods=["POST"], permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=["POST"])
     def change_username(self, request, pk=None):
         user = self.get_object()
         serializer = UsernameUpdateSerializer(data=request.data)

@@ -1,7 +1,6 @@
 import base64
 import hashlib
 import os
-from typing import override
 
 from celery import Celery
 from celery.exceptions import CeleryError
@@ -29,7 +28,6 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
 class Metadata(SimpleMetadata):
-    @override
     def determine_metadata(self, request, view):
         metadata = super().determine_metadata(request, view)
         metadata["filterset_fields"] = getattr(view, "filterset_fields", [])
@@ -41,7 +39,6 @@ class Metadata(SimpleMetadata):
 
 class PaginationModelViewSet(ModelViewSet):
     @property
-    @override
     def paginator(self):
         if not hasattr(self, "_paginator"):
             if self.pagination_class is None:
@@ -83,14 +80,12 @@ class PaginationModelViewSet(ModelViewSet):
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @override
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)
 
 
 class TranslationsModelViewSet(TranslationsProcessingMixin, ModelViewSet):
-    @override
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context["language"] = self.request.query_params.get(
@@ -98,17 +93,14 @@ class TranslationsModelViewSet(TranslationsProcessingMixin, ModelViewSet):
         )
         return context
 
-    @override
     def create(self, request, *args, **kwargs):
         request = self.process_translations_data(request)
         return super().create(request, *args, **kwargs)
 
-    @override
     def update(self, request, *args, **kwargs):
         request = self.process_translations_data(request)
         return super().update(request, *args, **kwargs)
 
-    @override
     def partial_update(self, request, *args, **kwargs):
         return super().partial_update(request, *args, **kwargs)
 

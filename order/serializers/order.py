@@ -1,5 +1,3 @@
-from typing import override
-
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from djmoney.contrib.django_rest_framework import MoneyField
@@ -234,7 +232,6 @@ class OrderCreateUpdateSerializer(serializers.ModelSerializer):
 
         return super().to_internal_value(data)
 
-    @override
     def validate(self, data):
         super().validate(data)
 
@@ -280,7 +277,6 @@ class OrderCreateUpdateSerializer(serializers.ModelSerializer):
 
         return data
 
-    @override
     def create(self, validated_data):
         items_data = validated_data.pop("items")
 
@@ -325,7 +321,6 @@ class OrderCreateUpdateSerializer(serializers.ModelSerializer):
 
         return order
 
-    @override
     def update(self, instance, validated_data):
         if "items" in validated_data:
             items_data = validated_data.pop("items")

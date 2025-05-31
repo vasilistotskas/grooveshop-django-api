@@ -19,15 +19,20 @@ from order.serializers.item import (
 
 @extend_schema_view(
     list=extend_schema(
-        description="List all order items associated with the authenticated user's orders.",
+        summary=_("List order items"),
+        description=_(
+            "List all order items associated with the authenticated user's orders."
+        ),
         tags=["order-items"],
     ),
     retrieve=extend_schema(
-        description="Retrieve a specific order item by ID.",
+        summary=_("Retrieve an order item"),
+        description=_("Retrieve a specific order item by ID."),
         tags=["order-items"],
     ),
     refund=extend_schema(
-        description="Process a refund for an order item.",
+        summary=_("Process a refund for an order item"),
+        description=_("Process a refund for an order item."),
         tags=["order-items"],
     ),
 )

@@ -563,7 +563,9 @@ CORS_ALLOW_METHODS = [
 ]
 CORS_ALLOW_HEADERS = (
     *default_headers,
-    "X-Session-Token",
+    "x-session-token",
+    "x-cart-id",
+    "x-session-key",
     "location",
 )
 
@@ -663,7 +665,7 @@ CONTENT_SECURITY_POLICY = {
         "form-action": [SELF],
         "frame-ancestors": [SELF],
         "frame-src": [SELF, "https://www.youtube.com"],
-        "report-uri": "/csp-report/",
+        "report-uri": "/csp_report/",
     },
 }
 

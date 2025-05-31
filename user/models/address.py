@@ -1,5 +1,3 @@
-from typing import override
-
 from django.contrib.postgres.indexes import BTreeIndex, GinIndex
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -89,7 +87,6 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
     def __str__(self):
         return f"{self.title} - {self.first_name} {self.last_name}, {self.city}"
 
-    @override
     def save(self, *args, **kwargs):
         if self.is_main:
             UserAddress.objects.filter(user=self.user, is_main=True).exclude(
@@ -97,7 +94,6 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
             ).update(is_main=False)
         super().save(*args, **kwargs)
 
-    @override
     def clean(self):
         if self.is_main:
             main_count = (

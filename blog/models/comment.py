@@ -1,5 +1,3 @@
-from typing import override
-
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -17,7 +15,6 @@ CONTENT_PREVIEW_LENGTH = 50
 
 
 class BlogCommentQuerySet(TranslatableQuerySet, TreeQuerySet):
-    @override
     def as_manager(cls):
         manager = BlogCommentManager.from_queryset(cls)()
         manager._built_with_as_manager = True

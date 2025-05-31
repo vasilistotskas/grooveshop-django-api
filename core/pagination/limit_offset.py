@@ -1,5 +1,4 @@
 import math
-from typing import override
 
 from rest_framework import pagination
 from rest_framework.response import Response
@@ -8,7 +7,6 @@ from rest_framework.response import Response
 class LimitOffsetPaginator(pagination.LimitOffsetPagination):
     max_limit = 100
 
-    @override
     def get_paginated_response(self, data):
         return Response(
             {

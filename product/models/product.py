@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import uuid
 from decimal import Decimal
-from typing import override
 
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
@@ -170,7 +169,6 @@ class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
 
 
 class ProductManager(TranslatableManager):
-    @override
     def get_queryset(self):
         return ProductQuerySet(self.model, using=self._db).exclude_deleted()
 
@@ -290,7 +288,6 @@ class Product(
         name = self.safe_translation_getter("name", any_language=True) or ""
         return f"<Product: {name} ({self.product_code})>"
 
-    @override
     def save(self, *args, **kwargs):
         if not self.product_code:
             self.product_code = self.generate_unique_product_code()
@@ -303,7 +300,6 @@ class Product(
             self.slug = unique_slugify(config)
         super().save(*args, **kwargs)
 
-    @override
     def clean(self):
         super().clean()
         if self.discount_percent > 0 >= self.price.amount:
@@ -520,7 +516,6 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
         pagination = {"maxTotalHits": 1000}
 
     @classmethod
-    @override
     def get_additional_meili_fields(cls):
         return {
             "likes_count": lambda obj: obj.master.likes_count,

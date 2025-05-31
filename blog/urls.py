@@ -19,6 +19,21 @@ urlpatterns = [
         name="blog-post-liked_posts",
     ),
     path(
+        "blog/post/trending",
+        BlogPostViewSet.as_view({"get": "trending"}),
+        name="blog-post-trending",
+    ),
+    path(
+        "blog/post/popular",
+        BlogPostViewSet.as_view({"get": "popular"}),
+        name="blog-post-popular",
+    ),
+    path(
+        "blog/post/featured",
+        BlogPostViewSet.as_view({"get": "featured"}),
+        name="blog-post-featured",
+    ),
+    path(
         "blog/post/<int:pk>",
         BlogPostViewSet.as_view(
             {
@@ -56,6 +71,16 @@ urlpatterns = [
         name="blog-category-list",
     ),
     path(
+        "blog/category/tree",
+        BlogCategoryViewSet.as_view({"get": "tree"}),
+        name="blog-category-tree",
+    ),
+    path(
+        "blog/category/reorder",
+        BlogCategoryViewSet.as_view({"post": "reorder"}),
+        name="blog-category-reorder",
+    ),
+    path(
         "blog/category/<int:pk>",
         BlogCategoryViewSet.as_view(
             {
@@ -71,6 +96,31 @@ urlpatterns = [
         "blog/category/<int:pk>/posts",
         BlogCategoryViewSet.as_view({"get": "posts"}),
         name="blog-category-posts",
+    ),
+    path(
+        "blog/category/<int:pk>/children",
+        BlogCategoryViewSet.as_view({"get": "children"}),
+        name="blog-category-children",
+    ),
+    path(
+        "blog/category/<int:pk>/descendants",
+        BlogCategoryViewSet.as_view({"get": "descendants"}),
+        name="blog-category-descendants",
+    ),
+    path(
+        "blog/category/<int:pk>/ancestors",
+        BlogCategoryViewSet.as_view({"get": "ancestors"}),
+        name="blog-category-ancestors",
+    ),
+    path(
+        "blog/category/<int:pk>/siblings",
+        BlogCategoryViewSet.as_view({"get": "siblings"}),
+        name="blog-category-siblings",
+    ),
+    path(
+        "blog/category/<int:pk>/stats",
+        BlogCategoryViewSet.as_view({"get": "stats"}),
+        name="blog-category-stats",
     ),
     path(
         "blog/author",
@@ -90,6 +140,16 @@ urlpatterns = [
         name="blog-author-detail",
     ),
     path(
+        "blog/author/<int:pk>/posts",
+        BlogAuthorViewSet.as_view({"get": "posts"}),
+        name="blog-author-posts",
+    ),
+    path(
+        "blog/author/<int:pk>/stats",
+        BlogAuthorViewSet.as_view({"get": "stats"}),
+        name="blog-author-stats",
+    ),
+    path(
         "blog/comment",
         BlogCommentViewSet.as_view({"get": "list", "post": "create"}),
         name="blog-comment-list",
@@ -107,14 +167,14 @@ urlpatterns = [
         name="blog-comment-detail",
     ),
     path(
-        "blog/comment/user_blog_comment",
-        BlogCommentViewSet.as_view({"post": "user_blog_comment"}),
-        name="blog-comment-user-blog-comment",
+        "blog/comment/<int:pk>/replies",
+        BlogCommentViewSet.as_view({"get": "replies"}),
+        name="blog-comment-replies",
     ),
     path(
-        "blog/comment/liked_comments",
-        BlogCommentViewSet.as_view({"post": "liked_comments"}),
-        name="blog-comment-liked_comments",
+        "blog/comment/<int:pk>/thread",
+        BlogCommentViewSet.as_view({"get": "thread"}),
+        name="blog-comment-thread",
     ),
     path(
         "blog/comment/<int:pk>/update_likes",
@@ -122,14 +182,24 @@ urlpatterns = [
         name="blog-comment-update_likes",
     ),
     path(
-        "blog/comment/<int:pk>/replies",
-        BlogCommentViewSet.as_view({"get": "replies"}),
-        name="blog-comment-replies",
-    ),
-    path(
         "blog/comment/<int:pk>/post",
         BlogCommentViewSet.as_view({"get": "post"}),
         name="blog-comment-post",
+    ),
+    path(
+        "blog/comment/liked_comments",
+        BlogCommentViewSet.as_view({"post": "liked_comments"}),
+        name="blog-comment-liked_comments",
+    ),
+    path(
+        "blog/comment/my_comments",
+        BlogCommentViewSet.as_view({"get": "my_comments"}),
+        name="blog-comment-my-comments",
+    ),
+    path(
+        "blog/comment/my_comment",
+        BlogCommentViewSet.as_view({"post": "my_comment"}),
+        name="blog-comment-my-comment",
     ),
     path(
         "blog/tag",

@@ -1,5 +1,3 @@
-from typing import override
-
 from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
@@ -171,7 +169,6 @@ class BlogCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
     list_display_links = ("indented_title",)
     search_fields = ("translations__name",)
 
-    @override
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         qs = BlogCategory.objects.add_related_count(
@@ -182,7 +179,6 @@ class BlogCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
         )
         return qs
 
-    @override
     def get_prepopulated_fields(self, request, obj=None):
         return {
             "slug": ("name",),
@@ -268,7 +264,6 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
     list_per_page = 25
     list_select_related = ["category", "author"]
 
-    @override
     def get_queryset(self, request):
         return super().get_queryset(request).with_all_annotations()
 
@@ -365,7 +360,6 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
 
     image_tag.short_description = _("Image")
 
-    @override
     def get_prepopulated_fields(self, request, obj=None):
         return {
             "slug": ("title",),

@@ -1,6 +1,5 @@
 import json
 import logging
-from typing import override
 
 from channels.generic.websocket import AsyncWebsocketConsumer
 
@@ -11,7 +10,6 @@ class NotificationConsumer(AsyncWebsocketConsumer):
     user = None
     group_name = None
 
-    @override
     async def connect(self):
         try:
             logger.debug("NotificationConsumer connect called")
@@ -50,7 +48,6 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             logger.exception(f"Unexpected error in connect: {e!s}")
             await self.close(code=4500)
 
-    @override
     async def disconnect(self, close_code):
         logger.debug(
             f"NotificationConsumer disconnect called with code: {close_code}"
@@ -75,7 +72,6 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         logger.debug(f"Sending notification: {event}")
         await self.send(text_data=json.dumps(event))
 
-    @override
     async def receive(self, text_data=None, bytes_data=None):
         logger.debug(f"Received message: {text_data}")
         try:

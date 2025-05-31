@@ -1,5 +1,3 @@
-from typing import override
-
 from djmoney.contrib.django_rest_framework import MoneyField
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
@@ -70,7 +68,6 @@ class CartItemCreateSerializer(serializers.ModelSerializer):
         fields = ("id", "cart", "product", "quantity")
         read_only_fields = ("id",)
 
-    @override
     def create(self, validated_data):
         cart = self.context.get("cart")
         product = validated_data.get("product")
@@ -79,14 +76,18 @@ class CartItemCreateSerializer(serializers.ModelSerializer):
         if not cart:
             raise serializers.ValidationError("Cart is not provided.")
 
-        cart_item, created = CartItem.objects.get_or_create(
-            cart=cart, product=product, defaults={"quantity": quantity}
-        )
-        if not created:
-            cart_item.quantity += quantity
-            cart_item.save()
+        existing_item = CartItem.objects.filter(
+            cart=cart, product=product
+        ).first()
 
-        return cart_item
+        if existing_item:
+            existing_item.quantity += quantity
+            existing_item.save()
+            return existing_item
+        else:
+            return CartItem.objects.create(
+                cart=cart, product=product, quantity=quantity
+            )
 
 
 class CartSerializer(serializers.ModelSerializer):

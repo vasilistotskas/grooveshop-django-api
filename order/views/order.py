@@ -38,16 +38,19 @@ User = get_user_model()
     list=extend_schema(
         summary=_("List all orders"),
         description=_("Returns a list of all orders with pagination"),
+        tags=["order"],
         responses={200: OrderSerializer(many=True)},
     ),
     retrieve=extend_schema(
         summary=_("Retrieve an order by ID"),
         description=_("Get detailed information about a specific order"),
+        tags=["order"],
         responses={200: OrderDetailSerializer},
     ),
     create=extend_schema(
         summary=_("Create an order or process a checkout"),
         description=_("Process a checkout and create a new order"),
+        tags=["order"],
         request=OrderCreateUpdateSerializer,
         responses={201: OrderDetailSerializer},
     ),
@@ -56,16 +59,19 @@ User = get_user_model()
         description=_(
             "Get detailed information about a specific order using its UUID"
         ),
+        tags=["order"],
         responses={200: OrderDetailSerializer},
     ),
     cancel=extend_schema(
         summary=_("Cancel an order"),
         description=_("Cancel an existing order and restore product stock"),
+        tags=["order"],
         responses={200: OrderDetailSerializer},
     ),
     my_orders=extend_schema(
         summary=_("List current user's orders"),
         description=_("Returns a list of the authenticated user's orders"),
+        tags=["order"],
         responses={200: OrderSerializer(many=True)},
     ),
 )
@@ -109,15 +115,15 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
             "partial_update",
             "destroy",
         ]:
-            permission_classes = [IsSelfOrAdmin]
+            self.permission_classes = [IsSelfOrAdmin]
         elif self.action in ["add_tracking", "update_status"]:
-            permission_classes = [IsAdminUser]
+            self.permission_classes = [IsAdminUser]
         elif self.action == "create":
-            permission_classes = []
+            self.permission_classes = []
         else:
-            permission_classes = [IsAuthenticated]
+            self.permission_classes = [IsAuthenticated]
 
-        return [permission() for permission in permission_classes]
+        return super().get_permissions()
 
     def check_object_permissions(self, request, obj):
         super().check_object_permissions(request, obj)
@@ -216,7 +222,7 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    @action(detail=True, methods=["GET"], url_path="by-uuid/(?P<uuid>[^/.]+)")
+    @action(detail=True, methods=["GET"])
     def retrieve_by_uuid(self, request, *args, **kwargs):
         uuid_str = kwargs.get("uuid")
         if not uuid_str:

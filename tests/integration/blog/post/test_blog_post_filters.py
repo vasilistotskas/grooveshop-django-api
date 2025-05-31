@@ -148,7 +148,7 @@ class BlogPostFilterTestCase(APITestCase):
         self.assertEqual(len(response.data["results"]), 3)
 
     def test_ordering_by_likes_count(self):
-        url = f"{self.get_post_list_url()}?ordering=-likesCount"
+        url = f"{self.get_post_list_url()}?ordering=-likesCountField"
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -158,7 +158,7 @@ class BlogPostFilterTestCase(APITestCase):
         self.assertEqual(results[2]["id"], self.unpopular_post.id)
 
     def test_ordering_by_comments_count(self):
-        url = f"{self.get_post_list_url()}?ordering=-commentsCount"
+        url = f"{self.get_post_list_url()}?ordering=-commentsCountField"
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 

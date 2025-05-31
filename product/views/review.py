@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import override
-
 from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
@@ -10,7 +8,6 @@ from rest_framework.filters import SearchFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.api.throttling import BurstRateThrottle
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from core.utils.serializers import MultiSerializerMixin
@@ -45,13 +42,11 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
         "product": ProductSerializer,
     }
 
-    @override
     def get_queryset(self):
         if self.request.user.is_superuser:
             return ProductReview.objects.all()
         return ProductReview.objects.filter(status=ReviewStatusEnum.TRUE)
 
-    @override
     def get_permissions(self):
         if self.action in [
             "create",
@@ -66,8 +61,6 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
     @action(
         detail=False,
         methods=["POST"],
-        throttle_classes=[BurstRateThrottle],
-        permission_classes=[IsAuthenticated],
     )
     def user_product_review(self, request, *args, **kwargs):
         if not request.user.is_authenticated:

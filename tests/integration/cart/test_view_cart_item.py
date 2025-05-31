@@ -106,3 +106,87 @@ class CartItemViewSetTest(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(CartItem.objects.count(), 0)
+
+    def test_create_cart_item_authenticated_user(self):
+        self.client.force_authenticate(user=self.user)
+
+        self.cart.items.all().delete()
+
+        from product.factories.product import ProductFactory
+
+        product = ProductFactory(num_images=0, num_reviews=0)
+
+        data = {"product": product.pk, "quantity": 2}
+
+        response = self.client.post(self.list_url, data=data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["quantity"], 2)
+        self.assertEqual(self.cart.items.count(), 1)
+
+    def test_create_cart_item_anonymous_user(self):
+        self.client.force_authenticate(user=None)
+
+        anonymous_cart = CartFactory(user=None, num_cart_items=0)
+
+        headers = {
+            "HTTP_X_CART_ID": str(anonymous_cart.id),
+            "HTTP_X_SESSION_KEY": anonymous_cart.session_key,
+        }
+
+        from product.factories.product import ProductFactory
+
+        product = ProductFactory(num_images=0, num_reviews=0)
+
+        data = {"product": product.pk, "quantity": 3}
+
+        response = self.client.post(
+            self.list_url, data=data, format="json", **headers
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["quantity"], 3)
+        self.assertEqual(anonymous_cart.items.count(), 1)
+
+    def test_update_cart_item_with_wrong_cart_forbidden(self):
+        self.client.force_authenticate(user=self.user)
+
+        other_user = UserAccountFactory(num_addresses=0)
+        other_cart = CartFactory(user=other_user, num_cart_items=1)
+        other_item = other_cart.items.first()
+
+        update_url = reverse("cart-item-detail", kwargs={"pk": other_item.pk})
+
+        response = self.client.patch(
+            update_url, data={"quantity": 5}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_list_cart_items_only_shows_own_items(self):
+        self.client.force_authenticate(user=self.user)
+
+        self.cart.items.all().delete()
+
+        from product.factories.product import ProductFactory
+
+        product1 = ProductFactory(num_images=0, num_reviews=0)
+        product2 = ProductFactory(num_images=0, num_reviews=0)
+
+        from cart.models import CartItem
+
+        CartItem.objects.create(cart=self.cart, product=product1, quantity=1)
+        CartItem.objects.create(cart=self.cart, product=product2, quantity=2)
+
+        CartFactory(user=None, num_cart_items=2)
+
+        response = self.client.get(self.list_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        items = response.data["results"]
+
+        self.assertEqual(len(items), 2)
+
+        cart_ids = [item["cart"] for item in items]
+        self.assertTrue(all(cart_id == self.cart.id for cart_id in cart_ids))

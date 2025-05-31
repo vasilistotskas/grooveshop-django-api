@@ -1,5 +1,3 @@
-from typing import override
-
 from django.contrib import admin
 from unfold.admin import ModelAdmin
 
@@ -14,6 +12,5 @@ class ContactAdmin(ModelAdmin):
     readonly_fields = ("created_at",)
     date_hierarchy = "created_at"
 
-    @override
     def get_ordering(self, request):
         return ["-created_at", "name"]

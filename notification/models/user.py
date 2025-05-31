@@ -1,8 +1,6 @@
-from typing import override
-
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
-from django.utils import timezone as tz
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
@@ -50,8 +48,7 @@ class NotificationUser(TimeStampMixinModel, UUIDModel):
             BTreeIndex(fields=["seen_at"], name="not_user_seen_at_ix"),
         ]
 
-    @override
     def save(self, *args, **kwargs):
         if self.seen and self.seen_at is None:
-            self.seen_at = tz.now()
+            self.seen_at = timezone.now()
         super().save(*args, **kwargs)

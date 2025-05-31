@@ -1,5 +1,3 @@
-from typing import override
-
 import admin_thumbnails
 from django.contrib import admin, messages
 from django.utils.html import format_html
@@ -55,7 +53,6 @@ class CategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
     list_display_links = ("indented_title",)
     search_fields = ("translations__name",)
 
-    @override
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         qs = ProductCategory.objects.add_related_count(
@@ -70,7 +67,6 @@ class CategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
         )
         return qs
 
-    @override
     def get_prepopulated_fields(self, request, obj=None):
         return {
             "slug": ("name",),
@@ -209,11 +205,9 @@ class ProductAdmin(
         },
     }
 
-    @override
     def get_queryset(self, request):
         return super().get_queryset(request).with_all_annotations()
 
-    @override
     def get_prepopulated_fields(self, request, obj=None):
         return {
             "slug": ("name",),

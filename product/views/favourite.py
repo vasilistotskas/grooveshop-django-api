@@ -1,15 +1,12 @@
 from __future__ import annotations
 
-from typing import override
-
+from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
-from rest_framework.decorators import action, throttle_classes
+from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.api.throttling import BurstRateThrottle
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from core.utils.serializers import MultiSerializerMixin
@@ -45,8 +42,6 @@ class ProductFavouriteViewSet(MultiSerializerMixin, BaseModelViewSet):
         "products": ProductSerializer,
     }
 
-    @throttle_classes([BurstRateThrottle])
-    @override
     def create(self, request, *args, **kwargs):
         return super().create(request, *args, **kwargs)
 
@@ -58,15 +53,13 @@ class ProductFavouriteViewSet(MultiSerializerMixin, BaseModelViewSet):
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @action(
-        detail=False, methods=["POST"], permission_classes=[IsAuthenticated]
-    )
+    @action(detail=False, methods=["POST"])
     def favourites_by_products(self, request, *args, **kwargs):
         user = request.user
         product_ids = request.data.get("product_ids", [])
         if not product_ids:
             return Response(
-                {"error": "No product IDs provided."},
+                {"error": _("No product IDs provided.")},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

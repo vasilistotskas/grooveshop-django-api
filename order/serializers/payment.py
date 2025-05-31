@@ -1,12 +1,7 @@
-import logging
-
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
-logger = logging.getLogger(__name__)
 
-
-# Serializers for different actions
 class ProcessPaymentRequestSerializer(serializers.Serializer):
     pay_way_id = serializers.IntegerField(
         help_text=_("ID of the payment method to use")

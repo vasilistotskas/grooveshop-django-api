@@ -1,5 +1,4 @@
 import importlib
-from typing import override
 
 from factory import declarations
 from factory.faker import Faker
@@ -13,7 +12,6 @@ class MaxLengthFaker(declarations.BaseDeclaration):
         self.field_name = field_name
         self.provider_kwargs = kwargs
 
-    @override
     def evaluate(self, instance, step, extra):
         faker = Faker._get_faker()
         value = getattr(faker, self.provider)(**self.provider_kwargs)

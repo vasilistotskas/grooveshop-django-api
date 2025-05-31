@@ -1,5 +1,4 @@
 from decimal import Decimal
-from typing import override
 
 from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
@@ -106,7 +105,6 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
         )
         return f"Order {self.order.id} - {product_name} x {self.quantity}"
 
-    @override
     def clean(self):
         if self.quantity <= 0:
             raise ValidationError(_("Quantity must be greater than 0."))
@@ -193,6 +191,5 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
             currency=self.price.currency,
         )
 
-    @override
     def get_ordering_queryset(self):
         return self.order.items.all()

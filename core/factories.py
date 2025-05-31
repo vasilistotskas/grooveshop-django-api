@@ -1,6 +1,5 @@
 import logging
 from collections.abc import Callable
-from typing import override
 
 import factory
 from django.core.exceptions import ValidationError
@@ -52,7 +51,6 @@ class CustomDjangoModelFactory(factory.django.DjangoModelFactory):
         exclude = ("unique_model_fields",)
 
     @classmethod
-    @override
     def _create(cls, model_class: type[Model], *args, **kwargs):
         if hasattr(cls, "unique_model_fields"):
             for field, generator_func in cls.unique_model_fields:

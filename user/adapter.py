@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING
 
 from allauth.account.adapter import DefaultAccountAdapter
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
@@ -18,7 +18,6 @@ class UserAccountAdapter(DefaultAccountAdapter):
 
 
 class SocialAccountAdapter(DefaultSocialAccountAdapter):
-    @override
     def pre_social_login(self, request, sociallogin: SocialLogin):
         email = None
 
@@ -40,7 +39,6 @@ class SocialAccountAdapter(DefaultSocialAccountAdapter):
         if user:
             sociallogin.connect(request, user)
 
-    @override
     def get_connect_redirect_url(self, request, social_account: SocialAccount):
         url = request.POST.get("next") or request.GET.get("next")
         return url if url else f"{settings.NUXT_BASE_URL}/account"

@@ -1,5 +1,3 @@
-from typing import override
-
 from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -53,7 +51,6 @@ class ProductFavourite(TimeStampMixinModel, UUIDModel):
         )
         return f"{self.user.email} - {product_name}"
 
-    @override
     def save(self, *args, **kwargs):
         if (
             not self.pk

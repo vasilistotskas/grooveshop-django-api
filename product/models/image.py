@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from typing import override
 
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
@@ -56,11 +55,9 @@ class ProductImage(
         main_status = "Main" if self.is_main else "Secondary"
         return f"{product_name} Image ({main_status})"
 
-    @override
     def get_ordering_queryset(self):
         return self.product.images.all()
 
-    @override
     def clean(self):
         if self.is_main:
             ProductImage.objects.filter(

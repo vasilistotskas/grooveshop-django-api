@@ -94,7 +94,7 @@ class OrderPaymentViewSetTestCase(TestCase):
 
         view = OrderPaymentViewSet.as_view({"post": "process_payment"})
         request = self.factory.post(
-            f"/api/v1/order/{self.user_order.pk}/process-payment",
+            f"/api/v1/order/{self.user_order.pk}/process_payment",
             {
                 "pay_way_id": self.stripe_pay_way.id,
                 "payment_data": {"token": "test_token"},
@@ -131,7 +131,7 @@ class OrderPaymentViewSetTestCase(TestCase):
         mock_is_paid.return_value = False
 
         request = self.factory.post(
-            f"/api/v1/order/{self.anon_order.pk}/process-payment",
+            f"/api/v1/order/{self.anon_order.pk}/process_payment",
             {"pay_way_id": self.bank_transfer_pay_way.id, "payment_data": {}},
             format="json",
         )
@@ -180,7 +180,7 @@ class OrderPaymentViewSetTestCase(TestCase):
 
         view = OrderPaymentViewSet.as_view({"post": "process_payment"})
         request = self.factory.post(
-            f"/api/v1/order/{self.user_order.pk}/process-payment",
+            f"/api/v1/order/{self.user_order.pk}/process_payment",
             {
                 "pay_way_id": self.stripe_pay_way.id,
                 "payment_data": {"token": "test_token"},
@@ -193,7 +193,7 @@ class OrderPaymentViewSetTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
         request = self.factory.post(
-            f"/api/v1/order/{self.user_order.pk}/process-payment",
+            f"/api/v1/order/{self.user_order.pk}/process_payment",
             {
                 "pay_way_id": self.stripe_pay_way.id,
                 "payment_data": {"token": "test_token"},
@@ -212,7 +212,7 @@ class OrderPaymentViewSetTestCase(TestCase):
     def test_process_payment_already_paid(self):
         view = OrderPaymentViewSet.as_view({"post": "process_payment"})
         request = self.factory.post(
-            f"/api/v1/order/{self.paid_order.pk}/process-payment",
+            f"/api/v1/order/{self.paid_order.pk}/process_payment",
             {
                 "pay_way_id": self.stripe_pay_way.id,
                 "payment_data": {"token": "test_token"},
@@ -242,7 +242,7 @@ class OrderPaymentViewSetTestCase(TestCase):
         order.save()
 
         view = OrderPaymentViewSet.as_view({"get": "check_payment_status"})
-        request = self.factory.get(f"/api/v1/order/{order.pk}/payment-status")
+        request = self.factory.get(f"/api/v1/order/{order.pk}/payment_status")
         force_authenticate(request, user=self.user)
         response = view(request, pk=order.pk)
 
@@ -257,7 +257,7 @@ class OrderPaymentViewSetTestCase(TestCase):
     def test_check_payment_status_no_payment(self):
         view = OrderPaymentViewSet.as_view({"get": "check_payment_status"})
         request = self.factory.get(
-            f"/api/v1/order/{self.user_order.pk}/payment-status"
+            f"/api/v1/order/{self.user_order.pk}/payment_status"
         )
         force_authenticate(request, user=self.user)
         response = view(request, pk=self.user_order.pk)
@@ -269,7 +269,7 @@ class OrderPaymentViewSetTestCase(TestCase):
         self.user_order.save()
 
         request = self.factory.get(
-            f"/api/v1/order/{self.user_order.pk}/payment-status"
+            f"/api/v1/order/{self.user_order.pk}/payment_status"
         )
         force_authenticate(request, user=self.user)
         response = view(request, pk=self.user_order.pk)

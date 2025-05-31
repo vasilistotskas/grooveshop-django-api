@@ -1,11 +1,11 @@
 import uuid
-from typing import Any, override
+from typing import Any
 
 from django.contrib.postgres.indexes import BTreeIndex, GinIndex
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models, transaction
 from django.db.models import F, JSONField, Max, Q
-from django.utils import timezone as tz
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
@@ -19,7 +19,6 @@ class SortableModel(models.Model):
             BTreeIndex(fields=["sort_order"], name="%(class)s_sort_order_ix"),
         ]
 
-    @override
     def save(self, *args, **kwargs):
         if self.pk is None:
             qs = self.get_ordering_queryset()
@@ -58,7 +57,6 @@ class SortableModel(models.Model):
             self.save()
 
     @transaction.atomic
-    @override
     def delete(self, *args, **kwargs):
         if self.sort_order is not None:
             qs = self.get_ordering_queryset()
@@ -80,10 +78,10 @@ class TimeStampMixinModel(models.Model):
         ]
 
     def get_duration_since_created(self):
-        return tz.now() - self.created_at
+        return timezone.now() - self.created_at
 
     def get_duration_since_updated(self):
-        return tz.now() - self.updated_at
+        return timezone.now() - self.updated_at
 
 
 class UUIDModel(models.Model):
@@ -95,7 +93,7 @@ class UUIDModel(models.Model):
 
 class PublishedQuerySet(models.QuerySet):
     def published(self):
-        today = tz.now()
+        today = timezone.now()
         return self.filter(
             Q(published_at__lte=today, is_published=True)
             | Q(published_at__isnull=True, is_published=True)
@@ -124,16 +122,15 @@ class PublishableModel(models.Model):
             ),
         ]
 
-    @override
     def save(self, *args, **kwargs):
         if self.is_published and self.published_at is None:
-            self.published_at = tz.now()
+            self.published_at = timezone.now()
         super().save(*args, **kwargs)
 
     @property
     def is_visible(self) -> bool:
         return self.is_published and (
-            self.published_at is None or self.published_at <= tz.now()
+            self.published_at is None or self.published_at <= timezone.now()
         )
 
 
@@ -150,7 +147,6 @@ class MetaDataModel(models.Model):
         ]
         abstract = True
 
-    @override
     def save(self, *args, **kwargs):
         if not self.private_metadata:
             self.private_metadata = {}
@@ -200,9 +196,8 @@ class SoftDeleteMixin(models.Model):
     class Meta(TypedModelMeta):
         abstract = True
 
-    @override
     def delete(self, using=None, keep_parents=False):
-        self.deleted_at = tz.now()
+        self.deleted_at = timezone.now()
         self.is_deleted = True
         self.save()
 
@@ -213,9 +208,8 @@ class SoftDeleteMixin(models.Model):
 
 
 class SoftDeleteQuerySet(models.QuerySet):
-    @override
     def delete(self):
-        return super().update(deleted_at=tz.now(), is_deleted=True)
+        return super().update(deleted_at=timezone.now(), is_deleted=True)
 
     def restore(self):
         return super().update(deleted_at=None, is_deleted=False)

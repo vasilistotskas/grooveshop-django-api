@@ -285,7 +285,7 @@ class ProductViewSetTestCase(APITestCase):
         ProductFactory(price=200, discount_percent=5)
         ProductFactory(price=100, discount_percent=20)
 
-        url = f"{self.get_product_list_url()}?ordering=discount_value"
+        url = f"{self.get_product_list_url()}?ordering=discountValueAmount"
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         results = response.data["results"]
@@ -293,7 +293,7 @@ class ProductViewSetTestCase(APITestCase):
         discount_values = [product["discount_value"] for product in results]
         self.assertEqual(sorted(discount_values), discount_values)
 
-        url = f"{self.get_product_list_url()}?ordering=-discount_value"
+        url = f"{self.get_product_list_url()}?ordering=-discountValueAmount"
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         results = response.data["results"]
@@ -305,7 +305,7 @@ class ProductViewSetTestCase(APITestCase):
         ProductFactory(price=150, discount_percent=10)
         ProductFactory(price=200, discount_percent=5)
 
-        url = f"{self.get_product_list_url()}?ordering=final_price"
+        url = f"{self.get_product_list_url()}?ordering=finalPriceAmount"
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         results = response.data["results"]
@@ -313,7 +313,7 @@ class ProductViewSetTestCase(APITestCase):
         final_prices = [product["final_price"] for product in results]
         self.assertEqual(sorted(final_prices), final_prices)
 
-        url = f"{self.get_product_list_url()}?ordering=-final_price"
+        url = f"{self.get_product_list_url()}?ordering=-finalPriceAmount"
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         results = response.data["results"]
@@ -329,7 +329,7 @@ class ProductViewSetTestCase(APITestCase):
         ProductReviewFactory(product=product2, rate=4, status="True")
         ProductReviewFactory(product=product3, rate=5, status="True")
 
-        url = f"{self.get_product_list_url()}?ordering=review_average"
+        url = f"{self.get_product_list_url()}?ordering=reviewAverageField"
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         results = response.data["results"]
@@ -337,7 +337,7 @@ class ProductViewSetTestCase(APITestCase):
         review_averages = [product["review_average"] for product in results]
         self.assertEqual(sorted(review_averages), review_averages)
 
-        url = f"{self.get_product_list_url()}?ordering=-review_average"
+        url = f"{self.get_product_list_url()}?ordering=-reviewAverageField"
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         results = response.data["results"]
@@ -357,7 +357,7 @@ class ProductViewSetTestCase(APITestCase):
         ProductFavouriteFactory(product=product3, user=user2)
         ProductFavouriteFactory(product=product3, user=user3)
 
-        url = f"{self.get_product_list_url()}?ordering=likes_count"
+        url = f"{self.get_product_list_url()}?ordering=likesCountField"
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         results = response.data["results"]
@@ -365,7 +365,7 @@ class ProductViewSetTestCase(APITestCase):
         likes_counts = [product["likes_count"] for product in results]
         self.assertEqual(sorted(likes_counts), likes_counts)
 
-        url = f"{self.get_product_list_url()}?ordering=-likes_count"
+        url = f"{self.get_product_list_url()}?ordering=-likesCountField"
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         results = response.data["results"]

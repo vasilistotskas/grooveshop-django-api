@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from core.api.serializers import ErrorResponseSerializer
+from core.utils.serializers import MultiSerializerMixin
 from order.models import Order
 from order.serializers.payment import (
     PaymentStatusResponseSerializer,
@@ -25,25 +26,21 @@ from pay_way.services import PayWayService
 logger = logging.getLogger(__name__)
 
 
-class OrderPaymentViewSet(GenericViewSet):
+class OrderPaymentViewSet(MultiSerializerMixin, GenericViewSet):
     lookup_field = "pk"
+
+    serializers = {
+        "default": serializers.Serializer,
+        "process_payment": ProcessPaymentRequestSerializer,
+        "check_payment_status": PaymentStatusResponseSerializer,
+        "refund_payment": RefundRequestSerializer,
+    }
 
     def get_permissions(self):
         if self.action == "refund_payment":
-            return [IsAdminUser()]
+            self.permission_classes = [IsAdminUser]
 
-        # For other actions, no permission classes required
-        # We'll validate access to the order in the method
-        return []
-
-    def get_serializer_class(self):
-        if self.action == "process_payment":
-            return ProcessPaymentRequestSerializer
-        elif self.action == "check_payment_status":
-            return PaymentStatusResponseSerializer
-        elif self.action == "refund_payment":
-            return RefundRequestSerializer
-        return serializers.Serializer
+        return super().get_permissions()
 
     def check_order_permission(self, request, order):
         if request.user.is_authenticated and request.user.is_staff:
@@ -113,7 +110,7 @@ class OrderPaymentViewSet(GenericViewSet):
             "Initiates payment processing for the specified order using the provided payment method."
         ),
     )
-    @action(detail=True, methods=["post"], url_path="process-payment")
+    @action(detail=True, methods=["post"])
     def process_payment(self, request: HttpRequest, pk: str) -> Response:
         order = get_object_or_404(Order, pk=pk)
 
@@ -187,7 +184,7 @@ class OrderPaymentViewSet(GenericViewSet):
             "Retrieves the current payment status for the specified order."
         ),
     )
-    @action(detail=True, methods=["get"], url_path="payment-status")
+    @action(detail=True, methods=["get"])
     def check_payment_status(
         self, request: HttpRequest, pk: str | None = None
     ) -> Response:
@@ -259,7 +256,7 @@ class OrderPaymentViewSet(GenericViewSet):
             "Initiates a refund for the specified order. Requires admin permissions."
         ),
     )
-    @action(detail=True, methods=["post"], url_path="refund")
+    @action(detail=True, methods=["post"])
     def refund_payment(
         self, request: HttpRequest, pk: str | None = None
     ) -> Response:

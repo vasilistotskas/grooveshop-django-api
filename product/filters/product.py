@@ -18,7 +18,6 @@ class ProductFilter(filters.FilterSet):
     category = filters.CharFilter(
         field_name="category__id", method="filter_category", label="Category"
     )
-    # Add filters for other virtual fields
     min_discount = filters.NumberFilter(
         field_name="discount_value_amount",
         lookup_expr="gte",

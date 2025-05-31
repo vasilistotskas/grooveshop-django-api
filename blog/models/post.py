@@ -1,5 +1,4 @@
 import os
-from typing import override
 
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
@@ -112,7 +111,6 @@ class BlogPost(
         author_name = self.author.user.email if self.author else "Unknown"
         return f"{title} by {author_name}"
 
-    @override
     def save(self, *args, **kwargs):
         if not self.slug:
             config = SlugifyConfig(
@@ -199,7 +197,6 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
         pagination = {"maxTotalHits": 1000}
 
     @classmethod
-    @override
     def get_additional_meili_fields(cls):
         return {"likes_count": lambda obj: obj.master.likes_count}
 

@@ -27,9 +27,13 @@ class CartViewSetTest(APITestCase):
             "user": self.user.pk,
         }
 
-        session = self.client.session
-        session["cart_id"] = self.cart.pk
-        session.save()
+    def _add_cart_headers(self, cart_id=None, session_key=None):
+        headers = {}
+        if cart_id:
+            headers["HTTP_X_CART_ID"] = str(cart_id)
+        if session_key:
+            headers["HTTP_X_SESSION_KEY"] = session_key
+        return headers
 
     def test_retrieve_cart(self):
         response = self.client.get(self.detail_url)
@@ -68,47 +72,44 @@ class CartViewSetTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(Cart.objects.filter(pk=self.cart.pk).exists())
 
-    def test_retrieve_cart_as_anonymous_user(self):
+    def test_retrieve_cart_as_anonymous_user_with_headers(self):
         self.client.force_authenticate(user=None)
 
         anonymous_cart = CartFactory(user=None, num_cart_items=0)
 
-        session = self.client.session
-        session["cart_id"] = anonymous_cart.pk
-        session.save()
+        headers = self._add_cart_headers(
+            cart_id=anonymous_cart.id, session_key=anonymous_cart.session_key
+        )
 
-        response = self.client.get(self.detail_url)
+        response = self.client.get(self.detail_url, **headers)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["id"], anonymous_cart.pk)
         self.assertIsNone(response.data["user"])
         self.assertIn("last_activity", response.data)
 
-    def test_update_cart_without_cart_id_in_session(self):
-        self.cart.delete()
-        session = self.client.session
-        session.pop("cart_id", None)
-        session.save()
+    def test_create_cart_for_anonymous_user_no_headers(self):
+        self.client.force_authenticate(user=None)
 
-        response = self.client.patch(
-            self.detail_url, data=self.update_data, format="json"
-        )
+        response = self.client.get(self.detail_url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNotNone(response.data["id"])
+        self.assertIsNone(response.data["user"])
+        self.assertIsNotNone(response.data["session_key"])
 
     def test_update_cart_as_anonymous_user(self):
         self.client.force_authenticate(user=None)
 
         anonymous_cart = CartFactory(user=None, num_cart_items=0)
 
-        session = self.client.session
-        session["cart_id"] = anonymous_cart.pk
-        session.save()
+        headers = self._add_cart_headers(
+            cart_id=anonymous_cart.id, session_key=anonymous_cart.session_key
+        )
 
         update_data = {}
-
         response = self.client.patch(
-            self.detail_url, data=update_data, format="json"
+            self.detail_url, data=update_data, format="json", **headers
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -120,24 +121,42 @@ class CartViewSetTest(APITestCase):
 
         anonymous_cart = CartFactory(user=None, num_cart_items=0)
 
-        session = self.client.session
-        session["cart_id"] = anonymous_cart.pk
-        session.save()
+        headers = self._add_cart_headers(
+            cart_id=anonymous_cart.id, session_key=anonymous_cart.session_key
+        )
 
-        response = self.client.delete(self.detail_url)
+        response = self.client.delete(self.detail_url, **headers)
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(Cart.objects.filter(pk=anonymous_cart.pk).exists())
 
-    def test_retrieve_nonexistent_cart(self):
-        self.cart.delete()
-        session = self.client.session
-        session.pop("cart_id", None)
-        session.save()
+    def test_wrong_session_key_creates_new_cart(self):
+        self.client.force_authenticate(user=None)
 
-        response = self.client.get(self.detail_url)
+        anonymous_cart = CartFactory(user=None, num_cart_items=0)
+
+        headers = self._add_cart_headers(
+            cart_id=anonymous_cart.id, session_key="wrong-session-key"
+        )
+
+        response = self.client.get(self.detail_url, **headers)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotEqual(response.data["id"], anonymous_cart.pk)
+
+    def test_authenticated_user_with_guest_cart_headers_merges(self):
+        guest_cart = CartFactory(user=None, num_cart_items=0)
+
+        headers = self._add_cart_headers(
+            cart_id=guest_cart.id, session_key=guest_cart.session_key
+        )
+
+        response = self.client.get(self.detail_url, **headers)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["user"], self.user.pk)
+
+        self.assertFalse(Cart.objects.filter(id=guest_cart.id).exists())
 
     def test_update_cart_with_invalid_data(self):
         invalid_update_data = {

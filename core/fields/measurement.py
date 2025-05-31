@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Optional, override
+from typing import Any, Optional
 
 from django.db.models import FloatField, Model
 from django.utils.translation import gettext_lazy as _
@@ -53,13 +53,11 @@ class MeasurementField(FloatField):
 
         super().__init__(verbose_name, name, *args, **kwargs)
 
-    @override
     def deconstruct(self):
         name, path, args, kwargs = super().deconstruct()
         kwargs["measurement"] = self.measurement
         return name, path, args, kwargs
 
-    @override
     def get_prep_value(self, value):
         if value is None:
             return None
@@ -86,7 +84,6 @@ class MeasurementField(FloatField):
             original_unit=self.get_default_unit(),
         )
 
-    @override
     def value_to_string(self, obj: Model):
         value = self.value_from_object(obj)
         if not isinstance(value, self.MEASURE_BASES):
@@ -103,7 +100,6 @@ class MeasurementField(FloatField):
             logger.error(f"Error deserializing measurement: {e}")
             return None
 
-    @override
     def to_python(self, value: Any):
         if value is None or isinstance(value, self.MEASURE_BASES):
             return value
@@ -130,7 +126,6 @@ class MeasurementField(FloatField):
             unit=return_unit,
         )
 
-    @override
     def formfield(self, **kwargs):
         defaults = {"form_class": MeasurementFormField}
         defaults.update(kwargs)

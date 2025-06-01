@@ -3,6 +3,12 @@
 
 
 
+## v1.11.0 (2025-06-01)
+
+### Features
+
+* feat: Improve API schema docs, generate locales and Bump Versions ([`d6c88a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d6c88a17d23751c8e6c59f05ea1d29d795f87e8f))
+
 ## v1.10.0 (2025-05-31)
 
 ### Features

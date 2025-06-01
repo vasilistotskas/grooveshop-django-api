@@ -114,10 +114,9 @@ This project is open-sourced under the MIT License. See the [LICENSE](LICENSE.md
 
 ### Localization
 - **Generate Locale Messages**:
-  `docker exec -it <container_id> sh -c "python manage.py makemessages -l <locale>"`
-  `docker exec -it <container_id> sh -c "python manage.py makemessages --all --ignore=env"`
+  `docker exec -it <container_id> sh -c "uv run django-admin makemessages -a`
 - **Compile Locale Messages**:
-  `docker exec -it <container_id> sh -c "python manage.py compilemessages --ignore=env"`
+  `docker exec -it <container_id> sh -c "uv run django-admin compilemessages"`
 
 # Additional Configuration for Development Tools
 

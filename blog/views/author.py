@@ -31,7 +31,7 @@ from core.utils.views import cache_methods
             "Retrieve a list of all blog authors with their basic information. "
             "Supports advanced filtering including activity levels, post counts, and more."
         ),
-        tags=["blog-authors"],
+        tags=["Blog Authors"],
         responses={
             200: BlogAuthorSerializer(many=True),
         },
@@ -39,7 +39,7 @@ from core.utils.views import cache_methods
     retrieve=extend_schema(
         summary=_("Retrieve a blog author"),
         description=_("Get detailed information about a specific blog author."),
-        tags=["blog-authors"],
+        tags=["Blog Authors"],
         responses={
             200: BlogAuthorSerializer,
             404: ErrorResponseSerializer,
@@ -50,7 +50,7 @@ from core.utils.views import cache_methods
         description=_(
             "Create a new blog author profile. Requires authentication."
         ),
-        tags=["blog-authors"],
+        tags=["Blog Authors"],
         responses={
             201: BlogAuthorSerializer,
             400: ErrorResponseSerializer,
@@ -62,7 +62,7 @@ from core.utils.views import cache_methods
         description=_(
             "Update blog author information. Requires authentication."
         ),
-        tags=["blog-authors"],
+        tags=["Blog Authors"],
         responses={
             200: BlogAuthorSerializer,
             400: ErrorResponseSerializer,
@@ -75,7 +75,7 @@ from core.utils.views import cache_methods
         description=_(
             "Partially update blog author information. Requires authentication."
         ),
-        tags=["blog-authors"],
+        tags=["Blog Authors"],
         responses={
             200: BlogAuthorSerializer,
             400: ErrorResponseSerializer,
@@ -86,7 +86,7 @@ from core.utils.views import cache_methods
     destroy=extend_schema(
         summary=_("Delete a blog author"),
         description=_("Delete a blog author profile. Requires authentication."),
-        tags=["blog-authors"],
+        tags=["Blog Authors"],
         responses={
             204: None,
             401: ErrorResponseSerializer,
@@ -98,7 +98,7 @@ from core.utils.views import cache_methods
         description=_(
             "Retrieve all blog posts written by this author with proper pagination."
         ),
-        tags=["blog-authors"],
+        tags=["Blog Authors"],
         responses={
             200: BlogPostSerializer(many=True),
             404: ErrorResponseSerializer,
@@ -109,7 +109,7 @@ from core.utils.views import cache_methods
         description=_(
             "Get comprehensive statistics about the author's blog posts and activity."
         ),
-        tags=["blog-authors"],
+        tags=["Blog Authors"],
         responses={
             200: inline_serializer(
                 name="BlogAuthorStatsResponse",

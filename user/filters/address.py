@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
 from user.models.address import UserAddress
@@ -8,7 +9,7 @@ class UserAddressFilter(filters.FilterSet):
     location_type = filters.CharFilter(
         field_name="location_type",
         lookup_expr="iexact",
-        help_text="Filter by location type (exact match, case insensitive)",
+        help_text=_("Filter by location type (exact match, case insensitive)"),
     )
     location_type_contains = filters.CharFilter(
         field_name="location_type",

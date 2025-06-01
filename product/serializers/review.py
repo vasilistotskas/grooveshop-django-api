@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_field
 from parler_rest.fields import TranslatedFieldsField
 from parler_rest.serializers import TranslatableModelSerializer
@@ -59,3 +60,14 @@ class ProductReviewSerializer(
             rep["user"] = AuthenticationSerializer(instance.user).data
 
         return rep
+
+    def create(self, validated_data):
+        user = self.context["request"].user
+        validated_data["user"] = user
+        return super().create(validated_data)
+
+
+class UserProductReviewRequestSerializer(serializers.Serializer):
+    product = serializers.IntegerField(
+        help_text=_("ID of the product to get user's review for")
+    )

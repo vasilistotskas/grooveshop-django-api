@@ -34,7 +34,7 @@ from core.utils.views import cache_methods
             "Retrieve a list of blog comments with hierarchical support. "
             "Supports filtering by post, user, approval status, and content. "
         ),
-        tags=["blog-comments"],
+        tags=["Blog Comments"],
         responses={
             200: BlogCommentSerializer(many=True),
         },
@@ -44,7 +44,7 @@ from core.utils.views import cache_methods
         description=_(
             "Get detailed information about a specific blog comment including replies."
         ),
-        tags=["blog-comments"],
+        tags=["Blog Comments"],
         responses={
             200: BlogCommentSerializer,
             404: ErrorResponseSerializer,
@@ -56,7 +56,7 @@ from core.utils.views import cache_methods
             "Create a new blog comment. Requires authentication. "
             "Comments are subject to approval before being visible."
         ),
-        tags=["blog-comments"],
+        tags=["Blog Comments"],
         responses={
             201: BlogCommentSerializer,
             400: ErrorResponseSerializer,
@@ -66,7 +66,7 @@ from core.utils.views import cache_methods
     update=extend_schema(
         summary=_("Update a blog comment"),
         description=_("Update your own blog comment. Requires authentication."),
-        tags=["blog-comments"],
+        tags=["Blog Comments"],
         responses={
             200: BlogCommentSerializer,
             400: ErrorResponseSerializer,
@@ -80,7 +80,7 @@ from core.utils.views import cache_methods
         description=_(
             "Partially update your own blog comment. Requires authentication."
         ),
-        tags=["blog-comments"],
+        tags=["Blog Comments"],
         responses={
             200: BlogCommentSerializer,
             400: ErrorResponseSerializer,
@@ -92,7 +92,7 @@ from core.utils.views import cache_methods
     destroy=extend_schema(
         summary=_("Delete a blog comment"),
         description=_("Delete your own blog comment. Requires authentication."),
-        tags=["blog-comments"],
+        tags=["Blog Comments"],
         responses={
             204: None,
             401: ErrorResponseSerializer,
@@ -105,7 +105,7 @@ from core.utils.views import cache_methods
         description=_(
             "Get all replies (children) of this comment in threaded structure."
         ),
-        tags=["blog-comments"],
+        tags=["Blog Comments"],
         responses={
             200: BlogCommentSerializer(many=True),
             404: ErrorResponseSerializer,
@@ -116,7 +116,7 @@ from core.utils.views import cache_methods
         description=_(
             "Get the complete thread (all ancestors and descendants) of this comment."
         ),
-        tags=["blog-comments"],
+        tags=["Blog Comments"],
         responses={
             200: BlogCommentSerializer(many=True),
         },
@@ -124,7 +124,7 @@ from core.utils.views import cache_methods
     update_likes=extend_schema(
         summary=_("Toggle comment like"),
         description=_("Like or unlike a comment. Toggles the like status."),
-        tags=["blog-comments"],
+        tags=["Blog Comments"],
         responses={
             200: BlogCommentSerializer,
             401: ErrorResponseSerializer,
@@ -136,7 +136,7 @@ from core.utils.views import cache_methods
         description=_(
             "Check which comments from a list are liked by the current user."
         ),
-        tags=["blog-comments"],
+        tags=["Blog Comments"],
         request=inline_serializer(
             name="BlogPostLikedCommentsRequest",
             fields={
@@ -161,7 +161,7 @@ from core.utils.views import cache_methods
     post=extend_schema(
         summary=_("Get comment's blog post"),
         description=_("Get the blog post that this comment belongs to."),
-        tags=["blog-comments"],
+        tags=["Blog Comments"],
         responses={
             200: BlogPostSerializer,
             404: ErrorResponseSerializer,
@@ -172,7 +172,7 @@ from core.utils.views import cache_methods
         description=_(
             "Get all comments made by the currently authenticated user."
         ),
-        tags=["blog-comments"],
+        tags=["Blog Comments"],
         responses={
             200: BlogCommentSerializer(many=True),
             401: ErrorResponseSerializer,
@@ -183,7 +183,7 @@ from core.utils.views import cache_methods
         description=_(
             "Get the comment made by the currently authenticated user for a specific post."
         ),
-        tags=["blog-comments"],
+        tags=["Blog Comments"],
         request=inline_serializer(
             name="MyCommentRequest",
             fields={

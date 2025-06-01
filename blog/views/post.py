@@ -46,7 +46,7 @@ if TYPE_CHECKING:
             "Supports filtering by category, tags, author, engagement metrics, and content. "
             "Includes MeiliSearch integration for advanced full-text search."
         ),
-        tags=["blog-posts"],
+        tags=["Blog Posts"],
         responses={
             200: BlogPostSerializer(many=True),
         },
@@ -54,7 +54,7 @@ if TYPE_CHECKING:
     create=extend_schema(
         summary=_("Create a blog post"),
         description=_("Create a new blog post. Requires authentication."),
-        tags=["blog-posts"],
+        tags=["Blog Posts"],
         responses={
             201: BlogPostSerializer,
             400: ErrorResponseSerializer,
@@ -67,7 +67,7 @@ if TYPE_CHECKING:
             "Get detailed information about a specific blog post including "
             "all relationships, engagement metrics, and SEO data."
         ),
-        tags=["blog-posts"],
+        tags=["Blog Posts"],
         responses={
             200: BlogPostSerializer,
             404: ErrorResponseSerializer,
@@ -76,7 +76,7 @@ if TYPE_CHECKING:
     update=extend_schema(
         summary=_("Update a blog post"),
         description=_("Update blog post information. Requires authentication."),
-        tags=["blog-posts"],
+        tags=["Blog Posts"],
         responses={
             200: BlogPostSerializer,
             400: ErrorResponseSerializer,
@@ -89,7 +89,7 @@ if TYPE_CHECKING:
         description=_(
             "Partially update blog post information. Requires authentication."
         ),
-        tags=["blog-posts"],
+        tags=["Blog Posts"],
         responses={
             200: BlogPostSerializer,
             400: ErrorResponseSerializer,
@@ -100,7 +100,7 @@ if TYPE_CHECKING:
     destroy=extend_schema(
         summary=_("Delete a blog post"),
         description=_("Delete a blog post. Requires authentication."),
-        tags=["blog-posts"],
+        tags=["Blog Posts"],
         responses={
             204: None,
             401: ErrorResponseSerializer,
@@ -110,7 +110,7 @@ if TYPE_CHECKING:
     update_likes=extend_schema(
         summary=_("Toggle post like"),
         description=_("Like or unlike a blog post. Toggles the like status."),
-        tags=["blog-posts"],
+        tags=["Blog Posts"],
         responses={
             200: BlogPostSerializer,
             401: ErrorResponseSerializer,
@@ -120,7 +120,7 @@ if TYPE_CHECKING:
     update_view_count=extend_schema(
         summary=_("Increment post view count"),
         description=_("Increment the view count for a blog post."),
-        tags=["blog-posts"],
+        tags=["Blog Posts"],
         responses={
             200: BlogPostSerializer,
             404: ErrorResponseSerializer,
@@ -129,7 +129,7 @@ if TYPE_CHECKING:
     comments=extend_schema(
         summary=_("Get post comments"),
         description=_("Get all comments for a blog post."),
-        tags=["blog-posts"],
+        tags=["Blog Posts"],
         responses={
             200: BlogCommentSerializer(many=True),
             404: ErrorResponseSerializer,
@@ -138,7 +138,7 @@ if TYPE_CHECKING:
     liked_posts=extend_schema(
         summary=_("Get liked posts"),
         description=_("Get all posts that the authenticated user has liked."),
-        tags=["blog-posts"],
+        tags=["Blog Posts"],
         request=inline_serializer(
             name="BlogPostLikedPostsRequest",
             fields={
@@ -162,7 +162,7 @@ if TYPE_CHECKING:
     related_posts=extend_schema(
         summary=_("Get related posts"),
         description=_("Get related posts for a blog post."),
-        tags=["blog-posts"],
+        tags=["Blog Posts"],
         responses={
             200: BlogPostSerializer,
             404: ErrorResponseSerializer,
@@ -174,7 +174,7 @@ if TYPE_CHECKING:
             "Get trending blog posts based on recent engagement metrics. "
             "Combines views, likes, and comments from recent time period."
         ),
-        tags=["blog-posts"],
+        tags=["Blog Posts"],
         parameters=[
             OpenApiParameter(
                 name="days",
@@ -194,7 +194,7 @@ if TYPE_CHECKING:
         description=_(
             "Get most popular blog posts based on all-time engagement metrics."
         ),
-        tags=["blog-posts"],
+        tags=["Blog Posts"],
         responses={
             200: BlogPostSerializer(many=True),
         },
@@ -204,7 +204,7 @@ if TYPE_CHECKING:
         description=_(
             "Get posts marked as featured, ordered by publication date."
         ),
-        tags=["blog-posts"],
+        tags=["Blog Posts"],
         responses={
             200: BlogPostSerializer(many=True),
         },

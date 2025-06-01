@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
@@ -10,13 +11,11 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from authentication.serializers import (
-    AuthenticationSerializer,
-    UsernameUpdateSerializer,
-)
+from authentication.serializers import AuthenticationSerializer
 from blog.serializers.comment import BlogCommentSerializer
 from blog.serializers.post import BlogPostSerializer
 from core.api.permissions import IsSelfOrAdmin
+from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from core.utils.serializers import MultiSerializerMixin
@@ -24,11 +23,182 @@ from notification.serializers.user import NotificationUserSerializer
 from order.serializers.order import OrderSerializer
 from product.serializers.favourite import ProductFavouriteSerializer
 from product.serializers.review import ProductReviewSerializer
+from user.serializers.account import (
+    UsernameUpdateResponseSerializer,
+    UsernameUpdateSerializer,
+)
 from user.serializers.address import UserAddressSerializer
 
 User = get_user_model()
 
 
+@extend_schema_view(
+    list=extend_schema(
+        summary=_("List user accounts"),
+        description=_(
+            "Retrieve a list of user accounts. Only accessible by staff users or users viewing their own account."
+        ),
+        tags=["User Accounts"],
+        responses={
+            200: AuthenticationSerializer(many=True),
+            401: ErrorResponseSerializer,
+        },
+    ),
+    create=extend_schema(
+        summary=_("Create a user account"),
+        description=_("Create a new user account."),
+        tags=["User Accounts"],
+        responses={
+            201: AuthenticationSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+        },
+    ),
+    retrieve=extend_schema(
+        summary=_("Retrieve a user account"),
+        description=_(
+            "Get detailed information about a specific user account. Users can only access their own account unless they are staff."
+        ),
+        tags=["User Accounts"],
+        responses={
+            200: AuthenticationSerializer,
+            401: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    update=extend_schema(
+        summary=_("Update a user account"),
+        description=_(
+            "Update user account information. Users can only update their own account unless they are staff."
+        ),
+        tags=["User Accounts"],
+        responses={
+            200: AuthenticationSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    partial_update=extend_schema(
+        summary=_("Partially update a user account"),
+        description=_(
+            "Partially update user account information. Users can only update their own account unless they are staff."
+        ),
+        tags=["User Accounts"],
+        responses={
+            200: AuthenticationSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    destroy=extend_schema(
+        summary=_("Delete a user account"),
+        description=_(
+            "Delete a user account. Users can only delete their own account unless they are staff."
+        ),
+        tags=["User Accounts"],
+        responses={
+            204: None,
+            401: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    favourite_products=extend_schema(
+        summary=_("Get user's favourite products"),
+        description=_("Get all favourite products for a specific user."),
+        tags=["User Accounts"],
+        responses={
+            200: ProductFavouriteSerializer(many=True),
+            401: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    orders=extend_schema(
+        summary=_("Get user's orders"),
+        description=_("Get all orders for a specific user."),
+        tags=["User Accounts"],
+        responses={
+            200: OrderSerializer(many=True),
+            401: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    product_reviews=extend_schema(
+        summary=_("Get user's product reviews"),
+        description=_("Get all product reviews written by a specific user."),
+        tags=["User Accounts"],
+        responses={
+            200: ProductReviewSerializer(many=True),
+            401: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    addresses=extend_schema(
+        summary=_("Get user's addresses"),
+        description=_("Get all addresses for a specific user."),
+        tags=["User Accounts"],
+        responses={
+            200: UserAddressSerializer(many=True),
+            401: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    blog_post_comments=extend_schema(
+        summary=_("Get user's blog comments"),
+        description=_("Get all blog post comments written by a specific user."),
+        tags=["User Accounts"],
+        responses={
+            200: BlogCommentSerializer(many=True),
+            401: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    liked_blog_posts=extend_schema(
+        summary=_("Get user's liked blog posts"),
+        description=_("Get all blog posts liked by a specific user."),
+        tags=["User Accounts"],
+        responses={
+            200: BlogPostSerializer(many=True),
+            401: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    notifications=extend_schema(
+        summary=_("Get user's notifications"),
+        description=_("Get all notifications for a specific user."),
+        tags=["User Accounts"],
+        responses={
+            200: NotificationUserSerializer(many=True),
+            401: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    change_username=extend_schema(
+        summary=_("Change username"),
+        description=_("Change the username for a specific user."),
+        tags=["User Accounts"],
+        request=UsernameUpdateSerializer,
+        responses={
+            200: UsernameUpdateResponseSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+)
 class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
     permission_classes = [IsAuthenticated, IsSelfOrAdmin]
     filter_backends = [
@@ -54,6 +224,9 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
     }
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return User.objects.none()
+
         match self.action:
             case "favourite_products":
                 queryset = get_object_or_404(

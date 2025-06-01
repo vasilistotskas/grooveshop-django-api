@@ -10,6 +10,7 @@ from django.conf import settings
 from django.db import DatabaseError, connection
 from django.middleware.csrf import get_token
 from django.shortcuts import redirect
+from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema
 from redis import Redis, RedisError
 from rest_framework import status
@@ -116,8 +117,10 @@ class BaseModelViewSet(TranslationsModelViewSet, PaginationModelViewSet):
 
 
 @extend_schema(
+    summary=_("Check the health status of database, Redis, and Celery"),
+    description=_("Check the health status of database, Redis, and Celery"),
+    tags=["Health"],
     responses=HealthCheckResponseSerializer,
-    description="Check the health status of database, Redis, and Celery",
 )
 @api_view(["GET"])
 def health_check(request):

@@ -11,7 +11,9 @@ from notification.serializers.notification import NotificationSerializer
 
 
 @extend_schema(
+    summary=_("Returns the notifications for a list of ids."),
     description=_("Returns the notifications for a list of ids."),
+    tags=["Notifications"],
     request=None,
     responses=NotificationSerializer(many=True),
     methods=["POST"],

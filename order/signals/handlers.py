@@ -10,7 +10,6 @@ from order.models.item import OrderItem
 from order.models.order import Order
 from order.notifications import (
     send_order_canceled_notification,
-    send_order_confirmation,
     send_order_delivered_notification,
     send_order_shipped_notification,
 )
@@ -64,8 +63,6 @@ def handle_order_post_save(
 def handle_order_created(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
-    send_order_confirmation(order)
-
     send_order_confirmation_email.delay(order.id)
 
     from order.models.history import OrderHistory

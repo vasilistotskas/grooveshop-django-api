@@ -33,7 +33,7 @@ from core.utils.views import cache_methods
             "Supports filtering by parent, level, and translation fields. "
             "Use 'tree=true' parameter to get nested tree structure."
         ),
-        tags=["blog-categories"],
+        tags=["Blog Categories"],
         responses={
             200: BlogCategorySerializer(many=True),
         },
@@ -44,7 +44,7 @@ from core.utils.views import cache_methods
             "Get detailed information about a specific blog category including "
             "ancestors, descendants, and post counts."
         ),
-        tags=["blog-categories"],
+        tags=["Blog Categories"],
         responses={
             200: BlogCategorySerializer,
             404: ErrorResponseSerializer,
@@ -55,7 +55,7 @@ from core.utils.views import cache_methods
         description=_(
             "Create a new blog category. Supports hierarchical structure."
         ),
-        tags=["blog-categories"],
+        tags=["Blog Categories"],
         responses={
             201: BlogCategorySerializer,
             400: ErrorResponseSerializer,
@@ -65,7 +65,7 @@ from core.utils.views import cache_methods
     update=extend_schema(
         summary=_("Update a blog category"),
         description=_("Update blog category information."),
-        tags=["blog-categories"],
+        tags=["Blog Categories"],
         responses={
             200: BlogCategorySerializer,
             400: ErrorResponseSerializer,
@@ -76,7 +76,7 @@ from core.utils.views import cache_methods
     partial_update=extend_schema(
         summary=_("Partially update a blog category"),
         description=_("Partially update blog category information."),
-        tags=["blog-categories"],
+        tags=["Blog Categories"],
         responses={
             200: BlogCategorySerializer,
             400: ErrorResponseSerializer,
@@ -90,7 +90,7 @@ from core.utils.views import cache_methods
             "Delete a blog category. Note: This will also affect all child categories "
             "and associated blog posts based on cascade settings."
         ),
-        tags=["blog-categories"],
+        tags=["Blog Categories"],
         responses={
             204: None,
             401: ErrorResponseSerializer,
@@ -103,7 +103,7 @@ from core.utils.views import cache_methods
             "Retrieve all blog posts in this category and its subcategories. "
             "Use 'recursive=true' to include posts from all descendant categories."
         ),
-        tags=["blog-categories"],
+        tags=["Blog Categories"],
         parameters=[
             OpenApiParameter(
                 name="recursive",
@@ -122,7 +122,7 @@ from core.utils.views import cache_methods
     children=extend_schema(
         summary=_("Get category children"),
         description=_("Get direct children of this category."),
-        tags=["blog-categories"],
+        tags=["Blog Categories"],
         responses={
             200: BlogCategorySerializer(many=True),
             404: ErrorResponseSerializer,
@@ -133,7 +133,7 @@ from core.utils.views import cache_methods
         description=_(
             "Get all descendants (children, grandchildren, etc.) of this category."
         ),
-        tags=["blog-categories"],
+        tags=["Blog Categories"],
         responses={
             200: BlogCategorySerializer(many=True),
             404: ErrorResponseSerializer,
@@ -144,7 +144,7 @@ from core.utils.views import cache_methods
         description=_(
             "Get all ancestors (parent, grandparent, etc.) of this category."
         ),
-        tags=["blog-categories"],
+        tags=["Blog Categories"],
         responses={
             200: BlogCategorySerializer(many=True),
             404: ErrorResponseSerializer,
@@ -153,7 +153,7 @@ from core.utils.views import cache_methods
     siblings=extend_schema(
         summary=_("Get category siblings"),
         description=_("Get sibling categories (same parent level)."),
-        tags=["blog-categories"],
+        tags=["Blog Categories"],
         responses={
             200: BlogCategorySerializer(many=True),
             404: ErrorResponseSerializer,
@@ -162,7 +162,7 @@ from core.utils.views import cache_methods
     stats=extend_schema(
         summary=_("Get category statistics"),
         description=_("Get comprehensive statistics about this category."),
-        tags=["blog-categories"],
+        tags=["Blog Categories"],
         responses={
             200: inline_serializer(
                 name="BlogCategoryStatsResponse",
@@ -189,7 +189,7 @@ from core.utils.views import cache_methods
             "This is more efficient than using list?tree=true for displaying "
             "navigation menus or category hierarchies."
         ),
-        tags=["blog-categories"],
+        tags=["Blog Categories"],
         responses={
             200: BlogCategorySerializer(many=True),
         },
@@ -199,7 +199,7 @@ from core.utils.views import cache_methods
         description=_(
             "Batch reorder categories by updating their sort_order values."
         ),
-        tags=["blog-categories"],
+        tags=["Blog Categories"],
         request=inline_serializer(
             name="BlogCategoryReorderRequest",
             fields={

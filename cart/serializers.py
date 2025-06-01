@@ -1,3 +1,4 @@
+from django.utils.translation import gettext_lazy as _
 from djmoney.contrib.django_rest_framework import MoneyField
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
@@ -74,7 +75,7 @@ class CartItemCreateSerializer(serializers.ModelSerializer):
         quantity = validated_data.get("quantity")
 
         if not cart:
-            raise serializers.ValidationError("Cart is not provided.")
+            raise serializers.ValidationError(_("Cart is not provided."))
 
         existing_item = CartItem.objects.filter(
             cart=cart, product=product

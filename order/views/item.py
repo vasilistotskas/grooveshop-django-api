@@ -23,17 +23,17 @@ from order.serializers.item import (
         description=_(
             "List all order items associated with the authenticated user's orders."
         ),
-        tags=["order-items"],
+        tags=["Order Items"],
     ),
     retrieve=extend_schema(
         summary=_("Retrieve an order item"),
         description=_("Retrieve a specific order item by ID."),
-        tags=["order-items"],
+        tags=["Order Items"],
     ),
     refund=extend_schema(
         summary=_("Process a refund for an order item"),
         description=_("Process a refund for an order item."),
-        tags=["order-items"],
+        tags=["Order Items"],
     ),
 )
 class OrderItemViewSet(viewsets.ReadOnlyModelViewSet):

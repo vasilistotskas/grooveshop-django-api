@@ -51,6 +51,8 @@ class ProductFavouriteViewSetTestCase(APITestCase):
             "user": self.user.id,
         }
 
+        self.client.force_authenticate(user=self.user)
+
         url = self.get_product_favourite_list_url()
         response = self.client.post(url, payload)
 
@@ -91,6 +93,8 @@ class ProductFavouriteViewSetTestCase(APITestCase):
             "user": self.user.id,
         }
 
+        self.client.force_authenticate(user=self.user)
+
         url = self.get_product_favourite_detail_url(self.product_favourite.id)
         response = self.client.put(url, payload)
 
@@ -102,6 +106,8 @@ class ProductFavouriteViewSetTestCase(APITestCase):
             "user": "invalid_user",
         }
 
+        self.client.force_authenticate(user=self.user)
+
         url = self.get_product_favourite_detail_url(self.product_favourite.id)
         response = self.client.put(url, payload)
 
@@ -111,6 +117,8 @@ class ProductFavouriteViewSetTestCase(APITestCase):
         payload = {
             "product": self.product.id,
         }
+
+        self.client.force_authenticate(user=self.user)
 
         url = self.get_product_favourite_detail_url(self.product_favourite.id)
         response = self.client.patch(url, payload)
@@ -122,12 +130,16 @@ class ProductFavouriteViewSetTestCase(APITestCase):
             "product": "invalid_product",
         }
 
+        self.client.force_authenticate(user=self.user)
+
         url = self.get_product_favourite_detail_url(self.product_favourite.id)
         response = self.client.patch(url, payload)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_destroy_valid(self):
+        self.client.force_authenticate(user=self.user)
+
         url = self.get_product_favourite_detail_url(self.product_favourite.id)
         response = self.client.delete(url)
 

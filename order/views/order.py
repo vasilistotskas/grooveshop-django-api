@@ -38,41 +38,73 @@ User = get_user_model()
     list=extend_schema(
         summary=_("List all orders"),
         description=_("Returns a list of all orders with pagination"),
-        tags=["order"],
+        tags=["Order"],
         responses={200: OrderSerializer(many=True)},
-    ),
-    retrieve=extend_schema(
-        summary=_("Retrieve an order by ID"),
-        description=_("Get detailed information about a specific order"),
-        tags=["order"],
-        responses={200: OrderDetailSerializer},
     ),
     create=extend_schema(
         summary=_("Create an order or process a checkout"),
         description=_("Process a checkout and create a new order"),
-        tags=["order"],
+        tags=["Order"],
         request=OrderCreateUpdateSerializer,
         responses={201: OrderDetailSerializer},
+    ),
+    update=extend_schema(
+        summary=_("Update an order"),
+        description=_("Update an existing order"),
+        tags=["Order"],
+        request=OrderCreateUpdateSerializer,
+        responses={200: OrderDetailSerializer},
+    ),
+    partial_update=extend_schema(
+        summary=_("Partially update an order"),
+        description=_("Partially update an existing order"),
+        tags=["Order"],
+        request=OrderCreateUpdateSerializer,
+        responses={200: OrderDetailSerializer},
+    ),
+    retrieve=extend_schema(
+        summary=_("Retrieve an order by ID"),
+        description=_("Get detailed information about a specific order"),
+        tags=["Order"],
+        responses={200: OrderDetailSerializer},
     ),
     retrieve_by_uuid=extend_schema(
         summary=_("Retrieve an order by UUID"),
         description=_(
             "Get detailed information about a specific order using its UUID"
         ),
-        tags=["order"],
+        tags=["Order"],
         responses={200: OrderDetailSerializer},
+    ),
+    destroy=extend_schema(
+        summary=_("Delete an order"),
+        description=_("Delete an existing order and restore product stock"),
+        tags=["Order"],
+        responses={204: None},
     ),
     cancel=extend_schema(
         summary=_("Cancel an order"),
         description=_("Cancel an existing order and restore product stock"),
-        tags=["order"],
+        tags=["Order"],
         responses={200: OrderDetailSerializer},
     ),
     my_orders=extend_schema(
         summary=_("List current user's orders"),
         description=_("Returns a list of the authenticated user's orders"),
-        tags=["order"],
+        tags=["Order"],
         responses={200: OrderSerializer(many=True)},
+    ),
+    add_tracking=extend_schema(
+        summary=_("Add tracking information to an order"),
+        description=_("Add tracking information to an existing order"),
+        tags=["Order"],
+        responses={200: OrderDetailSerializer},
+    ),
+    update_status=extend_schema(
+        summary=_("Update the status of an order"),
+        description=_("Update the status of an existing order"),
+        tags=["Order"],
+        responses={200: OrderDetailSerializer},
     ),
 )
 class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
@@ -98,11 +130,11 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
 
     serializers = {
         "default": OrderSerializer,
-        "retrieve": OrderDetailSerializer,
-        "retrieve_by_uuid": OrderDetailSerializer,
         "create": OrderCreateUpdateSerializer,
         "update": OrderCreateUpdateSerializer,
         "partial_update": OrderCreateUpdateSerializer,
+        "retrieve": OrderDetailSerializer,
+        "retrieve_by_uuid": OrderDetailSerializer,
         "cancel": OrderDetailSerializer,
         "add_tracking": OrderDetailSerializer,
         "update_status": OrderDetailSerializer,
@@ -111,6 +143,8 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
     def get_permissions(self):
         if self.action in [
             "list",
+            "retrieve",
+            "retrieve_by_uuid",
             "update",
             "partial_update",
             "destroy",

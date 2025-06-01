@@ -31,11 +31,16 @@ class OrderSignalsTestCase(TestCase):
         self.product.refresh_from_db()
         self.initial_stock = self.product.stock
 
+    @patch("order.notifications.send_order_confirmation")
     @patch("order.tasks.send_order_confirmation_email.delay")
-    def test_order_created_signal(self, mock_email_task):
+    def test_order_created_only_sends_one_email(
+        self, mock_email_task, mock_direct_notification
+    ):
+        # Test that only the Celery task is called and not the direct notification
         order_created.send(sender=Order, order=self.order)
 
         mock_email_task.assert_called_once_with(self.order.id)
+        mock_direct_notification.assert_not_called()
 
         self.assertTrue(
             OrderHistory.objects.filter(

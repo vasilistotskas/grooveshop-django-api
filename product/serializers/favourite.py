@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
@@ -36,3 +37,15 @@ class ProductFavouriteSerializer(serializers.ModelSerializer):
             rep["product"] = ProductSerializer(instance.product).data
 
         return rep
+
+    def create(self, validated_data):
+        user = self.context["request"].user
+        validated_data["user"] = user
+        return super().create(validated_data)
+
+
+class ProductFavouriteByProductsRequestSerializer(serializers.Serializer):
+    product_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        help_text=_("List of product IDs to check for favorites"),
+    )

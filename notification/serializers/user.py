@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
@@ -34,5 +35,24 @@ class NotificationUserSerializer(serializers.ModelSerializer):
 
 class NotificationUserActionSerializer(serializers.Serializer):
     notification_user_ids = serializers.ListField(
-        child=serializers.IntegerField(), required=True, allow_empty=False
+        child=serializers.IntegerField(),
+        help_text=_("List of notification user IDs to mark as seen/unseen"),
+    )
+
+
+class NotificationCountResponseSerializer(serializers.Serializer):
+    count = serializers.IntegerField(
+        help_text=_("Number of unseen notifications")
+    )
+
+
+class NotificationInfoResponseSerializer(serializers.Serializer):
+    info = serializers.CharField(
+        help_text=_("Information message about notifications")
+    )
+
+
+class NotificationSuccessResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField(
+        help_text=_("Whether the operation was successful")
     )

@@ -3,7 +3,7 @@ import logging
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import serializers, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAdminUser
@@ -26,6 +26,48 @@ from pay_way.services import PayWayService
 logger = logging.getLogger(__name__)
 
 
+@extend_schema_view(
+    process_payment=extend_schema(
+        summary=_("Process payment for an order"),
+        description=_(
+            "Initiates payment processing for the specified order using the provided payment method."
+        ),
+        tags=["Payment"],
+        request=ProcessPaymentRequestSerializer,
+        responses={
+            200: ProcessPaymentResponseSerializer,
+            400: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            500: ErrorResponseSerializer,
+        },
+    ),
+    check_payment_status=extend_schema(
+        summary=_("Check payment status"),
+        description=_(
+            "Retrieves the current payment status for the specified order."
+        ),
+        tags=["Payment"],
+        responses={
+            200: PaymentStatusResponseSerializer,
+            400: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            500: ErrorResponseSerializer,
+        },
+    ),
+    refund_payment=extend_schema(
+        summary=_("Refund payment"),
+        description=_(
+            "Initiates a refund for the specified order. Requires admin permissions."
+        ),
+        tags=["Payment"],
+        request=RefundRequestSerializer,
+        responses={
+            200: RefundResponseSerializer,
+            400: ErrorResponseSerializer,
+            500: ErrorResponseSerializer,
+        },
+    ),
+)
 class OrderPaymentViewSet(MultiSerializerMixin, GenericViewSet):
     lookup_field = "pk"
 
@@ -97,19 +139,6 @@ class OrderPaymentViewSet(MultiSerializerMixin, GenericViewSet):
         order.save(update_fields=["pay_way"])
         return None
 
-    @extend_schema(
-        request=ProcessPaymentRequestSerializer,
-        responses={
-            200: ProcessPaymentResponseSerializer,
-            400: ErrorResponseSerializer,
-            403: ErrorResponseSerializer,
-            500: ErrorResponseSerializer,
-        },
-        summary=_("Process payment for an order"),
-        description=_(
-            "Initiates payment processing for the specified order using the provided payment method."
-        ),
-    )
     @action(detail=True, methods=["post"])
     def process_payment(self, request: HttpRequest, pk: str) -> Response:
         order = get_object_or_404(Order, pk=pk)
@@ -172,18 +201,6 @@ class OrderPaymentViewSet(MultiSerializerMixin, GenericViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    @extend_schema(
-        responses={
-            200: PaymentStatusResponseSerializer,
-            400: ErrorResponseSerializer,
-            403: ErrorResponseSerializer,
-            500: ErrorResponseSerializer,
-        },
-        summary=_("Check payment status"),
-        description=_(
-            "Retrieves the current payment status for the specified order."
-        ),
-    )
     @action(detail=True, methods=["get"])
     def check_payment_status(
         self, request: HttpRequest, pk: str | None = None
@@ -244,18 +261,6 @@ class OrderPaymentViewSet(MultiSerializerMixin, GenericViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    @extend_schema(
-        request=RefundRequestSerializer,
-        responses={
-            200: RefundResponseSerializer,
-            400: ErrorResponseSerializer,
-            500: ErrorResponseSerializer,
-        },
-        summary=_("Refund payment"),
-        description=_(
-            "Initiates a refund for the specified order. Requires admin permissions."
-        ),
-    )
     @action(detail=True, methods=["post"])
     def refund_payment(
         self, request: HttpRequest, pk: str | None = None

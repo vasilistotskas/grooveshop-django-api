@@ -34,7 +34,7 @@ from user.serializers.address import (
         description=_(
             "Retrieve a list of addresses for the authenticated user."
         ),
-        tags=["user-addresses"],
+        tags=["User Addresses"],
         responses={
             200: UserAddressSerializer(many=True),
             401: ErrorResponseSerializer,
@@ -45,7 +45,7 @@ from user.serializers.address import (
         description=_(
             "Get detailed information about a specific user address."
         ),
-        tags=["user-addresses"],
+        tags=["User Addresses"],
         responses={
             200: UserAddressSerializer,
             401: ErrorResponseSerializer,
@@ -55,7 +55,7 @@ from user.serializers.address import (
     create=extend_schema(
         summary=_("Create a user address"),
         description=_("Create a new address for the authenticated user."),
-        tags=["user-addresses"],
+        tags=["User Addresses"],
         responses={
             201: UserAddressSerializer,
             400: ErrorResponseSerializer,
@@ -65,7 +65,7 @@ from user.serializers.address import (
     update=extend_schema(
         summary=_("Update a user address"),
         description=_("Update user address information."),
-        tags=["user-addresses"],
+        tags=["User Addresses"],
         responses={
             200: UserAddressSerializer,
             400: ErrorResponseSerializer,
@@ -76,7 +76,7 @@ from user.serializers.address import (
     partial_update=extend_schema(
         summary=_("Partially update a user address"),
         description=_("Partially update user address information."),
-        tags=["user-addresses"],
+        tags=["User Addresses"],
         responses={
             200: UserAddressSerializer,
             400: ErrorResponseSerializer,
@@ -87,7 +87,7 @@ from user.serializers.address import (
     destroy=extend_schema(
         summary=_("Delete a user address"),
         description=_("Delete a user address."),
-        tags=["user-addresses"],
+        tags=["User Addresses"],
         responses={
             204: None,
             401: ErrorResponseSerializer,
@@ -97,7 +97,7 @@ from user.serializers.address import (
     set_main=extend_schema(
         summary=_("Set address as main"),
         description=_("Set this address as the user's main address."),
-        tags=["user-addresses"],
+        tags=["User Addresses"],
         request=None,
         responses={
             200: UserAddressSerializer,
@@ -108,7 +108,7 @@ from user.serializers.address import (
     get_main=extend_schema(
         summary=_("Get main address"),
         description=_("Retrieve the user's main address."),
-        tags=["user-addresses"],
+        tags=["User Addresses"],
         responses={
             200: UserAddressSerializer,
             401: ErrorResponseSerializer,
@@ -118,7 +118,7 @@ from user.serializers.address import (
     stats=extend_schema(
         summary=_("Get address statistics"),
         description=_("Get statistics about the user's addresses."),
-        tags=["user-addresses"],
+        tags=["User Addresses"],
         responses={
             200: inline_serializer(
                 name="UserAddressStatsResponse",
@@ -142,7 +142,7 @@ from user.serializers.address import (
     validate_address=extend_schema(
         summary=_("Validate address"),
         description=_("Validate an address without saving it."),
-        tags=["user-addresses"],
+        tags=["User Addresses"],
         request=UserAddressCreateSerializer,
         responses={
             200: inline_serializer(
@@ -166,7 +166,7 @@ from user.serializers.address import (
     bulk_delete=extend_schema(
         summary=_("Bulk delete addresses"),
         description=_("Delete multiple addresses by their IDs."),
-        tags=["user-addresses"],
+        tags=["User Addresses"],
         request=inline_serializer(
             name="BulkDeleteAddressesRequest",
             fields={

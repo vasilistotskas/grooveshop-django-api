@@ -49,7 +49,7 @@ GUEST_CART_HEADERS = [
         description=_(
             "Get a cart. For guest users, include X-Cart-Id and X-Session-Key headers to maintain cart session."
         ),
-        tags=["cart"],
+        tags=["Cart"],
         parameters=GUEST_CART_HEADERS,
         responses={
             200: CartSerializer,
@@ -61,7 +61,7 @@ GUEST_CART_HEADERS = [
         description=_(
             "Get a cart. For guest users, include X-Cart-Id and X-Session-Key headers to maintain cart session."
         ),
-        tags=["cart"],
+        tags=["Cart"],
         parameters=GUEST_CART_HEADERS,
         responses={
             200: CartSerializer,
@@ -73,7 +73,7 @@ GUEST_CART_HEADERS = [
         description=_(
             "Update a cart. For guest users, include X-Cart-Id and X-Session-Key headers to maintain cart session."
         ),
-        tags=["cart"],
+        tags=["Cart"],
         parameters=GUEST_CART_HEADERS,
         responses={
             200: CartSerializer,
@@ -85,7 +85,7 @@ GUEST_CART_HEADERS = [
         description=_(
             "Update a cart. For guest users, include X-Cart-Id and X-Session-Key headers to maintain cart session."
         ),
-        tags=["cart"],
+        tags=["Cart"],
         parameters=GUEST_CART_HEADERS,
         responses={
             200: CartSerializer,
@@ -97,7 +97,7 @@ GUEST_CART_HEADERS = [
         description=_(
             "Delete a cart. For guest users, include X-Cart-Id and X-Session-Key headers to maintain cart session."
         ),
-        tags=["cart"],
+        tags=["Cart"],
         parameters=GUEST_CART_HEADERS,
         responses={
             200: CartSerializer,
@@ -176,7 +176,7 @@ class CartViewSet(BaseModelViewSet):
         description=_(
             "Get all cart items. For guest users, include X-Cart-Id and X-Session-Key headers to maintain cart session."
         ),
-        tags=["cart-items"],
+        tags=["Cart Items"],
         parameters=GUEST_CART_HEADERS,
         responses={
             200: CartItemSerializer(many=True),
@@ -187,7 +187,7 @@ class CartViewSet(BaseModelViewSet):
         description=_(
             "Create a new cart item. For guest users, include X-Cart-Id and X-Session-Key headers to maintain cart session."
         ),
-        tags=["cart-items"],
+        tags=["Cart Items"],
         parameters=GUEST_CART_HEADERS,
         request=CartItemCreateSerializer,
         responses={
@@ -201,7 +201,7 @@ class CartViewSet(BaseModelViewSet):
         description=_(
             "Get a specific cart item. For guest users, include X-Cart-Id and X-Session-Key headers to maintain cart session."
         ),
-        tags=["cart-items"],
+        tags=["Cart Items"],
         parameters=GUEST_CART_HEADERS,
         responses={
             200: CartItemSerializer,
@@ -213,7 +213,7 @@ class CartViewSet(BaseModelViewSet):
         description=_(
             "Update a specific cart item. For guest users, include X-Cart-Id and X-Session-Key headers to maintain cart session."
         ),
-        tags=["cart-items"],
+        tags=["Cart Items"],
         parameters=GUEST_CART_HEADERS,
         request=CartItemCreateSerializer,
         responses={
@@ -228,7 +228,7 @@ class CartViewSet(BaseModelViewSet):
         description=_(
             "Partial update a specific cart item. For guest users, include X-Cart-Id and X-Session-Key headers to maintain cart session."
         ),
-        tags=["cart-items"],
+        tags=["Cart Items"],
         parameters=GUEST_CART_HEADERS,
         request=CartItemCreateSerializer,
         responses={
@@ -243,7 +243,7 @@ class CartViewSet(BaseModelViewSet):
         description=_(
             "Delete a specific cart item. For guest users, include X-Cart-Id and X-Session-Key headers to maintain cart session."
         ),
-        tags=["cart-items"],
+        tags=["Cart Items"],
         parameters=GUEST_CART_HEADERS,
         responses={
             204: None,

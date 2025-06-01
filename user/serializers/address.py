@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.utils.translation import gettext_lazy as _
 from phonenumber_field.serializerfields import PhoneNumberField
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
@@ -54,7 +55,7 @@ class UserAddressSerializer(serializers.ModelSerializer):
                 pk=self.instance.pk
             ):
                 raise serializers.ValidationError(
-                    "A main address already exists for this user"
+                    _("A main address already exists for this user")
                 )
         return data
 
@@ -92,7 +93,7 @@ class UserAddressCreateSerializer(serializers.ModelSerializer):
             user = data["user"]
             if UserAddress.objects.filter(user=user, is_main=True).exists():
                 raise serializers.ValidationError(
-                    "A main address already exists for this user"
+                    _("A main address already exists for this user")
                 )
         return data
 
@@ -144,6 +145,6 @@ class UserAddressUpdateSerializer(serializers.ModelSerializer):
                 .exists()
             ):
                 raise serializers.ValidationError(
-                    "A main address already exists for this user"
+                    _("A main address already exists for this user")
                 )
         return data

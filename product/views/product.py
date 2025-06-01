@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
 
+from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from core.utils.serializers import MultiSerializerMixin
@@ -17,6 +20,111 @@ from product.serializers.review import ProductReviewSerializer
 from tag.serializers.tag import TagSerializer
 
 
+@extend_schema_view(
+    list=extend_schema(
+        summary=_("List products"),
+        description=_(
+            "Retrieve a list of products with rich filtering and search capabilities."
+        ),
+        tags=["Products"],
+        responses={
+            200: ProductSerializer(many=True),
+        },
+    ),
+    create=extend_schema(
+        summary=_("Create a product"),
+        description=_(
+            "Create a new product with all required information. Requires authentication."
+        ),
+        tags=["Products"],
+        responses={
+            201: ProductSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+        },
+    ),
+    retrieve=extend_schema(
+        summary=_("Retrieve a product"),
+        description=_(
+            "Get detailed information about a specific product including pricing, images, and metadata."
+        ),
+        tags=["Products"],
+        responses={
+            200: ProductSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    update=extend_schema(
+        summary=_("Update a product"),
+        description=_("Update product information. Requires authentication."),
+        tags=["Products"],
+        responses={
+            200: ProductSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    partial_update=extend_schema(
+        summary=_("Partially update a product"),
+        description=_(
+            "Partially update product information. Requires authentication."
+        ),
+        tags=["Products"],
+        responses={
+            200: ProductSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    destroy=extend_schema(
+        summary=_("Delete a product"),
+        description=_("Delete a product. Requires authentication."),
+        tags=["Products"],
+        responses={
+            204: None,
+            401: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    update_view_count=extend_schema(
+        summary=_("Increment product view count"),
+        description=_("Increment the view count for a product."),
+        tags=["Products"],
+        responses={
+            200: ProductSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    reviews=extend_schema(
+        summary=_("Get product reviews"),
+        description=_("Get all reviews for a product."),
+        tags=["Products"],
+        responses={
+            200: ProductReviewSerializer(many=True),
+            404: ErrorResponseSerializer,
+        },
+    ),
+    images=extend_schema(
+        summary=_("Get product images"),
+        description=_("Get all images for a product."),
+        tags=["Products"],
+        responses={
+            200: ProductImageSerializer(many=True),
+            404: ErrorResponseSerializer,
+        },
+    ),
+    tags=extend_schema(
+        summary=_("Get product tags"),
+        description=_("Get all tags associated with a product."),
+        tags=["Products"],
+        responses={
+            200: TagSerializer(many=True),
+            404: ErrorResponseSerializer,
+        },
+    ),
+)
 class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
     queryset = Product.objects.all()
     filter_backends = [

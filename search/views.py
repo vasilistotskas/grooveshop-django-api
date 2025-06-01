@@ -2,13 +2,15 @@ from __future__ import annotations
 
 from urllib.parse import unquote
 
-from drf_spectacular.utils import extend_schema
+from django.utils.translation import gettext_lazy as _
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from blog.models.post import BlogPostTranslation
+from core.api.serializers import ErrorResponseSerializer
 from product.models.product import ProductTranslation
 from search.serializers import (
     BlogPostMeiliSearchResponseSerializer,
@@ -19,8 +21,41 @@ from search.serializers import (
 
 
 @extend_schema(
-    responses=BlogPostMeiliSearchResponseSerializer,
-    description="Search blog posts with MeiliSearch",
+    summary=_("Search blog posts"),
+    description=_(
+        "Search blog posts using MeiliSearch. Provides full-text search with "
+        "highlighting, ranking, and faceting capabilities."
+    ),
+    tags=["Search"],
+    responses={
+        200: BlogPostMeiliSearchResponseSerializer,
+        400: ErrorResponseSerializer,
+    },
+    parameters=[
+        OpenApiParameter(
+            name="query",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            description="Search query string",
+            required=True,
+        ),
+        OpenApiParameter(
+            name="limit",
+            type=int,
+            location=OpenApiParameter.QUERY,
+            description="Maximum number of results to return",
+            required=False,
+            default=10,
+        ),
+        OpenApiParameter(
+            name="offset",
+            type=int,
+            location=OpenApiParameter.QUERY,
+            description="Number of results to skip",
+            required=False,
+            default=0,
+        ),
+    ],
 )
 @api_view(["GET"])
 def blog_post_meili_search(request):
@@ -60,8 +95,41 @@ def blog_post_meili_search(request):
 
 
 @extend_schema(
-    responses=ProductMeiliSearchResponseSerializer,
-    description="Search products with MeiliSearch",
+    summary=_("Search products"),
+    description=_(
+        "Search products using MeiliSearch. Provides full-text search with "
+        "highlighting, ranking, and faceting capabilities."
+    ),
+    tags=["Search"],
+    responses={
+        200: ProductMeiliSearchResponseSerializer,
+        400: ErrorResponseSerializer,
+    },
+    parameters=[
+        OpenApiParameter(
+            name="query",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            description="Search query string",
+            required=True,
+        ),
+        OpenApiParameter(
+            name="limit",
+            type=int,
+            location=OpenApiParameter.QUERY,
+            description="Maximum number of results to return",
+            required=False,
+            default=10,
+        ),
+        OpenApiParameter(
+            name="offset",
+            type=int,
+            location=OpenApiParameter.QUERY,
+            description="Number of results to skip",
+            required=False,
+            default=0,
+        ),
+    ],
 )
 @api_view(["GET"])
 def product_meili_search(request):

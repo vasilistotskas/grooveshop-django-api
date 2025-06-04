@@ -3,6 +3,16 @@
 
 
 
+## v1.12.0 (2025-06-04)
+
+### Chores
+
+* chore: remove useless files ([`50526fb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/50526fb47da4186472d8513e6a64cf0a181e73ba))
+
+### Features
+
+* feat: Increase postgres pool, Bump Versions ([`1c35327`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1c353276d440056d6de457cdcb7a5393da3faf5d))
+
 ## v1.11.0 (2025-06-01)
 
 ### Features

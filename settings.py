@@ -512,7 +512,7 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": crontab(hour="12", minute="0"),
     },
     "clear-blacklisted-tokens": {
-        "task": "core.tasks.tasks.clear_blacklisted_tokens_task",
+        "task": "core.tasks.clear_blacklisted_tokens_task",
         "schedule": crontab(hour="2", minute="0"),
     },
     "clear-log-files": {
@@ -702,9 +702,9 @@ DATABASES = {
         "PORT": getenv("DB_PORT", "5432"),
         "OPTIONS": {
             "pool": {
-                "min_size": 4,
-                "max_size": 8,
-                "timeout": 60,
+                "min_size": 8,
+                "max_size": 25,
+                "timeout": 120,
             }
         },
     },

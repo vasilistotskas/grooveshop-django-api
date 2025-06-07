@@ -1,5 +1,5 @@
 ARG PYTHON_VERSION=3.13.2
-ARG UV_VERSION=0.7.8
+ARG UV_VERSION=0.7.12
 ARG UV_IMAGE=ghcr.io/astral-sh/uv:${UV_VERSION}
 
 FROM $UV_IMAGE AS uv
@@ -16,6 +16,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     HOME=${APP_PATH}
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl ca-certificates gnupg \
+    && install -d /usr/share/postgresql-common/pgdg \
+    && curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+    && . /etc/os-release \
+    && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $VERSION_CODENAME-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+    postgresql-client-16 \
+    postgresql-16 \
+    gzip \
     && addgroup --system --gid ${GID} appgroup \
     && adduser --system \
          --uid    ${UID} \
@@ -47,13 +57,3 @@ FROM base AS default
 USER appuser
 
 CMD ["uv", "run", "python", "manage.py", "runserver", "0.0.0.0:8000"]
-
-FROM base AS cicd
-USER root
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    docker-compose \
-    docker.io \
-    git \
-    && apt-get clean && rm -rf /var/lib/apt/lists/* \
-
-USER appuser

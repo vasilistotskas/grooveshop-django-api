@@ -642,19 +642,6 @@ wheels = [
 ]
 
 [[package]]
-name = "django-dbbackup"
-version = "4.3.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "django" },
-    { name = "pytz" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/fb/26/45caf29882db46117b053dfc79229d6e97cb080486c504d42edfe54b133b/django_dbbackup-4.3.0.tar.gz", hash = "sha256:3549c8ccfdb167f20ca2c26eb0dfa55c79aa3f31ea4e4dbfa0816bc18ceec6dc", size = 43016, upload-time = "2025-05-09T19:12:57.455Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/4d/ef/d49ca67fefe5a933cf46e56a108cbdb064a26a47dc00c2ad15a21f7d35fd/django_dbbackup-4.3.0-py3-none-any.whl", hash = "sha256:b4003b353d49d914ffbc033c793198426572d0a2b137ec795ddb2fb82225b960", size = 58505, upload-time = "2025-05-09T19:12:56.034Z" },
-]
-
-[[package]]
 name = "django-debug-toolbar"
 version = "5.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1042,7 +1029,7 @@ wheels = [
 
 [[package]]
 name = "grooveshop-django-api"
-version = "1.11.0"
+version = "1.12.0"
 source = { virtual = "." }
 dependencies = [
     { name = "asgiref" },
@@ -1059,7 +1046,6 @@ dependencies = [
     { name = "django-celery-results" },
     { name = "django-cors-headers" },
     { name = "django-csp" },
-    { name = "django-dbbackup" },
     { name = "django-extra-settings" },
     { name = "django-filter" },
     { name = "django-money" },
@@ -1130,7 +1116,6 @@ requires-dist = [
     { name = "django-celery-results", specifier = "==2.6.0" },
     { name = "django-cors-headers", specifier = "==4.7.0" },
     { name = "django-csp", specifier = "==4.0" },
-    { name = "django-dbbackup", specifier = "==4.3.0" },
     { name = "django-extra-settings", specifier = "==0.14.0" },
     { name = "django-filter", specifier = "==25.1" },
     { name = "django-money", specifier = "==3.5.4" },

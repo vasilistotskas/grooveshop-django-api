@@ -135,7 +135,6 @@ THIRD_PARTY_APPS = [
     "django_celery_results",
     "pytest",
     "pytest_django",
-    "dbbackup",
     "extra_settings",
     "knox",
     "simple_history",
@@ -284,6 +283,7 @@ ENABLE_DEBUG_TOOLBAR = getenv("ENABLE_DEBUG_TOOLBAR", "False") == "True"
 ADMINS = [
     ("Admin", getenv("ADMIN_EMAIL", "")),
     ("Info", getenv("INFO_EMAIL", "")),
+    ("Superuser", getenv("DJANGO_SU_EMAIL", "")),
 ]
 
 if ENABLE_DEBUG_TOOLBAR:
@@ -441,8 +441,11 @@ CELERY_RESULT_BACKEND = getenv("CELERY_RESULT_BACKEND", "django-db")
 CELERY_CACHE_BACKEND = getenv("CELERY_CACHE_BACKEND", "django-cache")
 CELERY_TASK_TRACK_STARTED = True
 CELERY_ENABLE_UTC = False
-CELERY_BROKER_HEARTBEAT = 0
-CELERY_BROKER_POOL_LIMIT = None
+CELERY_BROKER_HEARTBEAT = 30
+CELERY_BROKER_POOL_LIMIT = 10
+CELERY_TASK_SOFT_TIME_LIMIT = 1500  # 25 minutes
+CELERY_TASK_TIME_LIMIT = 1800  # 30 minutes
+CELERY_BEAT_MAX_LOOP_INTERVAL = 300  # 5 minutes
 CELERY_BROKER_TRANSPORT_OPTIONS = {"confirm_publish": True}
 CELERY_BROKER_CONNECTION_TIMEOUT = 30
 CELERY_BROKER_CONNECTION_RETRY = True
@@ -453,8 +456,6 @@ CELERY_TIMEZONE = getenv("TIME_ZONE", "Europe/Athens")
 CELERY_ACCEPT_CONTENT = ["application/json"]
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TASK_SERIALIZER = "json"
-CELERY_TASK_TIME_LIMIT = 30 * 60
-CELERY_TASK_SOFT_TIME_LIMIT = 60
 CELERY_RESULT_EXTENDED = True
 CELERY_TASK_RESULT_EXPIRES = 3600
 CELERY_WORKER_SEND_TASK_EVENTS = True
@@ -464,60 +465,80 @@ CELERY_TASK_EAGER_PROPAGATES = False
 
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 
+SCHEDULE_PRESETS = {
+    # Daily schedules
+    "daily_2am": crontab(hour=2, minute=0),
+    "daily_3am": crontab(hour=3, minute=0),
+    "daily_4am": crontab(hour=4, minute=0),
+    "daily_5am": crontab(hour=5, minute=0),
+    "daily_6am": crontab(hour=6, minute=0),
+    "daily_7am": crontab(hour=7, minute=0),
+    "daily_noon": crontab(hour=12, minute=0),
+    # Weekly schedules
+    "weekly_sunday_5am": crontab(hour=5, minute=0, day_of_week=0),
+    "weekly_sunday_3am": crontab(hour=3, minute=0, day_of_week=0),
+    "weekly_monday_4am": crontab(hour=4, minute=0, day_of_week=1),
+    # Monthly schedules
+    "monthly_first_6am": crontab(hour=6, minute=0, day_of_month=1),
+    "monthly_first_4am": crontab(hour=4, minute=0, day_of_month=1),
+    # Bi-monthly schedules
+    "bimonthly_4am": crontab(hour=4, minute=0, day_of_month="1,15"),
+    "bimonthly_6am": crontab(hour=6, minute=0, day_of_month="1,15"),
+    # Frequent schedules
+    "every_minute": crontab(minute="*"),
+    "every_30_min": crontab(minute="*/30"),
+    "every_hour": crontab(minute=0),
+}
+
 CELERY_BEAT_SCHEDULE = {
-    "send-inactive-user-notifications": {
-        "task": "core.tasks.send_inactive_user_notifications",
-        "schedule": crontab(hour="6", minute="0", day_of_month="1"),
-    },
     "monitor-system-health": {
         "task": "core.tasks.monitor_system_health",
-        "schedule": crontab(minute="*/30"),
+        "schedule": SCHEDULE_PRESETS["every_30_min"],
     },
-    "backup-database": {
-        "task": "core.tasks.backup_database",
-        "schedule": crontab(hour="7", minute="0"),
+    "scheduled-database-backup": {
+        "task": "core.tasks.scheduled_database_backup",
+        "schedule": SCHEDULE_PRESETS["daily_3am"],
     },
-    "clear-duplicate-history": {
-        "task": "core.tasks.clear_duplicate_history_task",
-        "schedule": crontab(hour="4", minute="0"),
-        "kwargs": {
-            "excluded_fields": [],
-        },
-    },
-    "clear-old-history": {
-        "task": "core.tasks.clear_old_history_task",
-        "schedule": crontab(hour="5", minute="0"),
-        "kwargs": {
-            "days": 365,
-        },
-    },
-    "clear-expired-notifications": {
-        "task": "core.tasks.clear_expired_notifications_task",
-        "schedule": crontab(hour="6", minute="0", day_of_month="*/2"),
-    },
-    "clear-carts-for-none-users": {
-        "task": "core.tasks.clear_carts_for_none_users_task",
-        "schedule": crontab(hour="4", minute="0", day_of_month="*/2"),
-    },
-    "clear-expired-sessions": {
-        "task": "core.tasks.clear_expired_sessions_task",
-        "schedule": crontab(hour="5", minute="0", day_of_week="sunday"),
-    },
-    "clear-all-cache": {
-        "task": "core.tasks.clear_all_cache_task",
-        "schedule": datetime.timedelta(days=30),
-    },
-    "clear-old-database-backups": {
-        "task": "core.tasks.clear_old_database_backups",
-        "schedule": crontab(hour="12", minute="0"),
-    },
-    "clear-blacklisted-tokens": {
-        "task": "core.tasks.clear_blacklisted_tokens_task",
-        "schedule": crontab(hour="2", minute="0"),
+    "cleanup-old-backups": {
+        "task": "core.tasks.cleanup_old_backups",
+        "schedule": SCHEDULE_PRESETS["weekly_sunday_5am"],
+        "kwargs": {"days": 30, "backup_dir": "backups"},
     },
     "clear-log-files": {
         "task": "core.tasks.clear_log_files_task",
-        "schedule": crontab(hour="3", minute="0"),
+        "schedule": SCHEDULE_PRESETS["daily_4am"],
+        "kwargs": {"days": 30},
+    },
+    "clear-duplicate-history": {
+        "task": "core.tasks.clear_duplicate_history_task",
+        "schedule": SCHEDULE_PRESETS["daily_5am"],
+        "kwargs": {"excluded_fields": [], "minutes": None},
+    },
+    "clear-old-history": {
+        "task": "core.tasks.clear_old_history_task",
+        "schedule": SCHEDULE_PRESETS["weekly_sunday_3am"],
+        "kwargs": {"days": 365},
+    },
+    "clear-expired-sessions": {
+        "task": "core.tasks.clear_expired_sessions_task",
+        "schedule": SCHEDULE_PRESETS["weekly_monday_4am"],
+    },
+    "send-inactive-user-notifications": {
+        "task": "core.tasks.send_inactive_user_notifications",
+        "schedule": SCHEDULE_PRESETS["monthly_first_6am"],
+    },
+    "clear-all-cache": {
+        "task": "core.tasks.clear_all_cache_task",
+        "schedule": SCHEDULE_PRESETS["monthly_first_4am"],
+    },
+    "clear-carts-for-none-users": {
+        "task": "core.tasks.clear_carts_for_none_users_task",
+        "schedule": SCHEDULE_PRESETS["bimonthly_4am"],
+    },
+    "clear-expired-notifications": {
+        "task": "core.tasks.clear_expired_notifications_task",
+        "schedule": SCHEDULE_PRESETS["bimonthly_6am"],
+        "kwargs": {"days": 365},
     },
 }
 
@@ -686,7 +707,7 @@ CURRENCY_CHOICES = [("USD", "USD $"), ("EUR", "EUR €")]
 
 CONN_HEALTH_CHECKS = SYSTEM_ENV == "production"
 ATOMIC_REQUESTS = SYSTEM_ENV == "production"
-CONN_MAX_AGE = int(getenv("DJANGO_CONN_MAX_AGE", "30"))
+CONN_MAX_AGE = int(getenv("DJANGO_CONN_MAX_AGE", "300"))
 INDEX_MAXIMUM_EXPR_COUNT = 8000
 
 DATABASES = {
@@ -702,19 +723,10 @@ DATABASES = {
         "PORT": getenv("DB_PORT", "5432"),
         "OPTIONS": {
             "pool": {
-                "min_size": 8,
-                "max_size": 25,
-                "timeout": 120,
-            }
-        },
-    },
-    "replica": {
-        "TIME_ZONE": getenv("TIME_ZONE", "Europe/Athens"),
-        "ENGINE": "django.db.backends.postgresql",
-        "HOST": getenv("DB_HOST_TEST", "db_replica"),
-        "NAME": getenv("DB_NAME_TEST", "devdb_replica"),
-        "TEST": {
-            "MIRROR": getenv("DB_TEST_MIRROR", "default"),
+                "min_size": 2,
+                "max_size": 8,
+                "timeout": 60,
+            },
         },
     },
 }
@@ -730,9 +742,6 @@ if SYSTEM_ENV == "ci":
             "PORT": "5432",
         }
     }
-
-DBBACKUP_STORAGE = "django.core.files.storage.FileSystemStorage"
-DBBACKUP_STORAGE_OPTIONS = {"location": path.join(BASE_DIR, "backups")}
 
 # Maili settings
 MEILISEARCH = {
@@ -774,6 +783,10 @@ EMAIL_USE_TLS = getenv("EMAIL_USE_TLS", "False") == "True"
 DEFAULT_FROM_EMAIL = getenv("DEFAULT_FROM_EMAIL", "localhost@gmail.com")
 ADMIN_EMAIL = getenv("ADMIN_EMAIL", "localhost@gmail.com")
 INFO_EMAIL = getenv("INFO_EMAIL", "localhost@gmail.com")
+
+DJANGO_SU_NAME = getenv("DJANGO_SU_NAME", "superuser")
+DJANGO_SU_PASSWORD = getenv("DJANGO_SU_NAME", "changeme")
+DJANGO_SU_EMAIL = getenv("DJANGO_SU_EMAIL", "localhost@gmail.com")
 
 REST_KNOX = {
     "TOKEN_TTL": datetime.timedelta(days=20),

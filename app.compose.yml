@@ -12,7 +12,9 @@ x-common-vols: &common-vols
   - type: volume
     source: mediafiles
     target: /home/app/mediafiles
-
+  - type: volume
+    source: backups
+    target: /home/app/backups
 
 x-infra-service-condition: &infra-service-condition
   db:
@@ -153,3 +155,4 @@ services:
 volumes:
   staticfiles:
   mediafiles:
+  backups:

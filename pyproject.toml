@@ -23,7 +23,6 @@ dependencies = [
   "django-admin-thumbnails==0.2.9",
   "django-allauth==65.9.0",
   "django-csp==4.0",
-  "django-dbbackup==4.3.0",
   "django-extra-settings==0.14.0",
   "django-celery-beat==2.8.1",
   "django-celery-results==2.6.0",

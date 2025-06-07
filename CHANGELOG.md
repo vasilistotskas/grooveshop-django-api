@@ -3,6 +3,16 @@
 
 
 
+## v1.13.0 (2025-06-07)
+
+### Bug fixes
+
+* fix: remove useless tests ([`8d40865`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8d40865308f4ae0258d5c8b12ff8fae8a8277d78))
+
+### Features
+
+* feat: postgres specified version, tasks improved and Bump Versions ([`7b17681`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b176810cc7fec3ac7e4c0ff044922eb4491c85b))
+
 ## v1.12.0 (2025-06-04)
 
 ### Chores

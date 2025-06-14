@@ -13,6 +13,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
+from django.utils.translation import gettext_lazy as _
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
@@ -103,7 +104,7 @@ def upload_image(request):
     file_path = os.path.normpath(file_path)
 
     if not file_path.startswith(upload_dir):
-        raise ValidationError("Invalid file path")
+        raise ValidationError(_("Invalid file path"))
 
     if os.path.exists(file_path):
         sanitized_name = str(uuid4()) + "." + file_name_suffix

@@ -4,7 +4,8 @@ from typing import Any, TypedDict
 
 from django.conf import settings
 from django.db import models
-from meilisearch.models.task import TaskInfo
+from django.db.models.fields import Field
+from meilisearch.models.task import Task, TaskInfo
 
 from meili._client import client as _client
 from meili.dataclasses import MeiliIndexSettings
@@ -26,7 +27,7 @@ class _Meili(TypedDict):
     filterable_fields: Iterable[str] | None
     sortable_fields: Iterable[str] | None
     supports_geo: bool
-    tasks: list[TaskInfo]
+    tasks: list[Task | TaskInfo]
     include_pk_in_search: bool
 
 
@@ -34,23 +35,25 @@ class IndexMixin(models.Model):
     meilisearch: IndexQuerySet
     _meilisearch: _Meili
 
+    objects: models.Manager
+
     class Meta:
         abstract = True
 
     class MeiliMeta:
-        displayed_fields: Iterable[str] = None
-        searchable_fields: Iterable[str] = None
-        filterable_fields: Iterable[str] = None
-        sortable_fields: Iterable[str] = None
-        ranking_rules: Iterable[str] = None
-        stop_words: Iterable[str] = None
-        synonyms: dict[str, list[str]] = None
-        distinct_attribute: str = None
-        typo_tolerance: dict[str, Any] = None
-        faceting: dict[str, Any] = None
-        pagination: dict[str, Any] = None
+        displayed_fields: Iterable[str] | None = None
+        searchable_fields: Iterable[str] | None = None
+        filterable_fields: Iterable[str] | None = None
+        sortable_fields: Iterable[str] | None = None
+        ranking_rules: Iterable[str] | None = None
+        stop_words: Iterable[str] | None = None
+        synonyms: dict[str, list[str]] | None = None
+        distinct_attribute: str | None = None
+        typo_tolerance: dict[str, Any] | None = None
+        faceting: dict[str, Any] | None = None
+        pagination: dict[str, Any] | None = None
         supports_geo: bool = False
-        index_name: str = None
+        index_name: str | None = None
         primary_key: str = "pk"
         include_pk_in_search: bool = False
 
@@ -159,9 +162,13 @@ class IndexMixin(models.Model):
                 data[field_name] = None
 
         if getattr(self.MeiliMeta, "include_pk_in_search", False):
-            data[self.MeiliMeta.primary_key] = self._meta.get_field(
-                self.MeiliMeta.primary_key
-            ).value_to_string(self)
+            field = self._meta.get_field(self.MeiliMeta.primary_key)
+            if isinstance(field, Field):
+                data[self.MeiliMeta.primary_key] = field.value_to_string(self)
+            else:
+                data[self.MeiliMeta.primary_key] = str(
+                    getattr(self, self.MeiliMeta.primary_key)
+                )
 
         return data
 

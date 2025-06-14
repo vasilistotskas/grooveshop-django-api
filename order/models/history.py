@@ -4,20 +4,20 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
 from core.models import TimeStampMixinModel, UUIDModel
+from order.managers.history import OrderHistoryManager, OrderItemHistoryManager
 
 
 class OrderHistory(TimeStampMixinModel, UUIDModel):
-    CHANGE_TYPE_CHOICES = [
-        ("STATUS", _("Status Change")),
-        ("PAYMENT", _("Payment Update")),
-        ("SHIPPING", _("Shipping Update")),
-        ("CUSTOMER", _("Customer Info Update")),
-        ("ITEMS", _("Items Update")),
-        ("ADDRESS", _("Address Update")),
-        ("NOTE", _("Note Added")),
-        ("REFUND", _("Refund Processed")),
-        ("OTHER", _("Other Change")),
-    ]
+    class OrderHistoryChangeType(models.TextChoices):
+        STATUS = "STATUS", _("Status Change")
+        PAYMENT = "PAYMENT", _("Payment Update")
+        SHIPPING = "SHIPPING", _("Shipping Update")
+        CUSTOMER = "CUSTOMER", _("Customer Info Update")
+        ITEMS = "ITEMS", _("Items Update")
+        ADDRESS = "ADDRESS", _("Address Update")
+        NOTE = "NOTE", _("Note Added")
+        REFUND = "REFUND", _("Refund Processed")
+        OTHER = "OTHER", _("Other Change")
 
     order = models.ForeignKey(
         "order.Order",
@@ -35,7 +35,7 @@ class OrderHistory(TimeStampMixinModel, UUIDModel):
     change_type = models.CharField(
         _("Change Type"),
         max_length=20,
-        choices=CHANGE_TYPE_CHOICES,
+        choices=OrderHistoryChangeType,
     )
     previous_value = models.JSONField(
         _("Previous Value"),
@@ -66,6 +66,8 @@ class OrderHistory(TimeStampMixinModel, UUIDModel):
         blank=True,
         help_text=_("User agent of the browser/client that made the change."),
     )
+
+    objects = OrderHistoryManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Order History")
@@ -213,12 +215,11 @@ class OrderHistory(TimeStampMixinModel, UUIDModel):
 
 
 class OrderItemHistory(TimeStampMixinModel, UUIDModel):
-    CHANGE_TYPE_CHOICES = [
-        ("QUANTITY", _("Quantity Change")),
-        ("PRICE", _("Price Update")),
-        ("REFUND", _("Item Refund")),
-        ("OTHER", _("Other Change")),
-    ]
+    class OrderItemHistoryChangeType(models.TextChoices):
+        QUANTITY = "QUANTITY", _("Quantity Change")
+        PRICE = "PRICE", _("Price Update")
+        REFUND = "REFUND", _("Item Refund")
+        OTHER = "OTHER", _("Other Change")
 
     order_item = models.ForeignKey(
         "order.OrderItem",
@@ -236,7 +237,7 @@ class OrderItemHistory(TimeStampMixinModel, UUIDModel):
     change_type = models.CharField(
         _("Change Type"),
         max_length=20,
-        choices=CHANGE_TYPE_CHOICES,
+        choices=OrderItemHistoryChangeType,
     )
     previous_value = models.JSONField(
         _("Previous Value"),
@@ -256,6 +257,8 @@ class OrderItemHistory(TimeStampMixinModel, UUIDModel):
         default="",
         help_text=_("Description of what changed."),
     )
+
+    objects = OrderItemHistoryManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Order Item History")

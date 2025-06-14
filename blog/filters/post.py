@@ -1,3 +1,4 @@
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
@@ -49,6 +50,20 @@ class BlogPostFilter(filters.FilterSet):
         label="Minimum View Count",
         help_text=_("Filter by minimum number of views"),
     )
+    category_name = filters.CharFilter(
+        field_name="category__translations__name",
+        lookup_expr="icontains",
+        help_text=_("Filter by category name (case-insensitive)"),
+    )
+    tag_name = filters.CharFilter(
+        field_name="tags__translations__label",
+        lookup_expr="icontains",
+        help_text=_("Filter by tag label (case-insensitive)"),
+    )
+    author_name = filters.CharFilter(
+        method="filter_author_name",
+        help_text=_("Filter by author full name (case-insensitive)"),
+    )
 
     class Meta:
         model = BlogPost
@@ -57,12 +72,25 @@ class BlogPostFilter(filters.FilterSet):
             "tags",
             "slug",
             "author",
+            "category",
             "title",
             "author_email",
+            "author_name",
+            "category_name",
+            "tag_name",
             "featured",
+            "is_published",
             "min_likes",
             "min_comments",
             "min_tags",
             "min_view_count",
-            "category",
         ]
+
+    def filter_author_name(self, queryset, name, value):
+        if value:
+            return queryset.filter(
+                Q(author__user__first_name__icontains=value)
+                | Q(author__user__last_name__icontains=value)
+                | Q(author__user__username__icontains=value)
+            )
+        return queryset

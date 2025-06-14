@@ -14,7 +14,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
         "active",
         "payment_type_badge",
         "cost",
-        "free_for_order_amount",
+        "free_threshold",
     ]
     list_filter = ("active", "is_online_payment", "requires_confirmation")
     search_fields = (
@@ -59,7 +59,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
             {
                 "fields": (
                     "cost",
-                    "free_for_order_amount",
+                    "free_threshold",
                 ),
             },
         ),

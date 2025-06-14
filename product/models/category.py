@@ -5,31 +5,15 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from mptt.fields import TreeForeignKey
-from mptt.managers import TreeManager
 from mptt.models import MPTTModel
-from mptt.querysets import TreeQuerySet
-from parler.managers import TranslatableManager, TranslatableQuerySet
 from parler.models import TranslatableModel, TranslatedFields
 from tinymce.models import HTMLField
 
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
 from core.utils.generators import SlugifyConfig, unique_slugify
+from product.managers.category import CategoryManager
 from product.models.product import Product
 from seo.models import SeoModel
-
-
-class CategoryQuerySet(TranslatableQuerySet, TreeQuerySet):
-    def as_manager(cls):
-        manager = CategoryManager.from_queryset(cls)()
-        manager._built_with_as_manager = True
-        return manager
-
-    as_manager.queryset_only = True
-    as_manager = classmethod(as_manager)
-
-
-class CategoryManager(TreeManager, TranslatableManager):
-    _queryset_class = CategoryQuerySet
 
 
 class ProductCategory(
@@ -42,6 +26,7 @@ class ProductCategory(
 ):
     id = models.BigAutoField(primary_key=True)
     slug = models.SlugField(_("Slug"), max_length=255, unique=True)
+    active = models.BooleanField(_("Active"), default=True)
     menu_image_one = models.ImageField(
         _("Menu Image One"),
         upload_to="uploads/categories/",

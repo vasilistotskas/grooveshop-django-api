@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
+from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_field
-from parler_rest.fields import TranslatedFieldsField
 from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
@@ -9,18 +9,20 @@ from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
 from blog.models.post import BlogPost
 from blog.models.tag import BlogTag
+from blog.utils import calculate_reading_time
 from core.api.schema import generate_schema_multi_lang
+from core.utils.serializers import TranslatedFieldExtended
 
 User = get_user_model()
 
 
 @extend_schema_field(generate_schema_multi_lang(BlogPost))
-class TranslatedFieldsFieldExtend(TranslatedFieldsField):
+class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
 
 
-class BlogPostSerializer(
-    TranslatableModelSerializer, serializers.ModelSerializer
+class BlogPostListSerializer(
+    TranslatableModelSerializer, serializers.ModelSerializer[BlogPost]
 ):
     likes = PrimaryKeyRelatedField(queryset=User.objects.all(), many=True)
     category = PrimaryKeyRelatedField(queryset=BlogCategory.objects.all())
@@ -28,42 +30,154 @@ class BlogPostSerializer(
     author = PrimaryKeyRelatedField(queryset=BlogAuthor.objects.all())
     translations = TranslatedFieldsFieldExtend(shared_model=BlogPost)
 
+    reading_time = serializers.SerializerMethodField()
+    content_preview = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BlogPost
+        fields = (
+            "id",
+            "uuid",
+            "slug",
+            "likes",
+            "translations",
+            "author",
+            "category",
+            "tags",
+            "featured",
+            "view_count",
+            "likes_count",
+            "comments_count",
+            "tags_count",
+            "is_published",
+            "published_at",
+            "created_at",
+            "updated_at",
+            "main_image_path",
+            "reading_time",
+            "content_preview",
+            "absolute_url",
+        )
+        read_only_fields = (
+            "id",
+            "uuid",
+            "view_count",
+            "likes_count",
+            "comments_count",
+            "tags_count",
+            "published_at",
+            "created_at",
+            "updated_at",
+            "main_image_path",
+            "absolute_url",
+        )
+
+    def get_reading_time(self, obj: BlogPost) -> int:
+        if hasattr(obj, "reading_time"):
+            return obj.reading_time
+        body = obj.safe_translation_getter("body", any_language=True)
+        if body:
+            return calculate_reading_time(body)
+        return 1
+
+    def get_content_preview(self, obj: BlogPost) -> str:
+        body = obj.safe_translation_getter("body", any_language=True)
+        if body:
+            preview = body[:200]
+            return f"{preview}..." if len(body) > 200 else preview
+        return ""
+
+
+class BlogPostDetailSerializer(BlogPostListSerializer):
+    likes = PrimaryKeyRelatedField(many=True, read_only=True)
+    user_has_liked = serializers.SerializerMethodField()
+
+    class Meta(BlogPostListSerializer.Meta):
+        fields = (
+            *BlogPostListSerializer.Meta.fields,
+            "likes",
+            "user_has_liked",
+            "seo_title",
+            "seo_description",
+            "seo_keywords",
+            "is_visible",
+        )
+        read_only_fields = (
+            *BlogPostListSerializer.Meta.read_only_fields,
+            "likes",
+            "is_visible",
+        )
+
+    def get_user_has_liked(self, obj: BlogPost) -> bool:
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            return obj.likes.filter(id=request.user.id).exists()
+        return False
+
+
+class BlogPostWriteSerializer(
+    TranslatableModelSerializer, serializers.ModelSerializer[BlogPost]
+):
+    category = PrimaryKeyRelatedField(queryset=BlogCategory.objects.all())
+    tags = PrimaryKeyRelatedField(
+        queryset=BlogTag.objects.all(), many=True, required=False
+    )
+    author = PrimaryKeyRelatedField(queryset=BlogAuthor.objects.all())
+    translations = TranslatedFieldsFieldExtend(shared_model=BlogPost)
+
     class Meta:
         model = BlogPost
         fields = (
             "translations",
-            "id",
             "slug",
-            "likes",
             "category",
             "tags",
             "author",
             "featured",
-            "view_count",
             "is_published",
-            "created_at",
-            "updated_at",
-            "published_at",
-            "is_visible",
-            "uuid",
-            "main_image_path",
-            "likes_count",
-            "comments_count",
-            "tags_count",
-            "absolute_url",
             "seo_title",
             "seo_description",
             "seo_keywords",
         )
-        read_only_fields = (
-            "created_at",
-            "updated_at",
-            "published_at",
-            "is_visible",
-            "uuid",
-            "main_image_path",
-            "likes_count",
-            "comments_count",
-            "tags_count",
-            "absolute_url",
-        )
+
+    def validate_slug(self, value: str) -> str:
+        if not value:
+            raise serializers.ValidationError(_("Slug is required."))
+
+        queryset = BlogPost.objects.filter(slug=value)
+        if self.instance:
+            queryset = queryset.exclude(pk=self.instance.pk)
+
+        if queryset.exists():
+            raise serializers.ValidationError(
+                _("A post with this slug already exists.")
+            )
+
+        return value
+
+    @staticmethod
+    def validate_tags(value: list) -> list:
+        if not value:
+            raise serializers.ValidationError(
+                _("At least one tag is required.")
+            )
+
+        if len(value) > 10:
+            raise serializers.ValidationError(
+                _("Maximum 10 tags allowed per post.")
+            )
+
+        return value
+
+
+class BlogPostLikedPostsRequestSerializer(serializers.Serializer):
+    post_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        help_text=_("List of post IDs to check for likes"),
+    )
+
+
+class BlogPostLikedPostsResponseSerializer(serializers.Serializer):
+    post_ids = serializers.ListField(
+        child=serializers.IntegerField(), help_text=_("List of liked post IDs")
+    )

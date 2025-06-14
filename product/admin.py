@@ -185,7 +185,6 @@ class ProductAdmin(
         "display_discount_value",
         "display_price_save_percent",
         "display_review_average",
-        "display_approved_review_average",
     )
     list_select_related = ["category", "vat"]
     list_per_page = 25
@@ -256,14 +255,6 @@ class ProductAdmin(
 
     display_review_average.short_description = _("Rating")
     display_review_average.admin_order_field = "review_average_field"
-
-    def display_approved_review_average(self, obj):
-        return f"{obj.approved_review_average:.1f}/10"
-
-    display_approved_review_average.short_description = _("Approved Rating")
-    display_approved_review_average.admin_order_field = (
-        "approved_review_average_field"
-    )
 
     @action(
         description=_("Activate selected products"),

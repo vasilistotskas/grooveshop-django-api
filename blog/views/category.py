@@ -7,17 +7,21 @@ from drf_spectacular.utils import (
     OpenApiParameter,
     extend_schema,
     extend_schema_view,
-    inline_serializer,
 )
-from rest_framework import serializers
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
 
 from blog.filters.category import BlogCategoryFilter
 from blog.models.category import BlogCategory
-from blog.serializers.category import BlogCategorySerializer
-from blog.serializers.post import BlogPostSerializer
+from blog.serializers.category import (
+    BlogCategoryDetailSerializer,
+    BlogCategoryListSerializer,
+    BlogCategoryReorderRequestSerializer,
+    BlogCategoryReorderResponseSerializer,
+    BlogCategoryWriteSerializer,
+)
+from blog.serializers.post import BlogPostListSerializer
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
@@ -35,7 +39,7 @@ from core.utils.views import cache_methods
         ),
         tags=["Blog Categories"],
         responses={
-            200: BlogCategorySerializer(many=True),
+            200: BlogCategoryListSerializer(many=True),
         },
     ),
     retrieve=extend_schema(
@@ -46,7 +50,7 @@ from core.utils.views import cache_methods
         ),
         tags=["Blog Categories"],
         responses={
-            200: BlogCategorySerializer,
+            200: BlogCategoryDetailSerializer,
             404: ErrorResponseSerializer,
         },
     ),
@@ -56,8 +60,9 @@ from core.utils.views import cache_methods
             "Create a new blog category. Supports hierarchical structure."
         ),
         tags=["Blog Categories"],
+        request=BlogCategoryWriteSerializer,
         responses={
-            201: BlogCategorySerializer,
+            201: BlogCategoryDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
         },
@@ -66,8 +71,9 @@ from core.utils.views import cache_methods
         summary=_("Update a blog category"),
         description=_("Update blog category information."),
         tags=["Blog Categories"],
+        request=BlogCategoryWriteSerializer,
         responses={
-            200: BlogCategorySerializer,
+            200: BlogCategoryDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
@@ -77,8 +83,9 @@ from core.utils.views import cache_methods
         summary=_("Partially update a blog category"),
         description=_("Partially update blog category information."),
         tags=["Blog Categories"],
+        request=BlogCategoryWriteSerializer,
         responses={
-            200: BlogCategorySerializer,
+            200: BlogCategoryDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
@@ -115,7 +122,7 @@ from core.utils.views import cache_methods
             ),
         ],
         responses={
-            200: BlogPostSerializer(many=True),
+            200: BlogPostListSerializer(many=True),
             404: ErrorResponseSerializer,
         },
     ),
@@ -124,7 +131,7 @@ from core.utils.views import cache_methods
         description=_("Get direct children of this category."),
         tags=["Blog Categories"],
         responses={
-            200: BlogCategorySerializer(many=True),
+            200: BlogCategoryListSerializer(many=True),
             404: ErrorResponseSerializer,
         },
     ),
@@ -135,7 +142,7 @@ from core.utils.views import cache_methods
         ),
         tags=["Blog Categories"],
         responses={
-            200: BlogCategorySerializer(many=True),
+            200: BlogCategoryListSerializer(many=True),
             404: ErrorResponseSerializer,
         },
     ),
@@ -146,7 +153,7 @@ from core.utils.views import cache_methods
         ),
         tags=["Blog Categories"],
         responses={
-            200: BlogCategorySerializer(many=True),
+            200: BlogCategoryListSerializer(many=True),
             404: ErrorResponseSerializer,
         },
     ),
@@ -155,30 +162,7 @@ from core.utils.views import cache_methods
         description=_("Get sibling categories (same parent level)."),
         tags=["Blog Categories"],
         responses={
-            200: BlogCategorySerializer(many=True),
-            404: ErrorResponseSerializer,
-        },
-    ),
-    stats=extend_schema(
-        summary=_("Get category statistics"),
-        description=_("Get comprehensive statistics about this category."),
-        tags=["Blog Categories"],
-        responses={
-            200: inline_serializer(
-                name="BlogCategoryStatsResponse",
-                fields={
-                    "direct_post_count": serializers.IntegerField(),
-                    "recursive_post_count": serializers.CharField(),
-                    "children_count": serializers.IntegerField(),
-                    "descendants_count": serializers.IntegerField(),
-                    "level": serializers.IntegerField(),
-                    "absolute_url": serializers.CharField(),
-                    "main_image_path": serializers.CharField(),
-                    "has_image": serializers.BooleanField(),
-                    "is_root": serializers.BooleanField(),
-                    "is_leaf": serializers.BooleanField(),
-                },
-            ),
+            200: BlogCategoryListSerializer(many=True),
             404: ErrorResponseSerializer,
         },
     ),
@@ -191,7 +175,7 @@ from core.utils.views import cache_methods
         ),
         tags=["Blog Categories"],
         responses={
-            200: BlogCategorySerializer(many=True),
+            200: BlogCategoryListSerializer(many=True),
         },
     ),
     reorder=extend_schema(
@@ -200,28 +184,9 @@ from core.utils.views import cache_methods
             "Batch reorder categories by updating their sort_order values."
         ),
         tags=["Blog Categories"],
-        request=inline_serializer(
-            name="BlogCategoryReorderRequest",
-            fields={
-                "categories": serializers.ListField(
-                    child=inline_serializer(
-                        name="BlogCategoryReorderItem",
-                        fields={
-                            "id": serializers.IntegerField(),
-                            "sort_order": serializers.IntegerField(),
-                        },
-                    )
-                )
-            },
-        ),
+        request=BlogCategoryReorderRequestSerializer,
         responses={
-            200: inline_serializer(
-                name="BlogCategoryReorderResponse",
-                fields={
-                    "updated_count": serializers.IntegerField(),
-                    "message": serializers.CharField(),
-                },
-            ),
+            200: BlogCategoryReorderResponseSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
         },
@@ -255,8 +220,18 @@ class BlogCategoryViewSet(MultiSerializerMixin, BaseModelViewSet):
     ]
 
     serializers = {
-        "default": BlogCategorySerializer,
-        "posts": BlogPostSerializer,
+        "list": BlogCategoryListSerializer,
+        "retrieve": BlogCategoryDetailSerializer,
+        "create": BlogCategoryWriteSerializer,
+        "update": BlogCategoryWriteSerializer,
+        "partial_update": BlogCategoryWriteSerializer,
+        "posts": BlogPostListSerializer,
+        "children": BlogCategoryListSerializer,
+        "descendants": BlogCategoryListSerializer,
+        "ancestors": BlogCategoryListSerializer,
+        "siblings": BlogCategoryListSerializer,
+        "tree": BlogCategoryListSerializer,
+        "reorder": BlogCategoryReorderResponseSerializer,
     }
 
     def get_queryset(self):
@@ -284,7 +259,7 @@ class BlogCategoryViewSet(MultiSerializerMixin, BaseModelViewSet):
             self.get_queryset().filter(parent__isnull=True)
         )
 
-        serializer = BlogCategorySerializer(queryset, many=True)
+        serializer = BlogCategoryListSerializer(queryset, many=True)
         return Response(serializer.data)
 
     @action(detail=True, methods=["GET"])
@@ -337,13 +312,12 @@ class BlogCategoryViewSet(MultiSerializerMixin, BaseModelViewSet):
     @action(detail=True, methods=["GET"])
     def ancestors(self, request, pk=None):
         category = self.get_object()
-        ancestors = (
+        queryset = (
             category.get_ancestors()
             .select_related("parent")
             .prefetch_related("translations")
         )
-        serializer = BlogCategorySerializer(ancestors, many=True)
-        return Response(serializer.data)
+        return self.paginate_and_serialize(queryset, request)
 
     @action(detail=True, methods=["GET"])
     def siblings(self, request, pk=None):
@@ -355,28 +329,9 @@ class BlogCategoryViewSet(MultiSerializerMixin, BaseModelViewSet):
         )
         return self.paginate_and_serialize(queryset, request)
 
-    @action(detail=True, methods=["GET"])
-    def stats(self, request, pk=None):
-        category = self.get_object()
-
-        stats = {
-            "direct_post_count": category.post_count,
-            "recursive_post_count": category.recursive_post_count,
-            "children_count": category.get_children().count(),
-            "descendants_count": category.get_descendants().count(),
-            "level": category.level,
-            "absolute_url": category.absolute_url,
-            "main_image_path": category.main_image_path,
-            "has_image": bool(category.image),
-            "is_root": category.is_root_node(),
-            "is_leaf": category.is_leaf_node(),
-        }
-
-        return Response(stats)
-
     @action(detail=False, methods=["GET"])
     def tree(self, request):
-        root_categories = (
+        queryset = (
             BlogCategory.objects.filter(parent__isnull=True)
             .select_related("parent")
             .prefetch_related(
@@ -386,21 +341,17 @@ class BlogCategoryViewSet(MultiSerializerMixin, BaseModelViewSet):
                 "blog_posts",
             )
         )
-
-        serializer = BlogCategorySerializer(root_categories, many=True)
-        return Response(serializer.data)
+        return self.paginate_and_serialize(queryset, request)
 
     @action(detail=False, methods=["POST"])
     def reorder(self, request):
-        categories_data = request.data.get("categories", [])
+        serializer = BlogCategoryReorderRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
 
-        if not categories_data:
-            return Response(
-                {"detail": _("No categories provided for reordering.")},
-                status=400,
-            )
-
+        categories_data = serializer.validated_data["categories"]
         updated_count = 0
+
         for category_data in categories_data:
             try:
                 category = BlogCategory.objects.get(id=category_data["id"])
@@ -410,9 +361,12 @@ class BlogCategoryViewSet(MultiSerializerMixin, BaseModelViewSet):
             except BlogCategory.DoesNotExist:
                 continue
 
-        return Response(
-            {
-                "updated_count": updated_count,
-                "message": _("Categories reordered successfully."),
-            }
+        response_data = {
+            "updated_count": updated_count,
+            "message": _("Categories reordered successfully."),
+        }
+
+        response_serializer = BlogCategoryReorderResponseSerializer(
+            response_data
         )
+        return Response(response_serializer.data)

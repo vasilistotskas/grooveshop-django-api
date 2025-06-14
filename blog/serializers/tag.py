@@ -1,38 +1,71 @@
+from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_field
-from parler_rest.fields import TranslatedFieldsField
 from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 
-from blog.models.post import BlogPost
 from blog.models.tag import BlogTag
 from core.api.schema import generate_schema_multi_lang
+from core.utils.serializers import TranslatedFieldExtended
 
 
-@extend_schema_field(generate_schema_multi_lang(BlogPost))
-class TranslatedFieldsFieldExtend(TranslatedFieldsField):
+@extend_schema_field(generate_schema_multi_lang(BlogTag))
+class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
 
 
-class BlogTagSerializer(
-    TranslatableModelSerializer, serializers.ModelSerializer
+class BlogTagListSerializer(
+    TranslatableModelSerializer, serializers.ModelSerializer[BlogTag]
 ):
+    posts_count = serializers.CharField(
+        source="get_posts_count",
+        read_only=True,
+        help_text=_("Number of blog posts using this tag"),
+    )
     translations = TranslatedFieldsFieldExtend(shared_model=BlogTag)
 
     class Meta:
         model = BlogTag
         fields = (
-            "translations",
             "id",
+            "translations",
             "active",
             "sort_order",
+            "posts_count",
             "created_at",
             "updated_at",
             "uuid",
-            "get_posts_count",
         )
         read_only_fields = (
+            "id",
+            "posts_count",
             "created_at",
             "updated_at",
             "uuid",
-            "get_posts_count",
+        )
+
+
+class BlogTagDetailSerializer(BlogTagListSerializer):
+    class Meta(BlogTagListSerializer.Meta):
+        fields = (*BlogTagListSerializer.Meta.fields,)
+
+
+class BlogTagWriteSerializer(
+    TranslatableModelSerializer, serializers.ModelSerializer[BlogTag]
+):
+    translations = TranslatedFieldsFieldExtend(shared_model=BlogTag)
+
+    @staticmethod
+    def validate_sort_order(value: int) -> int:
+        if value is not None and value < 0:
+            raise serializers.ValidationError(
+                _("Sort order cannot be negative.")
+            )
+        return value
+
+    class Meta:
+        model = BlogTag
+        fields = (
+            "translations",
+            "active",
+            "sort_order",
         )

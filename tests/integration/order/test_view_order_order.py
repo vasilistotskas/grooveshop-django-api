@@ -10,7 +10,7 @@ from rest_framework.test import APITestCase
 from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from country.factories import CountryFactory
 from country.models import Country
-from order.enum.status_enum import OrderStatusEnum
+from order.enum.status import OrderStatusEnum
 from order.factories.order import OrderFactory
 from order.models.item import OrderItem
 from order.models.order import Order
@@ -60,7 +60,7 @@ class OrderViewSetTestCase(APITestCase):
         )
 
         products = ProductFactory.create_batch(
-            2, num_images=0, num_reviews=0, stock=20
+            2, active=True, num_images=0, num_reviews=0, stock=20
         )
         self.order_items = []
 

@@ -5,7 +5,7 @@ from typing import Any, Optional
 from django.conf import settings
 from djmoney.money import Money
 
-from order.enum.status_enum import PaymentStatusEnum
+from order.enum.status import PaymentStatusEnum
 
 logger = logging.getLogger(__name__)
 

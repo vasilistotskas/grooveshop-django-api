@@ -8,6 +8,7 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
 from core.models import TimeStampMixinModel, UUIDModel
+from vat.managers import VatManager
 
 MIN_VAT_VALUE = Decimal("0.0")
 MAX_VAT_VALUE = Decimal("100.0")
@@ -32,6 +33,8 @@ class Vat(TimeStampMixinModel, UUIDModel):
         ],
     )
 
+    objects = VatManager()
+
     class Meta(TypedModelMeta):
         verbose_name = _("Vat")
         verbose_name_plural = _("Vats")
@@ -55,3 +58,7 @@ class Vat(TimeStampMixinModel, UUIDModel):
     def get_highest_vat_value():
         highest_vat = Vat.objects.all().order_by("-value").first()
         return highest_vat.value if highest_vat else MIN_VAT_VALUE
+
+    @property
+    def display_name(self) -> str:
+        return f"{self.value}%"

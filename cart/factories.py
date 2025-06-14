@@ -3,7 +3,6 @@ import uuid
 
 import factory
 from django.apps import apps
-from django.contrib.auth import get_user_model
 from django.db.models import Count
 from django.utils import timezone
 from faker import Faker
@@ -12,10 +11,12 @@ from cart.models import Cart, CartItem
 
 fake = Faker()
 
-User = get_user_model()
-
 
 def get_or_create_user():
+    from django.contrib.auth import get_user_model
+
+    User = get_user_model()
+
     if User.objects.exists():
         user = (
             User.objects.annotate(num_carts=Count("cart"))
@@ -73,7 +74,7 @@ def get_or_create_cart(is_guest=False):
 class CartFactory(factory.django.DjangoModelFactory):
     user = factory.LazyFunction(get_or_create_user)
     last_activity = factory.LazyFunction(timezone.now)
-    session_key = factory.LazyFunction(uuid.uuid4)
+    session_key = factory.LazyFunction(lambda: str(uuid.uuid4()))
 
     class Meta:
         model = Cart

@@ -6,7 +6,6 @@ from functools import wraps
 
 from celery import Task
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.core import management
 from django.core.exceptions import ImproperlyConfigured
 from django.core.mail import send_mail
@@ -19,7 +18,6 @@ from core import celery_app
 
 logger = logging.getLogger(__name__)
 
-User = get_user_model()
 languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
 ]
@@ -369,6 +367,10 @@ def clear_log_files_task(days=30):
 )
 @track_task_metrics
 def send_inactive_user_notifications():
+    from django.contrib.auth import get_user_model
+
+    User = get_user_model()
+
     cutoff_date = timezone.now() - timedelta(days=60)
 
     inactive_users = User.objects.filter(

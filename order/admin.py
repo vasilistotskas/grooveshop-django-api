@@ -4,7 +4,7 @@ from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin
 
-from order.enum.status_enum import OrderStatusEnum
+from order.enum.status import OrderStatusEnum
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.services import OrderService

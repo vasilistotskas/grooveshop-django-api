@@ -6,9 +6,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
-    inline_serializer,
 )
-from rest_framework import serializers
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
 from rest_framework.permissions import IsAuthenticated
@@ -22,9 +20,12 @@ from core.utils.views import cache_methods
 from user.filters.address import UserAddressFilter
 from user.models.address import UserAddress
 from user.serializers.address import (
-    UserAddressCreateSerializer,
-    UserAddressSerializer,
-    UserAddressUpdateSerializer,
+    BulkDeleteAddressesRequestSerializer,
+    BulkDeleteAddressesResponseSerializer,
+    UserAddressDetailSerializer,
+    UserAddressListSerializer,
+    UserAddressWriteSerializer,
+    ValidateAddressResponseSerializer,
 )
 
 
@@ -36,7 +37,7 @@ from user.serializers.address import (
         ),
         tags=["User Addresses"],
         responses={
-            200: UserAddressSerializer(many=True),
+            200: UserAddressListSerializer(many=True),
             401: ErrorResponseSerializer,
         },
     ),
@@ -47,7 +48,7 @@ from user.serializers.address import (
         ),
         tags=["User Addresses"],
         responses={
-            200: UserAddressSerializer,
+            200: UserAddressDetailSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
         },
@@ -56,8 +57,9 @@ from user.serializers.address import (
         summary=_("Create a user address"),
         description=_("Create a new address for the authenticated user."),
         tags=["User Addresses"],
+        request=UserAddressWriteSerializer,
         responses={
-            201: UserAddressSerializer,
+            201: UserAddressDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
         },
@@ -66,8 +68,9 @@ from user.serializers.address import (
         summary=_("Update a user address"),
         description=_("Update user address information."),
         tags=["User Addresses"],
+        request=UserAddressWriteSerializer,
         responses={
-            200: UserAddressSerializer,
+            200: UserAddressDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
@@ -77,8 +80,9 @@ from user.serializers.address import (
         summary=_("Partially update a user address"),
         description=_("Partially update user address information."),
         tags=["User Addresses"],
+        request=UserAddressWriteSerializer,
         responses={
-            200: UserAddressSerializer,
+            200: UserAddressDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
@@ -100,7 +104,7 @@ from user.serializers.address import (
         tags=["User Addresses"],
         request=None,
         responses={
-            200: UserAddressSerializer,
+            200: UserAddressDetailSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
         },
@@ -110,55 +114,18 @@ from user.serializers.address import (
         description=_("Retrieve the user's main address."),
         tags=["User Addresses"],
         responses={
-            200: UserAddressSerializer,
+            200: UserAddressDetailSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
-        },
-    ),
-    stats=extend_schema(
-        summary=_("Get address statistics"),
-        description=_("Get statistics about the user's addresses."),
-        tags=["User Addresses"],
-        responses={
-            200: inline_serializer(
-                name="UserAddressStatsResponse",
-                fields={
-                    "total_addresses": serializers.IntegerField(),
-                    "addresses_by_type": serializers.DictField(
-                        child=serializers.IntegerField()
-                    ),
-                    "addresses_by_country": serializers.DictField(
-                        child=serializers.IntegerField()
-                    ),
-                    "addresses_by_region": serializers.DictField(
-                        child=serializers.IntegerField()
-                    ),
-                    "has_main": serializers.BooleanField(),
-                },
-            ),
-            401: ErrorResponseSerializer,
         },
     ),
     validate_address=extend_schema(
         summary=_("Validate address"),
         description=_("Validate an address without saving it."),
         tags=["User Addresses"],
-        request=UserAddressCreateSerializer,
+        request=UserAddressWriteSerializer,
         responses={
-            200: inline_serializer(
-                name="ValidateAddressResponse",
-                fields={
-                    "valid": serializers.BooleanField(),
-                    "errors": serializers.DictField(
-                        child=serializers.CharField()
-                    ),
-                    "suggestions": serializers.ListField(
-                        child=serializers.DictField(
-                            child=serializers.CharField()
-                        )
-                    ),
-                },
-            ),
+            200: ValidateAddressResponseSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
         },
@@ -167,24 +134,9 @@ from user.serializers.address import (
         summary=_("Bulk delete addresses"),
         description=_("Delete multiple addresses by their IDs."),
         tags=["User Addresses"],
-        request=inline_serializer(
-            name="BulkDeleteAddressesRequest",
-            fields={
-                "address_ids": serializers.ListField(
-                    child=serializers.IntegerField()
-                )
-            },
-        ),
+        request=BulkDeleteAddressesRequestSerializer,
         responses={
-            200: inline_serializer(
-                name="BulkDeleteAddressesResponse",
-                fields={
-                    "deleted_count": serializers.IntegerField(),
-                    "deleted_ids": serializers.ListField(
-                        child=serializers.IntegerField()
-                    ),
-                },
-            ),
+            200: BulkDeleteAddressesResponseSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
         },
@@ -192,15 +144,16 @@ from user.serializers.address import (
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class UserAddressViewSet(MultiSerializerMixin, BaseModelViewSet):
-    serializer_class = UserAddressSerializer
     serializers = {
-        "default": UserAddressSerializer,
-        "list": UserAddressSerializer,
-        "retrieve": UserAddressSerializer,
-        "create": UserAddressCreateSerializer,
-        "update": UserAddressUpdateSerializer,
-        "partial_update": UserAddressUpdateSerializer,
-        "destroy": UserAddressSerializer,
+        "list": UserAddressListSerializer,
+        "retrieve": UserAddressDetailSerializer,
+        "create": UserAddressWriteSerializer,
+        "update": UserAddressWriteSerializer,
+        "partial_update": UserAddressWriteSerializer,
+        "set_main": UserAddressDetailSerializer,
+        "get_main": UserAddressDetailSerializer,
+        "validate_address": ValidateAddressResponseSerializer,
+        "bulk_delete": BulkDeleteAddressesResponseSerializer,
     }
     permission_classes = [IsAuthenticated]
     filterset_class = UserAddressFilter
@@ -260,54 +213,9 @@ class UserAddressViewSet(MultiSerializerMixin, BaseModelViewSet):
         except UserAddress.DoesNotExist:
             return Response({"detail": _("No main address found.")}, status=404)
 
-    @action(detail=False, methods=["GET"])
-    def stats(self, request):
-        queryset = self.get_queryset()
-
-        addresses_by_type = {}
-        for location_type in queryset.values_list(
-            "location_type", flat=True
-        ).distinct():
-            if location_type:
-                addresses_by_type[location_type] = queryset.filter(
-                    location_type=location_type
-                ).count()
-
-        addresses_by_country = {}
-        for country in (
-            queryset.select_related("country")
-            .values_list("country__name", flat=True)
-            .distinct()
-        ):
-            if country:
-                addresses_by_country[country] = queryset.filter(
-                    country__name=country
-                ).count()
-
-        addresses_by_region = {}
-        for region in (
-            queryset.select_related("region")
-            .values_list("region__name", flat=True)
-            .distinct()
-        ):
-            if region:
-                addresses_by_region[region] = queryset.filter(
-                    region__name=region
-                ).count()
-
-        stats = {
-            "total_addresses": queryset.count(),
-            "addresses_by_type": addresses_by_type,
-            "addresses_by_country": addresses_by_country,
-            "addresses_by_region": addresses_by_region,
-            "has_main": queryset.filter(is_main=True).exists(),
-        }
-
-        return Response(stats)
-
     @action(detail=False, methods=["POST"])
     def validate_address(self, request):
-        serializer = UserAddressCreateSerializer(
+        serializer = UserAddressWriteSerializer(
             data=request.data, context=self.get_serializer_context()
         )
 

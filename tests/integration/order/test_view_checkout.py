@@ -6,7 +6,7 @@ from rest_framework.test import APIClient, APITestCase
 from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from country.factories import CountryFactory
 from country.models import Country
-from order.enum.status_enum import OrderStatusEnum
+from order.enum.status import OrderStatusEnum
 from order.models.order import Order
 from pay_way.factories import PayWayFactory
 from pay_way.models import PayWay
@@ -38,8 +38,12 @@ class CheckoutViewAPITest(APITestCase):
 
     def test_successful_order_creation(self):
         self.client.force_authenticate(user=self.user)
-        product_1 = ProductFactory.create(stock=20, num_images=0, num_reviews=0)
-        product_2 = ProductFactory.create(stock=20, num_images=0, num_reviews=0)
+        product_1 = ProductFactory.create(
+            active=True, stock=20, num_images=0, num_reviews=0
+        )
+        product_2 = ProductFactory.create(
+            active=True, stock=20, num_images=0, num_reviews=0
+        )
 
         order_data = {
             "user": self.user.id,
@@ -59,7 +63,7 @@ class CheckoutViewAPITest(APITestCase):
             "phone": "2101234567",
             "mobile_phone": "6912345678",
             "customer_notes": "Test notes",
-            "shipping_price": {"amount": "10.00", "currency": "USD"},
+            "shipping_price": "10.00",
             "items": [
                 {
                     "product": product_1.id,

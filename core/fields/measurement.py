@@ -1,7 +1,8 @@
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from django.db.models import FloatField, Model
+from django.forms import ChoiceField, Field
 from django.utils.translation import gettext_lazy as _
 from measurement.base import BidimensionalMeasure, MeasureBase
 
@@ -31,10 +32,10 @@ class MeasurementField(FloatField):
 
     def __init__(
         self,
-        verbose_name: Optional[str] = None,
-        name: Optional[str] = None,
-        measurement: Optional[type[MeasureBase | BidimensionalMeasure]] = None,
-        unit_choices: Optional[list[tuple[str, str]]] = None,
+        verbose_name: str | None = None,
+        name: str | None = None,
+        measurement: type[MeasureBase | BidimensionalMeasure] | None = None,
+        unit_choices: list[tuple[str, str]] | None = None,
         *args,
         **kwargs,
     ):
@@ -74,7 +75,7 @@ class MeasurementField(FloatField):
             return unit_choices[0][0]
         return self.measurement.STANDARD_UNIT
 
-    def from_db_value(self, value: Optional[float], *args, **kwargs):
+    def from_db_value(self, value: float | None, *args, **kwargs):
         if value is None:
             return None
 
@@ -92,9 +93,11 @@ class MeasurementField(FloatField):
 
     def deserialize_value_from_string(self, value_str: str):
         try:
-            value, unit = value_str.split(":", 1)
-            value = float(value)
-            measure = get_measurement(self.measurement, value=value, unit=unit)
+            value_part, unit = value_str.split(":", 1)
+            value_float = float(value_part)
+            measure = get_measurement(
+                self.measurement, value=value_float, unit=unit
+            )
             return measure
         except ValueError as e:
             logger.error(f"Error deserializing measurement: {e}")
@@ -126,8 +129,19 @@ class MeasurementField(FloatField):
             unit=return_unit,
         )
 
-    def formfield(self, **kwargs):
-        defaults = {"form_class": MeasurementFormField}
-        defaults.update(kwargs)
-        defaults.update(self.widget_args)
-        return super().formfield(**defaults)
+    def formfield(
+        self,
+        form_class: type[Field] | None = None,
+        choices_form_class: type[ChoiceField] | None = None,
+        **kwargs: Any,
+    ) -> Field | None:
+        if form_class is None:
+            form_class = MeasurementFormField
+
+        kwargs.update(self.widget_args)
+
+        return super().formfield(
+            form_class=form_class,
+            choices_form_class=choices_form_class,
+            **kwargs,
+        )

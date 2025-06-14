@@ -9,7 +9,12 @@ from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel, TranslatedFields
 
 from core.models import TimeStampMixinModel, UUIDModel
-from notification.enum import NotificationKindEnum
+from notification.enum import (
+    NotificationCategoryEnum,
+    NotificationKindEnum,
+    NotificationPriorityEnum,
+)
+from notification.managers import NotificationManager
 
 EXPIRATION_DAYS = 6 * 30
 
@@ -22,6 +27,24 @@ class Notification(TranslatableModel, TimeStampMixinModel, UUIDModel):
         choices=NotificationKindEnum,
         default=NotificationKindEnum.INFO,
     )
+    category = models.CharField(
+        _("Category"),
+        max_length=50,
+        choices=NotificationCategoryEnum,
+        default=NotificationCategoryEnum.SYSTEM,
+    )
+    priority = models.CharField(
+        _("Priority"),
+        max_length=20,
+        choices=NotificationPriorityEnum,
+        default=NotificationPriorityEnum.NORMAL,
+    )
+    notification_type = models.CharField(
+        _("Notification Type"),
+        max_length=100,
+        blank=True,
+        help_text=_("Specific type of notification for categorization"),
+    )
     expiry_date = models.DateTimeField(
         _("Expiry Date"),
         null=True,
@@ -32,6 +55,8 @@ class Notification(TranslatableModel, TimeStampMixinModel, UUIDModel):
         title=models.CharField(_("Title"), max_length=250),
         message=models.TextField(_("Message")),
     )
+
+    objects = NotificationManager()
 
     def __str__(self):
         message_snippet = (
@@ -47,8 +72,16 @@ class Notification(TranslatableModel, TimeStampMixinModel, UUIDModel):
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
             BTreeIndex(fields=["kind"], name="notification_kind_ix"),
+            BTreeIndex(fields=["category"], name="notification_category_ix"),
+            BTreeIndex(fields=["priority"], name="notification_priority_ix"),
+            BTreeIndex(
+                fields=["notification_type"], name="notification_type_ix"
+            ),
             BTreeIndex(
                 fields=["expiry_date"], name="notification_expiry_date_ix"
+            ),
+            BTreeIndex(
+                fields=["category", "priority"], name="notification_cat_pri_ix"
             ),
         ]
 

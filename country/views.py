@@ -9,9 +9,14 @@ from rest_framework.filters import SearchFilter
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+from core.utils.serializers import MultiSerializerMixin
 from core.utils.views import cache_methods
 from country.models import Country
-from country.serializers import CountrySerializer
+from country.serializers import (
+    CountryDetailSerializer,
+    CountryListSerializer,
+    CountryWriteSerializer,
+)
 
 
 @extend_schema_view(
@@ -22,7 +27,7 @@ from country.serializers import CountrySerializer
         ),
         tags=["Countries"],
         responses={
-            200: CountrySerializer(many=True),
+            200: CountryListSerializer(many=True),
         },
     ),
     create=extend_schema(
@@ -30,7 +35,7 @@ from country.serializers import CountrySerializer
         description=_("Create a new country record. Requires authentication."),
         tags=["Countries"],
         responses={
-            201: CountrySerializer,
+            201: CountryDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
         },
@@ -40,7 +45,7 @@ from country.serializers import CountrySerializer
         description=_("Get detailed information about a specific country."),
         tags=["Countries"],
         responses={
-            200: CountrySerializer,
+            200: CountryDetailSerializer,
             404: ErrorResponseSerializer,
         },
     ),
@@ -48,8 +53,9 @@ from country.serializers import CountrySerializer
         summary=_("Update a country"),
         description=_("Update country information. Requires authentication."),
         tags=["Countries"],
+        request=CountryWriteSerializer,
         responses={
-            200: CountrySerializer,
+            200: CountryDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
@@ -61,8 +67,9 @@ from country.serializers import CountrySerializer
             "Partially update country information. Requires authentication."
         ),
         tags=["Countries"],
+        request=CountryWriteSerializer,
         responses={
-            200: CountrySerializer,
+            200: CountryDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
@@ -80,9 +87,8 @@ from country.serializers import CountrySerializer
     ),
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
-class CountryViewSet(BaseModelViewSet):
+class CountryViewSet(MultiSerializerMixin, BaseModelViewSet):
     queryset = Country.objects.all()
-    serializer_class = CountrySerializer
     filter_backends = [
         DjangoFilterBackend,
         PascalSnakeCaseOrderingFilter,
@@ -103,3 +109,10 @@ class CountryViewSet(BaseModelViewSet):
         "iso_cc",
         "phone_code",
     ]
+    serializers = {
+        "list": CountryListSerializer,
+        "retrieve": CountryDetailSerializer,
+        "create": CountryWriteSerializer,
+        "update": CountryWriteSerializer,
+        "partial_update": CountryWriteSerializer,
+    }

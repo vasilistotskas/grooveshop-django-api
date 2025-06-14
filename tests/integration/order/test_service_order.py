@@ -6,7 +6,7 @@ from django.db import transaction
 from django.test import TestCase
 from djmoney.money import Money
 
-from order.enum.status_enum import OrderStatusEnum
+from order.enum.status import OrderStatusEnum
 from order.factories.order import OrderFactory
 from order.models.order import Order
 from order.services import OrderService

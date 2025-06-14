@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch
 from django.http import HttpRequest
 from djmoney.money import Money
 
-from order.enum.status_enum import OrderStatusEnum
+from order.enum.status import OrderStatusEnum
 from order.models.history import OrderHistory, OrderItemHistory
 
 

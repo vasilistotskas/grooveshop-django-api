@@ -5,7 +5,6 @@ import os
 from django.conf import settings
 from django.contrib.auth.models import (
     AbstractBaseUser,
-    BaseUserManager,
     PermissionsMixin,
 )
 from django.contrib.auth.validators import UnicodeUsernameValidator
@@ -16,52 +15,8 @@ from django_stubs_ext.db.models import TypedModelMeta
 from phonenumber_field.modelfields import PhoneNumberField
 
 from core.fields.image import ImageAndSvgField
-from core.generators import UserNameGenerator
 from core.models import TimeStampMixinModel, UUIDModel
-from user.enum.account import UserRole
-
-User = settings.AUTH_USER_MODEL
-
-
-class UserAccountManager(BaseUserManager):
-    def create_user(self, email, password, **extra_fields):
-        if not email:
-            raise ValueError("Users must have an email address")
-        new_email: str = self.normalize_email(email)
-        username = extra_fields.pop(
-            "username", None
-        ) or UserNameGenerator().generate_username(new_email)
-        user: UserAccount = self.model(
-            email=new_email, username=username, **extra_fields
-        )
-        user.set_password(password)
-        user.save(using=self._db)
-        return user
-
-    def _create_user(self, email, password, **extra_fields):
-        if not email:
-            raise ValueError("Users must have an email address")
-        new_email: str = self.normalize_email(email)
-        username = extra_fields.pop(
-            "username", None
-        ) or UserNameGenerator().generate_username(new_email)
-        user: UserAccount = self.model(
-            email=new_email, username=username, **extra_fields
-        )
-        user.set_password(password)
-        user.save(using=self._db)
-        return user
-
-    def create_superuser(self, email, password, **extra_fields):
-        extra_fields.setdefault("is_staff", True)
-        extra_fields.setdefault("is_superuser", True)
-
-        if extra_fields.get("is_staff") is not True:
-            raise ValueError("Superuser must have is_staff=True.")
-        if extra_fields.get("is_superuser") is not True:
-            raise ValueError("Superuser must have is_superuser=True.")
-
-        return self._create_user(email, password, **extra_fields)
+from user.managers.account import UserAccountManager
 
 
 class UserAccount(
@@ -134,7 +89,7 @@ class UserAccount(
     github = models.URLField(_("Github Profile"), blank=True, default="")
     bio = models.TextField(_("Bio"), blank=True, default="")
 
-    objects: UserAccountManager = UserAccountManager()
+    objects = UserAccountManager()
 
     USERNAME_FIELD: str = "email"
     REQUIRED_FIELDS: list[str] = []
@@ -172,17 +127,25 @@ class UserAccount(
         return self.username if self.username else self.email
 
     @property
-    def full_name(self):
-        return f"{self.first_name} {self.last_name}".strip()
+    def active_subscriptions(self):
+        return self.subscriptions.filter(status="active").select_related(
+            "topic"
+        )
 
     @property
-    def role(self):
-        if self.is_superuser:
-            return UserRole.SUPERUSER
-        elif self.is_staff:
-            return UserRole.STAFF
-        else:
-            return UserRole.USER
+    def subscription_preferences(self):
+        from user.models.subscription import UserSubscription
+
+        prefs = {}
+        for sub in self.subscriptions.select_related("topic"):
+            prefs[sub.topic.slug] = (
+                sub.status == UserSubscription.SubscriptionStatus.ACTIVE
+            )
+        return prefs
+
+    @property
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}".strip()
 
     @property
     def main_image_path(self) -> str:

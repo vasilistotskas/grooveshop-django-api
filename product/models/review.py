@@ -7,6 +7,7 @@ from parler.models import TranslatableModel, TranslatedFields
 
 from core.models import PublishableModel, TimeStampMixinModel, UUIDModel
 from product.enum.review import RateEnum, ReviewStatusEnum
+from product.managers.review import ReviewManager
 
 
 class ProductReview(
@@ -33,6 +34,8 @@ class ProductReview(
     translations = TranslatedFields(
         comment=models.TextField(_("Comment"), blank=True, null=True)
     )
+
+    objects: ReviewManager = ReviewManager()  # type: ignore[misc]
 
     class Meta(TypedModelMeta):
         verbose_name = _("Product Review")
@@ -74,6 +77,7 @@ class ProductReview(
         )
 
     def clean(self):
-        if self.rate not in [choice.value for choice in RateEnum]:
+        valid_rates = [choice[0] for choice in RateEnum.choices]
+        if self.rate not in valid_rates:
             raise ValidationError(_("Invalid rate value."))
         super().clean()

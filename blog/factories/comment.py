@@ -3,7 +3,6 @@ import importlib
 import factory
 from django.apps import apps
 from django.conf import settings
-from django.contrib.auth import get_user_model
 
 from blog import signals
 from blog.models.comment import BlogComment
@@ -12,10 +11,12 @@ available_languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
 ]
 
-User = get_user_model()
-
 
 def get_or_create_user():
+    from django.contrib.auth import get_user_model
+
+    User = get_user_model()
+
     if User.objects.exists():
         user = User.objects.order_by("?").first()
     else:

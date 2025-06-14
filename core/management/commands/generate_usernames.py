@@ -1,16 +1,17 @@
-from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db.models import Q
 
 from core.generators import UserNameGenerator
-
-User = get_user_model()
 
 
 class Command(BaseCommand):
     help = "Generate usernames for users who do not have one"
 
     def handle(self, *args, **options):
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+
         users_without_username = User.objects.filter(
             Q(username__isnull=True) | Q(username="")
         )

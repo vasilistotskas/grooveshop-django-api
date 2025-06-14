@@ -4,7 +4,6 @@ from datetime import timedelta
 
 import factory
 from django.apps import apps
-from django.contrib.auth import get_user_model
 from django.db.models import Count
 from django.utils import timezone
 from djmoney.money import Money
@@ -12,17 +11,19 @@ from faker import Faker
 from phonenumber_field.phonenumber import PhoneNumber
 
 from core.enum import FloorChoicesEnum, LocationChoicesEnum
-from order.enum.document_type_enum import OrderDocumentTypeEnum
-from order.enum.status_enum import OrderStatusEnum, PaymentStatusEnum
+from order.enum.document_type import OrderDocumentTypeEnum
+from order.enum.status import OrderStatusEnum, PaymentStatusEnum
 from order.factories.item import OrderItemFactory
 from order.models.order import Order
 
 fake = Faker()
 
-User = get_user_model()
-
 
 def get_or_create_user():
+    from django.contrib.auth import get_user_model
+
+    User = get_user_model()
+
     if User.objects.exists():
         user = (
             User.objects.annotate(num_orders=Count("orders"))

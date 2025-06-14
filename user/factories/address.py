@@ -3,15 +3,16 @@ import random
 
 import factory
 from django.apps import apps
-from django.contrib.auth import get_user_model
 
 from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from user.models.address import UserAddress
 
-User = get_user_model()
-
 
 def get_or_create_user():
+    from django.contrib.auth import get_user_model
+
+    User = get_user_model()
+
     if User.objects.exists():
         user = User.objects.order_by("?").first()
     else:

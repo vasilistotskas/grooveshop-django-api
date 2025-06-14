@@ -5,6 +5,7 @@ from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel, TranslatedFields
 
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
+from region.managers import RegionManager
 
 
 class Region(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
@@ -17,6 +18,8 @@ class Region(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     translations = TranslatedFields(
         name=models.CharField(_("Name"), max_length=100, blank=True, null=True)
     )
+
+    objects = RegionManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Region")

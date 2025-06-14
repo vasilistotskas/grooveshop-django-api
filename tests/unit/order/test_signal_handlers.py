@@ -1,7 +1,7 @@
 from unittest import TestCase
 from unittest.mock import MagicMock, Mock, patch
 
-from order.enum.status_enum import OrderStatusEnum
+from order.enum.status import OrderStatusEnum
 from order.signals.handlers import handle_order_post_save
 
 

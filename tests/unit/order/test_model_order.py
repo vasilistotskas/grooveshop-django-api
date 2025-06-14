@@ -6,8 +6,8 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from djmoney.money import Money
 
-from order.enum.document_type_enum import OrderDocumentTypeEnum
-from order.enum.status_enum import OrderStatusEnum, PaymentStatusEnum
+from order.enum.document_type import OrderDocumentTypeEnum
+from order.enum.status import OrderStatusEnum, PaymentStatusEnum
 from order.models.order import Order, OrderManager, OrderQuerySet
 
 

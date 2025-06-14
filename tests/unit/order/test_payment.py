@@ -3,7 +3,7 @@ from unittest import TestCase, mock
 
 from djmoney.money import Money
 
-from order.enum.status_enum import PaymentStatusEnum
+from order.enum.status import PaymentStatusEnum
 from order.payment import (
     PayPalPaymentProvider,
     StripePaymentProvider,

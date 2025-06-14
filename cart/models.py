@@ -10,6 +10,7 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.money import Money
 
+from cart.managers import CartItemManager, CartManager
 from core.models import TimeStampMixinModel, UUIDModel
 
 
@@ -31,6 +32,8 @@ class Cart(TimeStampMixinModel, UUIDModel):
         default=uuid.uuid4,
     )
     last_activity = models.DateTimeField(_("Last Activity"), auto_now=True)
+
+    objects = CartManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Cart")
@@ -101,6 +104,8 @@ class CartItem(TimeStampMixinModel, UUIDModel):
         "product.Product", related_name="cart_items", on_delete=models.CASCADE
     )
     quantity = models.PositiveIntegerField(_("Quantity"), default=1)
+
+    objects = CartItemManager()
 
     class Meta:
         verbose_name = _("Cart Item")

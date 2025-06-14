@@ -5,6 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
 from core.models import TimeStampMixinModel, UUIDModel
+from notification.managers import NotificationUserManager
 
 
 class UnseenNotificationUserManager(models.Manager):
@@ -25,6 +26,9 @@ class NotificationUser(TimeStampMixinModel, UUIDModel):
     )
     seen = models.BooleanField(_("Seen"), default=False)
     seen_at = models.DateTimeField(_("Seen At"), null=True, blank=True)
+
+    objects = NotificationUserManager()
+    unseen_objects = UnseenNotificationUserManager()
 
     def __str__(self):
         status = "seen" if self.seen else "unseen"

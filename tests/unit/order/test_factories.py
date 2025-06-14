@@ -2,7 +2,7 @@ from unittest import mock
 
 from django.test import TestCase
 
-from order.enum.status_enum import OrderStatusEnum, PaymentStatusEnum
+from order.enum.status import OrderStatusEnum, PaymentStatusEnum
 from order.factories import (
     OrderFactory,
     OrderHistoryFactory,

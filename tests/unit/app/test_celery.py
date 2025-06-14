@@ -1,7 +1,7 @@
 import datetime
 import os
 from os import makedirs, path, remove
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import patch
 
 from django.conf import settings
 from django.test import TestCase

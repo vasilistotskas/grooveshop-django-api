@@ -12,9 +12,14 @@ from rest_framework.response import Response
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+from core.utils.serializers import MultiSerializerMixin
 from core.utils.views import cache_methods
 from region.models import Region
-from region.serializers import RegionSerializer
+from region.serializers import (
+    RegionDetailSerializer,
+    RegionListSerializer,
+    RegionWriteSerializer,
+)
 
 
 @extend_schema_view(
@@ -25,15 +30,16 @@ from region.serializers import RegionSerializer
         ),
         tags=["Regions"],
         responses={
-            200: RegionSerializer(many=True),
+            200: RegionListSerializer(many=True),
         },
     ),
     create=extend_schema(
         summary=_("Create a region"),
         description=_("Create a new region. Requires authentication."),
         tags=["Regions"],
+        request=RegionWriteSerializer,
         responses={
-            201: RegionSerializer,
+            201: RegionDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
         },
@@ -43,7 +49,7 @@ from region.serializers import RegionSerializer
         description=_("Get detailed information about a specific region."),
         tags=["Regions"],
         responses={
-            200: RegionSerializer,
+            200: RegionDetailSerializer,
             404: ErrorResponseSerializer,
         },
     ),
@@ -51,8 +57,9 @@ from region.serializers import RegionSerializer
         summary=_("Update a region"),
         description=_("Update region information. Requires authentication."),
         tags=["Regions"],
+        request=RegionWriteSerializer,
         responses={
-            200: RegionSerializer,
+            200: RegionDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
@@ -64,8 +71,9 @@ from region.serializers import RegionSerializer
             "Partially update region information. Requires authentication."
         ),
         tags=["Regions"],
+        request=RegionWriteSerializer,
         responses={
-            200: RegionSerializer,
+            200: RegionDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
@@ -88,7 +96,7 @@ from region.serializers import RegionSerializer
         ),
         tags=["Regions"],
         responses={
-            200: RegionSerializer(many=True),
+            200: RegionListSerializer(many=True),
             404: ErrorResponseSerializer,
         },
     ),
@@ -97,9 +105,8 @@ from region.serializers import RegionSerializer
     settings.DEFAULT_CACHE_TTL,
     methods=["list", "retrieve", "get_regions_by_country_alpha_2"],
 )
-class RegionViewSet(BaseModelViewSet):
+class RegionViewSet(MultiSerializerMixin, BaseModelViewSet):
     queryset = Region.objects.all()
-    serializer_class = RegionSerializer
     filter_backends = [
         DjangoFilterBackend,
         PascalSnakeCaseOrderingFilter,

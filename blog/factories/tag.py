@@ -11,7 +11,7 @@ available_languages = [
 
 class BlogTagTranslationFactory(factory.django.DjangoModelFactory):
     language_code = factory.Iterator(available_languages)
-    name = factory.Faker("word")
+    name = factory.Faker("text", max_nb_chars=45)
     master = factory.SubFactory("blog.factories.tag.BlogTagFactory")
 
     class Meta:

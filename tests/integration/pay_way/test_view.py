@@ -3,7 +3,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from pay_way.enum.pay_way_enum import PayWayEnum
+from pay_way.enum.pay_way import PayWayEnum
 from pay_way.factories import PayWayFactory
 from pay_way.models import PayWay
 
@@ -20,7 +20,7 @@ class PayWayViewSetTestCase(APITestCase):
         self.pay_way = PayWayFactory(
             active=True,
             cost=10.00,
-            free_for_order_amount=100.00,
+            free_threshold=100.00,
         )
 
     @staticmethod
@@ -64,7 +64,7 @@ class PayWayViewSetTestCase(APITestCase):
         payload = {
             "active": True,
             "cost": 10.00,
-            "free_for_order_amount": 100.00,
+            "free_threshold": 100.00,
             "translations": {},
         }
 
@@ -86,7 +86,7 @@ class PayWayViewSetTestCase(APITestCase):
         payload = {
             "active": "invalid_active",
             "cost": "invalid_cost",
-            "free_for_order_amount": "invalid_amount",
+            "free_threshold": "invalid_amount",
             "translations": {
                 "invalid_lang_code": {
                     "name": "Translation for invalid language code",
@@ -117,21 +117,21 @@ class PayWayViewSetTestCase(APITestCase):
                 float(cost), float(self.pay_way.cost.amount), places=2
             )
 
-        free_amount = response.data["free_for_order_amount"]
+        free_amount = response.data["free_threshold"]
         if isinstance(free_amount, dict):
             self.assertAlmostEqual(
                 float(free_amount["amount"]),
-                float(self.pay_way.free_for_order_amount.amount),
+                float(self.pay_way.free_threshold.amount),
                 places=2,
             )
             self.assertEqual(
                 free_amount["currency"],
-                str(self.pay_way.free_for_order_amount.currency),
+                str(self.pay_way.free_threshold.currency),
             )
         else:
             self.assertAlmostEqual(
                 float(free_amount),
-                float(self.pay_way.free_for_order_amount.amount),
+                float(self.pay_way.free_threshold.amount),
                 places=2,
             )
 
@@ -146,7 +146,7 @@ class PayWayViewSetTestCase(APITestCase):
         payload = {
             "active": False,
             "cost": 20.00,
-            "free_for_order_amount": 200.00,
+            "free_threshold": 200.00,
             "translations": {},
         }
 
@@ -168,7 +168,7 @@ class PayWayViewSetTestCase(APITestCase):
         payload = {
             "active": "invalid_active",
             "cost": "invalid_cost",
-            "free_for_order_amount": "invalid_amount",
+            "free_threshold": "invalid_amount",
             "translations": {
                 "invalid_lang_code": {
                     "name": "Translation for invalid language code",

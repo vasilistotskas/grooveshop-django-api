@@ -10,7 +10,10 @@ from blog.factories.post import BlogPostFactory
 from blog.models.author import BlogAuthor
 from blog.models.comment import BlogComment
 from blog.models.post import BlogPost
-from blog.serializers.comment import BlogCommentSerializer
+from blog.serializers.comment import (
+    BlogCommentDetailSerializer,
+    BlogCommentListSerializer,
+)
 from user.factories.account import UserAccountFactory
 
 languages = [
@@ -51,7 +54,9 @@ class BlogCommentViewSetTestCase(APITestCase):
         url = self.get_comment_list_url()
         response = self.client.get(url)
         comments = BlogComment.objects.all()
-        serializer = BlogCommentSerializer(comments, many=True)
+        serializer = BlogCommentListSerializer(
+            comments, many=True, context={"request": response.wsgi_request}
+        )
 
         self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -108,7 +113,9 @@ class BlogCommentViewSetTestCase(APITestCase):
         url = self.get_comment_detail_url(self.comment.pk)
         response = self.client.get(url)
         comment = BlogComment.objects.get(pk=self.comment.pk)
-        serializer = BlogCommentSerializer(comment)
+        serializer = BlogCommentDetailSerializer(
+            comment, context={"request": response.wsgi_request}
+        )
 
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)

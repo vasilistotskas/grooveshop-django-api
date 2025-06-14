@@ -1,12 +1,12 @@
 from functools import cached_property
-from typing import Any, Optional, cast
+from typing import Any, Optional
 
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex, GinIndex
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import models
-from django.db.models import ExpressionWrapper, F, QuerySet, Sum
+from django.db.models import F, Sum
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
@@ -15,82 +15,9 @@ from phonenumber_field.modelfields import PhoneNumberField
 
 from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from core.models import SoftDeleteModel, TimeStampMixinModel, UUIDModel
-from order.enum.document_type_enum import OrderDocumentTypeEnum
-from order.enum.status_enum import OrderStatusEnum, PaymentStatusEnum
-
-
-class OrderQuerySet(models.QuerySet):
-    def with_total_amounts(self) -> QuerySet:
-        return self.annotate(
-            items_total=Sum(
-                ExpressionWrapper(
-                    F("items__price") * F("items__quantity"),
-                    output_field=MoneyField(max_digits=11, decimal_places=2),
-                )
-            )
-        )
-
-    def pending(self) -> QuerySet:
-        return self.filter(status=OrderStatusEnum.PENDING)
-
-    def processing(self) -> QuerySet:
-        return self.filter(status=OrderStatusEnum.PROCESSING)
-
-    def shipped(self) -> QuerySet:
-        return self.filter(status=OrderStatusEnum.SHIPPED)
-
-    def delivered(self) -> QuerySet:
-        return self.filter(status=OrderStatusEnum.DELIVERED)
-
-    def completed(self) -> QuerySet:
-        return self.filter(status=OrderStatusEnum.COMPLETED)
-
-    def canceled(self) -> QuerySet:
-        return self.filter(status=OrderStatusEnum.CANCELED)
-
-    def returned(self) -> QuerySet:
-        return self.filter(status=OrderStatusEnum.RETURNED)
-
-    def refunded(self) -> QuerySet:
-        return self.filter(status=OrderStatusEnum.REFUNDED)
-
-
-class OrderManager(models.Manager):
-    def get_queryset(self) -> OrderQuerySet:
-        return cast(
-            "OrderQuerySet",
-            OrderQuerySet(self.model, using=self._db)
-            .select_related("user", "pay_way", "country", "region")
-            .prefetch_related("items", "items__product")
-            .exclude(is_deleted=True),
-        )
-
-    def with_total_amounts(self) -> QuerySet:
-        return self.get_queryset().with_total_amounts()
-
-    def pending(self) -> QuerySet:
-        return self.get_queryset().pending()
-
-    def processing(self) -> QuerySet:
-        return self.get_queryset().processing()
-
-    def shipped(self) -> QuerySet:
-        return self.get_queryset().shipped()
-
-    def delivered(self) -> QuerySet:
-        return self.get_queryset().delivered()
-
-    def completed(self) -> QuerySet:
-        return self.get_queryset().completed()
-
-    def canceled(self) -> QuerySet:
-        return self.get_queryset().canceled()
-
-    def returned(self) -> QuerySet:
-        return self.get_queryset().returned()
-
-    def refunded(self) -> QuerySet:
-        return self.get_queryset().refunded()
+from order.enum.document_type import OrderDocumentTypeEnum
+from order.enum.status import OrderStatusEnum, PaymentStatusEnum
+from order.managers.order import OrderManager
 
 
 class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
@@ -305,8 +232,6 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
 
     @property
     def total_price_items(self) -> Money:
-        from django.db.models import F, Sum
-
         items_total = self.items.aggregate(
             total=Sum(F("price") * F("quantity"))
         ).get("total")

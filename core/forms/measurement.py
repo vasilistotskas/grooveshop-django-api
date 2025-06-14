@@ -150,16 +150,19 @@ class MeasurementFormField(forms.MultiValueField):
 
         float_field = forms.FloatField(*args, **kwargs)
         choice_field = forms.ChoiceField(choices=unit_choices)
-        defaults = {
-            "widget": MeasurementWidget(
-                float_widget=float_field.widget,
-                unit_choices_widget=choice_field.widget,
-                unit_choices=unit_choices,
-            ),
-        }
-        defaults.update(kwargs)
+
+        widget = MeasurementWidget(
+            float_widget=float_field.widget,
+            unit_choices_widget=choice_field.widget,
+            unit_choices=unit_choices,
+        )
+
         fields = (float_field, choice_field)
-        super().__init__(fields, *args, validators=validators, **defaults)
+
+        kwargs["widget"] = widget
+        kwargs["validators"] = validators
+
+        super().__init__(fields, **kwargs)
 
     def compress(self, data_list):
         if not data_list:

@@ -9,7 +9,7 @@ class PayWayModelTestCase(TestCase):
         self.credit_card = PayWay.objects.create(
             active=True,
             cost=Money(0, "USD"),
-            free_for_order_amount=Money(100, "USD"),
+            free_threshold=Money(100, "USD"),
             provider_code="stripe",
             is_online_payment=True,
             requires_confirmation=False,
@@ -27,7 +27,7 @@ class PayWayModelTestCase(TestCase):
         self.bank_transfer = PayWay.objects.create(
             active=True,
             cost=Money(0, "USD"),
-            free_for_order_amount=Money(0, "USD"),
+            free_threshold=Money(0, "USD"),
             provider_code="",
             is_online_payment=False,
             requires_confirmation=True,
@@ -42,7 +42,7 @@ class PayWayModelTestCase(TestCase):
         self.pay_on_delivery = PayWay.objects.create(
             active=True,
             cost=Money(5, "USD"),
-            free_for_order_amount=Money(50, "USD"),
+            free_threshold=Money(50, "USD"),
             provider_code="",
             is_online_payment=False,
             requires_confirmation=False,
@@ -57,19 +57,6 @@ class PayWayModelTestCase(TestCase):
         self.assertEqual(str(self.credit_card), "Credit Card")
         self.assertEqual(str(self.bank_transfer), "Bank Transfer")
         self.assertEqual(str(self.pay_on_delivery), "Pay On Delivery")
-
-    def test_pay_way_active_filter(self):
-        active_pay_ways = PayWay.active_pay_ways_by_status(True)
-        self.assertEqual(active_pay_ways.count(), 3)
-
-        self.credit_card.active = False
-        self.credit_card.save()
-
-        active_pay_ways = PayWay.active_pay_ways_by_status(True)
-        self.assertEqual(active_pay_ways.count(), 2)
-
-        inactive_pay_ways = PayWay.active_pay_ways_by_status(False)
-        self.assertEqual(inactive_pay_ways.count(), 1)
 
     def test_pay_way_ordering(self):
         pay_ways = list(PayWay.objects.all())

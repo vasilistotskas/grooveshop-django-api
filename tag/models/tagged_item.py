@@ -11,26 +11,19 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
 from core.models import TimeStampMixinModel, UUIDModel
+from tag.managers import TaggedItemManager
 from tag.models.tag import Tag
 
 logger = logging.getLogger(__name__)
 
 
-class TaggedItemManager(models.Manager):
-    def get_tags_for(self, obj_type, obj_id):
-        content_type = ContentType.objects.get_for_model(obj_type)
-
-        return TaggedItem.objects.select_related("tag").filter(
-            content_type=content_type, object_id=obj_id
-        )
-
-
 class TaggedItem(TimeStampMixinModel, UUIDModel):
-    objects = TaggedItemManager()
     tag = models.ForeignKey(Tag, on_delete=models.CASCADE)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
+
+    objects = TaggedItemManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Tagged Item")
@@ -47,6 +40,7 @@ class TaggedItem(TimeStampMixinModel, UUIDModel):
 
 
 class TaggedModel(models.Model):
+    id = models.BigAutoField(primary_key=True)
     tags = GenericRelation(
         "tag.TaggedItem",
         content_type_field="content_type",

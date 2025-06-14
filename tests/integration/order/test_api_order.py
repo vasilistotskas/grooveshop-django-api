@@ -8,7 +8,7 @@ from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 
 from country.factories import CountryFactory
-from order.enum.status_enum import OrderStatusEnum
+from order.enum.status import OrderStatusEnum
 from order.factories.order import OrderFactory
 from order.models.order import Order
 from pay_way.factories import PayWayFactory
@@ -28,10 +28,10 @@ class CheckoutAPITestCase(APITestCase):
         self.pay_way = PayWayFactory()
 
         self.product1 = ProductFactory.create(
-            stock=20, num_images=0, num_reviews=0
+            stock=20, num_images=0, num_reviews=0, active=True
         )
         self.product2 = ProductFactory.create(
-            stock=15, num_images=0, num_reviews=0
+            stock=15, num_images=0, num_reviews=0, active=True
         )
 
         self.currency = str(self.product1.price.currency)
@@ -49,7 +49,7 @@ class CheckoutAPITestCase(APITestCase):
             "country": self.country.alpha_2,
             "region": self.region.alpha,
             "pay_way": self.pay_way.id,
-            "shipping_price": {"amount": "10.00", "currency": self.currency},
+            "shipping_price": "10.00",
             "items": [
                 {"product": self.product1.id, "quantity": 2},
                 {"product": self.product2.id, "quantity": 1},
@@ -63,6 +63,13 @@ class CheckoutAPITestCase(APITestCase):
             data=json.dumps(self.checkout_data),
             content_type="application/json",
         )
+
+        # DEBUG: Print response details
+        print(f"DEBUG: Response status: {response.status_code}")
+        if hasattr(response, "data"):
+            print(f"DEBUG: Response data: {response.data}")
+        else:
+            print(f"DEBUG: Response content: {response.content}")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
@@ -78,7 +85,7 @@ class CheckoutAPITestCase(APITestCase):
 
     def test_checkout_insufficient_stock(self):
         product_limited = ProductFactory.create(
-            stock=5, num_images=0, num_reviews=0
+            stock=5, num_images=0, num_reviews=0, active=True
         )
 
         data = self.checkout_data.copy()
@@ -104,6 +111,13 @@ class CheckoutAPITestCase(APITestCase):
             data=json.dumps(self.checkout_data),
             content_type="application/json",
         )
+
+        # DEBUG: Print response details
+        print(f"DEBUG: Response status: {response.status_code}")
+        if hasattr(response, "data"):
+            print(f"DEBUG: Response data: {response.data}")
+        else:
+            print(f"DEBUG: Response content: {response.content}")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 

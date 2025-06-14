@@ -1,7 +1,6 @@
 import contextlib
 import uuid
 
-from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
@@ -19,19 +18,18 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 
 from core.api.permissions import IsSelfOrAdmin
+from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from core.utils.serializers import MultiSerializerMixin
-from order.enum.status_enum import OrderStatusEnum
+from order.enum.status import OrderStatusEnum
 from order.models.order import Order
 from order.serializers.order import (
-    OrderCreateUpdateSerializer,
     OrderDetailSerializer,
-    OrderSerializer,
+    OrderListSerializer,
+    OrderWriteSerializer,
 )
 from order.services import OrderService, OrderServiceError
-
-User = get_user_model()
 
 
 @extend_schema_view(
@@ -39,34 +37,51 @@ User = get_user_model()
         summary=_("List all orders"),
         description=_("Returns a list of all orders with pagination"),
         tags=["Order"],
-        responses={200: OrderSerializer(many=True)},
+        responses={200: OrderListSerializer(many=True)},
     ),
     create=extend_schema(
         summary=_("Create an order or process a checkout"),
         description=_("Process a checkout and create a new order"),
         tags=["Order"],
-        request=OrderCreateUpdateSerializer,
-        responses={201: OrderDetailSerializer},
-    ),
-    update=extend_schema(
-        summary=_("Update an order"),
-        description=_("Update an existing order"),
-        tags=["Order"],
-        request=OrderCreateUpdateSerializer,
-        responses={200: OrderDetailSerializer},
-    ),
-    partial_update=extend_schema(
-        summary=_("Partially update an order"),
-        description=_("Partially update an existing order"),
-        tags=["Order"],
-        request=OrderCreateUpdateSerializer,
-        responses={200: OrderDetailSerializer},
+        request=OrderWriteSerializer,
+        responses={
+            201: OrderDetailSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+        },
     ),
     retrieve=extend_schema(
         summary=_("Retrieve an order by ID"),
         description=_("Get detailed information about a specific order"),
         tags=["Order"],
-        responses={200: OrderDetailSerializer},
+        responses={
+            200: OrderDetailSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    update=extend_schema(
+        summary=_("Update an order"),
+        description=_("Update an existing order"),
+        tags=["Order"],
+        request=OrderWriteSerializer,
+        responses={
+            200: OrderDetailSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    partial_update=extend_schema(
+        summary=_("Partially update an order"),
+        description=_("Partially update an existing order"),
+        tags=["Order"],
+        request=OrderWriteSerializer,
+        responses={
+            200: OrderDetailSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
     ),
     retrieve_by_uuid=extend_schema(
         summary=_("Retrieve an order by UUID"),
@@ -74,37 +89,62 @@ User = get_user_model()
             "Get detailed information about a specific order using its UUID"
         ),
         tags=["Order"],
-        responses={200: OrderDetailSerializer},
+        responses={
+            200: OrderDetailSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
     ),
     destroy=extend_schema(
         summary=_("Delete an order"),
         description=_("Delete an existing order and restore product stock"),
         tags=["Order"],
-        responses={204: None},
+        responses={204: None, 404: ErrorResponseSerializer},
     ),
     cancel=extend_schema(
         summary=_("Cancel an order"),
         description=_("Cancel an existing order and restore product stock"),
         tags=["Order"],
-        responses={200: OrderDetailSerializer},
+        responses={
+            200: OrderDetailSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
     ),
     my_orders=extend_schema(
         summary=_("List current user's orders"),
         description=_("Returns a list of the authenticated user's orders"),
         tags=["Order"],
-        responses={200: OrderSerializer(many=True)},
+        responses={
+            200: OrderListSerializer(many=True),
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
     ),
     add_tracking=extend_schema(
         summary=_("Add tracking information to an order"),
         description=_("Add tracking information to an existing order"),
         tags=["Order"],
-        responses={200: OrderDetailSerializer},
+        responses={
+            200: OrderDetailSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
     ),
     update_status=extend_schema(
         summary=_("Update the status of an order"),
         description=_("Update the status of an existing order"),
         tags=["Order"],
-        responses={200: OrderDetailSerializer},
+        responses={
+            200: OrderDetailSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
     ),
 )
 class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
@@ -129,7 +169,6 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
     permission_classes = [IsAuthenticated, IsSelfOrAdmin]
 
     serializers = {
-        "default": OrderSerializer,
         "create": OrderCreateUpdateSerializer,
         "update": OrderCreateUpdateSerializer,
         "partial_update": OrderCreateUpdateSerializer,

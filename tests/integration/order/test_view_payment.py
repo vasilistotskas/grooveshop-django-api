@@ -7,7 +7,7 @@ from djmoney.money import Money
 from rest_framework import status
 from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
 
-from order.enum.status_enum import PaymentStatusEnum
+from order.enum.status import PaymentStatusEnum
 from order.factories.order import OrderFactory
 from order.views.payment import OrderPaymentViewSet
 from pay_way.factories import PayWayFactory
@@ -155,9 +155,6 @@ class OrderPaymentViewSetTestCase(TestCase):
             )
 
             response = view(request, pk=self.anon_order.pk)
-
-            print(f"Anon response status code: {response.status_code}")
-            print(f"Anon response data: {response.data}")
 
             self.assertEqual(response.status_code, status.HTTP_200_OK)
             mock_process_payment.assert_called_once()

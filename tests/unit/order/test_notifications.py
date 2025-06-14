@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, Mock, patch
 from django.utils import timezone
 from djmoney.money import Money
 
-from order.enum.status_enum import OrderStatusEnum
+from order.enum.status import OrderStatusEnum
 from order.models.order import Order
 from order.notifications import (
     OrderNotificationManager,

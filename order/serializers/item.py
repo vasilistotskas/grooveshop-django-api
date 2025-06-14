@@ -3,11 +3,11 @@ from djmoney.contrib.django_rest_framework import MoneyField
 from rest_framework import serializers
 
 from order.models.item import OrderItem
-from product.serializers.product import ProductSerializer
+from product.serializers.product import ProductListSerializer
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
-    product = ProductSerializer()
+    product = ProductListSerializer(read_only=True)
     price = MoneyField(max_digits=11, decimal_places=2)
     total_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     refunded_amount = MoneyField(
@@ -59,7 +59,8 @@ class OrderItemCreateUpdateSerializer(serializers.ModelSerializer):
             "notes",
         )
 
-    def validate_quantity(self, value: int) -> int:
+    @staticmethod
+    def validate_quantity(value: int) -> int:
         if value <= 0:
             raise serializers.ValidationError(
                 _("Quantity must be a positive number.")

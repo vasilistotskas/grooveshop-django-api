@@ -9,9 +9,14 @@ from rest_framework.filters import SearchFilter
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+from core.utils.serializers import MultiSerializerMixin
 from core.utils.views import cache_methods
 from pay_way.models import PayWay
-from pay_way.serializers import PayWaySerializer
+from pay_way.serializers import (
+    PayWayDetailSerializer,
+    PayWayListSerializer,
+    PayWayWriteSerializer,
+)
 
 
 @extend_schema_view(
@@ -22,15 +27,16 @@ from pay_way.serializers import PayWaySerializer
         ),
         tags=["Payment"],
         responses={
-            200: PayWaySerializer(many=True),
+            200: PayWayListSerializer(many=True),
         },
     ),
     create=extend_schema(
         summary=_("Create a payment method"),
         description=_("Create a new payment method. Requires authentication."),
         tags=["Payment"],
+        request=PayWayWriteSerializer,
         responses={
-            201: PayWaySerializer,
+            201: PayWayDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
         },
@@ -42,7 +48,7 @@ from pay_way.serializers import PayWaySerializer
         ),
         tags=["Payment"],
         responses={
-            200: PayWaySerializer,
+            200: PayWayDetailSerializer,
             404: ErrorResponseSerializer,
         },
     ),
@@ -52,8 +58,9 @@ from pay_way.serializers import PayWaySerializer
             "Update payment method information. Requires authentication."
         ),
         tags=["Payment"],
+        request=PayWayWriteSerializer,
         responses={
-            200: PayWaySerializer,
+            200: PayWayDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
@@ -65,8 +72,9 @@ from pay_way.serializers import PayWaySerializer
             "Partially update payment method information. Requires authentication."
         ),
         tags=["Payment"],
+        request=PayWayWriteSerializer,
         responses={
-            200: PayWaySerializer,
+            200: PayWayDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
@@ -84,9 +92,8 @@ from pay_way.serializers import PayWaySerializer
     ),
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
-class PayWayViewSet(BaseModelViewSet):
+class PayWayViewSet(MultiSerializerMixin, BaseModelViewSet):
     queryset = PayWay.objects.all()
-    serializer_class = PayWaySerializer
     filter_backends = [
         DjangoFilterBackend,
         PascalSnakeCaseOrderingFilter,
@@ -95,14 +102,14 @@ class PayWayViewSet(BaseModelViewSet):
     filterset_fields = [
         "active",
         "cost",
-        "free_for_order_amount",
+        "free_threshold",
         "provider_code",
         "is_online_payment",
         "requires_confirmation",
     ]
     ordering_fields = [
         "cost",
-        "free_for_order_amount",
+        "free_threshold",
         "created_at",
         "provider_code",
         "is_online_payment",
@@ -115,3 +122,11 @@ class PayWayViewSet(BaseModelViewSet):
         "translations__name",
         "translations__description",
     ]
+
+    serializers = {
+        "list": PayWayListSerializer,
+        "retrieve": PayWayDetailSerializer,
+        "create": PayWayWriteSerializer,
+        "update": PayWayWriteSerializer,
+        "partial_update": PayWayWriteSerializer,
+    }

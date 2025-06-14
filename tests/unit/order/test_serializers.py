@@ -3,48 +3,18 @@ from django.test import TestCase
 from djmoney.money import Money
 
 from country.factories import CountryFactory
-from order.enum.status_enum import OrderStatusEnum
+from order.enum.status import OrderStatusEnum
 from order.factories.order import OrderFactory
 from order.serializers.item import OrderItemSerializer
 from order.serializers.order import (
-    OrderCreateUpdateSerializer,
     OrderDetailSerializer,
-    OrderSerializer,
+    OrderWriteSerializer,
 )
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from region.factories import RegionFactory
 
 User = get_user_model()
-
-
-class OrderSerializerTestCase(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(
-            email="test1@example.com",
-            password="testpassword",
-        )
-
-        self.pay_way = PayWayFactory()
-        self.country = CountryFactory()
-        self.region = RegionFactory(country=self.country)
-
-        self.order = OrderFactory(
-            user=self.user,
-            pay_way=self.pay_way,
-            country=self.country,
-            region=self.region,
-            status=OrderStatusEnum.PENDING.value,
-            paid_amount=Money("100.00", "USD"),
-            shipping_price=Money("10.00", "USD"),
-        )
-
-        product = ProductFactory()
-        self.order_item = self.order.items.create(
-            product=product, price=Money("50.00", "USD"), quantity=2
-        )
-
-        self.serializer = OrderSerializer(instance=self.order)
 
 
 class OrderDetailSerializerTestCase(TestCase):
@@ -79,9 +49,9 @@ class OrderDetailSerializerTestCase(TestCase):
         data = self.serializer.data
 
         expected_additional_fields = {
-            "items",
-            "tracking_number",
-            "shipping_carrier",
+            "order_timeline",
+            "pricing_breakdown",
+            "tracking_details",
         }
 
         self.assertTrue(
@@ -130,7 +100,7 @@ class OrderCreateUpdateSerializerTestCase(TestCase):
         invalid_data = self.valid_data.copy()
         invalid_data["items"] = []
 
-        serializer = OrderCreateUpdateSerializer(data=invalid_data)
+        serializer = OrderWriteSerializer(data=invalid_data)
         self.assertFalse(serializer.is_valid())
 
         self.assertFalse(serializer.is_valid())
@@ -142,7 +112,7 @@ class OrderCreateUpdateSerializerTestCase(TestCase):
             "currency": "USD",
         }
 
-        serializer = OrderCreateUpdateSerializer(data=invalid_data)
+        serializer = OrderWriteSerializer(data=invalid_data)
         self.assertFalse(serializer.is_valid())
         self.assertIn("paid_amount", serializer.errors)
 
@@ -152,7 +122,7 @@ class OrderCreateUpdateSerializerTestCase(TestCase):
             "currency": "INVALID",
         }
 
-        serializer = OrderCreateUpdateSerializer(data=invalid_data)
+        serializer = OrderWriteSerializer(data=invalid_data)
         self.assertFalse(serializer.is_valid())
         self.assertIn("paid_amount", serializer.errors)
 
@@ -160,7 +130,7 @@ class OrderCreateUpdateSerializerTestCase(TestCase):
         invalid_data = self.valid_data.copy()
         invalid_data["phone"] = "not-a-phone-number"
 
-        serializer = OrderCreateUpdateSerializer(data=invalid_data)
+        serializer = OrderWriteSerializer(data=invalid_data)
         self.assertFalse(serializer.is_valid())
         self.assertIn("phone", serializer.errors)
 
@@ -168,14 +138,14 @@ class OrderCreateUpdateSerializerTestCase(TestCase):
         invalid_data = self.valid_data.copy()
         del invalid_data["email"]
 
-        serializer = OrderCreateUpdateSerializer(data=invalid_data)
+        serializer = OrderWriteSerializer(data=invalid_data)
         serializer.is_valid()
         self.assertIn("email", serializer.errors)
 
         invalid_data = self.valid_data.copy()
         del invalid_data["first_name"]
 
-        serializer = OrderCreateUpdateSerializer(data=invalid_data)
+        serializer = OrderWriteSerializer(data=invalid_data)
         serializer.is_valid()
         self.assertIn("first_name", serializer.errors)
 
@@ -183,7 +153,7 @@ class OrderCreateUpdateSerializerTestCase(TestCase):
         invalid_data = self.valid_data.copy()
         invalid_data["email"] = "not-an-email"
 
-        serializer = OrderCreateUpdateSerializer(data=invalid_data)
+        serializer = OrderWriteSerializer(data=invalid_data)
         self.assertFalse(serializer.is_valid())
         self.assertIn("email", serializer.errors)
 

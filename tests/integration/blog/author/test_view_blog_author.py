@@ -91,7 +91,7 @@ class BlogAuthorViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         self.assertIn("user", response.data)
-        self.assertEqual(response.data["user"], self.author.user.id)
+        self.assertEqual(response.data["user"]["pk"], self.author.user.id)
 
         self.assertIn("translations", response.data)
 

@@ -17,7 +17,7 @@ class Client:
             client_agents=settings.client_agents,
         )
         self.is_sync = settings.sync
-        self.tasks = []
+        self.tasks: list[Task | TaskInfo] = []
 
     def flush_tasks(self):
         self.tasks = []
@@ -129,7 +129,14 @@ class Client:
 
     def _handle_sync(self, task: Task | TaskInfo) -> Task | TaskInfo:
         if self.is_sync:
-            task = self.client.wait_for_task(task.task_uid)
+            if hasattr(task, "task_uid"):
+                uid = task.task_uid
+            elif hasattr(task, "uid"):
+                uid = task.uid
+            else:
+                raise AttributeError("Task object has no uid attribute")
+
+            task = self.client.wait_for_task(uid)
             if task.status == "failed":
                 raise Exception(task.error)
         return task

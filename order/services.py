@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
 
-from order.enum.status_enum import OrderStatusEnum
+from order.enum.status import OrderStatusEnum
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.signals import order_canceled, order_status_changed

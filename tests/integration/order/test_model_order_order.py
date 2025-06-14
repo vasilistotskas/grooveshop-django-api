@@ -5,7 +5,7 @@ from django.conf import settings
 from django.test import TestCase
 from djmoney.money import Money
 
-from order.enum.status_enum import OrderStatusEnum
+from order.enum.status import OrderStatusEnum
 from order.factories.order import OrderFactory
 from order.models.order import Order
 from product.factories.product import ProductFactory

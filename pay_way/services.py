@@ -1,9 +1,10 @@
 import logging
-from typing import Any, Optional
+from typing import Any
 
+from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
 
-from order.enum.status_enum import PaymentStatusEnum
+from order.enum.status import OrderStatusEnum, PaymentStatusEnum
 from order.models import Order
 from order.payment import get_payment_provider
 from pay_way.models import PayWay
@@ -56,7 +57,7 @@ class PayWayService:
 
         provider = PayWayService.get_provider_for_pay_way(pay_way)
         if not provider:
-            return False, {"error": "Payment provider not available"}
+            return False, {"error": _("Payment provider not available")}
 
         success, payment_data = provider.process_payment(
             amount=order.total_price, order_id=str(order.id), **kwargs
@@ -88,7 +89,7 @@ class PayWayService:
     ) -> tuple[PaymentStatusEnum, dict[str, Any]]:
         if not order.payment_id:
             return PaymentStatusEnum.PENDING, {
-                "error": "No payment ID found for order"
+                "error": _("No payment ID found for order")
             }
 
         if not pay_way.is_online_payment:
@@ -101,7 +102,7 @@ class PayWayService:
         provider = PayWayService.get_provider_for_pay_way(pay_way)
         if not provider:
             return PaymentStatusEnum.PENDING, {
-                "error": "Payment provider not available"
+                "error": _("Payment provider not available")
             }
 
         status, status_data = provider.get_payment_status(order.payment_id)
@@ -120,10 +121,10 @@ class PayWayService:
 
     @staticmethod
     def refund_payment(
-        pay_way: PayWay, order: Order, amount: Optional[Money] = None
+        pay_way: PayWay, order: Order, amount: Money | None = None
     ) -> tuple[bool, dict[str, Any]]:
         if not order.payment_id:
-            return False, {"error": "No payment ID found for order"}
+            return False, {"error": _("No payment ID found for order")}
 
         if not pay_way.is_online_payment:
             if amount and amount.amount > 0:
@@ -133,7 +134,7 @@ class PayWayService:
                     "amount": str(amount.amount),
                     "currency": amount.currency,
                     "provider": "manual",
-                    "note": "Manual refund process required",
+                    "note": _("Manual refund process required"),
                 }
             else:
                 refund_info = {
@@ -141,24 +142,24 @@ class PayWayService:
                     "status": PaymentStatusEnum.PENDING,
                     "amount": "full refund",
                     "provider": "manual",
-                    "note": "Manual refund process required",
+                    "note": _("Manual refund process required"),
                 }
 
             order.payment_status = PaymentStatusEnum.REFUNDED
-            order.status = "REFUNDED"
+            order.status = OrderStatusEnum.REFUNDED
             order.save(update_fields=["payment_status", "status"])
 
             return True, refund_info
 
         provider = PayWayService.get_provider_for_pay_way(pay_way)
         if not provider:
-            return False, {"error": "Payment provider not available"}
+            return False, {"error": _("Payment provider not available")}
 
         success, refund_data = provider.refund_payment(order.payment_id, amount)
 
         if success:
             order.payment_status = PaymentStatusEnum.REFUNDED
-            order.status = "REFUNDED"
+            order.status = OrderStatusEnum.REFUNDED
             order.save(update_fields=["payment_status", "status"])
 
         return success, refund_data

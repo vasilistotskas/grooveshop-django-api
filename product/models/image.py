@@ -6,16 +6,11 @@ from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
-from parler.managers import TranslatableManager
 from parler.models import TranslatableModel, TranslatedFields
 
 from core.fields.image import ImageAndSvgField
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
-
-
-class ProductImageManager(TranslatableManager):
-    def main_image(self, product):
-        return self.get_queryset().filter(product=product, is_main=True).first()
+from product.managers.image import ImageManager
 
 
 class ProductImage(
@@ -33,7 +28,7 @@ class ProductImage(
         title=models.CharField(_("Title"), max_length=50, blank=True, null=True)
     )
 
-    objects = ProductImageManager()
+    objects = ImageManager()
 
     class Meta(TypedModelMeta):
         verbose_name_plural = _("Product Images")

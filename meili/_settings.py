@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TypedDict
+from typing import TypedDict, cast
 
 
 class MeiliSettings(TypedDict):
@@ -32,15 +32,25 @@ class _MeiliSettings:
     def from_settings(cls) -> "_MeiliSettings":
         from django.conf import settings
 
+        meili_settings = cast("MeiliSettings", settings.MEILISEARCH)
+
+        master_key = meili_settings.get("MASTER_KEY")
+        if not master_key:
+            raise ValueError("MEILISEARCH['MASTER_KEY'] is required")
+
+        debug = meili_settings.get("DEBUG")
+        sync = meili_settings.get("SYNC")
+        offline = meili_settings.get("OFFLINE")
+
         return cls(
-            https=settings.MEILISEARCH.get("HTTPS", False),
-            host=settings.MEILISEARCH.get("HOST", "localhost"),
-            master_key=settings.MEILISEARCH.get("MASTER_KEY", None),
-            port=settings.MEILISEARCH.get("PORT", 7700),
-            timeout=settings.MEILISEARCH.get("TIMEOUT", None),
-            client_agents=settings.MEILISEARCH.get("CLIENT_AGENTS", None),
-            debug=settings.MEILISEARCH.get("DEBUG", settings.DEBUG),
-            sync=settings.MEILISEARCH.get("SYNC", False),
-            offline=settings.MEILISEARCH.get("OFFLINE", False),
-            batch_size=settings.MEILISEARCH.get("DEFAULT_BATCH_SIZE", 1000),
+            https=meili_settings.get("HTTPS", False),
+            host=meili_settings.get("HOST", "localhost"),
+            master_key=master_key,
+            port=meili_settings.get("PORT", 7700),
+            timeout=meili_settings.get("TIMEOUT", None),
+            client_agents=meili_settings.get("CLIENT_AGENTS", None),
+            debug=settings.DEBUG if debug is None else debug,
+            sync=False if sync is None else sync,
+            offline=False if offline is None else offline,
+            batch_size=meili_settings.get("DEFAULT_BATCH_SIZE", 1000),
         )

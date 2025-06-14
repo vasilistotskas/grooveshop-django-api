@@ -1,12 +1,9 @@
 from django.contrib import admin
-from django.contrib.auth import get_user_model
 from parler.admin import TranslatableAdmin
 from unfold.admin import ModelAdmin
 
 from notification.models.notification import Notification
 from notification.models.user import NotificationUser
-
-User = get_user_model()
 
 
 @admin.register(Notification)

@@ -32,10 +32,6 @@ class UserDetailsSerializer(serializers.ModelSerializer):
         read_only_fields = ("email",)
 
 
-class UsernameUpdateSerializer(serializers.Serializer):
-    username = serializers.CharField(max_length=30)
-
-
 class AuthenticationSerializer(UserDetailsSerializer):
     phone = PhoneNumberField(required=False)
 

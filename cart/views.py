@@ -15,9 +15,12 @@ from rest_framework.response import Response
 
 from cart.models import Cart, CartItem
 from cart.serializers import (
-    CartItemCreateSerializer,
-    CartItemSerializer,
-    CartSerializer,
+    CartDetailSerializer,
+    CartItemDetailSerializer,
+    CartItemListSerializer,
+    CartItemWriteSerializer,
+    CartListSerializer,
+    CartWriteSerializer,
 )
 from cart.services import CartService
 from core.api.serializers import ErrorResponseSerializer
@@ -52,7 +55,7 @@ GUEST_CART_HEADERS = [
         tags=["Cart"],
         parameters=GUEST_CART_HEADERS,
         responses={
-            200: CartSerializer,
+            200: CartListSerializer(many=True),
             404: ErrorResponseSerializer,
         },
     ),
@@ -64,7 +67,7 @@ GUEST_CART_HEADERS = [
         tags=["Cart"],
         parameters=GUEST_CART_HEADERS,
         responses={
-            200: CartSerializer,
+            200: CartDetailSerializer,
             404: ErrorResponseSerializer,
         },
     ),
@@ -75,8 +78,9 @@ GUEST_CART_HEADERS = [
         ),
         tags=["Cart"],
         parameters=GUEST_CART_HEADERS,
+        request=CartWriteSerializer,
         responses={
-            200: CartSerializer,
+            200: CartDetailSerializer,
             404: ErrorResponseSerializer,
         },
     ),
@@ -87,8 +91,9 @@ GUEST_CART_HEADERS = [
         ),
         tags=["Cart"],
         parameters=GUEST_CART_HEADERS,
+        request=CartWriteSerializer,
         responses={
-            200: CartSerializer,
+            200: CartDetailSerializer,
             404: ErrorResponseSerializer,
         },
     ),
@@ -100,14 +105,15 @@ GUEST_CART_HEADERS = [
         tags=["Cart"],
         parameters=GUEST_CART_HEADERS,
         responses={
-            200: CartSerializer,
+            200: None,
+            401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
         },
     ),
 )
-class CartViewSet(BaseModelViewSet):
+class CartViewSet(MultiSerializerMixin, BaseModelViewSet):
+    cart_service: CartService
     queryset = Cart.objects.all()
-    serializer_class = CartSerializer
     filter_backends = [
         DjangoFilterBackend,
         PascalSnakeCaseOrderingFilter,
@@ -117,7 +123,12 @@ class CartViewSet(BaseModelViewSet):
     ordering_fields = ["user", "created_at"]
     ordering = ["-created_at"]
     search_fields = ["user"]
-    cart_service: CartService
+    serializers = {
+        "list": CartListSerializer,
+        "retrieve": CartDetailSerializer,
+        "update": CartWriteSerializer,
+        "partial_update": CartWriteSerializer,
+    }
 
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
@@ -140,6 +151,9 @@ class CartViewSet(BaseModelViewSet):
         context["cart"] = self.cart_service.cart
         return context
 
+    def create(self, request, *args, **kwargs):
+        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
     def retrieve(self, request, *args, **kwargs):
         cart = self.cart_service.get_or_create_cart()
         if not cart:
@@ -156,7 +170,11 @@ class CartViewSet(BaseModelViewSet):
         )
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
-        return Response(serializer.data)
+
+        response_serializer = self.get_serializer(
+            cart, context=self.get_serializer_context()
+        )
+        return Response(response_serializer.data)
 
     def partial_update(self, request, *args, **kwargs):
         kwargs["partial"] = True
@@ -179,7 +197,7 @@ class CartViewSet(BaseModelViewSet):
         tags=["Cart Items"],
         parameters=GUEST_CART_HEADERS,
         responses={
-            200: CartItemSerializer(many=True),
+            200: CartItemListSerializer(many=True),
         },
     ),
     create=extend_schema(
@@ -189,9 +207,9 @@ class CartViewSet(BaseModelViewSet):
         ),
         tags=["Cart Items"],
         parameters=GUEST_CART_HEADERS,
-        request=CartItemCreateSerializer,
+        request=CartItemWriteSerializer,
         responses={
-            201: CartItemSerializer,
+            201: CartItemDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
         },
@@ -204,7 +222,7 @@ class CartViewSet(BaseModelViewSet):
         tags=["Cart Items"],
         parameters=GUEST_CART_HEADERS,
         responses={
-            200: CartItemSerializer,
+            200: CartItemDetailSerializer,
             404: ErrorResponseSerializer,
         },
     ),
@@ -215,9 +233,9 @@ class CartViewSet(BaseModelViewSet):
         ),
         tags=["Cart Items"],
         parameters=GUEST_CART_HEADERS,
-        request=CartItemCreateSerializer,
+        request=CartItemWriteSerializer,
         responses={
-            200: CartItemSerializer,
+            200: CartItemDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
@@ -230,9 +248,9 @@ class CartViewSet(BaseModelViewSet):
         ),
         tags=["Cart Items"],
         parameters=GUEST_CART_HEADERS,
-        request=CartItemCreateSerializer,
+        request=CartItemWriteSerializer,
         responses={
-            200: CartItemSerializer,
+            200: CartItemDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
@@ -266,13 +284,11 @@ class CartItemViewSet(MultiSerializerMixin, BaseModelViewSet):
     cart_service: CartService
 
     serializers = {
-        "default": CartItemSerializer,
-        "list": CartItemSerializer,
-        "create": CartItemCreateSerializer,
-        "retrieve": CartItemSerializer,
-        "update": CartItemSerializer,
-        "partial_update": CartItemSerializer,
-        "destroy": CartItemSerializer,
+        "list": CartItemListSerializer,
+        "create": CartItemWriteSerializer,
+        "retrieve": CartItemDetailSerializer,
+        "update": CartItemWriteSerializer,
+        "partial_update": CartItemWriteSerializer,
     }
 
     def initial(self, request, *args, **kwargs):
@@ -326,10 +342,14 @@ class CartItemViewSet(MultiSerializerMixin, BaseModelViewSet):
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
-        headers = self.get_success_headers(serializer.data)
+
+        response_serializer = CartItemDetailSerializer(
+            serializer.instance, context=self.get_serializer_context()
+        )
+        headers = self.get_success_headers(response_serializer.data)
 
         return Response(
-            serializer.data,
+            response_serializer.data,
             status=status.HTTP_201_CREATED,
             headers=headers,
         )
@@ -345,7 +365,11 @@ class CartItemViewSet(MultiSerializerMixin, BaseModelViewSet):
             )
             serializer.is_valid(raise_exception=True)
             self.perform_update(serializer)
-            return Response(serializer.data)
+
+            response_serializer = CartItemDetailSerializer(
+                serializer.instance, context=self.get_serializer_context()
+            )
+            return Response(response_serializer.data)
         except Http404:
             return Response(
                 {
@@ -355,10 +379,6 @@ class CartItemViewSet(MultiSerializerMixin, BaseModelViewSet):
                 },
                 status=status.HTTP_403_FORBIDDEN,
             )
-
-    def partial_update(self, request, *args, **kwargs):
-        kwargs["partial"] = True
-        return self.update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
         try:

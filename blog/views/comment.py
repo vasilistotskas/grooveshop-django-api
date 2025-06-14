@@ -6,9 +6,8 @@ from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
-    inline_serializer,
 )
-from rest_framework import serializers, status
+from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
 from rest_framework.permissions import (
@@ -18,8 +17,18 @@ from rest_framework.response import Response
 
 from blog.filters.comment import BlogCommentFilter
 from blog.models.comment import BlogComment
-from blog.serializers.comment import BlogCommentSerializer
-from blog.serializers.post import BlogPostSerializer
+from blog.models.post import BlogPost
+from blog.serializers.comment import (
+    BlogCommentDetailSerializer,
+    BlogCommentLikedCommentsRequestSerializer,
+    BlogCommentLikedCommentsResponseSerializer,
+    BlogCommentListSerializer,
+    BlogCommentMyCommentRequestSerializer,
+    BlogCommentWriteSerializer,
+)
+from blog.serializers.post import (
+    BlogPostDetailSerializer,
+)
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
@@ -36,7 +45,7 @@ from core.utils.views import cache_methods
         ),
         tags=["Blog Comments"],
         responses={
-            200: BlogCommentSerializer(many=True),
+            200: BlogCommentListSerializer(many=True),
         },
     ),
     retrieve=extend_schema(
@@ -46,7 +55,7 @@ from core.utils.views import cache_methods
         ),
         tags=["Blog Comments"],
         responses={
-            200: BlogCommentSerializer,
+            200: BlogCommentDetailSerializer,
             404: ErrorResponseSerializer,
         },
     ),
@@ -57,8 +66,9 @@ from core.utils.views import cache_methods
             "Comments are subject to approval before being visible."
         ),
         tags=["Blog Comments"],
+        request=BlogCommentWriteSerializer,
         responses={
-            201: BlogCommentSerializer,
+            201: BlogCommentDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
         },
@@ -67,8 +77,9 @@ from core.utils.views import cache_methods
         summary=_("Update a blog comment"),
         description=_("Update your own blog comment. Requires authentication."),
         tags=["Blog Comments"],
+        request=BlogCommentWriteSerializer,
         responses={
-            200: BlogCommentSerializer,
+            200: BlogCommentDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
             403: ErrorResponseSerializer,
@@ -81,8 +92,9 @@ from core.utils.views import cache_methods
             "Partially update your own blog comment. Requires authentication."
         ),
         tags=["Blog Comments"],
+        request=BlogCommentWriteSerializer,
         responses={
-            200: BlogCommentSerializer,
+            200: BlogCommentDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
             403: ErrorResponseSerializer,
@@ -107,7 +119,7 @@ from core.utils.views import cache_methods
         ),
         tags=["Blog Comments"],
         responses={
-            200: BlogCommentSerializer(many=True),
+            200: BlogCommentListSerializer(many=True),
             404: ErrorResponseSerializer,
         },
     ),
@@ -118,7 +130,7 @@ from core.utils.views import cache_methods
         ),
         tags=["Blog Comments"],
         responses={
-            200: BlogCommentSerializer(many=True),
+            200: BlogCommentListSerializer(many=True),
         },
     ),
     update_likes=extend_schema(
@@ -126,7 +138,7 @@ from core.utils.views import cache_methods
         description=_("Like or unlike a comment. Toggles the like status."),
         tags=["Blog Comments"],
         responses={
-            200: BlogCommentSerializer,
+            200: BlogCommentDetailSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
         },
@@ -137,23 +149,9 @@ from core.utils.views import cache_methods
             "Check which comments from a list are liked by the current user."
         ),
         tags=["Blog Comments"],
-        request=inline_serializer(
-            name="BlogPostLikedCommentsRequest",
-            fields={
-                "comment_ids": serializers.ListField(
-                    child=serializers.IntegerField()
-                )
-            },
-        ),
+        request=BlogCommentLikedCommentsRequestSerializer,
         responses={
-            200: inline_serializer(
-                name="LikedCommentsResponse",
-                fields={
-                    "liked_comment_ids": serializers.ListField(
-                        child=serializers.IntegerField()
-                    )
-                },
-            ),
+            200: BlogCommentLikedCommentsResponseSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
         },
@@ -163,7 +161,7 @@ from core.utils.views import cache_methods
         description=_("Get the blog post that this comment belongs to."),
         tags=["Blog Comments"],
         responses={
-            200: BlogPostSerializer,
+            200: BlogPostDetailSerializer,
             404: ErrorResponseSerializer,
         },
     ),
@@ -174,7 +172,7 @@ from core.utils.views import cache_methods
         ),
         tags=["Blog Comments"],
         responses={
-            200: BlogCommentSerializer(many=True),
+            200: BlogCommentListSerializer(many=True),
             401: ErrorResponseSerializer,
         },
     ),
@@ -184,14 +182,9 @@ from core.utils.views import cache_methods
             "Get the comment made by the currently authenticated user for a specific post."
         ),
         tags=["Blog Comments"],
-        request=inline_serializer(
-            name="MyCommentRequest",
-            fields={
-                "post": serializers.IntegerField(),
-            },
-        ),
+        request=BlogCommentMyCommentRequestSerializer,
         responses={
-            200: BlogCommentSerializer,
+            200: BlogCommentDetailSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
         },
@@ -199,83 +192,76 @@ from core.utils.views import cache_methods
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
-    filterset_class = BlogCommentFilter
+    queryset = BlogComment.objects.select_related(
+        "user", "post"
+    ).prefetch_related("likes")
     filter_backends = [
         DjangoFilterBackend,
-        PascalSnakeCaseOrderingFilter,
         SearchFilter,
+        PascalSnakeCaseOrderingFilter,
     ]
+    filterset_class = BlogCommentFilter
+    search_fields = ["translations__content"]
     ordering_fields = [
-        "id",
         "created_at",
         "updated_at",
-        "level",
-        "lft",
         "likes_count",
+        "replies_count",
     ]
     ordering = ["-created_at"]
-    search_fields = [
-        "translations__content",
-        "user__first_name",
-        "user__last_name",
-        "user__email",
-    ]
-
     serializers = {
-        "default": BlogCommentSerializer,
-        "post": BlogPostSerializer,
+        "list": BlogCommentListSerializer,
+        "retrieve": BlogCommentDetailSerializer,
+        "create": BlogCommentWriteSerializer,
+        "update": BlogCommentWriteSerializer,
+        "partial_update": BlogCommentWriteSerializer,
+        "replies": BlogCommentListSerializer,
+        "thread": BlogCommentListSerializer,
+        "update_likes": BlogCommentDetailSerializer,
+        "post": BlogPostDetailSerializer,
+        "liked_comments": BlogCommentLikedCommentsResponseSerializer,
+        "my_comments": BlogCommentListSerializer,
+        "my_comment": BlogCommentDetailSerializer,
     }
 
     def get_queryset(self):
-        queryset = BlogComment.objects.select_related(
-            "user", "post", "parent"
-        ).prefetch_related("translations", "likes", "children")
-
-        return queryset
+        return self.queryset.filter(is_approved=True)
 
     def get_permissions(self):
+        permission_classes = []
         if self.action in [
             "create",
             "update",
             "partial_update",
             "destroy",
             "update_likes",
-        ] or self.action in ["moderate", "bulk_moderate"]:
-            self.permission_classes = [IsAuthenticated]
-        return super().get_permissions()
-
-    def create(self, request, *args, **kwargs):
-        return super().create(request, *args, **kwargs)
+            "liked_comments",
+            "my_comments",
+            "my_comment",
+        ]:
+            permission_classes.append(IsAuthenticated)
+        return [permission() for permission in permission_classes]
 
     @action(detail=True, methods=["GET"])
     def replies(self, request, pk=None):
         comment = self.get_object()
-
-        if not comment.get_children().exists():
-            return Response(
-                {"detail": _("No replies found")},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
         queryset = (
             comment.get_children()
-            .select_related("user", "parent")
-            .prefetch_related("translations", "likes")
+            .select_related("user", "post")
+            .prefetch_related("likes")
+            .filter(is_approved=True)
+            .order_by("created_at")
         )
-
         return self.paginate_and_serialize(queryset, request)
 
     @action(detail=True, methods=["GET"])
     def thread(self, request, pk=None):
         comment = self.get_object()
+        ancestors = comment.get_ancestors().select_related("user", "post")
+        descendants = comment.get_descendants().select_related("user", "post")
 
-        root = comment.get_root()
-
-        queryset = (
-            root.get_descendants(include_self=True)
-            .select_related("user", "parent")
-            .prefetch_related("translations", "likes")
-        )
+        queryset = [*list(ancestors), comment, *list(descendants)]
+        queryset = sorted(queryset, key=lambda x: x.created_at)
 
         return self.paginate_and_serialize(queryset, request)
 
@@ -286,52 +272,48 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
 
         if comment.likes.filter(id=user.id).exists():
             comment.likes.remove(user)
-            action_taken = "unliked"
+            liked = False
         else:
             comment.likes.add(user)
-            action_taken = "liked"
+            liked = True
 
-        serializer = self.get_serializer(
-            comment, context=self.get_serializer_context()
-        )
+        comment.refresh_from_db()
 
-        response_data = serializer.data
-        response_data["action"] = action_taken
+        serializer = self.get_serializer(comment)
+        data = serializer.data
+        data["action"] = "liked" if liked else "unliked"
 
-        return Response(response_data, status=status.HTTP_200_OK)
+        return Response(data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["GET"])
     def post(self, request, pk=None):
         comment = self.get_object()
-        if not comment.post:
-            return Response(
-                {"detail": _("Comment has no associated post.")},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        serializer = BlogPostSerializer(
-            comment.post, context=self.get_serializer_context()
+        post = comment.post
+        serializer = BlogPostDetailSerializer(
+            post, context={"request": request}
         )
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.data)
 
     @action(detail=False, methods=["POST"])
     def liked_comments(self, request, *args, **kwargs):
+        serializer = BlogCommentLikedCommentsRequestSerializer(
+            data=request.data
+        )
+        serializer.is_valid(raise_exception=True)
+
+        comment_ids = serializer.validated_data["comment_ids"]
         user = request.user
-        comment_ids = request.data.get("comment_ids", [])
 
-        if not comment_ids:
-            return Response(
-                {"error": _("No comment IDs provided.")},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        liked_comment_ids = list(
+        liked_ids = list(
             BlogComment.objects.filter(
-                likes=user, id__in=comment_ids
+                id__in=comment_ids, likes=user
             ).values_list("id", flat=True)
         )
 
-        return Response(liked_comment_ids, status=status.HTTP_200_OK)
+        response_serializer = BlogCommentLikedCommentsResponseSerializer(
+            {"liked_comment_ids": liked_ids}
+        )
+        return Response(response_serializer.data)
 
     @action(detail=False, methods=["GET"])
     def my_comments(self, request):
@@ -340,36 +322,24 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
 
     @action(detail=False, methods=["POST"])
     def my_comment(self, request, *args, **kwargs) -> Response:
-        if not request.user.is_authenticated:
-            return Response(
-                {"detail": _("User is not authenticated")},
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
+        serializer = BlogCommentMyCommentRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
-        post_id = request.data.get("post")
-        user_id = request.user.id
+        post_id = serializer.validated_data["post"]
 
-        if not user_id or not post_id:
+        try:
+            post = BlogPost.objects.get(id=post_id)
+        except BlogPost.DoesNotExist:
             return Response(
-                {"detail": _("User and Post are required fields")},
-                status=status.HTTP_400_BAD_REQUEST,
+                {"error": "Post not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
         try:
-            comment = BlogComment.objects.get(
-                user=user_id, post=post_id, parent=None
-            )
+            comment = self.get_queryset().get(user=request.user, post=post)
             serializer = self.get_serializer(comment)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-
+            return Response(serializer.data)
         except BlogComment.DoesNotExist:
             return Response(
-                {"detail": _("Comment does not exist")},
+                {"error": "Comment not found for this post"},
                 status=status.HTTP_404_NOT_FOUND,
-            )
-
-        except ValueError:
-            return Response(
-                {"detail": _("Invalid data")},
-                status=status.HTTP_400_BAD_REQUEST,
             )

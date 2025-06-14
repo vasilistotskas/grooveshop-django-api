@@ -6,7 +6,7 @@ from django.test import TransactionTestCase
 from django.utils import timezone
 from djmoney.money import Money
 
-from order.enum.status_enum import OrderStatusEnum
+from order.enum.status import OrderStatusEnum
 from order.metrics import OrderMetrics
 
 

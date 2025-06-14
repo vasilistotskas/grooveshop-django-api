@@ -32,6 +32,7 @@ class ProductCategorySerializer(
             "translations",
             "id",
             "slug",
+            "active",
             "children",
             "parent",
             "level",

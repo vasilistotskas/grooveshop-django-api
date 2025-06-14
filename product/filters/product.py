@@ -33,11 +33,6 @@ class ProductFilter(filters.FilterSet):
         lookup_expr="gte",
         label="Minimum Review Average",
     )
-    min_approved_review_average = filters.NumberFilter(
-        field_name="approved_review_average_field",
-        lookup_expr="gte",
-        label="Minimum Approved Review Average",
-    )
     min_likes = filters.NumberFilter(
         field_name="likes_count_field",
         lookup_expr="gte",
@@ -53,7 +48,6 @@ class ProductFilter(filters.FilterSet):
             "min_discount",
             "max_discount",
             "min_review_average",
-            "min_approved_review_average",
             "min_likes",
         ]
 

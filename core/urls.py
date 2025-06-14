@@ -2,7 +2,6 @@ from django.conf import settings
 from django.conf.urls.i18n import i18n_patterns
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.urls import include, path
 from django.utils.translation import gettext_lazy as _
@@ -20,8 +19,6 @@ from core.views import (
     robots_txt,
     upload_image,
 )
-
-User = get_user_model()
 
 app_name = "core"
 
@@ -54,11 +51,8 @@ urlpatterns += i18n_patterns(
     path("api/v1/", include("user.urls")),
     path("api/v1/", include("country.urls")),
     path("api/v1/", include("region.urls")),
-    path("api/v1/", include("slider.urls")),
     path("api/v1/", include("search.urls")),
-    path("api/v1/", include("tip.urls")),
     path("api/v1/", include("blog.urls")),
-    path("api/v1/", include("vat.urls")),
     path("api/v1/", include("pay_way.urls")),
     path("api/v1/", include("cart.urls")),
     path("api/v1/", include("notification.urls")),

@@ -15,7 +15,10 @@ from product.models.favourite import ProductFavourite
 from product.models.image import ProductImage
 from product.models.product import Product
 from product.models.review import ProductReview
-from product.serializers.product import ProductSerializer
+from product.serializers.product import (
+    ProductDetailSerializer,
+    ProductListSerializer,
+)
 from user.factories.account import UserAccountFactory
 from vat.factories import VatFactory
 from vat.models import Vat
@@ -93,7 +96,9 @@ class ProductViewSetTestCase(APITestCase):
         pagination = LimitOffsetPaginator()
         limit = pagination.default_limit
         products = Product.objects.all()[0:limit]
-        serializer = ProductSerializer(products, many=True)
+        serializer = ProductListSerializer(
+            products, many=True, context={"request": response.wsgi_request}
+        )
 
         self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -160,7 +165,9 @@ class ProductViewSetTestCase(APITestCase):
         url = self.get_product_detail_url(self.product.pk)
         response = self.client.get(url)
         product = Product.objects.get(pk=self.product.pk)
-        serializer = ProductSerializer(product)
+        serializer = ProductDetailSerializer(
+            product, context={"request": response.wsgi_request}
+        )
 
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)

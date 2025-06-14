@@ -7,6 +7,7 @@ from phonenumber_field.modelfields import PhoneNumberField
 
 from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from core.models import TimeStampMixinModel, UUIDModel
+from user.managers.address import UserAddressManager
 
 
 class UserAddress(TimeStampMixinModel, UUIDModel):
@@ -59,6 +60,8 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
     mobile_phone = PhoneNumberField(_("Mobile Phone Number"))
     notes = models.CharField(_("Notes"), max_length=255, blank=True, default="")
     is_main = models.BooleanField(_("Is Main"), default=False)
+
+    objects = UserAddressManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("User Address")

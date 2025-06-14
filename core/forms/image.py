@@ -2,18 +2,22 @@ from __future__ import annotations
 
 import contextlib
 import xml.etree.ElementTree as ET
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
 from django.core import validators
 from django.core.exceptions import ValidationError
 from django.forms import ImageField
+from django.utils.translation import gettext_lazy as _
 
 if TYPE_CHECKING:  # pragma: no cover
     from django.core.files import File
 
 
-def validate_image_file_extension(value: File | None):
+def validate_image_file_extension(value: File[Any] | None):
+    if value is None:
+        return None
+
     allowed_extensions = [
         *list(validators.get_available_image_extensions()),
         "svg",
@@ -37,7 +41,7 @@ class ImageAndSvgField(ImageField):
         self.max_file_size = max_file_size
         super().__init__(*args, **kwargs)
 
-    def to_python(self, data: File | None):
+    def to_python(self, data: File[Any] | None):
         if data is None:
             return None
 
@@ -63,12 +67,15 @@ class ImageAndSvgField(ImageField):
 
             if not self.is_svg(data):
                 raise ValidationError(
-                    "Upload a valid image. The file you uploaded was either not an image or a corrupted image.",
+                    _(
+                        "Upload a valid image. The file you uploaded was either not an image or a corrupted image."
+                    ),
                     code="invalid_image",
                 ) from err
 
             f = data
-            f.content_type = "image/svg+xml"
+            if hasattr(f, "content_type"):
+                f.content_type = "image/svg+xml"  # type: ignore[attr-defined]
 
             if hasattr(f, "seek") and callable(f.seek):
                 f.seek(0)
@@ -76,7 +83,7 @@ class ImageAndSvgField(ImageField):
         return f
 
     @staticmethod
-    def is_svg(f: File | None) -> bool:
+    def is_svg(f: File[Any] | None) -> bool:
         if f is None:
             return False
 
@@ -104,14 +111,18 @@ class ImageAndSvgField(ImageField):
                 )
                 if tag_name.lower() == "script":
                     raise ValidationError(
-                        "SVG files containing script elements are not allowed for security reasons.",
+                        _(
+                            "SVG files containing script elements are not allowed for security reasons."
+                        ),
                         code="svg_script_not_allowed",
                     )
 
                 for attr in elem.attrib:
                     if attr.lower().startswith("on"):
                         raise ValidationError(
-                            "SVG files containing event handlers are not allowed for security reasons.",
+                            _(
+                                "SVG files containing event handlers are not allowed for security reasons."
+                            ),
                             code="svg_event_handler_not_allowed",
                         )
 

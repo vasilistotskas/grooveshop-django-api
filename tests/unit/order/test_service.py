@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from djmoney.money import Money
 
-from order.enum.status_enum import OrderStatusEnum
+from order.enum.status import OrderStatusEnum
 from order.models.order import Order
 from order.services import OrderService
 

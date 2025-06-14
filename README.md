@@ -138,7 +138,7 @@ This project is open-sourced under the MIT License. See the [LICENSE](LICENSE.md
 
 # Python Development Setup and Utilities
 
-## Python Version 3.13.2
+## Python Version 3.13.5
 
 ### Django Commands
 - **Install Django**:

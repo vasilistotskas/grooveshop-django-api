@@ -8,7 +8,7 @@ from parler.models import TranslatableModel, TranslatedFields
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
 
 
-class ActiveBlogTagManager(TranslatableManager):
+class BlogTagManager(TranslatableManager):
     def get_queryset(self):
         return super().get_queryset().filter(active=True)
 
@@ -25,7 +25,7 @@ class BlogTag(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         )
     )
 
-    active_tags = ActiveBlogTagManager()
+    objects = BlogTagManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Blog Tag")

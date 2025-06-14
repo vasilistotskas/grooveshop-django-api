@@ -18,13 +18,13 @@ from core.utils.generators import SlugifyConfig, unique_slugify
 
 
 class BlogCategoryQuerySet(TranslatableQuerySet, TreeQuerySet):
+    @classmethod
     def as_manager(cls):
         manager = BlogCategoryManager.from_queryset(cls)()
         manager._built_with_as_manager = True
         return manager
 
-    as_manager.queryset_only = True
-    as_manager = classmethod(as_manager)
+    as_manager.queryset_only = True  # type: ignore[attr-defined]
 
 
 class BlogCategoryManager(TreeManager, TranslatableManager):

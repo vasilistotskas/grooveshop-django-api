@@ -4,7 +4,7 @@ import factory
 from django.contrib.auth import get_user_model
 from faker import Faker
 
-from order.enum.status_enum import OrderStatusEnum, PaymentStatusEnum
+from order.enum.status import OrderStatusEnum, PaymentStatusEnum
 from order.models.history import OrderHistory, OrderItemHistory
 
 fake = Faker()
@@ -32,7 +32,7 @@ class OrderHistoryFactory(factory.django.DjangoModelFactory):
         else None
     )
     change_type = factory.Iterator(
-        [choice[0] for choice in OrderHistory.CHANGE_TYPE_CHOICES]
+        [choice[0] for choice in OrderHistory.OrderHistoryChangeType.choices]
     )
     previous_value = factory.LazyFunction(
         lambda: {
@@ -186,7 +186,10 @@ class OrderItemHistoryFactory(factory.django.DjangoModelFactory):
         else None
     )
     change_type = factory.Iterator(
-        [choice[0] for choice in OrderItemHistory.CHANGE_TYPE_CHOICES]
+        [
+            choice[0]
+            for choice in OrderItemHistory.OrderItemHistoryChangeType.choices
+        ]
     )
     previous_value = factory.LazyFunction(
         lambda: {"quantity": random.randint(1, 5)}

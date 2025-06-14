@@ -9,7 +9,8 @@ from djmoney.models.fields import MoneyField
 from parler.models import TranslatableModel, TranslatedFields
 
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
-from pay_way.enum.pay_way_enum import PayWayEnum
+from pay_way.enum.pay_way import PayWayEnum
+from pay_way.managers import PayWayManager
 
 
 class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
@@ -21,11 +22,14 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         decimal_places=2,
         default=0,
     )
-    free_for_order_amount = MoneyField(
-        _("Free For Order Amount"),
+    free_threshold = MoneyField(
+        _("Free Threshold"),
         max_digits=11,
         decimal_places=2,
         default=0,
+        help_text=_(
+            "Order amount above which this payment method becomes free"
+        ),
     )
     icon = models.ImageField(
         _("Icon"), upload_to="uploads/pay_way/", blank=True, null=True
@@ -78,6 +82,8 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         ),
     )
 
+    objects = PayWayManager()
+
     class Meta(TypedModelMeta):
         verbose_name = _("Pay Way")
         verbose_name_plural = _("Pay Ways")
@@ -88,7 +94,7 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
             BTreeIndex(fields=["active"], name="pay_way_active_ix"),
             BTreeIndex(fields=["cost"], name="pay_way_cost_ix"),
             BTreeIndex(
-                fields=["free_for_order_amount"], name="pay_way_free_order_ix"
+                fields=["free_threshold"], name="pay_way_free_threshold_ix"
             ),
             BTreeIndex(fields=["provider_code"], name="pay_way_provider_ix"),
             BTreeIndex(fields=["is_online_payment"], name="pay_way_online_ix"),
@@ -114,6 +120,35 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         else:
             return ""
 
-    @classmethod
-    def active_pay_ways_by_status(cls, status: bool):
-        return cls.objects.filter(active=status).values()
+    @property
+    def display_name(self) -> str:
+        return self.safe_translation_getter("name", any_language=True) or ""
+
+    @property
+    def has_configuration(self) -> bool:
+        return bool(self.configuration)
+
+    @property
+    def is_configured(self) -> bool:
+        if not self.is_online_payment:
+            return True
+        return self.has_configuration
+
+    @property
+    def effective_cost(self) -> float:
+        return float(self.cost.amount) if self.cost else 0.0
+
+    def is_free_for_amount(self, amount: float) -> bool:
+        if not self.free_threshold:
+            return False
+        return amount >= float(self.free_threshold.amount)
+
+    def get_configuration_value(self, key: str, default=None):
+        if not self.configuration:
+            return default
+        return self.configuration.get(key, default)
+
+    def set_configuration_value(self, key: str, value) -> None:
+        if not self.configuration:
+            self.configuration = {}
+        self.configuration[key] = value

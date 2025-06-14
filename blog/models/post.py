@@ -38,7 +38,7 @@ class BlogPostQuerySet(TranslatableQuerySet):
 
 
 class BlogPostManager(TranslatableManager):
-    def get_queryset(self):
+    def get_queryset(self) -> BlogPostQuerySet:
         return BlogPostQuerySet(self.model, using=self._db)
 
     def with_likes_count(self):
@@ -87,7 +87,7 @@ class BlogPost(
     featured = models.BooleanField(_("Featured"), default=False)
     view_count = models.PositiveBigIntegerField(_("View Count"), default=0)
 
-    objects = BlogPostManager()
+    objects: BlogPostManager = BlogPostManager()  # type: ignore[misc]
 
     class Meta(TypedModelMeta):
         verbose_name = _("Blog Post")
@@ -201,5 +201,5 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
         return {"likes_count": lambda obj: obj.master.likes_count}
 
     def __str__(self):
-        model = self._meta.verbose_name.title()
-        return f"{model:s}: {self.title:s}"
+        title = self.title or "Untitled"
+        return f"{title} ({self.language_code})"

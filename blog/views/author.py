@@ -6,17 +6,18 @@ from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
-    inline_serializer,
 )
-from rest_framework import serializers
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
-from rest_framework.response import Response
 
 from blog.filters.author import BlogAuthorFilter
 from blog.models.author import BlogAuthor
-from blog.serializers.author import BlogAuthorSerializer
-from blog.serializers.post import BlogPostSerializer
+from blog.serializers.author import (
+    BlogAuthorDetailSerializer,
+    BlogAuthorListSerializer,
+    BlogAuthorWriteSerializer,
+)
+from blog.serializers.post import BlogPostListSerializer
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
@@ -33,7 +34,7 @@ from core.utils.views import cache_methods
         ),
         tags=["Blog Authors"],
         responses={
-            200: BlogAuthorSerializer(many=True),
+            200: BlogAuthorListSerializer(many=True),
         },
     ),
     retrieve=extend_schema(
@@ -41,7 +42,7 @@ from core.utils.views import cache_methods
         description=_("Get detailed information about a specific blog author."),
         tags=["Blog Authors"],
         responses={
-            200: BlogAuthorSerializer,
+            200: BlogAuthorDetailSerializer,
             404: ErrorResponseSerializer,
         },
     ),
@@ -51,8 +52,9 @@ from core.utils.views import cache_methods
             "Create a new blog author profile. Requires authentication."
         ),
         tags=["Blog Authors"],
+        request=BlogAuthorWriteSerializer,
         responses={
-            201: BlogAuthorSerializer,
+            201: BlogAuthorDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
         },
@@ -63,8 +65,9 @@ from core.utils.views import cache_methods
             "Update blog author information. Requires authentication."
         ),
         tags=["Blog Authors"],
+        request=BlogAuthorWriteSerializer,
         responses={
-            200: BlogAuthorSerializer,
+            200: BlogAuthorDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
@@ -76,8 +79,9 @@ from core.utils.views import cache_methods
             "Partially update blog author information. Requires authentication."
         ),
         tags=["Blog Authors"],
+        request=BlogAuthorWriteSerializer,
         responses={
-            200: BlogAuthorSerializer,
+            200: BlogAuthorDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
@@ -100,46 +104,13 @@ from core.utils.views import cache_methods
         ),
         tags=["Blog Authors"],
         responses={
-            200: BlogPostSerializer(many=True),
-            404: ErrorResponseSerializer,
-        },
-    ),
-    stats=extend_schema(
-        summary=_("Get author statistics"),
-        description=_(
-            "Get comprehensive statistics about the author's blog posts and activity."
-        ),
-        tags=["Blog Authors"],
-        responses={
-            200: inline_serializer(
-                name="BlogAuthorStatsResponse",
-                fields={
-                    "total_posts": serializers.IntegerField(),
-                    "total_likes_received": serializers.IntegerField(),
-                    "member_since": serializers.DateField(),
-                    "has_website": serializers.BooleanField(),
-                    "full_name": serializers.CharField(),
-                    "user_active": serializers.BooleanField(),
-                    "posts_this_year": serializers.IntegerField(),
-                    "average_likes_per_post": serializers.FloatField(),
-                },
-            ),
+            200: BlogPostListSerializer(many=True),
             404: ErrorResponseSerializer,
         },
     ),
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class BlogAuthorViewSet(MultiSerializerMixin, BaseModelViewSet):
-    serializers = {
-        "default": BlogAuthorSerializer,
-        "list": BlogAuthorSerializer,
-        "retrieve": BlogAuthorSerializer,
-        "create": BlogAuthorSerializer,
-        "update": BlogAuthorSerializer,
-        "partial_update": BlogAuthorSerializer,
-        "destroy": BlogAuthorSerializer,
-        "posts": BlogPostSerializer,
-    }
     filterset_class = BlogAuthorFilter
     filter_backends = [
         DjangoFilterBackend,
@@ -162,6 +133,14 @@ class BlogAuthorViewSet(MultiSerializerMixin, BaseModelViewSet):
         "website",
         "translations__bio",
     ]
+    serializers = {
+        "list": BlogAuthorListSerializer,
+        "retrieve": BlogAuthorDetailSerializer,
+        "create": BlogAuthorWriteSerializer,
+        "update": BlogAuthorWriteSerializer,
+        "partial_update": BlogAuthorWriteSerializer,
+        "posts": BlogPostListSerializer,
+    }
 
     def get_queryset(self):
         return BlogAuthor.objects.select_related("user").prefetch_related(
@@ -181,30 +160,3 @@ class BlogAuthorViewSet(MultiSerializerMixin, BaseModelViewSet):
         queryset = author.blog_posts.all()
 
         return self.paginate_and_serialize(queryset, request)
-
-    @action(detail=True, methods=["GET"])
-    def stats(self, request, pk=None):
-        author = self.get_object()
-
-        posts_this_year = author.blog_posts.filter(
-            created_at__year=request.user.date_joined.year
-            if hasattr(request.user, "date_joined")
-            else 2024
-        ).count()
-
-        avg_likes = 0
-        if author.number_of_posts > 0:
-            avg_likes = author.total_likes_received / author.number_of_posts
-
-        stats = {
-            "total_posts": author.number_of_posts,
-            "total_likes_received": author.total_likes_received,
-            "member_since": author.created_at.date(),
-            "has_website": bool(author.website),
-            "full_name": author.full_name,
-            "user_active": author.user.is_active,
-            "posts_this_year": posts_this_year,
-            "average_likes_per_post": round(avg_likes, 2),
-        }
-
-        return Response(stats)

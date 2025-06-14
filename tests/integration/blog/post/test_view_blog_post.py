@@ -144,10 +144,10 @@ class BlogPostViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.data["id"], self.post.id)
 
         self.assertIn("author", response.data)
-        self.assertEqual(response.data["author"], self.author.id)
+        self.assertEqual(response.data["author"]["id"], self.author.id)
 
         self.assertIn("category", response.data)
-        self.assertEqual(response.data["category"], self.category.id)
+        self.assertEqual(response.data["category"]["id"], self.category.id)
 
         self.assertIn("translations", response.data)
 

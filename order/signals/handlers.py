@@ -4,8 +4,8 @@ from typing import Any
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
-from order.enum.document_type_enum import OrderDocumentTypeEnum
-from order.enum.status_enum import OrderStatusEnum
+from order.enum.document_type import OrderDocumentTypeEnum
+from order.enum.status import OrderStatusEnum
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.notifications import (

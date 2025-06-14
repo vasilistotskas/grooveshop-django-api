@@ -5,14 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
 from core.models import TimeStampMixinModel, UUIDModel
-
-
-class ProductFavouriteManager(models.Manager):
-    def for_user(self, user):
-        return self.get_queryset().filter(user=user)
-
-    def for_product(self, product):
-        return self.get_queryset().filter(product=product)
+from product.managers.favourite import FavouriteManager
 
 
 class ProductFavourite(TimeStampMixinModel, UUIDModel):
@@ -28,7 +21,7 @@ class ProductFavourite(TimeStampMixinModel, UUIDModel):
         on_delete=models.CASCADE,
     )
 
-    objects = ProductFavouriteManager()
+    objects = FavouriteManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Product Favourite")

@@ -2,6 +2,7 @@ import datetime
 from os import getenv, makedirs, path
 from pathlib import Path
 
+import django_stubs_ext
 import dotenv
 from celery.schedules import crontab
 from corsheaders.defaults import (
@@ -11,6 +12,8 @@ from csp.constants import SELF, UNSAFE_EVAL, UNSAFE_INLINE
 from django.templatetags.static import static
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
+
+django_stubs_ext.monkeypatch()
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -60,7 +63,7 @@ MEDIA_STREAM_BASE_URL = getenv("MEDIA_STREAM_BASE_URL", "http://localhost:3003")
 STATIC_BASE_URL = getenv("STATIC_BASE_URL", "http://localhost:8000")
 CSP_STATIC_BASE_URL = getenv("STATIC_BASE_URL", "http://localhost:8000")
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS: list[str] = []
 
 additional_hosts = getenv("ALLOWED_HOSTS", "*").split(",")
 ALLOWED_HOSTS.extend(filter(None, additional_hosts))
@@ -91,10 +94,8 @@ LOCAL_APPS = [
     "product",
     "order",
     "search",
-    "slider",
     "blog",
     "seo",
-    "tip",
     "vat",
     "country",
     "region",
@@ -467,27 +468,27 @@ CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 
 SCHEDULE_PRESETS = {
     # Daily schedules
-    "daily_2am": crontab(hour=2, minute=0),
-    "daily_3am": crontab(hour=3, minute=0),
-    "daily_4am": crontab(hour=4, minute=0),
-    "daily_5am": crontab(hour=5, minute=0),
-    "daily_6am": crontab(hour=6, minute=0),
-    "daily_7am": crontab(hour=7, minute=0),
-    "daily_noon": crontab(hour=12, minute=0),
+    "daily_2am": crontab(hour="2", minute="0"),
+    "daily_3am": crontab(hour="3", minute="0"),
+    "daily_4am": crontab(hour="4", minute="0"),
+    "daily_5am": crontab(hour="5", minute="0"),
+    "daily_6am": crontab(hour="6", minute="0"),
+    "daily_7am": crontab(hour="7", minute="0"),
+    "daily_noon": crontab(hour="12", minute="0"),
     # Weekly schedules
-    "weekly_sunday_5am": crontab(hour=5, minute=0, day_of_week=0),
-    "weekly_sunday_3am": crontab(hour=3, minute=0, day_of_week=0),
-    "weekly_monday_4am": crontab(hour=4, minute=0, day_of_week=1),
+    "weekly_sunday_5am": crontab(hour="5", minute="0", day_of_week="0"),
+    "weekly_sunday_3am": crontab(hour="3", minute="0", day_of_week="0"),
+    "weekly_monday_4am": crontab(hour="4", minute="0", day_of_week="1"),
     # Monthly schedules
-    "monthly_first_6am": crontab(hour=6, minute=0, day_of_month=1),
-    "monthly_first_4am": crontab(hour=4, minute=0, day_of_month=1),
+    "monthly_first_6am": crontab(hour="6", minute="0", day_of_month="1"),
+    "monthly_first_4am": crontab(hour="4", minute="0", day_of_month="1"),
     # Bi-monthly schedules
-    "bimonthly_4am": crontab(hour=4, minute=0, day_of_month="1,15"),
-    "bimonthly_6am": crontab(hour=6, minute=0, day_of_month="1,15"),
+    "bimonthly_4am": crontab(hour="4", minute="0", day_of_month="1,15"),
+    "bimonthly_6am": crontab(hour="6", minute="0", day_of_month="1,15"),
     # Frequent schedules
     "every_minute": crontab(minute="*"),
     "every_30_min": crontab(minute="*/30"),
-    "every_hour": crontab(minute=0),
+    "every_hour": crontab(minute="0"),
 }
 
 CELERY_BEAT_SCHEDULE = {
@@ -770,6 +771,16 @@ EXTRA_SETTINGS_DEFAULTS = [
         "type": "decimal",
         "value": 50.00,
     },
+    {
+        "name": "CART_ABANDONED_HOURS",
+        "type": "integer",
+        "value": 24,
+    },
+    {
+        "name": "DEFAULT_WEIGHT_UNIT",
+        "type": "string",
+        "value": "kg",
+    },
 ]
 
 EMAIL_BACKEND = getenv(
@@ -915,8 +926,7 @@ SPECTACULAR_SETTINGS = {
         "drf_spectacular.hooks.postprocess_schema_enums",
     ],
     "ENUM_NAME_OVERRIDES": {
-        # Used by Checkout, Order, OrderCreateUpdate, PatchedOrderCreateUpdate
-        "OrderStatusEnum": "order.enum.status_enum.OrderStatusEnum",
+        "OrderStatusEnum": "order.enum.status.OrderStatusEnum",
     },
 }
 

@@ -3,64 +3,13 @@ from decimal import Decimal
 from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import F, Sum
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
 from djmoney.money import Money
 
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
-
-
-class OrderItemQuerySet(models.QuerySet):
-    def for_product(self, product_id):
-        return self.filter(product_id=product_id)
-
-    def for_order(self, order_id):
-        return self.filter(order_id=order_id)
-
-    def with_product_data(self):
-        return self.select_related("product").prefetch_related(
-            "product__translations"
-        )
-
-    def sum_quantities(self):
-        return (
-            self.aggregate(total_quantity=Sum("quantity"))["total_quantity"]
-            or 0
-        )
-
-    def annotate_total_price(self):
-        return self.annotate(calculated_total=F("price_amount") * F("quantity"))
-
-    def total_items_cost(self):
-        items = self.annotate_total_price()
-        total = items.aggregate(total=Sum("calculated_total"))["total"] or 0
-
-        first_item = self.first()
-        if first_item and hasattr(first_item, "price"):
-            return Money(amount=total, currency=first_item.price.currency)
-        return Money(amount=0, currency="USD")
-
-
-class OrderItemManager(models.Manager):
-    def get_queryset(self) -> OrderItemQuerySet:
-        return OrderItemQuerySet(self.model, using=self._db)
-
-    def for_product(self, product_id):
-        return self.get_queryset().for_product(product_id)
-
-    def for_order(self, order_id):
-        return self.get_queryset().for_order(order_id)
-
-    def with_product_data(self):
-        return self.get_queryset().with_product_data()
-
-    def sum_quantities(self):
-        return self.get_queryset().sum_quantities()
-
-    def total_items_cost(self):
-        return self.get_queryset().total_items_cost()
+from order.managers.item import OrderItemManager
 
 
 class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):

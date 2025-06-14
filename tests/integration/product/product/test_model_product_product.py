@@ -143,14 +143,8 @@ class ProductModelTestCase(TestCase):
     def test_review_average(self):
         self.assertEqual(self.product.review_average, 5)
 
-    def test_approved_review_average(self):
-        self.assertEqual(self.product.approved_review_average, 5)
-
     def test_review_count(self):
         self.assertEqual(self.product.review_count, 2)
-
-    def test_approved_review_count(self):
-        self.assertEqual(self.product.approved_review_count, 1)
 
     def test_vat_percent(self):
         self.assertEqual(self.product.vat_percent, self.vat.value)
@@ -325,18 +319,6 @@ class ProductQuerySetTestCase(TestCase):
         self.assertEqual(product1.review_average_field, actual_avg)
         self.assertEqual(product2.review_average_field, 0)
 
-    def test_queryset_with_approved_review_average(self):
-        queryset = Product.objects.with_approved_review_average()
-        product1 = queryset.get(id=self.product1.id)
-        product2 = queryset.get(id=self.product2.id)
-
-        actual_avg = ProductReview.objects.filter(
-            product=self.product1, status=ReviewStatusEnum.TRUE
-        ).aggregate(avg=Avg("rate"))["avg"]
-
-        self.assertEqual(product1.approved_review_average_field, actual_avg)
-        self.assertEqual(product2.approved_review_average_field, 0)
-
     def test_queryset_with_all_annotations(self):
         queryset = Product.objects.with_all_annotations()
         product1 = queryset.get(id=self.product1.id)
@@ -347,7 +329,6 @@ class ProductQuerySetTestCase(TestCase):
         self.assertTrue(hasattr(product1, "price_save_percent_field"))
         self.assertTrue(hasattr(product1, "likes_count_field"))
         self.assertTrue(hasattr(product1, "review_average_field"))
-        self.assertTrue(hasattr(product1, "approved_review_average_field"))
 
     def test_annotations_match_property_values(self):
         queryset = Product.objects.with_all_annotations()
@@ -371,10 +352,6 @@ class ProductQuerySetTestCase(TestCase):
         )
         self.assertEqual(
             product1.review_average_field, product_instance.review_average
-        )
-        self.assertEqual(
-            product1.approved_review_average_field,
-            product_instance.approved_review_average,
         )
 
     def test_ordering_with_annotations(self):

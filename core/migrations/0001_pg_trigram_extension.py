@@ -13,7 +13,6 @@ class Migration(migrations.Migration):
         ("pay_way", "0001_initial"),
         ("product", "0001_initial"),
         ("region", "0001_initial"),
-        ("slider", "0001_initial"),
         ("tip", "0001_initial"),
         ("user", "0001_initial"),
         ("vat", "0001_initial"),

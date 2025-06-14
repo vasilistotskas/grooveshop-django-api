@@ -10,17 +10,8 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import (
     Avg,
-    Case,
-    Count,
-    DecimalField,
     F,
-    FloatField,
-    OuterRef,
-    Subquery,
-    Value,
-    When,
 )
-from django.db.models.functions import Coalesce
 from django.utils.safestring import SafeString, mark_safe
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -29,7 +20,6 @@ from djmoney.money import Money
 from measurement.measures import Weight
 from mptt.fields import TreeForeignKey
 from parler.fields import TranslationsForeignKey
-from parler.managers import TranslatableManager, TranslatableQuerySet
 from parler.models import TranslatableModel, TranslatedFieldsModel
 from simple_history.models import HistoricalRecords
 from tinymce.models import HTMLField
@@ -38,7 +28,6 @@ from core.fields.measurement import MeasurementField
 from core.models import (
     MetaDataModel,
     SoftDeleteModel,
-    SoftDeleteQuerySet,
     TimeStampMixinModel,
     UUIDModel,
 )
@@ -46,7 +35,7 @@ from core.units import WeightUnits
 from core.utils.generators import SlugifyConfig, unique_slugify
 from core.weight import zero_weight
 from meili.models import IndexMixin
-from product.enum.review import ReviewStatusEnum
+from product.managers.product import ProductManager
 from product.models.favourite import ProductFavourite
 from product.models.image import ProductImage
 from product.models.review import ProductReview
@@ -55,146 +44,6 @@ from tag.models.tagged_item import TaggedModel
 
 DISCOUNT_PERCENT_MIN = Decimal("0.0")
 DISCOUNT_PERCENT_MAX = Decimal("100.0")
-
-
-class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
-    def exclude_deleted(self):
-        return self.exclude(is_deleted=True)
-
-    def with_discount_value(self):
-        return self.annotate(
-            discount_value_amount=F("price")
-            * F("discount_percent")
-            / Value(100, output_field=DecimalField())
-        )
-
-    def with_vat_value(self):
-        return self.annotate(
-            vat_value_amount=Case(
-                When(
-                    vat__isnull=False,
-                    then=F("price")
-                    * F("vat__value")
-                    / Value(100, output_field=DecimalField()),
-                ),
-                default=Value(0, output_field=DecimalField()),
-            )
-        )
-
-    def with_final_price(self):
-        queryset = self.with_discount_value().with_vat_value()
-        return queryset.annotate(
-            final_price_amount=F("price")
-            + F("vat_value_amount")
-            - F("discount_value_amount")
-        )
-
-    def with_price_save_percent(self):
-        queryset = self.with_discount_value()
-        return queryset.annotate(
-            price_save_percent_field=Case(
-                When(
-                    price__gt=0,
-                    then=F("discount_value_amount")
-                    / F("price")
-                    * Value(100, output_field=DecimalField()),
-                ),
-                default=Value(0, output_field=DecimalField()),
-            )
-        )
-
-    def with_likes_count(self):
-        from product.models.favourite import ProductFavourite
-
-        likes_subquery = (
-            ProductFavourite.objects.filter(product_id=OuterRef("pk"))
-            .values("product_id")
-            .annotate(count=Count("id"))
-            .values("count")
-        )
-
-        return self.annotate(
-            likes_count_field=Coalesce(Subquery(likes_subquery), Value(0))
-        )
-
-    def with_review_average(self):
-        from product.models.review import ProductReview
-
-        reviews_avg_subquery = (
-            ProductReview.objects.filter(product_id=OuterRef("pk"))
-            .values("product_id")
-            .annotate(
-                avg=Coalesce(Avg("rate"), Value(0, output_field=FloatField()))
-            )
-            .values("avg")
-        )
-
-        return self.annotate(
-            review_average_field=Coalesce(
-                Subquery(reviews_avg_subquery),
-                Value(0, output_field=FloatField()),
-            )
-        )
-
-    def with_approved_review_average(self):
-        from product.enum.review import ReviewStatusEnum
-        from product.models.review import ProductReview
-
-        approved_reviews_avg_subquery = (
-            ProductReview.objects.filter(
-                product_id=OuterRef("pk"), status=ReviewStatusEnum.TRUE
-            )
-            .values("product_id")
-            .annotate(
-                avg=Coalesce(Avg("rate"), Value(0, output_field=FloatField()))
-            )
-            .values("avg")
-        )
-
-        return self.annotate(
-            approved_review_average_field=Coalesce(
-                Subquery(approved_reviews_avg_subquery),
-                Value(0, output_field=FloatField()),
-            )
-        )
-
-    def with_all_annotations(self):
-        return (
-            self.with_final_price()
-            .with_price_save_percent()
-            .with_likes_count()
-            .with_review_average()
-            .with_approved_review_average()
-        )
-
-
-class ProductManager(TranslatableManager):
-    def get_queryset(self):
-        return ProductQuerySet(self.model, using=self._db).exclude_deleted()
-
-    def with_discount_value(self):
-        return self.get_queryset().with_discount_value()
-
-    def with_vat_value(self):
-        return self.get_queryset().with_vat_value()
-
-    def with_final_price(self):
-        return self.get_queryset().with_final_price()
-
-    def with_price_save_percent(self):
-        return self.get_queryset().with_price_save_percent()
-
-    def with_likes_count(self):
-        return self.get_queryset().with_likes_count()
-
-    def with_review_average(self):
-        return self.get_queryset().with_review_average()
-
-    def with_approved_review_average(self):
-        return self.get_queryset().with_approved_review_average()
-
-    def with_all_annotations(self):
-        return self.get_queryset().with_all_annotations()
 
 
 class Product(
@@ -241,7 +90,7 @@ class Product(
     )
     view_count = models.PositiveBigIntegerField(_("View Count"), default=0)
     weight = MeasurementField(
-        _("Weight"),
+        str(_("Weight")),
         measurement=Weight,
         unit_choices=WeightUnits.CHOICES,
         default=zero_weight,
@@ -327,11 +176,11 @@ class Product(
         if self.stock < 0:
             raise ValidationError({"stock": _("Stock cannot be negative.")})
 
-    def generate_unique_product_code(self) -> uuid.UUID:
+    def generate_unique_product_code(self) -> str:
         while True:
             unique_code = uuid.uuid4()
             if not self.objects.filter(product_code=unique_code).exists():
-                return unique_code
+                return str(unique_code)
 
     def increment_stock(self, quantity: int) -> None:
         if quantity < 0:
@@ -382,21 +231,8 @@ class Product(
         return float(average) if average is not None else 0.0
 
     @property
-    def approved_review_average(self) -> float:
-        average = ProductReview.objects.filter(
-            product=self, status=ReviewStatusEnum.TRUE
-        ).aggregate(avg=Avg("rate"))["avg"]
-        return float(average) if average is not None else 0.0
-
-    @property
     def review_count(self) -> int:
         return ProductReview.objects.filter(product=self).count()
-
-    @property
-    def approved_review_count(self) -> int:
-        return ProductReview.objects.filter(
-            product=self, status=ReviewStatusEnum.TRUE
-        ).count()
 
     @property
     def vat_percent(self) -> Decimal:
@@ -505,7 +341,7 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "final_price:desc",
             "exactness",
         ]
-        synonyms = {}
+        synonyms: dict = {}
         typo_tolerance = {
             "enabled": True,
             "minWordSizeForTypos": {"oneTypo": 3, "twoTypos": 5},
@@ -524,5 +360,5 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
         }
 
     def __str__(self):
-        model = self._meta.verbose_name.title()
-        return f"{model:s}: {self.name:s}"
+        name = self.name or "Untitled"
+        return f"{name} ({self.language_code})"

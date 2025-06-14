@@ -8,7 +8,7 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from order.enum.status_enum import OrderStatusEnum
+from order.enum.status import OrderStatusEnum
 from order.models import Order, OrderHistory
 
 logger = logging.getLogger(__name__)

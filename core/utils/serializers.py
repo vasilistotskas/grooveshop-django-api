@@ -64,6 +64,12 @@ class MultiSerializerMixin:
     }
 
     def get_serializer_class(self):
+        if hasattr(self, "serializers") and hasattr(self, "serializer_class"):
+            raise ImproperlyConfigured(
+                "{cls} should only define either `serializer_class` or "
+                "`serializers`.".format(cls=self.__class__.__name__)
+            )
+
         if not hasattr(self, "serializers"):
             raise ImproperlyConfigured(
                 "{cls} is missing the serializer_classes attribute. Define "
@@ -72,6 +78,16 @@ class MultiSerializerMixin:
                     cls=self.__class__.__name__
                 )
             )
+
+        if self.action is None and self.serializers.get("default") is None:
+            raise ImproperlyConfigured(
+                "default or action based serializer is missing. Define "
+                "{cls}.default_serializer or override "
+                "{cls}.get_serializer_class().".format(
+                    cls=self.__class__.__name__
+                )
+            )
+
         return self.serializers.get(
             self.action, self.serializers.get("default")
         )

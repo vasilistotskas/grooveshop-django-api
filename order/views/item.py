@@ -9,7 +9,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from core.api.permissions import IsSelfOrAdmin
-from order.enum.status_enum import OrderStatusEnum
+from core.api.serializers import ErrorResponseSerializer
+from order.enum.status import OrderStatusEnum
 from order.models.item import OrderItem
 from order.serializers.item import (
     OrderItemRefundSerializer,
@@ -24,16 +25,30 @@ from order.serializers.item import (
             "List all order items associated with the authenticated user's orders."
         ),
         tags=["Order Items"],
+        responses={
+            200: OrderItemSerializer,
+        },
     ),
     retrieve=extend_schema(
         summary=_("Retrieve an order item"),
         description=_("Retrieve a specific order item by ID."),
         tags=["Order Items"],
+        responses={
+            200: OrderItemSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+        },
     ),
     refund=extend_schema(
         summary=_("Process a refund for an order item"),
         description=_("Process a refund for an order item."),
         tags=["Order Items"],
+        request=OrderItemRefundSerializer,
+        responses={
+            200: OrderItemSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+        },
     ),
 )
 class OrderItemViewSet(viewsets.ReadOnlyModelViewSet):
@@ -65,7 +80,7 @@ class OrderItemViewSet(viewsets.ReadOnlyModelViewSet):
                 _("You do not have permission to access this order.")
             )
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["POST"])
     def refund(self, request, pk=None):
         order_item = self.get_object()
 

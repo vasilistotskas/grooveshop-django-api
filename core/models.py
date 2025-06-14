@@ -1,5 +1,5 @@
 import uuid
-from typing import Any
+from typing import Any, cast
 
 from django.contrib.postgres.indexes import BTreeIndex, GinIndex
 from django.core.serializers.json import DjangoJSONEncoder
@@ -27,15 +27,15 @@ class SortableModel(models.Model):
         super().save(*args, **kwargs)
 
     def get_ordering_queryset(self):
-        model_class = self.__class__
-        return model_class.objects.all()
+        model_class = cast("type[models.Model]", self.__class__)
+        return model_class._default_manager.all()
 
     @staticmethod
     def get_max_sort_order(qs):
         return qs.aggregate(Max("sort_order"))["sort_order__max"] or 0
 
     def move_up(self):
-        if self.sort_order > 0:
+        if self.sort_order is not None and self.sort_order > 0:
             qs = self.get_ordering_queryset()
             prev_item = qs.get(sort_order=self.sort_order - 1)
             prev_item.sort_order, self.sort_order = (
@@ -46,15 +46,16 @@ class SortableModel(models.Model):
             self.save()
 
     def move_down(self):
-        qs = self.get_ordering_queryset()
-        next_item = qs.filter(sort_order__gt=self.sort_order).first()
-        if next_item:
-            next_item.sort_order, self.sort_order = (
-                self.sort_order,
-                next_item.sort_order,
-            )
-            next_item.save()
-            self.save()
+        if self.sort_order is not None:
+            qs = self.get_ordering_queryset()
+            next_item = qs.filter(sort_order__gt=self.sort_order).first()
+            if next_item:
+                next_item.sort_order, self.sort_order = (
+                    self.sort_order,
+                    next_item.sort_order,
+                )
+                next_item.save()
+                self.save()
 
     @transaction.atomic
     def delete(self, *args, **kwargs):
@@ -219,7 +220,7 @@ class SoftDeleteQuerySet(models.QuerySet):
 
 
 class SoftDeleteManager(models.Manager):
-    def get_queryset(self):
+    def get_queryset(self) -> SoftDeleteQuerySet:
         return SoftDeleteQuerySet(self.model, using=self._db).exclude(
             is_deleted=True
         )

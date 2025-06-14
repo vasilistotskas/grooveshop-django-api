@@ -10,7 +10,7 @@ from django.db.models.functions import (
 from django.utils import timezone
 
 from core.utils.dates import date_range
-from order.enum.status_enum import OrderStatusEnum
+from order.enum.status import OrderStatusEnum
 from order.models.item import OrderItem
 from order.models.order import Order
 

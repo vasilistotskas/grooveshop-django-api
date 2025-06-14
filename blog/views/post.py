@@ -13,18 +13,22 @@ from drf_spectacular.utils import (
     OpenApiParameter,
     extend_schema,
     extend_schema_view,
-    inline_serializer,
 )
-from rest_framework import serializers, status
+from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
 
 from blog.filters.post import BlogPostFilter
 from blog.models.post import BlogPost
-from blog.serializers.category import BlogCategorySerializer
-from blog.serializers.comment import BlogCommentSerializer
-from blog.serializers.post import BlogPostSerializer
+from blog.serializers.comment import BlogCommentListSerializer
+from blog.serializers.post import (
+    BlogPostDetailSerializer,
+    BlogPostLikedPostsRequestSerializer,
+    BlogPostLikedPostsResponseSerializer,
+    BlogPostListSerializer,
+    BlogPostWriteSerializer,
+)
 from blog.strategies.weighted_related_posts_strategy import (
     WeightedRelatedPostsStrategy,
 )
@@ -48,15 +52,16 @@ if TYPE_CHECKING:
         ),
         tags=["Blog Posts"],
         responses={
-            200: BlogPostSerializer(many=True),
+            200: BlogPostListSerializer(many=True),
         },
     ),
     create=extend_schema(
         summary=_("Create a blog post"),
         description=_("Create a new blog post. Requires authentication."),
         tags=["Blog Posts"],
+        request=BlogPostWriteSerializer,
         responses={
-            201: BlogPostSerializer,
+            201: BlogPostDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
         },
@@ -69,7 +74,7 @@ if TYPE_CHECKING:
         ),
         tags=["Blog Posts"],
         responses={
-            200: BlogPostSerializer,
+            201: BlogPostDetailSerializer,
             404: ErrorResponseSerializer,
         },
     ),
@@ -77,8 +82,9 @@ if TYPE_CHECKING:
         summary=_("Update a blog post"),
         description=_("Update blog post information. Requires authentication."),
         tags=["Blog Posts"],
+        request=BlogPostWriteSerializer,
         responses={
-            200: BlogPostSerializer,
+            201: BlogPostDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
@@ -90,8 +96,9 @@ if TYPE_CHECKING:
             "Partially update blog post information. Requires authentication."
         ),
         tags=["Blog Posts"],
+        request=BlogPostWriteSerializer,
         responses={
-            200: BlogPostSerializer,
+            201: BlogPostDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
@@ -111,8 +118,9 @@ if TYPE_CHECKING:
         summary=_("Toggle post like"),
         description=_("Like or unlike a blog post. Toggles the like status."),
         tags=["Blog Posts"],
+        request=BlogPostLikedPostsRequestSerializer,
         responses={
-            200: BlogPostSerializer,
+            200: BlogPostLikedPostsResponseSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
         },
@@ -122,7 +130,7 @@ if TYPE_CHECKING:
         description=_("Increment the view count for a blog post."),
         tags=["Blog Posts"],
         responses={
-            200: BlogPostSerializer,
+            200: BlogPostDetailSerializer,
             404: ErrorResponseSerializer,
         },
     ),
@@ -131,7 +139,7 @@ if TYPE_CHECKING:
         description=_("Get all comments for a blog post."),
         tags=["Blog Posts"],
         responses={
-            200: BlogCommentSerializer(many=True),
+            200: BlogCommentListSerializer(many=True),
             404: ErrorResponseSerializer,
         },
     ),
@@ -139,23 +147,9 @@ if TYPE_CHECKING:
         summary=_("Get liked posts"),
         description=_("Get all posts that the authenticated user has liked."),
         tags=["Blog Posts"],
-        request=inline_serializer(
-            name="BlogPostLikedPostsRequest",
-            fields={
-                "post_ids": serializers.ListField(
-                    child=serializers.IntegerField()
-                )
-            },
-        ),
+        request=BlogPostLikedPostsRequestSerializer,
         responses={
-            200: inline_serializer(
-                name="LikedPostsResponse",
-                fields={
-                    "post_ids": serializers.ListField(
-                        child=serializers.IntegerField()
-                    )
-                },
-            ),
+            200: BlogPostLikedPostsResponseSerializer,
             400: ErrorResponseSerializer,
         },
     ),
@@ -164,7 +158,7 @@ if TYPE_CHECKING:
         description=_("Get related posts for a blog post."),
         tags=["Blog Posts"],
         responses={
-            200: BlogPostSerializer,
+            200: BlogPostListSerializer(many=True),
             404: ErrorResponseSerializer,
         },
     ),
@@ -186,7 +180,7 @@ if TYPE_CHECKING:
             ),
         ],
         responses={
-            200: BlogPostSerializer(many=True),
+            200: BlogPostListSerializer(many=True),
         },
     ),
     popular=extend_schema(
@@ -196,7 +190,7 @@ if TYPE_CHECKING:
         ),
         tags=["Blog Posts"],
         responses={
-            200: BlogPostSerializer(many=True),
+            200: BlogPostListSerializer(many=True),
         },
     ),
     featured=extend_schema(
@@ -206,7 +200,7 @@ if TYPE_CHECKING:
         ),
         tags=["Blog Posts"],
         responses={
-            200: BlogPostSerializer(many=True),
+            200: BlogPostListSerializer(many=True),
         },
     ),
 )
@@ -243,9 +237,19 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
     filterset_class = BlogPostFilter
 
     serializers = {
-        "default": BlogPostSerializer,
-        "comments": BlogCommentSerializer,
-        "category": BlogCategorySerializer,
+        "list": BlogPostListSerializer,
+        "retrieve": BlogPostDetailSerializer,
+        "create": BlogPostWriteSerializer,
+        "update": BlogPostWriteSerializer,
+        "partial_update": BlogPostWriteSerializer,
+        "update_likes": BlogPostLikedPostsResponseSerializer,
+        "update_view_count": BlogPostDetailSerializer,
+        "liked_posts": BlogPostLikedPostsResponseSerializer,
+        "related_posts": BlogPostListSerializer,
+        "comments": BlogCommentListSerializer,
+        "trending": BlogPostListSerializer,
+        "popular": BlogPostListSerializer,
+        "featured": BlogPostListSerializer,
     }
 
     def get_queryset(self):
@@ -312,6 +316,36 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["GET"])
+    def related_posts(self, request, pk=None):
+        post = self.get_object()
+        strategy = self.get_related_posts_strategy()
+        related_posts = strategy.get_related_posts(post)
+
+        serializer = self.get_serializer(related_posts, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["POST"])
+    def liked_posts(self, request, *args, **kwargs):
+        serializer = BlogPostLikedPostsRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                serializer.errors, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = request.user
+        post_ids = serializer.validated_data["post_ids"]
+
+        liked_post_ids = BlogPost.objects.filter(
+            likes=user, id__in=post_ids
+        ).values_list("id", flat=True)
+
+        response_data = {"post_ids": list(liked_post_ids)}
+        response_serializer = BlogPostLikedPostsResponseSerializer(
+            response_data
+        )
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["GET"])
     def comments(self, request, pk=None):
         post = self.get_object()
         queryset = post.comments.select_related(
@@ -332,31 +366,6 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
                     )
 
         return self.paginate_and_serialize(queryset, request)
-
-    @action(detail=True, methods=["GET"])
-    def related_posts(self, request, pk=None):
-        post = self.get_object()
-        strategy = self.get_related_posts_strategy()
-        related_posts = strategy.get_related_posts(post)
-
-        serializer = self.get_serializer(related_posts, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    @action(detail=False, methods=["POST"])
-    def liked_posts(self, request, *args, **kwargs):
-        user = request.user
-        post_ids = request.data.get("post_ids", [])
-        if not isinstance(post_ids, list):
-            return Response(
-                {"error": _("post_ids must be a list.")},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        liked_post_ids = BlogPost.objects.filter(
-            likes=user, id__in=post_ids
-        ).values_list("id", flat=True)
-
-        return Response(list(liked_post_ids), status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["GET"])
     def trending(self, request):

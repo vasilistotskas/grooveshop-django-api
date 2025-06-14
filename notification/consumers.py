@@ -1,14 +1,19 @@
 import json
 import logging
+from typing import Optional
 
 from channels.generic.websocket import AsyncWebsocketConsumer
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 
 logger = logging.getLogger(__name__)
 
+User = get_user_model()
+
 
 class NotificationConsumer(AsyncWebsocketConsumer):
-    user = None
-    group_name = None
+    user: Optional[User | AnonymousUser] = None
+    group_name: Optional[str] = None
 
     async def connect(self):
         try:
@@ -76,14 +81,13 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         logger.debug(f"Received message: {text_data}")
         try:
             data = json.loads(text_data)
-            # Echo the message back for testing
             await self.send(
                 text_data=json.dumps(
                     {
                         "type": "echo.message",
                         "message": data,
                         "from": self.user.username
-                        if not self.user.is_anonymous
+                        if self.user and not self.user.is_anonymous
                         else "anonymous",
                     }
                 )

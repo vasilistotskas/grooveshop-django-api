@@ -15,3 +15,9 @@ class UsernameUpdateResponseSerializer(serializers.Serializer):
     detail = serializers.CharField(
         help_text=_("Success message for username update")
     )
+
+
+class UserSubscriptionSummaryResponseSerializer(serializers.Serializer):
+    total_subscriptions = serializers.IntegerField()
+    active_subscriptions = serializers.IntegerField()
+    categories = serializers.ListField(child=serializers.CharField())

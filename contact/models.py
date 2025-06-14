@@ -3,6 +3,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
+from contact.managers import ContactManager
 from core.models import TimeStampMixinModel, UUIDModel
 
 
@@ -13,6 +14,8 @@ class Contact(
     name = models.CharField(_("Name"), max_length=100)
     email = models.EmailField(_("Email"))
     message = models.TextField(_("Message"))
+
+    objects = ContactManager()
 
     def __str__(self):
         return f"{self.name} <{self.email}>"

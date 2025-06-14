@@ -29,7 +29,7 @@ class CartItemViewSetTest(APITestCase):
         self.cart = CartFactory(user=self.user, num_cart_items=0)
         self.cart.save()
 
-        self.product = ProductFactory(num_images=0, num_reviews=0)
+        self.product = ProductFactory(active=True, num_images=0, num_reviews=0)
         self.product.save()
 
         self.cart_item = CartItemFactory(
@@ -67,7 +67,7 @@ class CartItemViewSetTest(APITestCase):
         self.assertEqual(len(response.data["results"]), 1)
 
     def test_create_cart_item(self):
-        new_product = ProductFactory(num_images=0, num_reviews=0)
+        new_product = ProductFactory(active=True, num_images=0, num_reviews=0)
         new_product.save()
 
         create_data = {
@@ -114,7 +114,7 @@ class CartItemViewSetTest(APITestCase):
 
         from product.factories.product import ProductFactory
 
-        product = ProductFactory(num_images=0, num_reviews=0)
+        product = ProductFactory(active=True, num_images=0, num_reviews=0)
 
         data = {"product": product.pk, "quantity": 2}
 
@@ -136,7 +136,7 @@ class CartItemViewSetTest(APITestCase):
 
         from product.factories.product import ProductFactory
 
-        product = ProductFactory(num_images=0, num_reviews=0)
+        product = ProductFactory(active=True, num_images=0, num_reviews=0)
 
         data = {"product": product.pk, "quantity": 3}
 
@@ -170,8 +170,8 @@ class CartItemViewSetTest(APITestCase):
 
         from product.factories.product import ProductFactory
 
-        product1 = ProductFactory(num_images=0, num_reviews=0)
-        product2 = ProductFactory(num_images=0, num_reviews=0)
+        product1 = ProductFactory(active=True, num_images=0, num_reviews=0)
+        product2 = ProductFactory(active=True, num_images=0, num_reviews=0)
 
         from cart.models import CartItem
 

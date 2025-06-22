@@ -3,6 +3,14 @@
 
 
 
+## v1.14.0 (2025-06-22)
+
+### Features
+
+* feat: Include more tests, added managers, added filters, split cart and cart item, ProductCategoryImage and more ([`c93cc31`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c93cc31ef74779091ad868d8ae15a2d8b295db66))
+
+* feat: Remove vat API views, remove tip app, remove slider app, refactor API endpoints and schema and Bump Versions ([`e626219`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e6262191c133b2ad456afe5114aebac9569d3be0))
+
 ## v1.13.0 (2025-06-07)
 
 ### Bug fixes

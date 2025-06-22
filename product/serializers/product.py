@@ -20,8 +20,8 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
 
 
-class ProductListSerializer(
-    TranslatableModelSerializer, serializers.ModelSerializer
+class ProductSerializer(
+    TranslatableModelSerializer, serializers.ModelSerializer[Product]
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=Product)
     category = PrimaryKeyRelatedField(queryset=ProductCategory.objects.all())
@@ -63,7 +63,6 @@ class ProductListSerializer(
             "review_average",
             "review_count",
             "likes_count",
-            "absolute_url",
             "created_at",
             "updated_at",
             "uuid",
@@ -88,13 +87,13 @@ class ProductListSerializer(
         )
 
 
-class ProductDetailSerializer(ProductListSerializer):
-    class Meta(ProductListSerializer.Meta):
-        fields = (*ProductListSerializer.Meta.fields,)
+class ProductDetailSerializer(ProductSerializer):
+    class Meta(ProductSerializer.Meta):
+        fields = (*ProductSerializer.Meta.fields,)
 
 
 class ProductWriteSerializer(
-    TranslatableModelSerializer, serializers.ModelSerializer
+    TranslatableModelSerializer, serializers.ModelSerializer[Product]
 ):
     category = PrimaryKeyRelatedField(queryset=ProductCategory.objects.all())
     vat = PrimaryKeyRelatedField(queryset=Vat.objects.all())
@@ -104,8 +103,7 @@ class ProductWriteSerializer(
     )
     translations = TranslatedFieldsFieldExtend(shared_model=Product)
 
-    @staticmethod
-    def validate_price(value: Money) -> Money:
+    def validate_price(self, value: Money) -> Money:
         if value.amount <= 0:
             raise serializers.ValidationError(
                 _("Price must be greater than zero.")
@@ -114,14 +112,12 @@ class ProductWriteSerializer(
             raise serializers.ValidationError(_("Price cannot exceed 99,999."))
         return value
 
-    @staticmethod
-    def validate_stock(value: int) -> int:
+    def validate_stock(self, value: int) -> int:
         if value < 0:
             raise serializers.ValidationError(_("Stock cannot be negative."))
         return value
 
-    @staticmethod
-    def validate_discount_percent(value: int) -> int:
+    def validate_discount_percent(self, value: int) -> int:
         if value < 0 or value > 100:
             raise serializers.ValidationError(
                 _("Discount percent must be between 0 and 100.")

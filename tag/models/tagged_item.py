@@ -23,7 +23,7 @@ class TaggedItem(TimeStampMixinModel, UUIDModel):
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey()
 
-    objects = TaggedItemManager()
+    objects: TaggedItemManager = TaggedItemManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Tagged Item")

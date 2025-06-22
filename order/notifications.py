@@ -146,7 +146,7 @@ class SMSNotifier(NotifierInterface):
         ).format(order_id=order.id, total_price=order.total_price)
 
         try:
-            # Call SMS provider API here
+            # @TODO - Call SMS provider API here
             print(message)
             return True
         except Exception as e:
@@ -166,7 +166,7 @@ class SMSNotifier(NotifierInterface):
         )
 
         try:
-            # Call SMS provider API here
+            # @TODO - Call SMS provider API here
             print(message)
             return True
         except Exception as e:
@@ -182,7 +182,7 @@ class SMSNotifier(NotifierInterface):
         ).format(order_id=order.id)
 
         try:
-            # Call SMS provider API here
+            # @TODO - Call SMS provider API here
             print(message)
             return True
         except Exception as e:
@@ -198,7 +198,7 @@ class SMSNotifier(NotifierInterface):
         ).format(order_id=order.id)
 
         try:
-            # Call SMS provider API here
+            # @TODO - Call SMS provider API here
             print(message)
             return True
         except Exception as e:

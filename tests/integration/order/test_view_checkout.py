@@ -5,26 +5,17 @@ from rest_framework.test import APIClient, APITestCase
 
 from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from country.factories import CountryFactory
-from country.models import Country
-from order.enum.status import OrderStatusEnum
-from order.models.order import Order
+from order.enum.status import OrderStatus
 from pay_way.factories import PayWayFactory
-from pay_way.models import PayWay
 from product.factories.product import ProductFactory
 from product.models.product import Product
 from region.factories import RegionFactory
-from region.models import Region
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()
 
 
 class CheckoutViewAPITest(APITestCase):
-    order: Order = None
-    pay_way: PayWay = None
-    country: Country = None
-    region: Region = None
-
     def setUp(self):
         self.client = APIClient()
         self.user = UserAccountFactory(num_addresses=0)
@@ -32,8 +23,7 @@ class CheckoutViewAPITest(APITestCase):
         self.region = RegionFactory(country=self.country)
         self.pay_way = PayWayFactory()
 
-    @staticmethod
-    def get_checkout_url():
+    def get_checkout_url(self):
         return reverse("order-list")
 
     def test_successful_order_creation(self):
@@ -54,7 +44,7 @@ class CheckoutViewAPITest(APITestCase):
             "street": "123 Main St",
             "street_number": "Apt 4B",
             "pay_way": self.pay_way.id,
-            "status": OrderStatusEnum.PENDING.value,
+            "status": OrderStatus.PENDING.value,
             "first_name": "John",
             "last_name": "Doe",
             "email": "test@test.com",

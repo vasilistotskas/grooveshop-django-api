@@ -6,8 +6,6 @@ from django.test import TestCase
 
 from product.factories.image import ProductImageFactory
 from product.factories.product import ProductFactory
-from product.models.image import ProductImage
-from product.models.product import Product
 
 languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
@@ -16,9 +14,6 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
 class ProductImageModelTestCase(TestCase):
-    product: Product = None
-    product_image: ProductImage = None
-
     def setUp(self):
         self.product = ProductFactory(num_images=0, num_reviews=0)
         self.product_image = ProductImageFactory(

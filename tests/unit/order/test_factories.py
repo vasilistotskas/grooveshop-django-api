@@ -2,7 +2,7 @@ from unittest import mock
 
 from django.test import TestCase
 
-from order.enum.status import OrderStatusEnum, PaymentStatusEnum
+from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import (
     OrderFactory,
     OrderHistoryFactory,
@@ -15,8 +15,7 @@ from order.models.order import Order
 
 
 class TestOrderFactories(TestCase):
-    @mock.patch("order.models.history.OrderHistory.log_note")
-    def test_order_factory(self, mock_log_note):
+    def test_order_factory(self):
         order = OrderFactory.create()
 
         self.assertIsInstance(order, Order)
@@ -25,43 +24,38 @@ class TestOrderFactories(TestCase):
         self.assertIsNotNone(order.first_name)
         self.assertIsNotNone(order.last_name)
 
-    @mock.patch("order.models.history.OrderHistory.log_note")
-    def test_order_factory_with_items(self, mock_log_note):
+    def test_order_factory_with_items(self):
         with mock.patch(
             "order.factories.item.OrderItemFactory.create_batch"
         ) as mock_create_batch:
             order = OrderFactory.create(num_order_items=3)
             mock_create_batch.assert_called_once_with(3, order=order)
 
-    @mock.patch("order.models.history.OrderHistory.log_note")
-    def test_order_factory_with_specific_status(self, mock_log_note):
-        order = OrderFactory.create(status=OrderStatusEnum.PROCESSING)
+    def test_order_factory_with_specific_status(self):
+        order = OrderFactory.create(status=OrderStatus.PROCESSING)
 
-        self.assertEqual(order.status, OrderStatusEnum.PROCESSING)
+        self.assertEqual(order.status, OrderStatus.PROCESSING)
 
-    @mock.patch("order.models.history.OrderHistory.log_note")
-    def test_create_shipped_order(self, mock_log_note):
+    def test_create_shipped_order(self):
         order = OrderFactory.create_shipped_order()
 
-        self.assertEqual(order.status, OrderStatusEnum.SHIPPED)
+        self.assertEqual(order.status, OrderStatus.SHIPPED)
         self.assertIsNotNone(order.tracking_number)
         self.assertIsNotNone(order.shipping_carrier)
-        self.assertEqual(order.payment_status, PaymentStatusEnum.COMPLETED)
+        self.assertEqual(order.payment_status, PaymentStatus.COMPLETED)
 
-    @mock.patch("order.models.history.OrderHistory.log_note")
-    def test_create_refunded_order(self, mock_log_note):
+    def test_create_refunded_order(self):
         order = OrderFactory.create_refunded_order()
 
-        self.assertEqual(order.status, OrderStatusEnum.REFUNDED)
-        self.assertEqual(order.payment_status, PaymentStatusEnum.REFUNDED)
+        self.assertEqual(order.status, OrderStatus.REFUNDED)
+        self.assertEqual(order.payment_status, PaymentStatus.REFUNDED)
 
         refunded_items = sum(
             1 for item in order.items.all() if item.refunded_quantity > 0
         )
         self.assertGreater(refunded_items, 0)
 
-    @mock.patch("order.models.history.OrderHistory.log_note")
-    def test_order_item_factory(self, mock_log_note):
+    def test_order_item_factory(self):
         item = OrderItemFactory.create()
 
         self.assertIsInstance(item, OrderItem)
@@ -69,8 +63,7 @@ class TestOrderFactories(TestCase):
         self.assertIsNotNone(item.price)
         self.assertGreater(item.quantity, 0)
 
-    @mock.patch("order.models.history.OrderHistory.log_note")
-    def test_order_item_with_refund(self, mock_log_note):
+    def test_order_item_with_refund(self):
         item = OrderItemFactory.create_with_refund()
 
         self.assertIsNotNone(item.id)
@@ -96,21 +89,21 @@ class TestOrderFactories(TestCase):
         ):
             history = OrderHistoryFactory.create_status_change(
                 order=order,
-                old_status=OrderStatusEnum.PENDING,
-                new_status=OrderStatusEnum.PROCESSING,
+                old_status=OrderStatus.PENDING,
+                new_status=OrderStatus.PROCESSING,
             )
 
-            history.previous_value = {"status": OrderStatusEnum.PENDING}
-            history.new_value = {"status": OrderStatusEnum.PROCESSING}
-            history.description = f"Status changed from {OrderStatusEnum.PENDING} to {OrderStatusEnum.PROCESSING}"
+            history.previous_value = {"status": OrderStatus.PENDING}
+            history.new_value = {"status": OrderStatus.PROCESSING}
+            history.description = f"Status changed from {OrderStatus.PENDING} to {OrderStatus.PROCESSING}"
             history.save()
 
         self.assertEqual(history.change_type, "STATUS")
         self.assertEqual(
-            history.previous_value.get("status"), OrderStatusEnum.PENDING
+            history.previous_value.get("status"), OrderStatus.PENDING
         )
         self.assertEqual(
-            history.new_value.get("status"), OrderStatusEnum.PROCESSING
+            history.new_value.get("status"), OrderStatus.PROCESSING
         )
 
     def test_order_item_history_factory(self):
@@ -178,7 +171,7 @@ class TestOrderFactories(TestCase):
 
             mock_method.assert_called_once()
             args, kwargs = mock_method.call_args
-            self.assertEqual(kwargs.get("status"), OrderStatusEnum.SHIPPED)
+            self.assertEqual(kwargs.get("status"), OrderStatus.SHIPPED)
             self.assertEqual(kwargs.get("test_param"), 123)
 
         with mock.patch(
@@ -188,9 +181,9 @@ class TestOrderFactories(TestCase):
 
             mock_method.assert_called_once()
             args, kwargs = mock_method.call_args
-            self.assertEqual(kwargs.get("status"), OrderStatusEnum.PENDING)
+            self.assertEqual(kwargs.get("status"), OrderStatus.PENDING)
             self.assertEqual(
-                kwargs.get("payment_status"), PaymentStatusEnum.PENDING
+                kwargs.get("payment_status"), PaymentStatus.PENDING
             )
             self.assertEqual(kwargs.get("test_param"), 456)
 
@@ -201,7 +194,7 @@ class TestOrderFactories(TestCase):
 
             mock_method.assert_called_once()
             args, kwargs = mock_method.call_args
-            self.assertEqual(kwargs.get("status"), OrderStatusEnum.COMPLETED)
+            self.assertEqual(kwargs.get("status"), OrderStatus.COMPLETED)
 
         with mock.patch(
             "order.factories.order.OrderFactory.create_with_consistent_status_data"
@@ -214,7 +207,7 @@ class TestOrderFactories(TestCase):
 
             mock_method.assert_called_once()
             args, kwargs = mock_method.call_args
-            self.assertEqual(kwargs.get("status"), OrderStatusEnum.REFUNDED)
+            self.assertEqual(kwargs.get("status"), OrderStatus.REFUNDED)
             self.assertEqual(
-                kwargs.get("payment_status"), PaymentStatusEnum.REFUNDED
+                kwargs.get("payment_status"), PaymentStatus.REFUNDED
             )

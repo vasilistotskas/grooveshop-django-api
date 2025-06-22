@@ -2,17 +2,16 @@ import importlib
 
 import factory
 from django.apps import apps
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from notification import signals
 from notification.models.user import NotificationUser
 
+User = get_user_model()
+
 
 def get_or_create_user():
-    from django.contrib.auth import get_user_model
-
-    User = get_user_model()
-
     if User.objects.exists():
         user = User.objects.order_by("?").first()
     else:

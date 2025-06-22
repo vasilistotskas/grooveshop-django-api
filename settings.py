@@ -70,7 +70,6 @@ ALLOWED_HOSTS.extend(filter(None, additional_hosts))
 
 USE_X_FORWARDED_HOST = getenv("USE_X_FORWARDED_HOST", "False") == "True"
 
-# Django built-in apps
 DJANGO_APPS = [
     "daphne",
     "unfold.apps.BasicAppConfig",
@@ -87,7 +86,6 @@ DJANGO_APPS = [
     "django.contrib.postgres",
 ]
 
-# Project-specific apps
 LOCAL_APPS = [
     "core",
     "user",
@@ -108,7 +106,6 @@ LOCAL_APPS = [
     "meili",
 ]
 
-# Third-party apps
 THIRD_PARTY_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
@@ -189,16 +186,13 @@ AUTHENTICATION_BACKENDS = [
 WSGI_APPLICATION = "wsgi.application"
 ASGI_APPLICATION = "asgi.application"
 
-# User Model
 AUTH_USER_MODEL = "user.UserAccount"
 
-# Internationalization
 LANGUAGE_CODE = getenv("LANGUAGE_CODE", "el")
 TIME_ZONE = getenv("TIME_ZONE", "Europe/Athens")
 USE_I18N = getenv("USE_I18N", "True") == "True"
 USE_TZ = getenv("USE_TZ", "True") == "True"
 
-# Site info
 SITE_ID = int(getenv("SITE_ID", "1"))
 
 LANGUAGES = (
@@ -207,10 +201,8 @@ LANGUAGES = (
     ("de", _("German")),
 )
 
-# Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
@@ -228,13 +220,10 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Rest Framework
 REST_FRAMEWORK = {
-    # Authentication
     "DEFAULT_AUTHENTICATION_CLASSES": ("knox.auth.TokenAuthentication",),
-    # Permissions
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.AllowAny",
     ],
-    # Throttling
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
@@ -244,31 +233,21 @@ REST_FRAMEWORK = {
         "user": None if DEBUG else "150000/day",
         "burst": None if DEBUG else "5/minute",
     },
-    # Filtering
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend"
     ],
-    # Schema
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    # Pagination
     "DEFAULT_PAGINATION_CLASS": "core.pagination.page_number.PageNumberPaginator",
     "PAGE_SIZE": 52,
-    # Renderers and parsers
     "DEFAULT_RENDERER_CLASSES": (
         "djangorestframework_camel_case.render.CamelCaseJSONRenderer",
         "djangorestframework_camel_case.render.CamelCaseBrowsableAPIRenderer",
-        # Any other renders
     ),
     "DEFAULT_PARSER_CLASSES": (
-        # If you use MultiPartFormParser or FormParser, we also have a camel case version
         "djangorestframework_camel_case.parser.CamelCaseFormParser",
         "djangorestframework_camel_case.parser.CamelCaseMultiPartParser",
         "djangorestframework_camel_case.parser.CamelCaseJSONParser",
-        # Any other parsers
     ),
-    # Metadata
-    "DEFAULT_METADATA_CLASS": "rest_framework.metadata.SimpleMetadata",
-    # Other
     "COERCE_DECIMAL_TO_STRING": False,
 }
 
@@ -910,13 +889,19 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": getenv("DJANGO_SPECTACULAR_SETTINGS_DESCRIPTION", "Django"),
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "COMPONENT_NO_READ_ONLY_REQUIRED": False,
+    "ENFORCE_NON_BLANK_FIELDS": True,
+    "ENUM_ADD_EXPLICIT_BLANK_NULL_CHOICE": True,
     "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAuthenticated"],
     "AUTHENTICATION_WHITELIST": [
+        "knox.auth.TokenAuthentication",
         "rest_framework.authentication.TokenAuthentication",
         "rest_framework.authentication.BasicAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
     "SERVE_AUTHENTICATION": [
+        "knox.auth.TokenAuthentication",
         "rest_framework.authentication.TokenAuthentication",
         "rest_framework.authentication.BasicAuthentication",
         "rest_framework.authentication.SessionAuthentication",
@@ -925,8 +910,13 @@ SPECTACULAR_SETTINGS = {
         "drf_spectacular.contrib.djangorestframework_camel_case.camelize_serializer_fields",
         "drf_spectacular.hooks.postprocess_schema_enums",
     ],
+    "PREPROCESSING_HOOKS": [
+        "drf_spectacular.hooks.preprocess_exclude_path_format",
+    ],
     "ENUM_NAME_OVERRIDES": {
-        "OrderStatusEnum": "order.enum.status.OrderStatusEnum",
+        "OrderStatus": "order.enum.status.OrderStatus",
+        "ReviewStatus": "product.enum.review.ReviewStatus",
+        "SubscriptionStatus": "user.models.subscription.UserSubscription.SubscriptionStatus",
     },
 }
 

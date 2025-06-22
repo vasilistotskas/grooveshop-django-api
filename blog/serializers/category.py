@@ -1,10 +1,8 @@
-from typing import Any
-
 from django.utils.translation import gettext_lazy as _
+from drf_spectacular.helpers import lazy_serializer
 from drf_spectacular.utils import extend_schema_field
 from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
-from rest_framework.utils.serializer_helpers import ReturnDict
 
 from blog.models.category import BlogCategory
 from core.api.schema import generate_schema_multi_lang
@@ -16,7 +14,7 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
 
 
-class BlogCategoryListSerializer(
+class BlogCategorySerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[BlogCategory]
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=BlogCategory)
@@ -55,7 +53,7 @@ class BlogCategoryListSerializer(
         )
 
 
-class BlogCategoryDetailSerializer(BlogCategoryListSerializer):
+class BlogCategoryDetailSerializer(BlogCategorySerializer):
     children = serializers.SerializerMethodField()
     ancestors = serializers.SerializerMethodField()
     siblings_count = serializers.SerializerMethodField()
@@ -63,16 +61,26 @@ class BlogCategoryDetailSerializer(BlogCategoryListSerializer):
     recursive_post_count = serializers.SerializerMethodField()
     category_path = serializers.SerializerMethodField()
 
-    def get_children(self, obj: BlogCategory) -> ReturnDict | list[Any]:
+    @extend_schema_field(
+        lazy_serializer("blog.serializers.category.BlogCategorySerializer")(
+            many=True
+        )
+    )
+    def get_children(self, obj: BlogCategory):
         if obj.get_children().exists():
-            return BlogCategoryListSerializer(
+            return BlogCategorySerializer(
                 obj.get_children(), many=True, context=self.context
             ).data
         return []
 
-    def get_ancestors(self, obj: BlogCategory) -> ReturnDict:
+    @extend_schema_field(
+        lazy_serializer("blog.serializers.category.BlogCategorySerializer")(
+            many=True
+        )
+    )
+    def get_ancestors(self, obj: BlogCategory):
         ancestors = obj.get_ancestors()
-        return BlogCategoryListSerializer(
+        return BlogCategorySerializer(
             ancestors, many=True, context=self.context
         ).data
 
@@ -95,9 +103,9 @@ class BlogCategoryDetailSerializer(BlogCategoryListSerializer):
             ]
         )
 
-    class Meta(BlogCategoryListSerializer.Meta):
+    class Meta(BlogCategorySerializer.Meta):
         fields = (
-            *BlogCategoryListSerializer.Meta.fields,
+            *BlogCategorySerializer.Meta.fields,
             "children",
             "ancestors",
             "siblings_count",
@@ -105,11 +113,10 @@ class BlogCategoryDetailSerializer(BlogCategoryListSerializer):
             "recursive_post_count",
             "category_path",
             "tree_id",
-            "absolute_url",
             "uuid",
         )
         read_only_fields = (
-            *BlogCategoryListSerializer.Meta.read_only_fields,
+            *BlogCategorySerializer.Meta.read_only_fields,
             "children",
             "ancestors",
             "siblings_count",
@@ -117,7 +124,6 @@ class BlogCategoryDetailSerializer(BlogCategoryListSerializer):
             "recursive_post_count",
             "category_path",
             "tree_id",
-            "absolute_url",
             "uuid",
         )
 
@@ -176,8 +182,8 @@ class BlogCategoryReorderRequestSerializer(serializers.Serializer):
         help_text=_("List of categories with new sort orders"),
     )
 
-    @staticmethod
     def validate_categories(
+        self,
         value: list[dict[str, int]],
     ) -> list[dict[str, int]]:
         if not value:

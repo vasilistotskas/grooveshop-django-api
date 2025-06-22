@@ -6,8 +6,9 @@ from blog.models.post import BlogPostTranslation
 from product.models.product import ProductTranslation
 
 
-class BlogPostTranslationSerializer(serializers.ModelSerializer):
-    absolute_url = serializers.SerializerMethodField()
+class BlogPostTranslationSerializer(
+    serializers.ModelSerializer[BlogPostTranslation]
+):
     main_image_path = serializers.SerializerMethodField()
     matches_position = serializers.SerializerMethodField()
     ranking_score = serializers.SerializerMethodField()
@@ -22,15 +23,11 @@ class BlogPostTranslationSerializer(serializers.ModelSerializer):
             "subtitle",
             "body",
             "master",
-            "absolute_url",
             "main_image_path",
             "matches_position",
             "ranking_score",
             "formatted",
         )
-
-    def get_absolute_url(self, obj):
-        return obj.master.absolute_url if obj.master else ""
 
     def get_main_image_path(self, obj):
         return obj.master.main_image_path if obj.master else ""
@@ -45,8 +42,9 @@ class BlogPostTranslationSerializer(serializers.ModelSerializer):
         return self.context.get("_formatted", {})
 
 
-class ProductTranslationSerializer(serializers.ModelSerializer):
-    absolute_url = serializers.SerializerMethodField()
+class ProductTranslationSerializer(
+    serializers.ModelSerializer[ProductTranslation]
+):
     main_image_path = serializers.SerializerMethodField()
     matches_position = serializers.SerializerMethodField()
     ranking_score = serializers.SerializerMethodField()
@@ -60,15 +58,11 @@ class ProductTranslationSerializer(serializers.ModelSerializer):
             "name",
             "description",
             "master",
-            "absolute_url",
             "main_image_path",
             "matches_position",
             "ranking_score",
             "formatted",
         )
-
-    def get_absolute_url(self, obj):
-        return obj.master.absolute_url if obj.master else ""
 
     def get_main_image_path(self, obj):
         return obj.master.main_image_path if obj.master else ""
@@ -90,7 +84,6 @@ class BlogPostMeiliSearchResultSerializer(serializers.Serializer):
     subtitle = serializers.CharField()
     body = serializers.CharField()
     master = serializers.IntegerField()
-    absolute_url = serializers.CharField()
     main_image_path = serializers.CharField()
     matches_position = serializers.JSONField()
     ranking_score = serializers.FloatField(allow_null=True)
@@ -103,7 +96,6 @@ class ProductMeiliSearchResultSerializer(serializers.Serializer):
     name = serializers.CharField()
     description = serializers.CharField()
     master = serializers.IntegerField()
-    absolute_url = serializers.CharField()
     main_image_path = serializers.CharField()
     matches_position = serializers.JSONField()
     ranking_score = serializers.FloatField(allow_null=True)

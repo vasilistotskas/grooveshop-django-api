@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from django.conf import settings
 from django.db import transaction
@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
 
-from order.enum.status import OrderStatusEnum
+from order.enum.status import OrderStatus
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.signals import order_canceled, order_status_changed
@@ -46,7 +46,7 @@ class OrderCancellationError(OrderServiceError):
 
 class OrderService:
     @classmethod
-    def get_order_by_id(cls, order_id: int) -> Optional[Order]:
+    def get_order_by_id(cls, order_id: int) -> Order | None:
         order = (
             Order.objects.select_related("user", "pay_way", "country", "region")
             .prefetch_related("items")
@@ -56,7 +56,7 @@ class OrderService:
         return order
 
     @classmethod
-    def get_order_by_uuid(cls, uuid: str) -> Optional[Order]:
+    def get_order_by_uuid(cls, uuid: str) -> Order | None:
         order = (
             Order.objects.select_related("user", "pay_way", "country", "region")
             .prefetch_related("items")
@@ -167,26 +167,26 @@ class OrderService:
                 return order
 
             allowed_transitions = {
-                OrderStatusEnum.PENDING: [
-                    OrderStatusEnum.PROCESSING,
-                    OrderStatusEnum.CANCELED,
+                OrderStatus.PENDING: [
+                    OrderStatus.PROCESSING,
+                    OrderStatus.CANCELED,
                 ],
-                OrderStatusEnum.PROCESSING: [
-                    OrderStatusEnum.SHIPPED,
-                    OrderStatusEnum.CANCELED,
+                OrderStatus.PROCESSING: [
+                    OrderStatus.SHIPPED,
+                    OrderStatus.CANCELED,
                 ],
-                OrderStatusEnum.SHIPPED: [
-                    OrderStatusEnum.DELIVERED,
-                    OrderStatusEnum.RETURNED,
+                OrderStatus.SHIPPED: [
+                    OrderStatus.DELIVERED,
+                    OrderStatus.RETURNED,
                 ],
-                OrderStatusEnum.DELIVERED: [
-                    OrderStatusEnum.COMPLETED,
-                    OrderStatusEnum.RETURNED,
+                OrderStatus.DELIVERED: [
+                    OrderStatus.COMPLETED,
+                    OrderStatus.RETURNED,
                 ],
-                OrderStatusEnum.CANCELED: [],
-                OrderStatusEnum.COMPLETED: [],
-                OrderStatusEnum.RETURNED: [OrderStatusEnum.REFUNDED],
-                OrderStatusEnum.REFUNDED: [],
+                OrderStatus.CANCELED: [],
+                OrderStatus.COMPLETED: [],
+                OrderStatus.RETURNED: [OrderStatus.REFUNDED],
+                OrderStatus.REFUNDED: [],
             }
 
             if new_status not in allowed_transitions.get(order.status, []):
@@ -261,7 +261,7 @@ class OrderService:
                     product.save(update_fields=["stock"])
 
             old_status = order.status
-            order.status = OrderStatusEnum.CANCELED
+            order.status = OrderStatus.CANCELED
             order.status_updated_at = timezone.now()
             order.save(update_fields=["status", "status_updated_at"])
 
@@ -287,10 +287,10 @@ class OrderService:
     def calculate_shipping_cost(
         cls,
         order_value: Money,
-        country_id: Optional[int] = None,
-        region_id: Optional[int] = None,
+        country_id: int | None = None,
+        region_id: int | None = None,
     ) -> Money:
-        from extra_settings.models import Setting
+        from extra_settings.models import Setting  # noqa: PLC0415
 
         base_shipping_cost = Setting.get(
             "CHECKOUT_SHIPPING_PRICE", default=3.00
@@ -305,7 +305,7 @@ class OrderService:
         shipping_cost = float(base_shipping_cost)
 
         if country_id:
-            from country.models import Country
+            from country.models import Country  # noqa: PLC0415
 
             try:
                 country = Country.objects.get(id=country_id)
@@ -322,7 +322,7 @@ class OrderService:
                 )
 
         if region_id:
-            from region.models import Region
+            from region.models import Region  # noqa: PLC0415
 
             try:
                 region = Region.objects.get(id=region_id)

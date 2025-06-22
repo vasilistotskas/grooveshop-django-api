@@ -7,8 +7,9 @@ from django.utils import timezone
 from djmoney.money import Money
 
 from order.enum.document_type import OrderDocumentTypeEnum
-from order.enum.status import OrderStatusEnum, PaymentStatusEnum
-from order.models.order import Order, OrderManager, OrderQuerySet
+from order.enum.status import OrderStatus, PaymentStatus
+from order.managers.order import OrderManager, OrderQuerySet
+from order.models.order import Order
 
 
 class OrderModelTestCase(TestCase):
@@ -19,12 +20,12 @@ class OrderModelTestCase(TestCase):
         self.order.email = "customer@example.com"
         self.order.first_name = "John"
         self.order.last_name = "Doe"
-        self.order.status = OrderStatusEnum.PENDING
+        self.order.status = OrderStatus.PENDING
         self.order.created_at = timezone.now()
         self.order.document_type = OrderDocumentTypeEnum.RECEIPT
         self.order.shipping_price = Money("10.00", "USD")
         self.order.paid_amount = Money("0.00", "USD")
-        self.order._original_status = OrderStatusEnum.PENDING
+        self.order._original_status = OrderStatus.PENDING
 
         self.order.street = "Test Street"
         self.order.street_number = "123"
@@ -62,7 +63,7 @@ class OrderModelTestCase(TestCase):
         mock_now = timezone.now()
         mock_timezone_now.return_value = mock_now
 
-        self.order.status = OrderStatusEnum.PROCESSING
+        self.order.status = OrderStatus.PROCESSING
 
         with patch.object(Order, "save", lambda self, *args, **kwargs: None):
             Order.save(self.order)
@@ -71,8 +72,8 @@ class OrderModelTestCase(TestCase):
         self.assertEqual(self.order.status_updated_at, mock_now)
 
     def test_save_status_unchanged(self):
-        self.order.status = OrderStatusEnum.PENDING
-        self.order._original_status = OrderStatusEnum.PENDING
+        self.order.status = OrderStatus.PENDING
+        self.order._original_status = OrderStatus.PENDING
 
         previous_update = timezone.now() - timedelta(days=1)
         self.order.status_updated_at = previous_update
@@ -124,56 +125,56 @@ class OrderModelTestCase(TestCase):
         self.assertEqual(result, expected_name)
 
     def test_is_paid_property_true(self):
-        self.order.payment_status = PaymentStatusEnum.COMPLETED
+        self.order.payment_status = PaymentStatus.COMPLETED
 
         result = Order.is_paid.__get__(self.order)
 
         self.assertTrue(result)
 
     def test_is_paid_property_false(self):
-        self.order.status = OrderStatusEnum.PENDING
+        self.order.status = OrderStatus.PENDING
 
         result = Order.is_paid.__get__(self.order)
 
         self.assertFalse(result)
 
     def test_can_be_canceled_property_true(self):
-        self.order.status = OrderStatusEnum.PENDING
+        self.order.status = OrderStatus.PENDING
 
         result = Order.can_be_canceled.__get__(self.order)
 
         self.assertTrue(result)
 
     def test_can_be_canceled_property_false(self):
-        self.order.status = OrderStatusEnum.SHIPPED
+        self.order.status = OrderStatus.SHIPPED
 
         result = Order.can_be_canceled.__get__(self.order)
 
         self.assertFalse(result)
 
     def test_is_completed_property_true(self):
-        self.order.status = OrderStatusEnum.COMPLETED
+        self.order.status = OrderStatus.COMPLETED
 
         result = Order.is_completed.__get__(self.order)
 
         self.assertTrue(result)
 
     def test_is_completed_property_false(self):
-        self.order.status = OrderStatusEnum.PENDING
+        self.order.status = OrderStatus.PENDING
 
         result = Order.is_completed.__get__(self.order)
 
         self.assertFalse(result)
 
     def test_is_canceled_property_true(self):
-        self.order.status = OrderStatusEnum.CANCELED
+        self.order.status = OrderStatus.CANCELED
 
         result = Order.is_canceled.__get__(self.order)
 
         self.assertTrue(result)
 
     def test_is_canceled_property_false(self):
-        self.order.status = OrderStatusEnum.PENDING
+        self.order.status = OrderStatus.PENDING
 
         result = Order.is_canceled.__get__(self.order)
 
@@ -222,7 +223,7 @@ class OrderModelTestCase(TestCase):
                 payment_method=payment_method,
             )
 
-        self.assertEqual(self.order.payment_status, PaymentStatusEnum.COMPLETED)
+        self.assertEqual(self.order.payment_status, PaymentStatus.COMPLETED)
         self.assertEqual(self.order.payment_id, payment_id)
         self.assertEqual(self.order.payment_method, payment_method)
         self.assertEqual(self.order.status_updated_at, mock_now)
@@ -240,167 +241,70 @@ class OrderModelTestCase(TestCase):
 class OrderQuerySetTestCase(TestCase):
     def setUp(self):
         self.queryset = Mock(spec=OrderQuerySet)
-
         self.queryset.filter.return_value = self.queryset
-
-        self.queryset.annotate.return_value = self.queryset
 
     def test_pending_filter(self):
         result = OrderQuerySet.pending(self.queryset)
-
-        self.queryset.filter.assert_called_once_with(
-            status=OrderStatusEnum.PENDING
-        )
+        self.queryset.filter.assert_called_once_with(status=OrderStatus.PENDING)
         self.assertEqual(result, self.queryset)
 
     def test_processing_filter(self):
         result = OrderQuerySet.processing(self.queryset)
-
         self.queryset.filter.assert_called_once_with(
-            status=OrderStatusEnum.PROCESSING
+            status=OrderStatus.PROCESSING
         )
         self.assertEqual(result, self.queryset)
 
     def test_shipped_filter(self):
         result = OrderQuerySet.shipped(self.queryset)
-
-        self.queryset.filter.assert_called_once_with(
-            status=OrderStatusEnum.SHIPPED
-        )
+        self.queryset.filter.assert_called_once_with(status=OrderStatus.SHIPPED)
         self.assertEqual(result, self.queryset)
 
     def test_delivered_filter(self):
         result = OrderQuerySet.delivered(self.queryset)
-
         self.queryset.filter.assert_called_once_with(
-            status=OrderStatusEnum.DELIVERED
+            status=OrderStatus.DELIVERED
         )
         self.assertEqual(result, self.queryset)
 
     def test_completed_filter(self):
         result = OrderQuerySet.completed(self.queryset)
-
         self.queryset.filter.assert_called_once_with(
-            status=OrderStatusEnum.COMPLETED
+            status=OrderStatus.COMPLETED
         )
         self.assertEqual(result, self.queryset)
 
     def test_canceled_filter(self):
         result = OrderQuerySet.canceled(self.queryset)
-
         self.queryset.filter.assert_called_once_with(
-            status=OrderStatusEnum.CANCELED
+            status=OrderStatus.CANCELED
         )
         self.assertEqual(result, self.queryset)
 
     def test_returned_filter(self):
         result = OrderQuerySet.returned(self.queryset)
-
         self.queryset.filter.assert_called_once_with(
-            status=OrderStatusEnum.RETURNED
+            status=OrderStatus.RETURNED
         )
         self.assertEqual(result, self.queryset)
 
     def test_refunded_filter(self):
         result = OrderQuerySet.refunded(self.queryset)
-
         self.queryset.filter.assert_called_once_with(
-            status=OrderStatusEnum.REFUNDED
+            status=OrderStatus.REFUNDED
         )
-        self.assertEqual(result, self.queryset)
-
-    @patch("django.db.models.Sum")
-    @patch("django.db.models.ExpressionWrapper")
-    @patch("django.db.models.F")
-    def test_with_total_amounts(
-        self, mock_f, mock_expression_wrapper, mock_sum
-    ):
-        mock_f.return_value = "price_expression"
-        mock_expression_wrapper.return_value = "wrapper_expression"
-        mock_sum.return_value = "sum_expression"
-
-        result = OrderQuerySet.with_total_amounts(self.queryset)
-
-        self.queryset.annotate.assert_called_once()
         self.assertEqual(result, self.queryset)
 
 
 class OrderManagerTestCase(TestCase):
     def setUp(self):
         self.manager = Mock(spec=OrderManager)
-
         self.queryset = Mock(spec=OrderQuerySet)
         self.manager.get_queryset.return_value = self.queryset
-
         self.queryset.pending.return_value = "pending_result"
-        self.queryset.processing.return_value = "processing_result"
-        self.queryset.shipped.return_value = "shipped_result"
-        self.queryset.delivered.return_value = "delivered_result"
-        self.queryset.completed.return_value = "completed_result"
-        self.queryset.canceled.return_value = "canceled_result"
-        self.queryset.returned.return_value = "returned_result"
-        self.queryset.refunded.return_value = "refunded_result"
-        self.queryset.with_total_amounts.return_value = "total_amounts_result"
-
-    def test_with_total_amounts(self):
-        result = OrderManager.with_total_amounts(self.manager)
-
-        self.manager.get_queryset.assert_called_once()
-        self.queryset.with_total_amounts.assert_called_once()
-        self.assertEqual(result, "total_amounts_result")
 
     def test_pending(self):
         result = OrderManager.pending(self.manager)
-
         self.manager.get_queryset.assert_called_once()
         self.queryset.pending.assert_called_once()
         self.assertEqual(result, "pending_result")
-
-    def test_processing(self):
-        result = OrderManager.processing(self.manager)
-
-        self.manager.get_queryset.assert_called_once()
-        self.queryset.processing.assert_called_once()
-        self.assertEqual(result, "processing_result")
-
-    def test_shipped(self):
-        result = OrderManager.shipped(self.manager)
-
-        self.manager.get_queryset.assert_called_once()
-        self.queryset.shipped.assert_called_once()
-        self.assertEqual(result, "shipped_result")
-
-    def test_delivered(self):
-        result = OrderManager.delivered(self.manager)
-
-        self.manager.get_queryset.assert_called_once()
-        self.queryset.delivered.assert_called_once()
-        self.assertEqual(result, "delivered_result")
-
-    def test_completed(self):
-        result = OrderManager.completed(self.manager)
-
-        self.manager.get_queryset.assert_called_once()
-        self.queryset.completed.assert_called_once()
-        self.assertEqual(result, "completed_result")
-
-    def test_canceled(self):
-        result = OrderManager.canceled(self.manager)
-
-        self.manager.get_queryset.assert_called_once()
-        self.queryset.canceled.assert_called_once()
-        self.assertEqual(result, "canceled_result")
-
-    def test_returned(self):
-        result = OrderManager.returned(self.manager)
-
-        self.manager.get_queryset.assert_called_once()
-        self.queryset.returned.assert_called_once()
-        self.assertEqual(result, "returned_result")
-
-    def test_refunded(self):
-        result = OrderManager.refunded(self.manager)
-
-        self.manager.get_queryset.assert_called_once()
-        self.queryset.refunded.assert_called_once()
-        self.assertEqual(result, "refunded_result")

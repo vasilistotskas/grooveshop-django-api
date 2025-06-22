@@ -184,7 +184,6 @@ class ImageAndSvgFieldTest(TestCase):
             self.assertEqual(field.max_file_size, 2621440)  # 2.5MB default
 
     def test_custom_max_file_size(self):
-        """Test custom max_file_size override"""
         custom_size = 5242880  # 5MB
         field = ImageAndSvgField(max_file_size=custom_size)
         self.assertEqual(field.max_file_size, custom_size)

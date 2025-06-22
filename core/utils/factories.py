@@ -2,6 +2,7 @@ import importlib
 
 from factory import declarations
 from factory.faker import Faker
+from faker import Faker as FakerLib
 
 
 class MaxLengthFaker(declarations.BaseDeclaration):
@@ -24,9 +25,7 @@ class MaxLengthFaker(declarations.BaseDeclaration):
 
 
 def generate_unique_country_codes():
-    from faker import Faker
-
-    fake = Faker()
+    fake = FakerLib()
 
     country_model = importlib.import_module("country.models").Country
     existing_alpha_2_codes = set(

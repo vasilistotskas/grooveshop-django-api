@@ -1,8 +1,5 @@
-import os
-
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.files.storage import default_storage
 from django.test import TestCase
 
 from product.factories.category import ProductCategoryFactory
@@ -10,7 +7,6 @@ from product.factories.product import ProductFactory
 from product.models.category import ProductCategory
 from user.factories.account import UserAccountFactory
 from vat.factories import VatFactory
-from vat.models import Vat
 
 languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
@@ -20,11 +16,6 @@ User = get_user_model()
 
 
 class CategoryModelTestCase(TestCase):
-    category: ProductCategory = None
-    sub_category: ProductCategory = None
-    user: User = None
-    vat: Vat = None
-
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
         self.vat = VatFactory()
@@ -32,15 +23,9 @@ class CategoryModelTestCase(TestCase):
         self.sub_category = ProductCategoryFactory(parent=self.category)
 
     def test_fields(self):
-        self.assertTrue(
-            default_storage.exists(self.category.menu_image_one.path)
-        )
-        self.assertTrue(
-            default_storage.exists(self.category.menu_image_two.path)
-        )
-        self.assertTrue(
-            default_storage.exists(self.category.menu_main_banner.path)
-        )
+        self.assertIsNotNone(self.category.slug)
+        self.assertIsNotNone(self.category.id)
+        self.assertTrue(self.category.active)
 
     def test_str_representation_no_parent(self):
         self.assertEqual(
@@ -91,36 +76,3 @@ class CategoryModelTestCase(TestCase):
 
         count = self.category.recursive_product_count
         self.assertEqual(count, 2)
-
-    def test_absolute_url_no_parent(self):
-        url = self.category.absolute_url
-        expected_url = (
-            f"/product/category/{self.category.id}/{self.category.slug}"
-        )
-        self.assertEqual(url, expected_url)
-
-    def test_absolute_url_with_parent(self):
-        url = self.sub_category.absolute_url
-        expected_url = (
-            f"/product/category/{self.sub_category.id}/"
-            f"{self.category.slug}/{self.sub_category.slug}"
-        )
-        self.assertEqual(url, expected_url)
-
-    def category_menu_image_one_path(self):
-        expected_path = f"media/uploads/categories/{os.path.basename(self.category.menu_image_one.name)}"
-        self.assertEqual(
-            self.category.category_menu_image_one_path, expected_path
-        )
-
-    def category_menu_image_two_path(self):
-        expected_path = f"media/uploads/categories/{os.path.basename(self.category.menu_image_two.name)}"
-        self.assertEqual(
-            self.category.category_menu_image_two_path, expected_path
-        )
-
-    def category_menu_main_banner_path(self):
-        expected_path = f"media/uploads/categories/{os.path.basename(self.category.menu_main_banner.name)}"
-        self.assertEqual(
-            self.category.category_menu_main_banner_path, expected_path
-        )

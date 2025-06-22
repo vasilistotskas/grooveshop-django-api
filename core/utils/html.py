@@ -1,12 +1,11 @@
 import html
 import re
-from typing import Optional
 
 RE_HTML_TAGS = re.compile("<.*?>")
 RE_WHITESPACE_AND_PUNCTUATION = re.compile(r"[,.?!;:\'\"()\[\]]|\s+|\xa0")
 
 
-def preprocess_text(text: Optional[str]):
+def preprocess_text(text: str | None):
     if not text:
         return ""
 

@@ -5,7 +5,7 @@ from contact.models import Contact
 from contact.utils import sanitize_message, validate_contact_content
 
 
-class ContactSerializer(serializers.ModelSerializer):
+class ContactWriteSerializer(serializers.ModelSerializer[Contact]):
     class Meta:
         model = Contact
         fields = (
@@ -44,16 +44,14 @@ class ContactSerializer(serializers.ModelSerializer):
 
         return attrs
 
-    @staticmethod
-    def validate_name(value: str) -> str:
+    def validate_name(self, value: str) -> str:
         if len(value.strip()) < 2:
             raise serializers.ValidationError(
                 _("Name must be at least 2 characters long.")
             )
         return value.strip()
 
-    @staticmethod
-    def validate_message(value: str) -> str:
+    def validate_message(self, value: str) -> str:
         if len(value.strip()) < 10:
             raise serializers.ValidationError(
                 _("Message must be at least 10 characters long.")

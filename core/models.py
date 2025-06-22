@@ -110,7 +110,7 @@ class PublishableModel(models.Model):
     )
     is_published = models.BooleanField(_("Is Published"), default=False)
 
-    objects = PublishableManager()
+    objects: PublishableManager = PublishableManager()
 
     class Meta(TypedModelMeta):
         abstract = True
@@ -127,12 +127,6 @@ class PublishableModel(models.Model):
         if self.is_published and self.published_at is None:
             self.published_at = timezone.now()
         super().save(*args, **kwargs)
-
-    @property
-    def is_visible(self) -> bool:
-        return self.is_published and (
-            self.published_at is None or self.published_at <= timezone.now()
-        )
 
 
 class MetaDataModel(models.Model):

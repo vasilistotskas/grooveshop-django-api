@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view
@@ -12,113 +13,35 @@ from rest_framework.response import Response
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
-from core.utils.serializers import MultiSerializerMixin
-from product.enum.review import ReviewStatusEnum
+from core.utils.serializers import (
+    MultiSerializerMixin,
+    create_schema_view_config,
+)
+from product.enum.review import ReviewStatus
+from product.filters.review import ProductReviewFilter
 from product.models.review import ProductReview
 from product.serializers.product import ProductSerializer
 from product.serializers.review import (
+    ProductReviewDetailSerializer,
     ProductReviewSerializer,
+    ProductReviewWriteSerializer,
     UserProductReviewRequestSerializer,
 )
 
 
 @extend_schema_view(
-    list=extend_schema(
-        summary=_("List product reviews"),
-        description=_(
-            "Retrieve a list of product reviews with filtering and search capabilities. Regular users can see only approved reviews, while admins can see all reviews."
-        ),
-        tags=["Product Reviews"],
-        responses={
-            200: ProductReviewSerializer(many=True),
+    **create_schema_view_config(
+        model_class=ProductReview,
+        display_config={
+            "tag": "Product Reviews",
         },
-    ),
-    create=extend_schema(
-        summary=_("Create a product review"),
-        description=_(
-            "Create a new product review. Requires authentication. Users can only create one review per product."
-        ),
-        tags=["Product Reviews"],
-        responses={
-            201: ProductReviewSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
+        serializers={
+            "list_serializer": ProductReviewSerializer,
+            "detail_serializer": ProductReviewDetailSerializer,
+            "write_serializer": ProductReviewWriteSerializer,
         },
-    ),
-    retrieve=extend_schema(
-        summary=_("Retrieve a product review"),
-        description=_(
-            "Get detailed information about a specific product review."
-        ),
-        tags=["Product Reviews"],
-        responses={
-            200: ProductReviewSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    update=extend_schema(
-        summary=_("Update a product review"),
-        description=_(
-            "Update product review information. Requires authentication and ownership of the review."
-        ),
-        tags=["Product Reviews"],
-        responses={
-            200: ProductReviewSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    partial_update=extend_schema(
-        summary=_("Partially update a product review"),
-        description=_(
-            "Partially update product review information. Requires authentication and ownership of the review."
-        ),
-        tags=["Product Reviews"],
-        responses={
-            200: ProductReviewSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    destroy=extend_schema(
-        summary=_("Delete a product review"),
-        description=_(
-            "Delete a product review. Requires authentication and ownership of the review."
-        ),
-        tags=["Product Reviews"],
-        responses={
-            204: None,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    user_product_review=extend_schema(
-        summary=_("Get user's review for a product"),
-        description=_(
-            "Get the current user's review for a specific product. Requires authentication."
-        ),
-        tags=["Product Reviews"],
-        request=UserProductReviewRequestSerializer,
-        responses={
-            200: ProductReviewSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    product=extend_schema(
-        summary=_("Get reviewed product details"),
-        description=_(
-            "Get detailed information about the product this review is for."
-        ),
-        tags=["Product Reviews"],
-        responses={
-            200: ProductSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
+        error_serializer=ErrorResponseSerializer,
+    )
 )
 class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
     filter_backends = [
@@ -126,29 +49,56 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
         PascalSnakeCaseOrderingFilter,
         SearchFilter,
     ]
-    filterset_fields = ["id", "user_id", "product_id", "status"]
+
+    filterset_class = ProductReviewFilter
+
     ordering_fields = [
         "id",
         "user_id",
         "product_id",
+        "rate",
         "created_at",
+        "updated_at",
+        "published_at",
     ]
+
     ordering = ["-created_at"]
+
     search_fields = [
-        "id",
-        "user_id",
-        "product_id",
+        "product__translations__name",
+        "user__email",
+        "translations__comment",
     ]
 
     serializers = {
-        "default": ProductReviewSerializer,
+        "default": ProductReviewDetailSerializer,
+        "list": ProductReviewSerializer,
+        "retrieve": ProductReviewDetailSerializer,
+        "create": ProductReviewWriteSerializer,
+        "update": ProductReviewWriteSerializer,
+        "partial_update": ProductReviewWriteSerializer,
         "product": ProductSerializer,
     }
 
+    response_serializers = {
+        "create": ProductReviewDetailSerializer,
+        "update": ProductReviewDetailSerializer,
+        "partial_update": ProductReviewDetailSerializer,
+    }
+
     def get_queryset(self):
+        queryset = ProductReview.objects.with_product_details()
+
         if self.request.user.is_superuser:
-            return ProductReview.objects.all()
-        return ProductReview.objects.filter(status=ReviewStatusEnum.TRUE)
+            return queryset
+
+        if self.request.user.is_authenticated:
+            return queryset.filter(
+                models.Q(status=ReviewStatus.TRUE)
+                | models.Q(user=self.request.user)
+            )
+        else:
+            return queryset.filter(status=ReviewStatus.TRUE)
 
     def get_permissions(self):
         if self.action in [
@@ -161,10 +111,25 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
             self.permission_classes = [IsAuthenticated]
         return super().get_permissions()
 
-    @action(
-        detail=False,
-        methods=["POST"],
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    @extend_schema(
+        operation_id="getUserProductReview",
+        summary=_("Get user's review for a product"),
+        description=_(
+            "Get the current user's review for a specific product. Requires authentication."
+        ),
+        tags=["Product Reviews"],
+        request=UserProductReviewRequestSerializer,
+        responses={
+            200: ProductReviewDetailSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
     )
+    @action(detail=False, methods=["POST"])
     def user_product_review(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return Response(
@@ -172,21 +137,24 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        product_id = request.data.get("product")
-        user_id = request.user.id
-
-        if not user_id or not product_id:
+        serializer = UserProductReviewRequestSerializer(data=request.data)
+        if not serializer.is_valid():
             return Response(
-                {"detail": _("User and Product are required fields")},
+                serializer.errors,
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        product_id = serializer.validated_data["product"]
+        user_id = request.user.id
 
         try:
             review = ProductReview.objects.get(
                 user_id=user_id, product_id=product_id
             )
-            serializer = self.get_serializer(review)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            review_serializer = ProductReviewDetailSerializer(
+                review, context=self.get_serializer_context()
+            )
+            return Response(review_serializer.data, status=status.HTTP_200_OK)
 
         except ProductReview.DoesNotExist:
             return Response(
@@ -194,16 +162,23 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        except ValueError:
-            return Response(
-                {"detail": _("Invalid data")},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
+    @extend_schema(
+        operation_id="getProductReviewProduct",
+        summary=_("Get reviewed product details"),
+        description=_(
+            "Get detailed information about the product this review is for."
+        ),
+        tags=["Product Reviews"],
+        responses={
+            200: ProductSerializer,
+            404: ErrorResponseSerializer,
+        },
+    )
     @action(detail=True, methods=["GET"])
     def product(self, request, *args, **kwargs):
-        product_review = self.get_object()
-        serializer = self.get_serializer(
-            product_review.product, context=self.get_serializer_context()
+        review = self.get_object()
+        product = review.product
+        serializer = ProductSerializer(
+            product, context=self.get_serializer_context()
         )
         return Response(serializer.data, status=status.HTTP_200_OK)

@@ -1,16 +1,11 @@
 from django.test import TestCase
 
-from cart.factories import CartFactory, CartItemFactory
-from cart.models import Cart, CartItem
+from cart.factories.cart import CartFactory
+from cart.factories.item import CartItemFactory
 from product.factories.product import ProductFactory
-from product.models.product import Product
 
 
 class CartItemModelTestCase(TestCase):
-    cart_item: CartItem = None
-    cart: Cart = None
-    product: Product = None
-
     def setUp(self):
         self.cart = CartFactory(num_cart_items=0)
         self.product = ProductFactory(num_images=0, num_reviews=0)

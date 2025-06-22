@@ -13,7 +13,7 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
 
 
-class BlogTagListSerializer(
+class BlogTagSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[BlogTag]
 ):
     posts_count = serializers.CharField(
@@ -44,9 +44,9 @@ class BlogTagListSerializer(
         )
 
 
-class BlogTagDetailSerializer(BlogTagListSerializer):
-    class Meta(BlogTagListSerializer.Meta):
-        fields = (*BlogTagListSerializer.Meta.fields,)
+class BlogTagDetailSerializer(BlogTagSerializer):
+    class Meta(BlogTagSerializer.Meta):
+        fields = (*BlogTagSerializer.Meta.fields,)
 
 
 class BlogTagWriteSerializer(
@@ -54,8 +54,7 @@ class BlogTagWriteSerializer(
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=BlogTag)
 
-    @staticmethod
-    def validate_sort_order(value: int) -> int:
+    def validate_sort_order(self, value: int) -> int:
         if value is not None and value < 0:
             raise serializers.ValidationError(
                 _("Sort order cannot be negative.")

@@ -5,20 +5,14 @@ from django.conf import settings
 from django.test import TestCase
 from djmoney.money import Money
 
-from order.enum.status import OrderStatusEnum
+from order.enum.status import OrderStatus
 from order.factories.order import OrderFactory
-from order.models.order import Order
 from product.factories.product import ProductFactory
-from product.models.product import Product
 
 logger = logging.getLogger(__name__)
 
 
 class OrderModelTestCase(TestCase):
-    order: Order = None
-    product_1: Product = None
-    product_2: Product = None
-
     def setUp(self):
         self.order = OrderFactory(
             pay_way=None,
@@ -30,7 +24,7 @@ class OrderModelTestCase(TestCase):
             city="New York",
             zipcode="10001",
             phone="123-456-7890",
-            status=OrderStatusEnum.PENDING,
+            status=OrderStatus.PENDING,
             shipping_price=Money("10.00", settings.DEFAULT_CURRENCY),
             paid_amount=Money("0", settings.DEFAULT_CURRENCY),
         )
@@ -77,7 +71,7 @@ class OrderModelTestCase(TestCase):
         self.assertEqual(self.order.city, "New York")
         self.assertEqual(self.order.zipcode, "10001")
         self.assertEqual(self.order.phone, "123-456-7890")
-        self.assertEqual(self.order.status, OrderStatusEnum.PENDING)
+        self.assertEqual(self.order.status, OrderStatus.PENDING)
         self.assertEqual(
             self.order.shipping_price,
             Money("10.00", settings.DEFAULT_CURRENCY),

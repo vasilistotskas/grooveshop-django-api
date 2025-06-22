@@ -1,15 +1,17 @@
 from django.utils.translation import gettext_lazy as _
 from djmoney.contrib.django_rest_framework import MoneyField
+from drf_spectacular.utils import extend_schema_field
 from phonenumber_field.serializerfields import PhoneNumberField
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
 from core.utils.email import is_disposable_domain
 from country.models import Country
+from order.models.history import OrderHistory
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.serializers.item import (
-    OrderItemCreateUpdateSerializer,
+    OrderItemCreateSerializer,
     OrderItemSerializer,
 )
 from order.signals import order_created
@@ -18,7 +20,7 @@ from product.models.product import Product
 from region.models import Region
 
 
-class OrderListSerializer(serializers.ModelSerializer):
+class OrderSerializer(serializers.ModelSerializer[Order]):
     items = OrderItemSerializer(many=True)
     country = PrimaryKeyRelatedField(queryset=Country.objects.all())
     region = PrimaryKeyRelatedField(queryset=Region.objects.all())
@@ -95,7 +97,7 @@ class OrderListSerializer(serializers.ModelSerializer):
         )
 
 
-class OrderDetailSerializer(OrderListSerializer):
+class OrderDetailSerializer(OrderSerializer):
     order_timeline = serializers.SerializerMethodField(
         help_text="Order status timeline and history"
     )
@@ -108,27 +110,70 @@ class OrderDetailSerializer(OrderListSerializer):
     phone = PhoneNumberField(read_only=True)
     mobile_phone = PhoneNumberField(read_only=True)
 
-    def get_order_timeline(self, obj) -> list:
-        # In a real system, this would come from OrderHistory
-        timeline = [
+    @extend_schema_field(
+        {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "change_type": {"type": "string"},
+                    "timestamp": {"type": "string"},
+                    "description": {"type": "string"},
+                    "user": {"type": "string", "nullable": True},
+                    "previous_value": {"type": "object", "nullable": True},
+                    "new_value": {"type": "object", "nullable": True},
+                },
+            },
+        }
+    )
+    def get_order_timeline(self, obj):
+        timeline = []
+
+        timeline.append(
             {
-                "status": "created",
+                "change_type": "CREATED",
                 "timestamp": obj.created_at,
                 "description": "Order was created",
+                "user": None,
+                "previous_value": None,
+                "new_value": None,
             }
-        ]
+        )
 
-        if obj.status_updated_at and obj.status_updated_at != obj.created_at:
+        history_records = OrderHistory.objects.filter(order=obj).order_by(
+            "created_at"
+        )
+
+        for history in history_records:
             timeline.append(
                 {
-                    "status": obj.status,
-                    "timestamp": obj.status_updated_at,
-                    "description": f"Order status changed to {obj.get_status_display()}",
+                    "change_type": history.change_type,
+                    "timestamp": history.created_at,
+                    "description": history.description,
+                    "user": history.user.get_full_name()
+                    if history.user
+                    else None,
+                    "previous_value": history.previous_value,
+                    "new_value": history.new_value,
                 }
             )
 
         return timeline
 
+    @extend_schema_field(
+        {
+            "type": "object",
+            "properties": {
+                "items_subtotal": {"type": "number"},
+                "shipping_cost": {"type": "number"},
+                "extras_total": {"type": "number"},
+                "grand_total": {"type": "number"},
+                "currency": {"type": "string"},
+                "paid_amount": {"type": "number"},
+                "remaining_amount": {"type": "number"},
+            },
+        }
+    )
     def get_pricing_breakdown(self, obj) -> dict:
         items_total = (
             obj.total_price_items.amount if obj.total_price_items else 0
@@ -155,20 +200,32 @@ class OrderDetailSerializer(OrderListSerializer):
             ),
         }
 
+    @extend_schema_field(
+        {
+            "type": "object",
+            "properties": {
+                "tracking_number": {"type": "string"},
+                "shipping_carrier": {"type": "string"},
+                "has_tracking": {"type": "boolean"},
+                "estimated_delivery": {"type": "string"},
+                "tracking_url": {"type": "string"},
+            },
+        }
+    )
     def get_tracking_details(self, obj) -> dict:
         return {
             "tracking_number": obj.tracking_number,
             "shipping_carrier": obj.shipping_carrier,
             "has_tracking": bool(obj.tracking_number),
-            "estimated_delivery": None,  # Would be calculated based on shipping method
+            "estimated_delivery": None,  # @TODO - Would be calculated based on shipping method
             "tracking_url": f"https://track.carrier.com/{obj.tracking_number}"
             if obj.tracking_number
             else None,
         }
 
-    class Meta(OrderListSerializer.Meta):
+    class Meta(OrderSerializer.Meta):
         fields = (
-            *OrderListSerializer.Meta.fields,
+            *OrderSerializer.Meta.fields,
             "items",
             "country",
             "region",
@@ -190,15 +247,15 @@ class OrderDetailSerializer(OrderListSerializer):
             "full_address",
         )
         read_only_fields = (
-            *OrderListSerializer.Meta.read_only_fields,
+            *OrderSerializer.Meta.read_only_fields,
             "order_timeline",
             "pricing_breakdown",
             "tracking_details",
         )
 
 
-class OrderWriteSerializer(serializers.ModelSerializer):
-    items = OrderItemCreateUpdateSerializer(many=True)
+class OrderWriteSerializer(serializers.ModelSerializer[Order]):
+    items = OrderItemCreateSerializer(many=True)
     paid_amount = MoneyField(max_digits=11, decimal_places=2, required=False)
     shipping_price = MoneyField(max_digits=11, decimal_places=2)
     total_price_items = MoneyField(
@@ -213,8 +270,7 @@ class OrderWriteSerializer(serializers.ModelSerializer):
     payment_status = serializers.CharField(required=False)
     payment_method = serializers.CharField(required=False)
 
-    @staticmethod
-    def validate_items(value):
+    def validate_items(self, value):
         if not value:
             raise serializers.ValidationError(
                 _("At least one item is required.")
@@ -228,8 +284,7 @@ class OrderWriteSerializer(serializers.ModelSerializer):
 
         return value
 
-    @staticmethod
-    def validate_email(value):
+    def validate_email(self, value):
         if not value:
             raise serializers.ValidationError(_("Email is required."))
 
@@ -314,9 +369,9 @@ class OrderWriteSerializer(serializers.ModelSerializer):
 
             for item_data in items_data:
                 product = item_data.get("product")
-                item_data = item_data.copy()
-                item_data["price"] = product.price
-                OrderItem.objects.create(order=instance, **item_data)
+                item_to_create = item_data.copy()
+                item_to_create["price"] = product.price
+                OrderItem.objects.create(order=instance, **item_to_create)
 
         return instance
 
@@ -344,6 +399,8 @@ class OrderWriteSerializer(serializers.ModelSerializer):
             "customer_notes",
             "items",
             "shipping_price",
+            "total_price_items",
+            "total_price_extra",
             "document_type",
             "payment_id",
             "payment_status",

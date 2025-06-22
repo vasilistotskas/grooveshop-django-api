@@ -5,30 +5,31 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from djmoney.money import Money
 
-from order.enum.status import OrderStatusEnum
+from order.enum.status import OrderStatus
 from order.models.order import Order
 from order.services import OrderService
+from product.factories.product import ProductFactory
+from user.factories.account import UserAccountFactory
 
 
 @pytest.mark.django_db
 class OrderServiceTestCase(TestCase):
     def setUp(self):
-        self.user = Mock()
-        self.user.id = 1
-        self.user.email = "user@example.com"
-        self.user.is_authenticated = True
+        self.user = UserAccountFactory.create()
 
-        self.product1 = Mock()
-        self.product1.id = 1
+        self.product1 = ProductFactory.create(
+            price=Money("50.00", "USD"), stock=20
+        )
+        self.product1.set_current_language("en")
         self.product1.name = "Test Product 1"
-        self.product1.stock = 20
-        self.product1.final_price = Money("50.00", "USD")
+        self.product1.save()
 
-        self.product2 = Mock()
-        self.product2.id = 2
+        self.product2 = ProductFactory.create(
+            price=Money("30.00", "USD"), stock=15
+        )
+        self.product2.set_current_language("en")
         self.product2.name = "Test Product 2"
-        self.product2.stock = 15
-        self.product2.final_price = Money("30.00", "USD")
+        self.product2.save()
 
         self.order_data = {
             "email": "customer@example.com",
@@ -50,7 +51,7 @@ class OrderServiceTestCase(TestCase):
         self.order.id = 1
         self.order.uuid = "test-uuid-1234"
         self.order.user = self.user
-        self.order.status = OrderStatusEnum.PENDING
+        self.order.status = OrderStatus.PENDING
         self.order.items = MagicMock()
         self.order.calculate_order_total_amount = Mock(
             return_value=Money("135.00", "USD")
@@ -58,36 +59,19 @@ class OrderServiceTestCase(TestCase):
         self.order.paid_amount = Money("0.00", "USD")
 
     @patch("order.signals.order_created.send")
-    @patch("order.models.order.Order.objects.create")
-    @patch("order.models.item.OrderItem.objects.create")
-    def test_create_order(
-        self, mock_create_item, mock_create_order, mock_signal
-    ):
-        mock_create_order.return_value = self.order
-
-        self.order.shipping_price = Money("10.00", "USD")
-
-        for product in [self.product1, self.product2]:
-            product.final_price = Money("50.00", "USD")
-
+    def test_create_order(self, mock_signal):
         result = OrderService.create_order(
             self.order_data, self.items_data, user=self.user
         )
 
-        self.assertEqual(result, self.order)
+        self.assertIsInstance(result, Order)
+        self.assertEqual(result.email, self.order_data["email"])
+        self.assertEqual(result.first_name, self.order_data["first_name"])
+        self.assertEqual(result.user, self.user)
 
-        mock_create_order.assert_called_once_with(
-            **{**self.order_data, "user": self.user}
-        )
+        self.assertEqual(result.items.count(), 2)
 
-        self.assertEqual(mock_create_item.call_count, 2)
-
-        mock_signal.assert_not_called()
-
-        self.assertEqual(
-            self.order.paid_amount, self.order.calculate_order_total_amount()
-        )
-        self.order.save.assert_called_once_with(update_fields=["paid_amount"])
+        mock_signal.assert_called_once_with(sender=Order, order=result)
 
     def test_create_order_insufficient_stock(self):
         self.product1.stock = 1
@@ -121,44 +105,53 @@ class OrderServiceTestCase(TestCase):
 
     @patch("order.signals.order_status_changed.send")
     def test_update_order_status_valid(self, mock_signal):
-        self.order.status = OrderStatusEnum.PENDING
+        self.order.status = OrderStatus.PENDING
 
-        OrderService.update_order_status(self.order, OrderStatusEnum.PROCESSING)
+        OrderService.update_order_status(self.order, OrderStatus.PROCESSING)
 
-        self.assertEqual(self.order.status, OrderStatusEnum.PROCESSING)
+        self.assertEqual(self.order.status, OrderStatus.PROCESSING)
 
         mock_signal.assert_called_once()
 
     def test_update_order_status_invalid(self):
-        self.order.status = OrderStatusEnum.PENDING
+        self.order.status = OrderStatus.PENDING
 
         with self.assertRaises(ValueError) as context:
-            OrderService.update_order_status(
-                self.order, OrderStatusEnum.DELIVERED
-            )
+            OrderService.update_order_status(self.order, OrderStatus.DELIVERED)
 
-        self.assertEqual(self.order.status, OrderStatusEnum.PENDING)
+        self.assertEqual(self.order.status, OrderStatus.PENDING)
 
         self.assertIn("Cannot transition from", str(context.exception))
 
-    @patch("order.models.order.Order.objects.filter")
-    def test_get_user_orders(self, mock_filter):
-        mock_orders = [Mock(spec=Order), Mock(spec=Order)]
-        mock_queryset = Mock()
-        mock_filter.return_value = mock_queryset
-        mock_queryset.select_related.return_value = mock_queryset
-        mock_queryset.prefetch_related.return_value = mock_queryset
-        mock_queryset.order_by.return_value = mock_orders
+    def test_get_user_orders(self):
+        order1 = OrderService.create_order(
+            self.order_data, self.items_data, user=self.user
+        )
+
+        order_data_2 = self.order_data.copy()
+        order_data_2["email"] = "customer2@example.com"
+        order2 = OrderService.create_order(
+            order_data_2, self.items_data, user=self.user
+        )
+
+        other_user = UserAccountFactory.create()
+        order_data_3 = self.order_data.copy()
+        order_data_3["email"] = "other@example.com"
+        OrderService.create_order(
+            order_data_3, self.items_data, user=other_user
+        )
 
         result = OrderService.get_user_orders(self.user.id)
 
-        mock_filter.assert_called_once_with(user_id=self.user.id)
+        self.assertEqual(len(result), 2)
 
-        self.assertEqual(result, mock_orders)
+        order_ids = [order.id for order in result]
+        self.assertIn(order1.id, order_ids)
+        self.assertIn(order2.id, order_ids)
 
     @patch("order.signals.order_canceled.send")
     def test_cancel_order(self, mock_signal):
-        self.order.status = OrderStatusEnum.PENDING
+        self.order.status = OrderStatus.PENDING
         self.order.can_be_canceled = True
 
         item1 = Mock()
@@ -174,13 +167,13 @@ class OrderServiceTestCase(TestCase):
 
         OrderService.cancel_order(self.order)
 
-        self.assertEqual(self.order.status, OrderStatusEnum.CANCELED)
+        self.assertEqual(self.order.status, OrderStatus.CANCELED)
 
         mock_signal.assert_called_once()
 
     @patch("order.signals.order_canceled.send")
     def test_cancel_order_not_cancelable(self, mock_signal):
-        self.order.status = OrderStatusEnum.SHIPPED
+        self.order.status = OrderStatus.SHIPPED
         self.order.can_be_canceled = False
 
         with self.assertRaises(ValueError) as context:

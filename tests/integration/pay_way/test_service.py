@@ -2,7 +2,7 @@ from unittest import mock
 
 from django.test import TestCase
 
-from order.enum.status import PaymentStatusEnum
+from order.enum.status import PaymentStatus
 from order.factories import OrderFactory
 from pay_way.factories import PayWayFactory
 from pay_way.services import PayWayService
@@ -33,7 +33,7 @@ class PayWayServiceTestCase(TestCase):
 
         self.order = OrderFactory(
             pay_way=None,
-            payment_status=PaymentStatusEnum.PENDING,
+            payment_status=PaymentStatus.PENDING,
             payment_id="",
             payment_method="",
         )
@@ -66,11 +66,11 @@ class PayWayServiceTestCase(TestCase):
 
         self.assertTrue(success)
         self.assertEqual(data["payment_id"], f"OFFLINE_{self.order.id}")
-        self.assertEqual(data["status"], PaymentStatusEnum.PENDING)
+        self.assertEqual(data["status"], PaymentStatus.PENDING)
 
         self.order.refresh_from_db()
 
-        self.assertEqual(self.order.payment_status, PaymentStatusEnum.PENDING)
+        self.assertEqual(self.order.payment_status, PaymentStatus.PENDING)
         self.assertEqual(self.order.payment_id, f"OFFLINE_{self.order.id}")
         self.assertFalse(mock_get_provider.called)
 
@@ -82,11 +82,11 @@ class PayWayServiceTestCase(TestCase):
 
         self.assertTrue(success)
         self.assertEqual(data["payment_id"], f"OFFLINE_{self.order.id}")
-        self.assertEqual(data["status"], PaymentStatusEnum.PENDING)
+        self.assertEqual(data["status"], PaymentStatus.PENDING)
 
         self.order.refresh_from_db()
 
-        self.assertEqual(self.order.payment_status, PaymentStatusEnum.PENDING)
+        self.assertEqual(self.order.payment_status, PaymentStatus.PENDING)
         self.assertEqual(self.order.payment_id, "")
         self.assertFalse(mock_get_provider.called)
 
@@ -97,7 +97,7 @@ class PayWayServiceTestCase(TestCase):
             True,
             {
                 "payment_id": "TEST_PAYMENT_123",
-                "status": PaymentStatusEnum.COMPLETED,
+                "status": PaymentStatus.COMPLETED,
                 "amount": str(self.order.total_price.amount),
                 "currency": self.order.total_price.currency,
                 "provider": "stripe",
@@ -111,11 +111,11 @@ class PayWayServiceTestCase(TestCase):
 
         self.assertTrue(success)
         self.assertEqual(data["payment_id"], "TEST_PAYMENT_123")
-        self.assertEqual(data["status"], PaymentStatusEnum.COMPLETED)
+        self.assertEqual(data["status"], PaymentStatus.COMPLETED)
 
         self.order.refresh_from_db()
 
-        self.assertEqual(self.order.payment_status, PaymentStatusEnum.COMPLETED)
+        self.assertEqual(self.order.payment_status, PaymentStatus.COMPLETED)
         self.assertEqual(self.order.payment_id, "TEST_PAYMENT_123")
         self.assertTrue(self.order.is_paid)
 
@@ -140,7 +140,7 @@ class PayWayServiceTestCase(TestCase):
 
         self.order.refresh_from_db()
 
-        self.assertEqual(self.order.payment_status, PaymentStatusEnum.PENDING)
+        self.assertEqual(self.order.payment_status, PaymentStatus.PENDING)
         self.assertEqual(self.order.payment_id, "")
 
     @mock.patch("pay_way.services.PayWayService.get_provider_for_pay_way")
@@ -150,7 +150,7 @@ class PayWayServiceTestCase(TestCase):
 
         mock_provider = mock.MagicMock()
         mock_provider.get_payment_status.return_value = (
-            PaymentStatusEnum.COMPLETED,
+            PaymentStatus.COMPLETED,
             {
                 "payment_id": "TEST_PAYMENT_123",
                 "raw_status": "succeeded",
@@ -163,30 +163,30 @@ class PayWayServiceTestCase(TestCase):
             pay_way=self.online_pay_way, order=self.order
         )
 
-        self.assertEqual(status, PaymentStatusEnum.COMPLETED)
+        self.assertEqual(status, PaymentStatus.COMPLETED)
         self.assertEqual(data["payment_id"], "TEST_PAYMENT_123")
 
         self.order.refresh_from_db()
 
-        self.assertEqual(self.order.payment_status, PaymentStatusEnum.COMPLETED)
+        self.assertEqual(self.order.payment_status, PaymentStatus.COMPLETED)
 
     def test_check_payment_status_offline(self):
         self.order.payment_id = f"OFFLINE_{self.order.id}"
-        self.order.payment_status = PaymentStatusEnum.PENDING
+        self.order.payment_status = PaymentStatus.PENDING
         self.order.save()
 
         status, data = PayWayService.check_payment_status(
             pay_way=self.offline_pay_way_with_confirmation, order=self.order
         )
 
-        self.assertEqual(status, PaymentStatusEnum.PENDING)
+        self.assertEqual(status, PaymentStatus.PENDING)
         self.assertEqual(data["provider"], "offline")
         self.assertTrue(data["manual_check_required"])
 
     @mock.patch("pay_way.services.PayWayService.get_provider_for_pay_way")
     def test_refund_payment_online(self, mock_get_provider):
         self.order.payment_id = "TEST_PAYMENT_123"
-        self.order.payment_status = PaymentStatusEnum.COMPLETED
+        self.order.payment_status = PaymentStatus.COMPLETED
         self.order.mark_as_paid(
             payment_id="TEST_PAYMENT_123", payment_method="Stripe"
         )
@@ -197,7 +197,7 @@ class PayWayServiceTestCase(TestCase):
             True,
             {
                 "refund_id": "REFUND_123",
-                "status": PaymentStatusEnum.REFUNDED,
+                "status": PaymentStatus.REFUNDED,
                 "amount": "full refund",
                 "payment_id": "TEST_PAYMENT_123",
             },
@@ -213,12 +213,12 @@ class PayWayServiceTestCase(TestCase):
 
         self.order.refresh_from_db()
 
-        self.assertEqual(self.order.payment_status, PaymentStatusEnum.REFUNDED)
+        self.assertEqual(self.order.payment_status, PaymentStatus.REFUNDED)
         self.assertEqual(self.order.status, "REFUNDED")
 
     def test_refund_payment_offline(self):
         self.order.payment_id = f"OFFLINE_{self.order.id}"
-        self.order.payment_status = PaymentStatusEnum.COMPLETED
+        self.order.payment_status = PaymentStatus.COMPLETED
         self.order.mark_as_paid(
             payment_id=f"OFFLINE_{self.order.id}",
             payment_method="Bank Transfer",
@@ -231,10 +231,10 @@ class PayWayServiceTestCase(TestCase):
 
         self.assertTrue(success)
         self.assertEqual(data["refund_id"], f"MANUAL_REFUND_{self.order.id}")
-        self.assertEqual(data["status"], PaymentStatusEnum.PENDING)
+        self.assertEqual(data["status"], PaymentStatus.PENDING)
         self.assertEqual(data["provider"], "manual")
 
         self.order.refresh_from_db()
 
-        self.assertEqual(self.order.payment_status, PaymentStatusEnum.REFUNDED)
+        self.assertEqual(self.order.payment_status, PaymentStatus.REFUNDED)
         self.assertEqual(self.order.status, "REFUNDED")

@@ -2,7 +2,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 
-class OrderStatusEnum(models.TextChoices):
+class OrderStatus(models.TextChoices):
     PENDING = "PENDING", _("Pending")
     PROCESSING = "PROCESSING", _("Processing")
     SHIPPED = "SHIPPED", _("Shipped")
@@ -13,15 +13,15 @@ class OrderStatusEnum(models.TextChoices):
     REFUNDED = "REFUNDED", _("Refunded")
 
     @classmethod
-    def get_active_statuses(cls) -> list["OrderStatusEnum"]:
+    def get_active_statuses(cls) -> list["OrderStatus"]:
         return [cls.PENDING, cls.PROCESSING, cls.SHIPPED, cls.DELIVERED]
 
     @classmethod
-    def get_final_statuses(cls) -> list["OrderStatusEnum"]:
+    def get_final_statuses(cls) -> list["OrderStatus"]:
         return [cls.COMPLETED, cls.CANCELED, cls.REFUNDED]
 
     @classmethod
-    def get_status_groups(cls) -> dict[str, list["OrderStatusEnum"]]:
+    def get_status_groups(cls) -> dict[str, list["OrderStatus"]]:
         return {
             "active": cls.get_active_statuses(),
             "final": cls.get_final_statuses(),
@@ -30,7 +30,7 @@ class OrderStatusEnum(models.TextChoices):
         }
 
 
-class PaymentStatusEnum(models.TextChoices):
+class PaymentStatus(models.TextChoices):
     PENDING = "PENDING", _("Pending")
     PROCESSING = "PROCESSING", _("Processing")
     COMPLETED = "COMPLETED", _("Completed")

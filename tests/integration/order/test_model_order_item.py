@@ -5,17 +5,10 @@ from django.test import TestCase
 from djmoney.money import Money
 
 from order.factories.order import OrderFactory
-from order.models.item import OrderItem
-from order.models.order import Order
 from product.factories.product import ProductFactory
-from product.models.product import Product
 
 
 class OrderItemModelTestCase(TestCase):
-    order: Order = None
-    product: Product = None
-    order_item: OrderItem = None
-
     def setUp(self):
         self.order = OrderFactory()
         self.product = ProductFactory(num_images=0, num_reviews=0)

@@ -162,7 +162,6 @@ class UserSubscriptionModelTestCase(TestCase):
         self.assertGreaterEqual(subscription.unsubscribed_at, time_before)
 
     def test_activate_method(self):
-        """Test activate method functionality."""
         subscription = UserSubscription.objects.create(
             user=self.user,
             topic=self.topic,

@@ -8,8 +8,10 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from order.enum.status import OrderStatusEnum
+from order.enum.status import OrderStatus
 from order.models import Order, OrderHistory
+from order.services import OrderService
+from order.shipping import ShippingService
 
 logger = logging.getLogger(__name__)
 
@@ -89,12 +91,12 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=300)
 def send_order_status_update_email(
-    self, order_id: int, status: OrderStatusEnum
+    self, order_id: int, status: OrderStatus
 ) -> bool:
     try:
         order = Order.objects.get(id=order_id)
 
-        if status in [OrderStatusEnum.PENDING]:
+        if status in [OrderStatus.PENDING]:
             return True
 
         context = {
@@ -110,7 +112,7 @@ def send_order_status_update_email(
         template_base = f"emails/order_{status.lower()}"
 
         subject = _("Order #{order_id} Status Update - {status}").format(
-            order_id=order.id, status=OrderStatusEnum(status).label
+            order_id=order.id, status=OrderStatus(status).label
         )
 
         try:
@@ -259,7 +261,7 @@ def generate_order_invoice(order_id: int) -> bool:
     try:
         order = Order.objects.get(id=order_id)
 
-        # In a real implementation, you would generate a PDF using a library
+        # @TODO - In a real implementation, you would generate a PDF using a library
         # like weasyprint or reportlab, and store it in a file field on the Order model
         # or in a separate Invoice model
 
@@ -296,7 +298,7 @@ def check_pending_orders() -> int:
     try:
         one_day_ago = timezone.now() - timedelta(days=1)
         pending_orders = Order.objects.filter(
-            status=OrderStatusEnum.PENDING, created_at__lt=one_day_ago
+            status=OrderStatus.PENDING, created_at__lt=one_day_ago
         )
 
         count = 0
@@ -354,12 +356,10 @@ def check_pending_orders() -> int:
 def update_order_statuses_from_shipping() -> int:
     try:
         shipped_orders = Order.objects.filter(
-            status=OrderStatusEnum.SHIPPED, tracking_number__isnull=False
+            status=OrderStatus.SHIPPED, tracking_number__isnull=False
         ).exclude(tracking_number="")
 
         count = 0
-
-        from order.shipping import ShippingService
 
         for order in shipped_orders:
             if not order.shipping_carrier:
@@ -370,15 +370,13 @@ def update_order_statuses_from_shipping() -> int:
                     order.tracking_number, order.shipping_carrier
                 )
 
-                if tracking_info.get("status") == OrderStatusEnum.DELIVERED:
-                    from order.services import OrderService
-
+                if tracking_info.get("status") == OrderStatus.DELIVERED:
                     OrderService.update_order_status(
-                        order, OrderStatusEnum.DELIVERED
+                        order, OrderStatus.DELIVERED
                     )
 
                     send_order_status_update_email.delay(
-                        order.id, OrderStatusEnum.DELIVERED
+                        order.id, OrderStatus.DELIVERED
                     )
 
                     count += 1

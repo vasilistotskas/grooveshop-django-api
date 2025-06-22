@@ -8,9 +8,6 @@ from django.test import TestCase
 from blog.factories.author import BlogAuthorFactory
 from blog.factories.category import BlogCategoryFactory
 from blog.factories.post import BlogPostFactory
-from blog.models.author import BlogAuthor
-from blog.models.category import BlogCategory
-from blog.models.post import BlogPost
 from user.factories.account import UserAccountFactory
 
 languages = [
@@ -21,11 +18,6 @@ User = get_user_model()
 
 
 class BlogPostModelTestCase(TestCase):
-    post: BlogPost = None
-    user: User = None
-    author: BlogAuthor = None
-    category: BlogCategory = None
-
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
         self.author = BlogAuthorFactory(user=self.user)

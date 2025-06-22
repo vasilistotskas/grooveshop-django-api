@@ -6,11 +6,11 @@ class MeiliConfig(AppConfig):
     name = "meili"
 
     def ready(self):
-        from django.conf import settings
-        from django.db.models.signals import post_delete, post_save
+        from django.conf import settings  # noqa: PLC0415, I001
+        from django.db.models.signals import post_delete, post_save  # noqa: PLC0415
 
-        from ._client import client as _client
-        from .models import IndexMixin
+        from ._client import client as _client  # noqa: PLC0415
+        from .models import IndexMixin  # noqa: PLC0415
 
         def add_model(**kwargs):
             model: IndexMixin = kwargs["instance"]

@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.models import Group
 from django.db.models import Count, Q
+from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin
@@ -326,8 +327,6 @@ class UserSubscriptionAdmin(ModelAdmin):
 
     @admin.action(description=_("Deactivate selected subscriptions"))
     def deactivate_subscriptions(self, request, queryset):
-        from django.utils import timezone
-
         count = queryset.filter(
             status=UserSubscription.SubscriptionStatus.ACTIVE
         ).update(

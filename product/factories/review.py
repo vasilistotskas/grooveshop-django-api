@@ -6,7 +6,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db.models import Count
 
-from product.enum.review import RateEnum, ReviewStatusEnum
+from product.enum.review import RateEnum, ReviewStatus
 from product.models.review import ProductReview
 
 available_languages = [
@@ -60,7 +60,7 @@ class ProductReviewFactory(factory.django.DjangoModelFactory):
     product = factory.LazyFunction(get_or_create_product)
     user = factory.LazyFunction(get_or_create_user)
     rate = factory.Iterator([choice.value for choice in RateEnum])
-    status = factory.Iterator([choice.value for choice in ReviewStatusEnum])
+    status = factory.Iterator([choice.value for choice in ReviewStatus])
 
     class Meta:
         model = ProductReview

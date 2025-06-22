@@ -1,14 +1,12 @@
-import asyncio
 import importlib
 import os
 import pkgutil
 import time
 import traceback
 from types import ModuleType
-from typing import Optional, TypeVar, cast
+from typing import TypeVar, cast
 
 import factory
-from asgiref.sync import sync_to_async
 from django.apps import apps
 from django.conf import settings
 from django.core.management.base import BaseCommand
@@ -36,18 +34,18 @@ class Command(BaseCommand):
             help="Comma-separated list of model-specific counts in the form 'ModelName1=10,ModelName2=100'",
         )
 
-    async def handle_async(self, *args, **options):
+    def handle(self, *args, **options):
         self.stdout.write(
             self.style.NOTICE("Starting the seeding process...\n")
         )
         start_total_time = time.time()
         count = options["count"]
         model_counts = self.parse_model_counts(options["model_counts"])
-        available_models = await self.get_available_models()
+        available_models = self.get_available_models()
         success_messages = []
         factory_timings: dict[str, float] = {}
 
-        initial_counts = await self.get_initial_counts()
+        initial_counts = self.get_initial_counts()
 
         for model_name in model_counts:
             if model_name not in available_models:
@@ -64,7 +62,7 @@ class Command(BaseCommand):
 
         for module_path in factory_modules:
             if isinstance(module_path, str):
-                result = await self.process_module(
+                result = self.process_module(
                     module_path,
                     model_counts,
                     count,
@@ -89,13 +87,13 @@ class Command(BaseCommand):
                 )
             )
 
-        await self.print_created_counts(initial_counts)
+        self.print_created_counts(initial_counts)
 
         self.stdout.write(
             self.style.NOTICE(f"\nTotal seeding time: {total_time:.2f} seconds")
         )
 
-    async def process_module(
+    def process_module(
         self,
         module_path: str,
         model_counts: dict[str, int],
@@ -126,9 +124,7 @@ class Command(BaseCommand):
                 )
 
                 start_time = time.time()
-                await self.create_records(
-                    factory_class, model_count, created_counts
-                )
+                self.create_records(factory_class, model_count, created_counts)
                 elapsed_time = time.time() - start_time
 
                 factory_timings[factory_class.__name__] = elapsed_time
@@ -141,7 +137,7 @@ class Command(BaseCommand):
 
         return success_messages
 
-    async def create_records(
+    def create_records(
         self, factory_class: type[F], count: int, created_counts: dict[str, int]
     ):
         factory_name = factory_class.__name__
@@ -154,12 +150,12 @@ class Command(BaseCommand):
         instances = []
         for i in range(count):
             try:
-                instance = await sync_to_async(factory_class.create)()
-                await self.save_related_objects(instance)
+                instance = factory_class.create()
+                self.save_related_objects(instance)
                 instances.append(instance)
 
                 if len(instances) >= BATCH_SIZE:
-                    await self.save_batch(instances, factory_class)
+                    self.save_batch(instances, factory_class)
                     created_counts[factory_name] += len(instances)
                     instances.clear()
 
@@ -171,7 +167,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR(error_message))
 
         if instances:
-            await self.save_batch(instances, factory_class)
+            self.save_batch(instances, factory_class)
             created_counts[factory_name] += len(instances)
 
         self.stdout.write(
@@ -183,20 +179,16 @@ class Command(BaseCommand):
         return count
 
     @staticmethod
-    async def save_related_objects(instance: models.Model):
+    def save_related_objects(instance: models.Model):
         for field in instance._meta.get_fields():
             if field.is_relation and field.many_to_one:
-                related_instance = await sync_to_async(getattr)(
-                    instance, field.name
-                )
+                related_instance = getattr(instance, field.name)
                 if related_instance and not related_instance.pk:
-                    await sync_to_async(related_instance.save)()
+                    related_instance.save()
 
-    async def save_batch(
-        self, instances: list[models.Model], factory_class: type[F]
-    ):
+    def save_batch(self, instances: list[models.Model], factory_class: type[F]):
         try:
-            await factory_class._meta.model.objects.abulk_create(
+            factory_class._meta.model.objects.bulk_create(
                 instances, batch_size=BATCH_SIZE
             )
             self.stdout.write(
@@ -205,18 +197,13 @@ class Command(BaseCommand):
         except IntegrityError:
             for instance in instances:
                 try:
-                    await sync_to_async(instance.save)(
-                        force_insert=False,
-                        force_update=False,
-                        using=None,
-                        update_fields=None,
-                    )
+                    instance.save()
                 except IntegrityError as e:
                     self.stdout.write(
                         self.style.ERROR(f"Failed to save instance: {e!s}")
                     )
 
-    def parse_model_counts(self, model_counts_str: Optional[str]):
+    def parse_model_counts(self, model_counts_str: str | None):
         if not model_counts_str:
             return {}
 
@@ -271,7 +258,7 @@ class Command(BaseCommand):
                     factory_classes.append(cast("type[F]", attr))
         return factory_classes
 
-    async def get_available_models(self):
+    def get_available_models(self):
         available_models = []
         factory_modules = self.find_factory_modules()
         for module_path in factory_modules:
@@ -284,17 +271,17 @@ class Command(BaseCommand):
         return available_models
 
     @staticmethod
-    async def get_initial_counts():
+    def get_initial_counts():
         initial_counts = {}
         for model in apps.get_models():
             model_name = model.__name__
             if model_name.endswith("Translation"):
                 continue
-            count = await model.objects.acount()
+            count = model.objects.count()
             initial_counts[model_name] = count
         return initial_counts
 
-    async def print_created_counts(self, initial_counts: dict[str, int]):
+    def print_created_counts(self, initial_counts: dict[str, int]):
         self.stdout.write(
             self.style.NOTICE("\nTotal records created in the database:")
         )
@@ -303,16 +290,9 @@ class Command(BaseCommand):
             if model_name.endswith("Translation"):
                 continue
             initial_count = initial_counts.get(model_name, 0)
-            current_count = await model.objects.acount()
+            current_count = model.objects.count()
             created_count = current_count - initial_count
             if created_count > 0:
                 self.stdout.write(
                     self.style.SUCCESS(f"{model_name:<30} : {created_count:<5}")
                 )
-
-    def handle(self, *args, **options):
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.handle_async(*args, **options))
-        self.stdout.write(
-            self.style.SUCCESS("Seeding process completed successfully.")
-        )

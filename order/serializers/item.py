@@ -3,64 +3,111 @@ from djmoney.contrib.django_rest_framework import MoneyField
 from rest_framework import serializers
 
 from order.models.item import OrderItem
-from product.serializers.product import ProductListSerializer
+from product.serializers.product import ProductSerializer
 
 
-class OrderItemSerializer(serializers.ModelSerializer):
-    product = ProductListSerializer(read_only=True)
-    price = MoneyField(max_digits=11, decimal_places=2)
+class OrderItemSerializer(serializers.ModelSerializer[OrderItem]):
+    price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     total_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
+
+    class Meta:
+        model = OrderItem
+        fields = (
+            "id",
+            "uuid",
+            "order",
+            "product",
+            "price",
+            "quantity",
+            "is_refunded",
+            "refunded_quantity",
+            "net_quantity",
+            "total_price",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            "uuid",
+            "created_at",
+            "updated_at",
+            "total_price",
+            "is_refunded",
+            "refunded_quantity",
+            "net_quantity",
+        )
+
+
+class OrderItemDetailSerializer(OrderItemSerializer):
+    product = ProductSerializer(read_only=True)
     refunded_amount = MoneyField(
         max_digits=11, decimal_places=2, read_only=True
     )
     net_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
 
-    class Meta:
-        model = OrderItem
+    class Meta(OrderItemSerializer.Meta):
         fields = (
-            "id",
-            "price",
-            "product",
-            "quantity",
+            *OrderItemSerializer.Meta.fields,
             "original_quantity",
-            "is_refunded",
-            "refunded_quantity",
-            "net_quantity",
-            "sort_order",
-            "created_at",
-            "updated_at",
-            "uuid",
-            "total_price",
             "refunded_amount",
             "net_price",
+            "sort_order",
             "notes",
         )
         read_only_fields = (
-            "created_at",
-            "updated_at",
-            "uuid",
-            "total_price",
+            *OrderItemSerializer.Meta.read_only_fields,
             "original_quantity",
-            "is_refunded",
-            "refunded_quantity",
-            "net_quantity",
             "refunded_amount",
             "net_price",
+            "sort_order",
         )
 
 
-class OrderItemCreateUpdateSerializer(serializers.ModelSerializer):
+class OrderItemWriteSerializer(serializers.ModelSerializer[OrderItem]):
     class Meta:
         model = OrderItem
         fields = (
-            "id",
+            "order",
             "product",
             "quantity",
             "notes",
         )
 
-    @staticmethod
-    def validate_quantity(value: int) -> int:
+    def validate_quantity(self, value: int) -> int:
+        if value <= 0:
+            raise serializers.ValidationError(
+                _("Quantity must be a positive number.")
+            )
+        return value
+
+    def validate(self, data: dict) -> dict:
+        product = data.get("product")
+        quantity = data.get("quantity")
+
+        if product and hasattr(product, "stock") and product.stock < quantity:
+            raise serializers.ValidationError(
+                {
+                    "quantity": _(
+                        "Not enough stock available. Only {product_stock} remaining."
+                    ).format(
+                        product_stock=product.stock,
+                    )
+                }
+            )
+
+        return data
+
+
+class OrderItemCreateSerializer(serializers.ModelSerializer[OrderItem]):
+    class Meta:
+        model = OrderItem
+        fields = (
+            "product",
+            "quantity",
+            "notes",
+        )
+
+    def validate_quantity(self, value: int) -> int:
         if value <= 0:
             raise serializers.ValidationError(
                 _("Quantity must be a positive number.")

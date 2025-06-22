@@ -4,7 +4,7 @@ from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin
 
-from order.enum.status import OrderStatusEnum
+from order.enum.status import OrderStatus
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.services import OrderService
@@ -177,14 +177,14 @@ class OrderAdmin(ModelAdmin):
 
     def status_badge(self, obj):
         status_colors = {
-            OrderStatusEnum.PENDING: "#FFA500",  # Orange
-            OrderStatusEnum.PROCESSING: "#1E90FF",  # Blue
-            OrderStatusEnum.SHIPPED: "#9370DB",  # Purple
-            OrderStatusEnum.DELIVERED: "#32CD32",  # Green
-            OrderStatusEnum.COMPLETED: "#228B22",  # Dark Green
-            OrderStatusEnum.CANCELED: "#DC143C",  # Red
-            OrderStatusEnum.RETURNED: "#FF4500",  # Orange Red
-            OrderStatusEnum.REFUNDED: "#B22222",  # Fire Brick
+            OrderStatus.PENDING: "#FFA500",  # Orange
+            OrderStatus.PROCESSING: "#1E90FF",  # Blue
+            OrderStatus.SHIPPED: "#9370DB",  # Purple
+            OrderStatus.DELIVERED: "#32CD32",  # Green
+            OrderStatus.COMPLETED: "#228B22",  # Dark Green
+            OrderStatus.CANCELED: "#DC143C",  # Red
+            OrderStatus.RETURNED: "#FF4500",  # Orange Red
+            OrderStatus.REFUNDED: "#B22222",  # Fire Brick
         }
 
         color = status_colors.get(obj.status, "#808080")  # Default to gray
@@ -201,9 +201,7 @@ class OrderAdmin(ModelAdmin):
     def mark_as_processing(self, request, queryset):
         for order in queryset:
             try:
-                OrderService.update_order_status(
-                    order, OrderStatusEnum.PROCESSING
-                )
+                OrderService.update_order_status(order, OrderStatus.PROCESSING)
                 self.message_user(
                     request,
                     _("Order %(order_id)s marked as processing")
@@ -219,7 +217,7 @@ class OrderAdmin(ModelAdmin):
     def mark_as_shipped(self, request, queryset):
         for order in queryset:
             try:
-                OrderService.update_order_status(order, OrderStatusEnum.SHIPPED)
+                OrderService.update_order_status(order, OrderStatus.SHIPPED)
                 self.message_user(
                     request,
                     _("Order %(order_id)s marked as shipped")
@@ -233,9 +231,7 @@ class OrderAdmin(ModelAdmin):
     def mark_as_delivered(self, request, queryset):
         for order in queryset:
             try:
-                OrderService.update_order_status(
-                    order, OrderStatusEnum.DELIVERED
-                )
+                OrderService.update_order_status(order, OrderStatus.DELIVERED)
                 self.message_user(
                     request,
                     _("Order %(order_id)s marked as delivered")
@@ -249,9 +245,7 @@ class OrderAdmin(ModelAdmin):
     def mark_as_completed(self, request, queryset):
         for order in queryset:
             try:
-                OrderService.update_order_status(
-                    order, OrderStatusEnum.COMPLETED
-                )
+                OrderService.update_order_status(order, OrderStatus.COMPLETED)
                 self.message_user(
                     request,
                     _("Order %(order_id)s marked as completed")

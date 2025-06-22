@@ -1,6 +1,5 @@
 import os
 
-from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -82,7 +81,7 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         ),
     )
 
-    objects = PayWayManager()
+    objects: PayWayManager = PayWayManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Pay Way")
@@ -105,13 +104,6 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
 
     def get_ordering_queryset(self):
         return PayWay.objects.all()
-
-    @property
-    def icon_absolute_url(self) -> str:
-        icon: str = ""
-        if self.icon and hasattr(self.icon, "url"):
-            return settings.APP_BASE_URL + self.icon.url
-        return icon
 
     @property
     def icon_filename(self) -> str:

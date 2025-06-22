@@ -118,11 +118,6 @@ urlpatterns = [
         name="blog-category-siblings",
     ),
     path(
-        "blog/category/<int:pk>/stats",
-        BlogCategoryViewSet.as_view({"get": "stats"}),
-        name="blog-category-stats",
-    ),
-    path(
         "blog/author",
         BlogAuthorViewSet.as_view({"get": "list", "post": "create"}),
         name="blog-author-list",
@@ -143,11 +138,6 @@ urlpatterns = [
         "blog/author/<int:pk>/posts",
         BlogAuthorViewSet.as_view({"get": "posts"}),
         name="blog-author-posts",
-    ),
-    path(
-        "blog/author/<int:pk>/stats",
-        BlogAuthorViewSet.as_view({"get": "stats"}),
-        name="blog-author-stats",
     ),
     path(
         "blog/comment",

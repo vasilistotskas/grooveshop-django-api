@@ -1,17 +1,11 @@
-from typing import TYPE_CHECKING
-
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
-from parler.managers import TranslatableManager
 from parler.models import TranslatableModel, TranslatedFields
 
 from core.models import TimeStampMixinModel, UUIDModel
-
-
-class SubscriptionTopicManager(TranslatableManager["SubscriptionTopic"]):
-    pass
 
 
 class SubscriptionTopic(TranslatableModel, TimeStampMixinModel, UUIDModel):
@@ -75,11 +69,6 @@ class SubscriptionTopic(TranslatableModel, TimeStampMixinModel, UUIDModel):
         ),
     )
 
-    objects = SubscriptionTopicManager()
-
-    if TYPE_CHECKING:
-        subscribers: models.Manager["UserSubscription"]
-
     class Meta(TypedModelMeta):
         verbose_name = _("Subscription Topic")
         verbose_name_plural = _("Subscription Topics")
@@ -97,10 +86,6 @@ class SubscriptionTopic(TranslatableModel, TimeStampMixinModel, UUIDModel):
             or "Unnamed Topic"
         )
         return f"{name} ({self.category})"
-
-
-class UserSubscriptionManager(models.Manager["UserSubscription"]):
-    pass
 
 
 class UserSubscription(TimeStampMixinModel, UUIDModel):
@@ -145,8 +130,6 @@ class UserSubscription(TimeStampMixinModel, UUIDModel):
         help_text=_("Additional subscription preferences or data"),
     )
 
-    objects = UserSubscriptionManager()
-
     class Meta(TypedModelMeta):
         verbose_name = _("User Subscription")
         verbose_name_plural = _("User Subscriptions")
@@ -168,8 +151,6 @@ class UserSubscription(TimeStampMixinModel, UUIDModel):
         return f"{self.user} - {self.topic} ({self.status})"
 
     def unsubscribe(self):
-        from django.utils import timezone
-
         self.status = self.SubscriptionStatus.UNSUBSCRIBED
         self.unsubscribed_at = timezone.now()
         self.save(update_fields=["status", "unsubscribed_at", "updated_at"])

@@ -13,15 +13,15 @@ class OrderDocumentTypeEnum(models.TextChoices):
 
     @classmethod
     def get_document_types_for_status(cls, status: str) -> list[str]:
-        from order.enum.status import OrderStatusEnum
+        from order.enum.status import OrderStatus  # noqa: PLC0415
 
-        if status in [OrderStatusEnum.PENDING, OrderStatusEnum.PROCESSING]:
+        if status in [OrderStatus.PENDING, OrderStatus.PROCESSING]:
             return [cls.RECEIPT, cls.INVOICE, cls.PROFORMA]
-        elif status in [OrderStatusEnum.SHIPPED, OrderStatusEnum.DELIVERED]:
+        elif status in [OrderStatus.SHIPPED, OrderStatus.DELIVERED]:
             return [cls.RECEIPT, cls.INVOICE, cls.SHIPPING_LABEL]
-        elif status == OrderStatusEnum.RETURNED:
+        elif status == OrderStatus.RETURNED:
             return [cls.RECEIPT, cls.INVOICE, cls.RETURN_LABEL]
-        elif status == OrderStatusEnum.REFUNDED:
+        elif status == OrderStatus.REFUNDED:
             return [cls.RECEIPT, cls.INVOICE, cls.CREDIT_NOTE]
         else:
             return [cls.RECEIPT, cls.INVOICE]

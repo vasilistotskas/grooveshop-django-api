@@ -2,9 +2,7 @@ from django.conf import settings
 from django.test import TestCase
 
 from country.factories import CountryFactory
-from country.models import Country
 from region.factories import RegionFactory
-from region.models import Region
 
 languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
@@ -13,9 +11,6 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
 class RegionModelTestCase(TestCase):
-    region: Region = None
-    country: Country = None
-
     def setUp(self):
         self.country = CountryFactory(num_regions=0)
         self.region = RegionFactory(

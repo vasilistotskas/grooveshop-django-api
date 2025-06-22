@@ -2,6 +2,7 @@ from django.urls import path
 from rest_framework.urlpatterns import format_suffix_patterns
 
 from product.views.category import ProductCategoryViewSet
+from product.views.category_image import ProductCategoryImageViewSet
 from product.views.favourite import ProductFavouriteViewSet
 from product.views.image import ProductImageViewSet
 from product.views.product import ProductViewSet
@@ -132,6 +133,38 @@ urlpatterns = [
             }
         ),
         name="product-image-detail",
+    ),
+    path(
+        "product/category/image",
+        ProductCategoryImageViewSet.as_view({"get": "list", "post": "create"}),
+        name="product-category-image-list",
+    ),
+    path(
+        "product/category/image/<int:pk>",
+        ProductCategoryImageViewSet.as_view(
+            {
+                "get": "retrieve",
+                "put": "update",
+                "patch": "partial_update",
+                "delete": "destroy",
+            }
+        ),
+        name="product-category-image-detail",
+    ),
+    path(
+        "product/category/image/bulk_update",
+        ProductCategoryImageViewSet.as_view({"patch": "bulk_update"}),
+        name="product-category-image-bulk-update",
+    ),
+    path(
+        "product/category/image/by_category",
+        ProductCategoryImageViewSet.as_view({"get": "by_category"}),
+        name="product-category-image-by-category",
+    ),
+    path(
+        "product/category/image/by_type",
+        ProductCategoryImageViewSet.as_view({"get": "by_type"}),
+        name="product-category-image-by-type",
     ),
 ]
 

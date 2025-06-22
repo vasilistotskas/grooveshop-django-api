@@ -33,7 +33,7 @@ class Vat(TimeStampMixinModel, UUIDModel):
         ],
     )
 
-    objects = VatManager()
+    objects: VatManager = VatManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Vat")
@@ -53,11 +53,6 @@ class Vat(TimeStampMixinModel, UUIDModel):
 
     def __str__(self):
         return f"{self.value}% VAT"
-
-    @staticmethod
-    def get_highest_vat_value():
-        highest_vat = Vat.objects.all().order_by("-value").first()
-        return highest_vat.value if highest_vat else MIN_VAT_VALUE
 
     @property
     def display_name(self) -> str:

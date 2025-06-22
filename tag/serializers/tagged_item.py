@@ -5,7 +5,7 @@ from tag.models import TaggedItem
 from tag.serializers.tag import TagSerializer
 
 
-class TaggedItemSerializer(serializers.ModelSerializer):
+class TaggedItemSerializer(serializers.ModelSerializer[TaggedItem]):
     tag = TagSerializer(read_only=True)
     content_object = ContentObjectRelatedField(read_only=True)
 

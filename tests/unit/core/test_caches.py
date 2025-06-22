@@ -9,8 +9,6 @@ from core.caches import CustomCache
 
 class CustomCacheTestCase(TestCase):
     cache_instance: CustomCache = None
-    key: str = None
-    value: str = None
 
     def setUp(self):
         REDIS_HOST = getenv("REDIS_HOST", "localhost")

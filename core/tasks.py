@@ -3,18 +3,24 @@ import os
 import time
 from datetime import datetime, timedelta
 from functools import wraps
+from pathlib import Path
 
 from celery import Task
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core import management
+from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
 from django.core.mail import send_mail
-from django.db import models, transaction
+from django.db import connections, models, transaction
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from cart.models import Cart
 from core import celery_app
+
+User = get_user_model()
 
 logger = logging.getLogger(__name__)
 
@@ -252,9 +258,6 @@ def clear_expired_notifications_task(days=365):
 )
 @track_task_metrics
 def clear_carts_for_none_users_task():
-    """Clear carts that have no associated user."""
-    from cart.models import Cart
-
     try:
         with transaction.atomic():
             stats = Cart.objects.filter(user=None).aggregate(
@@ -367,10 +370,6 @@ def clear_log_files_task(days=30):
 )
 @track_task_metrics
 def send_inactive_user_notifications():
-    from django.contrib.auth import get_user_model
-
-    User = get_user_model()
-
     cutoff_date = timezone.now() - timedelta(days=60)
 
     inactive_users = User.objects.filter(
@@ -466,8 +465,6 @@ def monitor_system_health():
     errors = []
 
     try:
-        from django.db import connections
-
         with connections["default"].cursor() as cursor:
             cursor.execute("SELECT 1")
             cursor.fetchone()
@@ -481,8 +478,6 @@ def monitor_system_health():
         errors.append(error_msg)
 
     try:
-        from django.core.cache import cache
-
         cache.set("health_check", "ok", 30)
         if cache.get("health_check") == "ok":
             health_checks["cache"] = True
@@ -585,8 +580,6 @@ def backup_database_task(
         management.call_command(*command_args)
 
         duration = (timezone.now() - start_time).total_seconds()
-
-        from pathlib import Path
 
         backup_dir = Path(settings.BASE_DIR) / output_dir
 
@@ -719,8 +712,6 @@ def scheduled_database_backup():
 @track_task_metrics
 def cleanup_old_backups(days=30, backup_dir="backups"):
     try:
-        from pathlib import Path
-
         backup_path = Path(settings.BASE_DIR) / backup_dir
 
         if not backup_path.exists():

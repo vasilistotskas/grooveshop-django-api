@@ -3,16 +3,12 @@ from django.test import TestCase
 
 from product.factories.favourite import ProductFavouriteFactory
 from product.factories.product import ProductFactory
-from product.models.product import Product
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()
 
 
 class ProductFavouriteModelTestCase(TestCase):
-    user: User = None
-    product: Product = None
-
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
         self.product = ProductFactory(num_images=0, num_reviews=0)

@@ -31,24 +31,6 @@ class ProductCategoryFactory(CustomDjangoModelFactory):
         ("slug", lambda: fake.slug()),
     ]
 
-    menu_image_one = factory.django.ImageField(
-        filename="menu_image_one.jpg",
-        color=factory.Faker("color"),
-        width=1920,
-        height=1080,
-    )
-    menu_image_two = factory.django.ImageField(
-        filename="menu_image_two.jpg",
-        color=factory.Faker("color"),
-        width=1920,
-        height=1080,
-    )
-    menu_main_banner = factory.django.ImageField(
-        filename="menu_main_banner.jpg",
-        color=factory.Faker("color"),
-        width=1920,
-        height=1080,
-    )
     parent = None
 
     class Meta:

@@ -1,6 +1,5 @@
 import json
 import logging
-from typing import Optional
 
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.contrib.auth import get_user_model
@@ -12,8 +11,8 @@ User = get_user_model()
 
 
 class NotificationConsumer(AsyncWebsocketConsumer):
-    user: Optional[User | AnonymousUser] = None
-    group_name: Optional[str] = None
+    user: User | AnonymousUser | None = None
+    group_name: str | None = None
 
     async def connect(self):
         try:

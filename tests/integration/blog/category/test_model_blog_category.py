@@ -5,7 +5,6 @@ from django.core.files.storage import default_storage
 from django.test import TestCase
 
 from blog.factories.category import BlogCategoryFactory
-from blog.models.category import BlogCategory
 
 languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
@@ -14,8 +13,6 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
 class BlogCategoryModelTestCase(TestCase):
-    category: BlogCategory = None
-
     def setUp(self):
         self.category = BlogCategoryFactory(slug="sample-category")
 

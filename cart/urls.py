@@ -1,7 +1,8 @@
 from django.urls import path
 from rest_framework.urlpatterns import format_suffix_patterns
 
-from cart.views import CartItemViewSet, CartViewSet
+from cart.views.cart import CartViewSet
+from cart.views.item import CartItemViewSet
 
 urlpatterns = [
     path(

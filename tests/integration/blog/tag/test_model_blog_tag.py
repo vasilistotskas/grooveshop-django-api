@@ -12,8 +12,6 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
 class BlogTagModelTestCase(TestCase):
-    tag: BlogTag = None
-
     def setUp(self):
         self.tag = BlogTagFactory(active=True)
         self.tag.sort_order = 0

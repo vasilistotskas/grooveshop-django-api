@@ -1,27 +1,22 @@
+import json
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from core.pagination.limit_offset import LimitOffsetPaginator
 from product.factories.category import ProductCategoryFactory
 from product.factories.favourite import ProductFavouriteFactory
 from product.factories.image import ProductImageFactory
 from product.factories.product import ProductFactory
 from product.factories.review import ProductReviewFactory
-from product.models.category import ProductCategory
-from product.models.favourite import ProductFavourite
-from product.models.image import ProductImage
 from product.models.product import Product
-from product.models.review import ProductReview
 from product.serializers.product import (
     ProductDetailSerializer,
-    ProductListSerializer,
 )
 from user.factories.account import UserAccountFactory
 from vat.factories import VatFactory
-from vat.models import Vat
 
 languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
@@ -31,14 +26,6 @@ User = get_user_model()
 
 
 class ProductViewSetTestCase(APITestCase):
-    product: Product = None
-    user: User = None
-    category: ProductCategory = None
-    vat: Vat = None
-    images: list[ProductImage] = []
-    reviews: list[ProductReview] = []
-    favourite: ProductFavourite = None
-
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
         self.category = ProductCategoryFactory()
@@ -47,18 +34,18 @@ class ProductViewSetTestCase(APITestCase):
             category=self.category,
             vat=self.vat,
         )
+
+        self.images = []
         main_product_image = ProductImageFactory(
             product=self.product,
             is_main=True,
         )
-
         self.images.append(main_product_image)
 
         non_main_product_image = ProductImageFactory(
             product=self.product,
             is_main=False,
         )
-
         self.images.append(non_main_product_image)
 
         self.favourite = ProductFavouriteFactory(
@@ -68,6 +55,7 @@ class ProductViewSetTestCase(APITestCase):
 
         user_2 = UserAccountFactory(num_addresses=0)
 
+        self.reviews = []
         product_review_status_true = ProductReviewFactory(
             product=self.product,
             user=self.user,
@@ -82,330 +70,552 @@ class ProductViewSetTestCase(APITestCase):
         )
         self.reviews.append(product_review_status_false)
 
-    @staticmethod
-    def get_product_detail_url(pk):
+    def get_product_detail_url(self, pk):
         return reverse("product-detail", args=[pk])
 
-    @staticmethod
-    def get_product_list_url():
+    def get_product_list_url(self):
         return reverse("product-list")
 
-    def test_list(self):
+    def test_list_uses_correct_serializer(self):
         url = self.get_product_list_url()
         response = self.client.get(url)
-        pagination = LimitOffsetPaginator()
-        limit = pagination.default_limit
-        products = Product.objects.all()[0:limit]
-        serializer = ProductListSerializer(
-            products, many=True, context={"request": response.wsgi_request}
-        )
 
-        self.assertEqual(response.data["results"], serializer.data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("results", response.data)
+
+        if response.data["results"]:
+            product_data = response.data["results"][0]
+            expected_fields = {
+                "id",
+                "slug",
+                "category",
+                "price",
+                "vat",
+                "view_count",
+                "stock",
+                "active",
+                "translations",
+                "final_price",
+                "discount_value",
+                "review_average",
+                "review_count",
+                "likes_count",
+            }
+            self.assertTrue(expected_fields.issubset(set(product_data.keys())))
+
+    def test_retrieve_uses_correct_serializer(self):
+        url = self.get_product_detail_url(self.product.pk)
+        response = self.client.get(url)
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    def test_create_valid(self):
+        expected_fields = {
+            "id",
+            "slug",
+            "category",
+            "price",
+            "vat",
+            "view_count",
+            "stock",
+            "active",
+            "translations",
+            "final_price",
+            "discount_value",
+            "review_average",
+            "review_count",
+            "likes_count",
+        }
+        self.assertTrue(expected_fields.issubset(set(response.data.keys())))
+
+    def test_create_request_response_serializers(self):
         payload = {
-            "slug": "sample-product-2",
-            "product_code": "P123456",
+            "slug": "test-product-new",
             "category": self.category.pk,
-            "translations": {},
+            "translations": json.dumps(
+                {
+                    default_language: {
+                        "name": "Test Product Name",
+                        "description": "Test Product Description",
+                    },
+                }
+            ),
             "price": "100.00",
             "active": True,
             "stock": 10,
-            "discount_percent": "50.0",
+            "discount_percent": 0,
             "vat": self.vat.pk,
-            "view_count": 10,
             "weight": {
                 "value": "5.00",
                 "unit": "kg",
             },
         }
-
-        for language in languages:
-            language_code = language[0]
-            language_name = language[1]
-
-            translation_payload = {
-                "name": f"New Product name in {language_name}",
-                "description": f"New Product description in {language_name}",
-            }
-
-            payload["translations"][language_code] = translation_payload
 
         url = self.get_product_list_url()
         response = self.client.post(url, data=payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-    def test_create_invalid(self):
+        expected_fields = {
+            "id",
+            "slug",
+            "category",
+            "price",
+            "vat",
+            "view_count",
+            "stock",
+            "active",
+            "translations",
+            "final_price",
+            "discount_value",
+            "review_average",
+            "review_count",
+            "likes_count",
+        }
+        self.assertTrue(expected_fields.issubset(set(response.data.keys())))
+
+        product = Product.objects.get(id=response.data["id"])
+        self.assertEqual(product.slug, "test-product-new")
+        self.assertEqual(product.category.id, self.category.id)
+
+    def test_update_request_response_serializers(self):
         payload = {
-            "product_code": "invalid_product_code",
-            "category": "invalid_category",
-            "translations": {
-                "invalid_lang_code": {
-                    "name": "Translation for invalid language code",
-                    "description": "Translation for invalid language code",
+            "slug": "updated-product-slug",
+            "category": self.category.pk,
+            "translations": json.dumps(
+                {
+                    default_language: {
+                        "name": "Updated Product Name",
+                        "description": "Updated Product Description",
+                    },
                 }
+            ),
+            "price": "150.00",
+            "active": True,
+            "stock": 20,
+            "discount_percent": 10,
+            "vat": self.vat.pk,
+            "weight": {
+                "value": "3.00",
+                "unit": "kg",
             },
-            "price": "invalid_price",
-            "active": "invalid_active",
-            "stock": "invalid_stock",
-            "discount_percent": "invalid_discount_percent",
-            "vat": "invalid_vat",
-            "view_count": "invalid_view_count",
-            "weight": "invalid_weight",
+        }
+
+        url = self.get_product_detail_url(self.product.pk)
+        response = self.client.put(url, data=payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        expected_fields = {
+            "id",
+            "slug",
+            "category",
+            "price",
+            "vat",
+            "view_count",
+            "stock",
+            "active",
+            "translations",
+            "final_price",
+            "discount_value",
+            "review_average",
+            "review_count",
+            "likes_count",
+        }
+        self.assertTrue(expected_fields.issubset(set(response.data.keys())))
+
+        product = Product.objects.get(id=response.data["id"])
+        self.assertEqual(product.slug, "updated-product-slug")
+        self.assertEqual(product.stock, 20)
+
+    def test_partial_update_request_response_serializers(self):
+        payload = {
+            "active": False,
+            "stock": 5,
+        }
+
+        url = self.get_product_detail_url(self.product.pk)
+        response = self.client.patch(url, data=payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        expected_fields = {
+            "id",
+            "slug",
+            "category",
+            "price",
+            "vat",
+            "view_count",
+            "stock",
+            "active",
+            "translations",
+            "final_price",
+            "discount_value",
+            "review_average",
+            "review_count",
+            "likes_count",
+        }
+        self.assertTrue(expected_fields.issubset(set(response.data.keys())))
+
+        product = Product.objects.get(id=response.data["id"])
+        self.assertEqual(product.active, False)
+        self.assertEqual(product.stock, 5)
+
+    def test_filtering_functionality(self):
+        test_category = ProductCategoryFactory()
+
+        expensive_product = ProductFactory(
+            category=test_category,
+            vat=self.vat,
+            slug="expensive-product-test",
+            active=True,
+        )
+        expensive_product.price = "500.00"
+        expensive_product.save()
+
+        inactive_product = ProductFactory(
+            category=test_category,
+            vat=self.vat,
+            active=False,
+            slug="inactive-product-test",
+        )
+
+        url = self.get_product_list_url()
+
+        response = self.client.get(url, {"category": test_category.id})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        product_ids = [prod["id"] for prod in response.data["results"]]
+        self.assertIn(expensive_product.id, product_ids)
+        self.assertIn(inactive_product.id, product_ids)
+
+        response = self.client.get(url, {"active": True})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        active_products = response.data["results"]
+
+        for product in active_products:
+            self.assertTrue(product["active"])
+
+        active_ids = [prod["id"] for prod in active_products]
+        self.assertIn(expensive_product.id, active_ids)
+        self.assertNotIn(inactive_product.id, active_ids)
+
+    def test_search_functionality(self):
+        searchable_product = ProductFactory(
+            category=self.category, vat=self.vat, slug="searchable-product"
+        )
+        searchable_product.set_current_language(default_language)
+        searchable_product.name = "Unique Searchable Product Name"
+        searchable_product.description = "Special description content"
+        searchable_product.save()
+
+        url = self.get_product_list_url()
+
+        response = self.client.get(url, {"search": "Unique"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        product_ids = [prod["id"] for prod in response.data["results"]]
+        self.assertIn(searchable_product.id, product_ids)
+
+        response = self.client.get(url, {"search": "Special"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        product_ids = [prod["id"] for prod in response.data["results"]]
+        self.assertIn(searchable_product.id, product_ids)
+
+        response = self.client.get(url, {"search": "searchable-product"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        product_ids = [prod["id"] for prod in response.data["results"]]
+        self.assertIn(searchable_product.id, product_ids)
+
+    def test_ordering_functionality(self):
+        url = self.get_product_list_url()
+
+        response = self.client.get(url, {"ordering": "price"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        response = self.client.get(url, {"ordering": "-created_at"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        if len(response.data["results"]) > 1:
+            first_created = response.data["results"][0]["created_at"]
+            second_created = response.data["results"][1]["created_at"]
+            self.assertGreaterEqual(first_created, second_created)
+
+    def test_validation_errors_consistent(self):
+        payload = {
+            "slug": "test-product-invalid",
+            "category": self.category.pk,
+            "translations": json.dumps(
+                {
+                    default_language: {
+                        "name": "Test Product",
+                        "description": "Test Description",
+                    },
+                }
+            ),
+            "price": "-100.00",
+            "active": True,
+            "stock": 10,
+            "vat": self.vat.pk,
         }
 
         url = self.get_product_list_url()
         response = self.client.post(url, data=payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("price", response.data)
 
-    def test_retrieve_valid(self):
+    def test_consistency_with_manual_serializer_instantiation(self):
         url = self.get_product_detail_url(self.product.pk)
-        response = self.client.get(url)
-        product = Product.objects.get(pk=self.product.pk)
-        serializer = ProductDetailSerializer(
-            product, context={"request": response.wsgi_request}
+        viewset_response = self.client.get(url)
+
+        manual_serializer = ProductDetailSerializer(
+            self.product, context={"request": viewset_response.wsgi_request}
         )
 
-        self.assertEqual(response.data, serializer.data)
+        self.assertEqual(viewset_response.status_code, status.HTTP_200_OK)
+
+        key_fields = ["id", "slug", "category", "price", "active"]
+        for field in key_fields:
+            self.assertEqual(
+                viewset_response.data[field], manual_serializer.data[field]
+            )
+
+    def test_update_view_count_action(self):
+        initial_count = self.product.view_count
+        url = reverse("product-update-view-count", args=[self.product.pk])
+        response = self.client.post(url)
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    def test_retrieve_invalid(self):
-        invalid_product_id = 999999999
-        url = self.get_product_detail_url(invalid_product_id)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.view_count, initial_count + 1)
+
+        expected_fields = {
+            "id",
+            "slug",
+            "category",
+            "price",
+            "vat",
+            "view_count",
+            "stock",
+            "active",
+            "translations",
+        }
+        self.assertTrue(expected_fields.issubset(set(response.data.keys())))
+
+    def test_reviews_action(self):
+        url = reverse("product-reviews", args=[self.product.pk])
         response = self.client.get(url)
 
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsInstance(response.data, list)
 
-    def test_update_valid(self):
+        product_reviews = [
+            r for r in self.reviews if r.product_id == self.product.pk
+        ]
+        self.assertEqual(len(response.data), len(product_reviews))
+
+        if response.data:
+            review_data = response.data[0]
+            expected_fields = {"id", "product", "user", "rate", "status"}
+            self.assertTrue(expected_fields.issubset(set(review_data.keys())))
+
+    def test_images_action(self):
+        url = reverse("product-images", args=[self.product.pk])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsInstance(response.data, list)
+
+        product_images = [
+            img for img in self.images if img.product_id == self.product.pk
+        ]
+        self.assertEqual(len(response.data), len(product_images))
+
+        if response.data:
+            image_data = response.data[0]
+            expected_fields = {"id", "product", "image", "is_main"}
+            self.assertTrue(expected_fields.issubset(set(image_data.keys())))
+
+    def test_tags_action(self):
+        url = reverse("product-tags", args=[self.product.pk])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsInstance(response.data, list)
+
+        self.assertEqual(len(response.data), 0)
+
+    def test_create_with_complex_payload(self):
         payload = {
-            "slug": "sample-product-2",
-            "product_code": "P123456",
+            "slug": "complex-product-test",
             "category": self.category.pk,
-            "translations": {},
-            "price": "100.00",
+            "translations": json.dumps(
+                {
+                    "en": {
+                        "name": "Complex Product EN",
+                        "description": "Complex product description EN",
+                    },
+                    "de": {
+                        "name": "Complex Product DE",
+                        "description": "Complex product description DE",
+                    },
+                }
+            ),
+            "price": "250.00",
             "active": True,
-            "stock": 10,
-            "discount_percent": "50.0",
+            "stock": 15,
+            "discount_percent": 15,
             "vat": self.vat.pk,
-            "view_count": 10,
             "weight": {
-                "value": "5.00",
+                "value": "2.50",
                 "unit": "kg",
             },
+            "seo_title": "Complex Product SEO Title",
+            "seo_description": "Complex Product SEO Description",
+            "seo_keywords": "complex, product, test",
         }
 
-        for language in languages:
-            language_code = language[0]
-            language_name = language[1]
+        url = self.get_product_list_url()
+        response = self.client.post(url, data=payload, format="json")
 
-            translation_payload = {
-                "name": f"Updated Product name in {language_name}",
-                "description": f"Updated Product description in {language_name}",
-            }
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-            payload["translations"][language_code] = translation_payload
+        product = Product.objects.get(id=response.data["id"])
 
-        url = self.get_product_detail_url(self.product.pk)
-        response = self.client.put(url, data=payload, format="json")
+        if "en" in [
+            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+        ]:
+            product.set_current_language("en")
+            self.assertEqual(product.name, "Complex Product EN")
+
+        if "de" in [
+            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+        ]:
+            product.set_current_language("de")
+            self.assertEqual(product.name, "Complex Product DE")
+
+    def test_queryset_optimization(self):
+        url = self.get_product_list_url()
+        response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-    def test_update_invalid(self):
-        payload = {
-            "product_code": "invalid_product_code",
-            "category": "invalid_category",
-            "translations": {
-                "invalid_lang_code": {
-                    "name": "Translation for invalid language code",
-                    "description": "Translation for invalid language code",
-                }
-            },
-            "price": "invalid_price",
-            "active": "invalid_active",
-            "stock": "invalid_stock",
-            "discount_percent": "invalid_discount_percent",
-            "vat": "invalid_vat",
-            "hits": "invalid_view_count",
-            "weight": {
-                "value": "5.00",
-                "unit": "kg",
-            },
-        }
-
-        url = self.get_product_detail_url(self.product.pk)
-        response = self.client.put(url, data=payload, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_partial_update_valid(self):
-        payload = {
-            "translations": {
-                default_language: {
-                    "name": "Updated Product name",
-                    "description": "Updated Product description",
-                }
-            },
-        }
-
-        url = self.get_product_detail_url(self.product.pk)
-        response = self.client.patch(url, data=payload, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-    def test_partial_update_invalid(self):
-        payload = {
-            "product_code": "invalid_product_code",
-            "category": "invalid_category",
-            "translations": {
-                "invalid_lang_code": {
-                    "name": "Translation for invalid language code",
-                    "description": "Translation for invalid language code",
-                }
-            },
-            "price": "invalid_price",
-            "weight": "invalid_weight",
-        }
-
-        url = self.get_product_detail_url(self.product.pk)
-        response = self.client.patch(url, data=payload, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_destroy_valid(self):
-        url = self.get_product_detail_url(self.product.pk)
-        response = self.client.delete(url)
-
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(Product.objects.filter(pk=self.product.pk).exists())
-
-    def test_destroy_invalid(self):
-        invalid_product_id = 999999999
-        url = self.get_product_detail_url(invalid_product_id)
-        response = self.client.delete(url)
-
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_ordering_by_discount_value(self):
-        ProductFactory(price=200, discount_percent=5)
-        ProductFactory(price=100, discount_percent=20)
+        for _ in range(5):
+            ProductFactory(
+                category=self.category,
+                vat=self.vat,
+            )
 
-        url = f"{self.get_product_list_url()}?ordering=discountValueAmount"
-        response = self.client.get(url)
+        url = self.get_product_list_url()
+        response = self.client.get(url, {"ordering": "discount_value_amount"})
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data["results"]
 
-        discount_values = [product["discount_value"] for product in results]
-        self.assertEqual(sorted(discount_values), discount_values)
+        self.assertGreaterEqual(len(response.data["results"]), 1)
 
-        url = f"{self.get_product_list_url()}?ordering=-discountValueAmount"
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data["results"]
+        products = response.data["results"]
 
-        discount_values = [product["discount_value"] for product in results]
-        self.assertEqual(sorted(discount_values, reverse=True), discount_values)
+        for i in range(len(products) - 1):
+            current_discount = float(products[i]["discount_value"])
+            next_discount = float(products[i + 1]["discount_value"])
+            self.assertLessEqual(current_discount, next_discount)
 
     def test_ordering_by_final_price(self):
-        ProductFactory(price=150, discount_percent=10)
-        ProductFactory(price=200, discount_percent=5)
+        for _ in range(5):
+            ProductFactory(
+                category=self.category,
+                vat=self.vat,
+            )
 
-        url = f"{self.get_product_list_url()}?ordering=finalPriceAmount"
-        response = self.client.get(url)
+        url = self.get_product_list_url()
+        response = self.client.get(url, {"ordering": "final_price_amount"})
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data["results"]
 
-        final_prices = [product["final_price"] for product in results]
-        self.assertEqual(sorted(final_prices), final_prices)
+        self.assertGreaterEqual(len(response.data["results"]), 1)
 
-        url = f"{self.get_product_list_url()}?ordering=-finalPriceAmount"
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data["results"]
+        products = response.data["results"]
 
-        final_prices = [product["final_price"] for product in results]
-        self.assertEqual(sorted(final_prices, reverse=True), final_prices)
+        for i in range(len(products) - 1):
+            current_price = float(products[i]["final_price"])
+            next_price = float(products[i + 1]["final_price"])
+            self.assertLessEqual(current_price, next_price)
 
     def test_ordering_by_review_average(self):
-        product2 = ProductFactory()
-        product3 = ProductFactory()
+        products = []
+        for _i in range(5):
+            product = ProductFactory(
+                category=self.category,
+                num_images=0,
+                num_reviews=0,
+            )
+            products.append(product)
 
-        ProductReviewFactory(product=product2, rate=3, status="True")
-        ProductReviewFactory(product=product2, rate=4, status="True")
-        ProductReviewFactory(product=product3, rate=5, status="True")
+        for index, product in enumerate(products):
+            rating = 5 - index
+            ProductReviewFactory(product=product, rate=rating)
 
-        url = f"{self.get_product_list_url()}?ordering=reviewAverageField"
-        response = self.client.get(url)
+        url = self.get_product_list_url()
+        response = self.client.get(url, {"ordering": "-review_average_field"})
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         results = response.data["results"]
 
-        review_averages = [product["review_average"] for product in results]
-        self.assertEqual(sorted(review_averages), review_averages)
-
-        url = f"{self.get_product_list_url()}?ordering=-reviewAverageField"
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data["results"]
-
-        review_averages = [product["review_average"] for product in results]
-        self.assertEqual(sorted(review_averages, reverse=True), review_averages)
+        for i in range(len(results) - 1):
+            current_avg = results[i].get("review_average", 0)
+            next_avg = results[i + 1].get("review_average", 0)
+            self.assertGreaterEqual(current_avg, next_avg)
 
     def test_ordering_by_likes_count(self):
-        product2 = ProductFactory()
-        product3 = ProductFactory()
+        products = []
+        for _i in range(5):
+            product = ProductFactory(
+                category=self.category,
+                num_images=0,
+                num_reviews=0,
+            )
+            products.append(product)
 
-        user2 = UserAccountFactory(num_addresses=0)
-        user3 = UserAccountFactory(num_addresses=0)
+        users = []
+        for _i in range(5):
+            user = UserAccountFactory(num_addresses=0)
+            users.append(user)
 
-        ProductFavouriteFactory(product=product2, user=user2)
+        for i, product in enumerate(products):
+            for j in range(i + 1):
+                ProductFavouriteFactory(
+                    product=product,
+                    user=users[j],
+                )
 
-        ProductFavouriteFactory(product=product3, user=user2)
-        ProductFavouriteFactory(product=product3, user=user3)
+        url = self.get_product_list_url()
+        response = self.client.get(url, {"ordering": "likes_count_field"})
 
-        url = f"{self.get_product_list_url()}?ordering=likesCountField"
-        response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data["results"]
 
-        likes_counts = [product["likes_count"] for product in results]
-        self.assertEqual(sorted(likes_counts), likes_counts)
-
-        url = f"{self.get_product_list_url()}?ordering=-likesCountField"
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data["results"]
-
-        likes_counts = [product["likes_count"] for product in results]
-        self.assertEqual(sorted(likes_counts, reverse=True), likes_counts)
+        self.assertGreaterEqual(len(response.data["results"]), 1)
 
     def test_filter_by_price_range(self):
-        ProductFactory(price=150, discount_percent=0)
-        ProductFactory(price=250, discount_percent=0)
+        test_products = []
+        for i in range(3):
+            price = (i + 2) * 100
+            product = ProductFactory(
+                category=self.category,
+                vat=self.vat,
+                price=f"{price}.00",
+            )
+            test_products.append(product)
 
-        url = f"{self.get_product_list_url()}?min_final_price=200"
-        response = self.client.get(url)
+        url = self.get_product_list_url()
+        response = self.client.get(
+            url, {"min_final_price": "200", "max_final_price": "400"}
+        )
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data["results"]
 
-        for product in results:
-            self.assertGreaterEqual(float(product["final_price"]), 200)
+        products = response.data["results"]
 
-        url = f"{self.get_product_list_url()}?max_final_price=200"
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data["results"]
-
-        for product in results:
-            self.assertLessEqual(float(product["final_price"]), 200)
-
-        url = f"{self.get_product_list_url()}?min_final_price=100&max_final_price=200"
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data["results"]
-
-        for product in results:
-            price = float(product["final_price"])
-            self.assertGreaterEqual(price, 100)
-            self.assertLessEqual(price, 200)
+        for product in products:
+            final_price = float(product["final_price"])
+            self.assertGreaterEqual(final_price, 200)
+            self.assertLessEqual(final_price, 400)

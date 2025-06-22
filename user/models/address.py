@@ -61,7 +61,7 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
     notes = models.CharField(_("Notes"), max_length=255, blank=True, default="")
     is_main = models.BooleanField(_("Is Main"), default=False)
 
-    objects = UserAddressManager()
+    objects: UserAddressManager = UserAddressManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("User Address")

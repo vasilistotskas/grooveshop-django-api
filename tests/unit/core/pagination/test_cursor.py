@@ -7,8 +7,6 @@ from product.models.product import Product
 
 
 class CursorPaginatorTest(TestCase):
-    factory: RequestFactory = None
-
     def setUp(self):
         self.factory = RequestFactory()
         ProductFactory.create_batch(4, num_images=0, num_reviews=0)

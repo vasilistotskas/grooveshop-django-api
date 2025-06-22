@@ -1,112 +1,74 @@
 from __future__ import annotations
 
 from django.conf import settings
-from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import extend_schema_view
 from rest_framework.filters import SearchFilter
 
+from blog.filters.tag import BlogTagFilter
 from blog.models.tag import BlogTag
 from blog.serializers.tag import (
     BlogTagDetailSerializer,
-    BlogTagListSerializer,
+    BlogTagSerializer,
     BlogTagWriteSerializer,
 )
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
-from core.utils.serializers import MultiSerializerMixin
+from core.utils.serializers import (
+    MultiSerializerMixin,
+    create_schema_view_config,
+)
 from core.utils.views import cache_methods
 
 
 @extend_schema_view(
-    list=extend_schema(
-        summary=_("List blog tags"),
-        description=_(
-            "Retrieve a list of blog tags with filtering and search capabilities. "
-            "Includes usage statistics and trending information."
-        ),
-        tags=["Blog Tags"],
-        responses={
-            200: BlogTagListSerializer(many=True),
+    **create_schema_view_config(
+        model_class=BlogTag,
+        display_config={
+            "tag": "Blog Tags",
         },
-    ),
-    create=extend_schema(
-        summary=_("Create a blog tag"),
-        description=_("Create a new blog tag. Requires authentication."),
-        tags=["Blog Tags"],
-        request=BlogTagWriteSerializer,
-        responses={
-            201: BlogTagDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
+        serializers={
+            "list_serializer": BlogTagSerializer,
+            "detail_serializer": BlogTagDetailSerializer,
+            "write_serializer": BlogTagWriteSerializer,
         },
-    ),
-    retrieve=extend_schema(
-        summary=_("Retrieve a blog tag"),
-        description=_(
-            "Get detailed information about a specific blog tag including "
-            "related posts, usage statistics, and performance metrics."
-        ),
-        tags=["Blog Tags"],
-        responses={
-            200: BlogTagDetailSerializer,
-            404: ErrorResponseSerializer,
+        error_serializer=ErrorResponseSerializer,
+        additional_responses={
+            "create": {201: BlogTagDetailSerializer},
+            "update": {200: BlogTagDetailSerializer},
+            "partial_update": {200: BlogTagDetailSerializer},
         },
-    ),
-    update=extend_schema(
-        summary=_("Update a blog tag"),
-        description=_("Update blog tag information. Requires authentication."),
-        tags=["Blog Tags"],
-        request=BlogTagWriteSerializer,
-        responses={
-            200: BlogTagDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    partial_update=extend_schema(
-        summary=_("Partially update a blog tag"),
-        description=_(
-            "Partially update blog tag information. Requires authentication."
-        ),
-        tags=["Blog Tags"],
-        request=BlogTagWriteSerializer,
-        responses={
-            200: BlogTagDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    destroy=extend_schema(
-        summary=_("Delete a blog tag"),
-        description=_("Delete a blog tag. Requires authentication."),
-        tags=["Blog Tags"],
-        responses={
-            204: None,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
+    )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class BlogTagViewSet(MultiSerializerMixin, BaseModelViewSet):
     queryset = BlogTag.objects.all()
-    filter_backends = [
-        DjangoFilterBackend,
-        PascalSnakeCaseOrderingFilter,
-        SearchFilter,
-    ]
-    filterset_fields = ["id", "active"]
-    ordering_fields = ["id", "active", "created_at", "sort_order"]
-    ordering = ["-created_at"]
-    search_fields = ["translations__name"]
     serializers = {
-        "list": BlogTagListSerializer,
+        "default": BlogTagDetailSerializer,
+        "list": BlogTagSerializer,
         "retrieve": BlogTagDetailSerializer,
         "create": BlogTagWriteSerializer,
         "update": BlogTagWriteSerializer,
         "partial_update": BlogTagWriteSerializer,
     }
+    response_serializers = {
+        "create": BlogTagDetailSerializer,
+        "update": BlogTagDetailSerializer,
+        "partial_update": BlogTagDetailSerializer,
+    }
+    filter_backends = [
+        DjangoFilterBackend,
+        PascalSnakeCaseOrderingFilter,
+        SearchFilter,
+    ]
+    filterset_class = BlogTagFilter
+    ordering_fields = [
+        "id",
+        "active",
+        "created_at",
+        "updated_at",
+        "sort_order",
+    ]
+    ordering = ["-created_at"]
+    search_fields = ["translations__name"]

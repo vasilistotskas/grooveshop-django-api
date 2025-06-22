@@ -21,7 +21,7 @@ class ProductFavourite(TimeStampMixinModel, UUIDModel):
         on_delete=models.CASCADE,
     )
 
-    objects = FavouriteManager()
+    objects: FavouriteManager = FavouriteManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Product Favourite")

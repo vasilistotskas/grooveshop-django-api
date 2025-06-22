@@ -1,18 +1,10 @@
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import wsgi
 
 
 class TestWsgiInit(unittest.TestCase):
-    def test_get_allowed_host_lazy(self):
-        with patch("django.conf.settings") as mock_settings:
-            mock_settings.ALLOWED_HOSTS = ["example.com", "localhost"]
-
-            result = wsgi.get_allowed_host_lazy()
-
-            self.assertEqual(result, "example.com")
-
     def test_wsgi_application_exists(self):
         self.assertTrue(hasattr(wsgi, "application"))
 

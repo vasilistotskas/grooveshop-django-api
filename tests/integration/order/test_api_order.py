@@ -8,7 +8,7 @@ from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 
 from country.factories import CountryFactory
-from order.enum.status import OrderStatusEnum
+from order.enum.status import OrderStatus
 from order.factories.order import OrderFactory
 from order.models.order import Order
 from pay_way.factories import PayWayFactory
@@ -64,13 +64,6 @@ class CheckoutAPITestCase(APITestCase):
             content_type="application/json",
         )
 
-        # DEBUG: Print response details
-        print(f"DEBUG: Response status: {response.status_code}")
-        if hasattr(response, "data"):
-            print(f"DEBUG: Response data: {response.data}")
-        else:
-            print(f"DEBUG: Response content: {response.content}")
-
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         self.assertEqual(Order.objects.count(), 1)
@@ -111,14 +104,6 @@ class CheckoutAPITestCase(APITestCase):
             data=json.dumps(self.checkout_data),
             content_type="application/json",
         )
-
-        # DEBUG: Print response details
-        print(f"DEBUG: Response status: {response.status_code}")
-        if hasattr(response, "data"):
-            print(f"DEBUG: Response data: {response.data}")
-        else:
-            print(f"DEBUG: Response content: {response.content}")
-
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         order = Order.objects.first()
@@ -228,19 +213,19 @@ class OrderViewSetTestCase(APITestCase):
     def test_cancel_order(self):
         self.client.force_authenticate(user=self.admin_user)
 
-        self.order1.status = OrderStatusEnum.PENDING.value
+        self.order1.status = OrderStatus.PENDING.value
         self.order1.save()
 
         response = self.client.post(self.cancel_order_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         self.order1.refresh_from_db()
-        self.assertEqual(self.order1.status, OrderStatusEnum.CANCELED.value)
+        self.assertEqual(self.order1.status, OrderStatus.CANCELED.value)
 
     def test_add_tracking(self):
         self.client.force_authenticate(user=self.admin_user)
 
-        self.order1.status = OrderStatusEnum.PROCESSING.value
+        self.order1.status = OrderStatus.PROCESSING.value
         self.order1.save()
 
         tracking_data = {
@@ -262,10 +247,10 @@ class OrderViewSetTestCase(APITestCase):
     def test_update_order_status(self):
         self.client.force_authenticate(user=self.admin_user)
 
-        self.order1.status = OrderStatusEnum.PENDING.value
+        self.order1.status = OrderStatus.PENDING.value
         self.order1.save()
 
-        status_data = {"status": OrderStatusEnum.PROCESSING.value}
+        status_data = {"status": OrderStatus.PROCESSING.value}
 
         response = self.client.post(
             self.update_status_url,
@@ -275,15 +260,15 @@ class OrderViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         self.order1.refresh_from_db()
-        self.assertEqual(self.order1.status, OrderStatusEnum.PROCESSING.value)
+        self.assertEqual(self.order1.status, OrderStatus.PROCESSING.value)
 
     def test_update_order_status_invalid_transition(self):
         self.client.force_authenticate(user=self.admin_user)
 
-        self.order1.status = OrderStatusEnum.PENDING.value
+        self.order1.status = OrderStatus.PENDING.value
         self.order1.save()
 
-        status_data = {"status": OrderStatusEnum.COMPLETED.value}
+        status_data = {"status": OrderStatus.COMPLETED.value}
 
         response = self.client.post(
             self.update_status_url,
@@ -293,4 +278,4 @@ class OrderViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
         self.order1.refresh_from_db()
-        self.assertEqual(self.order1.status, OrderStatusEnum.PENDING.value)
+        self.assertEqual(self.order1.status, OrderStatus.PENDING.value)

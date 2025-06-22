@@ -1,61 +1,48 @@
 from unittest import TestCase
-from unittest.mock import Mock, patch
 
-from django.http import HttpRequest
+import pytest
 from djmoney.money import Money
 
-from order.enum.status import OrderStatusEnum
+from order.enum.status import OrderStatus
+from order.factories.item import OrderItemFactory
+from order.factories.order import OrderFactory
 from order.models.history import OrderHistory, OrderItemHistory
 
 
+@pytest.mark.django_db
 class OrderHistoryTestCase(TestCase):
     def setUp(self):
-        self.order = Mock()
-        self.order.id = 1
+        self.order = OrderFactory()
+        self.user = None
 
-        self.user = Mock()
-        self.user.id = 42
+        self.request = None
 
-        self.request = Mock(spec=HttpRequest)
-        self.request.META = {
-            "REMOTE_ADDR": "127.0.0.1",
-            "HTTP_USER_AGENT": "Mozilla/5.0 (Test)",
-        }
-
-    @patch("order.models.history.OrderHistory.objects.create")
-    def test_log_status_change(self, mock_create):
-        history_entry = Mock(spec=OrderHistory)
-        mock_create.return_value = history_entry
-
+    def test_log_status_change(self):
         result = OrderHistory.log_status_change(
             order=self.order,
-            previous_status=OrderStatusEnum.PENDING,
-            new_status=OrderStatusEnum.PROCESSING,
+            previous_status=OrderStatus.PENDING,
+            new_status=OrderStatus.PROCESSING,
             user=self.user,
             request=self.request,
         )
 
-        self.assertEqual(result, history_entry)
-
-        mock_create.assert_called_once_with(
-            order=self.order,
-            user=self.user,
-            change_type="STATUS",
-            previous_value={"status": OrderStatusEnum.PENDING},
-            new_value={"status": OrderStatusEnum.PROCESSING},
-            description=f"Status changed from {OrderStatusEnum.PENDING} to {OrderStatusEnum.PROCESSING}",
-            ip_address="127.0.0.1",
-            user_agent="Mozilla/5.0 (Test)",
+        self.assertIsInstance(result, OrderHistory)
+        self.assertEqual(result.order, self.order)
+        self.assertEqual(result.user, self.user)
+        self.assertEqual(result.change_type, "STATUS")
+        self.assertEqual(result.previous_value, {"status": OrderStatus.PENDING})
+        self.assertEqual(result.new_value, {"status": OrderStatus.PROCESSING})
+        self.assertIsNone(result.ip_address)
+        self.assertEqual(result.user_agent, "")
+        self.assertEqual(
+            result.description,
+            f"Status changed from {OrderStatus.PENDING} to {OrderStatus.PROCESSING}",
         )
 
-    @patch("order.models.history.OrderHistory.objects.create")
-    def test_log_payment_update(self, mock_create):
+    def test_log_payment_update(self):
         previous_value = {"paid_amount": {"amount": 0, "currency": "USD"}}
         new_value = {"paid_amount": {"amount": 100, "currency": "USD"}}
 
-        history_entry = Mock(spec=OrderHistory)
-        mock_create.return_value = history_entry
-
         result = OrderHistory.log_payment_update(
             order=self.order,
             previous_value=previous_value,
@@ -64,26 +51,19 @@ class OrderHistoryTestCase(TestCase):
             request=self.request,
         )
 
-        self.assertEqual(result, history_entry)
+        self.assertIsInstance(result, OrderHistory)
+        self.assertEqual(result.order, self.order)
+        self.assertEqual(result.user, self.user)
+        self.assertEqual(result.change_type, "PAYMENT")
+        self.assertEqual(result.previous_value, previous_value)
+        self.assertEqual(result.new_value, new_value)
+        self.assertIsNone(result.ip_address)
+        self.assertEqual(result.user_agent, "")
+        self.assertEqual(result.description, "Payment information updated")
 
-        mock_create.assert_called_once_with(
-            order=self.order,
-            user=self.user,
-            change_type="PAYMENT",
-            previous_value=previous_value,
-            new_value=new_value,
-            description="Payment information updated",
-            ip_address="127.0.0.1",
-            user_agent="Mozilla/5.0 (Test)",
-        )
-
-    @patch("order.models.history.OrderHistory.objects.create")
-    def test_log_payment_update_with_money_object(self, mock_create):
+    def test_log_payment_update_with_money_object(self):
         previous_value = {"paid_amount": Money("0.00", "USD")}
         new_value = {"paid_amount": Money("100.00", "USD")}
-
-        history_entry = Mock(spec=OrderHistory)
-        mock_create.return_value = history_entry
 
         result = OrderHistory.log_payment_update(
             order=self.order,
@@ -92,28 +72,22 @@ class OrderHistoryTestCase(TestCase):
             user=self.user,
         )
 
-        self.assertEqual(result, history_entry)
-
-        mock_create.assert_called_once()
-        call_kwargs = mock_create.call_args.kwargs
-        self.assertEqual(call_kwargs["order"], self.order)
-        self.assertEqual(call_kwargs["user"], self.user)
-        self.assertEqual(call_kwargs["change_type"], "PAYMENT")
+        self.assertIsInstance(result, OrderHistory)
+        self.assertEqual(result.order, self.order)
+        self.assertEqual(result.user, self.user)
+        self.assertEqual(result.change_type, "PAYMENT")
         self.assertEqual(
-            call_kwargs["previous_value"]["paid_amount"],
+            result.previous_value["paid_amount"],
             str(Money("0.00", "USD")),
         )
         self.assertEqual(
-            call_kwargs["new_value"]["paid_amount"], str(Money("100.00", "USD"))
+            result.new_value["paid_amount"], str(Money("100.00", "USD"))
         )
+        self.assertEqual(result.description, "Payment information updated")
 
-    @patch("order.models.history.OrderHistory.objects.create")
-    def test_log_shipping_update(self, mock_create):
+    def test_log_shipping_update(self):
         previous_value = {"tracking_number": None, "carrier": None}
         new_value = {"tracking_number": "TRACK123", "carrier": "FedEx"}
-
-        history_entry = Mock(spec=OrderHistory)
-        mock_create.return_value = history_entry
 
         result = OrderHistory.log_shipping_update(
             order=self.order,
@@ -123,52 +97,38 @@ class OrderHistoryTestCase(TestCase):
             request=self.request,
         )
 
-        self.assertEqual(result, history_entry)
+        self.assertIsInstance(result, OrderHistory)
+        self.assertEqual(result.order, self.order)
+        self.assertEqual(result.user, self.user)
+        self.assertEqual(result.change_type, "SHIPPING")
+        self.assertEqual(result.previous_value, previous_value)
+        self.assertEqual(result.new_value, new_value)
+        self.assertIsNone(result.ip_address)
+        self.assertEqual(result.user_agent, "")
+        self.assertEqual(result.description, "Shipping information updated")
 
-        mock_create.assert_called_once_with(
-            order=self.order,
-            user=self.user,
-            change_type="SHIPPING",
-            previous_value=previous_value,
-            new_value=new_value,
-            description="Shipping information updated",
-            ip_address="127.0.0.1",
-            user_agent="Mozilla/5.0 (Test)",
-        )
-
-    @patch("order.models.history.OrderHistory.objects.create")
-    def test_log_note(self, mock_create):
+    def test_log_note(self):
         note = "This is a test note"
-
-        history_entry = Mock(spec=OrderHistory)
-        mock_create.return_value = history_entry
 
         result = OrderHistory.log_note(
             order=self.order, note=note, user=self.user, request=self.request
         )
 
-        self.assertEqual(result, history_entry)
+        self.assertIsInstance(result, OrderHistory)
+        self.assertEqual(result.order, self.order)
+        self.assertEqual(result.user, self.user)
+        self.assertEqual(result.change_type, "NOTE")
+        self.assertEqual(result.new_value, {"note": note})
+        self.assertIsNone(result.ip_address)
+        self.assertEqual(result.user_agent, "")
+        self.assertEqual(result.description, "Note added to order")
 
-        mock_create.assert_called_once_with(
-            order=self.order,
-            user=self.user,
-            change_type="NOTE",
-            new_value={"note": note},
-            description="Note added to order",
-            ip_address="127.0.0.1",
-            user_agent="Mozilla/5.0 (Test)",
-        )
-
-    @patch("order.models.history.OrderHistory.objects.create")
-    def test_log_refund(self, mock_create):
+    def test_log_refund(self):
         refund_data = {
             "amount": {"amount": 50, "currency": "USD"},
             "reason": "Customer request",
             "transaction_id": "refund_123",
         }
-
-        history_entry = Mock(spec=OrderHistory)
-        mock_create.return_value = history_entry
 
         result = OrderHistory.log_refund(
             order=self.order,
@@ -177,34 +137,25 @@ class OrderHistoryTestCase(TestCase):
             request=self.request,
         )
 
-        self.assertEqual(result, history_entry)
-
-        mock_create.assert_called_once_with(
-            order=self.order,
-            user=self.user,
-            change_type="REFUND",
-            new_value=refund_data,
-            description=f"Refund processed for {refund_data['amount']}",
-            ip_address="127.0.0.1",
-            user_agent="Mozilla/5.0 (Test)",
+        self.assertIsInstance(result, OrderHistory)
+        self.assertEqual(result.order, self.order)
+        self.assertEqual(result.user, self.user)
+        self.assertEqual(result.change_type, "REFUND")
+        self.assertEqual(result.new_value, refund_data)
+        self.assertIsNone(result.ip_address)
+        self.assertEqual(result.user_agent, "")
+        self.assertEqual(
+            result.description, f"Refund processed for {refund_data['amount']}"
         )
 
 
+@pytest.mark.django_db
 class OrderItemHistoryTestCase(TestCase):
     def setUp(self):
-        self.order_item = Mock()
-        self.order_item.id = 1
-        self.order_item.product = Mock()
-        self.order_item.product.name = "Test Product"
+        self.order_item = OrderItemFactory()
+        self.user = None
 
-        self.user = Mock()
-        self.user.id = 42
-
-    @patch("order.models.history.OrderItemHistory.objects.create")
-    def test_log_quantity_change(self, mock_create):
-        history_entry = Mock(spec=OrderItemHistory)
-        mock_create.return_value = history_entry
-
+    def test_log_quantity_change(self):
         result = OrderItemHistory.log_quantity_change(
             order_item=self.order_item,
             previous_quantity=1,
@@ -213,24 +164,20 @@ class OrderItemHistoryTestCase(TestCase):
             reason="Customer request",
         )
 
-        self.assertEqual(result, history_entry)
-
-        mock_create.assert_called_once_with(
-            order_item=self.order_item,
-            user=self.user,
-            change_type="QUANTITY",
-            previous_value={"quantity": 1},
-            new_value={"quantity": 2},
-            description="Quantity changed from 1 to 2. Reason: Customer request",
+        self.assertIsInstance(result, OrderItemHistory)
+        self.assertEqual(result.order_item, self.order_item)
+        self.assertEqual(result.user, self.user)
+        self.assertEqual(result.change_type, "QUANTITY")
+        self.assertEqual(result.previous_value, {"quantity": 1})
+        self.assertEqual(result.new_value, {"quantity": 2})
+        self.assertEqual(
+            result.description,
+            "Quantity changed from 1 to 2. Reason: Customer request",
         )
 
-    @patch("order.models.history.OrderItemHistory.objects.create")
-    def test_log_price_update(self, mock_create):
+    def test_log_price_update(self):
         previous_price = Money("50.00", "USD")
         new_price = Money("45.00", "USD")
-
-        history_entry = Mock(spec=OrderItemHistory)
-        mock_create.return_value = history_entry
 
         result = OrderItemHistory.log_price_update(
             order_item=self.order_item,
@@ -240,22 +187,22 @@ class OrderItemHistoryTestCase(TestCase):
             reason="Price adjustment",
         )
 
-        self.assertEqual(result, history_entry)
+        self.assertIsInstance(result, OrderItemHistory)
+        self.assertEqual(result.order_item, self.order_item)
+        self.assertEqual(result.user, self.user)
+        self.assertEqual(result.change_type, "PRICE")
+        self.assertEqual(
+            result.previous_value["price"], float(previous_price.amount)
+        )
+        self.assertEqual(
+            result.previous_value["currency"], str(previous_price.currency)
+        )
+        self.assertEqual(result.new_value["price"], float(new_price.amount))
+        self.assertEqual(result.new_value["currency"], str(new_price.currency))
+        self.assertIn("Price updated from", result.description)
+        self.assertIn("Price adjustment", result.description)
 
-        mock_create.assert_called_once()
-        call_kwargs = mock_create.call_args.kwargs
-        self.assertEqual(call_kwargs["order_item"], self.order_item)
-        self.assertEqual(call_kwargs["user"], self.user)
-        self.assertEqual(call_kwargs["change_type"], "PRICE")
-        self.assertIn("Price updated from", call_kwargs["description"])
-
-    @patch("order.models.history.OrderItemHistory.objects.create")
-    def test_log_refund(self, mock_create):
-        self.order_item.price = Money("50.00", "USD")
-
-        history_entry = Mock(spec=OrderItemHistory)
-        mock_create.return_value = history_entry
-
+    def test_log_refund(self):
         result = OrderItemHistory.log_refund(
             order_item=self.order_item,
             refund_quantity=1,
@@ -263,12 +210,12 @@ class OrderItemHistoryTestCase(TestCase):
             reason="Damaged item",
         )
 
-        self.assertEqual(result, history_entry)
-
-        mock_create.assert_called_once()
-        call_kwargs = mock_create.call_args.kwargs
-        self.assertEqual(call_kwargs["order_item"], self.order_item)
-        self.assertEqual(call_kwargs["user"], self.user)
-        self.assertEqual(call_kwargs["change_type"], "REFUND")
-        self.assertEqual(call_kwargs["new_value"]["refund_quantity"], 1)
-        self.assertIn("refund_amount", call_kwargs["new_value"])
+        self.assertIsInstance(result, OrderItemHistory)
+        self.assertEqual(result.order_item, self.order_item)
+        self.assertEqual(result.user, self.user)
+        self.assertEqual(result.change_type, "REFUND")
+        self.assertEqual(result.new_value["refund_quantity"], 1)
+        self.assertIn("refund_amount", result.new_value)
+        self.assertEqual(result.new_value["currency"], "USD")
+        self.assertIn("Refund processed for 1 items", result.description)
+        self.assertIn("Damaged item", result.description)

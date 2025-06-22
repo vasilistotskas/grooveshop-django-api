@@ -33,7 +33,7 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
     refunded_quantity = models.IntegerField(_("Refunded Quantity"), default=0)
     notes = models.TextField(_("Notes"), blank=True, default="")
 
-    objects = OrderItemManager()
+    objects: OrderItemManager = OrderItemManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Order Item")

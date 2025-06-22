@@ -4,6 +4,7 @@ from datetime import timedelta
 
 import factory
 from django.apps import apps
+from django.contrib.auth import get_user_model
 from django.db.models import Count
 from django.utils import timezone
 from djmoney.money import Money
@@ -12,18 +13,16 @@ from phonenumber_field.phonenumber import PhoneNumber
 
 from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from order.enum.document_type import OrderDocumentTypeEnum
-from order.enum.status import OrderStatusEnum, PaymentStatusEnum
+from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.item import OrderItemFactory
 from order.models.order import Order
+
+User = get_user_model()
 
 fake = Faker()
 
 
 def get_or_create_user():
-    from django.contrib.auth import get_user_model
-
-    User = get_user_model()
-
     if User.objects.exists():
         user = (
             User.objects.annotate(num_orders=Count("orders"))
@@ -97,13 +96,13 @@ def generate_payment_data(status=None):
 
     if not status:
         if random.randint(1, 10) > 2:
-            status = PaymentStatusEnum.COMPLETED
+            status = PaymentStatus.COMPLETED
         else:
             status = random.choice(
                 [
-                    PaymentStatusEnum.PENDING,
-                    PaymentStatusEnum.PROCESSING,
-                    PaymentStatusEnum.FAILED,
+                    PaymentStatus.PENDING,
+                    PaymentStatus.PROCESSING,
+                    PaymentStatus.FAILED,
                 ]
             )
 
@@ -149,7 +148,7 @@ class OrderFactory(factory.django.DjangoModelFactory):
         else ""
     )
     status = factory.LazyFunction(
-        lambda: random.choice([s[0] for s in OrderStatusEnum.choices])
+        lambda: random.choice([s[0] for s in OrderStatus.choices])
     )
     shipping_price = factory.LazyFunction(
         lambda: Money(
@@ -181,7 +180,7 @@ class OrderFactory(factory.django.DjangoModelFactory):
         else Money(0, "USD")
     )
     payment_status = factory.LazyFunction(
-        lambda: random.choice([s[0] for s in PaymentStatusEnum.choices])
+        lambda: random.choice([s[0] for s in PaymentStatus.choices])
     )
     payment_id = factory.LazyFunction(
         lambda: f"payment_{fake.uuid4()}" if random.randint(1, 10) > 3 else ""
@@ -217,8 +216,9 @@ class OrderFactory(factory.django.DjangoModelFactory):
         if not create:
             return
 
-        if extracted:
-            OrderItemFactory.create_batch(extracted, order=self)
+        if extracted is not None:
+            if extracted > 0:
+                OrderItemFactory.create_batch(extracted, order=self)
         else:
             count = random.randint(1, 5)
             OrderItemFactory.create_batch_for_order(order=self, count=count)
@@ -226,17 +226,17 @@ class OrderFactory(factory.django.DjangoModelFactory):
     @classmethod
     def create_with_consistent_status_data(cls, status=None, **kwargs):
         if status is None:
-            status = random.choice([s[0] for s in OrderStatusEnum.choices])
+            status = random.choice([s[0] for s in OrderStatus.choices])
 
         now = timezone.now()
         data = {"status": status, "status_updated_at": now, **kwargs}
 
         if status in [
-            OrderStatusEnum.COMPLETED,
-            OrderStatusEnum.SHIPPED,
-            OrderStatusEnum.DELIVERED,
+            OrderStatus.COMPLETED,
+            OrderStatus.SHIPPED,
+            OrderStatus.DELIVERED,
         ]:
-            payment_data = generate_payment_data(PaymentStatusEnum.COMPLETED)
+            payment_data = generate_payment_data(PaymentStatus.COMPLETED)
             data.update(payment_data)
             data["paid_amount"] = Money(
                 fake.pydecimal(
@@ -248,19 +248,19 @@ class OrderFactory(factory.django.DjangoModelFactory):
                 ),
                 "USD",
             )
-        elif status == OrderStatusEnum.CANCELED:
+        elif status == OrderStatus.CANCELED:
             payment_status = random.choice(
                 [
-                    PaymentStatusEnum.FAILED,
-                    PaymentStatusEnum.CANCELED,
+                    PaymentStatus.FAILED,
+                    PaymentStatus.CANCELED,
                     "",
                 ]
             )
             if payment_status:
                 payment_data = generate_payment_data(payment_status)
                 data.update(payment_data)
-        elif status == OrderStatusEnum.REFUNDED:
-            payment_data = generate_payment_data(PaymentStatusEnum.REFUNDED)
+        elif status == OrderStatus.REFUNDED:
+            payment_data = generate_payment_data(PaymentStatus.REFUNDED)
             data.update(payment_data)
             data["paid_amount"] = Money(
                 fake.pydecimal(
@@ -273,7 +273,7 @@ class OrderFactory(factory.django.DjangoModelFactory):
                 "USD",
             )
 
-        if status in [OrderStatusEnum.SHIPPED, OrderStatusEnum.DELIVERED]:
+        if status in [OrderStatus.SHIPPED, OrderStatus.DELIVERED]:
             tracking_number = generate_tracking_number()
             carrier = (
                 tracking_number.split("-")[0]
@@ -289,42 +289,42 @@ class OrderFactory(factory.django.DjangoModelFactory):
     @classmethod
     def create_pending_order(cls, **kwargs):
         return cls.create_with_consistent_status_data(
-            status=OrderStatusEnum.PENDING,
-            payment_status=PaymentStatusEnum.PENDING,
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
             **kwargs,
         )
 
     @classmethod
     def create_processing_order(cls, **kwargs):
         return cls.create_with_consistent_status_data(
-            status=OrderStatusEnum.PROCESSING,
-            payment_status=PaymentStatusEnum.COMPLETED,
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.COMPLETED,
             **kwargs,
         )
 
     @classmethod
     def create_shipped_order(cls, **kwargs):
         return cls.create_with_consistent_status_data(
-            status=OrderStatusEnum.SHIPPED, **kwargs
+            status=OrderStatus.SHIPPED, **kwargs
         )
 
     @classmethod
     def create_completed_order(cls, **kwargs):
         return cls.create_with_consistent_status_data(
-            status=OrderStatusEnum.COMPLETED, **kwargs
+            status=OrderStatus.COMPLETED, **kwargs
         )
 
     @classmethod
     def create_canceled_order(cls, **kwargs):
         return cls.create_with_consistent_status_data(
-            status=OrderStatusEnum.CANCELED, **kwargs
+            status=OrderStatus.CANCELED, **kwargs
         )
 
     @classmethod
     def create_refunded_order(cls, **kwargs):
         order = cls.create_with_consistent_status_data(
-            status=OrderStatusEnum.REFUNDED,
-            payment_status=PaymentStatusEnum.REFUNDED,
+            status=OrderStatus.REFUNDED,
+            payment_status=PaymentStatus.REFUNDED,
             **kwargs,
         )
 

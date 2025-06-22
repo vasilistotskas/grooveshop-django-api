@@ -11,7 +11,7 @@ from region.factories import RegionFactory
 from user.factories.account import UserAccountFactory
 from user.factories.address import UserAddressFactory
 from user.models.address import UserAddress
-from user.serializers.address import UserAddressSerializer
+from user.serializers.address import UserAddressDetailSerializer
 
 languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
@@ -21,9 +21,6 @@ User = get_user_model()
 
 
 class UserAddressViewSetTestCase(APITestCase):
-    user: User = None
-    address: UserAddress = None
-
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
         self.country = CountryFactory(
@@ -42,23 +39,20 @@ class UserAddressViewSetTestCase(APITestCase):
             is_main=False,
         )
 
-    @staticmethod
-    def get_user_address_detail_url(pk):
+    def get_user_address_detail_url(self, pk):
         return reverse("user-address-detail", kwargs={"pk": pk})
 
-    @staticmethod
-    def get_user_address_list_url():
+    def get_user_address_list_url(self):
         return reverse("user-address-list")
 
-    @staticmethod
-    def get_user_address_set_main_url(pk):
+    def get_user_address_set_main_url(self, pk):
         return reverse("user-address-set-main", kwargs={"pk": pk})
 
     def test_list(self):
         url = self.get_user_address_list_url()
         response = self.client.get(url)
         user_addresses = UserAddress.objects.all()
-        serializer = UserAddressSerializer(user_addresses, many=True)
+        serializer = UserAddressDetailSerializer(user_addresses, many=True)
 
         self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -105,7 +99,7 @@ class UserAddressViewSetTestCase(APITestCase):
         url = self.get_user_address_detail_url(self.address.pk)
         response = self.client.get(url)
         addresses = UserAddress.objects.get(pk=self.address.pk)
-        serializer = UserAddressSerializer(addresses)
+        serializer = UserAddressDetailSerializer(addresses)
 
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)

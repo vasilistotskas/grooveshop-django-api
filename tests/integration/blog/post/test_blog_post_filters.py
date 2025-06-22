@@ -75,8 +75,7 @@ class BlogPostFilterTestCase(APITestCase):
         self.average_post.refresh_from_db()
         self.unpopular_post.refresh_from_db()
 
-    @staticmethod
-    def get_post_list_url():
+    def get_post_list_url(self):
         return reverse("blog-post-list")
 
     def test_filter_by_min_likes(self):

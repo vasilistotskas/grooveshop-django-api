@@ -1,5 +1,3 @@
-import os
-
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -11,6 +9,7 @@ from tinymce.models import HTMLField
 
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
 from core.utils.generators import SlugifyConfig, unique_slugify
+from product.enum.category import CategoryImageTypeEnum
 from product.managers.category import CategoryManager
 from product.models.product import Product
 from seo.models import SeoModel
@@ -27,24 +26,6 @@ class ProductCategory(
     id = models.BigAutoField(primary_key=True)
     slug = models.SlugField(_("Slug"), max_length=255, unique=True)
     active = models.BooleanField(_("Active"), default=True)
-    menu_image_one = models.ImageField(
-        _("Menu Image One"),
-        upload_to="uploads/categories/",
-        null=True,
-        blank=True,
-    )
-    menu_image_two = models.ImageField(
-        _("Menu Image Two"),
-        upload_to="uploads/categories/",
-        null=True,
-        blank=True,
-    )
-    menu_main_banner = models.ImageField(
-        _("Menu Main Banner"),
-        upload_to="uploads/categories/",
-        null=True,
-        blank=True,
-    )
     parent = TreeForeignKey(
         "self",
         blank=True,
@@ -57,7 +38,7 @@ class ProductCategory(
         description=HTMLField(_("Description"), blank=True, null=True),
     )
 
-    objects = CategoryManager()
+    objects: CategoryManager = CategoryManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Product Category")
@@ -105,25 +86,69 @@ class ProductCategory(
         ).count()
 
     @property
-    def absolute_url(self) -> str:
-        return f"/product/category/{self.id}/" + "/".join(
-            [x["slug"] for x in self.get_ancestors(include_self=True).values()]
-        )
+    def main_image(self):
+        from product.models.category_image import ProductCategoryImage  # noqa: PLC0415, I001
+
+        return ProductCategoryImage.get_main_image(self)
+
+    @property
+    def banner_image(self):
+        from product.models.category_image import ProductCategoryImage  # noqa: PLC0415, I001
+
+        return ProductCategoryImage.get_banner_image(self)
+
+    @property
+    def icon_image(self):
+        from product.models.category_image import ProductCategoryImage  # noqa: PLC0415, I001
+
+        return ProductCategoryImage.get_icon_image(self)
+
+    @property
+    def main_image_path(self) -> str:
+        main_img = self.main_image
+        return main_img.image_path if main_img else ""
+
+    @property
+    def banner_image_path(self) -> str:
+        banner_img = self.banner_image
+        return banner_img.image_path if banner_img else ""
+
+    @property
+    def icon_image_path(self) -> str:
+        icon_img = self.icon_image
+        return icon_img.image_path if icon_img else ""
+
+    @property
+    def main_image_url(self) -> str:
+        main_img = self.main_image
+        return main_img.image_url if main_img else ""
+
+    @property
+    def banner_image_url(self) -> str:
+        banner_img = self.banner_image
+        return banner_img.image_url if banner_img else ""
+
+    @property
+    def icon_image_url(self) -> str:
+        icon_img = self.icon_image
+        return icon_img.image_url if icon_img else ""
 
     @property
     def category_menu_image_one_path(self) -> str:
-        if self.menu_image_one:
-            return f"media/uploads/categories/{os.path.basename(self.menu_image_one.name)}"
-        return ""
+        return self.main_image_path
 
     @property
     def category_menu_image_two_path(self) -> str:
-        if self.menu_image_two:
-            return f"media/uploads/categories/{os.path.basename(self.menu_image_two.name)}"
-        return ""
+        return self.banner_image_path
 
     @property
     def category_menu_main_banner_path(self) -> str:
-        if self.menu_main_banner:
-            return f"media/uploads/categories/{os.path.basename(self.menu_main_banner.name)}"
-        return ""
+        return self.banner_image_path
+
+    def get_image_by_type(self, image_type: CategoryImageTypeEnum):
+        from product.models.category_image import ProductCategoryImage  # noqa: PLC0415, I001
+
+        return ProductCategoryImage.get_image_by_type(self, image_type)
+
+    def get_all_images(self):
+        return self.images.active()

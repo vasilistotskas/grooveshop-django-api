@@ -6,8 +6,8 @@ from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel, TranslatedFields
 
 from core.models import PublishableModel, TimeStampMixinModel, UUIDModel
-from product.enum.review import RateEnum, ReviewStatusEnum
-from product.managers.review import ReviewManager
+from product.enum.review import RateEnum, ReviewStatus
+from product.managers.review import ProductReviewManager
 
 
 class ProductReview(
@@ -28,14 +28,14 @@ class ProductReview(
     status = models.CharField(
         _("Status"),
         max_length=250,
-        choices=ReviewStatusEnum,
-        default=ReviewStatusEnum.NEW,
+        choices=ReviewStatus,
+        default=ReviewStatus.NEW,
     )
     translations = TranslatedFields(
         comment=models.TextField(_("Comment"), blank=True, null=True)
     )
 
-    objects: ReviewManager = ReviewManager()  # type: ignore[misc]
+    objects: ProductReviewManager = ProductReviewManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Product Review")

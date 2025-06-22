@@ -3,7 +3,7 @@ from unittest import TestCase, mock
 
 from djmoney.money import Money
 
-from order.enum.status import PaymentStatusEnum
+from order.enum.status import PaymentStatus
 from order.payment import (
     PayPalPaymentProvider,
     StripePaymentProvider,
@@ -13,15 +13,15 @@ from order.payment import (
 
 class PaymentModuleTestCase(TestCase):
     def test_payment_status_enum(self):
-        self.assertEqual(PaymentStatusEnum.PENDING.value, "PENDING")
-        self.assertEqual(PaymentStatusEnum.PROCESSING.value, "PROCESSING")
-        self.assertEqual(PaymentStatusEnum.COMPLETED.value, "COMPLETED")
-        self.assertEqual(PaymentStatusEnum.FAILED.value, "FAILED")
-        self.assertEqual(PaymentStatusEnum.REFUNDED.value, "REFUNDED")
+        self.assertEqual(PaymentStatus.PENDING.value, "PENDING")
+        self.assertEqual(PaymentStatus.PROCESSING.value, "PROCESSING")
+        self.assertEqual(PaymentStatus.COMPLETED.value, "COMPLETED")
+        self.assertEqual(PaymentStatus.FAILED.value, "FAILED")
+        self.assertEqual(PaymentStatus.REFUNDED.value, "REFUNDED")
         self.assertEqual(
-            PaymentStatusEnum.PARTIALLY_REFUNDED.value, "PARTIALLY_REFUNDED"
+            PaymentStatus.PARTIALLY_REFUNDED.value, "PARTIALLY_REFUNDED"
         )
-        self.assertEqual(PaymentStatusEnum.CANCELED.value, "CANCELED")
+        self.assertEqual(PaymentStatus.CANCELED.value, "CANCELED")
 
     @mock.patch("order.payment.settings")
     def test_stripe_payment_provider_init(self, mock_settings):
@@ -53,7 +53,7 @@ class PaymentModuleTestCase(TestCase):
 
         self.assertTrue(success)
         self.assertEqual(payment_data["payment_id"], f"pi_{order_id}_mock")
-        self.assertEqual(payment_data["status"], PaymentStatusEnum.COMPLETED)
+        self.assertEqual(payment_data["status"], PaymentStatus.COMPLETED)
         self.assertEqual(payment_data["amount"], str(amount.amount))
         self.assertEqual(payment_data["currency"], amount.currency)
         self.assertEqual(payment_data["provider"], "stripe")
@@ -70,7 +70,7 @@ class PaymentModuleTestCase(TestCase):
 
         self.assertTrue(success)
         self.assertEqual(payment_data["payment_id"], f"PP_{order_id}_mock")
-        self.assertEqual(payment_data["status"], PaymentStatusEnum.COMPLETED)
+        self.assertEqual(payment_data["status"], PaymentStatus.COMPLETED)
         self.assertEqual(payment_data["amount"], str(amount.amount))
         self.assertEqual(payment_data["currency"], amount.currency)
         self.assertEqual(payment_data["provider"], "paypal")
@@ -87,7 +87,7 @@ class PaymentModuleTestCase(TestCase):
 
         self.assertTrue(success)
         self.assertEqual(refund_data["refund_id"], f"re_{payment_id}_mock")
-        self.assertEqual(refund_data["status"], PaymentStatusEnum.REFUNDED)
+        self.assertEqual(refund_data["status"], PaymentStatus.REFUNDED)
         self.assertEqual(refund_data["amount"], str(amount.amount))
         self.assertEqual(refund_data["payment_id"], payment_id)
 
@@ -100,7 +100,7 @@ class PaymentModuleTestCase(TestCase):
 
         status, status_data = provider.get_payment_status(payment_id)
 
-        self.assertEqual(status, PaymentStatusEnum.COMPLETED)
+        self.assertEqual(status, PaymentStatus.COMPLETED)
         self.assertEqual(status_data["payment_id"], payment_id)
         self.assertEqual(status_data["raw_status"], "succeeded")
         self.assertEqual(status_data["provider"], "stripe")

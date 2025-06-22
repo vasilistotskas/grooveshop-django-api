@@ -15,8 +15,8 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
 
 
-class RegionListSerializer(
-    TranslatableModelSerializer, serializers.ModelSerializer
+class RegionSerializer(
+    TranslatableModelSerializer, serializers.ModelSerializer[Region]
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=Region)
     country = PrimaryKeyRelatedField(queryset=Country.objects.all())
@@ -39,19 +39,18 @@ class RegionListSerializer(
         )
 
 
-class RegionDetailSerializer(RegionListSerializer):
-    class Meta(RegionListSerializer.Meta):
-        fields = (*RegionListSerializer.Meta.fields,)
+class RegionDetailSerializer(RegionSerializer):
+    class Meta(RegionSerializer.Meta):
+        fields = (*RegionSerializer.Meta.fields,)
 
 
 class RegionWriteSerializer(
-    TranslatableModelSerializer, serializers.ModelSerializer
+    TranslatableModelSerializer, serializers.ModelSerializer[Region]
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=Region)
     country = PrimaryKeyRelatedField(queryset=Country.objects.all())
 
-    @staticmethod
-    def validate_alpha(value):
+    def validate_alpha(self, value):
         if value and len(value) > 10:
             raise serializers.ValidationError(
                 _("Region alpha code should be 10 characters or less.")

@@ -1,7 +1,7 @@
 import decimal
 
 from django.test import TestCase
-from measurement.measures import Distance, Temperature, Weight
+from measurement.measures import Distance, Speed, Temperature, Weight
 from rest_framework import serializers
 
 from core.api.serializers import MeasurementSerializerField
@@ -111,8 +111,6 @@ class MeasurementSerializerFieldTest(TestCase):
         self.assertEqual(cm.exception.detail[0].code, "invalid_value")
 
     def test_bidimensional_measure(self):
-        from measurement.measures import Speed
-
         speed_field = MeasurementSerializerField(measurement=Speed)
 
         speed = Speed(kph=100)

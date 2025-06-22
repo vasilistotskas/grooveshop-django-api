@@ -7,9 +7,6 @@ from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 
 
 class PascalSnakeCaseOrderingFilterTest(APITestCase):
-    view: BlogPostViewSet = None
-    filter: PascalSnakeCaseOrderingFilter = None
-
     def setUp(self):
         self.view = BlogPostViewSet.as_view({"get": "list"})
         self.filter = PascalSnakeCaseOrderingFilter()

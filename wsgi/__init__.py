@@ -1,6 +1,7 @@
 import io
 import os
 
+from django.conf import settings
 from django.core.wsgi import get_wsgi_application
 from django.utils.functional import SimpleLazyObject
 
@@ -10,8 +11,6 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
 
 def get_allowed_host_lazy():
-    from django.conf import settings
-
     return settings.ALLOWED_HOSTS[0]
 
 

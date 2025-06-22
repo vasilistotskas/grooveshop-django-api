@@ -4,6 +4,7 @@ from parler_rest.serializers import (
     TranslatableModelSerializer,
 )
 from rest_framework import serializers
+from rest_framework.relations import PrimaryKeyRelatedField
 
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
@@ -15,8 +16,8 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
 
 
-class CountryListSerializer(
-    TranslatableModelSerializer, serializers.ModelSerializer
+class CountrySerializer(
+    TranslatableModelSerializer, serializers.ModelSerializer[Country]
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=Country)
 
@@ -42,49 +43,43 @@ class CountryListSerializer(
         )
 
 
-class CountryDetailSerializer(CountryListSerializer):
-    regions = serializers.SerializerMethodField(
-        help_text="Administrative regions/states"
-    )
+class CountryDetailSerializer(CountrySerializer):
+    regions = PrimaryKeyRelatedField(many=True, read_only=True)
 
-    class Meta(CountryListSerializer.Meta):
+    class Meta(CountrySerializer.Meta):
         fields = (
-            *CountryListSerializer.Meta.fields,
+            *CountrySerializer.Meta.fields,
             "regions",
         )
 
 
 class CountryWriteSerializer(
-    TranslatableModelSerializer, serializers.ModelSerializer
+    TranslatableModelSerializer, serializers.ModelSerializer[Country]
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=Country)
 
-    @staticmethod
-    def validate_alpha_2(value):
+    def validate_alpha_2(self, value):
         if len(value) != 2:
             raise serializers.ValidationError(
                 _("Alpha-2 code must be exactly 2 characters.")
             )
         return value.upper()
 
-    @staticmethod
-    def validate_alpha_3(value):
+    def validate_alpha_3(self, value):
         if len(value) != 3:
             raise serializers.ValidationError(
                 _("Alpha-3 code must be exactly 3 characters.")
             )
         return value.upper()
 
-    @staticmethod
-    def validate_phone_code(value):
+    def validate_phone_code(self, value):
         if value is not None and (value <= 0 or value > 9999):
             raise serializers.ValidationError(
                 _("Phone code must be between 1 and 9999.")
             )
         return value
 
-    @staticmethod
-    def validate_iso_cc(value):
+    def validate_iso_cc(self, value):
         if value is not None and (value <= 0 or value > 999):
             raise serializers.ValidationError(
                 _("ISO country code must be between 1 and 999.")

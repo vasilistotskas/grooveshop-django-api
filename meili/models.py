@@ -1,8 +1,10 @@
 import logging
 from collections.abc import Iterable
+from json import loads
 from typing import Any, TypedDict
 
 from django.conf import settings
+from django.core.serializers import serialize
 from django.db import models
 from django.db.models.fields import Field
 from meilisearch.models.task import Task, TaskInfo
@@ -139,10 +141,6 @@ class IndexMixin(models.Model):
         return {}
 
     def meili_serialize(self):
-        from json import loads
-
-        from django.core.serializers import serialize
-
         serialized_model = loads(
             serialize(
                 "json",

@@ -1,11 +1,13 @@
 from django.contrib.auth import get_user_model
+from django.db import models
 from django.utils.translation import gettext_lazy as _
+from drf_spectacular.helpers import lazy_serializer
 from drf_spectacular.utils import extend_schema_field
 from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
-from rest_framework.utils.serializer_helpers import ReturnDict
 
+from authentication.serializers import AuthenticationSerializer
 from blog.models.author import BlogAuthor
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
@@ -18,7 +20,7 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
 
 
-class BlogAuthorListSerializer(
+class BlogAuthorSerializer(
     TranslatableModelSerializer,
     serializers.ModelSerializer[BlogAuthor],
 ):
@@ -47,34 +49,39 @@ class BlogAuthorListSerializer(
         )
 
 
-class BlogAuthorDetailSerializer(BlogAuthorListSerializer):
+class BlogAuthorDetailSerializer(BlogAuthorSerializer):
+    user = AuthenticationSerializer(read_only=True)
     recent_posts = serializers.SerializerMethodField()
     top_posts = serializers.SerializerMethodField()
 
-    class Meta(BlogAuthorListSerializer.Meta):
+    class Meta(BlogAuthorSerializer.Meta):
         fields = (
-            *BlogAuthorListSerializer.Meta.fields,
+            *BlogAuthorSerializer.Meta.fields,
             "recent_posts",
             "top_posts",
         )
 
-    def get_recent_posts(self, obj: BlogAuthor) -> ReturnDict:
-        from blog.serializers.post import BlogPostListSerializer
+    @extend_schema_field(
+        lazy_serializer("blog.serializers.post.BlogPostSerializer")(many=True)
+    )
+    def get_recent_posts(self, obj: BlogAuthor):
+        from blog.serializers.post import BlogPostSerializer  # noqa: PLC0415, I001
 
         recent_posts = obj.blog_posts.order_by("-created_at")[:3]
-        return BlogPostListSerializer(
+        return BlogPostSerializer(
             recent_posts, many=True, context=self.context
         ).data
 
-    def get_top_posts(self, obj: BlogAuthor) -> ReturnDict:
-        from django.db import models
-
-        from blog.serializers.post import BlogPostListSerializer
+    @extend_schema_field(
+        lazy_serializer("blog.serializers.post.BlogPostSerializer")(many=True)
+    )
+    def get_top_posts(self, obj: BlogAuthor):
+        from blog.serializers.post import BlogPostSerializer  # noqa: PLC0415, I001
 
         top_posts = obj.blog_posts.annotate(
             likes_count_annotation=models.Count("likes")
         ).order_by("-view_count", "-likes_count_annotation")[:3]
-        return BlogPostListSerializer(
+        return BlogPostSerializer(
             top_posts, many=True, context=self.context
         ).data
 
@@ -104,8 +111,7 @@ class BlogAuthorWriteSerializer(
             )
         return value
 
-    @staticmethod
-    def validate_website(value: str) -> str:
+    def validate_website(self, value: str) -> str:
         if value and not (
             value.startswith("http://") or value.startswith("https://")
         ):

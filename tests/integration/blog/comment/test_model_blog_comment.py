@@ -5,25 +5,17 @@ from django.test import TestCase
 from blog.factories.author import BlogAuthorFactory
 from blog.factories.comment import BlogCommentFactory
 from blog.factories.post import BlogPostFactory
-from blog.models.author import BlogAuthor
-from blog.models.comment import BlogComment
-from blog.models.post import BlogPost
 from user.factories.account import UserAccountFactory
 
 languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
 ]
-default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
+default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
 
 
 class BlogCommentModelTestCase(TestCase):
-    comment: BlogComment = None
-    user: User = None
-    author: BlogAuthor = None
-    post: BlogPost = None
-
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
         self.author = BlogAuthorFactory(user=self.user)

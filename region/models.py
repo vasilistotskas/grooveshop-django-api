@@ -19,7 +19,7 @@ class Region(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         name=models.CharField(_("Name"), max_length=100, blank=True, null=True)
     )
 
-    objects = RegionManager()
+    objects: RegionManager = RegionManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Region")

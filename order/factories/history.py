@@ -1,10 +1,11 @@
 import random
 
 import factory
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from faker import Faker
 
-from order.enum.status import OrderStatusEnum, PaymentStatusEnum
+from order.enum.status import OrderStatus, PaymentStatus
 from order.models.history import OrderHistory, OrderItemHistory
 
 fake = Faker()
@@ -37,7 +38,7 @@ class OrderHistoryFactory(factory.django.DjangoModelFactory):
     previous_value = factory.LazyFunction(
         lambda: {
             "status": random.choice(
-                [choice[0] for choice in OrderStatusEnum.choices]
+                [choice[0] for choice in OrderStatus.choices]
             )
         }
         if random.choice([True, False])
@@ -46,13 +47,12 @@ class OrderHistoryFactory(factory.django.DjangoModelFactory):
     new_value = factory.LazyFunction(
         lambda: {
             "status": random.choice(
-                [choice[0] for choice in OrderStatusEnum.choices]
+                [choice[0] for choice in OrderStatus.choices]
             )
         }
         if random.choice([True, False])
         else {"note": fake.sentence()}
     )
-    description = factory.LazyFunction(lambda: fake.sentence())
     ip_address = factory.Faker("ipv4")
     user_agent = factory.LazyFunction(get_fake_useragent)
 
@@ -61,49 +61,74 @@ class OrderHistoryFactory(factory.django.DjangoModelFactory):
         skip_postgeneration_save = True
 
     @factory.post_generation
+    def set_translatable_fields(self, create, extracted, **kwargs):
+        if not create:
+            return
+
+        available_languages = [
+            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+        ]
+
+        description_text = fake.sentence()
+
+        for lang_code in available_languages:
+            self.set_current_language(lang_code)
+            self.description = description_text
+
+    @factory.post_generation
     def set_change_type_specific_data(self, create, extracted, **kwargs):
         if not create:
             return
 
+        available_languages = [
+            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+        ]
+
+        description_text = ""
+
         if self.change_type == "STATUS":
             old_status = random.choice(
-                [choice[0] for choice in OrderStatusEnum.choices]
+                [choice[0] for choice in OrderStatus.choices]
             )
             new_status = random.choice(
-                [choice[0] for choice in OrderStatusEnum.choices]
+                [choice[0] for choice in OrderStatus.choices]
             )
             while new_status == old_status:
                 new_status = random.choice(
-                    [choice[0] for choice in OrderStatusEnum.choices]
+                    [choice[0] for choice in OrderStatus.choices]
                 )
 
             self.previous_value = {"status": old_status}
             self.new_value = {"status": new_status}
-            self.description = (
+            description_text = (
                 f"Status changed from {old_status} to {new_status}"
             )
 
         elif self.change_type == "PAYMENT":
             old_payment_status = random.choice(
-                [choice[0] for choice in PaymentStatusEnum.choices]
+                [choice[0] for choice in PaymentStatus.choices]
             )
             new_payment_status = random.choice(
-                [choice[0] for choice in PaymentStatusEnum.choices]
+                [choice[0] for choice in PaymentStatus.choices]
             )
 
             self.previous_value = {"payment_status": old_payment_status}
             self.new_value = {"payment_status": new_payment_status}
-            self.description = f"Payment status updated from {old_payment_status} to {new_payment_status}"
+            description_text = f"Payment status updated from {old_payment_status} to {new_payment_status}"
 
         elif self.change_type == "NOTE":
             self.previous_value = None
             self.new_value = {"note": fake.paragraph()}
-            self.description = "Note added to order"
+            description_text = "Note added to order"
 
         elif self.change_type == "REFUND":
             amount = f"${random.randint(5, 100)}.{random.randint(0, 99):02d}"
             self.new_value = {"amount": amount, "reason": fake.sentence()}
-            self.description = f"Refund processed for {amount}"
+            description_text = f"Refund processed for {amount}"
+
+        for lang_code in available_languages:
+            self.set_current_language(lang_code)
+            self.description = description_text
 
         self.save()
 
@@ -111,60 +136,93 @@ class OrderHistoryFactory(factory.django.DjangoModelFactory):
     def create_status_change(cls, order=None, **kwargs):
         old_status = kwargs.pop(
             "old_status",
-            random.choice([choice[0] for choice in OrderStatusEnum.choices]),
+            random.choice([choice[0] for choice in OrderStatus.choices]),
         )
         new_status = kwargs.pop(
             "new_status",
-            random.choice([choice[0] for choice in OrderStatusEnum.choices]),
+            random.choice([choice[0] for choice in OrderStatus.choices]),
         )
 
         while new_status == old_status:
             new_status = random.choice(
-                [choice[0] for choice in OrderStatusEnum.choices]
+                [choice[0] for choice in OrderStatus.choices]
             )
 
-        return cls.create(
+        instance = cls.create(
             order=order,
             change_type="STATUS",
             previous_value={"status": old_status},
             new_value={"status": new_status},
-            description=f"Status changed from {old_status} to {new_status}",
             **kwargs,
         )
+
+        available_languages = [
+            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+        ]
+        description_text = f"Status changed from {old_status} to {new_status}"
+
+        for lang_code in available_languages:
+            instance.set_current_language(lang_code)
+            instance.description = description_text
+        instance.save()
+
+        return instance
 
     @classmethod
     def create_payment_update(cls, order=None, **kwargs):
         old_payment_status = kwargs.pop(
             "old_payment_status",
-            random.choice([choice[0] for choice in PaymentStatusEnum.choices]),
+            random.choice([choice[0] for choice in PaymentStatus.choices]),
         )
         new_payment_status = kwargs.pop(
             "new_payment_status",
-            random.choice([choice[0] for choice in PaymentStatusEnum.choices]),
+            random.choice([choice[0] for choice in PaymentStatus.choices]),
         )
 
-        return cls.create(
+        instance = cls.create(
             order=order,
             change_type="PAYMENT",
             previous_value={"payment_status": old_payment_status},
             new_value={"payment_status": new_payment_status},
-            description=f"Payment status updated from {old_payment_status} to {new_payment_status}",
             **kwargs,
         )
+
+        available_languages = [
+            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+        ]
+        description_text = f"Payment status updated from {old_payment_status} to {new_payment_status}"
+
+        for lang_code in available_languages:
+            instance.set_current_language(lang_code)
+            instance.description = description_text
+        instance.save()
+
+        return instance
 
     @classmethod
     def create_note(cls, order=None, note=None, **kwargs):
         if not note:
             note = fake.paragraph()
 
-        return cls.create(
+        instance = cls.create(
             order=order,
             change_type="NOTE",
             previous_value=None,
             new_value={"note": note},
-            description="Note added to order",
             **kwargs,
         )
+
+        available_languages = [
+            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+        ]
+        description_text = "Note added to order"
+
+        for lang_code in available_languages:
+            instance.set_current_language(lang_code)
+            instance.description = description_text
+        instance.save()
+
+        return instance
 
     @classmethod
     def create_for_order(cls, order, count=None, **kwargs):
@@ -203,16 +261,36 @@ class OrderItemHistoryFactory(factory.django.DjangoModelFactory):
             "price": f"${random.randint(10, 100)}.{random.randint(0, 99):02d}"
         }
     )
-    description = factory.LazyFunction(lambda: fake.sentence())
 
     class Meta:
         model = OrderItemHistory
         skip_postgeneration_save = True
 
     @factory.post_generation
+    def set_translatable_fields(self, create, extracted, **kwargs):
+        if not create:
+            return
+
+        available_languages = [
+            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+        ]
+
+        description_text = fake.sentence()
+
+        for lang_code in available_languages:
+            self.set_current_language(lang_code)
+            self.description = description_text
+
+    @factory.post_generation
     def set_change_type_specific_data(self, create, extracted, **kwargs):
         if not create:
             return
+
+        available_languages = [
+            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+        ]
+
+        description_text = ""
 
         if self.change_type == "QUANTITY":
             old_quantity = random.randint(1, 5)
@@ -222,7 +300,7 @@ class OrderItemHistoryFactory(factory.django.DjangoModelFactory):
 
             self.previous_value = {"quantity": old_quantity}
             self.new_value = {"quantity": new_quantity}
-            self.description = (
+            description_text = (
                 f"Quantity changed from {old_quantity} to {new_quantity}"
             )
 
@@ -236,13 +314,17 @@ class OrderItemHistoryFactory(factory.django.DjangoModelFactory):
 
             self.previous_value = {"price": old_price}
             self.new_value = {"price": new_price}
-            self.description = f"Price updated from {old_price} to {new_price}"
+            description_text = f"Price updated from {old_price} to {new_price}"
 
         elif self.change_type == "REFUND":
             refund_quantity = random.randint(1, 5)
             self.previous_value = {"refunded_quantity": 0}
             self.new_value = {"refunded_quantity": refund_quantity}
-            self.description = f"Refunded {refund_quantity} units"
+            description_text = f"Refunded {refund_quantity} units"
+
+        for lang_code in available_languages:
+            self.set_current_language(lang_code)
+            self.description = description_text
 
         self.save()
 
@@ -254,14 +336,27 @@ class OrderItemHistoryFactory(factory.django.DjangoModelFactory):
         while new_quantity == old_quantity:
             new_quantity = random.randint(1, 5)
 
-        return cls.create(
+        instance = cls.create(
             order_item=order_item,
             change_type="QUANTITY",
             previous_value={"quantity": old_quantity},
             new_value={"quantity": new_quantity},
-            description=f"Quantity changed from {old_quantity} to {new_quantity}",
             **kwargs,
         )
+
+        available_languages = [
+            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+        ]
+        description_text = (
+            f"Quantity changed from {old_quantity} to {new_quantity}"
+        )
+
+        for lang_code in available_languages:
+            instance.set_current_language(lang_code)
+            instance.description = description_text
+        instance.save()
+
+        return instance
 
     @classmethod
     def create_price_update(cls, order_item=None, **kwargs):
@@ -274,14 +369,25 @@ class OrderItemHistoryFactory(factory.django.DjangoModelFactory):
             f"${random.randint(10, 100)}.{random.randint(0, 99):02d}",
         )
 
-        return cls.create(
+        instance = cls.create(
             order_item=order_item,
             change_type="PRICE",
             previous_value={"price": old_price},
             new_value={"price": new_price},
-            description=f"Price updated from {old_price} to {new_price}",
             **kwargs,
         )
+
+        available_languages = [
+            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+        ]
+        description_text = f"Price updated from {old_price} to {new_price}"
+
+        for lang_code in available_languages:
+            instance.set_current_language(lang_code)
+            instance.description = description_text
+        instance.save()
+
+        return instance
 
     @classmethod
     def create_refund(cls, order_item=None, refund_quantity=None, **kwargs):
@@ -291,14 +397,25 @@ class OrderItemHistoryFactory(factory.django.DjangoModelFactory):
             else:
                 refund_quantity = random.randint(1, 5)
 
-        return cls.create(
+        instance = cls.create(
             order_item=order_item,
             change_type="REFUND",
             previous_value={"refunded_quantity": 0},
             new_value={"refunded_quantity": refund_quantity},
-            description=f"Refunded {refund_quantity} units",
             **kwargs,
         )
+
+        available_languages = [
+            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+        ]
+        description_text = f"Refunded {refund_quantity} units"
+
+        for lang_code in available_languages:
+            instance.set_current_language(lang_code)
+            instance.description = description_text
+        instance.save()
+
+        return instance
 
     @classmethod
     def create_for_order_item(cls, order_item, count=None, **kwargs):

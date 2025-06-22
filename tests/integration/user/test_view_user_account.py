@@ -13,8 +13,6 @@ User = get_user_model()
 
 
 class UserAccountViewSetTestCase(TestURLFixerMixin, APITestCase):
-    user: User = None
-
     def setUp(self):
         self.user = UserAccountFactory(
             is_superuser=True,
@@ -22,12 +20,10 @@ class UserAccountViewSetTestCase(TestURLFixerMixin, APITestCase):
         )
         self.client.force_authenticate(user=self.user)
 
-    @staticmethod
-    def get_user_account_detail_url(pk):
+    def get_user_account_detail_url(self, pk):
         return reverse("user-account-detail", kwargs={"pk": pk})
 
-    @staticmethod
-    def get_user_account_list_url():
+    def get_user_account_list_url(self):
         return reverse("user-account-list")
 
     def test_list(self):

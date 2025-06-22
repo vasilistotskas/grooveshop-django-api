@@ -56,7 +56,7 @@ class Notification(TranslatableModel, TimeStampMixinModel, UUIDModel):
         message=models.TextField(_("Message")),
     )
 
-    objects = NotificationManager()
+    objects: NotificationManager = NotificationManager()
 
     def __str__(self):
         message_snippet = (

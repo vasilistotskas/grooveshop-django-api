@@ -5,7 +5,11 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from blog.factories.author import BlogAuthorFactory
+from blog.factories.post import BlogPostFactory
 from blog.models.author import BlogAuthor
+from blog.serializers.author import (
+    BlogAuthorDetailSerializer,
+)
 from core.utils.testing import TestURLFixerMixin
 from user.factories.account import UserAccountFactory
 
@@ -18,166 +22,319 @@ User = get_user_model()
 
 
 class BlogAuthorViewSetTestCase(TestURLFixerMixin, APITestCase):
-    author: BlogAuthor = None
-
     def setUp(self):
-        user = UserAccountFactory(num_addresses=0)
-        self.author = BlogAuthorFactory(user=user)
+        self.user = UserAccountFactory(num_addresses=0, is_superuser=False)
+        self.admin_user = UserAccountFactory(num_addresses=0, is_superuser=True)
+        self.author_user = UserAccountFactory(
+            num_addresses=0, is_superuser=False
+        )
+        self.blog_author = BlogAuthorFactory(user=self.author_user)
 
-    @staticmethod
-    def get_author_detail_url(pk):
+        self.blog_post_1 = BlogPostFactory(author=self.blog_author)
+        self.blog_post_2 = BlogPostFactory(author=self.blog_author)
+
+        self.client.force_authenticate(user=self.user)
+
+    def get_blog_author_detail_url(self, pk):
         return reverse("blog-author-detail", args=[pk])
 
-    @staticmethod
-    def get_author_list_url():
+    def get_blog_author_list_url(self):
         return reverse("blog-author-list")
 
-    def test_list(self):
-        url = self.get_author_list_url()
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+    def get_blog_author_posts_url(self, pk):
+        return reverse("blog-author-posts", args=[pk])
 
+    def test_list_uses_correct_serializer(self):
+        url = self.get_blog_author_list_url()
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("results", response.data)
-        self.assertIsInstance(response.data["results"], list)
 
-        authors_count = BlogAuthor.objects.count()
-        self.assertEqual(len(response.data["results"]), authors_count)
+        if response.data["results"]:
+            author_data = response.data["results"][0]
+            required_fields = ["id", "user", "website", "uuid", "translations"]
+            for field in required_fields:
+                self.assertIn(
+                    field,
+                    author_data,
+                    f"Field '{field}' missing from list response",
+                )
 
-        if authors_count > 0:
-            first_result = response.data["results"][0]
-            self.assertIn("translations", first_result)
-            self.assertIn("user", first_result)
-
-    def test_create_valid(self):
-        user = UserAccountFactory(num_addresses=0)
-        payload = {
-            "user": user.id,
-            "translations": {},
-        }
-
-        for language in languages:
-            language_code = language[0]
-            language_name = language[1]
-
-            translation_payload = {
-                "bio": f"New Author Bio in {language_name}",
-            }
-
-            payload["translations"][language_code] = translation_payload
-
-        url = self.get_author_list_url()
-        response = self.client.post(url, data=payload, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-
-    def test_create_invalid(self):
-        payload = {
-            "user": "invalid_user_id",
-            "translations": {
-                "invalid_lang_code": {
-                    "bio": "Translation for invalid language code",
-                },
-            },
-        }
-
-        url = self.get_author_list_url()
-        response = self.client.post(url, data=payload, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_retrieve_valid(self):
-        url = self.get_author_detail_url(self.author.pk)
+    def test_retrieve_uses_correct_serializer(self):
+        url = self.get_blog_author_detail_url(self.blog_author.id)
         response = self.client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        self.assertIn("user", response.data)
-        self.assertEqual(response.data["user"]["pk"], self.author.user.id)
-
-        self.assertIn("translations", response.data)
-
-    def test_retrieve_invalid(self):
-        invalid_author_id = 9999
-        url = self.get_author_detail_url(invalid_author_id)
-        response = self.client.get(url)
-
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-    def test_update_valid(self):
-        user = UserAccountFactory(num_addresses=0)
-        payload = {
-            "user": user.id,
-            "translations": {},
-        }
-
-        for language in languages:
-            language_code = language[0]
-            language_name = language[1]
-
-            translation_payload = {
-                "bio": f"Updated Author Bio in {language_name}",
-            }
-
-            payload["translations"][language_code] = translation_payload
-
-        url = self.get_author_detail_url(self.author.pk)
-        response = self.client.put(url, data=payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    def test_update_invalid(self):
-        payload = {
-            "user": "invalid_user_id",
-            "translations": {
-                "invalid_lang_code": {
-                    "bio": "Translation for invalid language code",
-                },
-            },
+        expected_basic_fields = {
+            "id",
+            "user",
+            "website",
+            "created_at",
+            "updated_at",
+            "uuid",
+            "translations",
+            "number_of_posts",
+            "total_likes_received",
+            "recent_posts",
+            "top_posts",
         }
+        self.assertTrue(
+            expected_basic_fields.issubset(set(response.data.keys()))
+        )
 
-        url = self.get_author_detail_url(self.author.pk)
-        response = self.client.put(url, data=payload, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_partial_update_valid(self):
+    def test_create_request_response_serializers(self):
+        new_user = UserAccountFactory(num_addresses=0, is_superuser=False)
         payload = {
+            "user": new_user.id,
+            "website": "https://example.com",
             "translations": {
                 default_language: {
-                    "bio": f"Updated bio in {default_language}",
+                    "bio": "Test author bio",
                 }
             },
         }
 
-        url = self.get_author_detail_url(self.author.pk)
+        url = self.get_blog_author_list_url()
+        response = self.client.post(url, data=payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        expected_basic_fields = {
+            "id",
+            "user",
+            "website",
+            "created_at",
+            "updated_at",
+            "uuid",
+            "translations",
+            "number_of_posts",
+            "total_likes_received",
+        }
+        actual_fields = set(response.data.keys())
+        self.assertTrue(expected_basic_fields.issubset(actual_fields))
+
+        author = BlogAuthor.objects.get(id=response.data["id"])
+        self.assertEqual(author.website, "https://example.com")
+        self.assertEqual(author.user.id, new_user.id)
+
+    def test_update_request_response_serializers(self):
+        new_user = UserAccountFactory(num_addresses=0, is_superuser=False)
+        payload = {
+            "user": new_user.id,
+            "website": "https://updated.com",
+            "translations": {
+                default_language: {
+                    "bio": "Updated author bio",
+                }
+            },
+        }
+
+        url = self.get_blog_author_detail_url(self.blog_author.id)
+        response = self.client.put(url, data=payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        expected_basic_fields = {
+            "id",
+            "user",
+            "website",
+            "created_at",
+            "updated_at",
+            "uuid",
+            "translations",
+            "number_of_posts",
+            "total_likes_received",
+        }
+        self.assertTrue(
+            expected_basic_fields.issubset(set(response.data.keys()))
+        )
+
+        author = BlogAuthor.objects.get(id=response.data["id"])
+        self.assertEqual(author.website, "https://updated.com")
+
+    def test_partial_update_request_response_serializers(self):
+        payload = {
+            "website": "https://partially-updated.com",
+            "translations": {
+                default_language: {
+                    "bio": "Partially updated bio",
+                }
+            },
+        }
+
+        url = self.get_blog_author_detail_url(self.blog_author.id)
         response = self.client.patch(url, data=payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    def test_partial_update_invalid(self):
-        payload = {
-            "user": "invalid_user_id",
-            "translations": {
-                "invalid_lang_code": {
-                    "bio": "Translation for invalid language code",
-                },
-            },
+        expected_basic_fields = {
+            "id",
+            "user",
+            "website",
+            "created_at",
+            "updated_at",
+            "uuid",
+            "translations",
+            "number_of_posts",
+            "total_likes_received",
         }
+        self.assertTrue(
+            expected_basic_fields.issubset(set(response.data.keys()))
+        )
 
-        url = self.get_author_detail_url(self.author.pk)
-        response = self.client.patch(url, data=payload, format="json")
+        author = BlogAuthor.objects.get(id=response.data["id"])
+        self.assertEqual(author.website, "https://partially-updated.com")
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_destroy_valid(self):
-        url = self.get_author_detail_url(self.author.pk)
+    def test_delete_endpoint(self):
+        url = self.get_blog_author_detail_url(self.blog_author.id)
         response = self.client.delete(url)
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(BlogAuthor.objects.filter(pk=self.author.pk).exists())
+        self.assertFalse(
+            BlogAuthor.objects.filter(id=self.blog_author.id).exists()
+        )
 
-    def test_destroy_invalid(self):
-        invalid_author_id = 9999
-        url = self.get_author_detail_url(invalid_author_id)
-        response = self.client.delete(url)
+    def test_filtering_functionality(self):
+        url = self.get_blog_author_list_url()
 
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        response = self.client.get(url, {"user_id": self.author_user.id})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        response = self.client.get(url, {"website": self.blog_author.website})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_ordering_functionality(self):
+        url = self.get_blog_author_list_url()
+
+        response = self.client.get(url, {"ordering": "created_at"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        response = self.client.get(url, {"ordering": "user__first_name"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_search_functionality(self):
+        url = self.get_blog_author_list_url()
+
+        response = self.client.get(url, {"search": self.author_user.first_name})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_validation_errors_consistent(self):
+        payload = {
+            "user": 99999,
+            "website": "invalid-url",
+        }
+
+        url = self.get_blog_author_list_url()
+        response = self.client.post(url, data=payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_create_duplicate_user_validation(self):
+        payload = {
+            "user": self.author_user.id,
+            "website": "https://example.com",
+            "translations": {
+                default_language: {
+                    "bio": "Duplicate author attempt",
+                }
+            },
+        }
+
+        url = self.get_blog_author_list_url()
+        response = self.client.post(url, data=payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn(
+            "This user already has an author profile", str(response.data)
+        )
+
+    def test_posts_endpoint(self):
+        url = self.get_blog_author_posts_url(self.blog_author.id)
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("results", response.data)
+
+        self.assertEqual(len(response.data["results"]), 2)
+
+        for post_data in response.data["results"]:
+            if isinstance(post_data["author"], dict):
+                self.assertEqual(post_data["author"]["id"], self.blog_author.id)
+            else:
+                self.assertEqual(post_data["author"], self.blog_author.id)
+
+    def test_website_validation(self):
+        new_user = UserAccountFactory(num_addresses=0, is_superuser=False)
+
+        payload = {
+            "user": new_user.id,
+            "website": "not-a-valid-url",
+            "translations": {
+                default_language: {
+                    "bio": "Test bio",
+                }
+            },
+        }
+
+        url = self.get_blog_author_list_url()
+        response = self.client.post(url, data=payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("website", response.data)
+        self.assertTrue(
+            any(
+                "invalid" in str(error).lower() or "url" in str(error).lower()
+                for error in response.data["website"]
+            )
+        )
+
+    def test_detail_serializer_computed_fields(self):
+        url = self.get_blog_author_detail_url(self.blog_author.id)
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertIn("number_of_posts", response.data)
+        self.assertIn("total_likes_received", response.data)
+        self.assertIn("recent_posts", response.data)
+        self.assertIn("top_posts", response.data)
+
+        self.assertEqual(response.data["number_of_posts"], 2)
+        self.assertIsInstance(response.data["recent_posts"], list)
+        self.assertIsInstance(response.data["top_posts"], list)
+
+    def test_user_serialization_in_detail(self):
+        url = self.get_blog_author_detail_url(self.blog_author.id)
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        user_data = response.data["user"]
+        self.assertIsInstance(user_data, dict)
+        self.assertIn("pk", user_data)
+        self.assertIn("email", user_data)
+        self.assertEqual(user_data["pk"], self.author_user.id)
+
+    def test_consistency_with_manual_serializer_instantiation(self):
+        url = self.get_blog_author_detail_url(self.blog_author.id)
+        viewset_response = self.client.get(url)
+
+        serializer = BlogAuthorDetailSerializer(
+            self.blog_author,
+            context={"request": self.client.request().wsgi_request},
+        )
+
+        self.assertEqual(viewset_response.status_code, status.HTTP_200_OK)
+
+        viewset_data = viewset_response.data
+        serializer_data = serializer.data
+
+        key_fields = ["id", "website", "uuid"]
+        for field in key_fields:
+            self.assertEqual(
+                viewset_data[field],
+                serializer_data[field],
+                f"Field '{field}' differs between ViewSet and manual serializer",
+            )

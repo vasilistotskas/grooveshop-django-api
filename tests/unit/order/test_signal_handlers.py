@@ -1,7 +1,7 @@
 from unittest import TestCase
 from unittest.mock import MagicMock, Mock, patch
 
-from order.enum.status import OrderStatusEnum
+from order.enum.status import OrderStatus
 from order.signals.handlers import handle_order_post_save
 
 
@@ -9,7 +9,7 @@ class OrderSignalHandlersTestCase(TestCase):
     def setUp(self):
         self.order = Mock()
         self.order.id = 1
-        self.order.status = OrderStatusEnum.PENDING
+        self.order.status = OrderStatus.PENDING
         self.order._previous_status = None
 
         self.sender = MagicMock()
@@ -31,8 +31,8 @@ class OrderSignalHandlersTestCase(TestCase):
 
     @patch("order.signals.order_status_changed.send")
     def test_handle_order_post_save_status_unchanged(self, mock_signal):
-        self.order.status = OrderStatusEnum.PENDING
-        self.order._previous_status = OrderStatusEnum.PENDING
+        self.order.status = OrderStatus.PENDING
+        self.order._previous_status = OrderStatus.PENDING
 
         handle_order_post_save(
             sender=self.sender, instance=self.order, created=False
@@ -42,8 +42,8 @@ class OrderSignalHandlersTestCase(TestCase):
 
     @patch("order.signals.order_status_changed.send")
     def test_handle_order_post_save_status_changed(self, mock_signal):
-        self.order.status = OrderStatusEnum.PROCESSING
-        self.order._previous_status = OrderStatusEnum.PENDING
+        self.order.status = OrderStatus.PROCESSING
+        self.order._previous_status = OrderStatus.PENDING
 
         handle_order_post_save(
             sender=self.sender, instance=self.order, created=False
@@ -52,8 +52,8 @@ class OrderSignalHandlersTestCase(TestCase):
         mock_signal.assert_called_once_with(
             sender=self.sender,
             order=self.order,
-            old_status=OrderStatusEnum.PENDING,
-            new_status=OrderStatusEnum.PROCESSING,
+            old_status=OrderStatus.PENDING,
+            new_status=OrderStatus.PROCESSING,
         )
 
     @patch("order.signals.order_status_changed.send")

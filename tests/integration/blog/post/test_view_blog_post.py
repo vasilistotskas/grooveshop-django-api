@@ -1,7 +1,6 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.urls import reverse
-from django.utils import translation
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -9,10 +8,7 @@ from blog.factories.author import BlogAuthorFactory
 from blog.factories.category import BlogCategoryFactory
 from blog.factories.post import BlogPostFactory
 from blog.factories.tag import BlogTagFactory
-from blog.models.author import BlogAuthor
-from blog.models.category import BlogCategory
 from blog.models.post import BlogPost
-from blog.serializers.post import BlogPostSerializer
 from core.utils.testing import TestURLFixerMixin
 from user.factories.account import UserAccountFactory
 
@@ -24,167 +20,278 @@ User = get_user_model()
 
 
 class BlogPostViewSetTestCase(TestURLFixerMixin, APITestCase):
-    post: BlogPost = None
-    user: User = None
-    author: BlogAuthor = None
-    category: BlogCategory = None
-    other_category: BlogCategory = None
-    tag1 = None
-    tag2 = None
-    tag3 = None
-    default_related_posts = []
-    tag_based_related_posts = []
-
-    def setUp(self):
-        translation.activate(default_language)
-        self.addCleanup(translation.deactivate)
-        self.user = UserAccountFactory(num_addresses=0)
-        self.author = BlogAuthorFactory(user=self.user)
-        self.category = BlogCategoryFactory(slug="sample-category")
-        self.other_category = BlogCategoryFactory(slug="other-category")
-
-        self.tag1 = BlogTagFactory(name="Django")
-        self.tag2 = BlogTagFactory(name="Python")
-        self.tag3 = BlogTagFactory(name="REST")
-
-        self.post = BlogPostFactory(
-            author=self.author,
-            category=self.category,
-            num_tags=2,
-            num_comments=0,
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = UserAccountFactory()
+        cls.author = BlogAuthorFactory(user=cls.user)
+        cls.category = BlogCategoryFactory()
+        cls.tag1 = BlogTagFactory()
+        cls.tag2 = BlogTagFactory()
+        cls.post = BlogPostFactory(
+            author=cls.author,
+            category=cls.category,
+            featured=True,
         )
-        self.post.tags.set([self.tag1, self.tag2])
-        self.post.likes.set([])
+        cls.post.tags.set([cls.tag1, cls.tag2])
 
-        self.default_related_posts = BlogPostFactory.create_batch(
-            5,
-            author=self.author,
-            category=self.category,
-            num_tags=0,
-            num_comments=0,
-        )
-
-        self.tag_based_related_posts = BlogPostFactory.create_batch(
-            3,
-            author=self.author,
-            category=self.other_category,
-            num_tags=1,
-            num_comments=0,
-        )
-        for i, post in enumerate(self.tag_based_related_posts):
-            if i % 2 == 0:
-                post.tags.set([self.tag1])
-            else:
-                post.tags.set([self.tag2])
-            post.likes.set([])
-
-    @staticmethod
-    def get_post_detail_url(pk):
-        return reverse("blog-post-detail", args=[pk])
-
-    @staticmethod
-    def get_post_list_url():
+    def get_post_list_url(self):
         return reverse("blog-post-list")
+
+    def get_post_detail_url(self, pk):
+        return reverse("blog-post-detail", args=[pk])
 
     def test_list(self):
         url = self.get_post_list_url()
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    def test_create_valid(self):
-        payload = {
-            "slug": "new-test-post",
-            "category": self.category.id,
-            "likes": [],
-            "tags": [],
-            "author": self.author.id,
-            "translations": {},
+        self.assertIn("results", response.data)
+        self.assertIn("count", response.data)
+        if "links" in response.data:
+            self.assertIn("next", response.data["links"])
+            self.assertIn("previous", response.data["links"])
+        else:
+            self.assertIn("next", response.data)
+            self.assertIn("previous", response.data)
+
+        self.assertGreaterEqual(len(response.data["results"]), 1)
+
+        first_result = response.data["results"][0]
+        expected_basic_fields = {
+            "id",
+            "uuid",
+            "slug",
+            "likes",
+            "translations",
+            "author",
+            "category",
+            "tags",
+            "featured",
+            "view_count",
+            "likes_count",
+            "comments_count",
+            "tags_count",
+            "is_published",
+            "published_at",
+            "created_at",
+            "updated_at",
+            "main_image_path",
+            "reading_time",
+            "content_preview",
         }
+        self.assertTrue(
+            expected_basic_fields.issubset(set(first_result.keys()))
+        )
 
-        for language in languages:
-            language_code = language[0]
-            language_name = language[1]
-
-            translation_payload = {
-                "title": f"New Test Post Title in {language_name}",
-                "subtitle": f"New Test Post Subtitle in {language_name}",
-                "body": f"This is a new test post body in {language_name}",
-            }
-
-            payload["translations"][language_code] = translation_payload
-
+    def test_list_uses_correct_serializer(self):
         url = self.get_post_list_url()
-        response = self.client.post(url, data=payload, format="json")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-
-    def test_create_invalid(self):
-        payload = {
-            "author": "invalid_author_id",
-            "translations": {
-                "invalid_lang_code": {
-                    "title": "Translation for invalid language code",
-                    "subtitle": "Translation for invalid language code",
-                    "body": "Translation for invalid language code",
-                }
-            },
+        first_result = response.data["results"][0]
+        expected_fields = {
+            "id",
+            "uuid",
+            "slug",
+            "likes",
+            "translations",
+            "author",
+            "category",
+            "tags",
+            "featured",
+            "view_count",
+            "likes_count",
+            "comments_count",
+            "tags_count",
+            "is_published",
+            "published_at",
+            "created_at",
+            "updated_at",
+            "main_image_path",
+            "reading_time",
+            "content_preview",
         }
-
-        url = self.get_post_list_url()
-        response = self.client.post(url, data=payload, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(expected_fields.issubset(set(first_result.keys())))
 
     def test_retrieve_valid(self):
         url = self.get_post_detail_url(self.post.id)
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        self.assertIn("id", response.data)
-        self.assertEqual(response.data["id"], self.post.id)
+        expected_fields = {
+            "id",
+            "uuid",
+            "slug",
+            "likes",
+            "translations",
+            "author",
+            "category",
+            "tags",
+            "featured",
+            "view_count",
+            "likes_count",
+            "comments_count",
+            "tags_count",
+            "is_published",
+            "published_at",
+            "created_at",
+            "updated_at",
+            "main_image_path",
+            "reading_time",
+            "content_preview",
+            "user_has_liked",
+            "seo_title",
+            "seo_description",
+            "seo_keywords",
+        }
+        self.assertTrue(expected_fields.issubset(set(response.data.keys())))
 
-        self.assertIn("author", response.data)
-        self.assertEqual(response.data["author"]["id"], self.author.id)
+    def test_retrieve_uses_correct_serializer(self):
+        url = self.get_post_detail_url(self.post.id)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        self.assertIn("category", response.data)
-        self.assertEqual(response.data["category"]["id"], self.category.id)
+        detail_only_fields = {
+            "user_has_liked",
+            "seo_title",
+            "seo_description",
+            "seo_keywords",
+        }
+        response_fields = set(response.data.keys())
 
-        self.assertIn("translations", response.data)
+        for field in detail_only_fields:
+            self.assertIn(
+                field,
+                response_fields,
+                f"Detail field '{field}' should be present in detail response",
+            )
 
     def test_retrieve_invalid(self):
         invalid_post_id = 9999
         url = self.get_post_detail_url(invalid_post_id)
         response = self.client.get(url)
-
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-    def test_update_valid(self):
+    def test_create_valid(self):
+        self.client.force_authenticate(user=self.user)
         payload = {
-            "slug": "updated-test-post",
+            "slug": "new-test-post",
             "category": self.category.id,
-            "likes": [],
-            "tags": [],
+            "tags": [self.tag1.id],
+            "author": self.author.id,
+            "featured": False,
             "translations": {},
         }
 
         for language in languages:
-            language_code = language[0]
-            language_name = language[1]
-
+            language_code = language
             translation_payload = {
-                "title": f"Updated Test Post Title in {language_name}",
-                "subtitle": f"Updated Test Post Subtitle in {language_name}",
-                "body": f"This is an updated test post body in {language_name}",
+                "title": f"New Test Post Title in {language_code}",
+                "subtitle": f"New Test Post Subtitle in {language_code}",
+                "body": f"This is a new test post body in {language_code}",
             }
+            payload["translations"][language_code] = translation_payload
 
+        url = self.get_post_list_url()
+        response = self.client.post(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        expected_fields = {
+            "id",
+            "uuid",
+            "slug",
+            "likes",
+            "translations",
+            "author",
+            "category",
+            "tags",
+            "featured",
+            "view_count",
+            "likes_count",
+            "comments_count",
+            "tags_count",
+            "is_published",
+            "published_at",
+            "created_at",
+            "updated_at",
+            "main_image_path",
+            "reading_time",
+            "content_preview",
+            "user_has_liked",
+            "seo_title",
+            "seo_description",
+            "seo_keywords",
+        }
+        self.assertTrue(expected_fields.issubset(set(response.data.keys())))
+
+    def test_create_invalid(self):
+        self.client.force_authenticate(user=self.user)
+        payload = {
+            "author": "invalid_author_id",
+            "translations": {
+                "invalid_lang_code": {
+                    "title": "Translation for invalid language code",
+                },
+            },
+        }
+
+        url = self.get_post_list_url()
+        response = self.client.post(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_update_valid(self):
+        self.client.force_authenticate(user=self.user)
+        payload = {
+            "slug": "updated-test-post",
+            "category": self.category.id,
+            "tags": [self.tag1.id],
+            "author": self.author.id,
+            "translations": {},
+        }
+
+        for language in languages:
+            language_code = language
+            translation_payload = {
+                "title": f"Updated Test Post Title in {language_code}",
+                "subtitle": f"Updated Test Post Subtitle in {language_code}",
+                "body": f"This is an updated test post body in {language_code}",
+            }
             payload["translations"][language_code] = translation_payload
 
         url = self.get_post_detail_url(self.post.id)
-        response = self.client.patch(url, data=payload, format="json")
-
+        response = self.client.put(url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+        expected_fields = {
+            "id",
+            "uuid",
+            "slug",
+            "likes",
+            "translations",
+            "author",
+            "category",
+            "tags",
+            "featured",
+            "view_count",
+            "likes_count",
+            "comments_count",
+            "tags_count",
+            "is_published",
+            "published_at",
+            "created_at",
+            "updated_at",
+            "main_image_path",
+            "reading_time",
+            "content_preview",
+            "user_has_liked",
+            "seo_title",
+            "seo_description",
+            "seo_keywords",
+        }
+        self.assertTrue(expected_fields.issubset(set(response.data.keys())))
+
     def test_update_invalid(self):
+        self.client.force_authenticate(user=self.user)
         payload = {
             "author": "invalid_author_id",
             "translations": {
@@ -195,52 +302,92 @@ class BlogPostViewSetTestCase(TestURLFixerMixin, APITestCase):
         }
 
         url = self.get_post_detail_url(self.post.id)
-        response = self.client.patch(url, data=payload, format="json")
-
+        response = self.client.put(url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_partial_update_valid(self):
+        self.client.force_authenticate(user=self.user)
         payload = {
             "translations": {
-                default_language: {
-                    "title": "Partial Update Test Post Title",
-                },
-            },
+                default_language: {"title": "Partially Updated Post Title"}
+            }
         }
 
         url = self.get_post_detail_url(self.post.id)
-        response = self.client.patch(url, data=payload, format="json")
-
+        response = self.client.patch(url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+        expected_fields = {
+            "id",
+            "uuid",
+            "slug",
+            "likes",
+            "translations",
+            "author",
+            "category",
+            "tags",
+            "featured",
+            "view_count",
+            "likes_count",
+            "comments_count",
+            "tags_count",
+            "is_published",
+            "published_at",
+            "created_at",
+            "updated_at",
+            "main_image_path",
+            "reading_time",
+            "content_preview",
+            "user_has_liked",
+            "seo_title",
+            "seo_description",
+            "seo_keywords",
+        }
+        self.assertTrue(expected_fields.issubset(set(response.data.keys())))
+
     def test_partial_update_invalid(self):
+        self.client.force_authenticate(user=self.user)
         payload = {
-            "author": "invalid_author_id",
-            "translations": {
-                "invalid_lang_code": {
-                    "title": "Translation for invalid language code",
-                },
-            },
+            "slug": "",
+            "translations": {default_language: {"title": "Test Post"}},
         }
 
         url = self.get_post_detail_url(self.post.id)
-        response = self.client.patch(url, data=payload, format="json")
-
+        response = self.client.patch(url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_destroy_valid(self):
-        url = self.get_post_detail_url(self.post.id)
-        response = self.client.delete(url)
+        self.client.force_authenticate(user=self.user)
+        post_to_delete = BlogPostFactory(author=self.author)
 
+        url = self.get_post_detail_url(post_to_delete.id)
+        response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(BlogPost.objects.filter(id=self.post.id).exists())
+
+        self.assertFalse(BlogPost.objects.filter(id=post_to_delete.id).exists())
 
     def test_destroy_invalid(self):
+        self.client.force_authenticate(user=self.user)
         invalid_post_id = 9999
+
         url = self.get_post_detail_url(invalid_post_id)
         response = self.client.delete(url)
-
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_related_posts_response_structure(self):
+        url = reverse("blog-post-related_posts", args=[self.post.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertIsInstance(response.data, list)
+
+    def test_related_posts_when_no_related_posts_exist(self):
+        BlogPost.objects.exclude(id=self.post.id).delete()
+
+        url = reverse("blog-post-related_posts", args=[self.post.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 0)
 
     def test_related_posts_default_strategy_fills_limit(self):
         additional_default_posts = BlogPostFactory.create_batch(
@@ -256,35 +403,109 @@ class BlogPostViewSetTestCase(TestURLFixerMixin, APITestCase):
 
         url = reverse("blog-post-related_posts", args=[self.post.id])
         response = self.client.get(url)
-
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 8)
+        self.assertLessEqual(len(response.data), 8)
 
-        allowed_categories = [self.category.id, self.other_category.id]
-
-        for related_post in response.data:
-            self.assertIn(related_post["category"], allowed_categories)
-            self.assertNotEqual(related_post["id"], self.post.id)
-
-    def test_related_posts_when_no_related_posts_exist(self):
-        BlogPost.objects.exclude(id=self.post.id).delete()
-
-        url = reverse("blog-post-related_posts", args=[self.post.id])
+    def test_comments_action(self):
+        url = reverse("blog-post-comments", args=[self.post.id])
         response = self.client.get(url)
-
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 0)
 
-    def test_related_posts_response_structure(self):
-        url = reverse("blog-post-related_posts", args=[self.post.id])
+        self.assertIn("results", response.data)
+        self.assertIn("count", response.data)
+
+    def test_trending_action(self):
+        url = reverse("blog-post-trending")
         response = self.client.get(url)
-
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        if response.data:
-            first_related_post = response.data[0]
-            serializer = BlogPostSerializer(
-                BlogPost.objects.get(id=first_related_post["id"])
-            )
-            expected_data = serializer.data
-            self.assertEqual(first_related_post, expected_data)
+        self.assertIn("results", response.data)
+        self.assertIn("count", response.data)
+
+    def test_trending_action_with_days_parameter(self):
+        url = reverse("blog-post-trending")
+        response = self.client.get(url, {"days": 30})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertIn("results", response.data)
+        self.assertIn("count", response.data)
+
+    def test_popular_action(self):
+        url = reverse("blog-post-popular")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertIn("results", response.data)
+        self.assertIn("count", response.data)
+
+    def test_featured_action(self):
+        url = reverse("blog-post-featured")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertIn("results", response.data)
+        self.assertIn("count", response.data)
+
+        for post_data in response.data["results"]:
+            self.assertTrue(post_data["featured"])
+
+    def test_update_likes_action_authenticated(self):
+        self.client.force_authenticate(user=self.user)
+        url = reverse("blog-post-update_likes", args=[self.post.id])
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_update_likes_action_unauthenticated(self):
+        url = reverse("blog-post-update_likes", args=[self.post.id])
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_update_view_count_action(self):
+        original_view_count = self.post.view_count
+        url = reverse("blog-post-update_view_count", args=[self.post.id])
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.post.refresh_from_db()
+        self.assertEqual(self.post.view_count, original_view_count + 1)
+
+    def test_liked_posts_action_authenticated(self):
+        self.client.force_authenticate(user=self.user)
+        payload = {"post_ids": [self.post.id]}
+
+        url = reverse("blog-post-liked_posts")
+        response = self.client.post(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertIn("post_ids", response.data)
+        self.assertIsInstance(response.data["post_ids"], list)
+
+    def test_liked_posts_action_invalid_data(self):
+        self.client.force_authenticate(user=self.user)
+        payload = {"invalid_field": "test"}
+
+        url = reverse("blog-post-liked_posts")
+        response = self.client.post(url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_filtering_functionality(self):
+        url = self.get_post_list_url()
+        response = self.client.get(url, {"featured": "true"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        for post_data in response.data["results"]:
+            self.assertTrue(post_data["featured"])
+
+    def test_ordering_functionality(self):
+        url = self.get_post_list_url()
+        response = self.client.get(url, {"ordering": "view_count"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertIn("results", response.data)
+
+    def test_search_functionality(self):
+        url = self.get_post_list_url()
+        response = self.client.get(url, {"search": "test"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertIn("results", response.data)

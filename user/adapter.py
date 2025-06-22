@@ -5,9 +5,12 @@ from typing import TYPE_CHECKING
 from allauth.account.adapter import DefaultAccountAdapter
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from django.conf import settings
+from django.contrib.auth import get_user_model
 
 if TYPE_CHECKING:  # pragma: no cover
     from allauth.socialaccount.models import SocialAccount, SocialLogin
+
+User = get_user_model()
 
 
 class UserAccountAdapter(DefaultAccountAdapter):
@@ -31,10 +34,6 @@ class SocialAccountAdapter(DefaultSocialAccountAdapter):
 
         if not email:
             return
-
-        from django.contrib.auth import get_user_model
-
-        User = get_user_model()
 
         user = User.objects.filter(email__iexact=email).first()
         if user:

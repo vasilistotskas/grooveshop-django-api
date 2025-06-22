@@ -2,7 +2,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 
-class ReviewStatusEnum(models.TextChoices):
+class ReviewStatus(models.TextChoices):
     NEW = "NEW", _("New")
     TRUE = "TRUE", _("True")
     FALSE = "FALSE", _("False")

@@ -1,17 +1,17 @@
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 
 @dataclass
 class MeiliIndexSettings:
-    displayed_fields: Optional[list[str]] = None
-    searchable_fields: Optional[list[str]] = None
-    filterable_fields: Optional[list[str]] = None
-    sortable_fields: Optional[list[str]] = None
-    ranking_rules: Optional[list[str]] = None
-    stop_words: Optional[list[str]] = None
-    synonyms: Optional[dict[str, list[str]]] = None
-    distinct_attribute: Optional[str] = None
-    typo_tolerance: Optional[dict[str, Any]] = None
-    faceting: Optional[dict[str, Any]] = None
-    pagination: Optional[dict[str, Any]] = None
+    displayed_fields: list[str] | None = None
+    searchable_fields: list[str] | None = None
+    filterable_fields: list[str] | None = None
+    sortable_fields: list[str] | None = None
+    ranking_rules: list[str] | None = None
+    stop_words: list[str] | None = None
+    synonyms: dict[str, list[str]] | None = None
+    distinct_attribute: str | None = None
+    typo_tolerance: dict[str, Any] | None = None
+    faceting: dict[str, Any] | None = None
+    pagination: dict[str, Any] | None = None

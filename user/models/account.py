@@ -17,6 +17,7 @@ from phonenumber_field.modelfields import PhoneNumberField
 from core.fields.image import ImageAndSvgField
 from core.models import TimeStampMixinModel, UUIDModel
 from user.managers.account import UserAccountManager
+from user.models.subscription import UserSubscription
 
 
 class UserAccount(
@@ -89,7 +90,7 @@ class UserAccount(
     github = models.URLField(_("Github Profile"), blank=True, default="")
     bio = models.TextField(_("Bio"), blank=True, default="")
 
-    objects = UserAccountManager()
+    objects: UserAccountManager = UserAccountManager()
 
     USERNAME_FIELD: str = "email"
     REQUIRED_FIELDS: list[str] = []
@@ -128,14 +129,12 @@ class UserAccount(
 
     @property
     def active_subscriptions(self):
-        return self.subscriptions.filter(status="active").select_related(
-            "topic"
-        )
+        return self.subscriptions.filter(
+            status=UserSubscription.SubscriptionStatus.ACTIVE
+        ).select_related("topic")
 
     @property
     def subscription_preferences(self):
-        from user.models.subscription import UserSubscription
-
         prefs = {}
         for sub in self.subscriptions.select_related("topic"):
             prefs[sub.topic.slug] = (

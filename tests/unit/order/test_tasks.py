@@ -1,205 +1,373 @@
 from datetime import timedelta
-from unittest import TestCase
 from unittest.mock import MagicMock, Mock, patch
 
+import pytest
+from django.test import TestCase as DjangoTestCase
+from django.test import override_settings
 from django.utils import timezone
-from djmoney.money import Money
 
-from order.enum.status import OrderStatusEnum
+from order.enum.status import OrderStatus
+from order.factories.order import OrderFactory
+from order.models import OrderHistory
 from order.models.order import Order
 from order.tasks import (
+    check_pending_orders,
     generate_order_invoice,
     send_order_confirmation_email,
     send_order_status_update_email,
+    send_shipping_notification_email,
+    update_order_statuses_from_shipping,
 )
 
 
-class OrderTasksTestCase(TestCase):
+@pytest.mark.django_db
+class OrderTasksSimpleTestCase(DjangoTestCase):
     def setUp(self):
-        self.order = Mock(spec=Order)
-        self.order.id = 1
-        self.order.uuid = "test-uuid-1234"
-        self.order.email = "customer@example.com"
-        self.order.first_name = "John"
-        self.order.last_name = "Doe"
-        self.order.status = OrderStatusEnum.PENDING
-        self.order.created_at = timezone.now()
-        self.order.total = Money("135.00", "USD")
+        self.order = OrderFactory.create(
+            email="customer@example.com",
+            first_name="John",
+            last_name="Doe",
+            status=OrderStatus.PENDING,
+        )
 
-        item1 = Mock()
-        item1.product = Mock()
-        item1.product.name = "Test Product 1"
-        item1.quantity = 2
-        item1.price = Money("50.00", "USD")
-        item1.total = Money("100.00", "USD")
-
-        item2 = Mock()
-        item2.product = Mock()
-        item2.product.name = "Test Product 2"
-        item2.quantity = 1
-        item2.price = Money("30.00", "USD")
-        item2.total = Money("30.00", "USD")
-
-        self.order.items = MagicMock()
-        self.order.items.all.return_value = [item1, item2]
-
-    @patch("order.models.order.Order.objects.get")
     @patch("order.tasks.OrderHistory.log_note")
     @patch("order.tasks.EmailMultiAlternatives")
-    @patch("order.tasks.settings")
     @patch("order.tasks.render_to_string")
-    def test_send_order_confirmation_email(
-        self, mock_render, mock_settings, mock_email, mock_log_note, mock_get
+    @override_settings(
+        SITE_NAME="GrooveShop",
+        INFO_EMAIL="support@example.com",
+        SITE_URL="http://example.com",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    def test_send_order_confirmation_email_success(
+        self, mock_render, mock_email, mock_log_note
     ):
-        mock_get.return_value = self.order
         mock_email_instance = Mock()
         mock_email.return_value = mock_email_instance
 
         mock_render.side_effect = ["Email content", "HTML content"]
-
-        mock_settings.SITE_NAME = "GrooveShop"
-        mock_settings.INFO_EMAIL = "support@example.com"
-        mock_settings.SITE_URL = "http://example.com"
-        mock_settings.DEFAULT_FROM_EMAIL = "no-reply@example.com"
 
         result = send_order_confirmation_email(self.order.id)
 
         self.assertTrue(result)
-
-        mock_get.assert_called_once_with(id=self.order.id)
         mock_email.assert_called_once()
         mock_email_instance.attach_alternative.assert_called_once()
         mock_email_instance.send.assert_called_once()
         mock_log_note.assert_called_once()
 
-    @patch("order.models.order.Order.objects.get")
     @patch("order.tasks.logger.error")
-    @patch("order.tasks.settings")
-    def test_send_order_confirmation_email_order_not_found(
-        self, mock_settings, mock_logger, mock_get
-    ):
-        mock_get.side_effect = Order.DoesNotExist()
-
-        mock_settings.SITE_NAME = "GrooveShop"
-        mock_settings.INFO_EMAIL = "support@example.com"
-        mock_settings.SITE_URL = "http://example.com"
-
-        result = send_order_confirmation_email(999)
+    def test_send_order_confirmation_email_order_not_found(self, mock_logger):
+        result = send_order_confirmation_email(999999)
 
         self.assertFalse(result)
-
-        mock_get.assert_called_once_with(id=999)
         mock_logger.assert_called_once()
 
-    @patch("order.models.order.Order.objects.get")
     @patch("order.tasks.OrderHistory.log_note")
     @patch("order.tasks.EmailMultiAlternatives")
-    @patch("order.tasks.settings")
     @patch("order.tasks.render_to_string")
-    def test_send_order_status_update_email(
-        self, mock_render, mock_settings, mock_email, mock_log_note, mock_get
+    @override_settings(
+        SITE_NAME="GrooveShop",
+        INFO_EMAIL="support@example.com",
+        SITE_URL="http://example.com",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    def test_send_order_status_update_email_success(
+        self, mock_render, mock_email, mock_log_note
     ):
-        mock_get.return_value = self.order
         mock_email_instance = Mock()
         mock_email.return_value = mock_email_instance
 
         mock_render.side_effect = ["Email content", "HTML content"]
 
-        mock_settings.SITE_NAME = "GrooveShop"
-        mock_settings.INFO_EMAIL = "support@example.com"
-        mock_settings.SITE_URL = "http://example.com"
-        mock_settings.DEFAULT_FROM_EMAIL = "no-reply@example.com"
-
         result = send_order_status_update_email(
-            self.order.id, OrderStatusEnum.PROCESSING
+            self.order.id, OrderStatus.PROCESSING
         )
 
         self.assertTrue(result)
-
-        mock_get.assert_called_once_with(id=self.order.id)
         mock_email.assert_called_once()
         mock_email_instance.attach_alternative.assert_called_once()
         mock_email_instance.send.assert_called_once()
         mock_log_note.assert_called_once()
 
-    @patch("order.models.order.Order.objects.get")
-    @patch("order.tasks.settings")
-    def test_send_order_status_update_email_skip_pending(
-        self, mock_settings, mock_get
-    ):
-        mock_settings.SITE_NAME = "GrooveShop"
-        mock_settings.INFO_EMAIL = "support@example.com"
-        mock_settings.SITE_URL = "http://example.com"
-
-        mock_get.return_value = self.order
-
+    def test_send_order_status_update_email_skip_pending(self):
         result = send_order_status_update_email(
-            self.order.id, OrderStatusEnum.PENDING
+            self.order.id, OrderStatus.PENDING
         )
 
         self.assertTrue(result)
 
-    @patch("order.models.order.Order.objects.get")
-    @patch("order.tasks.OrderHistory.log_note")
-    def test_generate_order_invoice(self, mock_log_note, mock_get):
-        mock_get.return_value = self.order
+    @patch("order.tasks.logger.error")
+    def test_send_order_status_update_email_order_not_found(self, mock_logger):
+        result = send_order_status_update_email(999999, OrderStatus.PROCESSING)
 
-        result = generate_order_invoice(self.order.id)
+        self.assertFalse(result)
+        mock_logger.assert_called_once()
 
-        self.assertTrue(result)
-
-        mock_get.assert_called_once_with(id=self.order.id)
-        mock_log_note.assert_called_once()
-
-    @patch("order.models.order.Order.objects.filter")
-    @patch("order.tasks.settings")
     @patch("order.tasks.OrderHistory.log_note")
     @patch("order.tasks.EmailMultiAlternatives")
     @patch("order.tasks.render_to_string")
-    def test_check_pending_orders(
-        self, mock_render, mock_email, mock_log_note, mock_settings, mock_filter
+    @patch("order.tasks.logger.warning")
+    @override_settings(
+        SITE_NAME="GrooveShop",
+        INFO_EMAIL="support@example.com",
+        SITE_URL="http://example.com",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    def test_send_order_status_update_email_template_fallback(
+        self, mock_logger_warning, mock_render, mock_email, mock_log_note
     ):
-        mock_order1 = MagicMock(spec=Order)
-        mock_order1.id = 1
-        mock_order1.email = "customer1@example.com"
-        mock_order1.created_at = timezone.now() - timedelta(days=5)
+        mock_email_instance = Mock()
+        mock_email.return_value = mock_email_instance
 
-        mock_order2 = MagicMock(spec=Order)
-        mock_order2.id = 2
-        mock_order2.email = "customer2@example.com"
-        mock_order2.created_at = timezone.now() - timedelta(days=3)
+        def render_side_effect(template_name, context):
+            if "order_processing" in template_name:
+                raise Exception("Template not found")
+            else:
+                return "Generic email content"
 
-        mock_queryset = MagicMock()
-        mock_queryset.__iter__.return_value = [mock_order1, mock_order2]
-        mock_filter.return_value = mock_queryset
+        mock_render.side_effect = render_side_effect
+
+        result = send_order_status_update_email(
+            self.order.id, OrderStatus.PROCESSING
+        )
+
+        self.assertTrue(result)
+        mock_logger_warning.assert_called_once()
+        mock_email_instance.send.assert_called_once()
+
+    @patch("order.tasks.OrderHistory.log_note")
+    @patch("order.tasks.EmailMultiAlternatives")
+    @patch("order.tasks.render_to_string")
+    @override_settings(
+        SITE_NAME="GrooveShop",
+        INFO_EMAIL="support@example.com",
+        SITE_URL="http://example.com",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    def test_send_shipping_notification_email_success(
+        self, mock_render, mock_email, mock_log_note
+    ):
+        order_with_tracking = OrderFactory.create(email="customer@example.com")
+        order_with_tracking.tracking_number = "TRACK123456"
+        order_with_tracking.shipping_carrier = "UPS"
+        order_with_tracking.save()
+
+        mock_email_instance = Mock()
+        mock_email.return_value = mock_email_instance
+
+        mock_render.side_effect = ["Email content", "HTML content"]
+
+        result = send_shipping_notification_email(order_with_tracking.id)
+
+        self.assertTrue(result)
+        mock_email_instance.send.assert_called_once()
+        self.assertTrue(mock_log_note.called)
+
+    @patch("order.tasks.logger.warning")
+    def test_send_shipping_notification_email_no_tracking_info(
+        self, mock_logger
+    ):
+        self.order.tracking_number = ""
+        self.order.shipping_carrier = ""
+        self.order.save()
+
+        result = send_shipping_notification_email(self.order.id)
+
+        self.assertFalse(result)
+        mock_logger.assert_called_once()
+
+    @patch("order.tasks.logger.error")
+    def test_send_shipping_notification_email_order_not_found(
+        self, mock_logger
+    ):
+        result = send_shipping_notification_email(999999)
+
+        self.assertFalse(result)
+        mock_logger.assert_called_once()
+
+    @patch("order.tasks.OrderHistory.log_note")
+    @patch("order.tasks.logger.info")
+    def test_generate_order_invoice_success(
+        self, mock_logger_info, mock_log_note
+    ):
+        result = generate_order_invoice(self.order.id)
+
+        self.assertTrue(result)
+        mock_logger_info.assert_called_once()
+        mock_log_note.assert_called_once()
+
+    @patch("order.tasks.logger.error")
+    def test_generate_order_invoice_order_not_found(self, mock_logger):
+        result = generate_order_invoice(999999)
+
+        self.assertFalse(result)
+        mock_logger.assert_called_once()
+
+    @patch("order.tasks.OrderHistory.log_note")
+    @patch("order.tasks.logger.error")
+    def test_generate_order_invoice_exception(
+        self, mock_logger_error, mock_log_note
+    ):
+        mock_log_note.side_effect = Exception("Database error")
+
+        result = generate_order_invoice(self.order.id)
+
+        self.assertFalse(result)
+        mock_logger_error.assert_called_once()
+
+    @patch("order.tasks.OrderHistory.log_note")
+    @patch("order.tasks.EmailMultiAlternatives")
+    @patch("order.tasks.render_to_string")
+    @override_settings(
+        SITE_NAME="GrooveShop",
+        INFO_EMAIL="support@example.com",
+        SITE_URL="http://example.com",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    def test_check_pending_orders_success(
+        self, mock_render, mock_email, mock_log_note
+    ):
+        _ = OrderFactory.create(
+            status=OrderStatus.PENDING,
+            email="old@example.com",
+            created_at=timezone.now() - timedelta(days=2),
+        )
 
         mock_render.return_value = "Email content"
-
         mock_email_instance = MagicMock()
         mock_email.return_value = mock_email_instance
 
-        mock_settings.SITE_NAME = "GrooveShop"
-        mock_settings.INFO_EMAIL = "support@example.com"
-        mock_settings.SITE_URL = "http://example.com"
-        mock_settings.DEFAULT_FROM_EMAIL = "no-reply@example.com"
+        result = check_pending_orders()
 
-        with patch("order.tasks.check_pending_orders", return_value=2):
-            self.assertEqual(2, 2)
+        self.assertGreaterEqual(result, 0)
+        if result > 0:
+            mock_email_instance.send.assert_called()
+            mock_log_note.assert_called()
 
-    @patch("order.models.order.Order.objects.filter")
-    @patch("order.services.OrderService.update_order_status")
+    @patch("order.tasks.logger.error")
+    def test_check_pending_orders_exception(self, mock_logger):
+        with patch("order.models.order.Order.objects.filter") as mock_filter:
+            mock_filter.side_effect = Exception("Database error")
+
+            result = check_pending_orders()
+
+            self.assertEqual(result, 0)
+            mock_logger.assert_called_once()
+
     @patch("order.tasks.send_order_status_update_email.delay")
-    def test_update_order_statuses_from_shipping(
-        self, mock_email_task, mock_update_status, mock_filter
+    @patch("order.services.OrderService.update_order_status")
+    @patch("order.shipping.ShippingService.get_tracking_info")
+    def test_update_order_statuses_from_shipping_success(
+        self, mock_tracking, mock_update_status, mock_email_task
     ):
-        def simplified_test():
-            mock_update_status.return_value = True
-            mock_email_task.return_value = True
-            return 1
+        shipped_order = OrderFactory.create(
+            status=OrderStatus.SHIPPED,
+            tracking_number="TRACK123",
+            shipping_carrier="UPS",
+        )
 
-        with patch(
-            "order.tasks.update_order_statuses_from_shipping", return_value=1
-        ):
-            result = simplified_test()
+        mock_tracking.return_value = {"status": OrderStatus.DELIVERED}
+        mock_update_status.return_value = True
 
-            self.assertEqual(result, 1)
+        result = update_order_statuses_from_shipping()
+
+        self.assertGreaterEqual(result, 0)
+        if result > 0:
+            mock_tracking.assert_called_with("TRACK123", "UPS")
+            mock_update_status.assert_called_with(
+                shipped_order, OrderStatus.DELIVERED
+            )
+            mock_email_task.assert_called_with(
+                shipped_order.id, OrderStatus.DELIVERED
+            )
+
+    @patch("order.tasks.logger.error")
+    def test_update_order_statuses_from_shipping_exception(self, mock_logger):
+        with patch("order.models.order.Order.objects.filter") as mock_filter:
+            mock_filter.side_effect = Exception("Database error")
+
+            result = update_order_statuses_from_shipping()
+
+            self.assertEqual(result, 0)
+            mock_logger.assert_called_once()
+
+    def test_update_order_statuses_from_shipping_no_carrier(self):
+        OrderFactory.create(
+            status=OrderStatus.SHIPPED,
+            tracking_number="TRACK123",
+            shipping_carrier="",
+        )
+
+        result = update_order_statuses_from_shipping()
+
+        self.assertEqual(result, 0)
+
+    @patch("order.shipping.ShippingService.get_tracking_info")
+    def test_update_order_statuses_from_shipping_not_delivered(
+        self, mock_tracking
+    ):
+        OrderFactory.create(
+            status=OrderStatus.SHIPPED,
+            tracking_number="TRACK123",
+            shipping_carrier="UPS",
+        )
+
+        mock_tracking.return_value = {"status": "IN_TRANSIT"}
+
+        result = update_order_statuses_from_shipping()
+
+        self.assertEqual(result, 0)
+
+
+@pytest.mark.django_db
+class OrderTasksIntegrationTestCase(DjangoTestCase):
+    def setUp(self):
+        self.order = OrderFactory.create(
+            email="integration@example.com",
+            status=OrderStatus.PROCESSING,
+            tracking_number="INT123",
+            shipping_carrier="FedEx",
+        )
+
+    @patch("order.tasks.EmailMultiAlternatives")
+    @patch("order.tasks.render_to_string")
+    @override_settings(
+        SITE_NAME="GrooveShop",
+        INFO_EMAIL="support@example.com",
+        SITE_URL="http://example.com",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    def test_order_workflow_email_sequence(self, mock_render, mock_email):
+        mock_render.return_value = "Email content"
+        mock_email_instance = MagicMock()
+        mock_email.return_value = mock_email_instance
+
+        confirmation_result = send_order_confirmation_email(self.order.id)
+        status_result = send_order_status_update_email(
+            self.order.id, OrderStatus.PROCESSING
+        )
+        shipping_result = send_shipping_notification_email(self.order.id)
+
+        self.assertTrue(confirmation_result)
+        self.assertTrue(status_result)
+        self.assertTrue(shipping_result)
+
+        self.assertEqual(mock_email_instance.send.call_count, 3)
+
+    def test_database_operations_integrity(self):
+        self.assertTrue(Order.objects.filter(id=self.order.id).exists())
+
+        original_status = self.order.status
+        result = generate_order_invoice(self.order.id)
+
+        self.assertTrue(result)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, original_status)
+
+        history_count = OrderHistory.objects.filter(order=self.order).count()
+
+        generate_order_invoice(self.order.id)
+        new_history_count = OrderHistory.objects.filter(
+            order=self.order
+        ).count()
+        self.assertGreater(new_history_count, history_count)

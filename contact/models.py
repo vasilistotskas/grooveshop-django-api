@@ -15,7 +15,7 @@ class Contact(
     email = models.EmailField(_("Email"))
     message = models.TextField(_("Message"))
 
-    objects = ContactManager()
+    objects: ContactManager = ContactManager()
 
     def __str__(self):
         return f"{self.name} <{self.email}>"

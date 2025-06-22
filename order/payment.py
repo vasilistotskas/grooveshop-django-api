@@ -1,11 +1,11 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any
 
 from django.conf import settings
 from djmoney.money import Money
 
-from order.enum.status import PaymentStatusEnum
+from order.enum.status import PaymentStatus
 
 logger = logging.getLogger(__name__)
 
@@ -19,14 +19,14 @@ class PaymentProvider(ABC):
 
     @abstractmethod
     def refund_payment(
-        self, payment_id: str, amount: Optional[Money] = None
+        self, payment_id: str, amount: Money | None = None
     ) -> tuple[bool, dict[str, Any]]:
         pass
 
     @abstractmethod
     def get_payment_status(
         self, payment_id: str
-    ) -> tuple[PaymentStatusEnum, dict[str, Any]]:
+    ) -> tuple[PaymentStatus, dict[str, Any]]:
         pass
 
 
@@ -35,7 +35,7 @@ class StripePaymentProvider(PaymentProvider):
         self.api_key = settings.STRIPE_API_KEY
         self.webhook_secret = settings.STRIPE_WEBHOOK_SECRET
 
-        # In a real implementation, we would import and use the Stripe SDK here
+        # @TODO - In a real implementation, we would import and use the Stripe SDK here
         # import stripe
         # stripe.api_key = self.api_key
 
@@ -52,7 +52,7 @@ class StripePaymentProvider(PaymentProvider):
                 },
             )
 
-            # In a real implementation:
+            # @TODO - In a real implementation:
             # payment_intent = stripe.PaymentIntent.create(
             #     amount=int(amount.amount * 100),  # Convert to cents
             #     currency=amount.currency.lower(),
@@ -63,7 +63,7 @@ class StripePaymentProvider(PaymentProvider):
             # Mock response for demonstration
             payment_data = {
                 "payment_id": f"pi_{order_id}_mock",
-                "status": PaymentStatusEnum.COMPLETED,
+                "status": PaymentStatus.COMPLETED,
                 "amount": str(amount.amount),
                 "currency": amount.currency,
                 "provider": "stripe",
@@ -79,7 +79,7 @@ class StripePaymentProvider(PaymentProvider):
             return False, {"error": str(e)}
 
     def refund_payment(
-        self, payment_id: str, amount: Optional[Money] = None
+        self, payment_id: str, amount: Money | None = None
     ) -> tuple[bool, dict[str, Any]]:
         try:
             logger.info(
@@ -90,7 +90,7 @@ class StripePaymentProvider(PaymentProvider):
                 },
             )
 
-            # In a real implementation:
+            # @TODO - In a real implementation:
             # refund_params = {"payment_intent": payment_id}
             # if amount:
             #     refund_params["amount"] = int(amount.amount * 100)  # Convert to cents
@@ -99,7 +99,7 @@ class StripePaymentProvider(PaymentProvider):
             # Mock response
             refund_data = {
                 "refund_id": f"re_{payment_id}_mock",
-                "status": PaymentStatusEnum.REFUNDED,
+                "status": PaymentStatus.REFUNDED,
                 "amount": str(amount.amount) if amount else "full refund",
                 "payment_id": payment_id,
             }
@@ -115,26 +115,26 @@ class StripePaymentProvider(PaymentProvider):
 
     def get_payment_status(
         self, payment_id: str
-    ) -> tuple[PaymentStatusEnum, dict[str, Any]]:
+    ) -> tuple[PaymentStatus, dict[str, Any]]:
         try:
             logger.info(
                 "Getting Stripe payment status",
                 extra={"payment_id": payment_id},
             )
 
-            # In a real implementation:
+            # @TODO - In a real implementation:
             # payment_intent = stripe.PaymentIntent.retrieve(payment_id)
             # status_mapping = {
-            #     "succeeded": PaymentStatusEnum.COMPLETED,
-            #     "processing": PaymentStatusEnum.PROCESSING,
-            #     "requires_payment_method": PaymentStatusEnum.PENDING,
-            #     "canceled": PaymentStatusEnum.CANCELED,
+            #     "succeeded": PaymentStatus.COMPLETED,
+            #     "processing": PaymentStatus.PROCESSING,
+            #     "requires_payment_method": PaymentStatus.PENDING,
+            #     "canceled": PaymentStatus.CANCELED,
             #     # ... other mappings
             # }
-            # status = status_mapping.get(payment_intent.status, PaymentStatusEnum.FAILED)
+            # status = status_mapping.get(payment_intent.status, PaymentStatus.FAILED)
 
             # Mock response
-            status = PaymentStatusEnum.COMPLETED
+            status = PaymentStatus.COMPLETED
             status_data = {
                 "payment_id": payment_id,
                 "raw_status": "succeeded",
@@ -148,7 +148,7 @@ class StripePaymentProvider(PaymentProvider):
                 f"Failed to get Stripe payment status: {e!s}",
                 extra={"payment_id": payment_id, "error": str(e)},
             )
-            return PaymentStatusEnum.FAILED, {"error": str(e)}
+            return PaymentStatus.FAILED, {"error": str(e)}
 
 
 class PayPalPaymentProvider(PaymentProvider):
@@ -156,7 +156,7 @@ class PayPalPaymentProvider(PaymentProvider):
         self.client_id = settings.PAYPAL_CLIENT_ID
         self.client_secret = settings.PAYPAL_CLIENT_SECRET
 
-        # In a real implementation, we would import and use the PayPal SDK here
+        # @TODO - In a real implementation, we would import and use the PayPal SDK here
 
     def process_payment(
         self, amount: Money, order_id: str, **kwargs
@@ -174,7 +174,7 @@ class PayPalPaymentProvider(PaymentProvider):
             # Mock response for demonstration
             payment_data = {
                 "payment_id": f"PP_{order_id}_mock",
-                "status": PaymentStatusEnum.COMPLETED,
+                "status": PaymentStatus.COMPLETED,
                 "amount": str(amount.amount),
                 "currency": amount.currency,
                 "provider": "paypal",
@@ -190,7 +190,7 @@ class PayPalPaymentProvider(PaymentProvider):
             return False, {"error": str(e)}
 
     def refund_payment(
-        self, payment_id: str, amount: Optional[Money] = None
+        self, payment_id: str, amount: Money | None = None
     ) -> tuple[bool, dict[str, Any]]:
         try:
             logger.info(
@@ -204,7 +204,7 @@ class PayPalPaymentProvider(PaymentProvider):
             # Mock response
             refund_data = {
                 "refund_id": f"PP_RE_{payment_id}_mock",
-                "status": PaymentStatusEnum.REFUNDED,
+                "status": PaymentStatus.REFUNDED,
                 "amount": str(amount.amount) if amount else "full refund",
                 "payment_id": payment_id,
             }
@@ -220,7 +220,7 @@ class PayPalPaymentProvider(PaymentProvider):
 
     def get_payment_status(
         self, payment_id: str
-    ) -> tuple[PaymentStatusEnum, dict[str, Any]]:
+    ) -> tuple[PaymentStatus, dict[str, Any]]:
         try:
             logger.info(
                 "Getting PayPal payment status",
@@ -228,7 +228,7 @@ class PayPalPaymentProvider(PaymentProvider):
             )
 
             # Mock response
-            status = PaymentStatusEnum.COMPLETED
+            status = PaymentStatus.COMPLETED
             status_data = {
                 "payment_id": payment_id,
                 "raw_status": "COMPLETED",
@@ -242,7 +242,7 @@ class PayPalPaymentProvider(PaymentProvider):
                 f"Failed to get PayPal payment status: {e!s}",
                 extra={"payment_id": payment_id, "error": str(e)},
             )
-            return PaymentStatusEnum.FAILED, {"error": str(e)}
+            return PaymentStatus.FAILED, {"error": str(e)}
 
 
 def get_payment_provider(provider_name: str) -> PaymentProvider:

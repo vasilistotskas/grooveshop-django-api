@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import Any, Optional
+from typing import Any
 
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex, GinIndex
@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import models
 from django.db.models import F, Sum
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
@@ -16,7 +17,7 @@ from phonenumber_field.modelfields import PhoneNumberField
 from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from core.models import SoftDeleteModel, TimeStampMixinModel, UUIDModel
 from order.enum.document_type import OrderDocumentTypeEnum
-from order.enum.status import OrderStatusEnum, PaymentStatusEnum
+from order.enum.status import OrderStatus, PaymentStatus
 from order.managers.order import OrderManager
 
 
@@ -82,8 +83,8 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
     status = models.CharField(
         _("Status"),
         max_length=20,
-        choices=OrderStatusEnum,
-        default=OrderStatusEnum.PENDING,
+        choices=OrderStatus,
+        default=OrderStatus.PENDING,
     )
     shipping_price = MoneyField(
         _("Shipping Price"), max_digits=11, decimal_places=2, default=0
@@ -111,8 +112,8 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
         _("Payment Status"),
         max_length=50,
         blank=True,
-        choices=PaymentStatusEnum,
-        default=PaymentStatusEnum.PENDING,
+        choices=PaymentStatus,
+        default=PaymentStatus.PENDING,
     )
     payment_method = models.CharField(
         _("Payment Method"), max_length=50, blank=True, default=""
@@ -124,7 +125,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
         _("Shipping Carrier"), max_length=255, blank=True, default=""
     )
 
-    objects = OrderManager()
+    objects: OrderManager = OrderManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Order")
@@ -183,8 +184,6 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
         return f"Order {self.id} - {self.first_name} {self.last_name}"
 
     def save(self, *args: Any, **kwargs: Any) -> None:
-        from django.utils import timezone
-
         if (
             self.pk
             and hasattr(self, "_original_status")
@@ -268,7 +267,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
         return bool(
             (
                 self.payment_status
-                and self.payment_status == PaymentStatusEnum.COMPLETED
+                and self.payment_status == PaymentStatus.COMPLETED
             )
             or (self.paid_amount and self.paid_amount.amount > 0)
         )
@@ -276,18 +275,18 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
     @property
     def can_be_canceled(self) -> bool:
         cancellable_statuses = [
-            OrderStatusEnum.PENDING,
-            OrderStatusEnum.PROCESSING,
+            OrderStatus.PENDING,
+            OrderStatus.PROCESSING,
         ]
         return self.status in cancellable_statuses
 
     @property
     def is_completed(self) -> bool:
-        return self.status == OrderStatusEnum.COMPLETED
+        return self.status == OrderStatus.COMPLETED
 
     @property
     def is_canceled(self) -> bool:
-        return self.status == OrderStatusEnum.CANCELED
+        return self.status == OrderStatus.CANCELED
 
     @cached_property
     def total_price(self) -> Money:
@@ -308,10 +307,10 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
 
     def mark_as_paid(
         self,
-        payment_id: Optional[str] = None,
-        payment_method: Optional[str] = None,
+        payment_id: str | None = None,
+        payment_method: str | None = None,
     ) -> None:
-        self.payment_status = PaymentStatusEnum.COMPLETED
+        self.payment_status = PaymentStatus.COMPLETED
         if payment_id:
             self.payment_id = payment_id
         if payment_method:

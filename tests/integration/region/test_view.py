@@ -4,10 +4,9 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from country.factories import CountryFactory
-from country.models import Country
 from region.factories import RegionFactory
 from region.models import Region
-from region.serializers import RegionSerializer
+from region.serializers import RegionDetailSerializer
 
 languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
@@ -16,9 +15,6 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
 class RegionViewSetTestCase(APITestCase):
-    region: Region = None
-    country: Country = None
-
     def setUp(self):
         self.country = CountryFactory(num_regions=0)
         self.region = RegionFactory(
@@ -26,19 +22,17 @@ class RegionViewSetTestCase(APITestCase):
             country=self.country,
         )
 
-    @staticmethod
-    def get_region_detail_url(pk):
+    def get_region_detail_url(self, pk):
         return reverse("region-detail", args=[pk])
 
-    @staticmethod
-    def get_region_list_url():
+    def get_region_list_url(self):
         return reverse("region-list")
 
     def test_list(self):
         url = self.get_region_list_url()
         response = self.client.get(url)
         regions = Region.objects.all()
-        serializer = RegionSerializer(regions, many=True)
+        serializer = RegionDetailSerializer(regions, many=True)
 
         self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -84,7 +78,7 @@ class RegionViewSetTestCase(APITestCase):
         url = self.get_region_detail_url(self.region.alpha)
         response = self.client.get(url)
         region = Region.objects.get(alpha=self.region.alpha)
-        serializer = RegionSerializer(region)
+        serializer = RegionDetailSerializer(region)
 
         self.assertEqual(response.data, serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)

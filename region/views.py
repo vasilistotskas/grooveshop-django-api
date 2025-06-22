@@ -12,91 +12,42 @@ from rest_framework.response import Response
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
-from core.utils.serializers import MultiSerializerMixin
+from core.utils.serializers import (
+    MultiSerializerMixin,
+    create_schema_view_config,
+)
 from core.utils.views import cache_methods
+from region.filters import RegionFilter
 from region.models import Region
 from region.serializers import (
     RegionDetailSerializer,
-    RegionListSerializer,
+    RegionSerializer,
     RegionWriteSerializer,
 )
 
 
 @extend_schema_view(
-    list=extend_schema(
-        summary=_("List regions"),
-        description=_(
-            "Retrieve a list of regions with filtering and search capabilities."
-        ),
-        tags=["Regions"],
-        responses={
-            200: RegionListSerializer(many=True),
+    **create_schema_view_config(
+        model_class=Region,
+        display_config={
+            "tag": "Regions",
         },
-    ),
-    create=extend_schema(
-        summary=_("Create a region"),
-        description=_("Create a new region. Requires authentication."),
-        tags=["Regions"],
-        request=RegionWriteSerializer,
-        responses={
-            201: RegionDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
+        serializers={
+            "list_serializer": RegionSerializer,
+            "detail_serializer": RegionDetailSerializer,
+            "write_serializer": RegionWriteSerializer,
         },
-    ),
-    retrieve=extend_schema(
-        summary=_("Retrieve a region"),
-        description=_("Get detailed information about a specific region."),
-        tags=["Regions"],
-        responses={
-            200: RegionDetailSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    update=extend_schema(
-        summary=_("Update a region"),
-        description=_("Update region information. Requires authentication."),
-        tags=["Regions"],
-        request=RegionWriteSerializer,
-        responses={
-            200: RegionDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    partial_update=extend_schema(
-        summary=_("Partially update a region"),
-        description=_(
-            "Partially update region information. Requires authentication."
-        ),
-        tags=["Regions"],
-        request=RegionWriteSerializer,
-        responses={
-            200: RegionDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    destroy=extend_schema(
-        summary=_("Delete a region"),
-        description=_("Delete a region. Requires authentication."),
-        tags=["Regions"],
-        responses={
-            204: None,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
+        error_serializer=ErrorResponseSerializer,
     ),
     get_regions_by_country_alpha_2=extend_schema(
+        operation_id="listRegionsByCountry",
         summary=_("Get regions by country"),
         description=_(
-            "Get all regions for a specific country using the country's ISO alpha-2 code."
+            "Get all regions for a specific country using its alpha-2 code."
         ),
-        tags=["Regions"],
+        tags=["Geography"],
         responses={
-            200: RegionListSerializer(many=True),
+            200: RegionSerializer(many=True),
             404: ErrorResponseSerializer,
         },
     ),
@@ -112,10 +63,19 @@ class RegionViewSet(MultiSerializerMixin, BaseModelViewSet):
         PascalSnakeCaseOrderingFilter,
         SearchFilter,
     ]
-    filterset_fields = ["alpha", "country"]
-    ordering_fields = ["created_at"]
+    filterset_class = RegionFilter
+    ordering_fields = ["created_at", "alpha", "sort_order"]
     ordering = ["-created_at"]
-    search_fields = ["alpha", "country"]
+    search_fields = ["alpha", "translations__name", "country__alpha_2"]
+
+    serializers = {
+        "list": RegionSerializer,
+        "create": RegionWriteSerializer,
+        "update": RegionWriteSerializer,
+        "partial_update": RegionWriteSerializer,
+        "retrieve": RegionDetailSerializer,
+        "get_regions_by_country_alpha_2": RegionSerializer,
+    }
 
     @action(
         detail=True,

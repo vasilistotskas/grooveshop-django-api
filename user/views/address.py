@@ -15,7 +15,10 @@ from rest_framework.response import Response
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
-from core.utils.serializers import MultiSerializerMixin
+from core.utils.serializers import (
+    MultiSerializerMixin,
+    create_schema_view_config,
+)
 from core.utils.views import cache_methods
 from user.filters.address import UserAddressFilter
 from user.models.address import UserAddress
@@ -23,82 +26,27 @@ from user.serializers.address import (
     BulkDeleteAddressesRequestSerializer,
     BulkDeleteAddressesResponseSerializer,
     UserAddressDetailSerializer,
-    UserAddressListSerializer,
+    UserAddressSerializer,
     UserAddressWriteSerializer,
     ValidateAddressResponseSerializer,
 )
 
 
 @extend_schema_view(
-    list=extend_schema(
-        summary=_("List user addresses"),
-        description=_(
-            "Retrieve a list of addresses for the authenticated user."
-        ),
-        tags=["User Addresses"],
-        responses={
-            200: UserAddressListSerializer(many=True),
-            401: ErrorResponseSerializer,
+    **create_schema_view_config(
+        model_class=UserAddress,
+        display_config={
+            "tag": "User Addresses",
         },
-    ),
-    retrieve=extend_schema(
-        summary=_("Retrieve a user address"),
-        description=_(
-            "Get detailed information about a specific user address."
-        ),
-        tags=["User Addresses"],
-        responses={
-            200: UserAddressDetailSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
+        serializers={
+            "list_serializer": UserAddressSerializer,
+            "detail_serializer": UserAddressDetailSerializer,
+            "write_serializer": UserAddressWriteSerializer,
         },
-    ),
-    create=extend_schema(
-        summary=_("Create a user address"),
-        description=_("Create a new address for the authenticated user."),
-        tags=["User Addresses"],
-        request=UserAddressWriteSerializer,
-        responses={
-            201: UserAddressDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-        },
-    ),
-    update=extend_schema(
-        summary=_("Update a user address"),
-        description=_("Update user address information."),
-        tags=["User Addresses"],
-        request=UserAddressWriteSerializer,
-        responses={
-            200: UserAddressDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    partial_update=extend_schema(
-        summary=_("Partially update a user address"),
-        description=_("Partially update user address information."),
-        tags=["User Addresses"],
-        request=UserAddressWriteSerializer,
-        responses={
-            200: UserAddressDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    destroy=extend_schema(
-        summary=_("Delete a user address"),
-        description=_("Delete a user address."),
-        tags=["User Addresses"],
-        responses={
-            204: None,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
+        error_serializer=ErrorResponseSerializer,
     ),
     set_main=extend_schema(
+        operation_id="setMainUserAddress",
         summary=_("Set address as main"),
         description=_("Set this address as the user's main address."),
         tags=["User Addresses"],
@@ -110,6 +58,7 @@ from user.serializers.address import (
         },
     ),
     get_main=extend_schema(
+        operation_id="getMainUserAddress",
         summary=_("Get main address"),
         description=_("Retrieve the user's main address."),
         tags=["User Addresses"],
@@ -120,6 +69,7 @@ from user.serializers.address import (
         },
     ),
     validate_address=extend_schema(
+        operation_id="validateUserAddress",
         summary=_("Validate address"),
         description=_("Validate an address without saving it."),
         tags=["User Addresses"],
@@ -131,6 +81,7 @@ from user.serializers.address import (
         },
     ),
     bulk_delete=extend_schema(
+        operation_id="bulkDeleteUserAddresses",
         summary=_("Bulk delete addresses"),
         description=_("Delete multiple addresses by their IDs."),
         tags=["User Addresses"],
@@ -144,8 +95,10 @@ from user.serializers.address import (
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class UserAddressViewSet(MultiSerializerMixin, BaseModelViewSet):
+    serializer_class = None
     serializers = {
-        "list": UserAddressListSerializer,
+        "default": UserAddressDetailSerializer,
+        "list": UserAddressSerializer,
         "retrieve": UserAddressDetailSerializer,
         "create": UserAddressWriteSerializer,
         "update": UserAddressWriteSerializer,
@@ -188,61 +141,59 @@ class UserAddressViewSet(MultiSerializerMixin, BaseModelViewSet):
 
         return UserAddress.objects.filter(
             user=self.request.user
-        ).select_related("user", "country", "region")
+        ).select_related("country", "region")
 
     @action(detail=True, methods=["POST"])
     def set_main(self, request, pk=None):
         address = self.get_object()
-
         UserAddress.objects.filter(user=request.user, is_main=True).update(
             is_main=False
         )
-
         address.is_main = True
-        address.save(update_fields=["is_main"])
+        address.save()
 
         serializer = self.get_serializer(address)
         return Response(serializer.data)
 
     @action(detail=False, methods=["GET"])
     def get_main(self, request):
-        try:
-            main_address = self.get_queryset().get(is_main=True)
+        main_address = UserAddress.objects.filter(
+            user=request.user, is_main=True
+        ).first()
+        if main_address:
             serializer = self.get_serializer(main_address)
             return Response(serializer.data)
-        except UserAddress.DoesNotExist:
-            return Response({"detail": _("No main address found.")}, status=404)
+        return Response({"detail": _("No main address found.")}, status=404)
 
     @action(detail=False, methods=["POST"])
     def validate_address(self, request):
-        serializer = UserAddressWriteSerializer(
-            data=request.data, context=self.get_serializer_context()
-        )
+        serializer = UserAddressWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
-        if serializer.is_valid():
-            # Here we could integrate with address validation services
-            # like Google Maps API, SmartyStreets, etc.
-            return Response({"valid": True, "errors": {}, "suggestions": []})
-        else:
-            return Response(
-                {"valid": False, "errors": serializer.errors, "suggestions": []}
-            )
+        return Response(
+            {
+                "valid": True,
+                "details": _("Address validation successful."),
+                "data": serializer.validated_data,
+            }
+        )
 
     @action(detail=False, methods=["DELETE"])
     def bulk_delete(self, request):
-        address_ids = request.data.get("address_ids", [])
+        serializer = BulkDeleteAddressesRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
-        if not address_ids:
-            return Response(
-                {"detail": _("No address IDs provided.")}, status=400
-            )
-
-        queryset = self.get_queryset().filter(id__in=address_ids)
-        deleted_ids = list(queryset.values_list("id", flat=True))
-        deleted_count = queryset.count()
-
-        queryset.delete()
+        address_ids = serializer.validated_data["address_ids"]
+        deleted_count, _ = UserAddress.objects.filter(
+            id__in=address_ids, user=request.user
+        ).delete()
 
         return Response(
-            {"deleted_count": deleted_count, "deleted_ids": deleted_ids}
+            {
+                "deleted_count": deleted_count,
+                "requested_count": len(address_ids),
+                "details": _(
+                    f"Deleted {deleted_count} out of {len(address_ids)} requested addresses."
+                ),
+            }
         )

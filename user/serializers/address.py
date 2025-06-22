@@ -11,7 +11,7 @@ from user.models.address import UserAddress
 User = get_user_model()
 
 
-class UserAddressListSerializer(serializers.ModelSerializer):
+class UserAddressSerializer(serializers.ModelSerializer[UserAddress]):
     user = PrimaryKeyRelatedField(read_only=True)
     country = PrimaryKeyRelatedField(queryset=Country.objects.all())
     region = PrimaryKeyRelatedField(queryset=Region.objects.all())
@@ -51,12 +51,12 @@ class UserAddressListSerializer(serializers.ModelSerializer):
         )
 
 
-class UserAddressDetailSerializer(UserAddressListSerializer):
-    class Meta(UserAddressListSerializer.Meta):
-        fields = (*UserAddressListSerializer.Meta.fields,)
+class UserAddressDetailSerializer(UserAddressSerializer):
+    class Meta(UserAddressSerializer.Meta):
+        fields = (*UserAddressSerializer.Meta.fields,)
 
 
-class UserAddressWriteSerializer(serializers.ModelSerializer):
+class UserAddressWriteSerializer(serializers.ModelSerializer[UserAddress]):
     user = PrimaryKeyRelatedField(queryset=User.objects.all())
     country = PrimaryKeyRelatedField(queryset=Country.objects.all())
     region = PrimaryKeyRelatedField(
@@ -88,6 +88,8 @@ class UserAddressWriteSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError(
                         _("A main address already exists for this user")
                     )
+
+        return data
 
     class Meta:
         model = UserAddress

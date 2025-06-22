@@ -14,8 +14,6 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 
 class PayWayViewSetTestCase(APITestCase):
-    pay_way: PayWay = None
-
     def setUp(self):
         self.pay_way = PayWayFactory(
             active=True,
@@ -23,12 +21,10 @@ class PayWayViewSetTestCase(APITestCase):
             free_threshold=100.00,
         )
 
-    @staticmethod
-    def get_pay_way_detail_url(pk):
+    def get_pay_way_detail_url(self, pk):
         return reverse("payway-detail", args=[pk])
 
-    @staticmethod
-    def get_pay_way_list_url():
+    def get_pay_way_list_url(self):
         return reverse("payway-list")
 
     def test_list(self):

@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.db.models.signals import post_save
 from django.test import TestCase, TransactionTestCase
 
@@ -47,7 +48,7 @@ class CreateDefaultSubscriptionsSignalTest(TransactionTestCase):
         )
 
         subscriptions = UserSubscription.objects.filter(user=user)
-        self.assertEqual(subscriptions.count(), 3)  # Only active default topics
+        self.assertEqual(subscriptions.count(), 3)
 
         subscribed_topics = set(sub.topic for sub in subscriptions)
         expected_topics = set(self.default_topics)
@@ -150,8 +151,6 @@ class CreateDefaultSubscriptionsSignalTest(TransactionTestCase):
             )
 
     def test_signal_with_transaction(self):
-        from django.db import transaction
-
         with transaction.atomic():
             user = User.objects.create_user(
                 email="transactiontest@test.com",
@@ -212,7 +211,6 @@ class SignalDisconnectionTest(TestCase):
                     status=UserSubscription.SubscriptionStatus.ACTIVE,
                 )
 
-            # Verify subscriptions exist
             self.assertEqual(
                 UserSubscription.objects.filter(user=user).count(),
                 default_topics.count(),

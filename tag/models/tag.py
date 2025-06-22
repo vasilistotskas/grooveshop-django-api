@@ -20,7 +20,7 @@ class Tag(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         )
     )
 
-    objects = TagManager()
+    objects: TagManager = TagManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Tag")

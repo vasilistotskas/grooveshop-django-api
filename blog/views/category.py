@@ -16,95 +16,36 @@ from blog.filters.category import BlogCategoryFilter
 from blog.models.category import BlogCategory
 from blog.serializers.category import (
     BlogCategoryDetailSerializer,
-    BlogCategoryListSerializer,
     BlogCategoryReorderRequestSerializer,
     BlogCategoryReorderResponseSerializer,
+    BlogCategorySerializer,
     BlogCategoryWriteSerializer,
 )
-from blog.serializers.post import BlogPostListSerializer
+from blog.serializers.post import BlogPostSerializer
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
-from core.utils.serializers import MultiSerializerMixin
+from core.utils.serializers import (
+    MultiSerializerMixin,
+    create_schema_view_config,
+)
 from core.utils.views import cache_methods
 
 
 @extend_schema_view(
-    list=extend_schema(
-        summary=_("List blog categories"),
-        description=_(
-            "Retrieve a list of blog categories with hierarchical support. "
-            "Supports filtering by parent, level, and translation fields. "
-            "Use 'tree=true' parameter to get nested tree structure."
-        ),
-        tags=["Blog Categories"],
-        responses={
-            200: BlogCategoryListSerializer(many=True),
+    **create_schema_view_config(
+        model_class=BlogCategory,
+        display_config={
+            "tag": "Blog Categories",
         },
-    ),
-    retrieve=extend_schema(
-        summary=_("Retrieve a blog category"),
-        description=_(
-            "Get detailed information about a specific blog category including "
-            "ancestors, descendants, and post counts."
-        ),
-        tags=["Blog Categories"],
-        responses={
-            200: BlogCategoryDetailSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    create=extend_schema(
-        summary=_("Create a blog category"),
-        description=_(
-            "Create a new blog category. Supports hierarchical structure."
-        ),
-        tags=["Blog Categories"],
-        request=BlogCategoryWriteSerializer,
-        responses={
-            201: BlogCategoryDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-        },
-    ),
-    update=extend_schema(
-        summary=_("Update a blog category"),
-        description=_("Update blog category information."),
-        tags=["Blog Categories"],
-        request=BlogCategoryWriteSerializer,
-        responses={
-            200: BlogCategoryDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    partial_update=extend_schema(
-        summary=_("Partially update a blog category"),
-        description=_("Partially update blog category information."),
-        tags=["Blog Categories"],
-        request=BlogCategoryWriteSerializer,
-        responses={
-            200: BlogCategoryDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    destroy=extend_schema(
-        summary=_("Delete a blog category"),
-        description=_(
-            "Delete a blog category. Note: This will also affect all child categories "
-            "and associated blog posts based on cascade settings."
-        ),
-        tags=["Blog Categories"],
-        responses={
-            204: None,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
+        serializers={
+            "list_serializer": BlogCategorySerializer,
+            "detail_serializer": BlogCategoryDetailSerializer,
+            "write_serializer": BlogCategoryWriteSerializer,
         },
     ),
     posts=extend_schema(
+        operation_id="listBlogCategoryPosts",
         summary=_("Get category's blog posts"),
         description=_(
             "Retrieve all blog posts in this category and its subcategories. "
@@ -122,51 +63,56 @@ from core.utils.views import cache_methods
             ),
         ],
         responses={
-            200: BlogPostListSerializer(many=True),
+            200: BlogPostSerializer(many=True),
             404: ErrorResponseSerializer,
         },
     ),
     children=extend_schema(
+        operation_id="listBlogCategoryChildren",
         summary=_("Get category children"),
         description=_("Get direct children of this category."),
         tags=["Blog Categories"],
         responses={
-            200: BlogCategoryListSerializer(many=True),
+            200: BlogCategorySerializer(many=True),
             404: ErrorResponseSerializer,
         },
     ),
     descendants=extend_schema(
+        operation_id="listBlogCategoryDescendants",
         summary=_("Get category descendants"),
         description=_(
             "Get all descendants (children, grandchildren, etc.) of this category."
         ),
         tags=["Blog Categories"],
         responses={
-            200: BlogCategoryListSerializer(many=True),
+            200: BlogCategorySerializer(many=True),
             404: ErrorResponseSerializer,
         },
     ),
     ancestors=extend_schema(
+        operation_id="listBlogCategoryAncestors",
         summary=_("Get category ancestors"),
         description=_(
             "Get all ancestors (parent, grandparent, etc.) of this category."
         ),
         tags=["Blog Categories"],
         responses={
-            200: BlogCategoryListSerializer(many=True),
+            200: BlogCategorySerializer(many=True),
             404: ErrorResponseSerializer,
         },
     ),
     siblings=extend_schema(
+        operation_id="listBlogCategorySiblings",
         summary=_("Get category siblings"),
         description=_("Get sibling categories (same parent level)."),
         tags=["Blog Categories"],
         responses={
-            200: BlogCategoryListSerializer(many=True),
+            200: BlogCategorySerializer(many=True),
             404: ErrorResponseSerializer,
         },
     ),
     tree=extend_schema(
+        operation_id="getBlogCategoryTree",
         summary=_("Get complete category tree"),
         description=_(
             "Get the complete category tree structure with nested relationships. "
@@ -175,10 +121,11 @@ from core.utils.views import cache_methods
         ),
         tags=["Blog Categories"],
         responses={
-            200: BlogCategoryListSerializer(many=True),
+            200: BlogCategorySerializer(many=True),
         },
     ),
     reorder=extend_schema(
+        operation_id="reorderBlogCategories",
         summary=_("Reorder categories"),
         description=_(
             "Batch reorder categories by updating their sort_order values."
@@ -197,12 +144,33 @@ from core.utils.views import cache_methods
     methods=["list", "retrieve", "posts", "tree", "ancestors", "descendants"],
 )
 class BlogCategoryViewSet(MultiSerializerMixin, BaseModelViewSet):
-    filterset_class = BlogCategoryFilter
+    queryset = BlogCategory.objects.all()
+    serializers = {
+        "default": BlogCategoryDetailSerializer,
+        "list": BlogCategorySerializer,
+        "retrieve": BlogCategoryDetailSerializer,
+        "create": BlogCategoryWriteSerializer,
+        "update": BlogCategoryWriteSerializer,
+        "partial_update": BlogCategoryWriteSerializer,
+        "posts": BlogPostSerializer,
+        "children": BlogCategorySerializer,
+        "descendants": BlogCategorySerializer,
+        "ancestors": BlogCategorySerializer,
+        "siblings": BlogCategorySerializer,
+        "tree": BlogCategorySerializer,
+        "reorder": BlogCategoryReorderResponseSerializer,
+    }
+    response_serializers = {
+        "create": BlogCategoryDetailSerializer,
+        "update": BlogCategoryDetailSerializer,
+        "partial_update": BlogCategoryDetailSerializer,
+    }
     filter_backends = [
         DjangoFilterBackend,
         PascalSnakeCaseOrderingFilter,
         SearchFilter,
     ]
+    filterset_class = BlogCategoryFilter
     ordering_fields = [
         "id",
         "created_at",
@@ -218,21 +186,6 @@ class BlogCategoryViewSet(MultiSerializerMixin, BaseModelViewSet):
         "translations__name",
         "translations__description",
     ]
-
-    serializers = {
-        "list": BlogCategoryListSerializer,
-        "retrieve": BlogCategoryDetailSerializer,
-        "create": BlogCategoryWriteSerializer,
-        "update": BlogCategoryWriteSerializer,
-        "partial_update": BlogCategoryWriteSerializer,
-        "posts": BlogPostListSerializer,
-        "children": BlogCategoryListSerializer,
-        "descendants": BlogCategoryListSerializer,
-        "ancestors": BlogCategoryListSerializer,
-        "siblings": BlogCategoryListSerializer,
-        "tree": BlogCategoryListSerializer,
-        "reorder": BlogCategoryReorderResponseSerializer,
-    }
 
     def get_queryset(self):
         if self.request and self.request.query_params.get("tree") == "true":
@@ -259,7 +212,7 @@ class BlogCategoryViewSet(MultiSerializerMixin, BaseModelViewSet):
             self.get_queryset().filter(parent__isnull=True)
         )
 
-        serializer = BlogCategoryListSerializer(queryset, many=True)
+        serializer = BlogCategorySerializer(queryset, many=True)
         return Response(serializer.data)
 
     @action(detail=True, methods=["GET"])

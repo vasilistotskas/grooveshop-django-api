@@ -4,8 +4,6 @@ from django.test import TestCase
 
 from product.factories.product import ProductFactory
 from product.factories.review import ProductReviewFactory
-from product.models.product import Product
-from product.models.review import ProductReview
 from user.factories.account import UserAccountFactory
 
 languages = [
@@ -16,10 +14,6 @@ User = get_user_model()
 
 
 class ProductReviewModelTestCase(TestCase):
-    user: User = None
-    product: Product = None
-    product_review: ProductReview = None
-
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
         self.product = ProductFactory(num_images=0, num_reviews=0)

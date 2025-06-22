@@ -5,10 +5,10 @@ from django.core.validators import RegexValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
-from parler.managers import TranslatableManager
 from parler.models import TranslatableModel, TranslatedFields
 
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
+from country.managers import CountryManager
 
 
 class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
@@ -48,7 +48,7 @@ class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         name=models.CharField(_("Name"), max_length=100, blank=True, null=True)
     )
 
-    objects: TranslatableManager = TranslatableManager()
+    objects: CountryManager = CountryManager()
 
     class Meta(TypedModelMeta):
         ordering = ["sort_order"]

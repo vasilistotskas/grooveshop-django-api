@@ -15,8 +15,8 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
 
 
-class PayWayListSerializer(
-    TranslatableModelSerializer, serializers.ModelSerializer
+class PayWaySerializer(
+    TranslatableModelSerializer, serializers.ModelSerializer[PayWay]
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=PayWay)
     cost = MoneyField(max_digits=11, decimal_places=2)
@@ -35,7 +35,6 @@ class PayWayListSerializer(
             "created_at",
             "updated_at",
             "uuid",
-            "icon_absolute_url",
             "icon_filename",
             "provider_code",
             "is_online_payment",
@@ -46,34 +45,31 @@ class PayWayListSerializer(
             "created_at",
             "updated_at",
             "uuid",
-            "icon_absolute_url",
             "icon_filename",
         )
 
 
-class PayWayDetailSerializer(PayWayListSerializer):
-    class Meta(PayWayListSerializer.Meta):
+class PayWayDetailSerializer(PayWaySerializer):
+    class Meta(PayWaySerializer.Meta):
         fields = (
-            *PayWayListSerializer.Meta.fields,
+            *PayWaySerializer.Meta.fields,
             "configuration",
         )
 
 
 class PayWayWriteSerializer(
-    TranslatableModelSerializer, serializers.ModelSerializer
+    TranslatableModelSerializer, serializers.ModelSerializer[PayWay]
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=PayWay)
     cost = MoneyField(max_digits=11, decimal_places=2)
     free_threshold = MoneyField(max_digits=11, decimal_places=2, required=False)
 
-    @staticmethod
-    def validate_cost(value: Money) -> Money:
+    def validate_cost(self, value: Money) -> Money:
         if value and value.amount < 0:
             raise serializers.ValidationError(_("Cost cannot be negative."))
         return value
 
-    @staticmethod
-    def validate_free_threshold(value: Money) -> Money:
+    def validate_free_threshold(self, value: Money) -> Money:
         if value and value.amount < 0:
             raise serializers.ValidationError(
                 _("Free order amount threshold cannot be negative.")

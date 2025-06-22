@@ -154,8 +154,7 @@ class CartService:
             self.cart.items.all().delete()
             self.cart_items = []
 
-    @staticmethod
-    def get_cart_by_id(cart_id: int):
+    def get_cart_by_id(self, cart_id: int):
         return Cart.objects.filter(id=cart_id).first()
 
     def get_cart_item(self, product_id: int | None):

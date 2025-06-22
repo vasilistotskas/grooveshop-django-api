@@ -25,7 +25,7 @@ class OrderItemQuerySet(models.QuerySet):
         )
 
     def annotate_total_price(self):
-        return self.annotate(calculated_total=F("price_amount") * F("quantity"))
+        return self.annotate(calculated_total=F("price") * F("quantity"))
 
     def total_items_cost(self):
         items = self.annotate_total_price()

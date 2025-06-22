@@ -6,6 +6,8 @@ from urllib.parse import parse_qs
 
 from channels.db import database_sync_to_async
 from channels.middleware import BaseMiddleware
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from django.utils import timezone
 from knox.crypto import hash_token
 from knox.settings import CONSTANTS, knox_settings
@@ -15,14 +17,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+User = get_user_model()
+
 
 @database_sync_to_async
 def get_user(user_id: int):
-    from django.contrib.auth import get_user_model
-    from django.contrib.auth.models import AnonymousUser
-
-    User = get_user_model()
-
     try:
         return User.objects.get(id=user_id)
     except User.DoesNotExist:
@@ -31,8 +30,8 @@ def get_user(user_id: int):
 
 @database_sync_to_async
 def authenticate_token(token: str):
-    from django.contrib.auth.models import AnonymousUser
-    from knox.models import get_token_model
+    from django.contrib.auth.models import AnonymousUser  # noqa: PLC0415
+    from knox.models import get_token_model  # noqa: PLC0415
 
     logger.debug(f"Authenticating token: {token[:10]}...")
 
@@ -134,7 +133,7 @@ class TokenAuthMiddleware(BaseMiddleware):
                 f"User retrieved by ID: {user.username if not user.is_anonymous else 'AnonymousUser'}"
             )
         else:
-            from django.contrib.auth.models import AnonymousUser
+            from django.contrib.auth.models import AnonymousUser  # noqa: PLC0415, I001
 
             logger.debug("TokenAuthMiddleware Token not found and no user_id")
             scope["user"] = AnonymousUser()

@@ -4,7 +4,7 @@ from django.db import models
 from django.db.models import ExpressionWrapper, F, QuerySet, Sum
 from djmoney.models.fields import MoneyField
 
-from order.enum.status import OrderStatusEnum
+from order.enum.status import OrderStatus
 
 
 class OrderQuerySet(models.QuerySet):
@@ -19,28 +19,28 @@ class OrderQuerySet(models.QuerySet):
         )
 
     def pending(self) -> QuerySet:
-        return self.filter(status=OrderStatusEnum.PENDING)
+        return self.filter(status=OrderStatus.PENDING)
 
     def processing(self) -> QuerySet:
-        return self.filter(status=OrderStatusEnum.PROCESSING)
+        return self.filter(status=OrderStatus.PROCESSING)
 
     def shipped(self) -> QuerySet:
-        return self.filter(status=OrderStatusEnum.SHIPPED)
+        return self.filter(status=OrderStatus.SHIPPED)
 
     def delivered(self) -> QuerySet:
-        return self.filter(status=OrderStatusEnum.DELIVERED)
+        return self.filter(status=OrderStatus.DELIVERED)
 
     def completed(self) -> QuerySet:
-        return self.filter(status=OrderStatusEnum.COMPLETED)
+        return self.filter(status=OrderStatus.COMPLETED)
 
     def canceled(self) -> QuerySet:
-        return self.filter(status=OrderStatusEnum.CANCELED)
+        return self.filter(status=OrderStatus.CANCELED)
 
     def returned(self) -> QuerySet:
-        return self.filter(status=OrderStatusEnum.RETURNED)
+        return self.filter(status=OrderStatus.RETURNED)
 
     def refunded(self) -> QuerySet:
-        return self.filter(status=OrderStatusEnum.REFUNDED)
+        return self.filter(status=OrderStatus.REFUNDED)
 
 
 class OrderManager(models.Manager):

@@ -3,12 +3,12 @@ from typing import Any
 
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
+from drf_spectacular.helpers import lazy_serializer
 from drf_spectacular.utils import extend_schema_field
 from mptt.fields import TreeForeignKey
 from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
-from rest_framework.utils.serializer_helpers import ReturnDict
 
 from authentication.serializers import AuthenticationSerializer
 from blog.models.comment import BlogComment
@@ -24,7 +24,7 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
 
 
-class BlogCommentListSerializer(
+class BlogCommentSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[BlogComment]
 ):
     user = AuthenticationSerializer(read_only=True)
@@ -105,7 +105,7 @@ class BlogCommentListSerializer(
         )
 
 
-class BlogCommentDetailSerializer(BlogCommentListSerializer):
+class BlogCommentDetailSerializer(BlogCommentSerializer):
     post = serializers.SerializerMethodField(
         help_text=_("Basic information about the blog post")
     )
@@ -122,17 +122,28 @@ class BlogCommentDetailSerializer(BlogCommentListSerializer):
         help_text=_("Position information in the comment tree")
     )
 
-    def get_post(self, obj: BlogComment) -> dict:
-        return {
-            "id": obj.post.id,
-            "title": obj.post.safe_translation_getter(
-                "title", any_language=True
-            ),
-            "slug": obj.post.slug,
-            "url": f"/blog/posts/{obj.post.slug}/",
-        }
+    @extend_schema_field(
+        lazy_serializer("blog.serializers.post.BlogPostSerializer")()
+    )
+    def get_post(self, obj: BlogComment):
+        from blog.serializers.post import BlogPostSerializer  # noqa: PLC0415, I001
 
-    def get_parent_comment(self, obj: BlogComment) -> dict | None:
+        return BlogPostSerializer(obj.post, context=self.context).data
+
+    @extend_schema_field(
+        {
+            "type": "object",
+            "nullable": True,
+            "properties": {
+                "id": {"type": "integer"},
+                "content_preview": {"type": "string"},
+                "user": {"$ref": "#/components/schemas/Authentication"},
+                "created_at": {"type": "string", "format": "date-time"},
+            },
+            "required": ["id", "content_preview", "user", "created_at"],
+        }
+    )
+    def get_parent_comment(self, obj: BlogComment):
         if obj.parent:
             return {
                 "id": obj.parent.id,
@@ -142,17 +153,36 @@ class BlogCommentDetailSerializer(BlogCommentListSerializer):
             }
         return None
 
-    def get_children_comments(self, obj: BlogComment) -> ReturnDict | list[Any]:
+    @extend_schema_field(
+        lazy_serializer("blog.serializers.comment.BlogCommentSerializer")(
+            many=True
+        )
+    )
+    def get_children_comments(self, obj: BlogComment):
         children = (
             obj.get_children().select_related("user").order_by("created_at")
         )
         if children.exists():
-            return BlogCommentListSerializer(
+            return BlogCommentSerializer(
                 children, many=True, context=self.context
             ).data
         return []
 
-    def get_ancestors_path(self, obj: BlogComment) -> list:
+    @extend_schema_field(
+        {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "content_preview": {"type": "string"},
+                    "user": {"$ref": "#/components/schemas/Authentication"},
+                },
+                "required": ["id", "content_preview", "user"],
+            },
+        }
+    )
+    def get_ancestors_path(self, obj: BlogComment):
         ancestors = obj.get_ancestors().select_related("user")
         return [
             {
@@ -163,7 +193,24 @@ class BlogCommentDetailSerializer(BlogCommentListSerializer):
             for ancestor in ancestors
         ]
 
-    def get_tree_position(self, obj: BlogComment) -> dict:
+    @extend_schema_field(
+        {
+            "type": "object",
+            "properties": {
+                "level": {"type": "integer"},
+                "tree_id": {"type": "integer"},
+                "position_in_tree": {"type": "integer"},
+                "siblings_count": {"type": "integer"},
+            },
+            "required": [
+                "level",
+                "tree_id",
+                "position_in_tree",
+                "siblings_count",
+            ],
+        }
+    )
+    def get_tree_position(self, obj: BlogComment):
         return {
             "level": obj.level,
             "tree_id": obj.tree_id,
@@ -171,9 +218,9 @@ class BlogCommentDetailSerializer(BlogCommentListSerializer):
             "siblings_count": obj.get_siblings().count(),
         }
 
-    class Meta(BlogCommentListSerializer.Meta):
+    class Meta(BlogCommentSerializer.Meta):
         fields = (
-            *BlogCommentListSerializer.Meta.fields,
+            *BlogCommentSerializer.Meta.fields,
             "post",
             "parent_comment",
             "children_comments",
@@ -228,8 +275,7 @@ class BlogCommentLikedCommentsRequestSerializer(serializers.Serializer):
         help_text=_("List of comment IDs to check like status for"),
     )
 
-    @staticmethod
-    def validate_comment_ids(value: list) -> list:
+    def validate_comment_ids(self, value: list) -> list:
         if not value:
             raise serializers.ValidationError(
                 _("At least one comment ID is required.")

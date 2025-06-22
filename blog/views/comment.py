@@ -22,8 +22,8 @@ from blog.serializers.comment import (
     BlogCommentDetailSerializer,
     BlogCommentLikedCommentsRequestSerializer,
     BlogCommentLikedCommentsResponseSerializer,
-    BlogCommentListSerializer,
     BlogCommentMyCommentRequestSerializer,
+    BlogCommentSerializer,
     BlogCommentWriteSerializer,
 )
 from blog.serializers.post import (
@@ -32,200 +32,78 @@ from blog.serializers.post import (
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
-from core.utils.serializers import MultiSerializerMixin
+from core.utils.serializers import (
+    MultiSerializerMixin,
+    create_schema_view_config,
+)
 from core.utils.views import cache_methods
 
 
 @extend_schema_view(
-    list=extend_schema(
-        summary=_("List blog comments"),
-        description=_(
-            "Retrieve a list of blog comments with hierarchical support. "
-            "Supports filtering by post, user, approval status, and content. "
-        ),
-        tags=["Blog Comments"],
-        responses={
-            200: BlogCommentListSerializer(many=True),
+    **create_schema_view_config(
+        model_class=BlogComment,
+        display_config={
+            "tag": "Blog Comments",
         },
-    ),
-    retrieve=extend_schema(
-        summary=_("Retrieve a blog comment"),
-        description=_(
-            "Get detailed information about a specific blog comment including replies."
-        ),
-        tags=["Blog Comments"],
-        responses={
-            200: BlogCommentDetailSerializer,
-            404: ErrorResponseSerializer,
+        serializers={
+            "list_serializer": BlogCommentSerializer,
+            "detail_serializer": BlogCommentDetailSerializer,
+            "write_serializer": BlogCommentWriteSerializer,
         },
-    ),
-    create=extend_schema(
-        summary=_("Create a blog comment"),
-        description=_(
-            "Create a new blog comment. Requires authentication. "
-            "Comments are subject to approval before being visible."
-        ),
-        tags=["Blog Comments"],
-        request=BlogCommentWriteSerializer,
-        responses={
-            201: BlogCommentDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
+        error_serializer=ErrorResponseSerializer,
+        additional_responses={
+            "create": {201: BlogCommentDetailSerializer},
+            "update": {200: BlogCommentDetailSerializer},
+            "partial_update": {200: BlogCommentDetailSerializer},
         },
-    ),
-    update=extend_schema(
-        summary=_("Update a blog comment"),
-        description=_("Update your own blog comment. Requires authentication."),
-        tags=["Blog Comments"],
-        request=BlogCommentWriteSerializer,
-        responses={
-            200: BlogCommentDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            403: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    partial_update=extend_schema(
-        summary=_("Partially update a blog comment"),
-        description=_(
-            "Partially update your own blog comment. Requires authentication."
-        ),
-        tags=["Blog Comments"],
-        request=BlogCommentWriteSerializer,
-        responses={
-            200: BlogCommentDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            403: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    destroy=extend_schema(
-        summary=_("Delete a blog comment"),
-        description=_("Delete your own blog comment. Requires authentication."),
-        tags=["Blog Comments"],
-        responses={
-            204: None,
-            401: ErrorResponseSerializer,
-            403: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    replies=extend_schema(
-        summary=_("Get comment replies"),
-        description=_(
-            "Get all replies (children) of this comment in threaded structure."
-        ),
-        tags=["Blog Comments"],
-        responses={
-            200: BlogCommentListSerializer(many=True),
-            404: ErrorResponseSerializer,
-        },
-    ),
-    thread=extend_schema(
-        summary=_("Get comment thread"),
-        description=_(
-            "Get the complete thread (all ancestors and descendants) of this comment."
-        ),
-        tags=["Blog Comments"],
-        responses={
-            200: BlogCommentListSerializer(many=True),
-        },
-    ),
-    update_likes=extend_schema(
-        summary=_("Toggle comment like"),
-        description=_("Like or unlike a comment. Toggles the like status."),
-        tags=["Blog Comments"],
-        responses={
-            200: BlogCommentDetailSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    liked_comments=extend_schema(
-        summary=_("Check bulk like status"),
-        description=_(
-            "Check which comments from a list are liked by the current user."
-        ),
-        tags=["Blog Comments"],
-        request=BlogCommentLikedCommentsRequestSerializer,
-        responses={
-            200: BlogCommentLikedCommentsResponseSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-        },
-    ),
-    post=extend_schema(
-        summary=_("Get comment's blog post"),
-        description=_("Get the blog post that this comment belongs to."),
-        tags=["Blog Comments"],
-        responses={
-            200: BlogPostDetailSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    my_comments=extend_schema(
-        summary=_("Get current user's comments"),
-        description=_(
-            "Get all comments made by the currently authenticated user."
-        ),
-        tags=["Blog Comments"],
-        responses={
-            200: BlogCommentListSerializer(many=True),
-            401: ErrorResponseSerializer,
-        },
-    ),
-    my_comment=extend_schema(
-        summary=_("Get current user's comment"),
-        description=_(
-            "Get the comment made by the currently authenticated user for a specific post."
-        ),
-        tags=["Blog Comments"],
-        request=BlogCommentMyCommentRequestSerializer,
-        responses={
-            200: BlogCommentDetailSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
+    )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
-    queryset = BlogComment.objects.select_related(
-        "user", "post"
-    ).prefetch_related("likes")
+    queryset = BlogComment.objects.all()
+    serializers = {
+        "default": BlogCommentDetailSerializer,
+        "list": BlogCommentSerializer,
+        "retrieve": BlogCommentDetailSerializer,
+        "create": BlogCommentWriteSerializer,
+        "update": BlogCommentWriteSerializer,
+        "partial_update": BlogCommentWriteSerializer,
+        "replies": BlogCommentSerializer,
+        "thread": BlogCommentSerializer,
+        "update_likes": BlogCommentDetailSerializer,
+        "post": BlogPostDetailSerializer,
+        "liked_comments": BlogCommentLikedCommentsResponseSerializer,
+        "my_comments": BlogCommentSerializer,
+        "my_comment": BlogCommentDetailSerializer,
+    }
+    response_serializers = {
+        "create": BlogCommentDetailSerializer,
+        "update": BlogCommentDetailSerializer,
+        "partial_update": BlogCommentDetailSerializer,
+    }
     filter_backends = [
         DjangoFilterBackend,
-        SearchFilter,
         PascalSnakeCaseOrderingFilter,
+        SearchFilter,
     ]
     filterset_class = BlogCommentFilter
-    search_fields = ["translations__content"]
     ordering_fields = [
+        "id",
         "created_at",
         "updated_at",
         "likes_count",
         "replies_count",
     ]
     ordering = ["-created_at"]
-    serializers = {
-        "list": BlogCommentListSerializer,
-        "retrieve": BlogCommentDetailSerializer,
-        "create": BlogCommentWriteSerializer,
-        "update": BlogCommentWriteSerializer,
-        "partial_update": BlogCommentWriteSerializer,
-        "replies": BlogCommentListSerializer,
-        "thread": BlogCommentListSerializer,
-        "update_likes": BlogCommentDetailSerializer,
-        "post": BlogPostDetailSerializer,
-        "liked_comments": BlogCommentLikedCommentsResponseSerializer,
-        "my_comments": BlogCommentListSerializer,
-        "my_comment": BlogCommentDetailSerializer,
-    }
+    search_fields = ["translations__content"]
 
     def get_queryset(self):
-        return self.queryset.filter(is_approved=True)
+        queryset = (
+            BlogComment.objects.select_related("user", "post")
+            .prefetch_related("likes", "translations")
+            .filter(is_approved=True)
+        )
+        return queryset
 
     def get_permissions(self):
         permission_classes = []
@@ -242,6 +120,18 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
             permission_classes.append(IsAuthenticated)
         return [permission() for permission in permission_classes]
 
+    @extend_schema(
+        operation_id="listBlogCommentReplies",
+        summary=_("Get comment replies"),
+        description=_(
+            "Get all replies (children) of this comment in threaded structure."
+        ),
+        tags=["Blog Comments"],
+        responses={
+            200: BlogCommentSerializer(many=True),
+            404: ErrorResponseSerializer,
+        },
+    )
     @action(detail=True, methods=["GET"])
     def replies(self, request, pk=None):
         comment = self.get_object()
@@ -254,6 +144,17 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
         )
         return self.paginate_and_serialize(queryset, request)
 
+    @extend_schema(
+        operation_id="getBlogCommentThread",
+        summary=_("Get comment thread"),
+        description=_(
+            "Get the complete thread (all ancestors and descendants) of this comment."
+        ),
+        tags=["Blog Comments"],
+        responses={
+            200: BlogCommentSerializer(many=True),
+        },
+    )
     @action(detail=True, methods=["GET"])
     def thread(self, request, pk=None):
         comment = self.get_object()
@@ -265,6 +166,17 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
 
         return self.paginate_and_serialize(queryset, request)
 
+    @extend_schema(
+        operation_id="toggleBlogCommentLike",
+        summary=_("Toggle comment like"),
+        description=_("Like or unlike a comment. Toggles the like status."),
+        tags=["Blog Comments"],
+        responses={
+            200: BlogCommentDetailSerializer,
+            401: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    )
     @action(detail=True, methods=["POST"])
     def update_likes(self, request, pk=None):
         comment = self.get_object()
@@ -285,6 +197,16 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
 
         return Response(data, status=status.HTTP_200_OK)
 
+    @extend_schema(
+        operation_id="getBlogCommentPost",
+        summary=_("Get comment's blog post"),
+        description=_("Get the blog post that this comment belongs to."),
+        tags=["Blog Comments"],
+        responses={
+            200: BlogPostDetailSerializer,
+            404: ErrorResponseSerializer,
+        },
+    )
     @action(detail=True, methods=["GET"])
     def post(self, request, pk=None):
         comment = self.get_object()
@@ -294,6 +216,20 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
         )
         return Response(serializer.data)
 
+    @extend_schema(
+        operation_id="checkBlogCommentLikes",
+        summary=_("Check bulk like status"),
+        description=_(
+            "Check which comments from a list are liked by the current user."
+        ),
+        tags=["Blog Comments"],
+        request=BlogCommentLikedCommentsRequestSerializer,
+        responses={
+            200: BlogCommentLikedCommentsResponseSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+        },
+    )
     @action(detail=False, methods=["POST"])
     def liked_comments(self, request, *args, **kwargs):
         serializer = BlogCommentLikedCommentsRequestSerializer(
@@ -315,11 +251,37 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
         )
         return Response(response_serializer.data)
 
+    @extend_schema(
+        operation_id="listMyBlogComments",
+        summary=_("Get current user's comments"),
+        description=_(
+            "Get all comments made by the currently authenticated user."
+        ),
+        tags=["Blog Comments"],
+        responses={
+            200: BlogCommentSerializer(many=True),
+            401: ErrorResponseSerializer,
+        },
+    )
     @action(detail=False, methods=["GET"])
     def my_comments(self, request):
         queryset = self.get_queryset().filter(user=request.user)
         return self.paginate_and_serialize(queryset, request)
 
+    @extend_schema(
+        operation_id="getMyBlogComment",
+        summary=_("Get current user's comment"),
+        description=_(
+            "Get the comment made by the currently authenticated user for a specific post."
+        ),
+        tags=["Blog Comments"],
+        request=BlogCommentMyCommentRequestSerializer,
+        responses={
+            200: BlogCommentDetailSerializer,
+            401: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    )
     @action(detail=False, methods=["POST"])
     def my_comment(self, request, *args, **kwargs) -> Response:
         serializer = BlogCommentMyCommentRequestSerializer(data=request.data)

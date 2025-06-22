@@ -1,5 +1,6 @@
 import pytest
 from django.conf import settings
+from django.contrib.sites.models import Site
 from django.core.cache import cache
 from django.db import connection, reset_queries
 
@@ -32,8 +33,6 @@ def reset_db_queries():
 
 @pytest.fixture(autouse=True)
 def _django_clear_site_cache():
-    from django.contrib.sites.models import Site
-
     Site.objects.clear_cache()
 
 

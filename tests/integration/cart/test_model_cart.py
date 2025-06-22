@@ -5,7 +5,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
 
-from cart.factories import CartFactory, CartItemFactory
+from cart.factories.cart import CartFactory
+from cart.factories.item import CartItemFactory
 from cart.models import Cart, CartItem
 from product.factories.product import ProductFactory
 from user.factories.account import UserAccountFactory
@@ -17,11 +18,6 @@ User = get_user_model()
 
 
 class CartModelTestCase(TestCase):
-    cart: Cart = None
-    user: User = None
-    cart_item_1: CartItem = None
-    cart_item_2: CartItem = None
-
     def setUp(self):
         products = ProductFactory.create_batch(2, num_images=0, num_reviews=0)
         product_1: Product = products[0]
@@ -94,11 +90,6 @@ class CartModelTestCase(TestCase):
 
 
 class GuestCartModelTestCase(TestCase):
-    cart: Cart = None
-    session_key: str = None
-    cart_item_1: CartItem = None
-    cart_item_2: CartItem = None
-
     def setUp(self):
         products = ProductFactory.create_batch(2, num_images=0, num_reviews=0)
         product_1: Product = products[0]

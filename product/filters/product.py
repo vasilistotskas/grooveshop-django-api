@@ -42,6 +42,7 @@ class ProductFilter(filters.FilterSet):
     class Meta:
         model = Product
         fields = [
+            "active",
             "min_final_price",
             "max_final_price",
             "category",

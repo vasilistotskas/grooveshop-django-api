@@ -59,31 +59,33 @@ class PaginationModelViewSet(ModelViewSet):
 
         return self._paginator
 
-    def paginate_and_serialize(self, queryset, request, many=True):
+    def paginate_and_serialize(
+        self, queryset, request, many=True, serializer_class=None
+    ):
         pagination_param = request.query_params.get(
             "pagination", "true"
         ).lower()
+
+        if serializer_class is None:
+            serializer_class = self.get_serializer_class()
+
         if pagination_param == "false":
-            serializer = self.get_serializer(
+            serializer = serializer_class(
                 queryset, many=many, context=self.get_serializer_context()
             )
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         page = self.paginate_queryset(queryset)
         if page is not None:
-            serializer = self.get_serializer(
+            serializer = serializer_class(
                 page, many=many, context=self.get_serializer_context()
             )
             return self.get_paginated_response(serializer.data)
 
-        serializer = self.get_serializer(
+        serializer = serializer_class(
             queryset, many=many, context=self.get_serializer_context()
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
-
-    def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        return self.paginate_and_serialize(queryset, request)
 
 
 class TranslationsModelViewSet(TranslationsProcessingMixin, ModelViewSet):
@@ -108,6 +110,73 @@ class TranslationsModelViewSet(TranslationsProcessingMixin, ModelViewSet):
 
 class BaseModelViewSet(TranslationsModelViewSet, PaginationModelViewSet):
     metadata_class = Metadata
+
+    def get_response_serializer_class(self):
+        if hasattr(super(), "get_response_serializer_class"):
+            return super().get_response_serializer_class()
+        return self.get_serializer_class()
+
+    def get_request_serializer_class(self):
+        if hasattr(super(), "get_request_serializer_class"):
+            return super().get_request_serializer_class()
+        return self.get_serializer_class()
+
+    def create(self, request, *args, **kwargs):
+        request_serializer_class = self.get_request_serializer_class()
+        serializer = request_serializer_class(
+            data=request.data, context=self.get_serializer_context()
+        )
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+
+        response_serializer_class = self.get_response_serializer_class()
+        response_serializer = response_serializer_class(
+            serializer.instance, context=self.get_serializer_context()
+        )
+
+        headers = self.get_success_headers(response_serializer.data)
+        return Response(
+            response_serializer.data,
+            status=status.HTTP_201_CREATED,
+            headers=headers,
+        )
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+
+        request_serializer_class = self.get_request_serializer_class()
+        serializer = request_serializer_class(
+            instance,
+            data=request.data,
+            partial=partial,
+            context=self.get_serializer_context(),
+        )
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        if getattr(instance, "_prefetched_objects_cache", None):
+            instance._prefetched_objects_cache = {}
+
+        response_serializer_class = self.get_response_serializer_class()
+        response_serializer = response_serializer_class(
+            serializer.instance, context=self.get_serializer_context()
+        )
+        return Response(response_serializer.data)
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        response_serializer_class = self.get_response_serializer_class()
+        serializer = response_serializer_class(
+            instance, context=self.get_serializer_context()
+        )
+        return Response(serializer.data)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        return self.paginate_and_serialize(
+            queryset, request, serializer_class=self.get_serializer_class()
+        )
 
     @action(detail=False, methods=["GET"])
     def api_schema(self, request, *args, **kwargs):
@@ -170,7 +239,7 @@ def encrypt_token(token: str, secret_key: str) -> str:
 
 
 def redirect_to_frontend(request, *args, **kwargs):
-    from knox.models import get_token_model
+    from knox.models import get_token_model  # noqa: PLC0415
 
     AuthToken = get_token_model()
     user = request.user

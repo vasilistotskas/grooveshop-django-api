@@ -22,6 +22,7 @@ from core.fields.measurement import MeasurementField
 from core.forms.measurement import MeasurementWidget
 from core.units import WeightUnits
 from product.models.category import ProductCategory
+from product.models.category_image import ProductCategoryImage
 from product.models.favourite import ProductFavourite
 from product.models.image import ProductImage
 from product.models.product import Product
@@ -40,6 +41,14 @@ def category_update_action(category):
     return category_update
 
 
+@admin_thumbnails.thumbnail("image")
+class ProductCategoryImageInline(TranslatableTabularInline):
+    model = ProductCategoryImage
+    readonly_fields = ("id",)
+    extra = 1
+    fields = ("image", "image_type", "active", "sort_order", "translations")
+
+
 @admin.register(ProductCategory)
 class CategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
     mptt_indent_field = "translations__name"
@@ -52,6 +61,7 @@ class CategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
     )
     list_display_links = ("indented_title",)
     search_fields = ("translations__name",)
+    inlines = [ProductCategoryImageInline]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -97,6 +107,38 @@ class ProductImageInline(TranslatableTabularInline):
     model = ProductImage
     readonly_fields = ("id",)
     extra = 1
+
+
+@admin.register(ProductCategoryImage)
+class ProductCategoryImageAdmin(ModelAdmin, TranslatableAdmin):
+    list_display = [
+        "id",
+        "category_name",
+        "image_type",
+        "active",
+        "sort_order",
+        "created_at",
+    ]
+    list_filter = [
+        "image_type",
+        "active",
+        ("category", RelatedDropdownFilter),
+        ("created_at", RangeDateTimeFilter),
+    ]
+    search_fields = [
+        "category__translations__name",
+        "translations__title",
+        "translations__alt_text",
+    ]
+    list_select_related = ["category"]
+    readonly_fields = ("created_at", "updated_at", "uuid")
+    ordering = ["category", "image_type", "sort_order"]
+
+    def category_name(self, obj):
+        return obj.category.safe_translation_getter("name", any_language=True)
+
+    category_name.short_description = _("Category")
+    category_name.admin_order_field = "category__translations__name"
 
 
 class LikesCountFilter(RangeNumericListFilter):

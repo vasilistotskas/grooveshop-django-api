@@ -27,8 +27,10 @@ class NotificationUser(TimeStampMixinModel, UUIDModel):
     seen = models.BooleanField(_("Seen"), default=False)
     seen_at = models.DateTimeField(_("Seen At"), null=True, blank=True)
 
-    objects = NotificationUserManager()
-    unseen_objects = UnseenNotificationUserManager()
+    objects: NotificationUserManager = NotificationUserManager()
+    unseen_objects: UnseenNotificationUserManager = (
+        UnseenNotificationUserManager()
+    )
 
     def __str__(self):
         status = "seen" if self.seen else "unseen"

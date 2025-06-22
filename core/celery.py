@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 @setup_logging.connect
 def config_loggers(*args, **kwags):
-    from django.conf import settings  # noqa: F401
+    from django.conf import settings  # noqa: F401, PLC0415
 
 
 def create_celery_app():

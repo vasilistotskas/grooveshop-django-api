@@ -1,10 +1,10 @@
 from datetime import timedelta
 
-from django.db import models
 from django.utils import timezone
+from parler.managers import TranslatableManager, TranslatableQuerySet
 
 
-class OrderHistoryQuerySet(models.QuerySet):
+class OrderHistoryQuerySet(TranslatableQuerySet):
     def for_order(self, order):
         return self.filter(order=order)
 
@@ -31,7 +31,7 @@ class OrderHistoryQuerySet(models.QuerySet):
         return self.filter(user__isnull=False)
 
 
-class OrderHistoryManager(models.Manager):
+class OrderHistoryManager(TranslatableManager):
     def get_queryset(self) -> OrderHistoryQuerySet:
         return OrderHistoryQuerySet(self.model, using=self._db)
 
@@ -60,7 +60,7 @@ class OrderHistoryManager(models.Manager):
         return self.get_queryset().user_changes()
 
 
-class OrderItemHistoryQuerySet(models.QuerySet):
+class OrderItemHistoryQuerySet(TranslatableQuerySet):
     def for_order_item(self, order_item):
         return self.filter(order_item=order_item)
 
@@ -80,7 +80,7 @@ class OrderItemHistoryQuerySet(models.QuerySet):
         return self.filter(change_type="REFUND")
 
 
-class OrderItemHistoryManager(models.Manager):
+class OrderItemHistoryManager(TranslatableManager):
     def get_queryset(self) -> OrderItemHistoryQuerySet:
         return OrderItemHistoryQuerySet(self.model, using=self._db)
 

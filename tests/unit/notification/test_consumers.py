@@ -97,7 +97,6 @@ class TestNotificationConsumer(TransactionTestCase):
 
         await consumer.connect()
 
-        # Check for calls with specific arguments
         consumer.channel_layer.group_add.assert_any_call(
             f"user_{staff_user.id}", consumer.channel_name
         )

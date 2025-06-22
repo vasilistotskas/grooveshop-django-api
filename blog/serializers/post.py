@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
+from drf_spectacular.helpers import lazy_serializer
 from drf_spectacular.utils import extend_schema_field
 from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
@@ -21,7 +22,7 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
 
 
-class BlogPostListSerializer(
+class BlogPostSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[BlogPost]
 ):
     likes = PrimaryKeyRelatedField(queryset=User.objects.all(), many=True)
@@ -56,7 +57,6 @@ class BlogPostListSerializer(
             "main_image_path",
             "reading_time",
             "content_preview",
-            "absolute_url",
         )
         read_only_fields = (
             "id",
@@ -69,7 +69,6 @@ class BlogPostListSerializer(
             "created_at",
             "updated_at",
             "main_image_path",
-            "absolute_url",
         )
 
     def get_reading_time(self, obj: BlogPost) -> int:
@@ -88,25 +87,58 @@ class BlogPostListSerializer(
         return ""
 
 
-class BlogPostDetailSerializer(BlogPostListSerializer):
+class BlogPostDetailSerializer(BlogPostSerializer):
     likes = PrimaryKeyRelatedField(many=True, read_only=True)
+    author = serializers.SerializerMethodField()
+    category = serializers.SerializerMethodField()
+    tags = serializers.SerializerMethodField()
     user_has_liked = serializers.SerializerMethodField()
 
-    class Meta(BlogPostListSerializer.Meta):
+    class Meta(BlogPostSerializer.Meta):
         fields = (
-            *BlogPostListSerializer.Meta.fields,
+            *BlogPostSerializer.Meta.fields,
             "likes",
             "user_has_liked",
             "seo_title",
             "seo_description",
             "seo_keywords",
-            "is_visible",
         )
         read_only_fields = (
-            *BlogPostListSerializer.Meta.read_only_fields,
+            *BlogPostSerializer.Meta.read_only_fields,
             "likes",
-            "is_visible",
         )
+
+    @extend_schema_field(
+        lazy_serializer("blog.serializers.author.BlogAuthorDetailSerializer")()
+    )
+    def get_author(self, obj: BlogPost):
+        from blog.serializers.author import BlogAuthorDetailSerializer  # noqa: PLC0415, I001
+
+        return BlogAuthorDetailSerializer(obj.author, context=self.context).data
+
+    @extend_schema_field(
+        lazy_serializer(
+            "blog.serializers.category.BlogCategoryDetailSerializer"
+        )()
+    )
+    def get_category(self, obj: BlogPost):
+        from blog.serializers.category import BlogCategoryDetailSerializer  # noqa: PLC0415, I001
+
+        return BlogCategoryDetailSerializer(
+            obj.category, context=self.context
+        ).data
+
+    @extend_schema_field(
+        lazy_serializer("blog.serializers.tag.BlogTagDetailSerializer")(
+            many=True
+        )
+    )
+    def get_tags(self, obj: BlogPost):
+        from blog.serializers.tag import BlogTagDetailSerializer  # noqa: PLC0415, I001
+
+        return BlogTagDetailSerializer(
+            obj.tags.all(), many=True, context=self.context
+        ).data
 
     def get_user_has_liked(self, obj: BlogPost) -> bool:
         request = self.context.get("request")
@@ -155,8 +187,7 @@ class BlogPostWriteSerializer(
 
         return value
 
-    @staticmethod
-    def validate_tags(value: list) -> list:
+    def validate_tags(self, value: list) -> list:
         if not value:
             raise serializers.ValidationError(
                 _("At least one tag is required.")

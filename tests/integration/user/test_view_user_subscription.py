@@ -90,7 +90,7 @@ class SubscriptionTopicViewSetTest(BaseSubscriptionAPITest):
         self.authenticate(self.user_token)
 
         url = reverse("user-subscription-topic-list")
-        response = self.client.get(url, {"category": "newsletter"})
+        response = self.client.get(url, {"category": "NEWSLETTER"})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 2)
@@ -139,7 +139,7 @@ class SubscriptionTopicViewSetTest(BaseSubscriptionAPITest):
 
         available_slugs = [t["slug"] for t in response.data["available"]]
         self.assertIn("topic-3", available_slugs)
-        self.assertNotIn("topic-0", available_slugs)  # Already subscribed
+        self.assertNotIn("topic-0", available_slugs)
 
     def test_subscribe_to_topic(self):
         self.authenticate(self.user_token)
@@ -150,7 +150,7 @@ class SubscriptionTopicViewSetTest(BaseSubscriptionAPITest):
         response = self.client.post(url)
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data["status"], "active")
+        self.assertEqual(response.data["status"], "ACTIVE")
 
         subscription = UserSubscription.objects.get(
             user=self.user, topic=self.topics[0]
@@ -169,7 +169,7 @@ class SubscriptionTopicViewSetTest(BaseSubscriptionAPITest):
         response = self.client.post(url)
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data["status"], "pending")
+        self.assertEqual(response.data["status"], "PENDING")
 
         subscription = UserSubscription.objects.get(
             user=self.user, topic=self.topics[1]
@@ -211,7 +211,7 @@ class SubscriptionTopicViewSetTest(BaseSubscriptionAPITest):
         response = self.client.post(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["status"], "active")
+        self.assertEqual(response.data["status"], "ACTIVE")
 
     def test_unsubscribe_from_topic(self):
         self.authenticate(self.user_token)
@@ -312,7 +312,7 @@ class UserSubscriptionViewSetTest(BaseSubscriptionAPITest):
         self.authenticate(self.user_token)
 
         url = reverse("user-subscription-list")
-        data = {"topic": self.topics[3].id, "status": "active"}
+        data = {"topic": self.topics[3].id, "status": "ACTIVE"}
         response = self.client.post(url, data)
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -337,7 +337,7 @@ class UserSubscriptionViewSetTest(BaseSubscriptionAPITest):
         other_sub = UserSubscription.objects.get(user=self.other_user)
 
         url = reverse("user-subscription-detail", args=[other_sub.id])
-        data = {"status": "unsubscribed"}
+        data = {"status": "UNSUBSCRIBED"}
         response = self.client.patch(url, data)
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
@@ -346,13 +346,13 @@ class UserSubscriptionViewSetTest(BaseSubscriptionAPITest):
         self.authenticate(self.user_token)
 
         url = reverse("user-subscription-list")
-        response = self.client.get(url, {"status": "active"})
+        response = self.client.get(url, {"status": "ACTIVE"})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 2)
 
         for sub in response.data["results"]:
-            self.assertEqual(sub["status"], "active")
+            self.assertEqual(sub["status"], "ACTIVE")
 
     def test_bulk_update_subscribe(self):
         self.authenticate(self.user_token)
@@ -427,7 +427,7 @@ class UserSubscriptionViewSetTest(BaseSubscriptionAPITest):
         data = {"token": "test-token-123"}
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["status"], "active")
+        self.assertEqual(response.data["status"], "ACTIVE")
 
         pending_sub.refresh_from_db()
         self.assertEqual(
@@ -467,7 +467,6 @@ class UserSubscriptionViewSetTest(BaseSubscriptionAPITest):
         self.assertIn("not pending confirmation", response.data["detail"])
 
     def test_ordering_subscriptions(self):
-        """Test ordering of subscriptions."""
         self.authenticate(self.user_token)
 
         url = reverse("user-subscription-list")

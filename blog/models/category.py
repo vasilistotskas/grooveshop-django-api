@@ -5,30 +5,14 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from mptt.fields import TreeForeignKey
-from mptt.managers import TreeManager
 from mptt.models import MPTTModel
-from mptt.querysets import TreeQuerySet
-from parler.managers import TranslatableManager, TranslatableQuerySet
 from parler.models import TranslatableModel, TranslatedFields
 
+from blog.managers.category import BlogCategoryManager
 from blog.models.post import BlogPost
 from core.fields.image import ImageAndSvgField
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
 from core.utils.generators import SlugifyConfig, unique_slugify
-
-
-class BlogCategoryQuerySet(TranslatableQuerySet, TreeQuerySet):
-    @classmethod
-    def as_manager(cls):
-        manager = BlogCategoryManager.from_queryset(cls)()
-        manager._built_with_as_manager = True
-        return manager
-
-    as_manager.queryset_only = True  # type: ignore[attr-defined]
-
-
-class BlogCategoryManager(TreeManager, TranslatableManager):
-    _queryset_class = BlogCategoryQuerySet
 
 
 class BlogCategory(
@@ -51,7 +35,7 @@ class BlogCategory(
         description=models.TextField(_("Description"), blank=True, null=True),
     )
 
-    objects = BlogCategoryManager()
+    objects: BlogCategoryManager = BlogCategoryManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Blog Category")
@@ -100,12 +84,6 @@ class BlogCategory(
         return BlogPost.objects.filter(
             category__in=self.get_descendants(include_self=True)
         ).count()
-
-    @property
-    def absolute_url(self) -> str:
-        return f"/blog/category/{self.id}/" + "/".join(
-            [x["slug"] for x in self.get_ancestors(include_self=True).values()]
-        )
 
     @property
     def main_image_path(self) -> str:

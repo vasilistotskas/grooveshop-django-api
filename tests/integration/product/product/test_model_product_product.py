@@ -8,20 +8,16 @@ from django.test import TestCase
 from django.utils.html import format_html
 from djmoney.money import Money
 
-from product.enum.review import ReviewStatusEnum
+from product.enum.review import ReviewStatus
 from product.factories.category import ProductCategoryFactory
 from product.factories.favourite import ProductFavouriteFactory
 from product.factories.image import ProductImageFactory
 from product.factories.product import ProductFactory
 from product.factories.review import ProductReviewFactory
-from product.models.category import ProductCategory
-from product.models.favourite import ProductFavourite
-from product.models.image import ProductImage
 from product.models.product import Product
 from product.models.review import ProductReview
 from user.factories.account import UserAccountFactory
 from vat.factories import VatFactory
-from vat.models import Vat
 
 languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
@@ -31,13 +27,8 @@ User = get_user_model()
 
 
 class ProductModelTestCase(TestCase):
-    product: Product = None
-    user: User = None
-    category: ProductCategory = None
-    vat: Vat = None
-    images: list[ProductImage] = []
-    reviews: list[ProductReview] = []
-    favourite: ProductFavourite = None
+    images: list = []
+    reviews: list = []
 
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
@@ -81,7 +72,7 @@ class ProductModelTestCase(TestCase):
             product=self.product,
             user=self.user,
             rate=5,
-            status=ReviewStatusEnum.TRUE,
+            status=ReviewStatus.TRUE,
         )
         self.reviews.append(product_review_status_true)
 
@@ -89,7 +80,7 @@ class ProductModelTestCase(TestCase):
             product=self.product,
             user=user_2,
             rate=5,
-            status=ReviewStatusEnum.FALSE,
+            status=ReviewStatus.FALSE,
         )
         self.reviews.append(product_review_status_false)
 
@@ -181,12 +172,6 @@ class ProductModelTestCase(TestCase):
             ),
         )
 
-    def test_absolute_url_property(self):
-        expected_absolute_url = (
-            f"/products/{self.product.id}/{self.product.slug}"
-        )
-        self.assertEqual(self.product.absolute_url, expected_absolute_url)
-
 
 class ProductQuerySetTestCase(TestCase):
     def setUp(self):
@@ -201,13 +186,13 @@ class ProductQuerySetTestCase(TestCase):
         )
 
         ProductReviewFactory(
-            product=self.product1, rate=5, status=ReviewStatusEnum.TRUE
+            product=self.product1, rate=5, status=ReviewStatus.TRUE
         )
         ProductReviewFactory(
-            product=self.product1, rate=3, status=ReviewStatusEnum.TRUE
+            product=self.product1, rate=3, status=ReviewStatus.TRUE
         )
         ProductReviewFactory(
-            product=self.product1, rate=4, status=ReviewStatusEnum.FALSE
+            product=self.product1, rate=4, status=ReviewStatus.FALSE
         )
 
         user1 = UserAccountFactory(num_addresses=0)

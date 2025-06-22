@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from django.conf import settings
 from django.utils import timezone
@@ -35,7 +35,7 @@ class ShippingOption:
     estimated_delivery_max: int
     carrier: str
     carrier_service_code: str
-    description: Optional[str] = None
+    description: str | None = None
 
     @property
     def estimated_delivery_date_min(self) -> date:
@@ -58,8 +58,8 @@ class ShippingCarrier(ABC):
         dimensions: dict[str, Decimal],
         from_country: Country,
         to_country: Country,
-        to_region: Optional[Region] = None,
-        to_postal_code: Optional[str] = None,
+        to_region: Region | None = None,
+        to_postal_code: str | None = None,
         **kwargs,
     ) -> list[ShippingOption]:
         pass
@@ -84,7 +84,7 @@ class FedExCarrier(ShippingCarrier):
         self.api_key = settings.FEDEX_API_KEY
         self.account_number = settings.FEDEX_ACCOUNT_NUMBER
 
-        # In a real implementation, we would import and use FedEx SDK
+        # @TODO - In a real implementation, we would import and use FedEx SDK
 
     def get_shipping_options(
         self,
@@ -92,8 +92,8 @@ class FedExCarrier(ShippingCarrier):
         dimensions: dict[str, Decimal],
         from_country: Country,
         to_country: Country,
-        to_region: Optional[Region] = None,
-        to_postal_code: Optional[str] = None,
+        to_region: Region | None = None,
+        to_postal_code: str | None = None,
         **kwargs,
     ) -> list[ShippingOption]:
         logger.info(
@@ -106,7 +106,7 @@ class FedExCarrier(ShippingCarrier):
             },
         )
 
-        # Mock implementation - in real world, we would call FedEx API
+        # @TODO - Mock implementation - in real world, we would call FedEx API
         # and parse the response
 
         options = []
@@ -215,7 +215,7 @@ class FedExCarrier(ShippingCarrier):
                 extra={"tracking_number": tracking_number},
             )
 
-            # Mock response
+            # @TODO - Mock response
             current_date = timezone.now().date()
 
             tracking_data = {
@@ -260,7 +260,7 @@ class UPSCarrier(ShippingCarrier):
         self.api_key = settings.UPS_API_KEY
         self.account_number = settings.UPS_ACCOUNT_NUMBER
 
-        # In a real implementation, we would import and use UPS SDK
+        # @TODO - In a real implementation, we would import and use UPS SDK
 
     def get_shipping_options(
         self,
@@ -268,8 +268,8 @@ class UPSCarrier(ShippingCarrier):
         dimensions: dict[str, Decimal],
         from_country: Country,
         to_country: Country,
-        to_region: Optional[Region] = None,
-        to_postal_code: Optional[str] = None,
+        to_region: Region | None = None,
+        to_postal_code: str | None = None,
         **kwargs,
     ) -> list[ShippingOption]:
         logger.info(
@@ -316,7 +316,7 @@ class UPSCarrier(ShippingCarrier):
                 },
             )
 
-            # Mock response
+            # @TODO - Mock response
             shipment_data = {
                 "tracking_number": f"1Z{order_id}789",
                 "label_url": f"https://example.com/labels/ups_{order_id}.pdf",
@@ -344,7 +344,7 @@ class UPSCarrier(ShippingCarrier):
                 extra={"tracking_number": tracking_number},
             )
 
-            # Mock response
+            # @TODO - Mock response
             current_date = timezone.now().date()
 
             tracking_data = {
@@ -405,8 +405,8 @@ class ShippingService:
         order_dimensions: dict[str, Decimal],
         from_country: Country,
         to_country: Country,
-        to_region: Optional[Region] = None,
-        to_postal_code: Optional[str] = None,
+        to_region: Region | None = None,
+        to_postal_code: str | None = None,
         **kwargs,
     ) -> list[ShippingOption]:
         all_options = []

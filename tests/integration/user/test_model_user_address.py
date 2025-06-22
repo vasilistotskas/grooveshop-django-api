@@ -10,9 +10,6 @@ User = get_user_model()
 
 
 class UserAddressModelTestCase(TestCase):
-    user: User = None
-    address: UserAddress = None
-
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
         self.address = UserAddressFactory(

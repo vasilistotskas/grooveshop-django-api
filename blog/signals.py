@@ -1,5 +1,6 @@
 from asgiref.sync import sync_to_async
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.db.models.signals import m2m_changed
 from django.dispatch import receiver
 
@@ -7,6 +8,8 @@ from blog.models import BlogComment
 from notification.enum import NotificationKindEnum
 from notification.models.notification import Notification
 from notification.models.user import NotificationUser
+
+User = get_user_model()
 
 languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
@@ -24,10 +27,6 @@ async def notify_comment_liked(
 
         for user_id in pk_set:
             if user and user.id != user_id:
-                from django.contrib.auth import get_user_model
-
-                User = get_user_model()
-
                 liker_user = await User.objects.aget(id=user_id)
                 notification = await Notification.objects.acreate(
                     kind=NotificationKindEnum.INFO,

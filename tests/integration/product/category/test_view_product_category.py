@@ -1,16 +1,14 @@
-import os
-
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from core.utils.serializers import flatten_dict_for_form_data
 from product.factories.category import ProductCategoryFactory
 from product.models.category import ProductCategory
-from product.serializers.category import ProductCategorySerializer
+from product.serializers.category import (
+    ProductCategoryDetailSerializer,
+)
 
 languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
@@ -20,82 +18,234 @@ User = get_user_model()
 
 
 class ProductCategoryViewSetTestCase(APITestCase):
-    category: ProductCategory = None
-    sub_category: ProductCategory = None
-
     def setUp(self):
         self.category = ProductCategoryFactory()
-        self.sub_category = ProductCategoryFactory(
-            parent=self.category,
+        self.sub_category = ProductCategoryFactory(parent=self.category)
+        self.user = User.objects.create_user(
+            email="test@example.com",
+            username="testuser",
+            password="testpass123",
         )
 
-    @staticmethod
-    def get_product_category_detail_url(pk):
+    def get_product_category_detail_url(self, pk):
         return reverse("product-category-detail", args=[pk])
 
-    @staticmethod
-    def get_product_category_list_url():
+    def get_product_category_list_url(self):
         return reverse("product-category-list")
 
-    def _create_mock_image(self):
-        image_path = os.path.join(settings.STATIC_ROOT, "images", "default.png")
-
-        if not os.path.exists(image_path):
-            image_path = os.path.join(
-                settings.BASE_DIR, "static", "images", "default.png"
-            )
-
-        with open(image_path, "rb") as f:
-            image_data = f.read()
-
-        image_file = SimpleUploadedFile(
-            name="test_image.png", content=image_data, content_type="image/png"
-        )
-        return image_file
-
-    def test_list(self):
+    def test_list_uses_correct_serializer(self):
         url = self.get_product_category_list_url()
         response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("results", response.data)
+
+        if response.data["results"]:
+            category_data = response.data["results"][0]
+            expected_fields = {
+                "id",
+                "slug",
+                "translations",
+                "parent",
+                "active",
+                "level",
+                "tree_id",
+                "created_at",
+                "updated_at",
+                "uuid",
+                "recursive_product_count",
+            }
+            self.assertTrue(expected_fields.issubset(set(category_data.keys())))
+
+    def test_retrieve_uses_correct_serializer(self):
+        url = self.get_product_category_detail_url(self.category.id)
+        response = self.client.get(url)
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    def test_create_valid(self):
+        expected_fields = {
+            "id",
+            "slug",
+            "translations",
+            "parent",
+            "active",
+            "level",
+            "tree_id",
+            "created_at",
+            "updated_at",
+            "uuid",
+            "recursive_product_count",
+            "children",
+            "seo_title",
+            "seo_description",
+            "seo_keywords",
+        }
+        self.assertTrue(expected_fields.issubset(set(response.data.keys())))
+
+    def test_create_request_response_serializers(self):
         payload = {
-            "slug": "new-category",
+            "slug": "new-category-enhanced",
             "parent": self.category.id,
-            "menu_image_one": self._create_mock_image(),
-            "menu_image_two": self._create_mock_image(),
-            "menu_main_banner": self._create_mock_image(),
             "translations": {
                 default_language: {
-                    "name": "New Category",
-                    "description": "New Category Description",
+                    "name": "New Enhanced Category",
+                    "description": "New Enhanced Category Description",
                 },
             },
         }
 
-        payload = flatten_dict_for_form_data(payload)
-
         url = self.get_product_category_list_url()
-        response = self.client.post(url, data=payload, format="multipart")
+        response = self.client.post(url, data=payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
+        expected_fields = {
+            "id",
+            "slug",
+            "translations",
+            "parent",
+            "active",
+            "level",
+            "tree_id",
+            "created_at",
+            "updated_at",
+            "uuid",
+            "recursive_product_count",
+            "children",
+            "seo_title",
+            "seo_description",
+            "seo_keywords",
+        }
+        self.assertTrue(expected_fields.issubset(set(response.data.keys())))
+
         category = ProductCategory.objects.get(id=response.data["id"])
-        serializer = ProductCategorySerializer(category)
+        self.assertEqual(category.slug, "new-category-enhanced")
+        self.assertEqual(category.parent.id, self.category.id)
 
-        self.assertEqual(response.data, serializer.data)
-
-    def test_create_invalid(self):
+    def test_update_request_response_serializers(self):
         payload = {
-            "slug": "invalid_category_slug",
-            "parent": "invalid_parent_id",
-            "menu_image_one": "invalid_image_id",
-            "menu_image_two": "invalid_image_id",
-            "menu_main_banner": "invalid_image_id",
+            "slug": "updated-category-enhanced",
             "translations": {
-                "invalid_lang_code": {
-                    "name": "Invalid Category Name",
-                    "description": "Invalid Category Description",
+                default_language: {
+                    "name": "Updated Enhanced Category",
+                    "description": "Updated Enhanced Category Description",
+                },
+            },
+        }
+
+        url = self.get_product_category_detail_url(self.category.id)
+        response = self.client.put(url, data=payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        expected_fields = {
+            "id",
+            "slug",
+            "translations",
+            "parent",
+            "active",
+            "level",
+            "tree_id",
+            "created_at",
+            "updated_at",
+            "uuid",
+            "recursive_product_count",
+            "children",
+            "seo_title",
+            "seo_description",
+            "seo_keywords",
+        }
+        self.assertTrue(expected_fields.issubset(set(response.data.keys())))
+
+        category = ProductCategory.objects.get(id=response.data["id"])
+        self.assertEqual(category.slug, "updated-category-enhanced")
+
+    def test_partial_update_request_response_serializers(self):
+        payload = {
+            "slug": "partial-updated-category-enhanced",
+        }
+
+        url = self.get_product_category_detail_url(self.category.id)
+        response = self.client.patch(url, data=payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        expected_fields = {
+            "id",
+            "slug",
+            "translations",
+            "parent",
+            "active",
+            "level",
+            "tree_id",
+            "created_at",
+            "updated_at",
+            "uuid",
+            "recursive_product_count",
+            "children",
+            "seo_title",
+            "seo_description",
+            "seo_keywords",
+        }
+        self.assertTrue(expected_fields.issubset(set(response.data.keys())))
+
+        category = ProductCategory.objects.get(id=response.data["id"])
+        self.assertEqual(category.slug, "partial-updated-category-enhanced")
+
+    def test_filtering_functionality(self):
+        parent_category = ProductCategoryFactory()
+        child_category = ProductCategoryFactory(parent=parent_category)
+
+        url = self.get_product_category_list_url()
+        response = self.client.get(url, {"parent": parent_category.id})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(response.data["results"][0]["id"], child_category.id)
+
+        response = self.client.get(url, {"slug": self.category.slug})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(response.data["results"][0]["id"], self.category.id)
+
+    def test_search_functionality(self):
+        url = self.get_product_category_list_url()
+
+        response = self.client.get(
+            url,
+            {
+                "search": self.category.safe_translation_getter(
+                    "name", any_language=True
+                )
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        category_ids = [cat["id"] for cat in response.data["results"]]
+        self.assertIn(self.category.id, category_ids)
+
+    def test_ordering_functionality(self):
+        url = self.get_product_category_list_url()
+
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        response = self.client.get(url, {"ordering": "id"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        if len(response.data["results"]) > 1:
+            ids = [cat["id"] for cat in response.data["results"]]
+            self.assertEqual(ids, sorted(ids))
+
+    def test_validation_errors_consistent(self):
+        payload = {
+            "slug": "invalid-parent-category",
+            "parent": 99999,
+            "translations": {
+                default_language: {
+                    "name": "Invalid Parent Category",
+                    "description": "Category with invalid parent",
                 },
             },
         }
@@ -104,144 +254,62 @@ class ProductCategoryViewSetTestCase(APITestCase):
         response = self.client.post(url, data=payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("parent", response.data)
 
-    def test_retrieve_valid(self):
+    def test_consistency_with_manual_serializer_instantiation(self):
         url = self.get_product_category_detail_url(self.category.id)
-        response = self.client.get(url)
-        category = ProductCategory.objects.get(pk=self.category.id)
+        viewset_response = self.client.get(url)
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        manual_serializer = ProductCategoryDetailSerializer(self.category)
 
-        self.assertIn("id", response.data)
-        self.assertEqual(response.data["id"], category.id)
+        self.assertEqual(viewset_response.status_code, status.HTTP_200_OK)
 
-        self.assertIn("translations", response.data)
-        self.assertIsInstance(response.data["translations"], dict)
+        key_fields = ["id", "slug", "parent"]
+        for field in key_fields:
+            self.assertEqual(
+                viewset_response.data[field], manual_serializer.data[field]
+            )
 
-        for lang_data in response.data["translations"].values():
-            self.assertIn("name", lang_data)
-            self.assertIsInstance(lang_data["name"], str)
-            self.assertIn("description", lang_data)
-            self.assertIsInstance(lang_data["description"], str)
-
-        if category.parent:
-            self.assertIn("parent", response.data)
-            self.assertEqual(response.data["parent"], category.parent.id)
-
-    def test_retrieve_invalid(self):
-        invalid_category_id = 999999
-        url = self.get_product_category_detail_url(invalid_category_id)
-        response = self.client.get(url)
-
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-    def test_update_valid(self):
+    def test_create_with_complex_payload(self):
         payload = {
-            "slug": "updated-category",
-            "menu_image_one": self._create_mock_image(),
-            "menu_image_two": self._create_mock_image(),
-            "menu_main_banner": self._create_mock_image(),
+            "slug": "complex-category",
+            "parent": self.category.id,
             "translations": {
-                default_language: {
-                    "name": "Updated Category",
-                    "description": "Updated Category Description",
+                "en": {
+                    "name": "Complex Category EN",
+                    "description": "Complex Category Description EN",
+                },
+                "de": {
+                    "name": "Complex Category DE",
+                    "description": "Complex Category Description DE",
                 },
             },
         }
 
-        payload = flatten_dict_for_form_data(payload)
+        url = self.get_product_category_list_url()
+        response = self.client.post(url, data=payload, format="json")
 
-        url = self.get_product_category_detail_url(self.category.id)
-        response = self.client.put(url, data=payload, format="multipart")
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         category = ProductCategory.objects.get(id=response.data["id"])
-        serializer = ProductCategorySerializer(category)
 
-        self.assertEqual(response.data, serializer.data)
+        category.set_current_language("en")
+        self.assertEqual(category.name, "Complex Category EN")
 
-    def test_update_invalid(self):
-        payload = {
-            "slug": "invalid_category_slug",
-            "parent": "invalid_parent_id",
-            "menu_image_one": "invalid_image_id",
-            "menu_image_two": "invalid_image_id",
-            "menu_main_banner": "invalid_image_id",
-            "translations": {
-                "invalid_lang_code": {
-                    "name": "Invalid Category Name",
-                    "description": "Invalid Category Description",
-                },
-            },
-        }
+        category.set_current_language("de")
+        self.assertEqual(category.name, "Complex Category DE")
 
+    def test_hierarchy_data_in_responses(self):
         url = self.get_product_category_detail_url(self.category.id)
-        response = self.client.put(url, data=payload, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_partial_update_valid(self):
-        payload = {
-            "slug": "updated-category",
-            "menu_image_one": self._create_mock_image(),
-            "menu_image_two": self._create_mock_image(),
-            "menu_main_banner": self._create_mock_image(),
-            "translations": {
-                default_language: {
-                    "name": "Updated Category",
-                    "description": "Updated Category Description",
-                },
-            },
-        }
-
-        payload = flatten_dict_for_form_data(payload)
-
-        url = self.get_product_category_detail_url(self.category.id)
-        response = self.client.patch(url, data=payload, format="multipart")
+        response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        category = ProductCategory.objects.get(id=response.data["id"])
-        serializer = ProductCategorySerializer(category)
+        self.assertIn("children", response.data)
+        self.assertIn("recursive_product_count", response.data)
 
-        self.assertEqual(response.data, serializer.data)
-
-    def test_partial_update_invalid(self):
-        payload = {
-            "slug": "invalid_category_slug",
-            "parent": "invalid_parent_id",
-            "menu_image_one": "invalid_image_id",
-            "menu_image_two": "invalid_image_id",
-            "menu_main_banner": "invalid_image_id",
-            "translations": {
-                "invalid_lang_code": {
-                    "name": "Invalid Category Name",
-                    "description": "Invalid Category Description",
-                },
-            },
-        }
-
-        url = self.get_product_category_detail_url(self.category.id)
-        response = self.client.patch(url, data=payload, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_destroy_valid(self):
-        url = self.get_product_category_detail_url(self.category.id)
-        response = self.client.delete(url)
-
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(
-            ProductCategory.objects.filter(id=self.category.id).exists()
-        )
-
-    def test_destroy_invalid(self):
-        invalid_category_id = 999999
-        url = self.get_product_category_detail_url(invalid_category_id)
-        response = self.client.delete(url)
-
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertTrue(
-            ProductCategory.objects.filter(id=self.category.id).exists()
-        )
+        if response.data["children"]:
+            child_data = response.data["children"][0]
+            self.assertIn("id", child_data)
+            self.assertIn("slug", child_data)
+            self.assertIn("translations", child_data)

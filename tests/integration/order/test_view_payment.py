@@ -7,7 +7,7 @@ from djmoney.money import Money
 from rest_framework import status
 from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
 
-from order.enum.status import PaymentStatusEnum
+from order.enum.status import PaymentStatus
 from order.factories.order import OrderFactory
 from order.views.payment import OrderPaymentViewSet
 from pay_way.factories import PayWayFactory
@@ -56,7 +56,7 @@ class OrderPaymentViewSetTestCase(TestCase):
         self.user_order = OrderFactory(
             user=self.user,
             pay_way=None,
-            payment_status=PaymentStatusEnum.PENDING,
+            payment_status=PaymentStatus.PENDING,
             payment_id="",
             payment_method="",
             status="PENDING",
@@ -66,7 +66,7 @@ class OrderPaymentViewSetTestCase(TestCase):
         self.anon_order = OrderFactory(
             user=None,
             pay_way=None,
-            payment_status=PaymentStatusEnum.PENDING,
+            payment_status=PaymentStatus.PENDING,
             payment_id="",
             payment_method="",
             status="PENDING",
@@ -76,7 +76,7 @@ class OrderPaymentViewSetTestCase(TestCase):
         self.paid_order = OrderFactory(
             user=self.user,
             pay_way=self.stripe_pay_way,
-            payment_status=PaymentStatusEnum.COMPLETED,
+            payment_status=PaymentStatus.COMPLETED,
             payment_id="PAID_123",
             payment_method="Stripe",
             status="COMPLETED",
@@ -110,7 +110,7 @@ class OrderPaymentViewSetTestCase(TestCase):
                 True,
                 {
                     "payment_id": "TEST_PAYMENT_123",
-                    "status": PaymentStatusEnum.COMPLETED,
+                    "status": PaymentStatus.COMPLETED,
                     "amount": "100.00",
                     "currency": "USD",
                     "provider": "stripe",
@@ -147,7 +147,7 @@ class OrderPaymentViewSetTestCase(TestCase):
                 True,
                 {
                     "payment_id": f"OFFLINE_{self.anon_order.id}",
-                    "status": PaymentStatusEnum.PENDING,
+                    "status": PaymentStatus.PENDING,
                     "amount": "100.00",
                     "currency": "USD",
                     "provider": "offline",
@@ -225,7 +225,7 @@ class OrderPaymentViewSetTestCase(TestCase):
     @mock.patch("order.views.payment.PayWayService.check_payment_status")
     def test_check_payment_status(self, mock_check_status):
         mock_check_status.return_value = (
-            PaymentStatusEnum.COMPLETED,
+            PaymentStatus.COMPLETED,
             {
                 "payment_id": "TEST_PAYMENT_123",
                 "raw_status": "succeeded",
@@ -248,7 +248,7 @@ class OrderPaymentViewSetTestCase(TestCase):
 
         self.assertEqual(response.data["order_id"], order.id)
         self.assertEqual(
-            response.data["payment_status"], PaymentStatusEnum.COMPLETED
+            response.data["payment_status"], PaymentStatus.COMPLETED
         )
 
     def test_check_payment_status_no_payment(self):
@@ -290,7 +290,7 @@ class OrderPaymentViewSetTestCase(TestCase):
             True,
             {
                 "refund_id": "REFUND_123",
-                "status": PaymentStatusEnum.REFUNDED,
+                "status": PaymentStatus.REFUNDED,
                 "amount": "full refund",
                 "payment_id": "PAID_123",
             },
@@ -342,7 +342,7 @@ class OrderPaymentViewSetTestCase(TestCase):
             True,
             {
                 "refund_id": "REFUND_123",
-                "status": PaymentStatusEnum.PARTIALLY_REFUNDED,
+                "status": PaymentStatus.PARTIALLY_REFUNDED,
                 "amount": "50.00",
                 "currency": "USD",
                 "payment_id": "PAID_123",

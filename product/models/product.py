@@ -104,7 +104,7 @@ class Product(
     )
     history = HistoricalRecords()
 
-    objects = ProductManager()
+    objects: ProductManager = ProductManager()
 
     class Meta(MetaDataModel.Meta, TypedModelMeta):
         verbose_name = _("Product")
@@ -281,10 +281,6 @@ class Product(
             return mark_safe(
                 '<span style="color: #ff0000;">{}</span>'.format(self.stock)
             )
-
-    @property
-    def absolute_url(self) -> str:
-        return f"/products/{self.id}/{self.slug}"
 
 
 class ProductTranslation(TranslatedFieldsModel, IndexMixin):

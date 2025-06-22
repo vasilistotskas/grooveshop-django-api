@@ -1,164 +1,120 @@
-from decimal import Decimal
-from unittest import TestCase
-from unittest.mock import Mock, PropertyMock, patch
-
+import pytest
 from django.core.exceptions import ValidationError
+from django.test import TestCase as DjangoTestCase
 from djmoney.money import Money
 
-from order.models.item import OrderItem, OrderItemManager, OrderItemQuerySet
+from order.factories.item import OrderItemFactory
+from order.factories.order import OrderFactory
+from order.models.item import OrderItem
+from product.factories.product import ProductFactory
 
 
-class OrderItemModelTestCase(TestCase):
+class OrderItemModelTestCase(DjangoTestCase):
     def setUp(self):
-        self.order_item = Mock(spec=OrderItem)
-        self.order_item.id = 1
-        self.order_item.uuid = "test-uuid-1234"
-        self.order_item.price = Money("50.00", "USD")
-        self.order_item.quantity = 2
-        self.order_item.original_quantity = 2
-        self.order_item.refunded_quantity = 0
+        self.order = OrderFactory.create()
+        self.product = ProductFactory.create(
+            stock=20, price=Money("50.00", "USD")
+        )
+        self.product.set_current_language("en")
+        self.product.name = "Test Product"
+        self.product.save()
 
-        self.order_item.order = Mock()
-
-        self.order_item.product = Mock()
-        self.order_item.product.stock = 10
-        self.order_item.product.name = "Test Product"
+        self.order_item = OrderItemFactory.create(
+            order=self.order,
+            product=self.product,
+            quantity=3,
+            refunded_quantity=0,
+        )
 
     def test_str_representation(self):
-        product_name = "Test Product"
-        quantity = 2
-
-        expected_str = f"{product_name} (x{quantity})"
-
-        self.assertEqual(expected_str, "Test Product (x2)")
+        expected = f"Order {self.order.id} - {self.product.name} x {self.order_item.quantity}"
+        self.assertEqual(str(self.order_item), expected)
 
     def test_get_ordering_queryset(self):
-        mock_qs = Mock()
-
-        self.order_item.order.items.all.return_value = mock_qs
-
-        result = OrderItem.get_ordering_queryset(self.order_item)
-
-        self.assertEqual(result, mock_qs)
-        self.order_item.order.items.all.assert_called_once()
+        queryset = self.order_item.get_ordering_queryset()
+        self.assertIsNotNone(queryset)
 
     def test_clean_valid_quantity(self):
-        self.order_item.quantity = 5
-
-        result = OrderItem.clean(self.order_item)
-
-        self.assertIsNone(result)
+        self.order_item.clean()
 
     def test_clean_invalid_quantity(self):
         self.order_item.quantity = 0
-
         with self.assertRaises(ValidationError):
-            OrderItem.clean(self.order_item)
+            self.order_item.clean()
 
     def test_clean_refunded_quantity_too_high(self):
-        self.order_item.quantity = 5
-        self.order_item.refunded_quantity = 6
-
+        self.order_item.refunded_quantity = 5
         with self.assertRaises(ValidationError):
-            OrderItem.clean(self.order_item)
+            self.order_item.clean()
 
     def test_clean_insufficient_stock(self):
-        self.order_item.quantity = 10
-        self.order_item.product.stock = 5
-        self.order_item.pk = None
+        self.product.stock = 2
+        self.product.save()
 
-        with self.assertRaises(ValidationError):
-            OrderItem.clean(self.order_item)
-
-    def test_clean_existing_item_stock_not_checked(self):
-        self.order_item.quantity = 15
-        self.order_item.product.stock = 10
-        self.order_item.pk = 1
-
-        result = OrderItem.clean(self.order_item)
-
-        self.assertIsNone(result)
-
-    def test_save_new_item(self):
-        self.order_item.pk = None
-        self.order_item.original_quantity = None
-        original_quantity_value = self.order_item.quantity
-
-        def mock_save_implementation(instance, *args, **kwargs):
-            if not instance.pk and instance.original_quantity is None:
-                instance.original_quantity = instance.quantity
-
-        with patch.object(OrderItem, "save"):
-            mock_save_implementation(self.order_item)
-
-        self.assertEqual(
-            self.order_item.original_quantity, original_quantity_value
+        new_item = OrderItem(
+            order=self.order,
+            product=self.product,
+            price=self.product.price,
+            quantity=5,
         )
 
+        with self.assertRaises(ValidationError):
+            new_item.clean()
+
+    def test_clean_existing_item_stock_not_checked(self):
+        self.order_item.save()
+        self.product.stock = 0
+        self.product.save()
+        self.order_item.clean()
+
+    def test_save_new_item(self):
+        new_item = OrderItem(
+            order=self.order,
+            product=self.product,
+            price=self.product.price,
+            quantity=2,
+        )
+        new_item.save()
+
+        new_item.refresh_from_db()
+
+        self.assertEqual(new_item.original_quantity, 2)
+
     def test_save_existing_item(self):
-        self.order_item.pk = 1
-        self.order_item.original_quantity = 2
-        original_value = self.order_item.original_quantity
+        initial_stock = self.product.stock
+        self.order_item.quantity = 5
+        self.order_item.save()
 
-        with patch.object(
-            OrderItem, "save", lambda self, *args, **kwargs: None
-        ):
-            OrderItem.save(self.order_item)
-
-        self.assertEqual(self.order_item.original_quantity, original_value)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, initial_stock - 2)
 
     def test_total_price_property(self):
-        self.order_item.price = Money("50.00", "USD")
-        self.order_item.quantity = 3
-        expected_total = Money("150.00", "USD")
-
-        result = OrderItem.total_price.__get__(self.order_item)
-
-        self.assertEqual(result, expected_total)
+        expected_total = self.order_item.price * self.order_item.quantity
+        self.assertEqual(self.order_item.total_price, expected_total)
 
     def test_net_quantity_property(self):
-        self.order_item.quantity = 5
-        self.order_item.refunded_quantity = 2
-        expected_net = 3
-
-        result = OrderItem.net_quantity.__get__(self.order_item)
-
-        self.assertEqual(result, expected_net)
+        self.order_item.refunded_quantity = 1
+        expected_net = (
+            self.order_item.quantity - self.order_item.refunded_quantity
+        )
+        self.assertEqual(self.order_item.net_quantity, expected_net)
 
     def test_net_price_property(self):
-        self.order_item.quantity = 5
-        self.order_item.refunded_quantity = 2
-
-        def mock_net_price(item):
-            net_quantity = item.quantity - item.refunded_quantity
-            return Money(
-                amount=Decimal("50.00") * Decimal(net_quantity), currency="USD"
-            )
-
-        expected_net = mock_net_price(self.order_item)
-
-        with patch.object(
-            OrderItem, "net_price", mock_net_price(self.order_item)
-        ):
-            self.assertEqual(expected_net, Money("150.00", "USD"))
+        self.order_item.refunded_quantity = 1
+        expected_net_price = (
+            self.order_item.price * self.order_item.net_quantity
+        )
+        self.assertEqual(self.order_item.net_price, expected_net_price)
 
     def test_refunded_amount_property_no_refund(self):
-        self.order_item.refunded_quantity = 0
-        expected_refund = Money("0.00", "USD")
-
-        result = OrderItem.refunded_amount.__get__(self.order_item)
-
-        self.assertEqual(result, expected_refund)
+        expected = Money("0.00", "USD")
+        self.assertEqual(self.order_item.refunded_amount, expected)
 
     def test_refunded_amount_property_partial_refund(self):
-        self.order_item.refunded_quantity = 2
-        self.order_item.quantity = 5
-        self.order_item.price = Money("50.00", "USD")
-        expected_refund = Money("100.00", "USD")
-
-        result = OrderItem.refunded_amount.__get__(self.order_item)
-
-        self.assertEqual(result, expected_refund)
+        self.order_item.refunded_quantity = 1
+        self.order_item.save()
+        expected = self.order_item.price * self.order_item.refunded_quantity
+        self.assertEqual(self.order_item.refunded_amount, expected)
 
     def test_refund_invalid_quantity(self):
         self.order_item.quantity = 5
@@ -197,164 +153,169 @@ class OrderItemModelTestCase(TestCase):
         self.assertEqual(self.order_item.refunded_quantity, 5)
 
 
-class OrderItemQuerySetTestCase(TestCase):
+@pytest.mark.django_db
+class OrderItemQuerySetTestCase(DjangoTestCase):
     def setUp(self):
-        self.queryset = Mock(spec=OrderItemQuerySet)
+        OrderItem.objects.all().delete()
 
-        self.queryset.filter.return_value = self.queryset
+        self.order1 = OrderFactory.create(num_order_items=0)
+        self.order2 = OrderFactory.create(num_order_items=0)
 
-        self.queryset.annotate.return_value = self.queryset
+        self.product1 = ProductFactory.create(
+            stock=50, price=Money("25.00", "USD")
+        )
+        self.product1.set_current_language("en")
+        self.product1.name = "Product 1"
+        self.product1.save()
 
-        self.settings_patch = patch("django.conf.settings")
-        self.mock_settings = self.settings_patch.start()
-        self.mock_settings.DEFAULT_CURRENCY = "USD"
+        self.product2 = ProductFactory.create(
+            stock=30, price=Money("40.00", "USD")
+        )
+        self.product2.set_current_language("en")
+        self.product2.name = "Product 2"
+        self.product2.save()
 
-    def tearDown(self):
-        self.settings_patch.stop()
+        self.item1 = OrderItemFactory.create(
+            order=self.order1, product=self.product1, quantity=2
+        )
+        self.item2 = OrderItemFactory.create(
+            order=self.order1, product=self.product2, quantity=3
+        )
+        self.item3 = OrderItemFactory.create(
+            order=self.order2, product=self.product1, quantity=1
+        )
 
     def test_for_order(self):
-        order_id = 1
+        result = OrderItem.objects.for_order(self.order1.id)
+        items = list(result)
 
-        result = OrderItemQuerySet.for_order(self.queryset, order_id)
+        item_ids = [item.id for item in items]
+        self.assertIn(self.item1.id, item_ids)
+        self.assertIn(self.item2.id, item_ids)
 
-        self.queryset.filter.assert_called_once_with(order_id=order_id)
-        self.assertEqual(result, self.queryset)
+        for item in items:
+            self.assertEqual(item.order_id, self.order1.id)
 
     def test_for_product(self):
-        product_id = 1
+        result = OrderItem.objects.for_product(self.product1.id)
+        items = list(result)
 
-        result = OrderItemQuerySet.for_product(self.queryset, product_id)
+        item_ids = [item.id for item in items]
+        self.assertIn(self.item1.id, item_ids)
+        self.assertIn(self.item3.id, item_ids)
 
-        self.queryset.filter.assert_called_once_with(product_id=product_id)
-        self.assertEqual(result, self.queryset)
+        for item in items:
+            self.assertEqual(item.product_id, self.product1.id)
 
     def test_with_product_data(self):
-        prefetch_result = Mock()
-        select_result = Mock()
-        select_result.prefetch_related.return_value = prefetch_result
-        self.queryset.select_related.return_value = select_result
+        result = OrderItem.objects.with_product_data()
 
-        result = OrderItemQuerySet.with_product_data(self.queryset)
-
-        self.queryset.select_related.assert_called_once_with("product")
-        select_result.prefetch_related.assert_called_once()
-        self.assertEqual(result, prefetch_result)
-
-    def test_annotate_total_price(self):
-        with (
-            patch("django.db.models.F"),
-            patch("django.db.models.ExpressionWrapper"),
-        ):
-            result = OrderItemQuerySet.annotate_total_price(self.queryset)
-
-        self.queryset.annotate.assert_called_once()
-        self.assertEqual(result, self.queryset)
+        for item in result:
+            self.assertIsNotNone(item.product.name)
 
     def test_sum_quantities(self):
-        with patch("django.db.models.Sum"):
-            self.queryset.aggregate.return_value = {"total_quantity": 10}
+        result = OrderItem.objects.for_order(self.order1.id).sum_quantities()
 
-            result = OrderItemQuerySet.sum_quantities(self.queryset)
+        items_for_order1 = OrderItem.objects.filter(order=self.order1.id)
+        expected_quantity = sum(item.quantity for item in items_for_order1)
+        self.assertEqual(result, expected_quantity)
 
-        self.assertEqual(result, 10)
+        result2 = OrderItem.objects.for_order(self.order2.id).sum_quantities()
+        items_for_order2 = OrderItem.objects.filter(order=self.order2.id)
+        expected_quantity2 = sum(item.quantity for item in items_for_order2)
+        self.assertEqual(result2, expected_quantity2)
 
-    def test_sum_quantities_no_results(self):
-        with patch("django.db.models.Sum"):
-            self.queryset.aggregate.return_value = {"total_quantity": None}
-
-            result = OrderItemQuerySet.sum_quantities(self.queryset)
-
-        self.assertEqual(result, 0)
+        self.assertGreater(expected_quantity, 0)
+        self.assertGreater(expected_quantity2, 0)
 
     def test_total_items_cost(self):
-        self.queryset.annotate_total_price.return_value = self.queryset
+        result = OrderItem.objects.for_order(self.order1.id).total_items_cost()
 
-        self.queryset.aggregate.return_value = {"total": Decimal("100.00")}
-
-        mock_item = Mock()
-        mock_price = Mock()
-        type(mock_price).currency = "USD"
-        type(mock_item).price = PropertyMock(return_value=mock_price)
-        self.queryset.first.return_value = mock_item
-
-        result = OrderItemQuerySet.total_items_cost(self.queryset)
-
-        expected_money = Money("100.00", "USD")
+        items = OrderItem.objects.filter(order=self.order1.id)
+        expected_total = sum(
+            item.price.amount * item.quantity for item in items
+        )
+        expected_money = Money(expected_total, "USD")
         self.assertEqual(result, expected_money)
 
-        self.queryset.annotate_total_price.assert_called_once()
-        self.queryset.aggregate.assert_called_once()
-
     def test_total_items_cost_no_items(self):
-        self.queryset.annotate_total_price.return_value = self.queryset
+        OrderItem.objects.all().delete()
 
-        self.queryset.aggregate.return_value = {"total": None}
-
-        mock_item = Mock()
-        mock_price = Mock()
-        type(mock_price).currency = "USD"
-        type(mock_item).price = PropertyMock(return_value=mock_price)
-        self.queryset.first.return_value = mock_item
-
-        result = OrderItemQuerySet.total_items_cost(self.queryset)
+        empty_order = OrderFactory.create(num_order_items=0)
+        result = OrderItem.objects.for_order(empty_order.id).total_items_cost()
 
         expected_money = Money("0", "USD")
         self.assertEqual(result, expected_money)
 
-        self.queryset.annotate_total_price.assert_called_once()
-        self.queryset.aggregate.assert_called_once()
 
-
-class OrderItemManagerTestCase(TestCase):
+@pytest.mark.django_db
+class OrderItemManagerTestCase(DjangoTestCase):
     def setUp(self):
-        self.manager = Mock(spec=OrderItemManager)
+        OrderItem.objects.all().delete()
 
-        self.queryset = Mock(spec=OrderItemQuerySet)
-        self.manager.get_queryset.return_value = self.queryset
-
-        self.queryset.for_order.return_value = "for_order_result"
-        self.queryset.for_product.return_value = "for_product_result"
-        self.queryset.with_product_data.return_value = (
-            "with_product_data_result"
+        self.order = OrderFactory.create(num_order_items=0)
+        self.product = ProductFactory.create(
+            stock=20, price=Money("15.00", "USD")
         )
-        self.queryset.sum_quantities.return_value = 5
-        self.queryset.total_items_cost.return_value = Money("100.00", "USD")
+        self.product.set_current_language("en")
+        self.product.name = "Test Product"
+        self.product.save()
+
+        self.items = []
+        for _i in range(3):
+            item = OrderItemFactory.create(
+                order=self.order,
+                product=self.product,
+                price=Money("15.00", "USD"),
+                quantity=2,
+            )
+            self.items.append(item)
 
     def test_for_order(self):
-        order_id = 1
+        result = OrderItem.objects.for_order(self.order.id)
 
-        result = OrderItemManager.for_order(self.manager, order_id)
+        for item in result:
+            self.assertEqual(item.order, self.order)
 
-        self.manager.get_queryset.assert_called_once()
-        self.queryset.for_order.assert_called_once_with(order_id)
-        self.assertEqual(result, "for_order_result")
+        item_ids = [item.id for item in result]
+        for item in self.items:
+            self.assertIn(item.id, item_ids)
 
     def test_for_product(self):
-        product_id = 1
+        result = OrderItem.objects.for_product(self.product.id)
 
-        result = OrderItemManager.for_product(self.manager, product_id)
+        for item in result:
+            self.assertEqual(item.product, self.product)
 
-        self.manager.get_queryset.assert_called_once()
-        self.queryset.for_product.assert_called_once_with(product_id)
-        self.assertEqual(result, "for_product_result")
+        item_ids = [item.id for item in result]
+        for item in self.items:
+            self.assertIn(item.id, item_ids)
 
     def test_with_product_data(self):
-        result = OrderItemManager.with_product_data(self.manager)
+        result = OrderItem.objects.with_product_data()
 
-        self.manager.get_queryset.assert_called_once()
-        self.queryset.with_product_data.assert_called_once()
-        self.assertEqual(result, "with_product_data_result")
+        self.assertGreater(result.count(), 0)
+
+        result_ids = [item.id for item in result]
+        for item in self.items:
+            self.assertIn(item.id, result_ids)
 
     def test_sum_quantities(self):
-        result = OrderItemManager.sum_quantities(self.manager)
+        result = OrderItem.objects.for_order(self.order.id).sum_quantities()
 
-        self.manager.get_queryset.assert_called_once()
-        self.queryset.sum_quantities.assert_called_once()
-        self.assertEqual(result, 5)
+        actual_items = OrderItem.objects.filter(order=self.order)
+        expected_quantity = sum(item.quantity for item in actual_items)
+
+        self.assertEqual(result, expected_quantity)
+        self.assertGreater(expected_quantity, 0)
 
     def test_total_items_cost(self):
-        result = OrderItemManager.total_items_cost(self.manager)
+        result = OrderItem.objects.for_order(self.order.id).total_items_cost()
 
-        self.manager.get_queryset.assert_called_once()
-        self.queryset.total_items_cost.assert_called_once()
-        self.assertEqual(result, Money("100.00", "USD"))
+        actual_items = OrderItem.objects.filter(order=self.order)
+        expected_total = sum(
+            item.price.amount * item.quantity for item in actual_items
+        )
+        expected_money = Money(expected_total, "USD")
+
+        self.assertEqual(result, expected_money)

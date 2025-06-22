@@ -2,12 +2,13 @@ from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
+from parler.models import TranslatableModel, TranslatedFields
 
 from core.models import TimeStampMixinModel, UUIDModel
 from order.managers.history import OrderHistoryManager, OrderItemHistoryManager
 
 
-class OrderHistory(TimeStampMixinModel, UUIDModel):
+class OrderHistory(TranslatableModel, TimeStampMixinModel, UUIDModel):
     class OrderHistoryChangeType(models.TextChoices):
         STATUS = "STATUS", _("Status Change")
         PAYMENT = "PAYMENT", _("Payment Update")
@@ -18,6 +19,15 @@ class OrderHistory(TimeStampMixinModel, UUIDModel):
         NOTE = "NOTE", _("Note Added")
         REFUND = "REFUND", _("Refund Processed")
         OTHER = "OTHER", _("Other Change")
+
+    translations = TranslatedFields(
+        description=models.TextField(
+            _("Description"),
+            blank=True,
+            default="",
+            help_text=_("Description of what changed."),
+        ),
+    )
 
     order = models.ForeignKey(
         "order.Order",
@@ -49,12 +59,6 @@ class OrderHistory(TimeStampMixinModel, UUIDModel):
         blank=True,
         help_text=_("New value of the changed field(s)."),
     )
-    description = models.TextField(
-        _("Description"),
-        blank=True,
-        default="",
-        help_text=_("Description of what changed."),
-    )
     ip_address = models.GenericIPAddressField(
         _("IP Address"),
         null=True,
@@ -67,7 +71,7 @@ class OrderHistory(TimeStampMixinModel, UUIDModel):
         help_text=_("User agent of the browser/client that made the change."),
     )
 
-    objects = OrderHistoryManager()
+    objects: OrderHistoryManager = OrderHistoryManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Order History")
@@ -214,12 +218,21 @@ class OrderHistory(TimeStampMixinModel, UUIDModel):
         )
 
 
-class OrderItemHistory(TimeStampMixinModel, UUIDModel):
+class OrderItemHistory(TranslatableModel, TimeStampMixinModel, UUIDModel):
     class OrderItemHistoryChangeType(models.TextChoices):
         QUANTITY = "QUANTITY", _("Quantity Change")
         PRICE = "PRICE", _("Price Update")
         REFUND = "REFUND", _("Item Refund")
         OTHER = "OTHER", _("Other Change")
+
+    translations = TranslatedFields(
+        description=models.TextField(
+            _("Description"),
+            blank=True,
+            default="",
+            help_text=_("Description of what changed."),
+        ),
+    )
 
     order_item = models.ForeignKey(
         "order.OrderItem",
@@ -251,14 +264,7 @@ class OrderItemHistory(TimeStampMixinModel, UUIDModel):
         blank=True,
         help_text=_("New value of the changed field(s)."),
     )
-    description = models.TextField(
-        _("Description"),
-        blank=True,
-        default="",
-        help_text=_("Description of what changed."),
-    )
-
-    objects = OrderItemHistoryManager()
+    objects: OrderItemHistoryManager = OrderItemHistoryManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Order Item History")

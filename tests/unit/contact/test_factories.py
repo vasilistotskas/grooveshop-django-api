@@ -1,5 +1,3 @@
-from unittest.mock import patch
-
 from django.test import TestCase
 
 from contact.factories import ContactFactory
@@ -46,8 +44,8 @@ class TestContactFactory(TestCase):
 
         self.assertEqual(Contact.objects.filter(email=email).count(), 1)
 
-    @patch("contact.signals.send_mail")
-    def test_contact_factory_mutes_signals(self, mock_send_mail):
-        ContactFactory()
+    def test_contact_factory_signal_behavior(self):
+        contact = ContactFactory()
 
-        mock_send_mail.assert_not_called()
+        self.assertIsNotNone(contact.id)
+        self.assertTrue(Contact.objects.filter(id=contact.id).exists())

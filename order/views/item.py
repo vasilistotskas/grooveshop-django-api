@@ -1,65 +1,119 @@
+from __future__ import annotations
+
+import logging
+
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view
-from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.exceptions import ValidationError as DRFValidationError
+from rest_framework.filters import SearchFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.api.permissions import IsSelfOrAdmin
 from core.api.serializers import ErrorResponseSerializer
-from order.enum.status import OrderStatusEnum
+from core.api.views import BaseModelViewSet
+from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+from core.utils.serializers import (
+    MultiSerializerMixin,
+    create_schema_view_config,
+)
+from core.utils.views import cache_methods
+from order.enum.status import OrderStatus
+from order.filters import OrderItemFilter
 from order.models.item import OrderItem
 from order.serializers.item import (
+    OrderItemDetailSerializer,
     OrderItemRefundSerializer,
     OrderItemSerializer,
+    OrderItemWriteSerializer,
 )
 
 
 @extend_schema_view(
-    list=extend_schema(
-        summary=_("List order items"),
-        description=_(
-            "List all order items associated with the authenticated user's orders."
-        ),
-        tags=["Order Items"],
-        responses={
-            200: OrderItemSerializer,
+    **create_schema_view_config(
+        model_class=OrderItem,
+        display_config={
+            "tag": "Order Items",
         },
-    ),
-    retrieve=extend_schema(
-        summary=_("Retrieve an order item"),
-        description=_("Retrieve a specific order item by ID."),
-        tags=["Order Items"],
-        responses={
-            200: OrderItemSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
+        serializers={
+            "list_serializer": OrderItemSerializer,
+            "detail_serializer": OrderItemDetailSerializer,
+            "write_serializer": OrderItemWriteSerializer,
         },
     ),
     refund=extend_schema(
+        operation_id="refundOrderItem",
         summary=_("Process a refund for an order item"),
         description=_("Process a refund for an order item."),
         tags=["Order Items"],
         request=OrderItemRefundSerializer,
         responses={
-            200: OrderItemSerializer,
+            200: OrderItemDetailSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
         },
     ),
 )
-class OrderItemViewSet(viewsets.ReadOnlyModelViewSet):
-    serializer_class = OrderItemSerializer
-    permission_classes = [IsAuthenticated, IsSelfOrAdmin]
+@cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
+class OrderItemViewSet(MultiSerializerMixin, BaseModelViewSet):
+    queryset = OrderItem.objects.all()
+    serializers = {
+        "default": OrderItemDetailSerializer,
+        "list": OrderItemSerializer,
+        "retrieve": OrderItemDetailSerializer,
+        "create": OrderItemWriteSerializer,
+        "update": OrderItemWriteSerializer,
+        "partial_update": OrderItemWriteSerializer,
+        "refund": OrderItemDetailSerializer,
+    }
+    response_serializers = {
+        "create": OrderItemDetailSerializer,
+        "update": OrderItemDetailSerializer,
+        "partial_update": OrderItemDetailSerializer,
+    }
+    permission_classes = [IsAuthenticated]
+    filter_backends = [
+        DjangoFilterBackend,
+        PascalSnakeCaseOrderingFilter,
+        SearchFilter,
+    ]
+    filterset_class = OrderItemFilter
+    ordering_fields = [
+        "id",
+        "created_at",
+        "updated_at",
+        "quantity",
+        "price",
+        "sort_order",
+    ]
+    ordering = ["-created_at"]
+    search_fields = [
+        "product__translations__name",
+        "notes",
+        "order__first_name",
+        "order__last_name",
+        "order__email",
+    ]
 
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):
             return OrderItem.objects.none()
 
         user = self.request.user
+
+        if user.is_staff or user.is_superuser:
+            return (
+                OrderItem.objects.all()
+                .select_related("order", "product")
+                .prefetch_related("product__translations")
+            )
+
         return (
             OrderItem.objects.filter(order__user=user)
             .select_related("order", "product")
@@ -75,19 +129,31 @@ class OrderItemViewSet(viewsets.ReadOnlyModelViewSet):
             raise NotFound(_("Order item not found.")) from e
 
     def check_order_permission(self, order):
-        if not order.user or order.user.id != self.request.user.id:
+        user = self.request.user
+
+        if user.is_staff or user.is_superuser:
+            return
+
+        if not order.user or order.user.id != user.id:
             raise PermissionDenied(
                 _("You do not have permission to access this order.")
             )
+
+    def perform_create(self, serializer):
+        product = serializer.validated_data["product"]
+        if not serializer.validated_data.get("price"):
+            serializer.save(price=product.price)
+        else:
+            serializer.save()
 
     @action(detail=True, methods=["POST"])
     def refund(self, request, pk=None):
         order_item = self.get_object()
 
         if order_item.order.status not in [
-            OrderStatusEnum.DELIVERED,
-            OrderStatusEnum.COMPLETED,
-            OrderStatusEnum.RETURNED,
+            OrderStatus.DELIVERED,
+            OrderStatus.COMPLETED,
+            OrderStatus.RETURNED,
         ]:
             raise DRFValidationError(
                 {"detail": _("This order is not in a refundable state.")}
@@ -118,12 +184,12 @@ class OrderItemViewSet(viewsets.ReadOnlyModelViewSet):
                 {
                     "detail": _("Refund processed successfully."),
                     "refunded_amount": str(refunded_amount),
-                    "item": OrderItemSerializer(order_item).data,
+                    "item": OrderItemDetailSerializer(
+                        order_item, context=self.get_serializer_context()
+                    ).data,
                 }
             )
         except ValidationError as e:
-            import logging
-
             logger = logging.getLogger(__name__)
 
             logger.error(
@@ -141,8 +207,6 @@ class OrderItemViewSet(viewsets.ReadOnlyModelViewSet):
                 }
             ) from e
         except Exception as e:
-            import logging
-
             logger = logging.getLogger(__name__)
             logger.error(
                 f"Error processing refund: {e!s}",

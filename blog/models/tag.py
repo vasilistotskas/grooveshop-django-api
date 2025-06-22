@@ -2,15 +2,10 @@ from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
-from parler.managers import TranslatableManager
 from parler.models import TranslatableModel, TranslatedFields
 
+from blog.managers.tag import BlogTagManager
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
-
-
-class BlogTagManager(TranslatableManager):
-    def get_queryset(self):
-        return super().get_queryset().filter(active=True)
 
 
 class BlogTag(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
@@ -25,7 +20,7 @@ class BlogTag(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         )
     )
 
-    objects = BlogTagManager()
+    objects: BlogTagManager = BlogTagManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Blog Tag")

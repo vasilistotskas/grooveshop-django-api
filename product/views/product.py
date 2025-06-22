@@ -12,130 +12,36 @@ from rest_framework.response import Response
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
-from core.utils.serializers import MultiSerializerMixin
+from core.utils.serializers import (
+    MultiSerializerMixin,
+    create_schema_view_config,
+)
 from core.utils.views import cache_methods
 from product.filters.product import ProductFilter
 from product.models.product import Product
 from product.serializers.image import ProductImageSerializer
 from product.serializers.product import (
     ProductDetailSerializer,
-    ProductListSerializer,
+    ProductSerializer,
     ProductWriteSerializer,
 )
 from product.serializers.review import ProductReviewSerializer
 from tag.serializers.tag import TagSerializer
 
-
-@extend_schema_view(
-    list=extend_schema(
-        summary=_("List products"),
-        description=_(
-            "Retrieve a list of products with rich filtering and search capabilities. "
-            "Includes computed fields like popularity scores, price categories, and stock status."
-        ),
-        tags=["Products"],
-        responses={
-            200: ProductListSerializer(many=True),
-        },
-    ),
-    create=extend_schema(
-        summary=_("Create a product"),
-        description=_(
-            "Create a new product with all required information. Requires authentication."
-        ),
-        tags=["Products"],
-        request=ProductWriteSerializer,
-        responses={
-            201: ProductDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-        },
-    ),
-    retrieve=extend_schema(
-        summary=_("Retrieve a product"),
-        description=_(
-            "Get detailed information about a specific product including pricing breakdown, "
-            "related products, recent reviews, and engagement metrics."
-        ),
-        tags=["Products"],
-        responses={
-            200: ProductDetailSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    update=extend_schema(
-        summary=_("Update a product"),
-        description=_("Update product information. Requires authentication."),
-        tags=["Products"],
-        request=ProductWriteSerializer,
-        responses={
-            200: ProductDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    partial_update=extend_schema(
-        summary=_("Partially update a product"),
-        description=_(
-            "Partially update product information. Requires authentication."
-        ),
-        tags=["Products"],
-        request=ProductWriteSerializer,
-        responses={
-            200: ProductDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    destroy=extend_schema(
-        summary=_("Delete a product"),
-        description=_("Delete a product. Requires authentication."),
-        tags=["Products"],
-        responses={
-            204: None,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    update_view_count=extend_schema(
-        summary=_("Increment product view count"),
-        description=_("Increment the view count for a product."),
-        tags=["Products"],
-        responses={
-            200: ProductDetailSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    reviews=extend_schema(
-        summary=_("Get product reviews"),
-        description=_("Get all reviews for a product."),
-        tags=["Products"],
-        responses={
-            200: ProductReviewSerializer(many=True),
-            404: ErrorResponseSerializer,
-        },
-    ),
-    images=extend_schema(
-        summary=_("Get product images"),
-        description=_("Get all images for a product."),
-        tags=["Products"],
-        responses={
-            200: ProductImageSerializer(many=True),
-            404: ErrorResponseSerializer,
-        },
-    ),
-    tags=extend_schema(
-        summary=_("Get product tags"),
-        description=_("Get all tags associated with a product."),
-        tags=["Products"],
-        responses={
-            200: TagSerializer(many=True),
-            404: ErrorResponseSerializer,
-        },
-    ),
+schema_config = create_schema_view_config(
+    model_class=Product,
+    display_config={
+        "tag": "Products",
+    },
+    serializers={
+        "list_serializer": ProductSerializer,
+        "detail_serializer": ProductDetailSerializer,
+        "write_serializer": ProductWriteSerializer,
+    },
 )
+
+
+@extend_schema_view(**schema_config)
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
     queryset = Product.objects.all()
@@ -148,11 +54,11 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
     ordering_fields = [
         "price",
         "created_at",
-        "discount_value",
-        "final_price",
-        "price_save_percent",
-        "review_average",
-        "likes_count",
+        "discount_value_amount",
+        "final_price_amount",
+        "price_save_percent_field",
+        "review_average_field",
+        "likes_count_field",
         "view_count",
         "stock",
     ]
@@ -160,20 +66,38 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
     search_fields = ["translations__name", "translations__description", "slug"]
 
     serializers = {
-        "list": ProductListSerializer,
+        "default": ProductDetailSerializer,
+        "list": ProductSerializer,
         "retrieve": ProductDetailSerializer,
         "create": ProductWriteSerializer,
         "update": ProductWriteSerializer,
         "partial_update": ProductWriteSerializer,
+        "update_view_count": ProductDetailSerializer,
         "reviews": ProductReviewSerializer,
         "images": ProductImageSerializer,
         "tags": TagSerializer,
+    }
+
+    response_serializers = {
+        "create": ProductDetailSerializer,
+        "update": ProductDetailSerializer,
+        "partial_update": ProductDetailSerializer,
     }
 
     def get_queryset(self):
         queryset = super().get_queryset()
         return queryset.with_all_annotations()
 
+    @extend_schema(
+        operation_id="incrementProductViews",
+        summary=_("Increment product view count"),
+        description=_("Increment the view count for a product."),
+        tags=["Products"],
+        responses={
+            200: ProductDetailSerializer,
+            404: ErrorResponseSerializer,
+        },
+    )
     @action(
         detail=True,
         methods=["POST"],
@@ -182,9 +106,21 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
         product = self.get_object()
         product.view_count += 1
         product.save()
-        serializer = self.get_serializer(product)
+        serializer = ProductDetailSerializer(
+            product, context=self.get_serializer_context()
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(
+        operation_id="listProductReviews",
+        summary=_("Get product reviews"),
+        description=_("Get all reviews for a product."),
+        tags=["Products"],
+        responses={
+            200: ProductReviewSerializer(many=True),
+            404: ErrorResponseSerializer,
+        },
+    )
     @action(
         detail=True,
         methods=["GET"],
@@ -192,31 +128,52 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
     def reviews(self, request, pk=None):
         product = self.get_object()
         reviews = product.reviews.all()
-        serializer = self.get_serializer(
+        serializer = ProductReviewSerializer(
             reviews, many=True, context=self.get_serializer_context()
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(
+        operation_id="listProductImages",
+        summary=_("Get product images"),
+        description=_("Get all images for a product."),
+        tags=["Products"],
+        responses={
+            200: ProductImageSerializer(many=True),
+            404: ErrorResponseSerializer,
+        },
+    )
     @action(
         detail=True,
         methods=["GET"],
     )
     def images(self, request, pk=None):
         product = self.get_object()
-        images = product.images.all().order_by("sort_order")
-        serializer = self.get_serializer(
+        images = product.images.all()
+        serializer = ProductImageSerializer(
             images, many=True, context=self.get_serializer_context()
         )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(
+        operation_id="listProductTags",
+        summary=_("Get product tags"),
+        description=_("Get all tags associated with a product."),
+        tags=["Products"],
+        parameters=[],
+        responses={
+            200: TagSerializer(many=True),
+            404: ErrorResponseSerializer,
+        },
+    )
     @action(
         detail=True,
         methods=["GET"],
     )
     def tags(self, request, pk=None):
         product = self.get_object()
-        tags = product.tags.filter(active=True)
-        serializer = self.get_serializer(
+        tags = [tagged_item.tag for tagged_item in product.tags.all()]
+        serializer = TagSerializer(
             tags, many=True, context=self.get_serializer_context()
         )
         return Response(serializer.data, status=status.HTTP_200_OK)

@@ -52,11 +52,11 @@ class Command(BaseCommand):
         )
 
     def get_featured_articles(self):
-        # Your logic here
+        # @TODO - Add logic
         return []
 
     def get_upcoming_events(self):
-        # Your logic here
+        # @TODO - Add logic
         return []
 
     def get_user_stats(self):

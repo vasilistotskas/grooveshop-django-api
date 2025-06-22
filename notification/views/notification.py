@@ -7,15 +7,16 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from notification.models.notification import Notification
-from notification.serializers.notification import NotificationListSerializer
+from notification.serializers.notification import NotificationSerializer
 
 
 @extend_schema(
+    operation_id="getNotificationsByIds",
     summary=_("Returns the notifications for a list of ids."),
     description=_("Returns the notifications for a list of ids."),
     tags=["Notifications"],
     request=None,
-    responses=NotificationListSerializer(many=True),
+    responses=NotificationSerializer(many=True),
     methods=["POST"],
 )
 @api_view(["POST"])
@@ -34,5 +35,5 @@ def notifications_by_ids(request):
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    serializer = NotificationListSerializer(notifications, many=True)
+    serializer = NotificationSerializer(notifications, many=True)
     return Response(serializer.data)

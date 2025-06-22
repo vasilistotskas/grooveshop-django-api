@@ -3,7 +3,6 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from blog.factories.author import BlogAuthorFactory
-from blog.models.author import BlogAuthor
 from user.factories.account import UserAccountFactory
 
 languages = [
@@ -14,9 +13,6 @@ User = get_user_model()
 
 
 class BlogAuthorModelTestCase(TestCase):
-    author: BlogAuthor = None
-    user: User = None
-
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
         self.author = BlogAuthorFactory(

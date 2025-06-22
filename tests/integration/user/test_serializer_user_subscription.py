@@ -66,8 +66,6 @@ class SubscriptionTopicSerializerTest(TestCase):
             "is_default",
             "requires_confirmation",
             "subscriber_count",
-            "created_at",
-            "updated_at",
             "translations",
         }
 
@@ -391,30 +389,34 @@ class UserSubscriptionStatusSerializerTest(TestCase):
             self.available_topics.append(topic)
 
     def test_serializer_structure(self):
-        subscribed_data = SubscriptionTopicSerializer(
-            self.subscribed_topics, many=True
-        ).data
-        available_data = SubscriptionTopicSerializer(
-            self.available_topics, many=True
-        ).data
+        class MockSubscriptionStatus:
+            def __init__(self, subscribed_topics, available_topics):
+                self.subscribed = subscribed_topics
+                self.available = available_topics
 
-        for item in subscribed_data:
-            if "subscriber_count" not in item:
-                item["subscriber_count"] = 0
+        mock_data = MockSubscriptionStatus(
+            subscribed_topics=self.subscribed_topics,
+            available_topics=self.available_topics,
+        )
 
-        for item in available_data:
-            if "subscriber_count" not in item:
-                item["subscriber_count"] = 0
+        serializer = UserSubscriptionStatusSerializer(mock_data)
+        data = serializer.data
 
-        data = {
-            "subscribed": subscribed_data,
-            "available": available_data,
-        }
+        self.assertIn("subscribed", data)
+        self.assertIn("available", data)
 
-        serializer = UserSubscriptionStatusSerializer(data)
+        self.assertEqual(len(data["subscribed"]), 3)
+        self.assertEqual(len(data["available"]), 2)
 
-        self.assertEqual(serializer.data["subscribed"], data["subscribed"])
-        self.assertEqual(serializer.data["available"], data["available"])
+        for topic_data in data["subscribed"]:
+            self.assertIn("id", topic_data)
+            self.assertIn("slug", topic_data)
+            self.assertIn("category", topic_data)
+
+        for topic_data in data["available"]:
+            self.assertIn("id", topic_data)
+            self.assertIn("slug", topic_data)
+            self.assertIn("category", topic_data)
 
     def test_read_only_fields(self):
         serializer = UserSubscriptionStatusSerializer()

@@ -3,9 +3,9 @@ from django.test import TestCase
 from djmoney.money import Money
 
 from country.factories import CountryFactory
-from order.enum.status import OrderStatusEnum
+from order.enum.status import OrderStatus
 from order.factories.order import OrderFactory
-from order.serializers.item import OrderItemSerializer
+from order.serializers.item import OrderItemDetailSerializer
 from order.serializers.order import (
     OrderDetailSerializer,
     OrderWriteSerializer,
@@ -33,7 +33,7 @@ class OrderDetailSerializerTestCase(TestCase):
             pay_way=self.pay_way,
             country=self.country,
             region=self.region,
-            status=OrderStatusEnum.PENDING.value,
+            status=OrderStatus.PENDING.value,
         )
 
         product = ProductFactory(
@@ -78,7 +78,7 @@ class OrderCreateUpdateSerializerTestCase(TestCase):
             "last_name": "Doe",
             "phone": "+12025550195",
             "paid_amount": {"amount": "100.00", "currency": "USD"},
-            "status": OrderStatusEnum.PENDING.value,
+            "status": OrderStatus.PENDING.value,
             "shipping_price": {"amount": "10.00", "currency": "USD"},
             "street": "Main Street",
             "street_number": "123",
@@ -168,7 +168,7 @@ class OrderItemSerializerTestCase(TestCase):
             product=self.product, price=Money("50.00", "USD"), quantity=2
         )
 
-        self.serializer = OrderItemSerializer(instance=self.order_item)
+        self.serializer = OrderItemDetailSerializer(instance=self.order_item)
 
     def test_contains_expected_fields(self):
         data = self.serializer.data

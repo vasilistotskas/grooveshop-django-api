@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import contextlib
+import logging
 import uuid
 
+from django.conf import settings
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
@@ -21,74 +25,41 @@ from core.api.permissions import IsSelfOrAdmin
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
-from core.utils.serializers import MultiSerializerMixin
-from order.enum.status import OrderStatusEnum
+from core.utils.serializers import (
+    MultiSerializerMixin,
+    create_schema_view_config,
+)
+from core.utils.views import cache_methods
+from order.enum.status import OrderStatus
+from order.filters import OrderFilter
 from order.models.order import Order
 from order.serializers.order import (
     OrderDetailSerializer,
-    OrderListSerializer,
+    OrderSerializer,
     OrderWriteSerializer,
 )
 from order.services import OrderService, OrderServiceError
 
 
 @extend_schema_view(
-    list=extend_schema(
-        summary=_("List all orders"),
-        description=_("Returns a list of all orders with pagination"),
-        tags=["Order"],
-        responses={200: OrderListSerializer(many=True)},
-    ),
-    create=extend_schema(
-        summary=_("Create an order or process a checkout"),
-        description=_("Process a checkout and create a new order"),
-        tags=["Order"],
-        request=OrderWriteSerializer,
-        responses={
-            201: OrderDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
+    **create_schema_view_config(
+        model_class=Order,
+        display_config={
+            "tag": "Orders",
         },
-    ),
-    retrieve=extend_schema(
-        summary=_("Retrieve an order by ID"),
-        description=_("Get detailed information about a specific order"),
-        tags=["Order"],
-        responses={
-            200: OrderDetailSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    update=extend_schema(
-        summary=_("Update an order"),
-        description=_("Update an existing order"),
-        tags=["Order"],
-        request=OrderWriteSerializer,
-        responses={
-            200: OrderDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    partial_update=extend_schema(
-        summary=_("Partially update an order"),
-        description=_("Partially update an existing order"),
-        tags=["Order"],
-        request=OrderWriteSerializer,
-        responses={
-            200: OrderDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
+        serializers={
+            "list_serializer": OrderSerializer,
+            "detail_serializer": OrderDetailSerializer,
+            "write_serializer": OrderWriteSerializer,
         },
     ),
     retrieve_by_uuid=extend_schema(
+        operation_id="retrieveOrderByUuid",
         summary=_("Retrieve an order by UUID"),
         description=_(
             "Get detailed information about a specific order using its UUID"
         ),
-        tags=["Order"],
+        tags=["Orders"],
         responses={
             200: OrderDetailSerializer,
             400: ErrorResponseSerializer,
@@ -96,16 +67,11 @@ from order.services import OrderService, OrderServiceError
             404: ErrorResponseSerializer,
         },
     ),
-    destroy=extend_schema(
-        summary=_("Delete an order"),
-        description=_("Delete an existing order and restore product stock"),
-        tags=["Order"],
-        responses={204: None, 404: ErrorResponseSerializer},
-    ),
     cancel=extend_schema(
+        operation_id="cancelOrder",
         summary=_("Cancel an order"),
         description=_("Cancel an existing order and restore product stock"),
-        tags=["Order"],
+        tags=["Orders"],
         responses={
             200: OrderDetailSerializer,
             400: ErrorResponseSerializer,
@@ -114,20 +80,22 @@ from order.services import OrderService, OrderServiceError
         },
     ),
     my_orders=extend_schema(
+        operation_id="listMyOrders",
         summary=_("List current user's orders"),
         description=_("Returns a list of the authenticated user's orders"),
-        tags=["Order"],
+        tags=["Orders"],
         responses={
-            200: OrderListSerializer(many=True),
+            200: OrderSerializer(many=True),
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
         },
     ),
     add_tracking=extend_schema(
+        operation_id="addOrderTracking",
         summary=_("Add tracking information to an order"),
         description=_("Add tracking information to an existing order"),
-        tags=["Order"],
+        tags=["Orders"],
         responses={
             200: OrderDetailSerializer,
             400: ErrorResponseSerializer,
@@ -136,9 +104,10 @@ from order.services import OrderService, OrderServiceError
         },
     ),
     update_status=extend_schema(
+        operation_id="updateOrderStatus",
         summary=_("Update the status of an order"),
         description=_("Update the status of an existing order"),
-        tags=["Order"],
+        tags=["Orders"],
         responses={
             200: OrderDetailSerializer,
             400: ErrorResponseSerializer,
@@ -147,43 +116,68 @@ from order.services import OrderService, OrderServiceError
         },
     ),
 )
+@cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
     queryset = Order.objects.all()
+    serializers = {
+        "default": OrderDetailSerializer,
+        "list": OrderSerializer,
+        "retrieve": OrderDetailSerializer,
+        "create": OrderWriteSerializer,
+        "update": OrderWriteSerializer,
+        "partial_update": OrderWriteSerializer,
+        "retrieve_by_uuid": OrderDetailSerializer,
+        "cancel": OrderDetailSerializer,
+        "add_tracking": OrderDetailSerializer,
+        "update_status": OrderDetailSerializer,
+        "my_orders": OrderSerializer,
+    }
+    response_serializers = {
+        "create": OrderDetailSerializer,
+        "update": OrderDetailSerializer,
+        "partial_update": OrderDetailSerializer,
+    }
     filter_backends = [
         DjangoFilterBackend,
         PascalSnakeCaseOrderingFilter,
         SearchFilter,
     ]
-    ordering_fields = ["created_at", "status", "paid_amount"]
-    filterset_fields = ["user_id", "status", "payment_status"]
+    filterset_class = OrderFilter
+    ordering_fields = [
+        "id",
+        "created_at",
+        "updated_at",
+        "status",
+        "status_updated_at",
+        "paid_amount",
+        "shipping_price",
+        "payment_status",
+        "user__first_name",
+        "user__last_name",
+    ]
     ordering = ["-created_at"]
     search_fields = [
         "user__email",
         "user__username",
-        "user_id",
+        "user__first_name",
+        "user__last_name",
         "first_name",
         "last_name",
         "email",
         "phone",
+        "mobile_phone",
+        "city",
+        "street",
+        "zipcode",
+        "tracking_number",
+        "payment_id",
     ]
     permission_classes = [IsAuthenticated, IsSelfOrAdmin]
-
-    serializers = {
-        "create": OrderCreateUpdateSerializer,
-        "update": OrderCreateUpdateSerializer,
-        "partial_update": OrderCreateUpdateSerializer,
-        "retrieve": OrderDetailSerializer,
-        "retrieve_by_uuid": OrderDetailSerializer,
-        "cancel": OrderDetailSerializer,
-        "add_tracking": OrderDetailSerializer,
-        "update_status": OrderDetailSerializer,
-    }
 
     def get_permissions(self):
         if self.action in [
             "list",
             "retrieve",
-            "retrieve_by_uuid",
             "update",
             "partial_update",
             "destroy",
@@ -262,8 +256,6 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
             )
 
         except OrderServiceError as e:
-            import logging
-
             logger = logging.getLogger(__name__)
 
             logger.error(
@@ -278,8 +270,6 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
                 }
             ) from e
         except Exception as e:
-            import logging
-
             logger = logging.getLogger(__name__)
 
             logger.error(
@@ -327,8 +317,6 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
             serializer = self.get_serializer(canceled_order)
             return Response(serializer.data)
         except OrderServiceError as e:
-            import logging
-
             logger = logging.getLogger(__name__)
 
             logger.error(f"Error canceling order: {e}")
@@ -340,8 +328,6 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
                 }
             ) from e
         except Exception as e:
-            import logging
-
             logger = logging.getLogger(__name__)
 
             logger.error(
@@ -399,34 +385,28 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
             if (
                 order.status
                 in {
-                    OrderStatusEnum.DELIVERED,
-                    OrderStatusEnum.COMPLETED,
-                    OrderStatusEnum.RETURNED,
-                    OrderStatusEnum.REFUNDED,
+                    OrderStatus.DELIVERED,
+                    OrderStatus.COMPLETED,
+                    OrderStatus.RETURNED,
+                    OrderStatus.REFUNDED,
                 }
-                or order.status == OrderStatusEnum.SHIPPED
+                or order.status == OrderStatus.SHIPPED
             ):
                 pass
-            elif order.status == OrderStatusEnum.PROCESSING:
-                OrderService.update_order_status(order, OrderStatusEnum.SHIPPED)
-            elif order.status == OrderStatusEnum.PENDING:
-                OrderService.update_order_status(
-                    order, OrderStatusEnum.PROCESSING
-                )
-                OrderService.update_order_status(order, OrderStatusEnum.SHIPPED)
+            elif order.status == OrderStatus.PROCESSING:
+                OrderService.update_order_status(order, OrderStatus.SHIPPED)
+            elif order.status == OrderStatus.PENDING:
+                OrderService.update_order_status(order, OrderStatus.PROCESSING)
+                OrderService.update_order_status(order, OrderStatus.SHIPPED)
             else:
                 with contextlib.suppress(OrderServiceError):
-                    OrderService.update_order_status(
-                        order, OrderStatusEnum.SHIPPED
-                    )
+                    OrderService.update_order_status(order, OrderStatus.SHIPPED)
 
             order = OrderService.get_order_by_id(order.id)
             serializer = self.get_serializer(order)
             return Response(serializer.data)
 
         except OrderServiceError as e:
-            import logging
-
             logger = logging.getLogger(__name__)
 
             logger.error(f"Error adding tracking information: {e}")
@@ -438,8 +418,6 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
                 }
             ) from e
         except Exception as e:
-            import logging
-
             logger = logging.getLogger(__name__)
 
             logger.error(
@@ -470,8 +448,6 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
             serializer = self.get_serializer(order)
             return Response(serializer.data)
         except ValueError as e:
-            import logging
-
             logger = logging.getLogger(__name__)
 
             logger.error(f"Error updating order status: {e}")
@@ -483,8 +459,6 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
                 }
             ) from e
         except OrderServiceError as e:
-            import logging
-
             logger = logging.getLogger(__name__)
 
             logger.error(f"Error updating order status: {e}")
@@ -496,8 +470,6 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
                 }
             ) from e
         except Exception as e:
-            import logging
-
             logger = logging.getLogger(__name__)
 
             logger.error(

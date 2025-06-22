@@ -2,28 +2,21 @@ import uuid
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
-from django.core.handlers.wsgi import WSGIRequest
 from django.test import RequestFactory, TestCase
 
-from cart.factories import CartFactory, CartItemFactory
+from cart.factories.cart import CartFactory
+from cart.factories.item import CartItemFactory
 from cart.models import Cart, CartItem
 from cart.services import (
     CartService,
 )
 from product.factories.product import ProductFactory
-from product.models.product import Product
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()
 
 
 class CartServiceTest(TestCase):
-    user: User = None
-    factory: RequestFactory = None
-    request: WSGIRequest = None
-    cart: Cart = None
-    product: Product = None
-
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
         self.factory = RequestFactory()
@@ -170,11 +163,6 @@ class CartServiceTest(TestCase):
 
 
 class GuestCartServiceTest(TestCase):
-    factory: RequestFactory = None
-    request: WSGIRequest = None
-    session_key: str = None
-    product: Product = None
-
     def setUp(self):
         self.factory = RequestFactory()
         self.session_key = str(uuid.uuid4())

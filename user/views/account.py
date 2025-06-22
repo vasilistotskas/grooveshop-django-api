@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
@@ -14,95 +15,49 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from authentication.serializers import AuthenticationSerializer
-from blog.serializers.comment import BlogCommentListSerializer
-from blog.serializers.post import BlogPostListSerializer
+from blog.serializers.comment import BlogCommentSerializer
+from blog.serializers.post import BlogPostSerializer
 from core.api.permissions import IsSelfOrAdmin
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
-from core.utils.serializers import MultiSerializerMixin
+from core.utils.serializers import (
+    MultiSerializerMixin,
+    create_schema_view_config,
+)
 from notification.serializers.user import NotificationUserSerializer
-from order.serializers.order import OrderListSerializer
+from order.serializers.order import OrderSerializer
 from product.serializers.favourite import ProductFavouriteSerializer
 from product.serializers.review import ProductReviewSerializer
+from user.filters.account import UserAccountFilter
 from user.models.subscription import SubscriptionTopic, UserSubscription
 from user.serializers.account import (
     UsernameUpdateResponseSerializer,
     UsernameUpdateSerializer,
     UserSubscriptionSummaryResponseSerializer,
 )
-from user.serializers.address import UserAddressListSerializer
+from user.serializers.address import UserAddressSerializer
 from user.serializers.subscription import UserSubscriptionSerializer
 from user.utils.subscription import get_user_subscription_summary
 
+User = get_user_model()
+
 
 @extend_schema_view(
-    list=extend_schema(
-        summary=_("List user accounts"),
-        description=_(
-            "Retrieve a list of user accounts. Only accessible by staff users or users viewing their own account."
-        ),
-        tags=["User Accounts"],
-        responses={
-            200: AuthenticationSerializer(many=True),
-            401: ErrorResponseSerializer,
+    **create_schema_view_config(
+        model_class=User,
+        display_config={
+            "tag": "User Accounts",
         },
-    ),
-    retrieve=extend_schema(
-        summary=_("Retrieve a user account"),
-        description=_(
-            "Get detailed information about a specific user account. Users can only access their own account unless they are staff."
-        ),
-        tags=["User Accounts"],
-        responses={
-            200: AuthenticationSerializer,
-            401: ErrorResponseSerializer,
-            403: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
+        serializers={
+            "list_serializer": AuthenticationSerializer,
+            "detail_serializer": AuthenticationSerializer,
+            "write_serializer": AuthenticationSerializer,
         },
-    ),
-    update=extend_schema(
-        summary=_("Update a user account"),
-        description=_(
-            "Update user account information. Users can only update their own account unless they are staff."
-        ),
-        tags=["User Accounts"],
-        responses={
-            200: AuthenticationSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            403: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    partial_update=extend_schema(
-        summary=_("Partially update a user account"),
-        description=_(
-            "Partially update user account information. Users can only update their own account unless they are staff."
-        ),
-        tags=["User Accounts"],
-        responses={
-            200: AuthenticationSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            403: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    destroy=extend_schema(
-        summary=_("Delete a user account"),
-        description=_(
-            "Delete a user account. Users can only delete their own account unless they are staff."
-        ),
-        tags=["User Accounts"],
-        responses={
-            204: None,
-            401: ErrorResponseSerializer,
-            403: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
+        error_serializer=ErrorResponseSerializer,
     ),
     favourite_products=extend_schema(
+        operation_id="getUserAccountFavouriteProducts",
         summary=_("Get user's favourite products"),
         description=_("Get all favourite products for a specific user."),
         tags=["User Accounts"],
@@ -114,17 +69,19 @@ from user.utils.subscription import get_user_subscription_summary
         },
     ),
     orders=extend_schema(
+        operation_id="getUserAccountOrders",
         summary=_("Get user's orders"),
         description=_("Get all orders for a specific user."),
         tags=["User Accounts"],
         responses={
-            200: OrderListSerializer(many=True),
+            200: OrderSerializer(many=True),
             401: ErrorResponseSerializer,
             403: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
         },
     ),
     product_reviews=extend_schema(
+        operation_id="getUserAccountProductReviews",
         summary=_("Get user's product reviews"),
         description=_("Get all product reviews written by a specific user."),
         tags=["User Accounts"],
@@ -136,39 +93,43 @@ from user.utils.subscription import get_user_subscription_summary
         },
     ),
     addresses=extend_schema(
+        operation_id="getUserAccountAddresses",
         summary=_("Get user's addresses"),
         description=_("Get all addresses for a specific user."),
         tags=["User Accounts"],
         responses={
-            200: UserAddressListSerializer(many=True),
+            200: UserAddressSerializer(many=True),
             401: ErrorResponseSerializer,
             403: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
         },
     ),
     blog_post_comments=extend_schema(
+        operation_id="getUserAccountBlogPostComments",
         summary=_("Get user's blog comments"),
         description=_("Get all blog post comments written by a specific user."),
         tags=["User Accounts"],
         responses={
-            200: BlogCommentListSerializer(many=True),
+            200: BlogCommentSerializer(many=True),
             401: ErrorResponseSerializer,
             403: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
         },
     ),
     liked_blog_posts=extend_schema(
+        operation_id="getUserAccountLikedBlogPosts",
         summary=_("Get user's liked blog posts"),
         description=_("Get all blog posts liked by a specific user."),
         tags=["User Accounts"],
         responses={
-            200: BlogPostListSerializer(many=True),
+            200: BlogPostSerializer(many=True),
             401: ErrorResponseSerializer,
             403: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
         },
     ),
     notifications=extend_schema(
+        operation_id="getUserAccountNotifications",
         summary=_("Get user's notifications"),
         description=_("Get all notifications for a specific user."),
         tags=["User Accounts"],
@@ -180,6 +141,7 @@ from user.utils.subscription import get_user_subscription_summary
         },
     ),
     subscriptions=extend_schema(
+        operation_id="getUserAccountSubscriptions",
         summary=_("Get user's subscriptions"),
         description=_("Get all subscriptions for a specific user."),
         tags=["User Accounts"],
@@ -191,6 +153,7 @@ from user.utils.subscription import get_user_subscription_summary
         },
     ),
     change_username=extend_schema(
+        operation_id="changeUserAccountUsername",
         summary=_("Change username"),
         description=_("Change the username for a specific user."),
         tags=["User Accounts"],
@@ -204,6 +167,7 @@ from user.utils.subscription import get_user_subscription_summary
         },
     ),
     subscription_summary=extend_schema(
+        operation_id="getUserAccountSubscriptionSummary",
         summary=_("Get user's subscription summary"),
         description=_("Get a summary of subscriptions for a specific user."),
         tags=["User Accounts"],
@@ -222,29 +186,26 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         PascalSnakeCaseOrderingFilter,
         SearchFilter,
     ]
-    filterset_fields = ["id", "email"]
-    ordering_fields = ["id", "email"]
+    filterset_class = UserAccountFilter
+    ordering_fields = ["id", "email", "username", "created_at", "updated_at"]
     ordering = ["-created_at"]
-    search_fields = ["id", "email"]
+    search_fields = ["id", "email", "username", "first_name", "last_name"]
 
     serializers = {
         "default": AuthenticationSerializer,
+        "create": AuthenticationSerializer,
         "favourite_products": ProductFavouriteSerializer,
-        "orders": OrderListSerializer,
+        "orders": OrderSerializer,
         "product_reviews": ProductReviewSerializer,
-        "addresses": UserAddressListSerializer,
-        "blog_post_comments": BlogCommentListSerializer,
-        "liked_blog_posts": BlogPostListSerializer,
+        "addresses": UserAddressSerializer,
+        "blog_post_comments": BlogCommentSerializer,
+        "liked_blog_posts": BlogPostSerializer,
         "notifications": NotificationUserSerializer,
         "subscriptions": UserSubscriptionSerializer,
         "change_username": UsernameUpdateSerializer,
     }
 
     def get_queryset(self):
-        from django.contrib.auth import get_user_model
-
-        User = get_user_model()
-
         if getattr(self, "swagger_fake_view", False):
             return User.objects.none()
 
@@ -294,9 +255,6 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         obj = super().get_object()
         self.check_object_permissions(self.request, obj)
         return obj
-
-    def create(self, request, *args, **kwargs):
-        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
     @action(detail=True, methods=["GET"])
     def favourite_products(self, request, pk=None):
@@ -414,65 +372,68 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
             queryset = self.filter_queryset(self.get_queryset())
             return self.paginate_and_serialize(queryset, request)
 
-        topic_id = request.data.get("topic_id")
-        action = request.data.get("action", "toggle")
+        elif request.method == "POST":
+            topic_id = request.data.get("topic_id")
+            if not topic_id:
+                return Response(
+                    {"detail": _("Topic ID is required.")},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        try:
-            topic = SubscriptionTopic.objects.get(id=topic_id, is_active=True)
-        except SubscriptionTopic.DoesNotExist:
-            return Response(
-                {"detail": _("Invalid topic.")},
-                status=status.HTTP_400_BAD_REQUEST,
+            try:
+                topic = SubscriptionTopic.objects.get(
+                    id=topic_id, is_active=True
+                )
+            except SubscriptionTopic.DoesNotExist:
+                return Response(
+                    {"detail": _("Topic not found or not active.")},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            subscription, created = UserSubscription.objects.get_or_create(
+                user=user,
+                topic=topic,
+                defaults={
+                    "status": UserSubscription.SubscriptionStatus.PENDING
+                    if topic.requires_confirmation
+                    else UserSubscription.SubscriptionStatus.ACTIVE
+                },
             )
 
-        subscription, created = UserSubscription.objects.get_or_create(
-            user=user,
-            topic=topic,
-        )
+            if (
+                not created
+                and subscription.status
+                == UserSubscription.SubscriptionStatus.ACTIVE
+            ):
+                return Response(
+                    {"detail": _("User is already subscribed to this topic.")},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        if action == "subscribe" or (
-            action == "toggle" and subscription.status != "active"
-        ):
-            subscription.status = UserSubscription.SubscriptionStatus.ACTIVE
-            subscription.unsubscribed_at = None
-            subscription.save()
-            message = _("Subscribed successfully.")
-        else:
-            subscription.unsubscribe()
-            message = _("Unsubscribed successfully.")
-
-        return Response({"detail": message})
+            serializer = UserSubscriptionSerializer(subscription)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["POST"])
     def change_username(self, request, pk=None):
         user = self.get_object()
+
         serializer = UsernameUpdateSerializer(data=request.data)
-
         if serializer.is_valid():
-            new_username = serializer.validated_data.get("username")
+            new_username = serializer.validated_data["username"]
 
-            if user.username == new_username:
+            if (
+                User.objects.filter(username=new_username)
+                .exclude(id=user.id)
+                .exists()
+            ):
                 return Response(
-                    {
-                        "detail": _(
-                            "The new username is the same as the current username."
-                        )
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            from django.contrib.auth import get_user_model
-
-            User = get_user_model()
-
-            if User.objects.filter(username=new_username).exists():
-                return Response(
-                    {"detail": _("Username already taken.")},
+                    {"detail": _("Username already exists.")},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
             user.username = new_username
             user.save()
+
             return Response(
                 {"detail": _("Username updated successfully.")},
                 status=status.HTTP_200_OK,

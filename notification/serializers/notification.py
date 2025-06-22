@@ -14,8 +14,8 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
 
 
-class NotificationListSerializer(
-    TranslatableModelSerializer, serializers.ModelSerializer
+class NotificationSerializer(
+    TranslatableModelSerializer, serializers.ModelSerializer[Notification]
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=Notification)
 
@@ -39,26 +39,24 @@ class NotificationListSerializer(
         )
 
 
-class NotificationDetailSerializer(NotificationListSerializer):
-    class Meta(NotificationListSerializer.Meta):
-        fields = (*NotificationListSerializer.Meta.fields,)
+class NotificationDetailSerializer(NotificationSerializer):
+    class Meta(NotificationSerializer.Meta):
+        fields = (*NotificationSerializer.Meta.fields,)
 
 
 class NotificationWriteSerializer(
-    TranslatableModelSerializer, serializers.ModelSerializer
+    TranslatableModelSerializer, serializers.ModelSerializer[Notification]
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=Notification)
 
-    @staticmethod
-    def validate_expiry_date(value):
+    def validate_expiry_date(self, value):
         if value and value <= timezone.now():
             raise serializers.ValidationError(
                 _("Expiry date must be in the future.")
             )
         return value
 
-    @staticmethod
-    def validate_link(value):
+    def validate_link(self, value):
         if value and not (
             value.startswith("http://")
             or value.startswith("https://")

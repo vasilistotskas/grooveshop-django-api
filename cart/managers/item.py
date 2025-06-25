@@ -49,14 +49,18 @@ class CartItemQuerySet(models.QuerySet):
         return self.filter(quantity__range=[min_qty, max_qty])
 
     def by_price_range(self, min_price, max_price):
-        currency = getattr(settings, "DEFAULT_CURRENCY", "USD")
+        currency = getattr(
+            settings, "DEFAULT_CURRENCY", settings.DEFAULT_CURRENCY
+        )
         return self.filter(
             product__price__gte=Money(min_price, currency),
             product__price__lte=Money(max_price, currency),
         )
 
     def expensive_items(self, threshold=100):
-        currency = getattr(settings, "DEFAULT_CURRENCY", "USD")
+        currency = getattr(
+            settings, "DEFAULT_CURRENCY", settings.DEFAULT_CURRENCY
+        )
         return self.filter(product__price__gte=Money(threshold, currency))
 
     def in_active_carts(self):

@@ -22,26 +22,26 @@ class TestBlogCommentManager(TestCase):
         self.user5 = UserAccountFactory()
 
         self.approved_comment1 = BlogCommentFactory(
-            post=self.post, user=self.user1, is_approved=True
+            post=self.post, user=self.user1, approved=True
         )
         self.approved_comment2 = BlogCommentFactory(
-            post=self.post, user=self.user2, is_approved=True
+            post=self.post, user=self.user2, approved=True
         )
         self.unapproved_comment = BlogCommentFactory(
-            post=self.post, user=self.user3, is_approved=False
+            post=self.post, user=self.user3, approved=False
         )
 
         self.reply_approved = BlogCommentFactory(
             post=self.post,
             user=self.user4,
             parent=self.approved_comment1,
-            is_approved=True,
+            approved=True,
         )
         self.reply_unapproved = BlogCommentFactory(
             post=self.post,
             user=self.user5,
             parent=self.approved_comment1,
-            is_approved=False,
+            approved=False,
         )
 
     def test_approved_manager_method(self):
@@ -79,26 +79,26 @@ class TestBlogCommentQuerySet(TestCase):
         self.user5 = UserAccountFactory()
 
         self.approved_comment1 = BlogCommentFactory(
-            post=self.post, user=self.user1, is_approved=True
+            post=self.post, user=self.user1, approved=True
         )
         self.approved_comment2 = BlogCommentFactory(
-            post=self.post, user=self.user2, is_approved=True
+            post=self.post, user=self.user2, approved=True
         )
         self.unapproved_comment = BlogCommentFactory(
-            post=self.post, user=self.user3, is_approved=False
+            post=self.post, user=self.user3, approved=False
         )
 
         self.reply_approved = BlogCommentFactory(
             post=self.post,
             user=self.user4,
             parent=self.approved_comment1,
-            is_approved=True,
+            approved=True,
         )
         self.reply_unapproved = BlogCommentFactory(
             post=self.post,
             user=self.user5,
             parent=self.approved_comment1,
-            is_approved=False,
+            approved=False,
         )
 
     def test_approved_queryset_method(self):
@@ -170,27 +170,27 @@ class TestBlogCommentManagerTreeFunctionality(TestCase):
         self.user5 = UserAccountFactory()
 
         self.root1 = BlogCommentFactory(
-            post=self.post, user=self.user1, is_approved=True
+            post=self.post, user=self.user1, approved=True
         )
         self.root2 = BlogCommentFactory(
-            post=self.post, user=self.user2, is_approved=False
+            post=self.post, user=self.user2, approved=False
         )
 
         self.child1_1 = BlogCommentFactory(
-            post=self.post, user=self.user3, parent=self.root1, is_approved=True
+            post=self.post, user=self.user3, parent=self.root1, approved=True
         )
         self.child1_2 = BlogCommentFactory(
             post=self.post,
             user=self.user4,
             parent=self.root1,
-            is_approved=False,
+            approved=False,
         )
 
         self.grandchild1_1_1 = BlogCommentFactory(
             post=self.post,
             user=self.user5,
             parent=self.child1_1,
-            is_approved=True,
+            approved=True,
         )
 
     def test_approved_with_tree_structure(self):
@@ -244,12 +244,8 @@ class TestBlogCommentManagerEdgeCases(TestCase):
         author = BlogAuthorFactory(user=UserAccountFactory())
         post = BlogPostFactory(author=author)
 
-        BlogCommentFactory(
-            post=post, user=UserAccountFactory(), is_approved=False
-        )
-        BlogCommentFactory(
-            post=post, user=UserAccountFactory(), is_approved=False
-        )
+        BlogCommentFactory(post=post, user=UserAccountFactory(), approved=False)
+        BlogCommentFactory(post=post, user=UserAccountFactory(), approved=False)
 
         approved_comments = BlogComment.objects.approved()
         assert approved_comments.count() == 0
@@ -259,13 +255,13 @@ class TestBlogCommentManagerEdgeCases(TestCase):
         post = BlogPostFactory(author=author)
 
         comment1 = BlogCommentFactory(
-            post=post, user=UserAccountFactory(), is_approved=True
+            post=post, user=UserAccountFactory(), approved=True
         )
         comment2 = BlogCommentFactory(
-            post=post, user=UserAccountFactory(), is_approved=True
+            post=post, user=UserAccountFactory(), approved=True
         )
         comment3 = BlogCommentFactory(
-            post=post, user=UserAccountFactory(), is_approved=True
+            post=post, user=UserAccountFactory(), approved=True
         )
 
         approved_comments = BlogComment.objects.approved()
@@ -278,7 +274,7 @@ class TestBlogCommentManagerEdgeCases(TestCase):
         author = BlogAuthorFactory(user=UserAccountFactory())
         post = BlogPostFactory(author=author)
         comment = BlogCommentFactory(
-            post=post, user=UserAccountFactory(), is_approved=True
+            post=post, user=UserAccountFactory(), approved=True
         )
 
         assert BlogComment.objects.approved().count() == 1
@@ -295,7 +291,7 @@ class TestBlogCommentManagerEdgeCases(TestCase):
         author = BlogAuthorFactory(user=UserAccountFactory())
         post = BlogPostFactory(author=author)
         user = UserAccountFactory()
-        comment = BlogCommentFactory(post=post, user=user, is_approved=True)
+        comment = BlogCommentFactory(post=post, user=user, approved=True)
 
         assert BlogComment.objects.approved().count() == 1
 
@@ -321,7 +317,7 @@ class TestBlogCommentManagerEdgeCases(TestCase):
             root = BlogCommentFactory(
                 post=post,
                 user=UserAccountFactory(),
-                is_approved=i % 2 == 0,
+                approved=i % 2 == 0,
             )
             root_comments.append(root)
 
@@ -330,7 +326,7 @@ class TestBlogCommentManagerEdgeCases(TestCase):
                     post=post,
                     user=UserAccountFactory(),
                     parent=root,
-                    is_approved=j % 2 == 0,
+                    approved=j % 2 == 0,
                 )
 
                 for k in range(2):
@@ -338,7 +334,7 @@ class TestBlogCommentManagerEdgeCases(TestCase):
                         post=post,
                         user=UserAccountFactory(),
                         parent=child,
-                        is_approved=k % 2 == 0,
+                        approved=k % 2 == 0,
                     )
 
         approved_comments = BlogComment.objects.approved()
@@ -346,4 +342,4 @@ class TestBlogCommentManagerEdgeCases(TestCase):
         assert approved_comments.count() > 0
 
         for comment in approved_comments:
-            assert comment.is_approved is True
+            assert comment.approved is True

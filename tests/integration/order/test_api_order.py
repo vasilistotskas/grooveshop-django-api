@@ -2,6 +2,7 @@ import json
 from decimal import Decimal
 from unittest.mock import patch
 
+from django.conf import settings
 from django.urls import reverse
 from djmoney.money import Money
 from rest_framework import status
@@ -150,7 +151,9 @@ class OrderViewSetTestCase(APITestCase):
         product = ProductFactory(stock=10)
         self.order1.items.create(
             product=product,
-            price=Money(amount=Decimal("50.00"), currency="USD"),
+            price=Money(
+                amount=Decimal("50.00"), currency=settings.DEFAULT_CURRENCY
+            ),
             quantity=2,
         )
 

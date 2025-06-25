@@ -150,9 +150,7 @@ class OrderDetailSerializer(OrderSerializer):
                     "change_type": history.change_type,
                     "timestamp": history.created_at,
                     "description": history.description,
-                    "user": history.user.get_full_name()
-                    if history.user
-                    else None,
+                    "user": history.user.full_name if history.user else None,
                     "previous_value": history.previous_value,
                     "new_value": history.new_value,
                 }

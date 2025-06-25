@@ -1,6 +1,7 @@
 from decimal import Decimal
 from unittest import TestCase, mock
 
+from django.conf import settings
 from djmoney.money import Money
 
 from order.shipping import (
@@ -31,7 +32,9 @@ class ShippingOptionTestCase(TestCase):
             id="test_id",
             name="Test Option",
             method_type=ShippingMethodType.STANDARD,
-            price=Money(amount=Decimal("10.00"), currency="USD"),
+            price=Money(
+                amount=Decimal("10.00"), currency=settings.DEFAULT_CURRENCY
+            ),
             estimated_delivery_min=3,
             estimated_delivery_max=5,
             carrier="Test Carrier",
@@ -43,7 +46,7 @@ class ShippingOptionTestCase(TestCase):
         self.assertEqual(option.name, "Test Option")
         self.assertEqual(option.method_type, ShippingMethodType.STANDARD)
         self.assertEqual(option.price.amount, Decimal("10.00"))
-        self.assertEqual(str(option.price.currency), "USD")
+        self.assertEqual(str(option.price.currency), settings.DEFAULT_CURRENCY)
         self.assertEqual(option.estimated_delivery_min, 3)
         self.assertEqual(option.estimated_delivery_max, 5)
         self.assertEqual(option.carrier, "Test Carrier")
@@ -55,7 +58,9 @@ class ShippingOptionTestCase(TestCase):
             id="test_id",
             name="Test Option",
             method_type=ShippingMethodType.STANDARD,
-            price=Money(amount=Decimal("10.00"), currency="USD"),
+            price=Money(
+                amount=Decimal("10.00"), currency=settings.DEFAULT_CURRENCY
+            ),
             estimated_delivery_min=3,
             estimated_delivery_max=5,
             carrier="Test Carrier",
@@ -95,6 +100,8 @@ class FedExCarrierTestCase(TestCase):
 
     @mock.patch("order.shipping.logger")
     def test_get_shipping_options_domestic(self, mock_logger, mock_settings):
+        mock_settings.DEFAULT_CURRENCY = "EUR"
+
         carrier = FedExCarrier()
 
         options = carrier.get_shipping_options(
@@ -118,6 +125,8 @@ class FedExCarrierTestCase(TestCase):
     def test_get_shipping_options_international(
         self, mock_logger, mock_settings
     ):
+        mock_settings.DEFAULT_CURRENCY = "EUR"
+
         carrier = FedExCarrier()
         international_country = mock.MagicMock()
         international_country.alpha_2 = "GB"
@@ -216,7 +225,7 @@ class ShippingServiceTestCase(TestCase):
                 id="fedex_ground",
                 name="FedEx Ground",
                 method_type=ShippingMethodType.STANDARD,
-                price=Money(amount="12.99", currency="USD"),
+                price=Money(amount="12.99", currency=settings.DEFAULT_CURRENCY),
                 estimated_delivery_min=3,
                 estimated_delivery_max=5,
                 carrier="FedEx",
@@ -231,7 +240,7 @@ class ShippingServiceTestCase(TestCase):
                 id="ups_ground",
                 name="UPS Ground",
                 method_type=ShippingMethodType.STANDARD,
-                price=Money(amount="11.99", currency="USD"),
+                price=Money(amount="11.99", currency=settings.DEFAULT_CURRENCY),
                 estimated_delivery_min=2,
                 estimated_delivery_max=4,
                 carrier="UPS",

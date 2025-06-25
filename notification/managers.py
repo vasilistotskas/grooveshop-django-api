@@ -3,6 +3,7 @@ from datetime import timedelta
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
+from parler.managers import TranslatableManager, TranslatableQuerySet
 
 from notification.enum import (
     NotificationCategoryEnum,
@@ -11,7 +12,7 @@ from notification.enum import (
 )
 
 
-class NotificationQuerySet(models.QuerySet):
+class NotificationQuerySet(TranslatableQuerySet):
     def active(self):
         return self.filter(
             Q(expiry_date__isnull=True) | Q(expiry_date__gt=timezone.now())
@@ -84,7 +85,7 @@ class NotificationQuerySet(models.QuerySet):
         )
 
 
-class NotificationManager(models.Manager):
+class NotificationManager(TranslatableManager):
     def get_queryset(self) -> NotificationQuerySet:
         return NotificationQuerySet(self.model, using=self._db)
 

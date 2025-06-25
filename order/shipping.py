@@ -118,7 +118,9 @@ class FedExCarrier(ShippingCarrier):
                     id="fedex_ground",
                     name="FedEx Ground",
                     method_type=ShippingMethodType.STANDARD,
-                    price=Money(amount="12.99", currency="USD"),
+                    price=Money(
+                        amount="12.99", currency=settings.DEFAULT_CURRENCY
+                    ),
                     estimated_delivery_min=3,
                     estimated_delivery_max=5,
                     carrier="FedEx",
@@ -132,7 +134,9 @@ class FedExCarrier(ShippingCarrier):
                     id="fedex_express",
                     name="FedEx Express",
                     method_type=ShippingMethodType.EXPRESS,
-                    price=Money(amount="19.99", currency="USD"),
+                    price=Money(
+                        amount="19.99", currency=settings.DEFAULT_CURRENCY
+                    ),
                     estimated_delivery_min=2,
                     estimated_delivery_max=3,
                     carrier="FedEx",
@@ -146,7 +150,9 @@ class FedExCarrier(ShippingCarrier):
                     id="fedex_overnight",
                     name="FedEx Overnight",
                     method_type=ShippingMethodType.NEXT_DAY,
-                    price=Money(amount="29.99", currency="USD"),
+                    price=Money(
+                        amount="29.99", currency=settings.DEFAULT_CURRENCY
+                    ),
                     estimated_delivery_min=1,
                     estimated_delivery_max=1,
                     carrier="FedEx",
@@ -161,7 +167,9 @@ class FedExCarrier(ShippingCarrier):
                     id="fedex_international",
                     name="FedEx International",
                     method_type=ShippingMethodType.INTERNATIONAL,
-                    price=Money(amount="49.99", currency="USD"),
+                    price=Money(
+                        amount="49.99", currency=settings.DEFAULT_CURRENCY
+                    ),
                     estimated_delivery_min=5,
                     estimated_delivery_max=7,
                     carrier="FedEx",
@@ -289,7 +297,7 @@ class UPSCarrier(ShippingCarrier):
                 id="ups_worldwide",
                 name="UPS Worldwide Expedited",
                 method_type=ShippingMethodType.INTERNATIONAL,
-                price=Money(amount="47.99", currency="USD"),
+                price=Money(amount="47.99", currency=settings.DEFAULT_CURRENCY),
                 estimated_delivery_min=4,
                 estimated_delivery_max=6,
                 carrier="UPS",

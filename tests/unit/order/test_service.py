@@ -3,6 +3,7 @@ from unittest import TestCase
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+from django.conf import settings
 from djmoney.money import Money
 
 from order.enum.status import OrderStatus
@@ -18,14 +19,14 @@ class OrderServiceTestCase(TestCase):
         self.user = UserAccountFactory.create()
 
         self.product1 = ProductFactory.create(
-            price=Money("50.00", "USD"), stock=20
+            price=Money("50.00", settings.DEFAULT_CURRENCY), stock=20
         )
         self.product1.set_current_language("en")
         self.product1.name = "Test Product 1"
         self.product1.save()
 
         self.product2 = ProductFactory.create(
-            price=Money("30.00", "USD"), stock=15
+            price=Money("30.00", settings.DEFAULT_CURRENCY), stock=15
         )
         self.product2.set_current_language("en")
         self.product2.name = "Test Product 2"
@@ -54,9 +55,9 @@ class OrderServiceTestCase(TestCase):
         self.order.status = OrderStatus.PENDING
         self.order.items = MagicMock()
         self.order.calculate_order_total_amount = Mock(
-            return_value=Money("135.00", "USD")
+            return_value=Money("135.00", settings.DEFAULT_CURRENCY)
         )
-        self.order.paid_amount = Money("0.00", "USD")
+        self.order.paid_amount = Money("0.00", settings.DEFAULT_CURRENCY)
 
     @patch("order.signals.order_created.send")
     def test_create_order(self, mock_signal):
@@ -184,19 +185,21 @@ class OrderServiceTestCase(TestCase):
     def test_calculate_shipping_cost(self):
         def mock_calculate_shipping_cost(order_value):
             if order_value.amount > Decimal("100.00"):
-                return Money("0.00", "USD")
+                return Money("0.00", settings.DEFAULT_CURRENCY)
             else:
-                return Money("10.00", "USD")
+                return Money("10.00", settings.DEFAULT_CURRENCY)
 
         with patch.object(
             OrderService,
             "calculate_shipping_cost",
             side_effect=mock_calculate_shipping_cost,
         ):
-            result = OrderService.calculate_shipping_cost(Money("50.00", "USD"))
-            self.assertEqual(result, Money("10.00", "USD"))
+            result = OrderService.calculate_shipping_cost(
+                Money("50.00", settings.DEFAULT_CURRENCY)
+            )
+            self.assertEqual(result, Money("10.00", settings.DEFAULT_CURRENCY))
 
             result = OrderService.calculate_shipping_cost(
-                Money("150.00", "USD")
+                Money("150.00", settings.DEFAULT_CURRENCY)
             )
-            self.assertEqual(result, Money("0.00", "USD"))
+            self.assertEqual(result, Money("0.00", settings.DEFAULT_CURRENCY))

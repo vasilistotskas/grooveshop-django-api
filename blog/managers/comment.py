@@ -13,7 +13,7 @@ class BlogCommentQuerySet(TranslatableQuerySet, TreeQuerySet):
     as_manager.queryset_only = True  # type: ignore[attr-defined]
 
     def approved(self):
-        return self.filter(is_approved=True)
+        return self.filter(approved=True)
 
 
 class BlogCommentManager(TreeManager, TranslatableManager):

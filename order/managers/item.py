@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.conf import settings
 from django.db import models
 from django.db.models import Count, F, Sum
 from django.utils import timezone
@@ -34,7 +35,7 @@ class OrderItemQuerySet(models.QuerySet):
         first_item = self.first()
         if first_item and hasattr(first_item, "price"):
             return Money(amount=total, currency=first_item.price.currency)
-        return Money(amount=0, currency="USD")
+        return Money(amount=0, currency=settings.DEFAULT_CURRENCY)
 
     def for_user(self, user):
         return self.filter(order__user=user)

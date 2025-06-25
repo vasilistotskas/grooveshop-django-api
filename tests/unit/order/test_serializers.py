@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from djmoney.money import Money
@@ -37,10 +38,12 @@ class OrderDetailSerializerTestCase(TestCase):
         )
 
         product = ProductFactory(
-            name="Test Product", price=Money("50.00", "USD")
+            name="Test Product", price=Money("50.00", settings.DEFAULT_CURRENCY)
         )
         self.order_item = self.order.items.create(
-            product=product, price=Money("50.00", "USD"), quantity=2
+            product=product,
+            price=Money("50.00", settings.DEFAULT_CURRENCY),
+            quantity=2,
         )
 
         self.serializer = OrderDetailSerializer(instance=self.order)
@@ -70,16 +73,24 @@ class OrderCreateUpdateSerializerTestCase(TestCase):
         self.country = CountryFactory()
         self.region = RegionFactory(country=self.country)
 
-        self.product = ProductFactory(stock=10, price=Money("50.00", "USD"))
+        self.product = ProductFactory(
+            stock=10, price=Money("50.00", settings.DEFAULT_CURRENCY)
+        )
 
         self.valid_data = {
             "email": "customer@example.com",
             "first_name": "John",
             "last_name": "Doe",
             "phone": "+12025550195",
-            "paid_amount": {"amount": "100.00", "currency": "USD"},
+            "paid_amount": {
+                "amount": "100.00",
+                "currency": settings.DEFAULT_CURRENCY,
+            },
             "status": OrderStatus.PENDING.value,
-            "shipping_price": {"amount": "10.00", "currency": "USD"},
+            "shipping_price": {
+                "amount": "10.00",
+                "currency": settings.DEFAULT_CURRENCY,
+            },
             "street": "Main Street",
             "street_number": "123",
             "city": "Testville",
@@ -91,7 +102,10 @@ class OrderCreateUpdateSerializerTestCase(TestCase):
                 {
                     "product": self.product.id,
                     "quantity": 2,
-                    "price": {"amount": "50.00", "currency": "USD"},
+                    "price": {
+                        "amount": "50.00",
+                        "currency": settings.DEFAULT_CURRENCY,
+                    },
                 }
             ],
         }
@@ -109,7 +123,7 @@ class OrderCreateUpdateSerializerTestCase(TestCase):
         invalid_data = self.valid_data.copy()
         invalid_data["paid_amount"] = {
             "amount": "-50.00",
-            "currency": "USD",
+            "currency": settings.DEFAULT_CURRENCY,
         }
 
         serializer = OrderWriteSerializer(data=invalid_data)
@@ -161,11 +175,13 @@ class OrderCreateUpdateSerializerTestCase(TestCase):
 class OrderItemSerializerTestCase(TestCase):
     def setUp(self):
         self.product = ProductFactory(
-            name="Test Product", price=Money("50.00", "USD")
+            name="Test Product", price=Money("50.00", settings.DEFAULT_CURRENCY)
         )
         self.order = OrderFactory()
         self.order_item = self.order.items.create(
-            product=self.product, price=Money("50.00", "USD"), quantity=2
+            product=self.product,
+            price=Money("50.00", settings.DEFAULT_CURRENCY),
+            quantity=2,
         )
 
         self.serializer = OrderItemDetailSerializer(instance=self.order_item)

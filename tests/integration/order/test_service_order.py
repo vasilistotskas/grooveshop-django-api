@@ -1,6 +1,7 @@
 from decimal import Decimal
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.test import TestCase
@@ -199,10 +200,14 @@ class OrderServiceTestCase(TestCase):
         self.assertEqual(product.stock, 10)
 
     def test_calculate_shipping_cost(self):
-        order_value = Money(amount=Decimal("49.99"), currency="USD")
+        order_value = Money(
+            amount=Decimal("49.99"), currency=settings.DEFAULT_CURRENCY
+        )
         shipping_cost = OrderService.calculate_shipping_cost(order_value)
         self.assertTrue(shipping_cost.amount > 0)
 
-        order_value = Money(amount=Decimal("500.00"), currency="USD")
+        order_value = Money(
+            amount=Decimal("500.00"), currency=settings.DEFAULT_CURRENCY
+        )
         shipping_cost = OrderService.calculate_shipping_cost(order_value)
         self.assertEqual(shipping_cost.amount, 0)

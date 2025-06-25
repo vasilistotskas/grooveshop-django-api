@@ -25,8 +25,8 @@ class BlogPostViewSetTestCase(TestURLFixerMixin, APITestCase):
         cls.user = UserAccountFactory()
         cls.author = BlogAuthorFactory(user=cls.user)
         cls.category = BlogCategoryFactory()
-        cls.tag1 = BlogTagFactory()
-        cls.tag2 = BlogTagFactory()
+        cls.tag1 = BlogTagFactory(active=True)
+        cls.tag2 = BlogTagFactory(active=True)
         cls.post = BlogPostFactory(
             author=cls.author,
             category=cls.category,

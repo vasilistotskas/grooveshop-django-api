@@ -3,6 +3,7 @@ import xml.etree.ElementTree as ET
 from io import StringIO
 from unittest.mock import MagicMock
 
+from django.conf import settings
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.db import models
 from django.db.models.options import Options
@@ -58,7 +59,9 @@ class ExportActionMixinTest(TestCase):
 
         self.test_model_instance = MagicMock(spec=MockAdminModel)
         self.test_model_instance.name = "Test Model"
-        self.test_model_instance.price = Money(amount=10.50, currency="USD")
+        self.test_model_instance.price = Money(
+            amount=10.50, currency=settings.DEFAULT_CURRENCY
+        )
         self.test_model_instance.description = "Test description"
 
         MockTranslatableModel._parler_meta = MockParlerMeta()

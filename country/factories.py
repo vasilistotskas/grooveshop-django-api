@@ -1,10 +1,13 @@
+import importlib
+import random
+import string
+
 import factory
 from django.apps import apps
 from django.conf import settings
 from faker import Faker
 
 from core.factories import CustomDjangoModelFactory
-from core.utils.factories import generate_unique_country_codes
 from country.models import Country
 from region.factories import RegionFactory
 
@@ -13,6 +16,48 @@ fake = Faker()
 available_languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
 ]
+
+
+def generate_unique_country_codes():
+    try:
+        country_model = importlib.import_module("country.models").Country
+        existing_alpha_2_codes = set(
+            country_model.objects.values_list("alpha_2", flat=True)
+        )
+        existing_alpha_3_codes = set(
+            country_model.objects.values_list("alpha_3", flat=True)
+        )
+
+        for _ in range(100):
+            try:
+                alpha_2_code = fake.country_code(representation="alpha-2")
+                alpha_3_code = fake.country_code(representation="alpha-3")
+                if (
+                    alpha_2_code not in existing_alpha_2_codes
+                    and alpha_3_code not in existing_alpha_3_codes
+                ):
+                    return alpha_2_code, alpha_3_code
+            except Exception:
+                alpha_2_code = "".join(
+                    random.choices(string.ascii_uppercase, k=2)
+                )
+                alpha_3_code = "".join(
+                    random.choices(string.ascii_uppercase, k=3)
+                )
+                if (
+                    alpha_2_code not in existing_alpha_2_codes
+                    and alpha_3_code not in existing_alpha_3_codes
+                ):
+                    return alpha_2_code, alpha_3_code
+
+        alpha_2_code = "".join(random.choices(string.ascii_uppercase, k=2))
+        alpha_3_code = "".join(random.choices(string.ascii_uppercase, k=3))
+        return alpha_2_code, alpha_3_code
+
+    except Exception:
+        alpha_2_code = "".join(random.choices(string.ascii_uppercase, k=2))
+        alpha_3_code = "".join(random.choices(string.ascii_uppercase, k=3))
+        return alpha_2_code, alpha_3_code
 
 
 class CountryTranslationFactory(factory.django.DjangoModelFactory):

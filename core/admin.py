@@ -32,6 +32,7 @@ from django_celery_beat.models import (
     SolarSchedule,
 )
 from djmoney.models.fields import Money
+from extra_settings.models import Setting
 from mptt.fields import TreeForeignKey
 from parler.models import TranslatableModel
 from unfold.admin import ModelAdmin
@@ -39,11 +40,30 @@ from unfold.widgets import UnfoldAdminSelectWidget, UnfoldAdminTextInputWidget
 
 logger = logging.getLogger(__name__)
 
+admin.site.unregister(Setting)
 admin.site.unregister(PeriodicTask)
 admin.site.unregister(IntervalSchedule)
 admin.site.unregister(CrontabSchedule)
 admin.site.unregister(SolarSchedule)
 admin.site.unregister(ClockedSchedule)
+
+for model, model_admin in dict(admin.site._registry).items():
+    if model._meta.app_label not in [
+        "knox",
+        "socialaccount",
+        "mfa",
+    ]:
+        continue
+
+    admin.site.unregister(model)
+
+    new_admin_class = type(
+        f"{model.__name__}AdminOverride",
+        (model_admin.__class__, ModelAdmin),
+        {},
+    )
+
+    admin.site.register(model, new_admin_class)
 
 
 class ExportActionMixin:
@@ -329,6 +349,16 @@ class UnfoldPeriodicTaskForm(PeriodicTaskForm):
         super().__init__(*args, **kwargs)
         self.fields["task"].widget = UnfoldAdminTextInputWidget()
         self.fields["regtask"].widget = UnfoldTaskSelectWidget()
+
+
+@admin.register(Setting)
+class SettingAdmin(ModelAdmin):
+    list_display = [
+        "id",
+        "name",
+        "value_type",
+        "description",
+    ]
 
 
 @admin.register(PeriodicTask)

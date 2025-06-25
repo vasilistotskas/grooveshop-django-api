@@ -3,6 +3,7 @@ import random
 
 import factory
 from django.apps import apps
+from django.conf import settings
 from djmoney.money import Money
 from faker import Faker
 
@@ -45,7 +46,7 @@ class OrderItemFactory(factory.django.DjangoModelFactory):
                 max_value=99,
                 positive=True,
             ),
-            "USD",
+            settings.DEFAULT_CURRENCY,
         )
     )
     quantity = factory.LazyFunction(lambda: random.randint(1, 5))

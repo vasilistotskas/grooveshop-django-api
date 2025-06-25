@@ -2,6 +2,7 @@ from datetime import timedelta
 from unittest import TestCase
 from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from djmoney.money import Money
@@ -23,8 +24,8 @@ class OrderModelTestCase(TestCase):
         self.order.status = OrderStatus.PENDING
         self.order.created_at = timezone.now()
         self.order.document_type = OrderDocumentTypeEnum.RECEIPT
-        self.order.shipping_price = Money("10.00", "USD")
-        self.order.paid_amount = Money("0.00", "USD")
+        self.order.shipping_price = Money("10.00", settings.DEFAULT_CURRENCY)
+        self.order.paid_amount = Money("0.00", settings.DEFAULT_CURRENCY)
         self.order._original_status = OrderStatus.PENDING
 
         self.order.street = "Test Street"
@@ -37,15 +38,15 @@ class OrderModelTestCase(TestCase):
         item1.product = Mock()
         item1.product.name = "Test Product 1"
         item1.quantity = 2
-        item1.price = Money("50.00", "USD")
-        item1.total = Money("100.00", "USD")
+        item1.price = Money("50.00", settings.DEFAULT_CURRENCY)
+        item1.total = Money("100.00", settings.DEFAULT_CURRENCY)
 
         item2 = Mock()
         item2.product = Mock()
         item2.product.name = "Test Product 2"
         item2.quantity = 1
-        item2.price = Money("30.00", "USD")
-        item2.total = Money("30.00", "USD")
+        item2.price = Money("30.00", settings.DEFAULT_CURRENCY)
+        item2.total = Money("30.00", settings.DEFAULT_CURRENCY)
 
         self.order.items = MagicMock()
         self.order.items.all.return_value = [item1, item2]
@@ -96,16 +97,19 @@ class OrderModelTestCase(TestCase):
             Order.clean(self.order)
 
     def test_total_price_items_property(self):
-        expected_total = Money("130.00", "USD")
+        expected_total = Money("130.00", settings.DEFAULT_CURRENCY)
 
         self.order.total_price_items = expected_total
 
         self.assertEqual(self.order.total_price_items, expected_total)
 
     def test_total_price_extra_property(self):
-        expected_total = Money("10.00", "USD")
+        expected_total = Money("10.00", settings.DEFAULT_CURRENCY)
 
-        with patch("order.models.order.settings.DEFAULT_CURRENCY", "USD"):
+        with patch(
+            "order.models.order.settings.DEFAULT_CURRENCY",
+            settings.DEFAULT_CURRENCY,
+        ):
             result = Order.total_price_extra.__get__(self.order)
 
         self.assertEqual(result, expected_total)
@@ -181,9 +185,9 @@ class OrderModelTestCase(TestCase):
         self.assertFalse(result)
 
     def test_calculate_order_total_amount(self):
-        items_total = Money("130.00", "USD")
-        shipping_total = Money("10.00", "USD")
-        expected_total = Money("140.00", "USD")
+        items_total = Money("130.00", settings.DEFAULT_CURRENCY)
+        shipping_total = Money("10.00", settings.DEFAULT_CURRENCY)
+        expected_total = Money("140.00", settings.DEFAULT_CURRENCY)
 
         with patch.object(
             Order, "total_price", new_callable=PropertyMock

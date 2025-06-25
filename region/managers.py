@@ -1,7 +1,7 @@
-from django.db import models
+from parler.managers import TranslatableManager
 
 
-class RegionManager(models.Manager):
+class RegionManager(TranslatableManager):
     def active(self):
         return self.get_queryset()
 

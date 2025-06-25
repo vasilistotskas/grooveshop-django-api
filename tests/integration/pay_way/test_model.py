@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.test import TestCase
 from djmoney.money import Money
 
@@ -8,8 +9,8 @@ class PayWayModelTestCase(TestCase):
     def setUp(self):
         self.credit_card = PayWay.objects.create(
             active=True,
-            cost=Money(0, "USD"),
-            free_threshold=Money(100, "USD"),
+            cost=Money(0, settings.DEFAULT_CURRENCY),
+            free_threshold=Money(100, settings.DEFAULT_CURRENCY),
             provider_code="stripe",
             is_online_payment=True,
             requires_confirmation=False,
@@ -26,8 +27,8 @@ class PayWayModelTestCase(TestCase):
 
         self.bank_transfer = PayWay.objects.create(
             active=True,
-            cost=Money(0, "USD"),
-            free_threshold=Money(0, "USD"),
+            cost=Money(0, settings.DEFAULT_CURRENCY),
+            free_threshold=Money(0, settings.DEFAULT_CURRENCY),
             provider_code="",
             is_online_payment=False,
             requires_confirmation=True,
@@ -41,8 +42,8 @@ class PayWayModelTestCase(TestCase):
 
         self.pay_on_delivery = PayWay.objects.create(
             active=True,
-            cost=Money(5, "USD"),
-            free_threshold=Money(50, "USD"),
+            cost=Money(5, settings.DEFAULT_CURRENCY),
+            free_threshold=Money(50, settings.DEFAULT_CURRENCY),
             provider_code="",
             is_online_payment=False,
             requires_confirmation=False,

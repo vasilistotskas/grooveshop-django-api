@@ -236,7 +236,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
         ).get("total")
 
         if not items_total:
-            default_currency = getattr(settings, "DEFAULT_CURRENCY", "USD")
+            default_currency = getattr(settings, "DEFAULT_CURRENCY", "EUR")
             if self.shipping_price:
                 return Money(0, self.shipping_price.currency)
             return Money(0, default_currency)
@@ -245,7 +245,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
         currency = (
             first_item.price.currency
             if first_item
-            else getattr(settings, "DEFAULT_CURRENCY", "USD")
+            else getattr(settings, "DEFAULT_CURRENCY", "EUR")
         )
 
         return Money(amount=items_total, currency=currency)

@@ -328,7 +328,7 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
 
     @action(detail=True, methods=["GET"])
     def blog_post_comments(self, request, pk=None):
-        self.filterset_fields = ["id", "post", "parent", "is_approved"]
+        self.filterset_fields = ["id", "post", "parent", "approved"]
         self.ordering_fields = ["id", "post", "created_at"]
         self.ordering = ["-created_at"]
         self.search_fields = ["id", "post"]

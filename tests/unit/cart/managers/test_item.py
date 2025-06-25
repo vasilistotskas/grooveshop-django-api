@@ -2,6 +2,7 @@ from datetime import timedelta
 from unittest.mock import patch
 
 import pytest
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.db import connection
@@ -39,17 +40,19 @@ def guest_cart():
 
 @pytest.fixture
 def product():
-    return ProductFactory(price=Money(50, "USD"))
+    return ProductFactory(price=Money(50, settings.DEFAULT_CURRENCY))
 
 
 @pytest.fixture
 def expensive_product():
-    return ProductFactory(price=Money(150, "USD"))
+    return ProductFactory(price=Money(150, settings.DEFAULT_CURRENCY))
 
 
 @pytest.fixture
 def discounted_product():
-    return ProductFactory(price=Money(30, "USD"), discount_percent=20)
+    return ProductFactory(
+        price=Money(30, settings.DEFAULT_CURRENCY), discount_percent=20
+    )
 
 
 @pytest.mark.django_db
@@ -190,9 +193,13 @@ class TestCartItemQuerySet:
         assert high_item not in items_in_range
 
     def test_by_price_range(self, cart):
-        cheap_product = ProductFactory(price=Money(20, "USD"))
-        mid_product = ProductFactory(price=Money(75, "USD"))
-        expensive_product = ProductFactory(price=Money(200, "USD"))
+        cheap_product = ProductFactory(
+            price=Money(20, settings.DEFAULT_CURRENCY)
+        )
+        mid_product = ProductFactory(price=Money(75, settings.DEFAULT_CURRENCY))
+        expensive_product = ProductFactory(
+            price=Money(200, settings.DEFAULT_CURRENCY)
+        )
 
         cheap_item = CartItemFactory(cart=cart, product=cheap_product)
         mid_item = CartItemFactory(cart=cart, product=mid_product)
@@ -426,10 +433,18 @@ class TestCartItemQuerySetEdgeCases:
         assert total == 12
 
     def test_price_range_boundary_conditions(self, cart):
-        product_at_min = ProductFactory(price=Money(50, "USD"))
-        product_at_max = ProductFactory(price=Money(100, "USD"))
-        product_below = ProductFactory(price=Money(49.99, "USD"))
-        product_above = ProductFactory(price=Money(100.01, "USD"))
+        product_at_min = ProductFactory(
+            price=Money(50, settings.DEFAULT_CURRENCY)
+        )
+        product_at_max = ProductFactory(
+            price=Money(100, settings.DEFAULT_CURRENCY)
+        )
+        product_below = ProductFactory(
+            price=Money(49.99, settings.DEFAULT_CURRENCY)
+        )
+        product_above = ProductFactory(
+            price=Money(100.01, settings.DEFAULT_CURRENCY)
+        )
 
         item_at_min = CartItemFactory(cart=cart, product=product_at_min)
         item_at_max = CartItemFactory(cart=cart, product=product_at_max)

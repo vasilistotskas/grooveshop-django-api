@@ -14,7 +14,7 @@ CONTENT_PREVIEW_LENGTH = 50
 
 class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel, MPTTModel):
     id = models.BigAutoField(primary_key=True)
-    is_approved = models.BooleanField(_("Is Approved"), default=False)
+    approved = models.BooleanField(_("Approved"), default=False)
     likes = models.ManyToManyField(
         "user.UserAccount", related_name="liked_blog_comments", blank=True
     )
@@ -56,7 +56,7 @@ class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel, MPTTModel):
         ordering = ["-created_at"]
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
-            BTreeIndex(fields=["is_approved"]),
+            BTreeIndex(fields=["approved"]),
             BTreeIndex(fields=["post"]),
             BTreeIndex(fields=["user"]),
             BTreeIndex(fields=["parent"]),

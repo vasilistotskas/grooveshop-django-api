@@ -46,7 +46,7 @@ class BlogCommentTranslationFactory(factory.django.DjangoModelFactory):
 
 @factory.django.mute_signals(signals.m2m_changed)
 class BlogCommentFactory(factory.django.DjangoModelFactory):
-    is_approved = factory.Faker("boolean")
+    approved = factory.Faker("boolean")
     user = factory.LazyFunction(get_or_create_user)
     post = factory.LazyFunction(get_or_create_post)
     parent = None

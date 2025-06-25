@@ -681,9 +681,8 @@ SECURE_HSTS_PRELOAD = not DEBUG
 
 # Currency
 DEFAULT_CURRENCY = getenv("DEFAULT_CURRENCY", "EUR")
-BASE_CURRENCY = "EUR"
-CURRENCIES = ("USD", "EUR")
-CURRENCY_CHOICES = [("USD", "USD $"), ("EUR", "EUR €")]
+CURRENCIES = ("EUR", "USD")
+CURRENCY_CHOICES = [("EUR", "EUR €"), ("USD", "USD $")]
 
 CONN_HEALTH_CHECKS = SYSTEM_ENV == "production"
 ATOMIC_REQUESTS = SYSTEM_ENV == "production"
@@ -752,7 +751,7 @@ EXTRA_SETTINGS_DEFAULTS = [
     },
     {
         "name": "CART_ABANDONED_HOURS",
-        "type": "integer",
+        "type": "int",
         "value": 24,
     },
     {

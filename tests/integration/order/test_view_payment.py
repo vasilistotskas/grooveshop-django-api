@@ -1,5 +1,6 @@
 from unittest import mock
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.test import TestCase
@@ -60,7 +61,7 @@ class OrderPaymentViewSetTestCase(TestCase):
             payment_id="",
             payment_method="",
             status="PENDING",
-            paid_amount=Money(0, "USD"),
+            paid_amount=Money(0, settings.DEFAULT_CURRENCY),
         )
 
         self.anon_order = OrderFactory(
@@ -70,7 +71,7 @@ class OrderPaymentViewSetTestCase(TestCase):
             payment_id="",
             payment_method="",
             status="PENDING",
-            paid_amount=Money(0, "USD"),
+            paid_amount=Money(0, settings.DEFAULT_CURRENCY),
         )
 
         self.paid_order = OrderFactory(
@@ -112,7 +113,7 @@ class OrderPaymentViewSetTestCase(TestCase):
                     "payment_id": "TEST_PAYMENT_123",
                     "status": PaymentStatus.COMPLETED,
                     "amount": "100.00",
-                    "currency": "USD",
+                    "currency": settings.DEFAULT_CURRENCY,
                     "provider": "stripe",
                 },
             )
@@ -149,7 +150,7 @@ class OrderPaymentViewSetTestCase(TestCase):
                     "payment_id": f"OFFLINE_{self.anon_order.id}",
                     "status": PaymentStatus.PENDING,
                     "amount": "100.00",
-                    "currency": "USD",
+                    "currency": settings.DEFAULT_CURRENCY,
                     "provider": "offline",
                 },
             )
@@ -344,7 +345,7 @@ class OrderPaymentViewSetTestCase(TestCase):
                 "refund_id": "REFUND_123",
                 "status": PaymentStatus.PARTIALLY_REFUNDED,
                 "amount": "50.00",
-                "currency": "USD",
+                "currency": settings.DEFAULT_CURRENCY,
                 "payment_id": "PAID_123",
             },
         )
@@ -352,7 +353,7 @@ class OrderPaymentViewSetTestCase(TestCase):
         view = OrderPaymentViewSet.as_view({"post": "refund_payment"})
         request = self.factory.post(
             f"/api/v1/order/{self.paid_order.pk}/refund",
-            {"amount": 50.00, "currency": "USD"},
+            {"amount": 50.00, "currency": settings.DEFAULT_CURRENCY},
             format="json",
         )
         force_authenticate(request, user=self.admin_user)
@@ -361,4 +362,4 @@ class OrderPaymentViewSetTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         amount_arg = mock_refund.call_args[1]["amount"]
         self.assertEqual(amount_arg.amount, 50.00)
-        self.assertEqual(str(amount_arg.currency), "USD")
+        self.assertEqual(str(amount_arg.currency), settings.DEFAULT_CURRENCY)

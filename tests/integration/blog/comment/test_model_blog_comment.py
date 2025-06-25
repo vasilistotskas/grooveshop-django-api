@@ -23,11 +23,11 @@ class BlogCommentModelTestCase(TestCase):
             author=self.author, num_tags=0, num_comments=0
         )
         self.comment = BlogCommentFactory(
-            is_approved=True, user=self.user, post=self.post
+            approved=True, user=self.user, post=self.post
         )
 
     def test_fields(self):
-        self.assertTrue(self.comment.is_approved)
+        self.assertTrue(self.comment.approved)
         self.assertEqual(self.comment.user, self.user)
         self.assertEqual(self.comment.post, self.post)
 

@@ -1,7 +1,7 @@
-from django.db import models
+from parler.managers import TranslatableManager, TranslatableQuerySet
 
 
-class PayWayQuerySet(models.QuerySet):
+class PayWayQuerySet(TranslatableQuerySet):
     def active(self):
         return self.filter(active=True)
 
@@ -15,7 +15,7 @@ class PayWayQuerySet(models.QuerySet):
         return self.filter(is_online_payment=False)
 
 
-class PayWayManager(models.Manager):
+class PayWayManager(TranslatableManager):
     def get_queryset(self) -> PayWayQuerySet:
         return PayWayQuerySet(self.model, using=self._db)
 

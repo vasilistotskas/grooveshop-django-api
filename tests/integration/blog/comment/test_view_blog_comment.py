@@ -29,7 +29,7 @@ class BlogCommentViewSetTestCase(TestURLFixerMixin, APITestCase):
             num_comments=0,
         )
         cls.comment = BlogCommentFactory(
-            is_approved=True, user=cls.user, post=cls.post
+            approved=True, user=cls.user, post=cls.post
         )
 
     def get_comment_detail_url(self, pk):
@@ -63,7 +63,7 @@ class BlogCommentViewSetTestCase(TestURLFixerMixin, APITestCase):
             "is_reply",
             "parent",
             "has_replies",
-            "is_approved",
+            "approved",
             "is_edited",
             "likes_count",
             "replies_count",
@@ -90,7 +90,7 @@ class BlogCommentViewSetTestCase(TestURLFixerMixin, APITestCase):
             "is_reply",
             "parent",
             "has_replies",
-            "is_approved",
+            "approved",
             "is_edited",
             "likes_count",
             "replies_count",
@@ -114,7 +114,7 @@ class BlogCommentViewSetTestCase(TestURLFixerMixin, APITestCase):
             "is_reply",
             "parent",
             "has_replies",
-            "is_approved",
+            "approved",
             "is_edited",
             "likes_count",
             "replies_count",
@@ -183,7 +183,7 @@ class BlogCommentViewSetTestCase(TestURLFixerMixin, APITestCase):
             "is_reply",
             "parent",
             "has_replies",
-            "is_approved",
+            "approved",
             "is_edited",
             "likes_count",
             "replies_count",
@@ -240,7 +240,7 @@ class BlogCommentViewSetTestCase(TestURLFixerMixin, APITestCase):
             "is_reply",
             "parent",
             "has_replies",
-            "is_approved",
+            "approved",
             "is_edited",
             "likes_count",
             "replies_count",
@@ -293,7 +293,7 @@ class BlogCommentViewSetTestCase(TestURLFixerMixin, APITestCase):
             "is_reply",
             "parent",
             "has_replies",
-            "is_approved",
+            "approved",
             "is_edited",
             "likes_count",
             "replies_count",
@@ -323,7 +323,7 @@ class BlogCommentViewSetTestCase(TestURLFixerMixin, APITestCase):
     def test_destroy_valid(self):
         self.client.force_authenticate(user=self.user)
         comment_to_delete = BlogCommentFactory(
-            is_approved=True, user=self.user, post=self.post
+            approved=True, user=self.user, post=self.post
         )
 
         url = self.get_comment_detail_url(comment_to_delete.id)
@@ -344,7 +344,7 @@ class BlogCommentViewSetTestCase(TestURLFixerMixin, APITestCase):
 
     def test_replies_action(self):
         BlogCommentFactory(
-            is_approved=True,
+            approved=True,
             user=self.user,
             post=self.post,
             parent=self.comment,
@@ -361,13 +361,13 @@ class BlogCommentViewSetTestCase(TestURLFixerMixin, APITestCase):
 
     def test_thread_action(self):
         reply = BlogCommentFactory(
-            is_approved=True,
+            approved=True,
             user=self.user,
             post=self.post,
             parent=self.comment,
         )
         BlogCommentFactory(
-            is_approved=True, user=self.user, post=self.post, parent=reply
+            approved=True, user=self.user, post=self.post, parent=reply
         )
 
         url = reverse("blog-comment-thread", args=[reply.id])
@@ -502,7 +502,7 @@ class BlogCommentViewSetTestCase(TestURLFixerMixin, APITestCase):
 
         other_post = BlogPostFactory(author=self.author)
         other_comment = BlogCommentFactory(
-            is_approved=True, user=self.user, post=other_post
+            approved=True, user=self.user, post=other_post
         )
 
         payload = {

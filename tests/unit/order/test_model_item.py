@@ -1,4 +1,5 @@
 import pytest
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.test import TestCase as DjangoTestCase
 from djmoney.money import Money
@@ -13,7 +14,7 @@ class OrderItemModelTestCase(DjangoTestCase):
     def setUp(self):
         self.order = OrderFactory.create()
         self.product = ProductFactory.create(
-            stock=20, price=Money("50.00", "USD")
+            stock=20, price=Money("50.00", settings.DEFAULT_CURRENCY)
         )
         self.product.set_current_language("en")
         self.product.name = "Test Product"
@@ -107,7 +108,7 @@ class OrderItemModelTestCase(DjangoTestCase):
         self.assertEqual(self.order_item.net_price, expected_net_price)
 
     def test_refunded_amount_property_no_refund(self):
-        expected = Money("0.00", "USD")
+        expected = Money("0.00", settings.DEFAULT_CURRENCY)
         self.assertEqual(self.order_item.refunded_amount, expected)
 
     def test_refunded_amount_property_partial_refund(self):
@@ -162,14 +163,14 @@ class OrderItemQuerySetTestCase(DjangoTestCase):
         self.order2 = OrderFactory.create(num_order_items=0)
 
         self.product1 = ProductFactory.create(
-            stock=50, price=Money("25.00", "USD")
+            stock=50, price=Money("25.00", settings.DEFAULT_CURRENCY)
         )
         self.product1.set_current_language("en")
         self.product1.name = "Product 1"
         self.product1.save()
 
         self.product2 = ProductFactory.create(
-            stock=30, price=Money("40.00", "USD")
+            stock=30, price=Money("40.00", settings.DEFAULT_CURRENCY)
         )
         self.product2.set_current_language("en")
         self.product2.name = "Product 2"
@@ -235,7 +236,7 @@ class OrderItemQuerySetTestCase(DjangoTestCase):
         expected_total = sum(
             item.price.amount * item.quantity for item in items
         )
-        expected_money = Money(expected_total, "USD")
+        expected_money = Money(expected_total, settings.DEFAULT_CURRENCY)
         self.assertEqual(result, expected_money)
 
     def test_total_items_cost_no_items(self):
@@ -244,7 +245,7 @@ class OrderItemQuerySetTestCase(DjangoTestCase):
         empty_order = OrderFactory.create(num_order_items=0)
         result = OrderItem.objects.for_order(empty_order.id).total_items_cost()
 
-        expected_money = Money("0", "USD")
+        expected_money = Money("0", settings.DEFAULT_CURRENCY)
         self.assertEqual(result, expected_money)
 
 
@@ -255,7 +256,7 @@ class OrderItemManagerTestCase(DjangoTestCase):
 
         self.order = OrderFactory.create(num_order_items=0)
         self.product = ProductFactory.create(
-            stock=20, price=Money("15.00", "USD")
+            stock=20, price=Money("15.00", settings.DEFAULT_CURRENCY)
         )
         self.product.set_current_language("en")
         self.product.name = "Test Product"
@@ -266,7 +267,7 @@ class OrderItemManagerTestCase(DjangoTestCase):
             item = OrderItemFactory.create(
                 order=self.order,
                 product=self.product,
-                price=Money("15.00", "USD"),
+                price=Money("15.00", settings.DEFAULT_CURRENCY),
                 quantity=2,
             )
             self.items.append(item)
@@ -316,6 +317,6 @@ class OrderItemManagerTestCase(DjangoTestCase):
         expected_total = sum(
             item.price.amount * item.quantity for item in actual_items
         )
-        expected_money = Money(expected_total, "USD")
+        expected_money = Money(expected_total, settings.DEFAULT_CURRENCY)
 
         self.assertEqual(result, expected_money)

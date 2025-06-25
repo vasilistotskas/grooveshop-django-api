@@ -4,6 +4,7 @@ from datetime import timedelta
 
 import factory
 from django.apps import apps
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db.models import Count
 from django.utils import timezone
@@ -159,7 +160,7 @@ class OrderFactory(factory.django.DjangoModelFactory):
                 max_value=20,
                 positive=True,
             ),
-            "USD",
+            settings.DEFAULT_CURRENCY,
         )
     )
     document_type = factory.LazyFunction(
@@ -174,10 +175,10 @@ class OrderFactory(factory.django.DjangoModelFactory):
                 max_value=99,
                 positive=True,
             ),
-            "USD",
+            settings.DEFAULT_CURRENCY,
         )
         if random.randint(1, 10) > 3
-        else Money(0, "USD")
+        else Money(0, settings.DEFAULT_CURRENCY)
     )
     payment_status = factory.LazyFunction(
         lambda: random.choice([s[0] for s in PaymentStatus.choices])
@@ -246,7 +247,7 @@ class OrderFactory(factory.django.DjangoModelFactory):
                     max_value=99,
                     positive=True,
                 ),
-                "USD",
+                settings.DEFAULT_CURRENCY,
             )
         elif status == OrderStatus.CANCELED:
             payment_status = random.choice(
@@ -270,7 +271,7 @@ class OrderFactory(factory.django.DjangoModelFactory):
                     max_value=99,
                     positive=True,
                 ),
-                "USD",
+                settings.DEFAULT_CURRENCY,
             )
 
         if status in [OrderStatus.SHIPPED, OrderStatus.DELIVERED]:

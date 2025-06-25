@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.conf import settings
 from django.test import TestCase
 from djmoney.money import Money
 
@@ -77,7 +78,7 @@ class OrderHistoryModelTestCase(TestCase):
     def test_log_refund(self):
         refund_data = {
             "amount": "50.00",
-            "currency": "USD",
+            "currency": settings.DEFAULT_CURRENCY,
             "reason": "Customer request",
         }
 
@@ -97,7 +98,9 @@ class OrderItemHistoryModelTestCase(TestCase):
         self.product = ProductFactory()
         self.order_item = self.order.items.create(
             product=self.product,
-            price=Money(amount=Decimal("50.00"), currency="USD"),
+            price=Money(
+                amount=Decimal("50.00"), currency=settings.DEFAULT_CURRENCY
+            ),
             quantity=2,
         )
 
@@ -123,8 +126,12 @@ class OrderItemHistoryModelTestCase(TestCase):
         )
 
     def test_log_price_update(self):
-        previous_price = Money(amount=Decimal("50.00"), currency="USD")
-        new_price = Money(amount=Decimal("60.00"), currency="USD")
+        previous_price = Money(
+            amount=Decimal("50.00"), currency=settings.DEFAULT_CURRENCY
+        )
+        new_price = Money(
+            amount=Decimal("60.00"), currency=settings.DEFAULT_CURRENCY
+        )
 
         history_entry = OrderItemHistory.log_price_update(
             order_item=self.order_item,

@@ -168,7 +168,7 @@ def handle_order_item_post_save(
 
             OrderHistory.log_note(
                 order=order,
-                note=f"Item {instance.product.name if instance.product else 'Unknown'} added to order",
+                note=f"Item {instance.product.safe_translation_getter('name', any_language=True) if instance.product else 'Unknown'} added to order",
             )
             logger.debug(
                 f"Order item {instance.id} created for order {order.id}"
@@ -196,7 +196,7 @@ def handle_order_item_post_save(
         try:
             OrderHistory.log_note(
                 order=instance.order,
-                note=f"Item {instance.product.name if instance.product else 'Unknown'} quantity updated from {instance._original_quantity} to {instance.quantity}",
+                note=f"Item {instance.product.safe_translation_getter('name', any_language=True) if instance.product else 'Unknown'} quantity updated from {instance._original_quantity} to {instance.quantity}",
             )
         except Exception as e:
             logger.error(
@@ -223,7 +223,7 @@ def handle_order_item_post_save(
             OrderHistory.log_note(
                 order=instance.order,
                 note=(
-                    f"Item {instance.product.name if instance.product else 'Unknown'} "
+                    f"Item {instance.product.safe_translation_getter('name', any_language=True) if instance.product else 'Unknown'} "
                     f"marked as {'refunded' if instance.is_refunded else 'not refunded'}"
                 ),
             )

@@ -1,4 +1,6 @@
 import factory
+from django.apps import apps
+from django.conf import settings
 from django.core.files.base import ContentFile
 from factory import fuzzy
 from factory.django import DjangoModelFactory
@@ -6,6 +8,23 @@ from factory.django import DjangoModelFactory
 from product.enum.category import CategoryImageTypeEnum
 from product.factories.category import ProductCategoryFactory
 from product.models.category_image import ProductCategoryImage
+
+available_languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
+
+
+class ProductCategoryImageTranslationFactory(factory.django.DjangoModelFactory):
+    language_code = factory.Iterator(available_languages)
+    title = factory.Faker("word")
+    alt_text = factory.Faker("sentence")
+    master = factory.SubFactory(
+        "product.factories.category_image.ProductCategoryImageFactory"
+    )
+
+    class Meta:
+        model = apps.get_model("product", "ProductCategoryImageTranslation")
+        django_get_or_create = ("language_code", "master")
 
 
 class ProductCategoryImageFactory(DjangoModelFactory):
@@ -49,23 +68,13 @@ class ProductCategoryImageFactory(DjangoModelFactory):
         if not create:
             return
 
-        if extracted:
-            for lang_code, translation_data in extracted.items():
-                self.create_translation(
-                    language_code=lang_code,
-                    title=translation_data.get(
-                        "title", f"Category Image {self.id}"
-                    ),
-                    alt_text=translation_data.get(
-                        "alt_text", f"Alt text for {self.id}"
-                    ),
-                )
-        else:
-            self.create_translation(
-                language_code="en",
-                title=f"Category Image {self.id}",
-                alt_text=f"Alt text for category image {self.id}",
+        translations = extracted or [
+            ProductCategoryImageTranslationFactory(
+                language_code=lang, master=self
             )
+            for lang in available_languages
+        ]
 
-        # Manual save since we disabled automatic postgeneration save
-        self.save()
+        for translation in translations:
+            translation.master = self
+            translation.save()

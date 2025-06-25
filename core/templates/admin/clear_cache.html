@@ -28,7 +28,7 @@
                 <form method="post" class="grid gap-2 space-y-4">
                     {% csrf_token %}
                     <div class="grid gap-2">
-                        <label for="id_viewset_class" class="block text-sm font-medium text-gray-700 dark:text-gray-300">{% trans "Select ViewSet class to clear cache" %}:</label>
+                        <label for="id_viewset_class" class="block text-sm font-medium text-base-700 dark:text-base-300">{% trans "Select ViewSet class to clear cache" %}:</label>
                         <select name="viewset_class" id="id_viewset_class" class="w-full p-2 rounded-md border border-gray-300 dark:bg-base-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500">
                             {% for value, label in form.viewset_class.field.choices %}
                                 <option value="{{ value }}">{{ label }}</option>

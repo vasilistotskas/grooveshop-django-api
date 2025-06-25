@@ -1,6 +1,7 @@
 from unittest import TestCase
 
 import pytest
+from django.conf import settings
 from djmoney.money import Money
 
 from order.enum.status import OrderStatus
@@ -40,8 +41,15 @@ class OrderHistoryTestCase(TestCase):
         )
 
     def test_log_payment_update(self):
-        previous_value = {"paid_amount": {"amount": 0, "currency": "USD"}}
-        new_value = {"paid_amount": {"amount": 100, "currency": "USD"}}
+        previous_value = {
+            "paid_amount": {"amount": 0, "currency": settings.DEFAULT_CURRENCY}
+        }
+        new_value = {
+            "paid_amount": {
+                "amount": 100,
+                "currency": settings.DEFAULT_CURRENCY,
+            }
+        }
 
         result = OrderHistory.log_payment_update(
             order=self.order,
@@ -62,8 +70,10 @@ class OrderHistoryTestCase(TestCase):
         self.assertEqual(result.description, "Payment information updated")
 
     def test_log_payment_update_with_money_object(self):
-        previous_value = {"paid_amount": Money("0.00", "USD")}
-        new_value = {"paid_amount": Money("100.00", "USD")}
+        previous_value = {
+            "paid_amount": Money("0.00", settings.DEFAULT_CURRENCY)
+        }
+        new_value = {"paid_amount": Money("100.00", settings.DEFAULT_CURRENCY)}
 
         result = OrderHistory.log_payment_update(
             order=self.order,
@@ -78,10 +88,11 @@ class OrderHistoryTestCase(TestCase):
         self.assertEqual(result.change_type, "PAYMENT")
         self.assertEqual(
             result.previous_value["paid_amount"],
-            str(Money("0.00", "USD")),
+            str(Money("0.00", settings.DEFAULT_CURRENCY)),
         )
         self.assertEqual(
-            result.new_value["paid_amount"], str(Money("100.00", "USD"))
+            result.new_value["paid_amount"],
+            str(Money("100.00", settings.DEFAULT_CURRENCY)),
         )
         self.assertEqual(result.description, "Payment information updated")
 
@@ -125,7 +136,7 @@ class OrderHistoryTestCase(TestCase):
 
     def test_log_refund(self):
         refund_data = {
-            "amount": {"amount": 50, "currency": "USD"},
+            "amount": {"amount": 50, "currency": settings.DEFAULT_CURRENCY},
             "reason": "Customer request",
             "transaction_id": "refund_123",
         }
@@ -176,8 +187,8 @@ class OrderItemHistoryTestCase(TestCase):
         )
 
     def test_log_price_update(self):
-        previous_price = Money("50.00", "USD")
-        new_price = Money("45.00", "USD")
+        previous_price = Money("50.00", settings.DEFAULT_CURRENCY)
+        new_price = Money("45.00", settings.DEFAULT_CURRENCY)
 
         result = OrderItemHistory.log_price_update(
             order_item=self.order_item,
@@ -216,6 +227,8 @@ class OrderItemHistoryTestCase(TestCase):
         self.assertEqual(result.change_type, "REFUND")
         self.assertEqual(result.new_value["refund_quantity"], 1)
         self.assertIn("refund_amount", result.new_value)
-        self.assertEqual(result.new_value["currency"], "USD")
+        self.assertEqual(
+            result.new_value["currency"], settings.DEFAULT_CURRENCY
+        )
         self.assertIn("Refund processed for 1 items", result.description)
         self.assertIn("Damaged item", result.description)

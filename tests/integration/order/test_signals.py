@@ -1,6 +1,7 @@
 from decimal import Decimal
 from unittest.mock import patch
 
+from django.conf import settings
 from django.test import TestCase
 from djmoney.money import Money
 
@@ -26,7 +27,9 @@ class OrderSignalsTestCase(TestCase):
         self.product = ProductFactory(stock=10)
         self.order_item = self.order.items.create(
             product=self.product,
-            price=Money(amount=Decimal("50.00"), currency="USD"),
+            price=Money(
+                amount=Decimal("50.00"), currency=settings.DEFAULT_CURRENCY
+            ),
             quantity=2,
         )
 
@@ -183,7 +186,9 @@ class OrderSignalsTestCase(TestCase):
 
     def test_handle_order_item_saved_price_changed(self):
         original_price = self.order_item.price
-        new_price = Money(amount=Decimal("60.00"), currency="USD")
+        new_price = Money(
+            amount=Decimal("60.00"), currency=settings.DEFAULT_CURRENCY
+        )
         self.order_item._original_price = original_price
 
         self.order_item.price = new_price

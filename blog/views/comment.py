@@ -101,7 +101,7 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
         queryset = (
             BlogComment.objects.select_related("user", "post")
             .prefetch_related("likes", "translations")
-            .filter(is_approved=True)
+            .filter(approved=True)
         )
         return queryset
 
@@ -139,7 +139,7 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
             comment.get_children()
             .select_related("user", "post")
             .prefetch_related("likes")
-            .filter(is_approved=True)
+            .filter(approved=True)
             .order_by("created_at")
         )
         return self.paginate_and_serialize(queryset, request)

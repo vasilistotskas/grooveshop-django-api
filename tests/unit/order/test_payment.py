@@ -1,6 +1,7 @@
 from decimal import Decimal
 from unittest import TestCase, mock
 
+from django.conf import settings
 from djmoney.money import Money
 
 from order.enum.status import PaymentStatus
@@ -46,7 +47,9 @@ class PaymentModuleTestCase(TestCase):
     @mock.patch("order.payment.logger")
     def test_stripe_process_payment(self, mock_logger):
         provider = StripePaymentProvider()
-        amount = Money(amount=Decimal("100.00"), currency="USD")
+        amount = Money(
+            amount=Decimal("100.00"), currency=settings.DEFAULT_CURRENCY
+        )
         order_id = "test_order_id"
 
         success, payment_data = provider.process_payment(amount, order_id)
@@ -63,7 +66,9 @@ class PaymentModuleTestCase(TestCase):
     @mock.patch("order.payment.logger")
     def test_paypal_process_payment(self, mock_logger):
         provider = PayPalPaymentProvider()
-        amount = Money(amount=Decimal("100.00"), currency="USD")
+        amount = Money(
+            amount=Decimal("100.00"), currency=settings.DEFAULT_CURRENCY
+        )
         order_id = "test_order_id"
 
         success, payment_data = provider.process_payment(amount, order_id)
@@ -81,7 +86,9 @@ class PaymentModuleTestCase(TestCase):
     def test_stripe_refund_payment(self, mock_logger):
         provider = StripePaymentProvider()
         payment_id = "test_payment_id"
-        amount = Money(amount=Decimal("50.00"), currency="USD")
+        amount = Money(
+            amount=Decimal("50.00"), currency=settings.DEFAULT_CURRENCY
+        )
 
         success, refund_data = provider.refund_payment(payment_id, amount)
 

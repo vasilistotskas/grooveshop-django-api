@@ -6,7 +6,7 @@ from blog.models.comment import BlogComment
 
 
 class BlogCommentFilter(django_filters.FilterSet):
-    is_approved = django_filters.BooleanFilter(
+    approved = django_filters.BooleanFilter(
         help_text=_("Filter by approval status")
     )
     has_content = django_filters.BooleanFilter(

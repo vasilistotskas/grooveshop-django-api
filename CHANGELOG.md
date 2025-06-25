@@ -3,6 +3,12 @@
 
 
 
+## v1.15.0 (2025-06-25)
+
+### Features
+
+* feat: Improve admin with `unfold`, Bump Versions ([`60b85d8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/60b85d8ae29f4fe25fc4d6b04215d3c8614ea5a4))
+
 ## v1.14.0 (2025-06-22)
 
 ### Features

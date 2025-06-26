@@ -31,7 +31,8 @@ class CountryModelTestCase(TestCase):
 
     def test_str_representation(self):
         self.assertEqual(
-            str(self.country), self.country.safe_translation_getter("name")
+            str(self.country),
+            self.country.safe_translation_getter("name") or "",
         )
 
     def test_get_ordering_queryset(self):

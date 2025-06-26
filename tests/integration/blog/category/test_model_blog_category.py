@@ -23,7 +23,7 @@ class BlogCategoryModelTestCase(TestCase):
     def test_str_representation(self):
         self.assertEqual(
             str(self.category),
-            self.category.safe_translation_getter("name"),
+            self.category.safe_translation_getter("name") or "Unnamed",
         )
 
     def test_post_count(self):

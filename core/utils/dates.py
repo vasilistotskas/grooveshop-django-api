@@ -1,10 +1,9 @@
 from datetime import date, datetime, timedelta
-from typing import Union
 
 
 def date_range(
-    start_date: Union[date, datetime],
-    end_date: Union[date, datetime],
+    start_date: date | datetime,
+    end_date: date | datetime,
     step: int = 1,
 ) -> list[date]:
     if isinstance(start_date, datetime):

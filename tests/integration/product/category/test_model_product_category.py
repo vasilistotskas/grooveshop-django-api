@@ -29,7 +29,7 @@ class CategoryModelTestCase(TestCase):
 
     def test_str_representation_no_parent(self):
         self.assertEqual(
-            str(self.category), self.category.safe_translation_getter("name")
+            str(self.category), self.category.safe_translation_getter("name") or ""
         )
 
     def test_get_ordering_queryset_with_parent(self):

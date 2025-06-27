@@ -60,12 +60,12 @@ class ProductCategory(
 
     def __str__(self):
         if not hasattr(self, "_full_path"):
-            self._full_path = " / ".join(
-                [
-                    k.safe_translation_getter("name", any_language=True)
-                    for k in self.get_ancestors(include_self=True)
-                ]
-            )
+            names = [
+                k.safe_translation_getter("name", any_language=True)
+                for k in self.get_ancestors(include_self=True)
+            ]
+            valid_names = [name for name in names if name is not None]
+            self._full_path = " / ".join(valid_names)
         return self._full_path
 
     def save(self, *args, **kwargs):

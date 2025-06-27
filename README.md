@@ -151,8 +151,6 @@ This project is open-sourced under the MIT License. See the [LICENSE](LICENSE.md
   - Make migrations: `python manage.py makemigrations`
   - Apply migrations: `python manage.py migrate`
   - Flush the database: `python manage.py sqlflush`
-  - Populate database with seed data (Single Factory Example): `python manage.py factory_seed
-    --model="BlogPost" --count="100"`
   - Populate database with seed data (All Factories Example): `python manage.py seed_all
     --model-counts="Country=10,Product=100"`
 - **Manage Users**:

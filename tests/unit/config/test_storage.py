@@ -9,7 +9,9 @@ from settings import MEDIA_URL, STATIC_URL
 
 
 class TestStorage(unittest.TestCase):
-    @patch.object(sys.modules["__main__"], "__file__", "config/storage.py")
+    @patch.object(
+        sys.modules["__main__"], "__file__", "config/storage.py", create=True
+    )
     @patch.dict(os.environ, {"SYSTEM_ENV": "dev"})
     def test_dev(self):
         reload(sys.modules["settings"])
@@ -17,7 +19,9 @@ class TestStorage(unittest.TestCase):
         self.assertEqual(STATIC_URL, "/static/")
         self.assertEqual(MEDIA_URL, "/media/")
 
-    @patch.object(sys.modules["__main__"], "__file__", "config/storage.py")
+    @patch.object(
+        sys.modules["__main__"], "__file__", "config/storage.py", create=True
+    )
     @patch.dict(
         os.environ,
         {

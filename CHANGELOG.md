@@ -3,6 +3,31 @@
 
 
 
+## v1.16.0 (2025-06-27)
+
+### Bug fixes
+
+* fix: tests ([`34e9a38`](https://github.com/vasilistotskas/grooveshop-django-api/commit/34e9a38b2f77c024e230d0e6a917a06f70ffb484))
+
+* fix: lint ([`416bf75`](https://github.com/vasilistotskas/grooveshop-django-api/commit/416bf75cf009b1765223b96b156366faff1121c6))
+
+* fix: product signals, test fix ([`308dc95`](https://github.com/vasilistotskas/grooveshop-django-api/commit/308dc9514b2ba8d8703a38c40a69208c032046cb))
+
+* fix: Product category `__str__` fix ([`916146b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/916146bef12b0ae458b4fc4a3662eac1c631570b))
+
+* fix: lint ([`651f5b1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/651f5b125168e5931c36029b3b27e541f1497e79))
+
+* fix: test_str_representation ([`4641ade`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4641ade0fb2fb81b60b399182c31109fa00108e0))
+
+* fix: test_str_representation ([`49357f0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/49357f0c920f4db2848d0a74b6e8013cab85e53b))
+
+### Features
+
+* feat: Seed all command rewrite
+
+- New `core\utils\dependencies.py`
+- New `core\utils\profiler.py` ([`b2201b4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b2201b4bc9ba41609b5d6fbec16af6a2ca3c3cd2))
+
 ## v1.15.0 (2025-06-25)
 
 ### Features

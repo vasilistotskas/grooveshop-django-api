@@ -61,6 +61,9 @@ async def notify_product_price_lowered(
         f"{settings.NUXT_BASE_URL}/products/{instance.id}/{instance.slug}"
     )
 
+    async def get_instance_name():
+        return await sync_to_async(lambda: instance.name, thread_sensitive=True)()
+
     for favorite in favorite_users:
         user = favorite.user
 
@@ -74,20 +77,22 @@ async def notify_product_price_lowered(
                 await sync_to_async(setattr)(
                     notification, "title", "Price Drop!"
                 )
+                name = await get_instance_name()
                 await sync_to_async(setattr)(
                     notification,
                     "message",
-                    f"The price of <a href='{product_url}'>{instance.name}</a> has dropped"
+                    f"The price of <a href='{product_url}'>{name}</a> has dropped"
                     f" from {old_price} to {new_price}. Check it out now!",
                 )
             elif language == "el":
                 await sync_to_async(setattr)(
                     notification, "title", "Μείωση Τιμής!"
                 )
+                name = await get_instance_name()
                 await sync_to_async(setattr)(
                     notification,
                     "message",
-                    f"Η τιμή του <a href='{product_url}'>{instance.name}</a> μειώθηκε"  # noqa: RUF001
+                    f"Η τιμή του <a href='{product_url}'>{name}</a> μειώθηκε"  # noqa: RUF001
                     f" από {old_price} σε {new_price}. Δείτε το τώρα!",
                 )
             await notification.asave()

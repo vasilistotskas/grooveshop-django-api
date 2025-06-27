@@ -211,7 +211,10 @@ class ProductCategoryViewSetTestCase(APITestCase):
 
     def test_search_functionality(self):
         url = self.get_product_category_list_url()
-        search_value = self.category.safe_translation_getter("name", any_language=True) or ""
+        search_value = (
+            self.category.safe_translation_getter("name", any_language=True)
+            or ""
+        )
         response = self.client.get(
             url,
             {"search": search_value},

@@ -23,7 +23,7 @@ class Migration(migrations.Migration):
             "DROP TABLE IF EXISTS order_orderitemhistory CASCADE;",
             reverse_sql="-- Cannot reverse table drop"
         ),
-        
+
         # Create OrderHistory table
         migrations.CreateModel(
             name='OrderHistory',
@@ -46,7 +46,7 @@ class Migration(migrations.Migration):
                 'ordering': ['-created_at'],
             },
         ),
-        
+
         # Create OrderItemHistory table
         migrations.CreateModel(
             name='OrderItemHistory',
@@ -67,7 +67,7 @@ class Migration(migrations.Migration):
                 'ordering': ['-created_at'],
             },
         ),
-        
+
         # Create translation tables
         migrations.CreateModel(
             name='OrderHistoryTranslation',
@@ -104,7 +104,7 @@ class Migration(migrations.Migration):
             },
         ),
 
-        
+
         # Add indexes
         migrations.AddIndex(
             model_name='orderhistory',
@@ -142,4 +142,4 @@ class Migration(migrations.Migration):
             model_name='orderitemhistory',
             index=BTreeIndex(fields=['change_type'], name='ord_item_hist_change_type_ix'),
         ),
-    ] 
+    ]

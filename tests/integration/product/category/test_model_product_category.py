@@ -28,10 +28,10 @@ class CategoryModelTestCase(TestCase):
         self.assertTrue(self.category.active)
 
     def test_str_representation_no_parent(self):
-        self.assertEqual(
-            str(self.category),
-            self.category.safe_translation_getter("name") or "",
-        )
+        category_name = self.category.safe_translation_getter("name") or ""
+        category_str = str(self.category)
+
+        self.assertEqual(category_str, category_name)
 
     def test_get_ordering_queryset_with_parent(self):
         self.assertEqual(ProductCategory.objects.count(), 2)

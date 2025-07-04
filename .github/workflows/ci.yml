@@ -131,7 +131,7 @@ jobs:
           MEILI_MASTER_KEY: ${{ secrets.MEILI_MASTER_KEY }}
           MEILI_ENV: production
         run: |
-          uv run coverage run --rcfile=.coveragerc --source='.' -m pytest
+          uv run coverage run --source='.' -m pytest
           uv run coverage report
         timeout-minutes: 15
 

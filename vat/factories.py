@@ -4,7 +4,7 @@ from vat.models import Vat
 
 
 class VatFactory(factory.django.DjangoModelFactory):
-    value = factory.Faker("random_int", min=0, max=100)
+    value = factory.Faker("random_int", min=1, max=100)
 
     class Meta:
         model = Vat

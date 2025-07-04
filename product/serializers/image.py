@@ -1,6 +1,7 @@
 import os
 
 from django.db import models
+from django.db.models.fields.files import ImageFieldFile
 from drf_spectacular.utils import extend_schema_field
 from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
@@ -177,7 +178,7 @@ class ProductImageWriteSerializer(
             "translations",
         )
 
-    def validate_image(self, value):
+    def validate_image(self, value: ImageFieldFile) -> ImageFieldFile:
         if not value:
             raise serializers.ValidationError("Image file is required.")
 

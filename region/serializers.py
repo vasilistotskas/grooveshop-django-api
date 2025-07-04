@@ -50,7 +50,7 @@ class RegionWriteSerializer(
     translations = TranslatedFieldsFieldExtend(shared_model=Region)
     country = PrimaryKeyRelatedField(queryset=Country.objects.all())
 
-    def validate_alpha(self, value):
+    def validate_alpha(self, value: str) -> str:
         if value and len(value) > 10:
             raise serializers.ValidationError(
                 _("Region alpha code should be 10 characters or less.")

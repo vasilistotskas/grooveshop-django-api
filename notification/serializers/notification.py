@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_field
@@ -49,14 +51,14 @@ class NotificationWriteSerializer(
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=Notification)
 
-    def validate_expiry_date(self, value):
+    def validate_expiry_date(self, value: datetime) -> datetime:
         if value and value <= timezone.now():
             raise serializers.ValidationError(
                 _("Expiry date must be in the future.")
             )
         return value
 
-    def validate_link(self, value):
+    def validate_link(self, value: str) -> str:
         if value and not (
             value.startswith("http://")
             or value.startswith("https://")

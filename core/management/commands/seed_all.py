@@ -29,7 +29,7 @@ languages_comma_separated = ",".join(languages)
 
 F = TypeVar("F", bound=factory.django.DjangoModelFactory)
 
-DEFAULT_COUNT = getattr(settings, "SEED_DEFAULT_COUNT", 20)
+DEFAULT_COUNT = getattr(settings, "SEED_DEFAULT_COUNT", 10)
 BATCH_SIZE = getattr(settings, "SEED_BATCH_SIZE", 10)
 MAX_RETRY_ATTEMPTS = getattr(settings, "SEED_MAX_RETRY_ATTEMPTS", 3)
 

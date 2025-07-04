@@ -13,7 +13,11 @@ class CustomCacheTestCase(TestCase):
     def setUp(self):
         REDIS_HOST = getenv("REDIS_HOST", "localhost")
         REDIS_PORT = getenv("REDIS_PORT", "6379")
-        REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
+
+        worker_id = getenv("PYTEST_XDIST_WORKER", "gw0")
+        db_number = "".join(filter(str.isdigit, worker_id)) or "0"
+
+        REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/{db_number}"
         self.cache_instance = CustomCache(server=REDIS_URL, params={})
         self.key = "test_key"
         self.value = "test_value"

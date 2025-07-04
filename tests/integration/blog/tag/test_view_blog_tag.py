@@ -274,9 +274,18 @@ class BlogTagViewSetTestCase(TestURLFixerMixin, APITestCase):
 
     def test_filtering_by_name(self):
         special_tag = BlogTagFactory()
-        special_tag.set_current_language(default_language)
-        special_tag.name = "SpecialTestTag"
-        special_tag.save()
+
+        from django.apps import apps
+
+        BlogTagTranslation = apps.get_model("blog", "BlogTagTranslation")
+
+        special_tag.translations.all().delete()
+
+        BlogTagTranslation.objects.create(
+            master=special_tag,
+            language_code=default_language,
+            name="SpecialTestTag",
+        )
 
         url = self.get_tag_list_url()
         response = self.client.get(url, {"name": "SpecialTestTag"})

@@ -49,22 +49,35 @@ class EnhancedImageQuerySet(TranslatableQuerySet):
     def get_products_needing_images(self, max_images=5):
         from product.models.product import Product  # noqa: PLC0415
 
-        products_with_few_images = (
-            self.values("product")
-            .annotate(image_count=Count("id"))
-            .filter(image_count__lt=max_images)
-            .values_list("product", flat=True)
+        return Product.objects.annotate(image_count=Count("images")).filter(
+            image_count__lt=max_images
         )
-
-        return Product.objects.filter(id__in=products_with_few_images)
 
     def get_products_without_main_image(self):
+        from django.db.models import Count  # noqa: PLC0415
         from product.models.product import Product  # noqa: PLC0415
 
-        products_with_main = self.main_images().values_list(
-            "product", flat=True
+        products_with_main_ids = set(
+            self.main_images().values_list("product", flat=True)
         )
-        return Product.objects.exclude(id__in=products_with_main)
+
+        products_with_any_images_ids = set(
+            self.values_list("product", flat=True).distinct()
+        )
+
+        products_without_main_ids = (
+            products_with_any_images_ids - products_with_main_ids
+        )
+
+        products_no_images_qs = Product.objects.annotate(
+            image_count=Count("images")
+        ).filter(image_count=0)
+
+        combined_ids = list(products_without_main_ids) + list(
+            products_no_images_qs.values_list("id", flat=True)
+        )
+
+        return Product.objects.filter(id__in=combined_ids)
 
     def bulk_update_sort_order(self, image_orders):
         cases = []

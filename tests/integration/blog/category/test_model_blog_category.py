@@ -21,10 +21,16 @@ class BlogCategoryModelTestCase(TestCase):
         self.assertTrue(default_storage.exists(self.category.image.path))
 
     def test_str_representation(self):
-        self.assertEqual(
-            str(self.category),
-            self.category.safe_translation_getter("name") or "Unnamed",
+        expected = " / ".join(
+            [
+                ancestor.safe_translation_getter(
+                    "name", default="Unnamed", any_language=True
+                )
+                or "Unnamed"
+                for ancestor in self.category.get_ancestors(include_self=True)
+            ]
         )
+        self.assertEqual(str(self.category), expected)
 
     def test_post_count(self):
         self.assertEqual(self.category.post_count, 0)

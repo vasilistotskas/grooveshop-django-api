@@ -85,3 +85,31 @@ class ProductCategoryWriteSerializer(
             "seo_description",
             "seo_keywords",
         )
+        read_only_fields = ()  # placeholder if needed
+
+    def validate_parent(self, value: ProductCategory) -> ProductCategory:
+        if value and self.instance:
+            if value == self.instance:
+                raise serializers.ValidationError(
+                    "Category cannot be its own parent."
+                )
+            if value in self.instance.get_descendants():
+                raise serializers.ValidationError(
+                    "Category cannot have a descendant as parent."
+                )
+        return value
+
+    def validate_slug(self, value: str) -> str:
+        if not value:
+            raise serializers.ValidationError("Slug is required.")
+
+        queryset = ProductCategory.objects.filter(slug=value)
+        if self.instance:
+            queryset = queryset.exclude(pk=self.instance.pk)
+
+        if queryset.exists():
+            raise serializers.ValidationError(
+                "A category with this slug already exists."
+            )
+
+        return value

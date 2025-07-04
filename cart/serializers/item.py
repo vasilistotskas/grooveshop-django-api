@@ -120,7 +120,7 @@ class CartItemDetailSerializer(CartItemSerializer):
 
 
 class CartItemWriteSerializer(serializers.ModelSerializer[CartItem]):
-    def validate_quantity(self, value: int):
+    def validate_quantity(self, value: int) -> int:
         if value <= 0:
             raise serializers.ValidationError(
                 _("Quantity must be greater than zero.")

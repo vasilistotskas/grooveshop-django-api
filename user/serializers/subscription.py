@@ -76,7 +76,7 @@ class SubscriptionTopicWriteSerializer(
             "requires_confirmation",
         ]
 
-    def validate_slug(self, value):
+    def validate_slug(self, value: str) -> str:
         if self.instance and self.instance.slug == value:
             return value
 
@@ -117,7 +117,7 @@ class UserSubscriptionSerializer(serializers.ModelSerializer[UserSubscription]):
             "updated_at",
         ]
 
-    def validate_topic(self, value):
+    def validate_topic(self, value: SubscriptionTopic) -> SubscriptionTopic:
         try:
             topic = SubscriptionTopic.objects.get(id=value.id)
             if not topic.is_active:
@@ -181,7 +181,7 @@ class UserSubscriptionWriteSerializer(
             "metadata",
         ]
 
-    def validate_topic(self, value):
+    def validate_topic(self, value: SubscriptionTopic) -> SubscriptionTopic:
         try:
             topic = SubscriptionTopic.objects.get(id=value.id)
             if not topic.is_active:
@@ -229,7 +229,7 @@ class BulkSubscriptionSerializer(serializers.Serializer):
         help_text=_("Action to perform on the topics"),
     )
 
-    def validate_topic_ids(self, value):
+    def validate_topic_ids(self, value: list[int]) -> list[int]:
         existing_ids = set(
             SubscriptionTopic.objects.filter(
                 id__in=value, is_active=True

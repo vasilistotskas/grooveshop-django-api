@@ -7,7 +7,7 @@ User = get_user_model()
 
 
 class UserDetailsSerializer(serializers.ModelSerializer[User]):
-    def validate_username(self, username):
+    def validate_username(self, username: str) -> str:
         if "allauth.account" not in settings.INSTALLED_APPS:
             return username
 

@@ -131,27 +131,56 @@ class TranslationUtilities:
 
         available_languages = cls.get_available_languages()
 
-        for language_code in available_languages:
-            if not instance.has_translation(language_code):
-                try:
-                    translation_fields = (
-                        translation_data.get(language_code, {})
-                        if translation_data
-                        else {}
-                    )
+        translation_model = model_class._parler_meta.root_model
 
-                    instance.create_translation(
-                        language_code=language_code, **translation_fields
-                    )
+        for language_code in available_languages:
+            translation_fields = (
+                translation_data.get(language_code, {})
+                if translation_data
+                else {}
+            )
+
+            try:
+                translation, created = translation_model.objects.get_or_create(
+                    language_code=language_code,
+                    master=instance,
+                    defaults=translation_fields,
+                )
+
+                if not created and translation_fields:
+                    updated = False
+                    for field, value in translation_fields.items():
+                        if hasattr(translation, field) and value is not None:
+                            current_value = getattr(translation, field, None)
+                            if current_value != value:
+                                setattr(translation, field, value)
+                                updated = True
+
+                    if updated:
+                        try:
+                            translation.save()
+                            logger.debug(
+                                f"Updated existing {language_code} translation for "
+                                f"{model_class.__name__} instance {instance.pk}"
+                            )
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to update {language_code} translation: {e}"
+                            )
+
+                if created:
                     logger.debug(
                         f"Created {language_code} translation for "
                         f"{model_class.__name__} instance {instance.pk}"
                     )
-                except Exception as e:
-                    raise TranslationError(
-                        f"Failed to create {language_code} translation for "
-                        f"{model_class.__name__}: {e}"
-                    ) from e
+
+            except Exception as e:
+                logger.warning(
+                    f"Failed to ensure {language_code} translation for "
+                    f"{model_class.__name__} instance {instance.pk}: {e}. "
+                    f"Continuing to next language."
+                )
+                continue
 
 
 class UniqueFieldMixin:
@@ -262,7 +291,7 @@ class CustomDjangoModelFactory(
 
     depends_on: list[str] = []
     conditional_depends_on: dict[str, list[str]] = {}
-    execution_priority: int = 0  # Higher number = executed later
+    execution_priority: int = 0
 
     locale_aware: bool = True
     relationship_aware: bool = False
@@ -317,7 +346,6 @@ class CustomDjangoModelFactory(
         cls, kwargs: dict[str, Any], market: str
     ) -> None:
         """Apply locale-aware field generation"""
-        # This can be overridden in subclasses for specific locale handling
         pass
 
     @classmethod
@@ -325,7 +353,6 @@ class CustomDjangoModelFactory(
         cls, context: dict[str, Any]
     ) -> dict[str, dict[str, Any]]:
         """Get translation data for all languages"""
-        # This can be overridden in subclasses
         return {}
 
     @classmethod

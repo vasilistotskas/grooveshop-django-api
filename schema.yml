@@ -1481,6 +1481,11 @@ paths:
       summary: List Blog Comments
       parameters:
       - in: query
+        name: approved
+        schema:
+          type: boolean
+        description: Filter by approval status
+      - in: query
         name: content
         schema:
           type: string
@@ -1513,11 +1518,6 @@ paths:
         description: Οι πολλαπλές τιμές πρέπει να διαχωρίζονται με κόμμα.
         explode: false
         style: form
-      - in: query
-        name: isApproved
-        schema:
-          type: boolean
-        description: Filter by approval status
       - in: query
         name: level
         schema:
@@ -1971,6 +1971,11 @@ paths:
       summary: Get comment replies
       parameters:
       - in: query
+        name: approved
+        schema:
+          type: boolean
+        description: Filter by approval status
+      - in: query
         name: content
         schema:
           type: string
@@ -2008,11 +2013,6 @@ paths:
         description: Οι πολλαπλές τιμές πρέπει να διαχωρίζονται με κόμμα.
         explode: false
         style: form
-      - in: query
-        name: isApproved
-        schema:
-          type: boolean
-        description: Filter by approval status
       - in: query
         name: level
         schema:
@@ -2152,6 +2152,11 @@ paths:
       summary: Get comment thread
       parameters:
       - in: query
+        name: approved
+        schema:
+          type: boolean
+        description: Filter by approval status
+      - in: query
         name: content
         schema:
           type: string
@@ -2189,11 +2194,6 @@ paths:
         description: Οι πολλαπλές τιμές πρέπει να διαχωρίζονται με κόμμα.
         explode: false
         style: form
-      - in: query
-        name: isApproved
-        schema:
-          type: boolean
-        description: Filter by approval status
       - in: query
         name: level
         schema:
@@ -2453,6 +2453,11 @@ paths:
       summary: Get current user's comments
       parameters:
       - in: query
+        name: approved
+        schema:
+          type: boolean
+        description: Filter by approval status
+      - in: query
         name: content
         schema:
           type: string
@@ -2485,11 +2490,6 @@ paths:
         description: Οι πολλαπλές τιμές πρέπει να διαχωρίζονται με κόμμα.
         explode: false
         style: form
-      - in: query
-        name: isApproved
-        schema:
-          type: boolean
-        description: Filter by approval status
       - in: query
         name: level
         schema:
@@ -13844,7 +13844,7 @@ components:
           type: boolean
           readOnly: true
           description: Whether this comment has replies
-        isApproved:
+        approved:
           type: boolean
           readOnly: true
         isEdited:
@@ -13874,11 +13874,11 @@ components:
           format: uuid
           readOnly: true
       required:
+      - approved
       - contentPreview
       - createdAt
       - hasReplies
       - id
-      - isApproved
       - isEdited
       - isReply
       - likesCount
@@ -13935,7 +13935,7 @@ components:
           type: boolean
           readOnly: true
           description: Whether this comment has replies
-        isApproved:
+        approved:
           type: boolean
           readOnly: true
         isEdited:
@@ -14032,12 +14032,12 @@ components:
           description: Position information in the comment tree
       required:
       - ancestorsPath
+      - approved
       - childrenComments
       - contentPreview
       - createdAt
       - hasReplies
       - id
-      - isApproved
       - isEdited
       - isReply
       - likesCount

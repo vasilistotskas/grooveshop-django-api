@@ -317,11 +317,9 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
             self.get_queryset()
             .filter(published_at__gte=cutoff_date)
             .annotate(
-                trending_score=(
-                    F("view_count")
-                    + (F("likes_count_field") * 2)
-                    + (F("comments_count_field") * 3)
-                )
+                trending_score=F("view_count")
+                + (F("likes_count_field") * 2)
+                + (F("comments_count_field") * 3)
             )
             .order_by("-trending_score")
         )

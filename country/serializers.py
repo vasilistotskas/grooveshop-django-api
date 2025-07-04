@@ -58,28 +58,28 @@ class CountryWriteSerializer(
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=Country)
 
-    def validate_alpha_2(self, value):
+    def validate_alpha_2(self, value: str) -> str:
         if len(value) != 2:
             raise serializers.ValidationError(
                 _("Alpha-2 code must be exactly 2 characters.")
             )
         return value.upper()
 
-    def validate_alpha_3(self, value):
+    def validate_alpha_3(self, value: str) -> str:
         if len(value) != 3:
             raise serializers.ValidationError(
                 _("Alpha-3 code must be exactly 3 characters.")
             )
         return value.upper()
 
-    def validate_phone_code(self, value):
+    def validate_phone_code(self, value: int) -> int:
         if value is not None and (value <= 0 or value > 9999):
             raise serializers.ValidationError(
                 _("Phone code must be between 1 and 9999.")
             )
         return value
 
-    def validate_iso_cc(self, value):
+    def validate_iso_cc(self, value: int) -> int:
         if value is not None and (value <= 0 or value > 999):
             raise serializers.ValidationError(
                 _("ISO country code must be between 1 and 999.")

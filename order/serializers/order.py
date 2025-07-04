@@ -268,7 +268,7 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
     payment_status = serializers.CharField(required=False)
     payment_method = serializers.CharField(required=False)
 
-    def validate_items(self, value):
+    def validate_items(self, value: list[dict]) -> list[dict]:
         if not value:
             raise serializers.ValidationError(
                 _("At least one item is required.")
@@ -282,7 +282,7 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
 
         return value
 
-    def validate_email(self, value):
+    def validate_email(self, value: str) -> str:
         if not value:
             raise serializers.ValidationError(_("Email is required."))
 

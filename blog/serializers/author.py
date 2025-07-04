@@ -79,8 +79,8 @@ class BlogAuthorDetailSerializer(BlogAuthorSerializer):
         from blog.serializers.post import BlogPostSerializer  # noqa: PLC0415, I001
 
         top_posts = obj.blog_posts.annotate(
-            likes_count_annotation=models.Count("likes")
-        ).order_by("-view_count", "-likes_count_annotation")[:3]
+            likes_count_field=models.Count("likes")
+        ).order_by("-view_count", "-likes_count_field")[:3]
         return BlogPostSerializer(
             top_posts, many=True, context=self.context
         ).data

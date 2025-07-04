@@ -295,6 +295,9 @@ class BlogTagAdmin(ModelAdmin, TranslatableAdmin):
     list_editable = ("active",)
     search_fields = ("translations__name",)
     ordering = ("sort_order",)
+    readonly_fields = [
+        "sort_order",
+    ]
 
     fieldsets = (
         (

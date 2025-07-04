@@ -112,7 +112,7 @@ class ProductCategoryImageBulkUpdateSerializer(serializers.Serializer):
     active = serializers.BooleanField(required=False)
     sort_order = serializers.IntegerField(required=False)
 
-    def validate_image_ids(self, value):
+    def validate_image_ids(self, value: list[int]) -> list[int]:
         if not value:
             raise serializers.ValidationError(
                 "At least one image ID is required."

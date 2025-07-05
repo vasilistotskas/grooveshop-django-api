@@ -3,6 +3,12 @@
 
 
 
+## v1.17.1 (2025-07-05)
+
+### Bug fixes
+
+* fix: update uv.lock ([`f6d80dc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f6d80dc7c636fe6971b1ae38cd849bbb31ee7989))
+
 ## v1.17.0 (2025-07-05)
 
 ### Features

@@ -11,6 +11,9 @@ FROM $UV_IMAGE AS uv
 FROM python:${PYTHON_VERSION}-alpine${ALPINE_VERSION} AS builder
 ARG UV_IMAGE
 ARG APP_PATH
+
+RUN apk add --no-cache gcc musl-dev python3-dev linux-headers
+
 COPY --from=uv /uv /uvx /bin/
 WORKDIR ${APP_PATH}
 COPY pyproject.toml .

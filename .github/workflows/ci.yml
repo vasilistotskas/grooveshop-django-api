@@ -131,8 +131,7 @@ jobs:
           MEILI_MASTER_KEY: ${{ secrets.MEILI_MASTER_KEY }}
           MEILI_ENV: production
         run: |
-          uv run coverage run --source='.' -m pytest
-          uv run coverage report
+          uv run pytest --cov=. --cov-report=term --cov-report=html --cov-config=pyproject.toml
         timeout-minutes: 15
 
       - name: Upload coverage to Coveralls

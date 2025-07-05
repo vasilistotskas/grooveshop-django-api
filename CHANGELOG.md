@@ -3,6 +3,12 @@
 
 
 
+## v1.17.2 (2025-07-05)
+
+### Bug fixes
+
+* fix: Update Dockerfile ([`f559b67`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f559b674a583c44917cb4edbe455c9d0ffcc5818))
+
 ## v1.17.1 (2025-07-05)
 
 ### Bug fixes

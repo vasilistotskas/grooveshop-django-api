@@ -3,6 +3,12 @@
 
 
 
+## v1.17.3 (2025-07-05)
+
+### Bug fixes
+
+* fix: factories auto_translations set False ([`e8d7254`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e8d7254c9c173b0c1cae12d88c56e0ca32550958))
+
 ## v1.17.2 (2025-07-05)
 
 ### Bug fixes

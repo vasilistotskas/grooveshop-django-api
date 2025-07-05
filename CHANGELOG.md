@@ -3,6 +3,14 @@
 
 
 
+## v1.17.0 (2025-07-05)
+
+### Features
+
+* feat: Update pytest and coverage ([`86ab3fa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/86ab3fa1530e9ba9386bd0bb2e6d3ba152131cc5))
+
+* feat: type improvements, Bump Version and bug fixes ([`cfc17c9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cfc17c998727ea40e95855142ea9e36b21d5afe0))
+
 ## v1.16.0 (2025-06-27)
 
 ### Bug fixes

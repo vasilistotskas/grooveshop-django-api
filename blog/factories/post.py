@@ -54,6 +54,8 @@ class BlogPostTranslationFactory(factory.django.DjangoModelFactory):
 
 
 class BlogPostFactory(CustomDjangoModelFactory):
+    auto_translations = False
+
     unique_model_fields = [
         ("slug", lambda: fake.slug()),
     ]

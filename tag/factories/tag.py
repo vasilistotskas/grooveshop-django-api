@@ -21,6 +21,7 @@ class TagTranslationFactory(factory.django.DjangoModelFactory):
 
 class TagFactory(factory.django.DjangoModelFactory):
     active = factory.Faker("boolean")
+    sort_order = factory.Faker("random_int", min=1, max=100)
 
     class Meta:
         model = Tag

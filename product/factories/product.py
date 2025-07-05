@@ -54,6 +54,8 @@ class ProductTranslationFactory(factory.django.DjangoModelFactory):
 
 
 class ProductFactory(CustomDjangoModelFactory):
+    auto_translations = False
+
     unique_model_fields = [
         ("slug", lambda: fake.slug()),
     ]

@@ -31,10 +31,16 @@ class BlogTagFactory(factory.django.DjangoModelFactory):
         if not create:
             return
 
-        translations = extracted or [
-            BlogTagTranslationFactory(language_code=lang, master=self)
-            for lang in available_languages
-        ]
+        if extracted is not None:
+            self.translations.all().delete()
+
+        if extracted is None and not self.translations.exists():
+            translations = [
+                BlogTagTranslationFactory(language_code=lang, master=self)
+                for lang in available_languages
+            ]
+        else:
+            translations = extracted or []
 
         for translation in translations:
             translation.master = self

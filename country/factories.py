@@ -1,15 +1,14 @@
-import importlib
-import random
-import string
-
 import factory
 from django.apps import apps
 from django.conf import settings
 from faker import Faker
 
-from core.factories import CustomDjangoModelFactory
+from core.factories import (
+    CustomDjangoModelFactory,
+    custom_seeding,
+    SeedingResult,
+)
 from country.models import Country
-from region.factories import RegionFactory
 
 fake = Faker()
 
@@ -17,52 +16,14 @@ available_languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
 ]
 
-
-def generate_unique_country_codes():
-    try:
-        country_model = importlib.import_module("country.models").Country
-        existing_alpha_2_codes = set(
-            country_model.objects.values_list("alpha_2", flat=True)
-        )
-        existing_alpha_3_codes = set(
-            country_model.objects.values_list("alpha_3", flat=True)
-        )
-
-        for _ in range(100):
-            try:
-                alpha_2_code = fake.country_code(representation="alpha-2")
-                alpha_3_code = fake.country_code(representation="alpha-3")
-                if (
-                    alpha_2_code not in existing_alpha_2_codes
-                    and alpha_3_code not in existing_alpha_3_codes
-                ):
-                    return alpha_2_code, alpha_3_code
-            except Exception:
-                alpha_2_code = "".join(
-                    random.choices(string.ascii_uppercase, k=2)
-                )
-                alpha_3_code = "".join(
-                    random.choices(string.ascii_uppercase, k=3)
-                )
-                if (
-                    alpha_2_code not in existing_alpha_2_codes
-                    and alpha_3_code not in existing_alpha_3_codes
-                ):
-                    return alpha_2_code, alpha_3_code
-
-        alpha_2_code = "".join(random.choices(string.ascii_uppercase, k=2))
-        alpha_3_code = "".join(random.choices(string.ascii_uppercase, k=3))
-        return alpha_2_code, alpha_3_code
-
-    except Exception:
-        alpha_2_code = "".join(random.choices(string.ascii_uppercase, k=2))
-        alpha_3_code = "".join(random.choices(string.ascii_uppercase, k=3))
-        return alpha_2_code, alpha_3_code
+LANGUAGE_COUNTRY_MAPPING = getattr(settings, "LANGUAGE_COUNTRY_MAPPING", {})
 
 
 class CountryTranslationFactory(factory.django.DjangoModelFactory):
     language_code = factory.Iterator(available_languages)
-    name = factory.Faker("country")
+    name = factory.LazyAttribute(
+        lambda obj: f"Country Name ({obj.language_code})"
+    )
     master = factory.SubFactory("country.factories.CountryFactory")
 
     class Meta:
@@ -70,12 +31,17 @@ class CountryTranslationFactory(factory.django.DjangoModelFactory):
         django_get_or_create = ("language_code", "master")
 
 
+@custom_seeding(
+    description="Creates countries based on PARLER_LANGUAGES settings (el→GR, en→GB, de→DE)",
+    settings_key="PARLER_LANGUAGES",
+)
 class CountryFactory(CustomDjangoModelFactory):
+    auto_translations = False
+
     unique_model_fields = [
-        ("alpha_2", lambda: generate_unique_country_codes()[0]),
-        ("alpha_3", lambda: generate_unique_country_codes()[1]),
-        ("iso_cc", lambda: fake.random_int(min=1, max=999)),
-        ("phone_code", lambda: fake.random_int(min=1, max=999)),
+        ("alpha_2", lambda: fake.country_code(representation="alpha-2")),
+        ("alpha_3", lambda: fake.country_code(representation="alpha-3")),
+        ("phone_code", lambda: fake.random_int(min=1, max=9999)),
     ]
 
     image_flag = factory.django.ImageField(
@@ -90,12 +56,69 @@ class CountryFactory(CustomDjangoModelFactory):
         django_get_or_create = ("alpha_2",)
         skip_postgeneration_save = True
 
+    @classmethod
+    def custom_seed(cls, **kwargs) -> SeedingResult:
+        result = SeedingResult(created_count=0)
+
+        verbose = kwargs.get("verbose", True)
+
+        for lang_code in available_languages:
+            if lang_code in LANGUAGE_COUNTRY_MAPPING:
+                country_data = LANGUAGE_COUNTRY_MAPPING[lang_code]
+
+                existing_country = Country.objects.filter(
+                    alpha_2=country_data["alpha_2"]
+                ).first()
+
+                if existing_country:
+                    if verbose:
+                        print(
+                            f"Country {country_data['alpha_2']} already exists, skipping..."
+                        )
+                    result.skipped_count += 1
+                    continue
+
+                try:
+                    country = Country.objects.create(
+                        alpha_2=country_data["alpha_2"],
+                        alpha_3=country_data["alpha_3"],
+                        iso_cc=country_data.get("iso_cc"),
+                        phone_code=country_data["phone_code"],
+                    )
+
+                    for trans_lang in available_languages:
+                        country_name = country_data["names"].get(
+                            trans_lang, country_data["names"]["en"]
+                        )
+                        translation_model = apps.get_model(
+                            "country", "CountryTranslation"
+                        )
+                        translation_model.objects.get_or_create(
+                            language_code=trans_lang,
+                            master=country,
+                            defaults={"name": country_name},
+                        )
+
+                    result.created_count += 1
+                    if verbose:
+                        print(f"Created country: {country_data['alpha_2']}")
+
+                except Exception as e:
+                    error_msg = f"Failed to create country {country_data['alpha_2']}: {str(e)}"
+                    result.errors.append(error_msg)
+                    if verbose:
+                        print(f"Error: {error_msg}")
+
+        return result
+
     @factory.post_generation
     def num_regions(self, create, extracted, **kwargs):
         if not create:
             return
 
         if extracted:
+            from region.factories import RegionFactory
+
             RegionFactory.create_batch(extracted, country=self)
 
     @factory.post_generation
@@ -103,10 +126,11 @@ class CountryFactory(CustomDjangoModelFactory):
         if not create:
             return
 
-        translations = extracted or [
-            CountryTranslationFactory(language_code=lang, master=self)
-            for lang in available_languages
-        ]
+        if not hasattr(self, "_translations_created"):
+            translations = extracted or [
+                CountryTranslationFactory(language_code=lang, master=self)
+                for lang in available_languages
+            ]
 
-        for translation in translations:
-            translation.save()
+            for translation in translations:
+                translation.save()

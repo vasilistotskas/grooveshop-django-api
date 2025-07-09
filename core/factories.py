@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any, TypeVar
 
 import factory
@@ -14,6 +15,23 @@ logger = logging.getLogger(__name__)
 fake = Faker()
 
 M = TypeVar("M", bound=Model)
+
+
+@dataclass
+class SeedingResult:
+    """Result of custom seeding operation"""
+
+    created_count: int
+    skipped_count: int = 0
+    errors: list[str] = None
+
+    def __post_init__(self):
+        if self.errors is None:
+            self.errors = []
+
+    @property
+    def total_processed(self) -> int:
+        return self.created_count + self.skipped_count
 
 
 class TranslationError(Exception):
@@ -183,6 +201,35 @@ class TranslationUtilities:
                 continue
 
 
+class SeedingStrategyRegistry:
+    """
+    Registry for custom seeding strategies.
+    Allows runtime registration of seeding behaviors.
+    """
+
+    _strategies: dict[str, Callable] = {}
+
+    @classmethod
+    def register(cls, factory_name: str, strategy: Callable):
+        """Register a custom seeding strategy for a factory."""
+        cls._strategies[factory_name] = strategy
+
+    @classmethod
+    def get_strategy(cls, factory_name: str) -> Callable | None:
+        """Get the registered strategy for a factory."""
+        return cls._strategies.get(factory_name)
+
+    @classmethod
+    def has_strategy(cls, factory_name: str) -> bool:
+        """Check if a factory has a registered strategy."""
+        return factory_name in cls._strategies
+
+    @classmethod
+    def clear(cls):
+        """Clear all registered strategies."""
+        cls._strategies.clear()
+
+
 class UniqueFieldMixin:
     """Mixin for handling unique field generation with improved error handling"""
 
@@ -194,6 +241,8 @@ class UniqueFieldMixin:
         generator_func: Callable[[], Any],
         max_attempts: int = 20,
         error_callback: Callable[[int], None] | None = None,
+        generator_name: str | None = None,
+        _retry_count: int = 0,
     ) -> Any:
         """
         Generate a unique value for a field with retries.
@@ -204,6 +253,8 @@ class UniqueFieldMixin:
             generator_func: Function to generate values
             max_attempts: Maximum number of attempts
             error_callback: Optional callback called on each failed attempt
+            generator_name: Optional human-readable name for the generator function
+            _retry_count: Internal retry counter (for logging control)
 
         Returns:
             Unique value for the field
@@ -213,11 +264,14 @@ class UniqueFieldMixin:
         """
         attempts = 0
         generated_values = set()
+        duplicate_generations = 0
+        existing_db_conflicts = 0
 
         while attempts < max_attempts:
             value = generator_func()
 
             if value in generated_values:
+                duplicate_generations += 1
                 attempts += 1
                 continue
 
@@ -226,19 +280,92 @@ class UniqueFieldMixin:
             if not model.objects.filter(**{field_name: value}).exists():
                 return value
 
+            existing_db_conflicts += 1
             attempts += 1
 
             if error_callback:
                 error_callback(attempts)
 
-        logger.error(
-            f"Failed to generate unique '{field_name}' for {model.__name__} "
-            f"after {max_attempts} attempts. Tried values: {list(generated_values)[:10]}..."
-        )
+        failure_reasons = []
 
+        if duplicate_generations > 0:
+            failure_reasons.append(
+                f"generator produced {duplicate_generations} duplicate values"
+            )
+
+        if existing_db_conflicts > 0:
+            failure_reasons.append(
+                f"{existing_db_conflicts} values already exist in database"
+            )
+
+        existing_count = model.objects.count()
+
+        func_name = generator_name or getattr(
+            generator_func, "__name__", "unknown"
+        )
+        if func_name == "<lambda>":
+            func_name = f"lambda function (module: {getattr(generator_func, '__module__', 'unknown')})"
+
+        if _retry_count == 0:
+            generated_values_display = list(generated_values)[:10]
+            if len(generated_values) > 10:
+                generated_values_display.append("...")
+
+            logger.error(
+                f"❌ Unique field generation failed for {model.__name__}.{field_name}\n"
+                f"   📊 Attempts: {max_attempts} | Generated: {len(generated_values)} unique values | DB records: {existing_count}\n"
+                f"   🔧 Generator: {func_name}\n"
+                f"   📋 Values tried: {generated_values_display}\n"
+                f"   ⚠️  Issues: {'; '.join(failure_reasons) if failure_reasons else 'unknown'}\n"
+                f"   📈 Stats: {duplicate_generations} duplicates, {existing_db_conflicts} DB conflicts"
+            )
+
+            suggestions = []
+
+            if len(generated_values) <= 5:
+                suggestions.append(
+                    f"🔍 Limited generator variation ({len(generated_values)} unique values)"
+                )
+                suggestions.append(
+                    "💡 Use a more diverse generator (e.g., random strings, UUIDs, or larger value pools)"
+                )
+
+            if existing_count > max_attempts:
+                suggestions.append(
+                    f"📈 High DB record count ({existing_count}) vs attempts ({max_attempts})"
+                )
+                suggestions.append(
+                    "💡 Consider increasing max_attempts or using sequential/incremental generators"
+                )
+
+            if (
+                existing_count >= len(generated_values)
+                and len(generated_values) <= 10
+            ):
+                suggestions.append(
+                    "🎯 Generator pool exhausted - all possible values may be taken"
+                )
+                suggestions.append(
+                    "💡 Expand the generator's value pool or use a different generation strategy"
+                )
+
+            if suggestions:
+                logger.warning(
+                    "🔧 Suggestions to fix this issue:\n   "
+                    + "\n   ".join(suggestions)
+                )
+        else:
+            logger.warning(
+                f"🔄 Retry {_retry_count} failed for {model.__name__}.{field_name}: "
+                f"{failure_reasons[0] if failure_reasons else 'generation failed'}"
+            )
+
+        primary_issue = (
+            failure_reasons[0] if failure_reasons else "generator exhaustion"
+        )
         raise UniqueFieldError(
-            f"Unable to generate unique value for {field_name} on {model.__name__} "
-            f"after {max_attempts} attempts."
+            f"Unique {field_name} generation failed: {primary_issue} "
+            f"({len(generated_values)} unique values from {max_attempts} attempts)"
         )
 
     @classmethod
@@ -247,11 +374,16 @@ class UniqueFieldMixin:
         model: type[M],
         field_name: str,
         generator_func: Callable[[], Any],
+        generator_name: str | None = None,
         **kwargs,
     ) -> Any:
         """Convenience method for generating unique values"""
         return cls.generate_unique_field(
-            model, field_name, generator_func, **kwargs
+            model,
+            field_name,
+            generator_func,
+            generator_name=generator_name,
+            **kwargs,
         )
 
 
@@ -392,3 +524,66 @@ class CustomDjangoModelFactory(
             )
 
         return instance
+
+
+def custom_seeding(
+    description: str = None,
+    settings_key: str = None,
+    dependencies: list[str] = None,
+):
+    """
+    Decorator to mark a factory as using custom seeding.
+
+    This avoids inheritance issues by adding attributes directly.
+
+    Usage:
+        @custom_seeding(
+            description="Seeds based on language settings",
+            settings_key="PARLER_LANGUAGES",
+            dependencies=["Country"]
+        )
+        class MyFactory(CustomDjangoModelFactory):
+            @classmethod
+            def custom_seed(cls, **kwargs):
+                ...
+    """
+
+    def decorator(factory_class):
+        factory_class.use_custom_seeding = True
+
+        if description:
+            factory_class._seeding_description = description
+
+        if settings_key:
+            factory_class._settings_key = settings_key
+
+        if dependencies:
+            factory_class._dependencies = dependencies
+
+        if not hasattr(factory_class, "get_seeding_description"):
+            factory_class.get_seeding_description = classmethod(
+                lambda cls: getattr(
+                    cls,
+                    "_seeding_description",
+                    f"Custom seeding for {cls.__name__}",
+                )
+            )
+
+        if not hasattr(factory_class, "get_settings_key"):
+            factory_class.get_settings_key = classmethod(
+                lambda cls: getattr(cls, "_settings_key", None)
+            )
+
+        if not hasattr(factory_class, "get_dependencies"):
+            factory_class.get_dependencies = classmethod(
+                lambda cls: getattr(cls, "_dependencies", [])
+            )
+
+        if not hasattr(factory_class, "custom_seed"):
+            raise TypeError(
+                f"{factory_class.__name__} must implement custom_seed() method"
+            )
+
+        return factory_class
+
+    return decorator

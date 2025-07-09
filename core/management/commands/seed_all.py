@@ -174,7 +174,20 @@ class ResetManager:
 
     def _should_reset_model(self, model: type[Model]) -> bool:
         """Determine if a model should be reset"""
-        system_apps = {"auth", "contenttypes", "sessions", "admin", "sites"}
+        system_apps = {
+            "admin",
+            "auth",
+            "sessions",
+            "sitescontenttypes",
+            "authtoken",
+            "account",
+            "socialaccount",
+            "mfa",
+            "usersessions",
+            "extra_settings",
+            "knox",
+        }
+        print("model._meta.app_label: ", model._meta.app_label)
         return not (
             model._meta.app_label in system_apps
             or model.__name__.endswith("Translation")
@@ -747,7 +760,7 @@ class Command(BaseCommand):
     def _show_execution_plan(
         self, ordered_factories: list[type[F]], options: SeedingOptions
     ) -> None:
-        """Show execution plan for dry run"""
+        """Show execution plan for dry run with custom seeding info"""
         self.stdout.write(self.style.NOTICE("📋 Execution Plan (Dry Run)"))
         self.stdout.write("=" * 50)
 
@@ -755,17 +768,34 @@ class Command(BaseCommand):
         default_count = options.count
 
         total_records = 0
+        custom_seeding_factories = []
 
         for i, factory_class in enumerate(ordered_factories, 1):
             model_name = factory_class._meta.model.__name__
-            count = model_counts.get(model_name, default_count)
-            total_records += count
 
-            self.stdout.write(
-                f"{i:>3}. {factory_class.__name__:<30} → {count:>4} {model_name} records"
-            )
+            if self._uses_custom_seeding(factory_class):
+                custom_seeding_factories.append(factory_class)
+                self.stdout.write(
+                    f"{i:>3}. {factory_class.__name__:<30} → [CUSTOM SEEDING] {model_name}"
+                )
 
-        self.stdout.write(f"\n📈 Total records to create: {total_records}")
+                if hasattr(factory_class, "get_seeding_description"):
+                    self.stdout.write(
+                        f"     └─ {factory_class.get_seeding_description()}"
+                    )
+            else:
+                count = model_counts.get(model_name, default_count)
+                total_records += count
+                self.stdout.write(
+                    f"{i:>3}. {factory_class.__name__:<30} → {count:>4} {model_name} records"
+                )
+
+        self.stdout.write(
+            f"\n📈 Total standard records to create: {total_records}"
+        )
+        self.stdout.write(
+            f"📦 Factories with custom seeding: {len(custom_seeding_factories)}"
+        )
 
     def _execute_seeding(
         self,
@@ -773,7 +803,7 @@ class Command(BaseCommand):
         options: SeedingOptions,
         execution_context: dict[str, Any],
     ) -> None:
-        """Execute the seeding process"""
+        """Execute the seeding process with support for custom seeding strategies"""
         self.stdout.write(self.style.NOTICE("🌱 Starting seeding process..."))
 
         model_counts = self._parse_model_counts(options.model_counts)
@@ -785,9 +815,14 @@ class Command(BaseCommand):
             )
 
             try:
-                result = self._process_factory(
-                    factory_class, model_counts, options, execution_context
-                )
+                if self._uses_custom_seeding(factory_class):
+                    result = self._execute_custom_seeding(
+                        factory_class, options, execution_context
+                    )
+                else:
+                    result = self._process_factory(
+                        factory_class, model_counts, options, execution_context
+                    )
 
                 self.total_created += result.created
                 self.factory_results[factory_class.__name__] = result
@@ -802,6 +837,98 @@ class Command(BaseCommand):
                 self._handle_factory_error(factory_class, e, options)
                 if not options.continue_on_error:
                     raise
+
+    def _uses_custom_seeding(self, factory_class: type[F]) -> bool:
+        """
+        Check if a factory uses custom seeding.
+
+        Checks in order:
+        1. Has use_custom_seeding = True attribute
+        2. Has custom_seed() method
+        3. Is registered in SeedingStrategyRegistry
+        """
+        if (
+            hasattr(factory_class, "use_custom_seeding")
+            and factory_class.use_custom_seeding
+        ):
+            return True
+
+        if hasattr(factory_class, "custom_seed") and callable(
+            getattr(factory_class, "custom_seed")
+        ):
+            return True
+
+        from core.factories import SeedingStrategyRegistry
+
+        if SeedingStrategyRegistry.has_strategy(factory_class.__name__):
+            return True
+
+        return False
+
+    def _execute_custom_seeding(
+        self,
+        factory_class: type[F],
+        options: SeedingOptions,
+        execution_context: dict[str, Any],
+    ) -> FactoryResult:
+        """Execute custom seeding for a factory"""
+        model_name = factory_class._meta.model.__name__
+
+        if hasattr(factory_class, "get_seeding_description"):
+            description = factory_class.get_seeding_description()
+            self.stdout.write(f"  ℹ️  {description}")
+
+        custom_kwargs = {
+            "verbose": options.debug,
+            "batch_size": options.batch_size,
+            "execution_context": execution_context,
+            **execution_context,
+        }
+
+        try:
+            if hasattr(factory_class, "custom_seed"):
+                seeding_result = factory_class.custom_seed(**custom_kwargs)
+
+                result = FactoryResult(
+                    factory_name=factory_class.__name__,
+                    model_name=model_name,
+                    created=seeding_result.created_count,
+                    requested=seeding_result.total_processed,
+                    errors=seeding_result.errors,
+                )
+
+                if seeding_result.skipped_count > 0:
+                    self.stdout.write(
+                        f"  ℹ️  Skipped {seeding_result.skipped_count} existing records"
+                    )
+
+            else:
+                from core.factories import SeedingStrategyRegistry
+
+                strategy = SeedingStrategyRegistry.get_strategy(
+                    factory_class.__name__
+                )
+
+                if strategy:
+                    created_count = strategy(factory_class, **custom_kwargs)
+                    result = FactoryResult(
+                        factory_name=factory_class.__name__,
+                        model_name=model_name,
+                        created=created_count,
+                        requested=created_count,
+                    )
+                else:
+                    raise ValueError(
+                        f"No custom seeding implementation found for {factory_class.__name__}"
+                    )
+
+            return result
+
+        except Exception as e:
+            self.stdout.write(
+                self.style.ERROR(f"  ❌ Custom seeding failed: {str(e)}")
+            )
+            raise
 
     def _process_factory(
         self,

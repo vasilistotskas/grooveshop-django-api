@@ -27,8 +27,6 @@ class ProductCategoryTranslationFactory(factory.django.DjangoModelFactory):
 
 
 class ProductCategoryFactory(CustomDjangoModelFactory):
-    auto_translations = False
-
     unique_model_fields = [
         ("slug", lambda: fake.slug()),
     ]
@@ -45,7 +43,20 @@ class ProductCategoryFactory(CustomDjangoModelFactory):
         if not create:
             return
 
-        translations = extracted or [
+        if extracted is not None:
+            if hasattr(self, "translations"):
+                self.translations.all().delete()
+
+            translations = extracted
+            for translation in translations:
+                translation.master = self
+                translation.save()
+            return
+
+        if hasattr(self, "translations") and self.translations.exists():
+            return
+
+        translations = [
             ProductCategoryTranslationFactory(language_code=lang, master=self)
             for lang in available_languages
         ]

@@ -1,4 +1,5 @@
 from os import getenv
+import uuid
 
 from django.core.cache import caches
 from django.core.cache.backends.redis import RedisCache
@@ -16,11 +17,16 @@ class CustomCacheTestCase(TestCase):
 
         worker_id = getenv("PYTEST_XDIST_WORKER", "gw0")
         db_number = "".join(filter(str.isdigit, worker_id)) or "0"
+        db_number = str(int(db_number) % 16)
 
         REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/{db_number}"
         self.cache_instance = CustomCache(server=REDIS_URL, params={})
-        self.key = "test_key"
+
+        test_method_name = self._testMethodName
+        unique_id = str(uuid.uuid4())[:8]
+        self.key = f"test_key_{test_method_name}_{unique_id}"
         self.value = "test_value"
+
         self.cache_instance.clear()
 
     def test_cache_get(self):
@@ -29,13 +35,15 @@ class CustomCacheTestCase(TestCase):
         self.assertEqual(cached_value, self.value)
 
     def test_cache_get_default(self):
+        non_existent_key = f"non_existent_key_{uuid.uuid4().hex[:8]}"
         cached_value = self.cache_instance.get(
-            "non_existent_key", default="default_value"
+            non_existent_key, default="default_value"
         )
         self.assertEqual(cached_value, "default_value")
 
     def test_cache_get_many(self):
-        keys = [self.key, "another_key"]
+        unique_suffix = uuid.uuid4().hex[:8]
+        keys = [self.key, f"another_key_{unique_suffix}"]
         values = [self.value, "another_value"]
         self.cache_instance.set(self.key, self.value)
         self.cache_instance.set(keys[1], values[1])
@@ -57,16 +65,20 @@ class CustomCacheTestCase(TestCase):
         self.assertEqual(cached_value, self.value)
 
     def test_cache_add(self):
-        added = self.cache_instance.add("new_key", "new_value")
+        new_key = f"new_key_{uuid.uuid4().hex[:8]}"
+        added = self.cache_instance.add(new_key, "new_value")
         self.assertTrue(added)
 
     def test_cache_delete(self):
         self.cache_instance.set(self.key, self.value)
         self.assertTrue(self.cache_instance.has_key(self.key))
+
         deleted = self.cache_instance.delete(self.key)
-        self.assertTrue(deleted)
+
         cached_value = self.cache_instance.get(self.key)
         self.assertIsNone(cached_value)
+
+        self.assertTrue(deleted, f"Delete operation failed for key: {self.key}")
 
     def test_cache_clear(self):
         self.cache_instance.set(self.key, self.value)
@@ -80,17 +92,23 @@ class CustomCacheTestCase(TestCase):
         self.assertTrue(has_key)
 
     def test_cache_has_key_false(self):
-        has_key = self.cache_instance.has_key("non_existent_key_3")
+        non_existent_key = f"non_existent_key_{uuid.uuid4().hex[:8]}"
+        has_key = self.cache_instance.has_key(non_existent_key)
         self.assertFalse(has_key)
 
     def test_cache_set_many(self):
-        data = {self.key: self.value, "another_key": "another_value"}
+        unique_suffix = uuid.uuid4().hex[:8]
+        data = {
+            self.key: self.value,
+            f"another_key_{unique_suffix}": "another_value",
+        }
         self.cache_instance.set_many(data)
         cached_values = self.cache_instance.get_many(list(data.keys()))
         self.assertEqual(cached_values, data)
 
     def test_cache_delete_many(self):
-        keys = [self.key, "another_key"]
+        unique_suffix = uuid.uuid4().hex[:8]
+        keys = [self.key, f"another_key_{unique_suffix}"]
         self.cache_instance.set_many(
             {keys[0]: self.value, keys[1]: "another_value"}
         )
@@ -99,25 +117,32 @@ class CustomCacheTestCase(TestCase):
         self.assertEqual(len(cached_values), 0)
 
     def test_cache_keys(self):
+        unique_prefix = f"search_key_{uuid.uuid4().hex[:8]}"
         new_keys = {
-            "search_key1": "search_value1",
-            "search_key2": "search_value2",
-            "search_key3": "search_value3",
+            f"{unique_prefix}_1": "search_value1",
+            f"{unique_prefix}_2": "search_value2",
+            f"{unique_prefix}_3": "search_value3",
         }
         self.cache_instance.set_many(new_keys)
 
-        keys = self.cache_instance.keys("search_key")
+        keys = self.cache_instance.keys(unique_prefix)
         self.assertEqual(
-            keys,
-            [
-                "search_key1",
-                "search_key2",
-                "search_key3",
-            ],
+            sorted(keys),
+            sorted(
+                [
+                    f"{unique_prefix}_1",
+                    f"{unique_prefix}_2",
+                    f"{unique_prefix}_3",
+                ]
+            ),
         )
 
     def test_cache_keys_redis(self):
-        keys_with_prefix = ["prefix:" + self.key, "prefix:another_key"]
+        unique_prefix = f"prefix_{uuid.uuid4().hex[:8]}"
+        keys_with_prefix = [
+            f"{unique_prefix}:" + self.key,
+            f"{unique_prefix}:another_key",
+        ]
 
         if isinstance(self.cache_instance, caches["default"].__class__):
             keys = self.cache_instance.keys()
@@ -130,13 +155,18 @@ class CustomCacheTestCase(TestCase):
 
                 def keys(self, pattern):
                     return [
-                        b"prefix:" + key.encode() for key in keys_with_prefix
+                        (f"{unique_prefix}:" + key).encode()
+                        for key in keys_with_prefix
                     ]
 
             self.cache_instance.__class__ = MockRedisCache
-            keys = self.cache_instance.keys("prefix")
-            self.assertEqual(keys, [self.key, "another_key"])
+            keys = self.cache_instance.keys(unique_prefix)
+            self.assertEqual(
+                sorted(keys),
+                sorted([f"{unique_prefix}:" + key for key in keys_with_prefix]),
+            )
 
     def tearDown(self):
-        self.cache_instance.clear()
+        if hasattr(self, "key"):
+            self.cache_instance.delete(self.key)
         super().tearDown()

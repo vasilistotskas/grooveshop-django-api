@@ -13,7 +13,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
-  "asgiref==3.9.0",
+  "asgiref==3.9.1",
   "boto3==1.39.3",
   "charset_normalizer==3.4.2",
   "channels[daphne]==4.2.2",
@@ -48,7 +48,7 @@ dependencies = [
   "importlib-resources==6.5.2",
   "measurement==3.2.2",
   "meilisearch==0.36.0",
-  "phonenumbers==9.0.8",
+  "phonenumbers==9.0.9",
   "pillow==11.3.0",
   "psycopg[binary,pool] == 3.2.9",
   "python-dotenv==1.1.1",

@@ -263,7 +263,6 @@ ENABLE_DEBUG_TOOLBAR = getenv("ENABLE_DEBUG_TOOLBAR", "False") == "True"
 ADMINS = [
     ("Admin", getenv("ADMIN_EMAIL", "")),
     ("Info", getenv("INFO_EMAIL", "")),
-    ("Superuser", getenv("DJANGO_SU_EMAIL", "")),
 ]
 
 if ENABLE_DEBUG_TOOLBAR:
@@ -773,10 +772,6 @@ DEFAULT_FROM_EMAIL = getenv("DEFAULT_FROM_EMAIL", "localhost@gmail.com")
 ADMIN_EMAIL = getenv("ADMIN_EMAIL", "localhost@gmail.com")
 INFO_EMAIL = getenv("INFO_EMAIL", "localhost@gmail.com")
 
-DJANGO_SU_NAME = getenv("DJANGO_SU_NAME", "superuser")
-DJANGO_SU_PASSWORD = getenv("DJANGO_SU_NAME", "changeme")
-DJANGO_SU_EMAIL = getenv("DJANGO_SU_EMAIL", "localhost@gmail.com")
-
 REST_KNOX = {
     "TOKEN_TTL": datetime.timedelta(days=20),
     "AUTH_HEADER_PREFIX": "Bearer",
@@ -816,6 +811,244 @@ PARLER_LANGUAGES = {
     },
 }
 PARLER_ENABLE_CACHING = True
+
+LANGUAGE_COUNTRY_MAPPING = {
+    "el": {
+        "alpha_2": "GR",
+        "alpha_3": "GRC",
+        "iso_cc": 300,
+        "phone_code": "30",
+        "names": {"el": "Ελλάδα", "en": "Greece", "de": "Griechenland"},
+    },
+    "en": {
+        "alpha_2": "GB",
+        "alpha_3": "GBR",
+        "iso_cc": 826,
+        "phone_code": "44",
+        "names": {
+            "el": "Ηνωμένο Βασίλειο",
+            "en": "United Kingdom",
+            "de": "Vereinigtes Königreich",
+        },
+    },
+    "de": {
+        "alpha_2": "DE",
+        "alpha_3": "DEU",
+        "iso_cc": 276,
+        "phone_code": "49",
+        "names": {"el": "Γερμανία", "en": "Germany", "de": "Deutschland"},
+    },
+}
+
+COUNTRY_REGIONS_MAPPING = {
+    "GR": [
+        {
+            "alpha": "EMT",
+            "names": {
+                "el": "Ανατολική Μακεδονία και Θράκη",
+                "en": "East Macedonia and Thrace",
+                "de": "Ostmakedonien und Thrakien",
+            },
+        },
+        {
+            "alpha": "CMA",
+            "names": {
+                "el": "Κεντρική Μακεδονία",
+                "en": "Central Macedonia",
+                "de": "Zentralmakedonien",
+            },
+        },
+        {
+            "alpha": "WMA",
+            "names": {
+                "el": "Δυτική Μακεδονία",
+                "en": "West Macedonia",
+                "de": "Westmakedonien",
+            },
+        },
+        {
+            "alpha": "EPI",
+            "names": {"el": "Ήπειρος", "en": "Epirus", "de": "Epirus"},
+        },
+        {
+            "alpha": "THS",
+            "names": {"el": "Θεσσαλία", "en": "Thessaly", "de": "Thessalien"},
+        },
+        {
+            "alpha": "ION",
+            "names": {
+                "el": "Ιόνια Νησιά",
+                "en": "Ionian Islands",
+                "de": "Ionische Inseln",
+            },
+        },
+        {
+            "alpha": "WGR",
+            "names": {
+                "el": "Δυτική Ελλάδα",
+                "en": "West Greece",
+                "de": "Westgriechenland",
+            },
+        },
+        {
+            "alpha": "CGR",
+            "names": {
+                "el": "Στερεά Ελλάδα",
+                "en": "Central Greece",
+                "de": "Mittelgriechenland",
+            },
+        },
+        {
+            "alpha": "ATT",
+            "names": {"el": "Αττική", "en": "Attica", "de": "Attika"},
+        },
+        {
+            "alpha": "PEL",
+            "names": {
+                "el": "Πελοπόννησος",
+                "en": "Peloponnese",
+                "de": "Peloponnes",
+            },
+        },
+        {
+            "alpha": "NAE",
+            "names": {
+                "el": "Βόρειο Αιγαίο",
+                "en": "North Aegean",
+                "de": "Nordägäis",
+            },
+        },
+        {
+            "alpha": "SAE",
+            "names": {
+                "el": "Νότιο Αιγαίο",
+                "en": "South Aegean",
+                "de": "Südägάις",
+            },
+        },
+        {
+            "alpha": "CRT",
+            "names": {"el": "Κρήτη", "en": "Crete", "de": "Kreta"},
+        },
+    ],
+    "GB": [
+        {
+            "alpha": "ENG",
+            "names": {"el": "Αγγλία", "en": "England", "de": "England"},
+        },
+        {
+            "alpha": "SCT",
+            "names": {"el": "Σκωτία", "en": "Scotland", "de": "Schottland"},
+        },
+        {
+            "alpha": "WLS",
+            "names": {"el": "Ουαλία", "en": "Wales", "de": "Wales"},
+        },
+        {
+            "alpha": "NIR",
+            "names": {
+                "el": "Βόρεια Ιρλανδία",
+                "en": "Northern Ireland",
+                "de": "Nordirland",
+            },
+        },
+    ],
+    "DE": [
+        {
+            "alpha": "BW",
+            "names": {
+                "el": "Βάδη-Βυρτεμβέργη",
+                "en": "Baden-Württemberg",
+                "de": "Baden-Württemberg",
+            },
+        },
+        {
+            "alpha": "BY",
+            "names": {"el": "Βαυαρία", "en": "Bavaria", "de": "Bayern"},
+        },
+        {
+            "alpha": "BE",
+            "names": {"el": "Βερολίνο", "en": "Berlin", "de": "Berlin"},
+        },
+        {
+            "alpha": "BB",
+            "names": {
+                "el": "Βρανδεμβούργο",
+                "en": "Brandenburg",
+                "de": "Brandenburg",
+            },
+        },
+        {
+            "alpha": "HB",
+            "names": {"el": "Βρέμη", "en": "Bremen", "de": "Bremen"},
+        },
+        {
+            "alpha": "HH",
+            "names": {"el": "Αμβούργο", "en": "Hamburg", "de": "Hamburg"},
+        },
+        {"alpha": "HE", "names": {"el": "Έσση", "en": "Hesse", "de": "Hessen"}},
+        {
+            "alpha": "MV",
+            "names": {
+                "el": "Μεκλεμβούργο-Πομερανία",
+                "en": "Mecklenburg-Western Pomerania",
+                "de": "Mecklenburg-Vorpommern",
+            },
+        },
+        {
+            "alpha": "NI",
+            "names": {
+                "el": "Κάτω Σαξονία",
+                "en": "Lower Saxony",
+                "de": "Niedersachsen",
+            },
+        },
+        {
+            "alpha": "NW",
+            "names": {
+                "el": "Βόρεια Ρηνανία-Βεστφαλία",
+                "en": "North Rhine-Westphalia",
+                "de": "Nordrhein-Westfalen",
+            },
+        },
+        {
+            "alpha": "RP",
+            "names": {
+                "el": "Ρηνανία-Παλατινάτο",
+                "en": "Rhineland-Palatinate",
+                "de": "Rheinland-Pfalz",
+            },
+        },
+        {
+            "alpha": "SL",
+            "names": {"el": "Σάαρλαντ", "en": "Saarland", "de": "Saarland"},
+        },
+        {
+            "alpha": "SN",
+            "names": {"el": "Σαξονία", "en": "Saxony", "de": "Sachsen"},
+        },
+        {
+            "alpha": "ST",
+            "names": {
+                "el": "Σαξονία-Άνχαλτ",
+                "en": "Saxony-Anhalt",
+                "de": "Sachsen-Anhalt",
+            },
+        },
+        {
+            "alpha": "SH",
+            "names": {
+                "el": "Σλέσβιχ-Χολστάιν",
+                "en": "Schleswig-Holstein",
+                "de": "Schleswig-Holstein",
+            },
+        },
+        {
+            "alpha": "TH",
+            "names": {"el": "Θουριγγία", "en": "Thuringia", "de": "Thüringen"},
+        },
+    ],
+}
 
 PHONENUMBER_DEFAULT_REGION = "GR"
 

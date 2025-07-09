@@ -17,13 +17,9 @@ class ProductCategoryTranslationFactory(factory.django.DjangoModelFactory):
     language_code = factory.Iterator(available_languages)
     name = factory.Faker("word")
     description = factory.Faker("paragraph")
-    master = factory.SubFactory(
-        "product.factories.category.ProductCategoryFactory"
-    )
 
     class Meta:
         model = apps.get_model("product", "ProductCategoryTranslation")
-        django_get_or_create = ("language_code", "master")
 
 
 class ProductCategoryFactory(CustomDjangoModelFactory):
@@ -40,9 +36,6 @@ class ProductCategoryFactory(CustomDjangoModelFactory):
 
     @factory.post_generation
     def translations(self, create, extracted, **kwargs):
-        if not create:
-            return
-
         if extracted is not None:
             if hasattr(self, "translations"):
                 self.translations.all().delete()
@@ -53,14 +46,18 @@ class ProductCategoryFactory(CustomDjangoModelFactory):
                 translation.save()
             return
 
-        if hasattr(self, "translations") and self.translations.exists():
-            return
+        if hasattr(self, "translations"):
+            existing_translations = self.translations.all()
+            needs_translations = (
+                not existing_translations.exists() or
+                all(not t.name and not t.description for t in existing_translations)
+            )
 
-        translations = [
-            ProductCategoryTranslationFactory(language_code=lang, master=self)
-            for lang in available_languages
-        ]
+            if needs_translations:
+                existing_translations.delete()
 
-        for translation in translations:
-            translation.master = self
-            translation.save()
+                for lang in available_languages:
+                    ProductCategoryTranslationFactory.create(
+                        language_code=lang,
+                        master=self
+                    )

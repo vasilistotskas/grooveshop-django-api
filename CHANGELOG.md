@@ -3,6 +3,18 @@
 
 
 
+## v1.19.0 (2025-07-09)
+
+### Bug fixes
+
+* fix: `ProductCategoryFactory` translations ([`b049fd3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b049fd3d6b11f3039a63d44e39aea64f6833d48f))
+
+### Features
+
+* feat: Refactor category factory and update type checking config
+
+Simplified logic in ProductCategoryFactory for checking translation needs and reformatted argument placement. Removed mypy configuration from pyproject.toml ([`0a01f04`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0a01f047537cb1d91cde56427514eb1f80bee873))
+
 ## v1.18.0 (2025-07-09)
 
 ### Features

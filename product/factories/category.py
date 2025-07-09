@@ -48,9 +48,8 @@ class ProductCategoryFactory(CustomDjangoModelFactory):
 
         if hasattr(self, "translations"):
             existing_translations = self.translations.all()
-            needs_translations = (
-                not existing_translations.exists() or
-                all(not t.name and not t.description for t in existing_translations)
+            needs_translations = not existing_translations.exists() or all(
+                not t.name and not t.description for t in existing_translations
             )
 
             if needs_translations:
@@ -58,6 +57,5 @@ class ProductCategoryFactory(CustomDjangoModelFactory):
 
                 for lang in available_languages:
                     ProductCategoryTranslationFactory.create(
-                        language_code=lang,
-                        master=self
+                        language_code=lang, master=self
                     )

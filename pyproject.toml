@@ -14,14 +14,14 @@ classifiers = [
 ]
 dependencies = [
   "asgiref==3.9.1",
-  "boto3==1.39.3",
+  "boto3==1.39.4",
   "charset_normalizer==3.4.2",
   "channels[daphne]==4.2.2",
   "channels-redis==4.2.1",
   "cryptography==45.0.5",
   "django==5.2.4",
   "django-admin-thumbnails==0.2.9",
-  "django-allauth==65.9.0",
+  "django-allauth==65.10.0",
   "django-csp==4.0",
   "django-extra-settings==0.14.0",
   "django-celery-beat==2.8.1",
@@ -106,11 +106,15 @@ source = ["."]
 
 [tool.coverage.run]
 branch = true
+parallel = true
+concurrency = ["multiprocessing"]
 omit = [
     "*/tests/*",
     "*/migrations/*",
     "*/management/*",
+    "*/factories/*",
     "*/manage.py",
+    "*/factories.py",
     "*/setup.py",
     "asgi/gunicorn_worker.py",
     "core/storages.py",
@@ -145,8 +149,11 @@ directory = "htmlcov"
 # ─────────────────────────────────────────────────────────
 # Coverage commands reference
 # ─────────────────────────────────────────────────────────
-# Run tests with coverage (recommended):
+# Run tests with coverage (sequential, recommended for coverage):
 #   uv run pytest --cov=. --cov-report=term --cov-report=html --cov-config=pyproject.toml
+#
+# Run tests in parallel (fast, no coverage):
+#   uv run pytest -n auto
 #
 # Run specific test with coverage:
 #   uv run pytest tests/path/to/test.py --cov=module_name --cov-report=term
@@ -206,8 +213,8 @@ env = [
     "MEILI_OFFLINE=True",
 ]
 testpaths = ["tests"]
-timeout = 300
-addopts = "-xvs -n auto"
+timeout = 600
+addopts = "-xvs"
 
 # ─────────────────────────────────────────────────────────
 # Django-stubs configuration

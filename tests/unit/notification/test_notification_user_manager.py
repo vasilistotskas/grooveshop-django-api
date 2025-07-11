@@ -295,30 +295,15 @@ class TestNotificationUserQuerySet(TestCase):
             self.assertNotIn(notification_user, expired_notifications)
 
     def test_seen_today(self):
-        fresh_notification = NotificationFactory()
-        fresh_notification_user = NotificationUserFactory(
-            notification=fresh_notification,
-            user=self.user1,
-            seen=True,
-            seen_at=timezone.now(),
-        )
-
-        fresh_notification_user.refresh_from_db()
-        self.assertTrue(fresh_notification_user.seen)
-        self.assertIsNotNone(fresh_notification_user.seen_at)
-
         today_seen = NotificationUser.objects.seen_today()
-
-        _ = NotificationUser.objects.filter(seen=True)
-        _ = timezone.now().date()
-
-        self.assertGreaterEqual(today_seen.count(), 0)
-
-        if today_seen.exists():
-            self.assertIn(fresh_notification_user, today_seen)
 
         self.assertNotIn(self.old_notification_user, today_seen)
         self.assertNotIn(self.unseen_notification_user, today_seen)
+
+        self.assertIn(self.seen_notification_user, today_seen)
+        self.assertIn(self.user2_seen_notification, today_seen)
+
+        self.assertGreaterEqual(today_seen.count(), 2)
 
     def test_by_date_range_filtering(self):
         start_date = (self.now - timedelta(days=1)).date()

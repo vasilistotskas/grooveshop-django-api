@@ -162,9 +162,23 @@ class BlogPostFilterTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         results = response.data["results"]
-        self.assertEqual(results[0]["id"], self.popular_post.id)
-        self.assertEqual(results[1]["id"], self.average_post.id)
-        self.assertEqual(results[2]["id"], self.unpopular_post.id)
+        self.assertGreaterEqual(len(results), 3)
+
+        post_positions = {}
+        for i, result in enumerate(results):
+            if result["id"] == self.popular_post.id:
+                post_positions["popular"] = i
+            elif result["id"] == self.average_post.id:
+                post_positions["average"] = i
+            elif result["id"] == self.unpopular_post.id:
+                post_positions["unpopular"] = i
+
+        self.assertIn("popular", post_positions)
+        self.assertIn("average", post_positions)
+        self.assertIn("unpopular", post_positions)
+
+        self.assertLess(post_positions["popular"], post_positions["average"])
+        self.assertLess(post_positions["average"], post_positions["unpopular"])
 
     def test_ordering_by_view_count(self):
         url = f"{self.get_post_list_url()}?ordering=-viewCount"

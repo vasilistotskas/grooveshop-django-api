@@ -302,7 +302,7 @@ class TestClearCartsForNoneUsersTask(TestCase):
     ):
         mock_atomic.side_effect = Exception("Database error")
 
-        with self.assertRaises(Exception):  # noqa: B017
+        with self.assertRaises(Exception):
             clear_carts_for_none_users_task()
 
         mock_logger.exception.assert_called_with(
@@ -329,7 +329,7 @@ class TestClearLogFilesTask(TestCase):
     @patch("core.tasks.os.path.getsize")
     @patch("core.tasks.os.remove")
     @patch("core.tasks.logger")
-    def test_clear_old_log_files(  # noqa: PLR0913
+    def test_clear_old_log_files(
         self,
         mock_logger,
         mock_remove,
@@ -553,7 +553,7 @@ class TestMonitorSystemHealthTask(TestCase):
         mock_cache.set.return_value = None
         mock_cache.get.return_value = "ok"
 
-        with self.assertRaises(  # noqa: B017
+        with self.assertRaises(
             Exception,
             msg="Critical system health check failed",
         ):
@@ -722,7 +722,7 @@ class TestScheduledDatabaseBackupTask(TestCase):
         mock_result.result = {"status": "error", "message": "Backup failed"}
         mock_backup.apply.return_value = mock_result
 
-        with self.assertRaises(Exception):  # noqa: B017
+        with self.assertRaises(Exception):
             scheduled_database_backup()
 
         mock_send_mail.assert_called_once()
@@ -743,7 +743,7 @@ class TestScheduledDatabaseBackupTask(TestCase):
 
         mock_send_mail.side_effect = Exception("Email error")
 
-        with self.assertRaises(Exception):  # noqa: B017
+        with self.assertRaises(Exception):
             scheduled_database_backup()
 
         mock_logger.error.assert_any_call(

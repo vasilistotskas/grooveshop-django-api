@@ -98,15 +98,22 @@ class TestFactoryExecutionMetrics(TestCase):
         self.metrics.query_count = 0
         self.assertEqual(self.metrics.avg_query_time, 0.0)
 
-    def test_add_memory_snapshot(self):
+    @patch("time.perf_counter")
+    def test_add_memory_snapshot(self, mock_perf_counter):
+        mock_perf_counter.return_value = 1001.5
+
         self.metrics.add_memory_snapshot(1500)
 
         self.assertEqual(len(self.metrics.memory_snapshots), 1)
         timestamp, memory = self.metrics.memory_snapshots[0]
         self.assertGreaterEqual(timestamp, 0)
+        self.assertAlmostEqual(timestamp, 1.5, places=1)
         self.assertEqual(memory, 1500)
 
-    def test_add_slow_query(self):
+    @patch("time.perf_counter")
+    def test_add_slow_query(self, mock_perf_counter):
+        mock_perf_counter.return_value = 1001.2
+
         long_query = "SELECT * FROM test WHERE " + "x" * 300
         self.metrics.add_slow_query(long_query, 0.1)
 
@@ -114,6 +121,7 @@ class TestFactoryExecutionMetrics(TestCase):
         slow_query = self.metrics.slow_queries[0]
         self.assertEqual(len(slow_query["query"]), 200)
         self.assertEqual(slow_query["duration"], 0.1)
+        self.assertAlmostEqual(slow_query["timestamp"], 1.2, places=1)
         self.assertIn("timestamp", slow_query)
 
 

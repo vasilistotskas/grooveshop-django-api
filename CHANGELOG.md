@@ -3,6 +3,22 @@
 
 
 
+## v1.20.0 (2025-07-11)
+
+### Bug fixes
+
+* fix: CI test failure in profiler tests
+
+- Fixed timestamp calculation issue in test_add_memory_snapshot and test_add_slow_query
+- Issue occurred when hardcoded start_time (1000.0) was greater than time.perf_counter() in CI environment
+- Added @patch('time.perf_counter') to mock consistent time values
+- Used assertAlmostEqual for floating point precision tolerance
+- Ensures tests pass consistently across different environments ([`2a988cd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2a988cdaa76cb3c7ebd6b3b5f8033752f55266a5))
+
+### Features
+
+* feat: New tests, Bump Versions, pytest settings fixes ([`3ac7795`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3ac7795d4a5e0b54613568f337473a7c2e6b9dde))
+
 ## v1.19.0 (2025-07-09)
 
 ### Bug fixes

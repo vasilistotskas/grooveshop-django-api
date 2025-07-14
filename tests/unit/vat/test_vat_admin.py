@@ -190,7 +190,6 @@ class VatAdminTestCase(TestCase):
 
     def test_list_display(self):
         expected_fields = [
-            "id",
             "vat_display",
             "vat_category_badge",
             "usage_metrics",

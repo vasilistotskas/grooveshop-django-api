@@ -325,7 +325,6 @@ class PayWayAdminTestCase(TestCase):
 
     def test_list_display(self):
         expected_fields = [
-            "id",
             "name_display",
             "provider_code_badge",
             "active_status",

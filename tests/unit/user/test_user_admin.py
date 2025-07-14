@@ -305,10 +305,9 @@ class TestUserAdmin:
         assert admin.save_on_top is True
         assert admin.list_per_page == 25
 
-    def test_list_display_fields(self, admin_request):
+    def test_list_display(self, admin_request):
         admin = UserAdmin(UserAccount, AdminSite())
         expected_fields = [
-            "id",
             "user_profile_display",
             "contact_info_display",
             "location_display",
@@ -449,7 +448,6 @@ class TestUserAddressAdmin:
         assert admin.list_fullwidth is True
 
         expected_fields = [
-            "id",
             "address_display",
             "contact_person",
             "location_info",

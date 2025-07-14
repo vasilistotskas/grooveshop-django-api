@@ -2,7 +2,6 @@ from django.conf import settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
-
 from blog.factories.tag import BlogTagFactory
 from blog.models.tag import BlogTag
 from core.utils.testing import TestURLFixerMixin
@@ -287,8 +286,10 @@ class BlogTagViewSetTestCase(TestURLFixerMixin, APITestCase):
             name="SpecialTestTag",
         )
 
+        special_tag.refresh_from_db()
+
         url = self.get_tag_list_url()
-        response = self.client.get(url, {"name": "SpecialTestTag"})
+        response = self.client.get(url, {"search": "SpecialTestTag"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         found = False

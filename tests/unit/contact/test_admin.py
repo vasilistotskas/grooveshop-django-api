@@ -305,7 +305,6 @@ class TestContactAdmin(TestCase):
 
     def test_list_display(self):
         expected_display = [
-            "id",
             "contact_info",
             "message_preview",
             "message_stats",

@@ -1,4 +1,5 @@
 from datetime import timedelta
+from datetime import datetime
 
 from django.db import models
 from django.db.models import Q
@@ -224,8 +225,17 @@ class NotificationUserQuerySet(models.QuerySet):
         return self.filter(notification__expiry_date__lt=timezone.now())
 
     def seen_today(self):
-        today = timezone.now().date()
-        return self.filter(seen=True, seen_at__date=today)
+        now = timezone.now()
+        local_now = timezone.localtime(now)
+        today = local_now.date()
+
+        start_of_day = timezone.make_aware(
+            datetime.combine(today, datetime.min.time())
+        )
+        end_of_day = timezone.make_aware(
+            datetime.combine(today, datetime.max.time())
+        )
+        return self.filter(seen=True, seen_at__range=[start_of_day, end_of_day])
 
     def by_date_range(self, start_date, end_date):
         return self.filter(created_at__date__range=[start_date, end_date])

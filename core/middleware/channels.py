@@ -33,7 +33,9 @@ def authenticate_token(token: str):
     from django.contrib.auth.models import AnonymousUser  # noqa: PLC0415
     from knox.models import get_token_model  # noqa: PLC0415
 
-    logger.debug(f"Authenticating token: {token[:10]}...")
+    logger.debug(
+        f"Authenticating token: {token[:10] if token and isinstance(token, str) else 'None'}..."
+    )
 
     try:
         token = token.strip()

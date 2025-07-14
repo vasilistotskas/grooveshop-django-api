@@ -132,8 +132,6 @@ class CountryViewSetTestCase(TestURLFixerMixin, APITestCase):
         }
 
         response = self.client.post(self.list_url, payload, format="json")
-        if response.status_code != status.HTTP_201_CREATED:
-            print(f"Error response: {response.data}")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Country.objects.count(), initial_count + 1)
 

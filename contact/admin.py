@@ -12,6 +12,7 @@ from unfold.contrib.filters.admin import (
 
 from contact.models import Contact
 from core.admin import ExportModelAdmin
+import datetime
 
 
 class MessageLengthFilter(admin.SimpleListFilter):
@@ -155,9 +156,14 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
         return ["-created_at", "name"]
 
     def contact_info(self, obj):
-        is_suspicious = (
-            "@" not in obj.email or "." not in obj.email.split("@")[-1]
-        )
+        if not obj.email:
+            email_display = "(no email)"
+            is_suspicious = True
+        else:
+            email_display = obj.email
+            is_suspicious = (
+                "@" not in obj.email or "." not in obj.email.split("@")[-1]
+            )
 
         email_class = (
             "text-red-600 dark:text-red-400"
@@ -173,7 +179,7 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
             "</div>",
             obj.name[:30] + ("..." if len(obj.name) > 30 else ""),
             email_class,
-            obj.email,
+            email_display,
             obj.id,
         )
 
@@ -337,6 +343,19 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
         now = timezone.now()
         age = now - obj.created_at
         word_count = len(obj.message.split())
+        message_length = len(obj.message)
+
+        if age < timedelta(hours=2):
+            priority = "urgent"
+        elif message_length > 500:
+            priority = "high"
+        elif age < timedelta(days=1):
+            priority = "medium"
+        else:
+            priority = "low"
+
+        priority_scores = {"low": 25, "medium": 50, "high": 75, "urgent": 100}
+        priority_score = priority_scores[priority]
 
         reading_time = max(1, word_count // 200)
 
@@ -349,6 +368,7 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
             "<div><strong>Contact Day:</strong></div><div>{}</div>"
             "<div><strong>Contact Time:</strong></div><div>{}</div>"
             "<div><strong>Reading Time:</strong></div><div>{}min</div>"
+            '<div><strong>Priority Score:</strong></div><div class="font-medium">{}</div>'
             "</div>"
             "</div>",
             age.days,
@@ -358,6 +378,7 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
             obj.created_at.strftime("%A"),
             obj.created_at.strftime("%H:%M"),
             reading_time,
+            priority_score,
         )
 
     contact_analytics.short_description = _("Contact Analytics")
@@ -385,6 +406,17 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
             1 for word in urgent_words if word.lower() in message.lower()
         )
 
+        if word_count == 0:
+            reading_time_seconds = 0
+        else:
+            reading_time_seconds = max(1, int((word_count / 200) * 60))
+
+        sentiment = "Urgent" if urgency_score >= 3 else "Neutral"
+        avg_word_length_value = char_count / max(word_count, 1)
+        avg_word_length = f"{avg_word_length_value:.1f}"
+        complexity = "Complex" if avg_word_length_value > 5 else "Simple"
+        language = "English"
+
         return format_html(
             '<div class="text-sm">'
             '<div class="grid grid-cols-2 gap-2">'
@@ -393,7 +425,11 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
             "<div><strong>Sentences:</strong></div><div>{}</div>"
             "<div><strong>Paragraphs:</strong></div><div>{}</div>"
             "<div><strong>Urgency Score:</strong></div><div>{}/10</div>"
-            "<div><strong>Avg Word Length:</strong></div><div>{:.1f}</div>"
+            "<div><strong>Avg Word Length:</strong></div><div>{}</div>"
+            "<div><strong>Reading Time:</strong></div><div>{} seconds</div>"
+            "<div><strong>Sentiment:</strong></div><div>{}</div>"
+            "<div><strong>Complexity:</strong></div><div>{}</div>"
+            "<div><strong>Language:</strong></div><div>{}</div>"
             "</div>"
             "</div>",
             char_count,
@@ -401,7 +437,11 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
             sentence_count,
             paragraph_count,
             urgency_score,
-            char_count / max(word_count, 1),
+            avg_word_length,
+            reading_time_seconds,
+            sentiment,
+            complexity,
+            language,
         )
 
     message_analytics.short_description = _("Message Analytics")
@@ -439,12 +479,16 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
 
     timing_info.short_description = _("Timing Information")
 
-    def _get_season(self, month):
-        if month in [12, 1, 2]:
-            return "Winter"
-        elif month in [3, 4, 5]:
-            return "Spring"
-        elif month in [6, 7, 8]:
-            return "Summer"
+    def _get_season(self, value):
+        if isinstance(value, (datetime.date, datetime.datetime)):
+            month = value.month
         else:
-            return "Autumn"
+            month = int(value)
+
+        if month in (12, 1, 2):
+            return "Winter"
+        if month in (3, 4, 5):
+            return "Spring"
+        if month in (6, 7, 8):
+            return "Summer"
+        return "Autumn"

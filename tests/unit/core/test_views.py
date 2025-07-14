@@ -1,6 +1,5 @@
 import json
 from unittest.mock import MagicMock, mock_open, patch
-from rest_framework.test import APIClient
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.http import HttpResponse, JsonResponse
@@ -9,7 +8,6 @@ from django.test import RequestFactory, TestCase, override_settings
 from core.views import (
     HomeView,
     ManageTOTPSvgView,
-    TOTPSvgNotFoundResponse,
     csp_report,
     robots_txt,
     upload_image,
@@ -379,7 +377,6 @@ class TestManageTOTPSvgView(TestCase):
         self.assertTrue(issubclass(ManageTOTPSvgView, ManageTOTPView))
 
 
-
 class TestViewsEdgeCases(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
@@ -413,4 +410,3 @@ class TestViewsEdgeCases(TestCase):
             response = csp_report(request)
 
             self.assertEqual(response.status_code, 204)
-

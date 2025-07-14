@@ -78,7 +78,6 @@ class VatAdmin(ModelAdmin):
     list_filter_sheet = True
 
     list_display = [
-        "id",
         "vat_display",
         "vat_category_badge",
         "usage_metrics",

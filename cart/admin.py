@@ -179,7 +179,6 @@ class CartAdmin(ModelAdmin):
     list_filter_sheet = True
 
     list_display = (
-        "id",
         "cart_owner_display",
         "cart_type_badge",
         "activity_status_badge",
@@ -426,7 +425,6 @@ class CartItemAdmin(ModelAdmin):
     list_filter_sheet = True
 
     list_display = (
-        "id",
         "cart_info",
         "product_display",
         "quantity_display",

@@ -130,7 +130,6 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
     }
 
     list_display = [
-        "id",
         "name_display",
         "provider_code_badge",
         "active_status",

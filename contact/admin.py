@@ -81,7 +81,6 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
     list_filter_sheet = True
 
     list_display = [
-        "id",
         "contact_info",
         "message_preview",
         "message_stats",

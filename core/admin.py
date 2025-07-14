@@ -354,7 +354,6 @@ class UnfoldPeriodicTaskForm(PeriodicTaskForm):
 @admin.register(Setting)
 class SettingAdmin(ModelAdmin):
     list_display = [
-        "id",
         "name",
         "value_type",
         "description",

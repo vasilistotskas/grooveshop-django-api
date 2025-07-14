@@ -326,7 +326,6 @@ class OrderAdmin(ModelAdmin):
     list_filter_sheet = True
 
     list_display = [
-        "id",
         "status_badge",
         "customer_info",
         "order_summary",
@@ -1059,7 +1058,6 @@ class OrderItemAdmin(ModelAdmin):
     list_filter_sheet = True
 
     list_display = [
-        "id",
         "order_link",
         "product_display",
         "quantity_display",
@@ -1275,7 +1273,6 @@ class OrderHistoryAdmin(ModelAdmin):
     list_filter_sheet = True
 
     list_display = [
-        "id",
         "order_link",
         "change_type_badge",
         "description_display",
@@ -1418,7 +1415,6 @@ class OrderItemHistoryAdmin(ModelAdmin):
     list_filter_sheet = True
 
     list_display = [
-        "id",
         "order_item_link",
         "change_type_badge",
         "description_display",

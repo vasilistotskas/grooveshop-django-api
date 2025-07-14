@@ -7,10 +7,10 @@ from django.contrib.auth import get_user_model
 from django.test import RequestFactory
 
 from product.admin import (
-    CategoryAdmin,
+    ProductCategoryAdmin,
     ProductAdmin,
-    ReviewAdmin,
-    FavouriteAdmin,
+    ProductReviewAdmin,
+    ProductFavouriteAdmin,
     ProductCategoryImageAdmin,
     ProductImageAdmin,
     StockStatusFilter,
@@ -20,7 +20,6 @@ from product.admin import (
     LikesCountFilter,
     ReviewAverageFilter,
     ProductImageInline,
-    TaggedItemInline,
     ProductCategoryImageInline,
 )
 from product.factories import (
@@ -39,6 +38,7 @@ from product.models import (
     ProductImage,
     ProductCategoryImage,
 )
+from tag.admin import TaggedItemInline
 from user.factories import UserAccountFactory
 
 User = get_user_model()
@@ -62,17 +62,17 @@ def product_admin():
 
 @pytest.fixture
 def category_admin():
-    return CategoryAdmin(ProductCategory, AdminSite())
+    return ProductCategoryAdmin(ProductCategory, AdminSite())
 
 
 @pytest.fixture
 def review_admin():
-    return ReviewAdmin(ProductReview, AdminSite())
+    return ProductReviewAdmin(ProductReview, AdminSite())
 
 
 @pytest.fixture
 def favourite_admin():
-    return FavouriteAdmin(ProductFavourite, AdminSite())
+    return ProductFavouriteAdmin(ProductFavourite, AdminSite())
 
 
 @pytest.fixture
@@ -565,7 +565,7 @@ class TestReviewAdmin:
         assert len(result) > 10
         assert "2025" in result or "2024" in result
 
-    @patch.object(ReviewAdmin, "message_user")
+    @patch.object(ProductReviewAdmin, "message_user")
     def test_approve_reviews_action(
         self, mock_message, review_admin, admin_request
     ):
@@ -580,7 +580,7 @@ class TestReviewAdmin:
 
         mock_message.assert_called_once()
 
-    @patch.object(ReviewAdmin, "message_user")
+    @patch.object(ProductReviewAdmin, "message_user")
     def test_reject_reviews_action(
         self, mock_message, review_admin, admin_request
     ):

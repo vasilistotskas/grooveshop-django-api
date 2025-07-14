@@ -116,7 +116,6 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
     list_filter_sheet = True
 
     list_display = [
-        "id",
         "notification_info",
         "priority_badge",
         "category_badge",
@@ -609,7 +608,6 @@ class NotificationUserAdmin(ModelAdmin):
     list_filter_submit = True
 
     list_display = [
-        "id",
         "user_info",
         "notification_info",
         "seen_status",

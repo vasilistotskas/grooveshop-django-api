@@ -225,7 +225,6 @@ class UserAdmin(ModelAdmin):
     }
 
     list_display = [
-        "id",
         "user_profile_display",
         "contact_info_display",
         "location_display",
@@ -630,7 +629,6 @@ class UserAddressAdmin(ModelAdmin):
     list_filter_sheet = True
 
     list_display = [
-        "id",
         "address_display",
         "contact_person",
         "location_info",

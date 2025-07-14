@@ -827,3 +827,17 @@ class TaggedItemAdmin(ModelAdmin):
         )
 
     created_display.short_description = _("Created")
+
+
+class TaggedItemInline(GenericTabularInline):
+    model = TaggedItem
+    extra = 0
+    fields = ("tag",)
+    verbose_name = "Tag"
+    verbose_name_plural = "Tags"
+
+    ct_field = "content_type"
+    ct_fk_field = "object_id"
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("tag")

@@ -11,7 +11,7 @@ from django.utils.translation import ngettext
 from mptt.admin import DraggableMPTTAdmin
 from parler.admin import TranslatableAdmin
 from simple_history.admin import SimpleHistoryAdmin
-from unfold.admin import GenericTabularInline, ModelAdmin, TabularInline
+from unfold.admin import ModelAdmin, TabularInline
 from unfold.contrib.filters.admin import (
     DropdownFilter,
     RangeDateTimeFilter,
@@ -34,7 +34,7 @@ from product.models.favourite import ProductFavourite
 from product.models.image import ProductImage
 from product.models.product import Product
 from product.models.review import ProductReview
-from tag.models import TaggedItem
+from tag.admin import TaggedItemInline
 
 
 class StockStatusFilter(DropdownFilter):
@@ -235,20 +235,6 @@ class ProductImageInline(TabularInline):
     image_preview.short_description = _("Preview")
 
 
-class TaggedItemInline(GenericTabularInline):
-    model = TaggedItem
-    extra = 0
-    fields = ("tag",)
-    verbose_name = "Tag"
-    verbose_name_plural = "Tags"
-
-    ct_field = "content_type"
-    ct_fk_field = "object_id"
-
-    def get_queryset(self, request):
-        return super().get_queryset(request).select_related("tag")
-
-
 @admin_thumbnails.thumbnail("image")
 class ProductCategoryImageInline(TabularInline):
     model = ProductCategoryImage
@@ -273,7 +259,7 @@ class ProductCategoryImageInline(TabularInline):
 
 
 @admin.register(ProductCategory)
-class CategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
+class ProductCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
     compressed_fields = True
     warn_unsaved_form = True
     list_fullwidth = True
@@ -284,11 +270,14 @@ class CategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
     list_per_page = 25
     list_display = (
         "tree_actions",
+        "indented_title",
         "category_info",
         "category_stats",
         "category_status",
         "image_preview",
         "created_display",
+        "products_count_display",
+        "recursive_products_display",
     )
     list_display_links = ("category_info",)
     search_fields = ("translations__name", "translations__description")
@@ -299,7 +288,14 @@ class CategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
         "parent",
     ]
     inlines = [ProductCategoryImageInline]
-    readonly_fields = ("uuid", "created_at", "updated_at", "category_analytics")
+    readonly_fields = [
+        "uuid",
+        "created_at",
+        "updated_at",
+        "category_analytics",
+        "products_count_display",
+        "recursive_products_display",
+    ]
 
     fieldsets = (
         (
@@ -326,7 +322,11 @@ class CategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
         (
             _("Analytics"),
             {
-                "fields": ("category_analytics",),
+                "fields": (
+                    "category_analytics",
+                    "products_count_display",
+                    "recursive_products_display",
+                ),
                 "classes": ("collapse",),
             },
         ),
@@ -468,6 +468,24 @@ class CategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
 
     category_analytics.short_description = _("Category Analytics")
 
+    def products_count_display(self, instance):
+        count = getattr(instance, "products_count", 0)
+        return format_html(
+            '<span class="inline-flex items-center px-2 py-1 text-xs font-semibold bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">{}</span>',
+            count,
+        )
+
+    products_count_display.short_description = _("Direct Products")
+
+    def recursive_products_display(self, instance):
+        count = getattr(instance, "products_cumulative_count", 0)
+        return format_html(
+            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-full">{}</span>',
+            count,
+        )
+
+    recursive_products_display.short_description = _("Total Products")
+
 
 @admin.register(Product)
 class ProductAdmin(
@@ -480,7 +498,6 @@ class ProductAdmin(
     list_filter_sheet = True
 
     list_display = [
-        "id",
         "product_info",
         "category_display",
         "pricing_info",
@@ -1070,13 +1087,12 @@ class ProductAdmin(
 
 
 @admin.register(ProductReview)
-class ReviewAdmin(ModelAdmin, TranslatableAdmin):
+class ProductReviewAdmin(ModelAdmin, TranslatableAdmin):
     compressed_fields = True
     list_fullwidth = True
     list_filter_sheet = True
 
     list_display = [
-        "id",
         "review_info",
         "product_link",
         "user_link",
@@ -1324,12 +1340,11 @@ class ReviewAdmin(ModelAdmin, TranslatableAdmin):
 
 
 @admin.register(ProductFavourite)
-class FavouriteAdmin(ModelAdmin):
+class ProductFavouriteAdmin(ModelAdmin):
     compressed_fields = True
     list_fullwidth = True
 
     list_display = [
-        "id",
         "user_display",
         "product_display",
         "created_display",
@@ -1392,7 +1407,6 @@ class ProductCategoryImageAdmin(ModelAdmin, TranslatableAdmin):
     list_fullwidth = True
 
     list_display = [
-        "id",
         "image_preview",
         "category_name",
         "image_type_badge",
@@ -1534,7 +1548,6 @@ class ProductImageAdmin(ModelAdmin, TranslatableAdmin):
     list_fullwidth = True
 
     list_display = [
-        "id",
         "image_preview",
         "product_name",
         "main_badge",

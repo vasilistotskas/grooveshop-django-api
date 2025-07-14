@@ -181,7 +181,6 @@ class BlogAuthorAdmin(ModelAdmin, TranslatableAdmin):
     list_filter_sheet = True
 
     list_display = (
-        "id",
         "user_display",
         "bio_preview",
         "posts_count",
@@ -365,8 +364,6 @@ class BlogCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
     mptt_indent_field = "translations__name"
     list_per_page = 15
     list_display = (
-        "id",
-        "sort_order",
         "tree_actions",
         "indented_title",
         "category_image",
@@ -450,7 +447,7 @@ class BlogCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
     def posts_count_display(self, instance):
         count = getattr(instance, "posts_count", 0)
         return format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">{}</span>',
+            '<span class="inline-flex items-center px-2 py-1 text-xs font-semibold bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">{}</span>',
             count,
         )
 
@@ -482,7 +479,6 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
     }
 
     list_display = (
-        "id",
         "title_display",
         "category_badge",
         "author_display",

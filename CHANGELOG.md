@@ -3,6 +3,24 @@
 
 
 
+## v1.21.0 (2025-07-15)
+
+### Bug fixes
+
+* fix: Clear BlogTag objects before name filter test
+
+Added deletion of all BlogTag objects at the start of the test_filtering_by_name method to ensure a clean state for the test. This prevents interference from existing tags and improves test reliability. ([`a547fdf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a547fdf1b6e7db3c7e4c7546578baba8c76b554f))
+
+* fix: Update admin list display tests and blog tag search
+
+Removed 'id' from expected list display fields in admin tests for contact, pay way, user, and vat modules to reflect updated admin configuration. Changed blog tag view test to use 'search' parameter instead of 'name' for filtering tags. ([`07a8523`](https://github.com/vasilistotskas/grooveshop-django-api/commit/07a85235bf161a0a61ffb8b0ff013e0f0a7f7104))
+
+### Features
+
+* feat: Bump UV, remove "id" from admin `list_display ` and some admin classes renamed ([`f9dc562`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f9dc562b371c7c662e98ca6b1ab44cce29409e1a))
+
+* feat: Add more tests ([`9f1398d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9f1398dc2e14e15f175c7278a9870b47c13dfa38))
+
 ## v1.20.0 (2025-07-11)
 
 ### Bug fixes

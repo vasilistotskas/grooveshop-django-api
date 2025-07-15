@@ -272,6 +272,8 @@ class BlogTagViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.data["results"][0]["id"], self.tag.id)
 
     def test_filtering_by_name(self):
+        BlogTag.objects.all().delete()
+
         special_tag = BlogTagFactory()
 
         from django.apps import apps

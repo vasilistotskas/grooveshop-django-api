@@ -224,7 +224,7 @@ class CountryAdmin(ModelAdmin, TranslatableAdmin):
             )
         else:
             phone_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-gray-50 dark:bg-gray-800 text-base-500 dark:text-base-400 rounded border border-gray-200 dark:border-gray-700">'
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-gray-50 dark:bg-gray-900 text-base-500 dark:text-base-400 rounded border border-gray-200 dark:border-gray-700">'
                 "📞 No Code"
                 "</span>"
             )

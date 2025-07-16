@@ -1,0 +1,163 @@
+{% extends "admin/base_site.html" %}
+{% load i18n unfold %}
+
+{% block extrahead %}
+    {{ block.super }}
+    <script src="{% url 'admin:jsi18n' %}"></script>
+    {{ form.media }}
+{% endblock %}
+
+{% block breadcrumbs %}
+    <div class="px-4">
+        <div class="container mb-6 mx-auto -my-3 lg:mb-12">
+            <ul class="flex flex-wrap">
+                {% url 'admin:index' as link %}
+                {% trans 'Home' as name %}
+                {% include 'unfold/helpers/breadcrumb_item.html' with link=link name=name %}
+
+                {% url 'admin:product_product_changelist' as link %}
+                {% include 'unfold/helpers/breadcrumb_item.html' with link=link name=opts.verbose_name_plural|capfirst %}
+
+                {% include 'unfold/helpers/breadcrumb_item.html' with link='' name=_('Apply Custom Discount') %}
+            </ul>
+        </div>
+    </div>
+{% endblock %}
+
+{% block title %}
+    {% trans "Apply Custom Discount" %}
+{% endblock %}
+
+{% block content %}
+    <div class="flex flex-col gap-6">
+        <div class="flex flex-col gap-2">
+            <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
+                {% trans "Apply Custom Discount" %}
+            </h1>
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+                {% blocktrans count total_count as count %}
+                    Apply discount to {{ count }} selected product
+                {% plural %}
+                    Apply discount to {{ count }} selected products
+                {% endblocktrans %}
+            </p>
+        </div>
+
+        <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+            <form method="post" action="{% url 'admin:product_product_changelist' %}">
+                {% csrf_token %}
+
+                <input type="hidden" name="action" value="apply_custom_discount">
+                {% for product in queryset %}
+                    <input type="hidden" name="_selected_action" value="{{ product.id }}">
+                {% endfor %}
+
+                <div class="grid gap-6 p-6">
+                    {% if form.non_field_errors %}
+                        <div class="rounded-md bg-red-50 dark:bg-red-900/20 p-4 border border-red-200 dark:border-red-800">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                                    </svg>
+                                </div>
+                                <div class="ml-3">
+                                    <div class="text-sm text-red-800 dark:text-red-200">
+                                        {{ form.non_field_errors }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    <div class="grid gap-4 p-6">
+                        {% for field in form %}
+                            <div class="grid gap-2">
+                                <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-900 dark:text-white">
+                                    {{ field.label }}
+                                    {% if field.field.required %}
+                                        <span class="text-red-500 ml-1">*</span>
+                                    {% endif %}
+                                </label>
+
+                                {% if field.name == 'discount_percent' %}
+                                    <div class="relative">
+                                        {{ field }}
+                                        <div class="absolute inset-y-0 right-0 top-0 h-full pr-3 flex items-center pointer-events-none">
+                                            <span class="text-gray-500 dark:text-gray-400 text-sm font-medium">%</span>
+                                        </div>
+                                    </div>
+                                {% elif field.name == 'apply_to_inactive' %}
+                                    <div class="flex items-start space-x-3">
+                                        <div class="flex flex-col gap-2">
+                                            <div class="flex items-center gap-2">
+                                              {{ field }}
+                                              <span class="text-sm text-gray-900 dark:text-white">
+                                                {{ field.label }}
+                                              </span>
+                                            </div>
+                                            {% if field.help_text %}
+                                                <span class="text-xs text-gray-500 dark:text-gray-400">{{ field.help_text }}</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    {{ field }}
+                                {% endif %}
+
+                                {% if field.name != 'apply_to_inactive' and field.help_text %}
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ field.help_text }}</p>
+                                {% endif %}
+
+                                {% if field.errors %}
+                                    <div class="text-sm text-red-600 dark:text-red-400">
+                                        {{ field.errors }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                        <h3 class="text-sm font-medium text-gray-900 dark:text-white mb-3 flex items-center">
+                            {% component "unfold/components/icon.html" with class="mr-2 text-blue-500" %}
+                                bar_chart
+                            {% endcomponent %}
+                            {% trans "Selection Summary" %}
+                        </h3>
+                        <div class="grid grid-cols-3 gap-4 text-sm">
+                            <div class="text-center">
+                                <div class="text-2xl font-bold text-green-600 dark:text-green-400">{{ active_count }}</div>
+                                <div class="text-gray-600 dark:text-gray-400">{% trans "Active" %}</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-2xl font-bold text-gray-600 dark:text-gray-400">{{ inactive_count }}</div>
+                                <div class="text-gray-600 dark:text-gray-400">{% trans "Inactive" %}</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ total_count }}</div>
+                                <div class="text-gray-600 dark:text-gray-400">{% trans "Total" %}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="px-6 py-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 rounded-b-lg">
+                    <div class="flex items-center justify-end gap-2">
+                        {% url 'admin:product_product_changelist' as cancel_url %}
+                        {% component "unfold/components/button.html" with href=cancel_url variant="secondary" %}
+                            {% trans "Cancel" %}
+                        {% endcomponent %}
+
+                        {% component "unfold/components/button.html" with submit=1 variant="primary" %}
+                            {% component "unfold/components/icon.html" with class="mr-2" %}
+                                local_offer
+                            {% endcomponent %}
+                            {% trans "Apply Discount" %}
+                        {% endcomponent %}
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}

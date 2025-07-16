@@ -10,17 +10,17 @@
 
     {% if REQUEST_DETAILS %}
     <div class="w-full grid gap-6 grid-cols-1 md:grid-cols-2">
-      <div class="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-6">
+      <div class="bg-white dark:bg-gray-900 shadow-lg rounded-lg p-6">
         <h2 class="text-2xl font-semibold mb-4">{% trans "Request Headers" %}</h2>
         <pre class="bg-gray-100 dark:bg-gray-700 p-4 rounded text-sm text-base-800 dark:text-base-200 overflow-auto max-h-64">{{ REQUEST_DETAILS.headers|pprint }}</pre>
       </div>
 
-      <div class="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-6">
+      <div class="bg-white dark:bg-gray-900 shadow-lg rounded-lg p-6">
         <h2 class="text-2xl font-semibold mb-4">{% trans "Request Cookies" %}</h2>
         <pre class="bg-gray-100 dark:bg-gray-700 p-4 rounded text-sm text-base-800 dark:text-base-200 overflow-auto max-h-64">{{ REQUEST_DETAILS.cookies|pprint }}</pre>
       </div>
 
-      <div class="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-6">
+      <div class="bg-white dark:bg-gray-900 shadow-lg rounded-lg p-6">
         <h2 class="text-2xl font-semibold mb-4">{% trans "Request Meta" %}</h2>
         <pre class="bg-gray-100 dark:bg-gray-700 p-4 rounded text-sm text-base-800 dark:text-base-200 overflow-auto max-h-64">{{ REQUEST_DETAILS.meta|pprint }}</pre>
       </div>

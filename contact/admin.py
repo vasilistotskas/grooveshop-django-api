@@ -266,7 +266,7 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
             )
         else:
             time_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-gray-50 dark:bg-gray-800 text-base-700 dark:text-base-200 rounded-full">'
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-gray-50 dark:bg-gray-900 text-base-700 dark:text-base-200 rounded-full">'
                 "📆 Old"
                 "</span>"
             )

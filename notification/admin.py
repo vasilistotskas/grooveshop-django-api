@@ -232,7 +232,7 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
     def priority_badge(self, obj):
         priority_config = {
             "LOW": {
-                "bg": "bg-gray-50 dark:bg-gray-800",
+                "bg": "bg-gray-50 dark:bg-gray-900",
                 "text": "text-base-700 dark:text-base-700",
                 "icon": "🔽",
             },
@@ -316,7 +316,7 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
                 "icon": "🎉",
             },
             "SYSTEM": {
-                "bg": "bg-gray-50 dark:bg-gray-800",
+                "bg": "bg-gray-50 dark:bg-gray-900",
                 "text": "text-base-700 dark:text-base-700",
                 "icon": "⚙️",
             },

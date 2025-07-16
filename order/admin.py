@@ -661,7 +661,7 @@ class OrderAdmin(ModelAdmin):
                 "icon": "↩️",
             },
             OrderStatus.REFUNDED: {
-                "bg": "bg-gray-50 dark:bg-gray-800",
+                "bg": "bg-gray-50 dark:bg-gray-900",
                 "text": "text-base-700 dark:text-base-300",
                 "icon": "💰",
             },
@@ -670,7 +670,7 @@ class OrderAdmin(ModelAdmin):
         config = status_config.get(
             obj.status,
             {
-                "bg": "bg-gray-50 dark:bg-gray-800",
+                "bg": "bg-gray-50 dark:bg-gray-900",
                 "text": "text-base-700 dark:text-base-300",
                 "icon": "❓",
             },
@@ -722,7 +722,7 @@ class OrderAdmin(ModelAdmin):
                 "icon": "⚠️",
             },
             PaymentStatus.CANCELED: {
-                "bg": "bg-gray-50 dark:bg-gray-800",
+                "bg": "bg-gray-50 dark:bg-gray-900",
                 "text": "text-base-700 dark:text-base-700",
                 "icon": "🚫",
             },
@@ -731,7 +731,7 @@ class OrderAdmin(ModelAdmin):
         config = payment_config.get(
             obj.payment_status,
             {
-                "bg": "bg-gray-50 dark:bg-gray-800",
+                "bg": "bg-gray-50 dark:bg-gray-900",
                 "text": "text-base-700 dark:text-base-700",
                 "icon": "❓",
             },
@@ -785,7 +785,7 @@ class OrderAdmin(ModelAdmin):
         config = document_config.get(
             obj.document_type,
             {
-                "bg": "bg-gray-50 dark:bg-gray-800",
+                "bg": "bg-gray-50 dark:bg-gray-900",
                 "text": "text-base-700 dark:text-base-700",
                 "icon": "📄",
             },
@@ -1354,7 +1354,7 @@ class OrderHistoryAdmin(ModelAdmin):
                 "icon": "📝",
             },
             "REFUND": {
-                "bg": "bg-gray-50 dark:bg-gray-800",
+                "bg": "bg-gray-50 dark:bg-gray-900",
                 "text": "text-base-700 dark:text-base-700",
                 "icon": "💰",
             },
@@ -1363,7 +1363,7 @@ class OrderHistoryAdmin(ModelAdmin):
         config = type_config.get(
             obj.change_type,
             {
-                "bg": "bg-gray-50 dark:bg-gray-800",
+                "bg": "bg-gray-50 dark:bg-gray-900",
                 "text": "text-base-700 dark:text-base-700",
                 "icon": "📋",
             },
@@ -1476,7 +1476,7 @@ class OrderItemHistoryAdmin(ModelAdmin):
                 "icon": "↩️",
             },
             "OTHER": {
-                "bg": "bg-gray-50 dark:bg-gray-800",
+                "bg": "bg-gray-50 dark:bg-gray-900",
                 "text": "text-base-700 dark:text-base-700",
                 "icon": "📋",
             },

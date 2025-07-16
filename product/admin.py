@@ -3,6 +3,9 @@ from decimal import Decimal
 
 import admin_thumbnails
 from django.contrib import admin, messages
+from django.http import HttpResponseRedirect
+from django.shortcuts import render
+from django.urls import reverse_lazy
 from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
@@ -24,10 +27,10 @@ from unfold.decorators import action
 from unfold.enums import ActionVariant
 
 from core.admin import ExportModelAdmin
-from core.fields.measurement import MeasurementField
 from core.forms.measurement import MeasurementWidget
 from core.units import WeightUnits
 from product.enum.review import ReviewStatus
+from product.forms import ApplyDiscountForm
 from product.models.category import ProductCategory
 from product.models.category_image import ProductCategoryImage
 from product.models.favourite import ProductFavourite
@@ -229,262 +232,10 @@ class ProductImageInline(TabularInline):
                 obj.image.url,
             )
         return format_html(
-            '<div class="bg-gray-100 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-400 dark:text-base-500 text-xs">No Image</div>'
+            '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-400 dark:text-base-500 text-xs">No Image</div>'
         )
 
     image_preview.short_description = _("Preview")
-
-
-@admin_thumbnails.thumbnail("image")
-class ProductCategoryImageInline(TabularInline):
-    model = ProductCategoryImage
-    extra = 0
-    fields = ("image_preview", "image", "image_type", "active")
-    readonly_fields = ("image_preview",)
-
-    tab = True
-    show_change_link = True
-
-    def image_preview(self, obj):
-        if obj.image:
-            return format_html(
-                '<img src="{}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb;" />',
-                obj.image.url,
-            )
-        return format_html(
-            '<div class="bg-gray-100 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-400 dark:text-base-500 text-xs">No Image</div>'
-        )
-
-    image_preview.short_description = _("Preview")
-
-
-@admin.register(ProductCategory)
-class ProductCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
-    compressed_fields = True
-    warn_unsaved_form = True
-    list_fullwidth = True
-    list_filter_submit = True
-    list_filter_sheet = True
-
-    mptt_indent_field = "translations__name"
-    list_per_page = 25
-    list_display = (
-        "tree_actions",
-        "indented_title",
-        "category_info",
-        "category_stats",
-        "category_status",
-        "image_preview",
-        "created_display",
-        "products_count_display",
-        "recursive_products_display",
-    )
-    list_display_links = ("category_info",)
-    search_fields = ("translations__name", "translations__description")
-    list_filter = [
-        "active",
-        ("created_at", RangeDateTimeFilter),
-        ("updated_at", RangeDateTimeFilter),
-        "parent",
-    ]
-    inlines = [ProductCategoryImageInline]
-    readonly_fields = [
-        "uuid",
-        "created_at",
-        "updated_at",
-        "category_analytics",
-        "products_count_display",
-        "recursive_products_display",
-    ]
-
-    fieldsets = (
-        (
-            _("Category Information"),
-            {
-                "fields": ("parent", "slug", "active"),
-                "classes": ("wide",),
-            },
-        ),
-        (
-            _("Content"),
-            {
-                "fields": ("name", "description"),
-                "classes": ("wide",),
-            },
-        ),
-        (
-            _("SEO"),
-            {
-                "fields": ("seo_title", "seo_description", "seo_keywords"),
-                "classes": ("collapse",),
-            },
-        ),
-        (
-            _("Analytics"),
-            {
-                "fields": (
-                    "category_analytics",
-                    "products_count_display",
-                    "recursive_products_display",
-                ),
-                "classes": ("collapse",),
-            },
-        ),
-        (
-            _("System Information"),
-            {
-                "fields": ("uuid", "created_at", "updated_at"),
-                "classes": ("collapse",),
-            },
-        ),
-    )
-
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        qs = ProductCategory.objects.add_related_count(
-            qs,
-            Product,
-            "category",
-            "products_cumulative_count",
-            cumulative=True,
-        )
-        qs = ProductCategory.objects.add_related_count(
-            qs, Product, "category", "products_count", cumulative=False
-        )
-        return qs
-
-    def get_prepopulated_fields(self, request, obj=None):
-        return {"slug": ("name",)}
-
-    def category_info(self, instance):
-        name = (
-            instance.safe_translation_getter("name", any_language=True)
-            or "Unnamed Category"
-        )
-        level = instance.level
-        path = " → ".join(
-            [
-                cat.safe_translation_getter("name", any_language=True)
-                or "Unnamed"
-                for cat in instance.get_ancestors()
-            ]
-        )
-
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{}</div>'
-            '<div class="text-base-500 dark:text-base-400">Level: {}</div>'
-            '<div class="text-xs text-base-400 dark:text-base-500">{}</div>'
-            "</div>",
-            name,
-            level,
-            path if path else "Root Category",
-        )
-
-    category_info.short_description = _("Category")
-
-    def category_stats(self, instance):
-        direct_count = getattr(instance, "products_count", 0)
-        total_count = getattr(instance, "products_cumulative_count", 0)
-        children_count = instance.get_children().count()
-
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">Direct: {}</div>'
-            '<div class="text-base-600 dark:text-base-400">Total: {}</div>'
-            '<div class="text-base-500 dark:text-base-500">Subcategories: {}</div>'
-            "</div>",
-            direct_count,
-            total_count,
-            children_count,
-        )
-
-    category_stats.short_description = _("Product Stats")
-
-    def category_status(self, instance):
-        if instance.active:
-            status_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
-                "✅ Active"
-                "</span>"
-            )
-        else:
-            status_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
-                "❌ Inactive"
-                "</span>"
-            )
-
-        return status_badge
-
-    category_status.short_description = _("Status")
-
-    def image_preview(self, instance):
-        main_image = instance.main_image
-        if main_image and main_image.image:
-            return format_html(
-                '<img src="{}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 6px; border: 1px solid #e5e7eb;" />',
-                main_image.image.url,
-            )
-        return format_html(
-            '<div class="bg-gray-100 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-400 dark:text-base-500 text-xs">'
-            "📁"
-            "</div>"
-        )
-
-    image_preview.short_description = _("Image")
-
-    def created_display(self, instance):
-        return format_html(
-            '<div class="text-sm text-base-600 dark:text-base-400">{}</div>',
-            instance.created_at.strftime("%Y-%m-%d"),
-        )
-
-    created_display.short_description = _("Created")
-
-    def category_analytics(self, instance):
-        ancestors_count = instance.get_ancestors().count()
-        descendants_count = instance.get_descendants().count()
-        siblings_count = instance.get_siblings().count()
-
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Level:</strong></div><div>{}</div>"
-            "<div><strong>Ancestors:</strong></div><div>{}</div>"
-            "<div><strong>Descendants:</strong></div><div>{}</div>"
-            "<div><strong>Siblings:</strong></div><div>{}</div>"
-            "<div><strong>Direct Products:</strong></div><div>{}</div>"
-            "<div><strong>Total Products:</strong></div><div>{}</div>"
-            "</div>"
-            "</div>",
-            instance.level,
-            ancestors_count,
-            descendants_count,
-            siblings_count,
-            getattr(instance, "products_count", 0),
-            getattr(instance, "products_cumulative_count", 0),
-        )
-
-    category_analytics.short_description = _("Category Analytics")
-
-    def products_count_display(self, instance):
-        count = getattr(instance, "products_count", 0)
-        return format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-semibold bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">{}</span>',
-            count,
-        )
-
-    products_count_display.short_description = _("Direct Products")
-
-    def recursive_products_display(self, instance):
-        count = getattr(instance, "products_cumulative_count", 0)
-        return format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-full">{}</span>',
-            count,
-        )
-
-    recursive_products_display.short_description = _("Total Products")
 
 
 @admin.register(Product)
@@ -548,20 +299,10 @@ class ProductAdmin(
     actions = [
         "make_active",
         "make_inactive",
-        "apply_discount_10",
-        "apply_discount_20",
-        "apply_discount_50",
+        "apply_custom_discount",
         "clear_discount",
     ]
     date_hierarchy = "created_at"
-
-    formfield_overrides = {
-        MeasurementField: {
-            "widget": MeasurementWidget(
-                unit_choices=WeightUnits.CHOICES,
-            )
-        },
-    }
 
     fieldsets = (
         (
@@ -643,6 +384,13 @@ class ProductAdmin(
             },
         ),
     )
+
+    def get_form(self, request, obj=None, change=False, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        form.base_fields["weight"].widget = MeasurementWidget(
+            unit_choices=WeightUnits.CHOICES
+        )
+        return form
 
     def get_queryset(self, request):
         return (
@@ -1029,42 +777,127 @@ class ProductAdmin(
         )
 
     @action(
-        description=_("Apply 10%% discount"),
+        description=_("Apply custom discount to selected products"),
         variant=ActionVariant.INFO,
         icon="local_offer",
+        permissions=["change"],
     )
-    def apply_discount_10(self, request, queryset):
-        updated = queryset.update(discount_percent=Decimal("10.0"))
-        self.message_user(
-            request,
-            _("Applied 10%% discount to %(count)d products.")
-            % {"count": updated},
-        )
+    def apply_custom_discount(self, request, queryset):
+        is_action_post = "_selected_action" in request.POST
+        is_form_post = "discount_percent" in request.POST
 
-    @action(
-        description=_("Apply 20%% discount"),
-        variant=ActionVariant.INFO,
-        icon="local_offer",
-    )
-    def apply_discount_20(self, request, queryset):
-        updated = queryset.update(discount_percent=Decimal("20.0"))
-        self.message_user(
-            request,
-            _("Applied 20%% discount to %(count)d products.")
-            % {"count": updated},
-        )
+        if is_action_post and not is_form_post:
+            selected_ids = list(queryset.values_list("id", flat=True))
+            request.session["selected_product_ids"] = selected_ids
 
-    @action(
-        description=_("Apply 50%% discount (Clearance)"),
-        variant=ActionVariant.WARNING,
-        icon="local_offer",
-    )
-    def apply_discount_50(self, request, queryset):
-        updated = queryset.update(discount_percent=Decimal("50.0"))
-        self.message_user(
-            request,
-            _("Applied 50%% clearance discount to %(count)d products.")
-            % {"count": updated},
+            total_count = queryset.count()
+            active_count = queryset.filter(active=True).count()
+            inactive_count = total_count - active_count
+
+            form = ApplyDiscountForm()
+
+            context = {
+                **self.admin_site.each_context(request),
+                "title": _("Apply Custom Discount"),
+                "form": form,
+                "queryset": queryset,
+                "total_count": total_count,
+                "active_count": active_count,
+                "inactive_count": inactive_count,
+                "opts": self.model._meta,
+                "has_view_permission": self.has_view_permission(request),
+                "has_change_permission": self.has_change_permission(request),
+                "breadcrumbs_items": [
+                    {"title": _("Home"), "link": "admin:index"},
+                    {
+                        "title": self.model._meta.verbose_name_plural.title(),
+                        "link": "admin:product_product_changelist",
+                    },
+                    {"title": _("Apply Custom Discount")},
+                ],
+            }
+
+            return render(request, "admin/product/apply_discount.html", context)
+
+        if is_form_post:
+            selected_ids = request.session.get("selected_product_ids", [])
+
+            if selected_ids:
+                queryset = Product.objects.filter(id__in=selected_ids)
+            else:
+                messages.error(
+                    request, _("No products selected. Please try again.")
+                )
+                return HttpResponseRedirect(
+                    reverse_lazy("admin:product_product_changelist")
+                )
+
+            form = ApplyDiscountForm(request.POST)
+
+            if form.is_valid():
+                discount_percent = form.cleaned_data["discount_percent"]
+                apply_to_inactive = form.cleaned_data["apply_to_inactive"]
+
+                if not apply_to_inactive:
+                    queryset = queryset.filter(active=True)
+
+                updated = queryset.update(discount_percent=discount_percent)
+
+                if "selected_product_ids" in request.session:
+                    del request.session["selected_product_ids"]
+
+                self.message_user(
+                    request,
+                    ngettext(
+                        _(
+                            "Applied %(discount)s%% discount to %(count)d product."
+                        ),
+                        _(
+                            "Applied %(discount)s%% discount to %(count)d products."
+                        ),
+                        updated,
+                    )
+                    % {"count": updated, "discount": discount_percent},
+                    messages.SUCCESS,
+                )
+
+                return HttpResponseRedirect(
+                    reverse_lazy("admin:product_product_changelist")
+                )
+            else:
+                total_count = queryset.count()
+                active_count = queryset.filter(active=True).count()
+                inactive_count = total_count - active_count
+
+                context = {
+                    **self.admin_site.each_context(request),
+                    "title": _("Apply Custom Discount"),
+                    "form": form,
+                    "queryset": queryset,
+                    "total_count": total_count,
+                    "active_count": active_count,
+                    "inactive_count": inactive_count,
+                    "opts": self.model._meta,
+                    "has_view_permission": self.has_view_permission(request),
+                    "has_change_permission": self.has_change_permission(
+                        request
+                    ),
+                    "breadcrumbs_items": [
+                        {"title": _("Home"), "link": "admin:index"},
+                        {
+                            "title": self.model._meta.verbose_name_plural.title(),
+                            "link": "admin:product_product_changelist",
+                        },
+                        {"title": _("Apply Custom Discount")},
+                    ],
+                }
+
+                return render(
+                    request, "admin/product/apply_discount.html", context
+                )
+
+        return HttpResponseRedirect(
+            reverse_lazy("admin:product_product_changelist")
         )
 
     @action(
@@ -1084,6 +917,258 @@ class ProductAdmin(
             % {"count": updated},
             messages.SUCCESS,
         )
+
+
+@admin_thumbnails.thumbnail("image")
+class ProductCategoryImageInline(TabularInline):
+    model = ProductCategoryImage
+    extra = 0
+    fields = ("image_preview", "image", "image_type", "active")
+    readonly_fields = ("image_preview",)
+
+    tab = True
+    show_change_link = True
+
+    def image_preview(self, obj):
+        if obj.image:
+            return format_html(
+                '<img src="{}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb;" />',
+                obj.image.url,
+            )
+        return format_html(
+            '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-400 dark:text-base-500 text-xs">No Image</div>'
+        )
+
+    image_preview.short_description = _("Preview")
+
+
+@admin.register(ProductCategory)
+class ProductCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
+    compressed_fields = True
+    warn_unsaved_form = True
+    list_fullwidth = True
+    list_filter_submit = True
+    list_filter_sheet = True
+
+    mptt_indent_field = "translations__name"
+    list_per_page = 25
+    list_display = (
+        "tree_actions",
+        "indented_title",
+        "category_info",
+        "category_stats",
+        "category_status",
+        "image_preview",
+        "created_display",
+        "products_count_display",
+        "recursive_products_display",
+    )
+    list_display_links = ("category_info",)
+    search_fields = ("translations__name", "translations__description")
+    list_filter = [
+        "active",
+        ("created_at", RangeDateTimeFilter),
+        ("updated_at", RangeDateTimeFilter),
+        "parent",
+    ]
+    inlines = [ProductCategoryImageInline]
+    readonly_fields = [
+        "uuid",
+        "created_at",
+        "updated_at",
+        "category_analytics",
+        "products_count_display",
+        "recursive_products_display",
+    ]
+
+    fieldsets = (
+        (
+            _("Category Information"),
+            {
+                "fields": ("parent", "slug", "active"),
+                "classes": ("wide",),
+            },
+        ),
+        (
+            _("Content"),
+            {
+                "fields": ("name", "description"),
+                "classes": ("wide",),
+            },
+        ),
+        (
+            _("SEO"),
+            {
+                "fields": ("seo_title", "seo_description", "seo_keywords"),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            _("Analytics"),
+            {
+                "fields": (
+                    "category_analytics",
+                    "products_count_display",
+                    "recursive_products_display",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            _("System Information"),
+            {
+                "fields": ("uuid", "created_at", "updated_at"),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        qs = ProductCategory.objects.add_related_count(
+            qs,
+            Product,
+            "category",
+            "products_cumulative_count",
+            cumulative=True,
+        )
+        qs = ProductCategory.objects.add_related_count(
+            qs, Product, "category", "products_count", cumulative=False
+        )
+        return qs
+
+    def get_prepopulated_fields(self, request, obj=None):
+        return {"slug": ("name",)}
+
+    def category_info(self, instance):
+        name = (
+            instance.safe_translation_getter("name", any_language=True)
+            or "Unnamed Category"
+        )
+        level = instance.level
+        path = " → ".join(
+            [
+                cat.safe_translation_getter("name", any_language=True)
+                or "Unnamed"
+                for cat in instance.get_ancestors()
+            ]
+        )
+
+        return format_html(
+            '<div class="text-sm">'
+            '<div class="font-medium text-base-900 dark:text-base-100">{}</div>'
+            '<div class="text-base-500 dark:text-base-400">Level: {}</div>'
+            '<div class="text-xs text-base-400 dark:text-base-500">{}</div>'
+            "</div>",
+            name,
+            level,
+            path if path else "Root Category",
+        )
+
+    category_info.short_description = _("Category")
+
+    def category_stats(self, instance):
+        direct_count = getattr(instance, "products_count", 0)
+        total_count = getattr(instance, "products_cumulative_count", 0)
+        children_count = instance.get_children().count()
+
+        return format_html(
+            '<div class="text-sm">'
+            '<div class="font-medium text-base-900 dark:text-base-100">Direct: {}</div>'
+            '<div class="text-base-600 dark:text-base-400">Total: {}</div>'
+            '<div class="text-base-500 dark:text-base-500">Subcategories: {}</div>'
+            "</div>",
+            direct_count,
+            total_count,
+            children_count,
+        )
+
+    category_stats.short_description = _("Product Stats")
+
+    def category_status(self, instance):
+        if instance.active:
+            status_badge = format_html(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
+                "✅ Active"
+                "</span>"
+            )
+        else:
+            status_badge = format_html(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
+                "❌ Inactive"
+                "</span>"
+            )
+
+        return status_badge
+
+    category_status.short_description = _("Status")
+
+    def image_preview(self, instance):
+        main_image = instance.main_image
+        if main_image and main_image.image:
+            return format_html(
+                '<img src="{}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 6px; border: 1px solid #e5e7eb;" />',
+                main_image.image.url,
+            )
+        return format_html(
+            '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-400 dark:text-base-500 text-xs">'
+            "📁"
+            "</div>"
+        )
+
+    image_preview.short_description = _("Image")
+
+    def created_display(self, instance):
+        return format_html(
+            '<div class="text-sm text-base-600 dark:text-base-400">{}</div>',
+            instance.created_at.strftime("%Y-%m-%d"),
+        )
+
+    created_display.short_description = _("Created")
+
+    def category_analytics(self, instance):
+        ancestors_count = instance.get_ancestors().count()
+        descendants_count = instance.get_descendants().count()
+        siblings_count = instance.get_siblings().count()
+
+        return format_html(
+            '<div class="text-sm">'
+            '<div class="grid grid-cols-2 gap-2">'
+            "<div><strong>Level:</strong></div><div>{}</div>"
+            "<div><strong>Ancestors:</strong></div><div>{}</div>"
+            "<div><strong>Descendants:</strong></div><div>{}</div>"
+            "<div><strong>Siblings:</strong></div><div>{}</div>"
+            "<div><strong>Direct Products:</strong></div><div>{}</div>"
+            "<div><strong>Total Products:</strong></div><div>{}</div>"
+            "</div>"
+            "</div>",
+            instance.level,
+            ancestors_count,
+            descendants_count,
+            siblings_count,
+            getattr(instance, "products_count", 0),
+            getattr(instance, "products_cumulative_count", 0),
+        )
+
+    category_analytics.short_description = _("Category Analytics")
+
+    def products_count_display(self, instance):
+        count = getattr(instance, "products_count", 0)
+        return format_html(
+            '<span class="inline-flex items-center px-2 py-1 text-xs font-semibold bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">{}</span>',
+            count,
+        )
+
+    products_count_display.short_description = _("Direct Products")
+
+    def recursive_products_display(self, instance):
+        count = getattr(instance, "products_cumulative_count", 0)
+        return format_html(
+            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-full">{}</span>',
+            count,
+        )
+
+    recursive_products_display.short_description = _("Total Products")
 
 
 @admin.register(ProductReview)
@@ -1247,7 +1332,7 @@ class ProductReviewAdmin(ModelAdmin, TranslatableAdmin):
         config = status_config.get(
             obj.status,
             {
-                "bg": "bg-gray-50 dark:bg-gray-800",
+                "bg": "bg-gray-50 dark:bg-gray-900",
                 "text": "text-base-700 dark:text-base-300",
                 "icon": "❓",
             },
@@ -1467,7 +1552,7 @@ class ProductCategoryImageAdmin(ModelAdmin, TranslatableAdmin):
                 obj.image.url,
             )
         return format_html(
-            '<div class="bg-gray-100 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-400 dark:text-base-500 text-xs">No Image</div>'
+            '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-400 dark:text-base-500 text-xs">No Image</div>'
         )
 
     image_preview.short_description = _("Preview")
@@ -1506,7 +1591,7 @@ class ProductCategoryImageAdmin(ModelAdmin, TranslatableAdmin):
         config = type_config.get(
             obj.image_type,
             {
-                "bg": "bg-gray-50 dark:bg-gray-800",
+                "bg": "bg-gray-50 dark:bg-gray-900",
                 "text": "text-base-700 dark:text-base-700",
                 "icon": "📸",
             },
@@ -1606,7 +1691,7 @@ class ProductImageAdmin(ModelAdmin, TranslatableAdmin):
                 obj.image.url,
             )
         return format_html(
-            '<div class="bg-gray-100 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-400 dark:text-base-500 text-xs">No Image</div>'
+            '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-400 dark:text-base-500 text-xs">No Image</div>'
         )
 
     image_preview.short_description = _("Preview")
@@ -1636,7 +1721,7 @@ class ProductImageAdmin(ModelAdmin, TranslatableAdmin):
             )
         else:
             return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-gray-50 dark:bg-gray-800 text-base-700 dark:text-base-700 rounded-full">'
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-gray-50 dark:bg-gray-900 text-base-700 dark:text-base-700 rounded-full">'
                 "📷 Gallery"
                 "</span>"
             )

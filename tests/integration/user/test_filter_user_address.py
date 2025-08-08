@@ -432,7 +432,6 @@ class UserAddressFilterTest(APITestCase):
         self.assertEqual(response.status_code, 200)
 
         result_ids = [r["id"] for r in response.data["results"]]
-
         self.assertGreaterEqual(len(result_ids), 1)
 
         self.assertNotIn(self.home_address.id, result_ids)

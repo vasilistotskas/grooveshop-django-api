@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-08-07 14:18+0300\n"
+"POT-Creation-Date: 2025-08-08 17:26+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -933,11 +933,11 @@ msgstr ""
 msgid "Sort order cannot be negative."
 msgstr ""
 
-#: .\blog\views\author.py:89
+#: .\blog\views\author.py:93
 msgid "Get author's blog posts"
 msgstr ""
 
-#: .\blog\views\author.py:91
+#: .\blog\views\author.py:95
 msgid "Retrieve all blog posts written by this author with proper pagination."
 msgstr ""
 
@@ -1002,7 +1002,7 @@ msgstr ""
 msgid "Batch reorder categories by updating their sort_order values."
 msgstr ""
 
-#: .\blog\views\category.py:325
+#: .\blog\views\category.py:328
 msgid "Categories reordered successfully."
 msgstr ""
 
@@ -4937,35 +4937,35 @@ msgid ""
 "Get favourite entries for the specified product IDs. Requires authentication."
 msgstr ""
 
-#: .\product\views\product.py:91
+#: .\product\views\product.py:99
 msgid "Increment product view count"
 msgstr ""
 
-#: .\product\views\product.py:92
+#: .\product\views\product.py:100
 msgid "Increment the view count for a product."
 msgstr ""
 
-#: .\product\views\product.py:114
+#: .\product\views\product.py:122
 msgid "Get product reviews"
 msgstr ""
 
-#: .\product\views\product.py:115
+#: .\product\views\product.py:123
 msgid "Get all reviews for a product."
 msgstr ""
 
-#: .\product\views\product.py:144
+#: .\product\views\product.py:152
 msgid "Get product images"
 msgstr ""
 
-#: .\product\views\product.py:145
+#: .\product\views\product.py:153
 msgid "Get all images for a product."
 msgstr ""
 
-#: .\product\views\product.py:174
+#: .\product\views\product.py:182
 msgid "Get product tags"
 msgstr ""
 
-#: .\product\views\product.py:175
+#: .\product\views\product.py:183
 msgid "Get all tags associated with a product."
 msgstr ""
 
@@ -5134,19 +5134,19 @@ msgstr ""
 msgid "Seo Keywords"
 msgstr ""
 
-#: .\settings.py:203
+#: .\settings.py:202
 msgid "Greek"
 msgstr ""
 
-#: .\settings.py:204
+#: .\settings.py:203
 msgid "English"
 msgstr ""
 
-#: .\settings.py:205
+#: .\settings.py:204
 msgid "German"
 msgstr ""
 
-#: .\settings.py:1113
+#: .\settings.py:1112
 msgid "Cache"
 msgstr ""
 
@@ -6010,23 +6010,23 @@ msgstr ""
 msgid "Get a summary of subscriptions for a specific user."
 msgstr ""
 
-#: .\user\views\account.py:382
+#: .\user\views\account.py:385
 msgid "Topic ID is required."
 msgstr ""
 
-#: .\user\views\account.py:392
+#: .\user\views\account.py:395
 msgid "Topic not found or not active."
 msgstr ""
 
-#: .\user\views\account.py:412
+#: .\user\views\account.py:415
 msgid "User is already subscribed to this topic."
 msgstr ""
 
-#: .\user\views\account.py:433
+#: .\user\views\account.py:436
 msgid "Username already exists."
 msgstr ""
 
-#: .\user\views\account.py:441
+#: .\user\views\account.py:444
 msgid "Username updated successfully."
 msgstr ""
 

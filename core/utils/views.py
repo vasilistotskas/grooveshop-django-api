@@ -47,7 +47,14 @@ cache_methods_registry = []
 
 def cache_methods(timeout, methods, *, cache=None):
     def class_decorator(cls):
-        if "test" in sys.argv or getattr(settings, "DISABLE_CACHE", False):
+        is_testing = (
+            "test" in sys.argv
+            or "pytest" in sys.argv[0]
+            or any("pytest" in arg for arg in sys.argv)
+            or getattr(settings, "DISABLE_CACHE", False)
+        )
+
+        if is_testing:
             return cls
         for method_name in methods:
             func = getattr(cls, method_name)

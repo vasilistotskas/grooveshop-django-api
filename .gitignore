@@ -9,6 +9,7 @@ mediafiles/*
 cache/*
 logs/*
 backups/*
+.auth-token
 
 # Not all .gitkeep files
 !.gitkeep

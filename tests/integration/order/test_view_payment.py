@@ -273,7 +273,9 @@ class OrderPaymentViewSetTestCase(TestCase):
         response = view(request, pk=self.user_order.pk)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("no associated payment", response.data["detail"])
+        self.assertIn(
+            "This order has no associated payment", response.data["detail"]
+        )
 
     @mock.patch("order.views.payment.PayWayService.refund_payment")
     @mock.patch(

@@ -3,9 +3,16 @@ from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
 from blog.models import BlogPost
+from core.filters.camel_case_filters import (
+    CamelCasePublishableTimeStampFilterSet,
+)
+from core.filters.core import UUIDFilterMixin
 
 
-class BlogPostFilter(filters.FilterSet):
+class BlogPostFilter(
+    UUIDFilterMixin,
+    CamelCasePublishableTimeStampFilterSet,
+):
     title = filters.CharFilter(
         field_name="translations__title",
         lookup_expr="icontains",
@@ -39,11 +46,6 @@ class BlogPostFilter(filters.FilterSet):
         lookup_expr="exact",
         help_text=_("Filter by featured status"),
     )
-    is_published = filters.BooleanFilter(
-        field_name="is_published",
-        lookup_expr="exact",
-        help_text=_("Filter by published status"),
-    )
     min_view_count = filters.NumberFilter(
         field_name="view_count",
         lookup_expr="gte",
@@ -65,26 +67,46 @@ class BlogPostFilter(filters.FilterSet):
         help_text=_("Filter by author full name (case-insensitive)"),
     )
 
+    category = filters.ModelChoiceFilter(
+        field_name="category",
+        queryset=None,
+        help_text=_("Filter by category ID"),
+    )
+    author = filters.ModelChoiceFilter(
+        field_name="author",
+        queryset=None,
+        help_text=_("Filter by author ID"),
+    )
+    tags = filters.ModelMultipleChoiceFilter(
+        field_name="tags",
+        queryset=None,
+        help_text=_("Filter by tag IDs (comma-separated)"),
+    )
+
     class Meta:
         model = BlogPost
-        fields = [
-            "id",
-            "tags",
-            "slug",
-            "author",
-            "category",
-            "title",
-            "author_email",
-            "author_name",
-            "category_name",
-            "tag_name",
-            "featured",
-            "is_published",
-            "min_likes",
-            "min_comments",
-            "min_tags",
-            "min_view_count",
-        ]
+        fields = {
+            "created_at": ["gte", "lte", "date"],
+            "updated_at": ["gte", "lte", "date"],
+            "published_at": ["gte", "lte", "date"],
+            "is_published": ["exact"],
+            "uuid": ["exact"],
+            "id": ["exact", "in"],
+            "slug": ["exact", "icontains"],
+            "featured": ["exact"],
+            "view_count": ["gte", "lte", "exact"],
+            "category": ["exact"],
+            "author": ["exact"],
+            "tags": ["exact"],
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from blog.models import BlogCategory, BlogAuthor, BlogTag
+
+        self.filters["category"].queryset = BlogCategory.objects.all()
+        self.filters["author"].queryset = BlogAuthor.objects.all()
+        self.filters["tags"].queryset = BlogTag.objects.all()
 
     def filter_author_name(self, queryset, name, value):
         if value:

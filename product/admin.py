@@ -259,7 +259,7 @@ class ProductAdmin(
     ]
     search_fields = [
         "id",
-        "product_code",
+        "sku",
         "translations__name",
         "translations__description",
         "category__translations__name",
@@ -285,7 +285,7 @@ class ProductAdmin(
     readonly_fields = (
         "id",
         "uuid",
-        "product_code",
+        "sku",
         "created_at",
         "updated_at",
         "view_count",
@@ -309,7 +309,7 @@ class ProductAdmin(
             _("Product Information"),
             {
                 "fields": (
-                    "product_code",
+                    "sku",
                     "category",
                     "active",
                     "name",
@@ -432,7 +432,7 @@ class ProductAdmin(
             "</div>",
             image_html,
             name,
-            obj.product_code[:8],
+            obj.sku[:8],
         )
 
     product_info.short_description = _("Product")
@@ -1444,7 +1444,7 @@ class ProductFavouriteAdmin(ModelAdmin):
         "user__email",
         "user__username",
         "product__translations__name",
-        "product__product_code",
+        "product__sku",
     ]
     list_select_related = ["user", "product"]
     readonly_fields = ("created_at", "updated_at", "uuid")
@@ -1472,7 +1472,7 @@ class ProductFavouriteAdmin(ModelAdmin):
             '<div class="text-base-500 dark:text-base-400">#{}</div>'
             "</div>",
             name,
-            obj.product.product_code[:8],
+            obj.product.sku[:8],
         )
 
     product_display.short_description = _("Product")
@@ -1646,7 +1646,7 @@ class ProductImageAdmin(ModelAdmin, TranslatableAdmin):
     ]
     search_fields = [
         "product__translations__name",
-        "product__product_code",
+        "product__sku",
         "translations__title",
     ]
     list_select_related = ["product"]
@@ -1707,7 +1707,7 @@ class ProductImageAdmin(ModelAdmin, TranslatableAdmin):
             '<div class="text-base-500 dark:text-base-400">#{}</div>'
             "</div>",
             name,
-            obj.product.product_code[:8],
+            obj.product.sku[:8],
         )
 
     product_name.short_description = _("Product")

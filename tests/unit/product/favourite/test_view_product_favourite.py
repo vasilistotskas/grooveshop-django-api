@@ -74,10 +74,6 @@ class ProductFavouriteViewSetTestCase(TestCase):
         self.assertIn("user", str(queryset.query))
         self.assertIn("product", str(queryset.query))
 
-    def test_filterset_fields_configuration(self):
-        expected_fields = ["id", "user_id", "product_id"]
-        self.assertEqual(self.viewset.filterset_fields, expected_fields)
-
     def test_ordering_fields_configuration(self):
         expected_fields = [
             "id",

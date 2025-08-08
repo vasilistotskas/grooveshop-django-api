@@ -2,17 +2,14 @@ from __future__ import annotations
 
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.filters import SearchFilter
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from core.api.permissions import IsOwnerOrAdmin
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
@@ -25,7 +22,6 @@ from product.serializers.review import (
     ProductReviewDetailSerializer,
     ProductReviewSerializer,
     ProductReviewWriteSerializer,
-    UserProductReviewRequestSerializer,
 )
 
 
@@ -44,32 +40,26 @@ from product.serializers.review import (
     )
 )
 class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
-    filter_backends = [
-        DjangoFilterBackend,
-        PascalSnakeCaseOrderingFilter,
-        SearchFilter,
-    ]
-
     filterset_class = ProductReviewFilter
-
     ordering_fields = [
         "id",
         "user_id",
         "product_id",
         "rate",
+        "status",
+        "is_published",
         "created_at",
         "updated_at",
         "published_at",
     ]
-
     ordering = ["-created_at"]
-
     search_fields = [
         "product__translations__name",
         "user__email",
+        "user__first_name",
+        "user__last_name",
         "translations__comment",
     ]
-
     serializers = {
         "default": ProductReviewDetailSerializer,
         "list": ProductReviewSerializer,
@@ -79,7 +69,6 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
         "partial_update": ProductReviewWriteSerializer,
         "product": ProductSerializer,
     }
-
     response_serializers = {
         "create": ProductReviewDetailSerializer,
         "update": ProductReviewDetailSerializer,
@@ -108,7 +97,7 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
             "destroy",
             "user_product_review",
         ]:
-            self.permission_classes = [IsAuthenticated]
+            self.permission_classes = [IsOwnerOrAdmin]
         return super().get_permissions()
 
     def perform_create(self, serializer):
@@ -121,7 +110,6 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
             "Get the current user's review for a specific product. Requires authentication."
         ),
         tags=["Product Reviews"],
-        request=UserProductReviewRequestSerializer,
         responses={
             200: ProductReviewDetailSerializer,
             400: ErrorResponseSerializer,
@@ -129,7 +117,7 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
             404: ErrorResponseSerializer,
         },
     )
-    @action(detail=False, methods=["POST"])
+    @action(detail=True, methods=["GET"])
     def user_product_review(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return Response(
@@ -137,19 +125,11 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        serializer = UserProductReviewRequestSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(
-                serializer.errors,
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        product_id = serializer.validated_data["product"]
         user_id = request.user.id
 
         try:
             review = ProductReview.objects.get(
-                user_id=user_id, product_id=product_id
+                user_id=user_id, product_id=kwargs["pk"]
             )
             review_serializer = ProductReviewDetailSerializer(
                 review, context=self.get_serializer_context()

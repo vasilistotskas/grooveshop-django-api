@@ -2,16 +2,19 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
-from django_filters.rest_framework import DjangoFilterBackend
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import (
+    extend_schema,
+    extend_schema_view,
+    OpenApiParameter,
+)
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.filters import SearchFilter
+
 from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
@@ -45,12 +48,6 @@ schema_config = create_schema_view_config(
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
     queryset = Product.objects.all()
-    filter_backends = [
-        DjangoFilterBackend,
-        PascalSnakeCaseOrderingFilter,
-        SearchFilter,
-    ]
-    filterset_class = ProductFilter
     ordering_fields = [
         "price",
         "created_at",
@@ -65,6 +62,16 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
     ordering = ["-created_at"]
     search_fields = ["translations__name", "translations__description", "slug"]
 
+    @property
+    def filterset_class(self):
+        if hasattr(self, "action") and self.action in [
+            "images",
+            "reviews",
+            "tags",
+        ]:
+            return None
+        return ProductFilter
+
     serializers = {
         "default": ProductDetailSerializer,
         "list": ProductSerializer,
@@ -77,7 +84,6 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
         "images": ProductImageSerializer,
         "tags": TagSerializer,
     }
-
     response_serializers = {
         "create": ProductDetailSerializer,
         "update": ProductDetailSerializer,
@@ -116,6 +122,14 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
         summary=_("Get product reviews"),
         description=_("Get all reviews for a product."),
         tags=["Products"],
+        parameters=[
+            OpenApiParameter(
+                name="id",
+                type=int,
+                location=OpenApiParameter.PATH,
+                description="Product ID",
+            ),
+        ],
         responses={
             200: ProductReviewSerializer(many=True),
             404: ErrorResponseSerializer,
@@ -138,6 +152,14 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
         summary=_("Get product images"),
         description=_("Get all images for a product."),
         tags=["Products"],
+        parameters=[
+            OpenApiParameter(
+                name="id",
+                type=int,
+                location=OpenApiParameter.PATH,
+                description="Product ID",
+            ),
+        ],
         responses={
             200: ProductImageSerializer(many=True),
             404: ErrorResponseSerializer,
@@ -160,7 +182,14 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
         summary=_("Get product tags"),
         description=_("Get all tags associated with a product."),
         tags=["Products"],
-        parameters=[],
+        parameters=[
+            OpenApiParameter(
+                name="id",
+                type=int,
+                location=OpenApiParameter.PATH,
+                description="Product ID",
+            ),
+        ],
         responses={
             200: TagSerializer(many=True),
             404: ErrorResponseSerializer,

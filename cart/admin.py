@@ -2,7 +2,8 @@ from datetime import timedelta
 
 from django.contrib import admin
 from django.utils import timezone
-from django.utils.html import format_html
+from django.utils.html import conditional_escape
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.contrib.filters.admin import (
@@ -105,7 +106,6 @@ class CartItemInline(TabularInline):
         "total_price_display",
         "discount_info",
     )
-
     tab = True
     show_change_link = True
 
@@ -115,14 +115,15 @@ class CartItemInline(TabularInline):
                 obj.product.safe_translation_getter("name", any_language=True)
                 or "Unnamed Product"
             )
-            return format_html(
-                '<div class="text-sm">'
-                '<div class="font-medium text-base-900 dark:text-base-100">{}</div>'
-                '<div class="text-base-500 dark:text-base-400">ID: {}</div>'
-                "</div>",
-                product_name,
-                obj.product.id,
+            safe_name = conditional_escape(product_name)
+            safe_id = conditional_escape(str(obj.product.id))
+            html = (
+                f'<div class="text-sm">'
+                f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
+                f'<div class="text-base-500 dark:text-base-400">ID: {safe_id}</div>'
+                f"</div>"
             )
+            return mark_safe(html)
         return "-"
 
     product_display.short_description = _("Product")
@@ -130,41 +131,49 @@ class CartItemInline(TabularInline):
     def unit_price_display(self, obj):
         if hasattr(obj, "price") and hasattr(obj, "final_price"):
             if obj.price != obj.final_price:
-                return format_html(
-                    '<div class="text-sm">'
-                    '<div class="line-through text-base-500 dark:text-base-400">{}</div>'
-                    '<div class="font-medium text-green-600 dark:text-green-400">{}</div>'
-                    "</div>",
-                    obj.price,
-                    obj.final_price,
+                safe_price = conditional_escape(str(obj.price))
+                safe_final = conditional_escape(str(obj.final_price))
+                html = (
+                    f'<div class="text-sm">'
+                    f'<div class="line-through text-base-500 dark:text-base-400">{safe_price}</div>'
+                    f'<div class="font-medium text-green-600 dark:text-green-400">{safe_final}</div>'
+                    f"</div>"
                 )
             else:
-                return format_html(
-                    '<div class="text-sm font-medium text-base-900 dark:text-base-100">{}</div>',
-                    obj.final_price,
+                safe_final = conditional_escape(str(obj.final_price))
+                html = (
+                    f'<div class="text-sm font-medium text-base-900 dark:text-base-100">'
+                    f"{safe_final}"
+                    f"</div>"
                 )
+            return mark_safe(html)
         return "-"
 
     unit_price_display.short_description = _("Unit Price")
 
     def total_price_display(self, obj):
         if hasattr(obj, "total_price"):
-            return format_html(
-                '<div class="text-sm font-bold text-base-900 dark:text-base-100">{}</div>',
-                obj.total_price,
+            safe_total = conditional_escape(str(obj.total_price))
+            html = (
+                f'<div class="text-sm font-bold text-base-900 dark:text-base-100">'
+                f"{safe_total}"
+                f"</div>"
             )
+            return mark_safe(html)
         return "-"
 
     total_price_display.short_description = _("Total")
 
     def discount_info(self, obj):
         if hasattr(obj, "discount_percent") and obj.discount_percent > 0:
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
-                "-{}%"
-                "</span>",
-                obj.discount_percent,
+            safe_percent = conditional_escape(str(obj.discount_percent))
+            html = (
+                f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                f'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
+                f"-{safe_percent}%"
+                f"</span>"
             )
+            return mark_safe(html)
         return ""
 
     discount_info.short_description = _("Discount")
@@ -242,53 +251,54 @@ class CartAdmin(ModelAdmin):
     inlines = [CartItemInline]
 
     def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        return qs.prefetch_related("items__product")
+        return super().get_queryset(request).prefetch_related("items__product")
 
     def cart_owner_display(self, obj):
         if obj.user:
-            full_name = obj.user.full_name
-            username = obj.user.username
-            email = obj.user.email
-
-            display_name = full_name if full_name else username
-            return format_html(
-                '<div class="text-sm">'
-                '<div class="font-medium text-base-900 dark:text-base-100">{}</div>'
-                '<div class="text-base-500 dark:text-base-400">{}</div>'
-                "</div>",
-                display_name,
-                email,
+            display_name = obj.user.full_name or obj.user.username
+            safe_name = conditional_escape(display_name)
+            safe_email = conditional_escape(obj.user.email)
+            html = (
+                f'<div class="text-sm">'
+                f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
+                f'<div class="text-base-500 dark:text-base-400">{safe_email}</div>'
+                f"</div>"
             )
+            return mark_safe(html)
         elif obj.session_key:
-            return format_html(
-                '<div class="text-sm">'
-                '<div class="font-medium text-base-700 dark:text-base-300">Guest User</div>'
-                '<div class="text-base-500 dark:text-base-400 font-mono">{}...</div>'
-                "</div>",
-                obj.session_key[:12],
+            safe_key = conditional_escape(obj.session_key[:12])
+            html = (
+                f'<div class="text-sm">'
+                f'<div class="font-medium text-base-700 dark:text-base-300">Guest User</div>'
+                f'<div class="text-base-500 dark:text-base-400 font-mono">{safe_key}...</div>'
+                f"</div>"
             )
-        return format_html(
-            '<span class="text-base-400 dark:text-base-500 italic">Anonymous</span>'
-        )
+            return mark_safe(html)
+        else:
+            return mark_safe(
+                '<span class="text-base-400 dark:text-base-500 italic">Anonymous</span>'
+            )
 
     cart_owner_display.short_description = _("Cart Owner")
 
     def cart_type_badge(self, obj):
         if obj.user:
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
+            return mark_safe(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
                 "👤 User"
                 "</span>"
             )
         elif obj.session_key:
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
+            return mark_safe(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
                 "🛒 Guest"
                 "</span>"
             )
-        return format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-gray-50 dark:bg-gray-900 text-base-700 dark:text-base-300 rounded-full">'
+        return mark_safe(
+            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+            'bg-gray-50 dark:bg-gray-900 text-base-700 dark:text-base-300 rounded-full">'
             "❓ Unknown"
             "</span>"
         )
@@ -297,47 +307,51 @@ class CartAdmin(ModelAdmin):
 
     def activity_status_badge(self, obj):
         now = timezone.now()
-        time_diff = now - obj.last_activity
-
-        if time_diff < timedelta(hours=1):
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
-                "🟢 Active"
-                "</span>"
+        delta = now - obj.last_activity
+        if delta < timedelta(hours=1):
+            label, emoji = "Active", "🟢"
+            bg, text = (
+                "bg-green-50 dark:bg-green-900",
+                "text-green-700 dark:text-green-300",
             )
-        elif time_diff < timedelta(hours=24):
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-full">'
-                "🟡 Recent"
-                "</span>"
+        elif delta < timedelta(hours=24):
+            label, emoji = "Recent", "🟡"
+            bg, text = (
+                "bg-yellow-50 dark:bg-yellow-900",
+                "text-yellow-700 dark:text-yellow-300",
             )
-        elif time_diff < timedelta(days=7):
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full">'
-                "🟠 Idle"
-                "</span>"
+        elif delta < timedelta(days=7):
+            label, emoji = "Idle", "🟠"
+            bg, text = (
+                "bg-orange-50 dark:bg-orange-900",
+                "text-orange-700 dark:text-orange-300",
             )
         else:
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
-                "🔴 Abandoned"
-                "</span>"
+            label, emoji = "Abandoned", "🔴"
+            bg, text = (
+                "bg-red-50 dark:bg-red-900",
+                "text-red-700 dark:text-red-300",
             )
+
+        html = (
+            f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium {bg} {text} rounded-full">'
+            f"{emoji} {conditional_escape(label)}"
+            f"</span>"
+        )
+        return mark_safe(html)
 
     activity_status_badge.short_description = _("Activity")
 
     def items_summary(self, obj):
-        total_items = obj.total_items
-        unique_items = obj.total_items_unique
-
-        return format_html(
-            '<div class="text-sm text-base-700 dark:text-base-300">'
-            '<div class="font-medium">{} items</div>'
-            '<div class="text-base-500 dark:text-base-400">{} unique</div>'
-            "</div>",
-            total_items,
-            unique_items,
+        safe_total = conditional_escape(str(obj.total_items))
+        safe_unique = conditional_escape(str(obj.total_items_unique))
+        html = (
+            f'<div class="text-sm text-base-700 dark:text-base-300">'
+            f'<div class="font-medium">{safe_total} items</div>'
+            f'<div class="text-base-500 dark:text-base-400">{safe_unique} unique</div>'
+            f"</div>"
         )
+        return mark_safe(html)
 
     items_summary.short_description = _("Items")
 
@@ -345,73 +359,82 @@ class CartAdmin(ModelAdmin):
         total_price = obj.total_price
         total_discount = obj.total_discount_value
 
-        if total_discount.amount > 0:
-            return format_html(
-                '<div class="text-sm">'
-                '<div class="font-bold text-base-900 dark:text-base-100">{}</div>'
-                '<div class="text-red-600 dark:text-red-400 text-xs">-{} saved</div>'
-                "</div>",
-                total_price,
-                total_discount,
+        safe_price = conditional_escape(str(total_price))
+        if getattr(total_discount, "amount", 0) > 0:
+            safe_disc = conditional_escape(str(total_discount))
+            html = (
+                f'<div class="text-sm">'
+                f'<div class="font-bold text-base-900 dark:text-base-100">{safe_price}</div>'
+                f'<div class="text-red-600 dark:text-red-400 text-xs">-{safe_disc} saved</div>'
+                f"</div>"
             )
         else:
-            return format_html(
-                '<div class="text-sm font-bold text-base-900 dark:text-base-100">{}</div>',
-                total_price,
+            html = (
+                f'<div class="text-sm font-bold text-base-900 dark:text-base-100">'
+                f"{safe_price}"
+                f"</div>"
             )
+        return mark_safe(html)
 
     price_summary.short_description = _("Total")
 
     def cart_summary(self, obj):
-        return format_html(
-            '<div class="grid grid-cols-2 gap-4 text-sm">'
-            "<div>"
-            "<strong>Items:</strong> {} total, {} unique<br>"
-            "<strong>Total Price:</strong> {}<br>"
-            "<strong>Total Discount:</strong> {}"
-            "</div>"
-            "<div>"
-            "<strong>VAT:</strong> {}<br>"
-            "<strong>Activity:</strong> {}<br>"
-            "<strong>Created:</strong> {}"
-            "</div>"
-            "</div>",
-            obj.total_items,
-            obj.total_items_unique,
-            obj.total_price,
-            obj.total_discount_value,
-            obj.total_vat_value,
-            obj.last_activity.strftime("%Y-%m-%d %H:%M"),
-            obj.created_at.strftime("%Y-%m-%d %H:%M"),
+        safe_items = conditional_escape(str(obj.total_items))
+        safe_unique = conditional_escape(str(obj.total_items_unique))
+        safe_price = conditional_escape(str(obj.total_price))
+        safe_disc = conditional_escape(str(obj.total_discount_value))
+        safe_vat = conditional_escape(str(obj.total_vat_value))
+        safe_last = conditional_escape(
+            obj.last_activity.strftime("%Y-%m-%d %H:%M")
         )
+        safe_created = conditional_escape(
+            obj.created_at.strftime("%Y-%m-%d %H:%M")
+        )
+
+        html = (
+            f'<div class="grid grid-cols-2 gap-4 text-sm">'
+            f"<div>"
+            f"<strong>Items:</strong> {safe_items} total, {safe_unique} unique<br>"
+            f"<strong>Total Price:</strong> {safe_price}<br>"
+            f"<strong>Total Discount:</strong> {safe_disc}"
+            f"</div>"
+            f"<div>"
+            f"<strong>VAT:</strong> {safe_vat}<br>"
+            f"<strong>Activity:</strong> {safe_last}<br>"
+            f"<strong>Created:</strong> {safe_created}"
+            f"</div>"
+            f"</div>"
+        )
+        return mark_safe(html)
 
     cart_summary.short_description = _("Cart Summary")
 
     def financial_summary(self, obj):
-        savings_percent = 0
-        if obj.total_price.amount > 0 and obj.total_discount_value.amount > 0:
-            original_total = (
-                obj.total_price.amount + obj.total_discount_value.amount
-            )
-            savings_percent = (
-                obj.total_discount_value.amount / original_total
-            ) * 100
+        savings_percent = 0.0
+        if (
+            getattr(obj.total_price, "amount", 0) > 0
+            and getattr(obj.total_discount_value, "amount", 0) > 0
+        ):
+            original = obj.total_price.amount + obj.total_discount_value.amount
+            savings_percent = (obj.total_discount_value.amount / original) * 100
 
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="mb-2"><strong>Financial Breakdown:</strong></div>'
-            '<div class="grid grid-cols-2 gap-2">'
-            '<div>Final Total:</div><div class="font-bold">{}</div>'
-            '<div>Total Discounts:</div><div class="text-red-600 dark:text-red-400">-{}</div>'
-            "<div>Total VAT:</div><div>{}</div>"
-            '<div>Savings:</div><div class="text-green-600 dark:text-green-400">{:.1f}%</div>'
-            "</div>"
-            "</div>",
-            obj.total_price,
-            obj.total_discount_value,
-            obj.total_vat_value,
-            savings_percent,
+        safe_final = conditional_escape(str(obj.total_price))
+        safe_disc = conditional_escape(str(obj.total_discount_value))
+        safe_vat = conditional_escape(str(obj.total_vat_value))
+        safe_savings = conditional_escape(f"{savings_percent:.1f}%")
+
+        html = (
+            f'<div class="text-sm">'
+            f'<div class="mb-2"><strong>Financial Breakdown:</strong></div>'
+            f'<div class="grid grid-cols-2 gap-2">'
+            f'<div>Final Total:</div><div class="font-bold">{safe_final}</div>'
+            f'<div>Total Discounts:</div><div class="text-red-600 dark:text-red-400">-{safe_disc}</div>'
+            f"<div>Total VAT:</div><div>{safe_vat}</div>"
+            f'<div>Savings:</div><div class="text-green-600 dark:text-green-400">{safe_savings}</div>'
+            f"</div>"
+            f"</div>"
         )
+        return mark_safe(html)
 
     financial_summary.short_description = _("Financial Summary")
 
@@ -485,19 +508,20 @@ class CartItemAdmin(ModelAdmin):
     ]
 
     def cart_info(self, obj):
-        owner_info = (
+        owner = (
             "Guest"
             if not obj.cart.user
             else obj.cart.user.full_name or obj.cart.user.username
         )
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">Cart #{}</div>'
-            '<div class="text-base-500 dark:text-base-400">{}</div>'
-            "</div>",
-            obj.cart.id,
-            owner_info,
+        safe_owner = conditional_escape(owner)
+        safe_cart = conditional_escape(str(obj.cart.id))
+        html = (
+            f'<div class="text-sm">'
+            f'<div class="font-medium text-base-900 dark:text-base-100">Cart #{safe_cart}</div>'
+            f'<div class="text-base-500 dark:text-base-400">{safe_owner}</div>'
+            f"</div>"
         )
+        return mark_safe(html)
 
     cart_info.short_description = _("Cart")
 
@@ -506,26 +530,27 @@ class CartItemAdmin(ModelAdmin):
             obj.product.safe_translation_getter("name", any_language=True)
             or "Unnamed Product"
         )
-        product_id = obj.product.id
-
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{}</div>'
-            '<div class="text-base-500 dark:text-base-400">ID: {}</div>'
-            "</div>",
-            product_name,
-            product_id,
+        safe_name = conditional_escape(product_name)
+        safe_id = conditional_escape(str(obj.product.id))
+        html = (
+            f'<div class="text-sm">'
+            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
+            f'<div class="text-base-500 dark:text-base-400">ID: {safe_id}</div>'
+            f"</div>"
         )
+        return mark_safe(html)
 
     product_display.short_description = _("Product")
 
     def quantity_display(self, obj):
-        return format_html(
-            '<span class="inline-flex items-center px-3 py-1 text-sm font-medium bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
-            "x{}"
-            "</span>",
-            obj.quantity,
+        safe_qty = conditional_escape(str(obj.quantity))
+        html = (
+            f'<span class="inline-flex items-center px-3 py-1 text-sm font-medium '
+            f'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
+            f"x{safe_qty}"
+            f"</span>"
         )
+        return mark_safe(html)
 
     quantity_display.short_description = _("Qty")
 
@@ -536,72 +561,83 @@ class CartItemAdmin(ModelAdmin):
             and hasattr(obj, "total_price")
         ):
             if obj.price != obj.final_price:
-                return format_html(
-                    '<div class="text-sm">'
-                    '<div class="text-base-500 dark:text-base-400 line-through">{} each</div>'
-                    '<div class="font-medium text-green-600 dark:text-green-400">{} each</div>'
-                    '<div class="font-bold text-base-900 dark:text-base-100">Total: {}</div>'
-                    "</div>",
-                    obj.price,
-                    obj.final_price,
-                    obj.total_price,
+                safe_price = conditional_escape(str(obj.price))
+                safe_final = conditional_escape(str(obj.final_price))
+                safe_total = conditional_escape(str(obj.total_price))
+                html = (
+                    f'<div class="text-sm">'
+                    f'<div class="text-base-500 dark:text-base-400 line-through">{safe_price} each</div>'
+                    f'<div class="font-medium text-green-600 dark:text-green-400">{safe_final} each</div>'
+                    f'<div class="font-bold text-base-900 dark:text-base-100">Total: {safe_total}</div>'
+                    f"</div>"
                 )
             else:
-                return format_html(
-                    '<div class="text-sm">'
-                    '<div class="font-medium text-base-900 dark:text-base-100">{} each</div>'
-                    '<div class="font-bold text-base-900 dark:text-base-100">Total: {}</div>'
-                    "</div>",
-                    obj.final_price,
-                    obj.total_price,
+                safe_final = conditional_escape(str(obj.final_price))
+                safe_total = conditional_escape(str(obj.total_price))
+                html = (
+                    f'<div class="text-sm">'
+                    f'<div class="font-medium text-base-900 dark:text-base-100">{safe_final} each</div>'
+                    f'<div class="font-bold text-base-900 dark:text-base-100">Total: {safe_total}</div>'
+                    f"</div>"
                 )
+            return mark_safe(html)
         return "-"
 
     pricing_info.short_description = _("Pricing")
 
     def discount_badge(self, obj):
         if hasattr(obj, "discount_percent") and obj.discount_percent > 0:
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
-                "🏷️ -{}%"
-                "</span>",
-                obj.discount_percent,
+            safe_percent = conditional_escape(str(obj.discount_percent))
+            html = (
+                f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                f'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
+                f"🏷️ -{safe_percent}%"
+                f"</span>"
             )
+            return mark_safe(html)
         return ""
 
     discount_badge.short_description = _("Discount")
 
     def pricing_breakdown(self, obj):
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="grid grid-cols-2 gap-2">'
-            "<div>Unit Price:</div><div>{}</div>"
-            '<div>Final Price:</div><div class="font-medium">{}</div>'
-            "<div>Quantity:</div><div>{}</div>"
-            '<div>Total:</div><div class="font-bold">{}</div>'
-            "</div>"
-            "</div>",
-            getattr(obj, "price", "N/A"),
-            getattr(obj, "final_price", "N/A"),
-            obj.quantity,
-            getattr(obj, "total_price", "N/A"),
+        safe_price = conditional_escape(str(getattr(obj, "price", "N/A")))
+        safe_final = conditional_escape(str(getattr(obj, "final_price", "N/A")))
+        safe_qty = conditional_escape(str(obj.quantity))
+        safe_total = conditional_escape(str(getattr(obj, "total_price", "N/A")))
+        html = (
+            f'<div class="text-sm">'
+            f'<div class="grid grid-cols-2 gap-2">'
+            f"<div>Unit Price:</div><div>{safe_price}</div>"
+            f'<div>Final Price:</div><div class="font-medium">{safe_final}</div>'
+            f"<div>Quantity:</div><div>{safe_qty}</div>"
+            f'<div>Total:</div><div class="font-bold">{safe_total}</div>'
+            f"</div>"
+            f"</div>"
         )
+        return mark_safe(html)
 
     pricing_breakdown.short_description = _("Pricing Breakdown")
 
     def savings_info(self, obj):
         if hasattr(obj, "discount_percent") and obj.discount_percent > 0:
-            return format_html(
-                '<div class="text-sm text-green-600 dark:text-green-400">'
-                "<div>Discount: {}%</div>"
-                "<div>You save: {} per item</div>"
-                "<div>Total savings: {}</div>"
-                "</div>",
-                getattr(obj, "discount_percent", 0),
-                getattr(obj, "discount_value", "N/A"),
-                getattr(obj, "total_discount_value", "N/A"),
+            safe_percent = conditional_escape(
+                str(getattr(obj, "discount_percent", 0))
             )
-        return format_html(
+            safe_value = conditional_escape(
+                str(getattr(obj, "discount_value", "N/A"))
+            )
+            safe_total = conditional_escape(
+                str(getattr(obj, "total_discount_value", "N/A"))
+            )
+            html = (
+                f'<div class="text-sm text-green-600 dark:text-green-400">'
+                f"<div>Discount: {safe_percent}%</div>"
+                f"<div>You save: {safe_value} per item</div>"
+                f"<div>Total savings: {safe_total}</div>"
+                f"</div>"
+            )
+            return mark_safe(html)
+        return mark_safe(
             '<div class="text-sm text-base-500 dark:text-base-400">No discounts applied</div>'
         )
 

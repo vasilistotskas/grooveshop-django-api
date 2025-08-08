@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from django.conf import settings
-from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema_view
-from rest_framework.filters import SearchFilter
 
 from blog.filters.tag import BlogTagFilter
 from blog.models.tag import BlogTag
@@ -14,7 +12,7 @@ from blog.serializers.tag import (
 )
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
@@ -57,11 +55,6 @@ class BlogTagViewSet(MultiSerializerMixin, BaseModelViewSet):
         "update": BlogTagDetailSerializer,
         "partial_update": BlogTagDetailSerializer,
     }
-    filter_backends = [
-        DjangoFilterBackend,
-        PascalSnakeCaseOrderingFilter,
-        SearchFilter,
-    ]
     filterset_class = BlogTagFilter
     ordering_fields = [
         "id",
@@ -69,6 +62,7 @@ class BlogTagViewSet(MultiSerializerMixin, BaseModelViewSet):
         "created_at",
         "updated_at",
         "sort_order",
+        "name",
     ]
-    ordering = ["-created_at"]
+    ordering = ["sort_order", "-created_at"]
     search_fields = ["translations__name"]

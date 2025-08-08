@@ -358,7 +358,7 @@ class TestProductAdmin:
         assert (
             product.safe_translation_getter("name", any_language=True) in result
         )
-        assert product.product_code[:8] in result
+        assert product.sku[:8] in result
 
     def test_category_display(self, product_admin):
         category = ProductCategoryFactory()
@@ -471,21 +471,6 @@ class TestProductAdmin:
         for product in products:
             product.refresh_from_db()
             assert product.active is False
-
-        mock_message.assert_called_once()
-
-    @patch.object(ProductAdmin, "message_user")
-    def test_apply_discount_10_action(
-        self, mock_message, product_admin, admin_request
-    ):
-        products = [ProductFactory(discount_percent=0) for _ in range(2)]
-        queryset = Product.objects.filter(id__in=[p.id for p in products])
-
-        product_admin.apply_discount_10(admin_request, queryset)
-
-        for product in products:
-            product.refresh_from_db()
-            assert product.discount_percent == 10
 
         mock_message.assert_called_once()
 

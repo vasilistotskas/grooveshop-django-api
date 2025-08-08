@@ -2,10 +2,22 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
+from core.filters.camel_case_filters import CamelCaseFilterMixin
+from core.filters.core import (
+    TimeStampFilterMixin,
+    UUIDFilterMixin,
+    SortableFilterMixin,
+)
 from pay_way.models import PayWay
 
 
-class PayWayFilter(filters.FilterSet):
+class PayWayFilter(
+    TimeStampFilterMixin,
+    UUIDFilterMixin,
+    SortableFilterMixin,
+    CamelCaseFilterMixin,
+    filters.FilterSet,
+):
     id = filters.NumberFilter(
         field_name="id",
         lookup_expr="exact",
@@ -71,21 +83,17 @@ class PayWayFilter(filters.FilterSet):
 
     class Meta:
         model = PayWay
-        fields = [
-            "id",
-            "active",
-            "cost_min",
-            "cost_max",
-            "free_threshold_min",
-            "free_threshold_max",
-            "provider_code",
-            "is_online_payment",
-            "requires_confirmation",
-            "name",
-            "description",
-            "has_icon",
-            "has_configuration",
-        ]
+        fields = {
+            "id": ["exact"],
+            "active": ["exact"],
+            "cost": ["gte", "lte"],
+            "free_threshold": ["gte", "lte"],
+            "provider_code": ["icontains"],
+            "is_online_payment": ["exact"],
+            "requires_confirmation": ["exact"],
+            "sort_order": ["exact", "gte", "lte"],
+            "uuid": ["exact"],
+        }
 
     def filter_has_icon(self, queryset, name, value):
         if value is True:

@@ -4,17 +4,16 @@ from django.conf import settings
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
-from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import serializers, status
 from rest_framework.decorators import action
-from rest_framework.filters import SearchFilter
+
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from core.api.serializers import ErrorResponseSerializer
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+
 from core.utils.serializers import MultiSerializerMixin
 from core.utils.views import cache_methods
 from order.filters import OrderFilter
@@ -81,25 +80,17 @@ logger = logging.getLogger(__name__)
 class OrderPaymentViewSet(MultiSerializerMixin, GenericViewSet):
     queryset = Order.objects.all()
     lookup_field = "pk"
-
     serializers = {
         "default": serializers.Serializer,
         "process_payment": ProcessPaymentRequestSerializer,
         "check_payment_status": PaymentStatusResponseSerializer,
         "refund_payment": RefundRequestSerializer,
     }
-
     response_serializers = {
         "process_payment": ProcessPaymentResponseSerializer,
         "check_payment_status": PaymentStatusResponseSerializer,
         "refund_payment": RefundResponseSerializer,
     }
-
-    filter_backends = [
-        DjangoFilterBackend,
-        PascalSnakeCaseOrderingFilter,
-        SearchFilter,
-    ]
     filterset_class = OrderFilter
     ordering_fields = [
         "id",

@@ -2,16 +2,15 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
-from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.filters import SearchFilter
+
 from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
@@ -58,16 +57,10 @@ from region.serializers import (
 )
 class RegionViewSet(MultiSerializerMixin, BaseModelViewSet):
     queryset = Region.objects.all()
-    filter_backends = [
-        DjangoFilterBackend,
-        PascalSnakeCaseOrderingFilter,
-        SearchFilter,
-    ]
     filterset_class = RegionFilter
     ordering_fields = ["created_at", "alpha", "sort_order"]
     ordering = ["-created_at"]
     search_fields = ["alpha", "translations__name", "country__alpha_2"]
-
     serializers = {
         "list": RegionSerializer,
         "create": RegionWriteSerializer,

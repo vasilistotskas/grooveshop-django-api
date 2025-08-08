@@ -7,7 +7,6 @@ import uuid
 from django.conf import settings
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
-from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
@@ -17,14 +16,14 @@ from rest_framework.exceptions import (
     PermissionDenied,
     ValidationError,
 )
-from rest_framework.filters import SearchFilter
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
+
+from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 
-from core.api.permissions import IsSelfOrAdmin
+from core.api.permissions import IsOwnerOrAdmin
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
@@ -137,11 +136,6 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
         "update": OrderDetailSerializer,
         "partial_update": OrderDetailSerializer,
     }
-    filter_backends = [
-        DjangoFilterBackend,
-        PascalSnakeCaseOrderingFilter,
-        SearchFilter,
-    ]
     filterset_class = OrderFilter
     ordering_fields = [
         "id",
@@ -172,7 +166,7 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
         "tracking_number",
         "payment_id",
     ]
-    permission_classes = [IsAuthenticated, IsSelfOrAdmin]
+    permission_classes = [IsOwnerOrAdmin]
 
     def get_permissions(self):
         if self.action in [
@@ -181,14 +175,17 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
             "update",
             "partial_update",
             "destroy",
+            "retrieve_by_uuid",
+            "cancel",
+            "my_orders",
         ]:
-            self.permission_classes = [IsSelfOrAdmin]
+            self.permission_classes = [IsOwnerOrAdmin]
         elif self.action in ["add_tracking", "update_status"]:
             self.permission_classes = [IsAdminUser]
         elif self.action == "create":
             self.permission_classes = []
         else:
-            self.permission_classes = [IsAuthenticated]
+            self.permission_classes = [IsAdminUser]
 
         return super().get_permissions()
 

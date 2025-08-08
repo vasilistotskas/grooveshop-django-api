@@ -2,16 +2,15 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
-from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.filters import SearchFilter
+
 from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
@@ -126,28 +125,33 @@ class NotificationUserViewSet(MultiSerializerMixin, BaseModelViewSet):
         "update": NotificationUserDetailSerializer,
         "partial_update": NotificationUserDetailSerializer,
     }
-    filter_backends = [
-        DjangoFilterBackend,
-        PascalSnakeCaseOrderingFilter,
-        SearchFilter,
-    ]
     filterset_class = NotificationUserFilter
     ordering_fields = [
         "id",
         "user",
+        "user__email",
+        "user__first_name",
+        "user__last_name",
         "notification",
+        "notification__kind",
+        "notification__category",
+        "notification__priority",
+        "notification__created_at",
         "seen",
         "seen_at",
         "created_at",
         "updated_at",
     ]
-    ordering = ["-created_at"]
+    ordering = ["-created_at", "-notification__created_at"]
     search_fields = [
         "user__first_name",
         "user__last_name",
         "user__email",
+        "user__username",
         "notification__translations__title",
         "notification__translations__message",
+        "notification__notification_type",
+        "notification__link",
     ]
 
     @action(detail=False, methods=["GET"])
@@ -165,7 +169,8 @@ class NotificationUserViewSet(MultiSerializerMixin, BaseModelViewSet):
                 status=status.HTTP_204_NO_CONTENT,
             )
 
-        return Response({"count": count}, status=status.HTTP_200_OK)
+        serializer = NotificationCountResponseSerializer({"count": count})
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["POST"])
     def mark_all_as_seen(self, request):
@@ -176,7 +181,9 @@ class NotificationUserViewSet(MultiSerializerMixin, BaseModelViewSet):
             )
 
         self.queryset.filter(user=request.user, seen=False).update(seen=True)
-        return Response({"success": True}, status=status.HTTP_200_OK)
+
+        serializer = NotificationSuccessResponseSerializer({"success": True})
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["POST"])
     def mark_all_as_unseen(self, request):
@@ -187,7 +194,9 @@ class NotificationUserViewSet(MultiSerializerMixin, BaseModelViewSet):
             )
 
         self.queryset.filter(user=request.user, seen=True).update(seen=False)
-        return Response({"success": True}, status=status.HTTP_200_OK)
+
+        serializer = NotificationSuccessResponseSerializer({"success": True})
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["POST"])
     def mark_as_seen(self, request):
@@ -212,7 +221,9 @@ class NotificationUserViewSet(MultiSerializerMixin, BaseModelViewSet):
         self.queryset.filter(
             id__in=notification_user_ids, user=request.user
         ).update(seen=True)
-        return Response({"success": True}, status=status.HTTP_200_OK)
+
+        serializer = NotificationSuccessResponseSerializer({"success": True})
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["POST"])
     def mark_as_unseen(self, request):
@@ -237,4 +248,6 @@ class NotificationUserViewSet(MultiSerializerMixin, BaseModelViewSet):
         self.queryset.filter(
             id__in=notification_user_ids, user=request.user
         ).update(seen=False)
-        return Response({"success": True}, status=status.HTTP_200_OK)
+
+        serializer = NotificationSuccessResponseSerializer({"success": True})
+        return Response(serializer.data, status=status.HTTP_200_OK)

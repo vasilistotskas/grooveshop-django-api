@@ -2,19 +2,18 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
-from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
 )
 from rest_framework.decorators import action
-from rest_framework.filters import SearchFilter
-from rest_framework.permissions import IsAuthenticated
+
 from rest_framework.response import Response
 
+from core.api.permissions import IsOwnerOrAdmin
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
@@ -108,13 +107,8 @@ class UserAddressViewSet(MultiSerializerMixin, BaseModelViewSet):
         "validate_address": ValidateAddressResponseSerializer,
         "bulk_delete": BulkDeleteAddressesResponseSerializer,
     }
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsOwnerOrAdmin]
     filterset_class = UserAddressFilter
-    filter_backends = [
-        DjangoFilterBackend,
-        PascalSnakeCaseOrderingFilter,
-        SearchFilter,
-    ]
     ordering_fields = [
         "id",
         "created_at",

@@ -1,6 +1,7 @@
 from django.contrib import admin, messages
 from django.db import models
-from django.utils.html import format_html
+from django.utils.html import conditional_escape
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from parler.admin import TranslatableAdmin
 from unfold.admin import ModelAdmin
@@ -124,7 +125,6 @@ class CountryAdmin(ModelAdmin, TranslatableAdmin):
             obj.safe_translation_getter("name", any_language=True)
             or "Unnamed Country"
         )
-
         has_iso = obj.iso_cc is not None
         status_icon = "✅" if has_iso else "⚠️"
         status_color = (
@@ -133,73 +133,83 @@ class CountryAdmin(ModelAdmin, TranslatableAdmin):
             else "text-orange-600 dark:text-orange-400"
         )
 
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100 flex items-center gap-2">'
-            '<span class="{}">{}</span>'
-            "<span>{}</span>"
-            "</div>"
-            '<div class="text-base-600 dark:text-base-400">{}</div>'
-            '<div class="text-xs text-base-500 dark:text-base-400">Sort: {}</div>'
-            "</div>",
-            status_color,
-            status_icon,
-            name,
-            obj.alpha_2,
-            obj.sort_order or "No order",
+        safe_status_color = conditional_escape(status_color)
+        safe_status_icon = conditional_escape(status_icon)
+        safe_name = conditional_escape(name)
+        safe_alpha_2 = conditional_escape(obj.alpha_2)
+        safe_sort_order = conditional_escape(str(obj.sort_order or "No order"))
+
+        html = (
+            f'<div class="text-sm">'
+            f'<div class="font-medium text-base-900 dark:text-base-100 flex items-center gap-2">'
+            f'<span class="{safe_status_color}">{safe_status_icon}</span>'
+            f"<span>{safe_name}</span>"
+            f"</div>"
+            f'<div class="text-base-600 dark:text-base-400">{safe_alpha_2}</div>'
+            f'<div class="text-xs text-base-500 dark:text-base-400">Sort: {safe_sort_order}</div>'
+            f"</div>"
         )
+        return mark_safe(html)
 
     country_info.short_description = _("Country")
 
     def flag_display(self, obj):
         if obj.image_flag:
-            return format_html(
-                '<div class="flex items-center justify-center">'
-                '<img src="{}" style="width: 48px; height: 32px; object-fit: cover; border-radius: 4px; border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1);" />'
-                "</div>",
-                obj.image_flag.url,
+            safe_url = conditional_escape(obj.image_flag.url)
+            html = (
+                f'<div class="flex items-center justify-center">'
+                f'<img src="{safe_url}" style="width: 48px; height: 32px; object-fit: cover; '
+                f'border-radius: 4px; border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1);" />'
+                f"</div>"
             )
+            return mark_safe(html)
         else:
-            return format_html(
-                '<div style="width: 48px; height: 32px; background: linear-gradient(45deg, #f3f4f6 25%, transparent 25%), linear-gradient(-45deg, #f3f4f6 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f3f4f6 75%), linear-gradient(-45deg, transparent 75%, #f3f4f6 75%); background-size: 8px 8px; background-position: 0 0, 0 4px, 4px -4px, -4px 0px; border-radius: 4px; border: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 12px;">'
+            html = (
+                '<div style="width: 48px; height: 32px; '
+                "background: linear-gradient(45deg, #f3f4f6 25%, transparent 25%), "
+                "linear-gradient(-45deg, #f3f4f6 25%, transparent 25%), "
+                "linear-gradient(45deg, transparent 75%, #f3f4f6 75%), "
+                "linear-gradient(-45deg, transparent 75%, #f3f4f6 75%); "
+                "background-size: 8px 8px; background-position: 0 0, 0 4px, 4px -4px, -4px 0px; "
+                "border-radius: 4px; border: 1px solid #e5e7eb; display: flex; align-items: center; "
+                'justify-content: center; color: #9ca3af; font-size: 12px;">'
                 "🏳️"
                 "</div>"
             )
+            return mark_safe(html)
 
     flag_display.short_description = _("Flag")
 
     def codes_display(self, obj):
-        alpha_2_badge = format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded border border-blue-200 dark:border-blue-700">'
-            "{}"
-            "</span>",
-            obj.alpha_2,
+        safe_a2 = conditional_escape(obj.alpha_2)
+        safe_a3 = conditional_escape(obj.alpha_3)
+        alpha_2_badge = (
+            f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+            f"bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded border "
+            f'border-blue-200 dark:border-blue-700">{safe_a2}</span>'
         )
-
-        alpha_3_badge = format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 rounded border border-green-200 dark:border-green-700">'
-            "{}"
-            "</span>",
-            obj.alpha_3,
+        alpha_3_badge = (
+            f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+            f"bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 rounded border "
+            f'border-green-200 dark:border-green-700">{safe_a3}</span>'
         )
 
         iso_display = str(obj.iso_cc) if obj.iso_cc else "—"
+        safe_iso_display = conditional_escape(iso_display)
         iso_color = (
             "text-base-900 dark:text-base-100"
             if obj.iso_cc
             else "text-base-400 dark:text-base-500"
         )
+        safe_iso_color = conditional_escape(iso_color)
 
-        return format_html(
+        html = (
             '<div class="text-sm space-y-1">'
-            '<div class="flex gap-1">{} {}</div>'
-            '<div class="{}">ISO: {}</div>'
-            "</div>",
-            alpha_2_badge,
-            alpha_3_badge,
-            iso_color,
-            iso_display,
+            f'<div class="flex gap-1">{alpha_2_badge} {alpha_3_badge}</div>'
+            f'<div class="{safe_iso_color}">ISO: {safe_iso_display}</div>'
+            "</div>"
         )
+        return mark_safe(html)
 
     codes_display.short_description = _("Codes")
 
@@ -215,24 +225,21 @@ class CountryAdmin(ModelAdmin, TranslatableAdmin):
             else:
                 badge_class = "bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200 border-red-200 dark:border-red-700"
 
-            phone_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium {} rounded border">'
-                "📞 +{}"
-                "</span>",
-                badge_class,
-                obj.phone_code,
+            safe_badge_class = conditional_escape(badge_class)
+            safe_code = conditional_escape(code_str)
+            phone_badge = (
+                f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                f'{safe_badge_class} rounded border">📞 +{safe_code}</span>'
             )
         else:
-            phone_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-gray-50 dark:bg-gray-900 text-base-500 dark:text-base-400 rounded border border-gray-200 dark:border-gray-700">'
-                "📞 No Code"
-                "</span>"
+            phone_badge = (
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                "bg-gray-50 dark:bg-gray-900 text-base-500 dark:text-base-400 rounded border "
+                'border-gray-200 dark:border-gray-700">📞 No Code</span>'
             )
 
-        return format_html(
-            '<div class="text-sm"><div>{}</div></div>',
-            phone_badge,
-        )
+        html = f'<div class="text-sm"><div>{phone_badge}</div></div>'
+        return mark_safe(html)
 
     contact_info.short_description = _("Contact")
 
@@ -268,31 +275,37 @@ class CountryAdmin(ModelAdmin, TranslatableAdmin):
             icon = "❌"
             label = "Incomplete"
 
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{}%</div>'
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium {} rounded border gap-1">'
-            "<span>{}</span>"
-            "<span>{}</span>"
-            "</span>"
-            "</div>",
-            int(percentage),
-            badge_class,
-            icon,
-            label,
+        safe_percentage = conditional_escape(str(int(percentage)))
+        safe_badge_class = conditional_escape(badge_class)
+        safe_icon = conditional_escape(icon)
+        safe_label = conditional_escape(label)
+
+        html = (
+            f'<div class="text-sm">'
+            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_percentage}%</div>'
+            f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium {safe_badge_class} rounded border gap-1">'
+            f"<span>{safe_icon}</span>"
+            f"<span>{safe_label}</span>"
+            f"</span>"
+            f"</div>"
         )
+        return mark_safe(html)
 
     completeness_badge.short_description = _("Completeness")
 
     def created_display(self, obj):
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{}</div>'
-            '<div class="text-base-600 dark:text-base-400">{}</div>'
-            "</div>",
-            obj.created_at.strftime("%Y-%m-%d"),
-            obj.created_at.strftime("%H:%M"),
+        date_str = obj.created_at.strftime("%Y-%m-%d")
+        time_str = obj.created_at.strftime("%H:%M")
+        safe_date = conditional_escape(date_str)
+        safe_time = conditional_escape(time_str)
+
+        html = (
+            f'<div class="text-sm">'
+            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_date}</div>'
+            f'<div class="text-base-600 dark:text-base-400">{safe_time}</div>'
+            f"</div>"
         )
+        return mark_safe(html)
 
     created_display.short_description = _("Created")
 

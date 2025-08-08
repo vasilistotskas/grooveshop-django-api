@@ -327,9 +327,9 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
     def test_filter_by_date_range(self):
         self.client.force_authenticate(user=self.admin_user)
 
-        yesterday = self.order.created_at.replace(
-            day=self.order.created_at.day - 1
-        )
+        from datetime import timedelta
+
+        yesterday = self.order.created_at - timedelta(days=1)
         response = self.client.get(
             self.list_url, {"created_after": yesterday.isoformat()}
         )

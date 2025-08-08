@@ -2,13 +2,12 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
-from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework.decorators import action
-from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
 
 from blog.filters.author import BlogAuthorFilter
+from blog.filters.post import BlogPostFilter
 from blog.models.author import BlogAuthor
 from blog.serializers.author import (
     BlogAuthorDetailSerializer,
@@ -18,7 +17,7 @@ from blog.serializers.author import (
 from blog.serializers.post import BlogPostSerializer
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
@@ -56,25 +55,35 @@ class BlogAuthorViewSet(MultiSerializerMixin, BaseModelViewSet):
         "update": BlogAuthorDetailSerializer,
         "partial_update": BlogAuthorDetailSerializer,
     }
-    filter_backends = [
-        DjangoFilterBackend,
-        PascalSnakeCaseOrderingFilter,
-        SearchFilter,
-    ]
-    filterset_class = BlogAuthorFilter
+
+    def get_filterset_class(self):
+        """Return filterset class based on action."""
+        # During schema generation, we might not have the right context
+        if not hasattr(self, "action") or getattr(
+            self, "swagger_fake_view", False
+        ):
+            return BlogAuthorFilter
+
+        if self.action == "posts":
+            return BlogPostFilter
+        return BlogAuthorFilter
+
     ordering_fields = [
         "id",
         "created_at",
         "updated_at",
         "user__first_name",
         "user__last_name",
-        "user__date_joined",
+        "user__email",
+        "user__created_at",
+        "website",
     ]
-    ordering = ["-created_at"]
+    ordering = ["-created_at", "user__first_name", "user__last_name"]
     search_fields = [
         "user__first_name",
         "user__last_name",
         "user__email",
+        "user__username",
         "website",
         "translations__bio",
     ]

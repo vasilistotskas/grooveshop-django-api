@@ -1,19 +1,15 @@
 from datetime import timedelta
-
 from django.contrib import admin, messages
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.utils import timezone
-from django.utils.html import format_html
-from django.utils.translation import gettext_lazy as _
-from django.utils.translation import ngettext
+from django.utils.html import conditional_escape
+from django.utils.safestring import mark_safe
+from django.utils.translation import gettext_lazy as _, ngettext
 from parler.admin import TranslatableAdmin
 from unfold.admin import ModelAdmin
-from unfold.contrib.filters.admin import (
-    DropdownFilter,
-    RangeDateTimeFilter,
-)
+from unfold.contrib.filters.admin import DropdownFilter, RangeDateTimeFilter
 from unfold.decorators import action
 from unfold.enums import ActionVariant
 
@@ -36,28 +32,24 @@ class TagStatusFilter(DropdownFilter):
         ]
 
     def queryset(self, request, queryset):
-        filter_value = self.value()
-
-        match filter_value:
+        match self.value():
             case "active":
-                filter_kwargs = {"active": True}
+                return queryset.filter(active=True)
             case "inactive":
-                filter_kwargs = {"active": False}
+                return queryset.filter(active=False)
             case "used":
                 return queryset.filter(taggeditem__isnull=False).distinct()
             case "unused":
-                filter_kwargs = {"taggeditem__isnull": True}
+                return queryset.filter(taggeditem__isnull=True)
             case "popular":
                 return queryset.annotate(
                     usage_count=models.Count("taggeditem")
                 ).filter(usage_count__gt=10)
             case "recent":
-                seven_days_ago = timezone.now() - timedelta(days=7)
-                filter_kwargs = {"created_at__gte": seven_days_ago}
+                cutoff = timezone.now() - timedelta(days=7)
+                return queryset.filter(created_at__gte=cutoff)
             case _:
                 return queryset
-
-        return queryset.filter(**filter_kwargs)
 
 
 class TagUsageFilter(DropdownFilter):
@@ -74,25 +66,20 @@ class TagUsageFilter(DropdownFilter):
         ]
 
     def queryset(self, request, queryset):
-        filter_value = self.value()
-
-        queryset = queryset.annotate(usage_count=models.Count("taggeditem"))
-
-        match filter_value:
+        qs = queryset.annotate(usage_count=models.Count("taggeditem"))
+        match self.value():
             case "single":
-                filter_kwargs = {"usage_count": 1}
+                return qs.filter(usage_count=1)
             case "low":
-                filter_kwargs = {"usage_count__range": (2, 5)}
+                return qs.filter(usage_count__range=(2, 5))
             case "medium":
-                filter_kwargs = {"usage_count__range": (6, 20)}
+                return qs.filter(usage_count__range=(6, 20))
             case "high":
-                filter_kwargs = {"usage_count__range": (21, 50)}
+                return qs.filter(usage_count__range=(21, 50))
             case "very_high":
-                filter_kwargs = {"usage_count__gt": 50}
+                return qs.filter(usage_count__gt=50)
             case _:
-                return queryset
-
-        return queryset.filter(**filter_kwargs)
+                return qs
 
 
 class ContentTypeFilter(DropdownFilter):
@@ -100,13 +87,12 @@ class ContentTypeFilter(DropdownFilter):
     parameter_name = "content_type"
 
     def lookups(self, request, model_admin):
-        content_types = (
+        types = (
             ContentType.objects.filter(taggeditem__isnull=False)
             .distinct()
             .values_list("id", "model")
         )
-
-        return [(ct_id, ct_model.title()) for ct_id, ct_model in content_types]
+        return [(cid, model.title()) for cid, model in types]
 
     def queryset(self, request, queryset):
         if self.value():
@@ -121,9 +107,8 @@ class TagInLine(GenericTabularInline):
     autocomplete_fields = ["tag"]
     extra = 0
     fields = ("tag",)
-    verbose_name = "Tag"
-    verbose_name_plural = "Tags"
-
+    verbose_name = _("Tag")
+    verbose_name_plural = _("Tags")
     classes = ["collapse"]
 
 
@@ -151,10 +136,7 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
         ("created_at", RangeDateTimeFilter),
         ("updated_at", RangeDateTimeFilter),
     ]
-    search_fields = [
-        "translations__label",
-        "id",
-    ]
+    search_fields = ["translations__label", "id"]
     readonly_fields = (
         "id",
         "uuid",
@@ -177,18 +159,9 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
     fieldsets = (
         (
             _("Tag Information"),
-            {
-                "fields": ("label", "active"),
-                "classes": ("wide",),
-            },
+            {"fields": ("label", "active"), "classes": ("wide",)},
         ),
-        (
-            _("Organization"),
-            {
-                "fields": ("sort_order",),
-                "classes": ("wide",),
-            },
-        ),
+        (_("Organization"), {"fields": ("sort_order",), "classes": ("wide",)}),
         (
             _("Analytics"),
             {
@@ -223,337 +196,328 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
         )
 
     def tag_info(self, obj):
-        label = (
-            obj.safe_translation_getter("label", any_language=True)
-            or "Unnamed Tag"
+        label = obj.safe_translation_getter("label", any_language=True) or _(
+            "Unnamed Tag"
         )
+        display = label[:30] + ("…" if len(label) > 30 else "")
+        usage = getattr(obj, "usage_count", 0)
+        usage_color = (
+            "text-green-600 dark:text-green-400"
+            if usage > 0
+            else "text-base-500 dark:text-base-400"
+        )
+        usage_icon = "🏷️"
+        esc_color = conditional_escape(usage_color)
+        esc_icon = conditional_escape(usage_icon)
+        esc_label = conditional_escape(display)
+        esc_id = conditional_escape(str(obj.id))
+        esc_sort = conditional_escape(str(obj.sort_order or _("No order")))
 
-        label_display = label[:30] + "..." if len(label) > 30 else label
-
-        usage_count = getattr(obj, "usage_count", 0)
-        if usage_count > 0:
-            usage_color = "text-green-600 dark:text-green-400"
-            usage_icon = "🏷️"
-        else:
-            usage_color = "text-base-500 dark:text-base-400"
-            usage_icon = "🏷️"
-
-        return format_html(
+        html = (
             '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100 flex items-center gap-2">'
-            '<span class="{}">{}</span>'
-            "<span>{}</span>"
+            f'<div class="font-medium text-base-900 dark:text-base-100 flex items-center gap-2">'
+            f'<span class="{esc_color}">{esc_icon}</span>'
+            f"<span>{esc_label}</span>"
             "</div>"
-            '<div class="text-base-600 dark:text-base-400">ID: {}</div>'
-            '<div class="text-xs text-base-500 dark:text-base-400">Sort: {}</div>'
-            "</div>",
-            usage_color,
-            usage_icon,
-            label_display,
-            obj.id,
-            obj.sort_order or "No order",
+            f'<div class="text-base-600 dark:text-base-400">ID: {esc_id}</div>'
+            f'<div class="text-xs text-base-500 dark:text-base-400">Sort: {esc_sort}</div>'
+            "</div>"
         )
+        return mark_safe(html)
 
     tag_info.short_description = _("Tag")
 
     def status_badge(self, obj):
         if obj.active:
-            status_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 rounded-full">'
+            status = mark_safe(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 rounded-full">'
                 "✅ Active"
                 "</span>"
             )
         else:
-            status_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-full">'
+            status = mark_safe(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-full">'
                 "❌ Inactive"
                 "</span>"
             )
 
         label = obj.safe_translation_getter("label", any_language=True) or ""
-        label_length = len(label)
-
-        if label_length == 0:
-            label_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200 rounded mt-1">'
+        length = len(label)
+        if length == 0:
+            label_badge = mark_safe(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200 rounded mt-1">'
                 "📝 No Label"
                 "</span>"
             )
-        elif label_length < 3:
-            label_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200 rounded mt-1">'
+        elif length < 3:
+            label_badge = mark_safe(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200 rounded mt-1">'
                 "📝 Short"
                 "</span>"
             )
         else:
-            label_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 rounded mt-1">'
+            label_badge = mark_safe(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 rounded mt-1">'
                 "📝 Good"
                 "</span>"
             )
 
-        return format_html(
-            '<div class="space-y-1"><div>{}</div><div>{}</div></div>',
-            status_badge,
-            label_badge,
+        html = (
+            '<div class="space-y-1">'
+            f"<div>{status}</div>"
+            f"<div>{label_badge}</div>"
+            "</div>"
         )
+        return mark_safe(html)
 
     status_badge.short_description = _("Status")
 
     def usage_stats(self, obj):
-        usage_count = getattr(obj, "usage_count", 0)
-
-        if usage_count == 0:
-            usage_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-base-50 dark:bg-base-800 text-base-700 dark:text-base-700 rounded">'
+        usage = getattr(obj, "usage_count", 0)
+        if usage == 0:
+            badge = mark_safe(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-base-50 dark:bg-base-800 text-base-700 dark:text-base-700 rounded">'
                 "🚫 Unused"
                 "</span>"
             )
-        elif usage_count == 1:
-            usage_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200 rounded">'
+        elif usage == 1:
+            badge = mark_safe(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200 rounded">'
                 "⚠️ Single"
                 "</span>"
             )
-        elif usage_count <= 10:
-            usage_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded">'
+        elif usage <= 10:
+            badge = mark_safe(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded">'
                 "📊 Low"
                 "</span>"
             )
-        elif usage_count <= 50:
-            usage_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 rounded">'
+        elif usage <= 50:
+            badge = mark_safe(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 rounded">'
                 "📈 Popular"
                 "</span>"
             )
         else:
-            usage_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-200 rounded">'
+            badge = mark_safe(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-200 rounded">'
                 "🌟 Trending"
                 "</span>"
             )
 
-        return format_html(
+        esc_usage = conditional_escape(str(usage))
+        html = (
             '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{} uses</div>'
-            '<div class="mt-1">{}</div>'
-            "</div>",
-            usage_count,
-            usage_badge,
+            f'<div class="font-medium text-base-900 dark:text-base-100">{esc_usage} uses</div>'
+            f'<div class="mt-1">{badge}</div>'
+            "</div>"
         )
+        return mark_safe(html)
 
     usage_stats.short_description = _("Usage")
 
     def content_distribution(self, obj):
-        content_types_count = getattr(obj, "content_types_count", 0)
-
-        if hasattr(obj, "taggeditem_set"):
-            content_type_usage = {}
-            for tagged_item in obj.taggeditem_set.all()[:10]:
-                ct_name = tagged_item.content_type.model
-                content_type_usage[ct_name] = (
-                    content_type_usage.get(ct_name, 0) + 1
-                )
-
-            if content_type_usage:
-                top_content_type = max(
-                    content_type_usage, key=content_type_usage.get
-                )
-                top_count = content_type_usage[top_content_type]
-            else:
-                top_content_type = "None"
-                top_count = 0
+        ct_count = getattr(obj, "content_types_count", 0)
+        top_map = {}
+        for ti in obj.taggeditem_set.all()[:10]:
+            name = ti.content_type.model
+            top_map[name] = top_map.get(name, 0) + 1
+        if top_map:
+            top, count = max(top_map.items(), key=lambda kv: kv[1])
         else:
-            top_content_type = "Unknown"
-            top_count = 0
+            top, count = _("None"), 0
 
-        if content_types_count == 0:
-            diversity_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-base-50 dark:bg-base-800 text-base-700 dark:text-base-700 rounded">'
+        if ct_count == 0:
+            div_badge = mark_safe(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-base-50 dark:bg-base-800 text-base-700 dark:text-base-700 rounded">'
                 "📊 No Data"
                 "</span>"
             )
-        elif content_types_count == 1:
-            diversity_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded">'
+        elif ct_count == 1:
+            div_badge = mark_safe(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded">'
                 "📌 Focused"
                 "</span>"
             )
         else:
-            diversity_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 rounded">'
+            div_badge = mark_safe(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 rounded">'
                 "🌐 Diverse"
                 "</span>"
             )
 
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{} types</div>'
-            '<div class="text-base-600 dark:text-base-400">{}: {}</div>'
-            '<div class="mt-1">{}</div>'
-            "</div>",
-            content_types_count,
-            top_content_type.title()
-            if top_content_type != "None"
-            else "No usage",
-            top_count if top_count > 0 else "",
-            diversity_badge,
+        esc_ct = conditional_escape(str(ct_count))
+        esc_top = conditional_escape(
+            top.title() if top != _("None") else _("No usage")
         )
+        esc_count = conditional_escape(str(count or ""))
+
+        html = (
+            '<div class="text-sm">'
+            f'<div class="font-medium text-base-900 dark:text-base-100">{esc_ct} types</div>'
+            f'<div class="text-base-600 dark:text-base-400">{esc_top}: {esc_count}</div>'
+            f'<div class="mt-1">{div_badge}</div>'
+            "</div>"
+        )
+        return mark_safe(html)
 
     content_distribution.short_description = _("Content Types")
 
     def sort_display(self, obj):
-        sort_order = obj.sort_order
-
-        if sort_order is None:
-            badge_class = (
-                "bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200"
-            )
-            icon = "❌"
-            label = "No Order"
-        elif sort_order == 0:
-            badge_class = (
-                "bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200"
-            )
-            icon = "🥇"
-            label = "First"
+        order = obj.sort_order
+        if order is None:
+            cls = "bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200"
+            icon, label = "❌", _("None")
+        elif order == 0:
+            cls = "bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200"
+            icon, label = "🥇", _("First")
         else:
-            badge_class = "bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200"
-            icon = "📋"
-            label = f"#{sort_order}"
+            cls = "bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200"
+            icon, label = "📋", f"#{order}"
 
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{}</div>'
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium {} rounded gap-1">'
-            "<span>{}</span>"
-            "<span>{}</span>"
-            "</span>"
-            "</div>",
-            sort_order if sort_order is not None else "None",
-            badge_class,
-            icon,
-            label,
+        esc_order = conditional_escape(
+            str(order if order is not None else _("None"))
         )
+        esc_cls = conditional_escape(cls)
+        esc_icon = conditional_escape(icon)
+        esc_label = conditional_escape(label)
+
+        html = (
+            '<div class="text-sm">'
+            f'<div class="font-medium text-base-900 dark:text-base-100">{esc_order}</div>'
+            f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium {esc_cls} rounded gap-1">'
+            f"<span>{esc_icon}</span><span>{esc_label}</span>"
+            "</span>"
+            "</div>"
+        )
+        return mark_safe(html)
 
     sort_display.short_description = _("Sort Order")
 
     def created_display(self, obj):
-        return format_html(
+        d = obj.created_at.strftime("%Y-%m-%d")
+        t = obj.created_at.strftime("%H:%M")
+        esc_d = conditional_escape(d)
+        esc_t = conditional_escape(t)
+        html = (
             '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{}</div>'
-            '<div class="text-base-600 dark:text-base-400">{}</div>'
-            "</div>",
-            obj.created_at.strftime("%Y-%m-%d"),
-            obj.created_at.strftime("%H:%M"),
+            f'<div class="font-medium text-base-900 dark:text-base-100">{esc_d}</div>'
+            f'<div class="text-base-600 dark:text-base-400">{esc_t}</div>'
+            "</div>"
         )
+        return mark_safe(html)
 
     created_display.short_description = _("Created")
 
     def tag_analytics(self, obj):
         label = obj.safe_translation_getter("label", any_language=True) or ""
-        label_length = len(label)
-        usage_count = TaggedItem.objects.filter(tag=obj).count()
-
-        words = label.split() if label else []
-        word_count = len(words)
-
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Label Length:</strong></div><div>{} chars</div>"
-            "<div><strong>Word Count:</strong></div><div>{} words</div>"
-            "<div><strong>Total Usage:</strong></div><div>{} items</div>"
-            "<div><strong>Active Status:</strong></div><div>{}</div>"
-            "<div><strong>Has Label:</strong></div><div>{}</div>"
-            "<div><strong>Sort Position:</strong></div><div>{}</div>"
-            "</div>"
-            "</div>",
-            label_length,
-            word_count,
-            usage_count,
-            "Active" if obj.active else "Inactive",
-            "Yes" if label else "No",
-            obj.sort_order if obj.sort_order is not None else "Not Set",
+        chars = len(label)
+        words = len(label.split())
+        uses = TaggedItem.objects.filter(tag=obj).count()
+        status = _("Active") if obj.active else _("Inactive")
+        has_lbl = _("Yes") if label else _("No")
+        sort_val = (
+            obj.sort_order if obj.sort_order is not None else _("Not Set")
         )
+
+        esc_chars = conditional_escape(str(chars))
+        esc_words = conditional_escape(str(words))
+        esc_uses = conditional_escape(str(uses))
+        esc_status = conditional_escape(status)
+        esc_has = conditional_escape(has_lbl)
+        esc_sort = conditional_escape(str(sort_val))
+
+        html = (
+            '<div class="text-sm"><div class="grid grid-cols-2 gap-2">'
+            f"<div><strong>Label Length:</strong></div><div>{esc_chars} chars</div>"
+            f"<div><strong>Word Count:</strong></div><div>{esc_words} words</div>"
+            f"<div><strong>Total Usage:</strong></div><div>{esc_uses} items</div>"
+            f"<div><strong>Active Status:</strong></div><div>{esc_status}</div>"
+            f"<div><strong>Has Label:</strong></div><div>{esc_has}</div>"
+            f"<div><strong>Sort Position:</strong></div><div>{esc_sort}</div>"
+            "</div></div>"
+        )
+        return mark_safe(html)
 
     tag_analytics.short_description = _("Tag Analytics")
 
     def usage_analytics(self, obj):
-        tagged_items = TaggedItem.objects.filter(tag=obj)
-        total_usage = tagged_items.count()
-
-        content_types = (
-            tagged_items.values("content_type__model")
-            .annotate(count=models.Count("id"))
-            .order_by("-count")[:3]
-        )
-
-        thirty_days_ago = timezone.now() - timedelta(days=30)
-        recent_usage = tagged_items.filter(
-            created_at__gte=thirty_days_ago
+        items = TaggedItem.objects.filter(tag=obj)
+        total = items.count()
+        recent = items.filter(
+            created_at__gte=timezone.now() - timedelta(days=30)
         ).count()
-
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Total Usage:</strong></div><div>{}</div>"
-            "<div><strong>Recent Usage:</strong></div><div>{} (30d)</div>"
-            "<div><strong>Content Types:</strong></div><div>{}</div>"
-            "<div><strong>Usage Rate:</strong></div><div>{}</div>"
-            "</div>"
-            "</div>",
-            total_usage,
-            recent_usage,
-            len(content_types),
-            "High"
-            if total_usage > 20
-            else "Medium"
-            if total_usage > 5
-            else "Low",
+        types = items.values("content_type__model").distinct().count()
+        rate = (
+            _("High") if total > 20 else _("Medium") if total > 5 else _("Low")
         )
+
+        esc_total = conditional_escape(str(total))
+        esc_recent = conditional_escape(str(recent))
+        esc_types = conditional_escape(str(types))
+        esc_rate = conditional_escape(rate)
+
+        html = (
+            '<div class="text-sm"><div class="grid grid-cols-2 gap-2">'
+            f"<div><strong>Total Usage:</strong></div><div>{esc_total}</div>"
+            f"<div><strong>Recent Usage:</strong></div><div>{esc_recent} (30d)</div>"
+            f"<div><strong>Content Types:</strong></div><div>{esc_types}</div>"
+            f"<div><strong>Usage Rate:</strong></div><div>{esc_rate}</div>"
+            "</div></div>"
+        )
+        return mark_safe(html)
 
     usage_analytics.short_description = _("Usage Analytics")
 
     def content_analytics(self, obj):
-        tagged_items = TaggedItem.objects.filter(tag=obj)
+        items = TaggedItem.objects.filter(tag=obj).select_related(
+            "content_type"
+        )[:50]
+        stats = {}
+        for i in items:
+            m = i.content_type.model
+            stats[m] = stats.get(m, 0) + 1
 
-        content_type_stats = {}
-        for item in tagged_items.select_related("content_type")[:50]:
-            ct_name = item.content_type.model
-            content_type_stats[ct_name] = content_type_stats.get(ct_name, 0) + 1
-
-        diversity_score = len(content_type_stats)
-        most_used_type = (
-            max(content_type_stats, key=content_type_stats.get)
-            if content_type_stats
-            else "None"
-        )
-        most_used_count = (
-            content_type_stats.get(most_used_type, 0)
-            if most_used_type != "None"
-            else 0
+        diversity = len(stats)
+        top = max(stats, key=stats.get) if stats else _("None")
+        top_count = stats.get(top, 0)
+        spec = (
+            _("Specialized")
+            if diversity == 1
+            else _("General")
+            if diversity > 3
+            else _("Mixed")
         )
 
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Diversity Score:</strong></div><div>{} types</div>"
-            "<div><strong>Most Used Type:</strong></div><div>{}</div>"
-            "<div><strong>Type Usage:</strong></div><div>{} items</div>"
-            "<div><strong>Specialization:</strong></div><div>{}</div>"
-            "</div>"
-            "</div>",
-            diversity_score,
-            most_used_type.title() if most_used_type != "None" else "No data",
-            most_used_count,
-            "Specialized"
-            if diversity_score == 1
-            else "General"
-            if diversity_score > 3
-            else "Mixed",
+        esc_div = conditional_escape(str(diversity))
+        esc_top = conditional_escape(
+            top.title() if top != _("None") else _("No data")
         )
+        esc_count = conditional_escape(str(top_count))
+        esc_spec = conditional_escape(spec)
+
+        html = (
+            '<div class="text-sm"><div class="grid grid-cols-2 gap-2">'
+            f"<div><strong>Diversity Score:</strong></div><div>{esc_div} types</div>"
+            f"<div><strong>Most Used Type:</strong></div><div>{esc_top}</div>"
+            f"<div><strong>Type Usage:</strong></div><div>{esc_count} items</div>"
+            f"<div><strong>Specialization:</strong></div><div>{esc_spec}</div>"
+            "</div></div>"
+        )
+        return mark_safe(html)
 
     content_analytics.short_description = _("Content Analytics")
 
@@ -599,16 +563,14 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
         icon="sort",
     )
     def update_sort_order(self, request, queryset):
-        tags_with_usage = queryset.annotate(
+        ordered = queryset.annotate(
             usage_count=models.Count("taggeditem")
         ).order_by("-usage_count", "translations__label")
-
         updated = 0
-        for index, tag in enumerate(tags_with_usage):
-            tag.sort_order = index
+        for idx, tag in enumerate(ordered):
+            tag.sort_order = idx
             tag.save(update_fields=["sort_order"])
             updated += 1
-
         self.message_user(
             request,
             _("Updated sort order for %(count)d tags.") % {"count": updated},
@@ -621,16 +583,15 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
         icon="analytics",
     )
     def analyze_usage(self, request, queryset):
-        total_tags = queryset.count()
-        active_tags = queryset.filter(active=True).count()
-        used_tags = queryset.filter(taggeditem__isnull=False).distinct().count()
-
+        total = queryset.count()
+        active = queryset.filter(active=True).count()
+        used = queryset.filter(taggeditem__isnull=False).distinct().count()
         self.message_user(
             request,
             _(
                 "Analysis complete: %(total)d total tags, %(active)d active, %(used)d in use."
             )
-            % {"total": total_tags, "active": active_tags, "used": used_tags},
+            % {"total": total, "active": active, "used": used},
             messages.INFO,
         )
 
@@ -652,16 +613,8 @@ class TaggedItemAdmin(ModelAdmin):
         ("content_type", admin.RelatedOnlyFieldListFilter),
         ("created_at", RangeDateTimeFilter),
     ]
-    search_fields = [
-        "tag__translations__label",
-        "object_id",
-    ]
-    readonly_fields = (
-        "uuid",
-        "created_at",
-        "updated_at",
-        "content_object",
-    )
+    search_fields = ["tag__translations__label", "object_id"]
+    readonly_fields = ("uuid", "created_at", "updated_at", "content_object")
     list_select_related = ["tag", "content_type"]
     list_per_page = 100
     ordering = ["-created_at"]
@@ -697,134 +650,130 @@ class TaggedItemAdmin(ModelAdmin):
         )
 
     def tagged_item_info(self, obj):
-        return format_html(
+        esc_id = conditional_escape(str(obj.id))
+        esc_obj = conditional_escape(str(obj.object_id))
+        esc_uuid = conditional_escape(str(obj.uuid)[:8])
+        html = (
             '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">Item #{}</div>'
-            '<div class="text-base-600 dark:text-base-400">Object ID: {}</div>'
-            '<div class="text-xs text-base-500 dark:text-base-400">UUID: {}</div>'
-            "</div>",
-            obj.id,
-            obj.object_id,
-            str(obj.uuid)[:8],
+            f'<div class="font-medium text-base-900 dark:text-base-100">Item #{esc_id}</div>'
+            f'<div class="text-base-600 dark:text-base-400">Object ID: {esc_obj}</div>'
+            f'<div class="text-xs text-base-500 dark:text-base-400">UUID: {esc_uuid}</div>'
+            "</div>"
         )
+        return mark_safe(html)
 
     tagged_item_info.short_description = _("Tagged Item")
 
     def tag_display(self, obj):
-        tag = obj.tag
-        label = (
-            tag.safe_translation_getter("label", any_language=True)
-            or "Unnamed Tag"
+        t = obj.tag
+        label = t.safe_translation_getter("label", any_language=True) or _(
+            "Unnamed Tag"
         )
-
-        if tag.active:
-            status_color = "text-green-600 dark:text-green-400"
-            status_icon = "✅"
-        else:
-            status_color = "text-red-600 dark:text-red-400"
-            status_icon = "❌"
-
-        return format_html(
+        status_color = (
+            "text-green-600 dark:text-green-400"
+            if t.active
+            else "text-red-600 dark:text-red-400"
+        )
+        status_icon = "✅" if t.active else "❌"
+        esc_label = conditional_escape(label)
+        esc_color = conditional_escape(status_color)
+        esc_icon = conditional_escape(status_icon)
+        esc_tid = conditional_escape(str(t.id))
+        html = (
             '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{}</div>'
-            '<div class="flex items-center gap-1 {}">'
-            "<span>{}</span>"
-            "<span>Tag #{}</span>"
+            f'<div class="font-medium text-base-900 dark:text-base-100">{esc_label}</div>'
+            f'<div class="flex items-center gap-1 {esc_color}">'
+            f"<span>{esc_icon}</span><span>Tag #{esc_tid}</span>"
             "</div>"
-            "</div>",
-            label,
-            status_color,
-            status_icon,
-            tag.id,
+            "</div>"
         )
+        return mark_safe(html)
 
     tag_display.short_description = _("Tag")
 
     def content_object_display(self, obj):
         try:
-            content_obj = obj.content_object
-            if content_obj:
-                obj_str = str(content_obj)[:40]
-                if len(str(content_obj)) > 40:
-                    obj_str += "..."
-
-                return format_html(
+            co = obj.content_object
+            if co:
+                text = str(co)
+                display = text[:40] + ("…" if len(text) > 40 else "")
+                esc_text = conditional_escape(display)
+                esc_oid = conditional_escape(str(obj.object_id))
+                html = (
                     '<div class="text-sm">'
-                    '<div class="font-medium text-base-900 dark:text-base-100">{}</div>'
-                    '<div class="text-base-600 dark:text-base-400">ID: {}</div>'
-                    "</div>",
-                    obj_str,
-                    obj.object_id,
+                    f'<div class="font-medium text-base-900 dark:text-base-100">{esc_text}</div>'
+                    f'<div class="text-base-600 dark:text-base-400">ID: {esc_oid}</div>'
+                    "</div>"
                 )
-            else:
-                return format_html(
-                    '<div class="text-sm text-red-600 dark:text-red-400">Object not found</div>'
-                )
+                return mark_safe(html)
+            return mark_safe(
+                '<div class="text-sm text-red-600 dark:text-red-400">Object not found</div>'
+            )
         except Exception:
-            return format_html(
+            return mark_safe(
                 '<div class="text-sm text-red-600 dark:text-red-400">Error loading object</div>'
             )
 
     content_object_display.short_description = _("Content Object")
 
     def content_type_badge(self, obj):
-        content_type = obj.content_type
-        model_name = content_type.model
-
-        type_configs = {
-            "product": {
-                "bg": "bg-green-50 dark:bg-green-900",
-                "text": "text-green-700 dark:text-green-200",
-                "icon": "🏷️",
-            },
-            "article": {
-                "bg": "bg-blue-50 dark:bg-blue-900",
-                "text": "text-blue-700 dark:text-blue-200",
-                "icon": "📄",
-            },
-            "user": {
-                "bg": "bg-purple-50 dark:bg-purple-900",
-                "text": "text-purple-700 dark:text-purple-200",
-                "icon": "👤",
-            },
-            "category": {
-                "bg": "bg-orange-50 dark:bg-orange-900",
-                "text": "text-orange-700 dark:text-orange-200",
-                "icon": "📁",
-            },
-        }
-
-        config = type_configs.get(
-            model_name,
-            {
-                "bg": "bg-base-50 dark:bg-base-800",
-                "text": "text-base-700 dark:text-base-700",
-                "icon": "📦",
-            },
+        name = obj.content_type.model
+        cfg = {
+            "product": (
+                "bg-green-50 dark:bg-green-900",
+                "text-green-700 dark:text-green-200",
+                "🏷️",
+            ),
+            "article": (
+                "bg-blue-50 dark:bg-blue-900",
+                "text-blue-700 dark:text-blue-200",
+                "📄",
+            ),
+            "user": (
+                "bg-purple-50 dark:bg-purple-900",
+                "text-purple-700 dark:text-purple-200",
+                "👤",
+            ),
+            "category": (
+                "bg-orange-50 dark:bg-orange-900",
+                "text-orange-700 dark:text-orange-200",
+                "📁",
+            ),
+        }.get(
+            name,
+            (
+                "bg-base-50 dark:bg-base-800",
+                "text-base-700 dark:text-base-700",
+                "📦",
+            ),
         )
-
-        return format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium {} {} rounded border gap-1">'
-            "<span>{}</span>"
-            "<span>{}</span>"
-            "</span>",
-            config["bg"],
-            config["text"],
-            config["icon"],
-            model_name.title(),
+        bg, text, icon = cfg
+        esc_bg = conditional_escape(bg)
+        esc_text = conditional_escape(text)
+        esc_icon = conditional_escape(icon)
+        esc_name = conditional_escape(name.title())
+        html = (
+            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+            f'{esc_bg} {esc_text} rounded border gap-1">'
+            f"<span>{esc_icon}</span><span>{esc_name}</span>"
+            "</span>"
         )
+        return mark_safe(html)
 
     content_type_badge.short_description = _("Content Type")
 
     def created_display(self, obj):
-        return format_html(
+        d = obj.created_at.strftime("%Y-%m-%d")
+        t = obj.created_at.strftime("%H:%M")
+        esc_d = conditional_escape(d)
+        esc_t = conditional_escape(t)
+        html = (
             '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{}</div>'
-            '<div class="text-base-600 dark:text-base-400">{}</div>'
-            "</div>",
-            obj.created_at.strftime("%Y-%m-%d"),
-            obj.created_at.strftime("%H:%M"),
+            f'<div class="font-medium text-base-900 dark:text-base-100">{esc_d}</div>'
+            f'<div class="text-base-600 dark:text-base-400">{esc_t}</div>'
+            "</div>"
         )
+        return mark_safe(html)
 
     created_display.short_description = _("Created")
 
@@ -833,11 +782,7 @@ class TaggedItemInline(GenericTabularInline):
     model = TaggedItem
     extra = 0
     fields = ("tag",)
-    verbose_name = "Tag"
-    verbose_name_plural = "Tags"
-
+    verbose_name = _("Tag")
+    verbose_name_plural = _("Tags")
     ct_field = "content_type"
     ct_fk_field = "object_id"
-
-    def get_queryset(self, request):
-        return super().get_queryset(request).select_related("tag")

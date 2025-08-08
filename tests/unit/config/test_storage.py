@@ -33,7 +33,7 @@ class TestStorage(unittest.TestCase):
     )
     def test_aws(self):
         reload(sys.modules["settings"])
-        from settings import MEDIA_URL, STATIC_URL  # noqa: PLC0415
+        from settings import MEDIA_URL, STATIC_URL
 
         AWS_STORAGE_BUCKET_NAME = getenv("AWS_STORAGE_BUCKET_NAME")
         AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"

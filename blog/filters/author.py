@@ -1,12 +1,13 @@
-from django.db import models
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
 from blog.models.author import BlogAuthor
+from core.filters.camel_case_filters import CamelCaseTimeStampFilterSet
+from core.filters.core import UUIDFilterMixin
 
 
-class BlogAuthorFilter(filters.FilterSet):
+class BlogAuthorFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
     user = filters.NumberFilter(
         field_name="user__id",
         lookup_expr="exact",
@@ -74,43 +75,37 @@ class BlogAuthorFilter(filters.FilterSet):
 
     most_active = filters.BooleanFilter(
         method="filter_most_active",
-        help_text=_("Get most active authors (top 10 by post count)"),
+        help_text=_("Get authors ordered by post count (most active first)"),
     )
     most_liked = filters.BooleanFilter(
         method="filter_most_liked",
-        help_text=_("Get most liked authors (top 10 by total likes)"),
+        help_text=_("Get authors ordered by total likes (most liked first)"),
     )
 
     class Meta:
         model = BlogAuthor
-        fields = [
-            "id",
-            "user",
-            "user_email",
-            "first_name",
-            "last_name",
-            "full_name",
-            "has_website",
-            "website",
-            "bio",
-            "min_posts",
-            "max_posts",
-            "has_posts",
-            "min_total_likes",
-            "has_likes",
-            "most_active",
-            "most_liked",
-        ]
+        fields = {
+            "created_at": ["gte", "lte", "date"],
+            "updated_at": ["gte", "lte", "date"],
+            "uuid": ["exact"],
+            "id": ["exact", "in"],
+            "website": ["exact", "icontains"],
+            "user": ["exact"],
+            "user__email": ["exact", "icontains"],
+            "user__first_name": ["exact", "icontains"],
+            "user__last_name": ["exact", "icontains"],
+        }
 
     def filter_full_name(self, queryset, name, value):
+        """Filter by full name (supports first name, last name, or both)"""
         if not value:
             return queryset
 
         names = value.strip().split()
         if len(names) == 1:
             return queryset.filter(
-                models.Q(user__first_name__icontains=names[0])
-                | models.Q(user__last_name__icontains=names[0])
+                Q(user__first_name__icontains=names[0])
+                | Q(user__last_name__icontains=names[0])
             )
         elif len(names) >= 2:
             return queryset.filter(
@@ -120,73 +115,83 @@ class BlogAuthorFilter(filters.FilterSet):
         return queryset
 
     def filter_has_website(self, queryset, name, value):
+        """Filter authors who have/don't have a website"""
         if value is True:
-            return queryset.exclude(website__isnull=True).exclude(
-                website__exact=""
+            return queryset.exclude(
+                Q(website__isnull=True) | Q(website__exact="")
             )
         elif value is False:
             return queryset.filter(
-                models.Q(website__isnull=True) | models.Q(website__exact="")
+                Q(website__isnull=True) | Q(website__exact="")
             )
         return queryset
 
     def filter_min_posts(self, queryset, name, value):
-        if value is not None:
-            return queryset.annotate(post_count=Count("blog_posts")).filter(
-                post_count__gte=value
-            )
+        """Filter authors with minimum number of posts"""
+        if value is not None and value >= 0:
+            return queryset.annotate(
+                post_count=Count("blog_posts", distinct=True)
+            ).filter(post_count__gte=value)
         return queryset
 
     def filter_max_posts(self, queryset, name, value):
-        if value is not None:
-            return queryset.annotate(post_count=Count("blog_posts")).filter(
-                post_count__lte=value
-            )
+        """Filter authors with maximum number of posts"""
+        if value is not None and value >= 0:
+            return queryset.annotate(
+                post_count=Count("blog_posts", distinct=True)
+            ).filter(post_count__lte=value)
         return queryset
 
     def filter_has_posts(self, queryset, name, value):
+        """Filter authors who have/don't have posts"""
         if value is True:
-            return queryset.annotate(post_count=Count("blog_posts")).filter(
-                post_count__gt=0
-            )
+            return queryset.annotate(
+                post_count=Count("blog_posts", distinct=True)
+            ).filter(post_count__gt=0)
         elif value is False:
-            return queryset.annotate(post_count=Count("blog_posts")).filter(
-                post_count=0
-            )
+            return queryset.annotate(
+                post_count=Count("blog_posts", distinct=True)
+            ).filter(post_count=0)
         return queryset
 
     def filter_min_total_likes(self, queryset, name, value):
-        if value is not None:
+        """Filter authors with minimum total likes across all posts"""
+        if value is not None and value >= 0:
             return queryset.annotate(
-                total_likes=Count("blog_posts__likes")
+                total_likes=Count("blog_posts__likes", distinct=True)
             ).filter(total_likes__gte=value)
         return queryset
 
     def filter_has_likes(self, queryset, name, value):
+        """Filter authors who have/don't have likes on their posts"""
         if value is True:
             return queryset.annotate(
-                total_likes=Count("blog_posts__likes")
+                total_likes=Count("blog_posts__likes", distinct=True)
             ).filter(total_likes__gt=0)
         elif value is False:
             return queryset.annotate(
-                total_likes=Count("blog_posts__likes")
+                total_likes=Count("blog_posts__likes", distinct=True)
             ).filter(total_likes=0)
         return queryset
 
     def filter_most_active(self, queryset, name, value):
+        """Order authors by post count (most active first)"""
         if value is True:
             return (
-                queryset.annotate(post_count=Count("blog_posts"))
+                queryset.annotate(post_count=Count("blog_posts", distinct=True))
                 .filter(post_count__gt=0)
-                .order_by("-post_count")[:10]
+                .order_by("-post_count", "-created_at")
             )
         return queryset
 
     def filter_most_liked(self, queryset, name, value):
+        """Order authors by total likes (most liked first)"""
         if value is True:
             return (
-                queryset.annotate(total_likes=Count("blog_posts__likes"))
+                queryset.annotate(
+                    total_likes=Count("blog_posts__likes", distinct=True)
+                )
                 .filter(total_likes__gt=0)
-                .order_by("-total_likes")[:10]
+                .order_by("-total_likes", "-created_at")
             )
         return queryset

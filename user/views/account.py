@@ -2,33 +2,38 @@ from __future__ import annotations
 
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
-from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
 )
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.filters import SearchFilter
+
 from rest_framework.generics import get_object_or_404
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from authentication.serializers import AuthenticationSerializer
+from blog.filters.comment import BlogCommentFilter
+from blog.filters.post import BlogPostFilter
 from blog.serializers.comment import BlogCommentSerializer
 from blog.serializers.post import BlogPostSerializer
-from core.api.permissions import IsSelfOrAdmin
+from core.api.permissions import IsOwnerOrAdmin
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
 )
+from notification.filters import NotificationUserFilter
 from notification.serializers.user import NotificationUserSerializer
+from order.filters import OrderFilter
 from order.serializers.order import OrderSerializer
+from product.filters.favourite import ProductFavouriteFilter
+from product.filters.review import ProductReviewFilter
 from product.serializers.favourite import ProductFavouriteSerializer
 from product.serializers.review import ProductReviewSerializer
+from user.filters import UserAddressFilter, UserSubscriptionFilter
 from user.filters.account import UserAccountFilter
 from user.models.subscription import SubscriptionTopic, UserSubscription
 from user.serializers.account import (
@@ -180,16 +185,34 @@ User = get_user_model()
     ),
 )
 class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
-    permission_classes = [IsAuthenticated, IsSelfOrAdmin]
-    filter_backends = [
-        DjangoFilterBackend,
-        PascalSnakeCaseOrderingFilter,
-        SearchFilter,
-    ]
-    filterset_class = UserAccountFilter
+    permission_classes = [IsOwnerOrAdmin]
     ordering_fields = ["id", "email", "username", "created_at", "updated_at"]
     ordering = ["-created_at"]
     search_fields = ["id", "email", "username", "first_name", "last_name"]
+
+    def get_filterset_class(self):
+        """Return filterset class based on action."""
+        # During schema generation, we might not have the right context
+        # so we need to be more careful about when to apply action-specific filters
+        if not hasattr(self, "action") or getattr(
+            self, "swagger_fake_view", False
+        ):
+            return UserAccountFilter
+
+        action_filter_map = {
+            "favourite_products": ProductFavouriteFilter,
+            "orders": OrderFilter,
+            "product_reviews": ProductReviewFilter,
+            "addresses": UserAddressFilter,
+            "blog_post_comments": BlogCommentFilter,
+            "liked_blog_posts": BlogPostFilter,
+            "notifications": NotificationUserFilter,
+            "subscriptions": UserSubscriptionFilter,
+        }
+
+        if self.action in action_filter_map:
+            return action_filter_map[self.action]
+        return UserAccountFilter
 
     serializers = {
         "default": AuthenticationSerializer,
@@ -258,7 +281,6 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
 
     @action(detail=True, methods=["GET"])
     def favourite_products(self, request, pk=None):
-        self.filterset_fields = ["id"]
         self.ordering_fields = [
             "id",
             "product_id",
@@ -268,7 +290,7 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         self.ordering = ["-updated_at"]
         self.search_fields = [
             "id",
-            "product_id",
+            "product__name",
         ]
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)
@@ -276,7 +298,6 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
     @action(detail=True, methods=["GET"])
     def orders(self, request, pk=None):
         self.ordering_fields = ["created_at", "updated_at", "status"]
-        self.filterset_fields = ["status"]
         self.ordering = ["-created_at"]
         self.search_fields = []
         queryset = self.filter_queryset(self.get_queryset())
@@ -284,7 +305,6 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
 
     @action(detail=True, methods=["GET"])
     def product_reviews(self, request, pk=None):
-        self.filterset_fields = ["id", "product_id", "status"]
         self.ordering_fields = [
             "id",
             "product_id",
@@ -301,16 +321,6 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
 
     @action(detail=True, methods=["GET"])
     def addresses(self, request, pk=None):
-        self.filterset_fields = [
-            "id",
-            "country",
-            "city",
-            "street",
-            "zipcode",
-            "floor",
-            "location_type",
-            "is_main",
-        ]
         self.ordering_fields = [
             "id",
             "country",
@@ -328,7 +338,6 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
 
     @action(detail=True, methods=["GET"])
     def blog_post_comments(self, request, pk=None):
-        self.filterset_fields = ["id", "post", "parent", "approved"]
         self.ordering_fields = ["id", "post", "created_at"]
         self.ordering = ["-created_at"]
         self.search_fields = ["id", "post"]
@@ -337,7 +346,6 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
 
     @action(detail=True, methods=["GET"])
     def liked_blog_posts(self, request, pk=None):
-        self.filterset_fields = ["id", "tags", "slug", "author"]
         self.ordering_fields = [
             "id",
             "title",
@@ -352,7 +360,6 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
 
     @action(detail=True, methods=["GET"])
     def notifications(self, request, pk=None):
-        self.filterset_fields = ["seen", "notification__kind"]
         self.ordering_fields = ["created_at", "seen_at"]
         self.ordering = ["-created_at"]
 
@@ -364,7 +371,6 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         user = self.get_object()
 
         if request.method == "GET":
-            self.filterset_fields = ["topic", "status", "topic__category"]
             self.ordering_fields = ["subscribed_at", "created_at"]
             self.ordering = ["-subscribed_at"]
             self.search_fields = ["topic__name", "topic__description"]

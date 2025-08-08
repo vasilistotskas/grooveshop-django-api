@@ -68,6 +68,9 @@ ALLOWED_HOSTS: list[str] = []
 additional_hosts = getenv("ALLOWED_HOSTS", "*").split(",")
 ALLOWED_HOSTS.extend(filter(None, additional_hosts))
 
+if "testserver" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append("testserver")
+
 USE_X_FORWARDED_HOST = getenv("USE_X_FORWARDED_HOST", "False") == "True"
 
 DJANGO_APPS = [
@@ -220,7 +223,10 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Rest Framework
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": ("knox.auth.TokenAuthentication",),
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "knox.auth.TokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ),
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.AllowAny",
     ],
@@ -234,7 +240,9 @@ REST_FRAMEWORK = {
         "burst": None if DEBUG else "5/minute",
     },
     "DEFAULT_FILTER_BACKENDS": [
-        "django_filters.rest_framework.DjangoFilterBackend"
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "core.filters.camel_case_ordering.CamelCaseOrderingFilter",
+        "rest_framework.filters.SearchFilter",
     ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "core.pagination.page_number.PageNumberPaginator",
@@ -757,6 +765,11 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "DEFAULT_WEIGHT_UNIT",
         "type": "string",
         "value": "kg",
+    },
+    {
+        "name": "SUBSCRIPTION_CONFIRMATION_URL",
+        "type": "string",
+        "value": "https://example.com/confirm/{token}/",
     },
 ]
 

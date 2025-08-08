@@ -19,6 +19,8 @@ from core.views import (
     robots_txt,
     upload_image,
 )
+import core.filters.camel_case_filters  # noqa
+import core.filters.camel_case_ordering  # noqa
 
 app_name = "core"
 

@@ -1,10 +1,17 @@
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
+from core.filters.camel_case_filters import CamelCaseFilterMixin
+from core.filters.core import TimeStampFilterMixin, UUIDFilterMixin
 from user.models.account import UserAccount
 
 
-class UserAccountFilter(filters.FilterSet):
+class UserAccountFilter(
+    TimeStampFilterMixin,
+    UUIDFilterMixin,
+    CamelCaseFilterMixin,
+    filters.FilterSet,
+):
     id = filters.NumberFilter(
         field_name="id",
         lookup_expr="exact",
@@ -73,26 +80,75 @@ class UserAccountFilter(filters.FilterSet):
         lookup_expr="icontains",
         help_text=_("Filter by zipcode (partial match)"),
     )
-    created_after = filters.DateTimeFilter(
-        field_name="created_at",
-        lookup_expr="gte",
-        help_text=_("Filter users created after this date"),
+    has_phone = filters.BooleanFilter(
+        method="filter_has_phone",
+        help_text=_("Filter users who have a phone number"),
     )
-    created_before = filters.DateTimeFilter(
-        field_name="created_at",
-        lookup_expr="lte",
-        help_text=_("Filter users created before this date"),
+    has_image = filters.BooleanFilter(
+        method="filter_has_image",
+        help_text=_("Filter users who have a profile image"),
     )
-    updated_after = filters.DateTimeFilter(
-        field_name="updated_at",
-        lookup_expr="gte",
-        help_text=_("Filter users updated after this date"),
+    has_birth_date = filters.BooleanFilter(
+        method="filter_has_birth_date",
+        help_text=_("Filter users who have a birth date"),
     )
-    updated_before = filters.DateTimeFilter(
-        field_name="updated_at",
-        lookup_expr="lte",
-        help_text=_("Filter users updated before this date"),
+    has_social_links = filters.BooleanFilter(
+        method="filter_has_social_links",
+        help_text=_("Filter users who have social media links"),
     )
+    full_name = filters.CharFilter(
+        method="filter_full_name",
+        help_text=_("Filter by full name (first + last name)"),
+    )
+
+    def filter_has_phone(self, queryset, name, value):
+        if value:
+            return queryset.exclude(phone__isnull=True).exclude(phone="")
+        else:
+            return queryset.filter(phone__isnull=True) | queryset.filter(
+                phone=""
+            )
+
+    def filter_has_image(self, queryset, name, value):
+        if value:
+            return queryset.exclude(image__isnull=True).exclude(image="")
+        else:
+            return queryset.filter(image__isnull=True) | queryset.filter(
+                image=""
+            )
+
+    def filter_has_birth_date(self, queryset, name, value):
+        if value:
+            return queryset.exclude(birth_date__isnull=True)
+        else:
+            return queryset.filter(birth_date__isnull=True)
+
+    def filter_has_social_links(self, queryset, name, value):
+        from django.db.models import Q
+
+        social_fields = (
+            Q(twitter__gt="")
+            | Q(linkedin__gt="")
+            | Q(facebook__gt="")
+            | Q(instagram__gt="")
+            | Q(website__gt="")
+            | Q(youtube__gt="")
+            | Q(github__gt="")
+        )
+
+        if value:
+            return queryset.filter(social_fields)
+        else:
+            return queryset.exclude(social_fields)
+
+    def filter_full_name(self, queryset, name, value):
+        from django.contrib.postgres.search import SearchVector
+
+        if value:
+            return queryset.annotate(
+                full_name_search=SearchVector("first_name", "last_name")
+            ).filter(full_name_search=value)
+        return queryset
 
     class Meta:
         model = UserAccount
@@ -110,4 +166,5 @@ class UserAccountFilter(filters.FilterSet):
             "zipcode": ["icontains"],
             "created_at": ["gte", "lte"],
             "updated_at": ["gte", "lte"],
+            "uuid": ["exact"],
         }

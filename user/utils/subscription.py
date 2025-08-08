@@ -1,6 +1,6 @@
 import logging
 from typing import Any
-
+from extra_settings.models import Setting
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
@@ -41,10 +41,12 @@ def send_subscription_confirmation(
         return False
 
     try:
+        confirmation_url = Setting.get("SUBSCRIPTION_CONFIRMATION_URL")
+
         context = {
             "user": subscription.user,
             "topic": subscription.topic,
-            "confirmation_url": settings.SUBSCRIPTION_CONFIRMATION_URL.format(
+            "confirmation_url": confirmation_url.format(
                 token=subscription.confirmation_token
             ),
             "site_name": getattr(settings, "SITE_NAME", "Our Site"),
@@ -57,8 +59,9 @@ def send_subscription_confirmation(
             topic=subscription.topic.name
         )
 
+        # @TODO: create email template
         html_message = render_to_string(
-            "subscription/emails/confirmation.html", context
+            "emails/subscription/confirmation.html", context
         )
 
         text_message = strip_tags(html_message)

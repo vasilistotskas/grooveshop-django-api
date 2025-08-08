@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from django.conf import settings
-from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema_view
-from rest_framework.filters import SearchFilter
+
 
 from core.api.views import BaseModelViewSet
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
@@ -49,11 +48,6 @@ class ProductImageViewSet(MultiSerializerMixin, BaseModelViewSet):
         "update": ProductImageDetailSerializer,
         "partial_update": ProductImageDetailSerializer,
     }
-    filter_backends = [
-        DjangoFilterBackend,
-        PascalSnakeCaseOrderingFilter,
-        SearchFilter,
-    ]
     filterset_fields = [
         "id",
         "product",

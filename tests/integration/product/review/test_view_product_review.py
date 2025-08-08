@@ -37,8 +37,8 @@ class ProductReviewViewSetTestCase(APITestCase):
     def get_product_review_list_url(self):
         return reverse("product-review-list")
 
-    def get_user_product_review_url(self):
-        return reverse("product-review-user-product-review")
+    def get_user_product_review_url(self, pk):
+        return reverse("product-review-user-product-review", args=[pk])
 
     def get_product_review_product_url(self, pk):
         return reverse("product-review-product", args=[pk])
@@ -265,10 +265,10 @@ class ProductReviewViewSetTestCase(APITestCase):
         )
 
     def test_user_product_review_endpoint(self):
-        url = self.get_user_product_review_url()
+        url = self.get_user_product_review_url(pk=self.product.id)
         payload = {"product": self.product.id}
 
-        response = self.client.post(url, data=payload, format="json")
+        response = self.client.get(url, data=payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["id"], self.product_review.id)
@@ -276,19 +276,18 @@ class ProductReviewViewSetTestCase(APITestCase):
 
     def test_user_product_review_not_found(self):
         product_2 = ProductFactory(num_images=0, num_reviews=0)
-        url = self.get_user_product_review_url()
+        url = self.get_user_product_review_url(pk=product_2.id)
         payload = {"product": product_2.id}
 
-        response = self.client.post(url, data=payload, format="json")
-
+        response = self.client.get(url, data=payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_user_product_review_unauthenticated(self):
         self.client.force_authenticate(user=None)
-        url = self.get_user_product_review_url()
+        url = self.get_user_product_review_url(pk=self.product.id)
         payload = {"product": self.product.id}
 
-        response = self.client.post(url, data=payload, format="json")
+        response = self.client.get(url, data=payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 

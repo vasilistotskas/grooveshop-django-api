@@ -267,7 +267,8 @@ class NotificationUserViewSetTestCase(TestURLFixerMixin, APITestCase):
         )
 
         response = self.client.get(
-            self.list_url, {"notification_kind": NotificationKindEnum.SUCCESS}
+            self.list_url,
+            {"notification_kind": NotificationKindEnum.SUCCESS.value},
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)

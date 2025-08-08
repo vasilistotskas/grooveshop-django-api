@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from django.http import Http404
 from django.utils.translation import gettext_lazy as _
-from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.openapi import OpenApiTypes
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -10,7 +9,7 @@ from drf_spectacular.utils import (
     extend_schema_view,
 )
 from rest_framework import status
-from rest_framework.filters import SearchFilter
+
 from rest_framework.response import Response
 
 from cart.filters.item import CartItemFilter
@@ -23,7 +22,7 @@ from cart.serializers.item import (
 from cart.services import CartService
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
@@ -179,11 +178,6 @@ class CartItemViewSet(MultiSerializerMixin, BaseModelViewSet):
         "update": CartItemDetailSerializer,
         "partial_update": CartItemDetailSerializer,
     }
-    filter_backends = [
-        DjangoFilterBackend,
-        PascalSnakeCaseOrderingFilter,
-        SearchFilter,
-    ]
     filterset_class = CartItemFilter
     ordering_fields = [
         "id",
@@ -191,9 +185,10 @@ class CartItemViewSet(MultiSerializerMixin, BaseModelViewSet):
         "updated_at",
         "quantity",
         "cart__id",
+        "cart__last_activity",
         "product__id",
     ]
-    ordering = ["-created_at"]
+    ordering = ["-cart__last_activity", "-created_at"]
     search_fields = [
         "product__translations__name",
         "cart__user__email",

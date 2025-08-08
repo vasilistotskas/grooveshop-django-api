@@ -274,7 +274,7 @@ class BlogTagViewSetTestCase(TestURLFixerMixin, APITestCase):
     def test_filtering_by_name(self):
         BlogTag.objects.all().delete()
 
-        special_tag = BlogTagFactory()
+        special_tag = BlogTagFactory(active=True)
 
         from django.apps import apps
 

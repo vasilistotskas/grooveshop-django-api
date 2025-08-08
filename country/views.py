@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from django.conf import settings
-from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema_view
-from rest_framework.filters import SearchFilter
+
 
 from core.api.views import BaseModelViewSet
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
@@ -50,11 +49,6 @@ class CountryViewSet(MultiSerializerMixin, BaseModelViewSet):
         "update": CountryDetailSerializer,
         "partial_update": CountryDetailSerializer,
     }
-    filter_backends = [
-        DjangoFilterBackend,
-        PascalSnakeCaseOrderingFilter,
-        SearchFilter,
-    ]
     filterset_class = CountryFilter
     ordering_fields = [
         "alpha_2",
@@ -66,7 +60,7 @@ class CountryViewSet(MultiSerializerMixin, BaseModelViewSet):
         "sort_order",
         "translations__name",
     ]
-    ordering = ["-created_at"]
+    ordering = ["sort_order", "translations__name"]
     search_fields = [
         "alpha_2",
         "alpha_3",

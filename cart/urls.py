@@ -18,6 +18,11 @@ urlpatterns = [
         name="cart-detail",
     ),
     path(
+        "cart/list",
+        CartViewSet.as_view({"get": "list"}),
+        name="cart-list",
+    ),
+    path(
         "cart/item",
         CartItemViewSet.as_view({"get": "list", "post": "create"}),
         name="cart-item-list",

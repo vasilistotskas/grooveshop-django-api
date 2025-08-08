@@ -6,18 +6,18 @@ from django.db import transaction
 from django.utils.crypto import get_random_string
 from django.utils.http import urlsafe_base64_decode
 from django.utils.translation import gettext_lazy as _
-from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import serializers, status
 from rest_framework.decorators import action
-from rest_framework.filters import SearchFilter
-from rest_framework.permissions import BasePermission, IsAuthenticated
+
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.api.permissions import IsOwnerOrAdmin
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
@@ -73,11 +73,6 @@ class SubscriptionTopicViewSet(MultiSerializerMixin, BaseModelViewSet):
         "partial_update": SubscriptionTopicDetailSerializer,
     }
     permission_classes = [IsAuthenticated]
-    filter_backends = [
-        DjangoFilterBackend,
-        PascalSnakeCaseOrderingFilter,
-        SearchFilter,
-    ]
     filterset_class = SubscriptionTopicFilter
     ordering_fields = ["category", "created_at", "updated_at", "slug"]
     ordering = ["category"]
@@ -227,16 +222,6 @@ class SubscriptionTopicViewSet(MultiSerializerMixin, BaseModelViewSet):
             )
 
 
-class IsOwnerOfSubscription(BasePermission):
-    message = _("You do not have permission to access this subscription.")
-
-    def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated
-
-    def has_object_permission(self, request, view, obj):
-        return obj.user == request.user
-
-
 @extend_schema_view(
     **create_schema_view_config(
         model_class=UserSubscription,
@@ -267,12 +252,7 @@ class UserSubscriptionViewSet(MultiSerializerMixin, BaseModelViewSet):
         "partial_update": UserSubscriptionDetailSerializer,
         "confirm": UserSubscriptionDetailSerializer,
     }
-    permission_classes = [IsAuthenticated, IsOwnerOfSubscription]
-    filter_backends = [
-        DjangoFilterBackend,
-        PascalSnakeCaseOrderingFilter,
-        SearchFilter,
-    ]
+    permission_classes = [IsOwnerOrAdmin]
     filterset_class = UserSubscriptionFilter
     ordering_fields = [
         "subscribed_at",

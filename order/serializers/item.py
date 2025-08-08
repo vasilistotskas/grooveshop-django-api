@@ -164,3 +164,9 @@ class OrderItemRefundSerializer(serializers.Serializer):
             )
 
         return data
+
+
+class OrderItemRefundResponseSerializer(serializers.Serializer):
+    detail = serializers.CharField()
+    refunded_amount = MoneyField(max_digits=11, decimal_places=2)
+    item = OrderItemSerializer()

@@ -35,7 +35,7 @@ class ProductModelTestCase(TestCase):
         self.category = ProductCategoryFactory()
         self.vat = VatFactory()
         self.product = ProductFactory(
-            product_code="P123456",
+            sku="P123456",
             category=self.category,
             vat=self.vat,
             slug="sample-product",
@@ -111,7 +111,7 @@ class ProductModelTestCase(TestCase):
         )
 
     def test_fields(self):
-        self.assertEqual(self.product.product_code, "P123456")
+        self.assertEqual(self.product.sku, "P123456")
         self.assertEqual(self.product.slug, "sample-product")
         self.assertEqual(
             self.product.price, Money("100.00", settings.DEFAULT_CURRENCY)

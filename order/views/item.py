@@ -1,22 +1,20 @@
 from __future__ import annotations
 
 import logging
-
+from rest_framework.response import Response
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
-from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.exceptions import ValidationError as DRFValidationError
-from rest_framework.filters import SearchFilter
+from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
@@ -30,6 +28,7 @@ from order.serializers.item import (
     OrderItemRefundSerializer,
     OrderItemSerializer,
     OrderItemWriteSerializer,
+    OrderItemRefundResponseSerializer,
 )
 
 
@@ -52,7 +51,7 @@ from order.serializers.item import (
         tags=["Order Items"],
         request=OrderItemRefundSerializer,
         responses={
-            200: OrderItemDetailSerializer,
+            200: OrderItemRefundResponseSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
             403: ErrorResponseSerializer,
@@ -76,13 +75,9 @@ class OrderItemViewSet(MultiSerializerMixin, BaseModelViewSet):
         "create": OrderItemDetailSerializer,
         "update": OrderItemDetailSerializer,
         "partial_update": OrderItemDetailSerializer,
+        "refund": OrderItemRefundResponseSerializer,
     }
     permission_classes = [IsAuthenticated]
-    filter_backends = [
-        DjangoFilterBackend,
-        PascalSnakeCaseOrderingFilter,
-        SearchFilter,
-    ]
     filterset_class = OrderItemFilter
     ordering_fields = [
         "id",
@@ -180,15 +175,14 @@ class OrderItemViewSet(MultiSerializerMixin, BaseModelViewSet):
 
             refunded_amount = order_item.refund(quantity)
 
-            return Response(
+            serializer = OrderItemRefundResponseSerializer(
                 {
                     "detail": _("Refund processed successfully."),
-                    "refunded_amount": str(refunded_amount),
-                    "item": OrderItemDetailSerializer(
-                        order_item, context=self.get_serializer_context()
-                    ).data,
+                    "refunded_amount": refunded_amount,
+                    "item": order_item,
                 }
             )
+            return Response(serializer.data, status=status.HTTP_200_OK)
         except ValidationError as e:
             logger = logging.getLogger(__name__)
 

@@ -9,7 +9,6 @@ from django.conf import settings
 from django.db.models import F
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
     OpenApiParameter,
     extend_schema,
@@ -17,7 +16,7 @@ from drf_spectacular.utils import (
 )
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.filters import SearchFilter
+
 from rest_framework.response import Response
 
 from blog.filters.post import BlogPostFilter
@@ -35,7 +34,7 @@ from blog.strategies.weighted_related_posts_strategy import (
 )
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
@@ -89,11 +88,7 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
         "update": BlogPostDetailSerializer,
         "partial_update": BlogPostDetailSerializer,
     }
-    filter_backends = [
-        DjangoFilterBackend,
-        PascalSnakeCaseOrderingFilter,
-        SearchFilter,
-    ]
+
     filterset_class = BlogPostFilter
     ordering_fields = [
         "id",
@@ -101,9 +96,9 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
         "updated_at",
         "published_at",
         "view_count",
-        "likes_count",
-        "comments_count",
-        "tags_count",
+        "likes_count_field",
+        "comments_count_field",
+        "tags_count_field",
         "featured",
     ]
     ordering = ["-created_at"]
@@ -130,6 +125,11 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
             .with_all_annotations()
         )
         return queryset
+
+    def get_serializer_class(self):
+        if hasattr(super(), "get_serializer_class"):
+            return super().get_serializer_class()
+        return self.serializers.get(self.action, BlogPostSerializer)
 
     @cached_property
     def related_posts_strategy(self):

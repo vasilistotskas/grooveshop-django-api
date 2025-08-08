@@ -108,8 +108,8 @@ urlpatterns = [
         name="product-review-detail",
     ),
     path(
-        "product/review/user_product_review",
-        ProductReviewViewSet.as_view({"post": "user_product_review"}),
+        "product/review/<str:pk>/user_product_review",
+        ProductReviewViewSet.as_view({"get": "user_product_review"}),
         name="product-review-user-product-review",
     ),
     path(

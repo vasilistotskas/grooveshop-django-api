@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from django.utils.translation import gettext_lazy as _
-from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.openapi import OpenApiTypes
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -9,7 +8,8 @@ from drf_spectacular.utils import (
     extend_schema_view,
 )
 from rest_framework import status
-from rest_framework.filters import SearchFilter
+from rest_framework.permissions import IsAdminUser
+
 from rest_framework.response import Response
 
 from cart.filters.cart import CartFilter
@@ -22,7 +22,7 @@ from cart.serializers.cart import (
 from cart.services import CartService
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
@@ -158,11 +158,6 @@ class CartViewSet(MultiSerializerMixin, BaseModelViewSet):
         "update": CartDetailSerializer,
         "partial_update": CartDetailSerializer,
     }
-    filter_backends = [
-        DjangoFilterBackend,
-        PascalSnakeCaseOrderingFilter,
-        SearchFilter,
-    ]
     filterset_class = CartFilter
     ordering_fields = [
         "id",
@@ -171,12 +166,19 @@ class CartViewSet(MultiSerializerMixin, BaseModelViewSet):
         "updated_at",
         "last_activity",
     ]
-    ordering = ["-created_at"]
+    ordering = ["-last_activity", "-created_at"]
     search_fields = ["user__email", "user__first_name", "user__last_name"]
 
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
         self.cart_service = CartService(request=request)
+
+    def get_permissions(self):
+        if self.action in [
+            "list",
+        ]:
+            self.permission_classes = [IsAdminUser]
+        return super().get_permissions()
 
     def get_queryset(self):
         user = self.request.user

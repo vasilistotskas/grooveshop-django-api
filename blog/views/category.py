@@ -2,17 +2,16 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
-from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
     OpenApiParameter,
     extend_schema,
     extend_schema_view,
 )
 from rest_framework.decorators import action
-from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
 
 from blog.filters.category import BlogCategoryFilter
+from blog.filters.post import BlogPostFilter
 from blog.models.category import BlogCategory
 from blog.serializers.category import (
     BlogCategoryDetailSerializer,
@@ -24,7 +23,7 @@ from blog.serializers.category import (
 from blog.serializers.post import BlogPostSerializer
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
@@ -165,12 +164,19 @@ class BlogCategoryViewSet(MultiSerializerMixin, BaseModelViewSet):
         "update": BlogCategoryDetailSerializer,
         "partial_update": BlogCategoryDetailSerializer,
     }
-    filter_backends = [
-        DjangoFilterBackend,
-        PascalSnakeCaseOrderingFilter,
-        SearchFilter,
-    ]
-    filterset_class = BlogCategoryFilter
+
+    def get_filterset_class(self):
+        """Return filterset class based on action."""
+        # During schema generation, we might not have the right context
+        if not hasattr(self, "action") or getattr(
+            self, "swagger_fake_view", False
+        ):
+            return BlogCategoryFilter
+
+        if self.action == "posts":
+            return BlogPostFilter
+        return BlogCategoryFilter
+
     ordering_fields = [
         "id",
         "created_at",
@@ -179,12 +185,15 @@ class BlogCategoryViewSet(MultiSerializerMixin, BaseModelViewSet):
         "level",
         "lft",
         "rght",
+        "tree_id",
+        "name",
     ]
     ordering = ["sort_order", "lft", "-created_at"]
     search_fields = [
         "slug",
         "translations__name",
         "translations__description",
+        "parent__translations__name",
     ]
 
     def get_queryset(self):

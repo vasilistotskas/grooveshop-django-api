@@ -5,7 +5,7 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from cart.models import Cart
-from cart.serializers.item import CartItemDetailSerializer, CartItemSerializer
+from cart.serializers.item import CartItemSerializer
 from product.serializers.product import ProductSerializer
 
 
@@ -32,6 +32,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             "user",
             "session_key",
             "uuid",
+            "items",
             "total_price",
             "total_discount_value",
             "total_vat_value",
@@ -56,7 +57,6 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
 
 
 class CartDetailSerializer(CartSerializer):
-    items = CartItemDetailSerializer(many=True, read_only=True)
     recommendations = serializers.SerializerMethodField(
         help_text=_("Product recommendations based on cart contents")
     )
@@ -89,6 +89,5 @@ class CartDetailSerializer(CartSerializer):
     class Meta(CartSerializer.Meta):
         fields = (
             *CartSerializer.Meta.fields,
-            "items",
             "recommendations",
         )

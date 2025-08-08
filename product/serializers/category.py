@@ -85,7 +85,7 @@ class ProductCategoryWriteSerializer(
             "seo_description",
             "seo_keywords",
         )
-        read_only_fields = ()  # placeholder if needed
+        read_only_fields = ()
 
     def validate_parent(self, value: ProductCategory) -> ProductCategory:
         if value and self.instance:

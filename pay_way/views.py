@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from django.conf import settings
-from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema_view
-from rest_framework.filters import SearchFilter
+
 
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
@@ -52,11 +51,6 @@ class PayWayViewSet(MultiSerializerMixin, BaseModelViewSet):
         "update": PayWayDetailSerializer,
         "partial_update": PayWayDetailSerializer,
     }
-    filter_backends = [
-        DjangoFilterBackend,
-        PascalSnakeCaseOrderingFilter,
-        SearchFilter,
-    ]
     filterset_class = PayWayFilter
     ordering_fields = [
         "id",

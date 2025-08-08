@@ -13,9 +13,7 @@ from core.forms.image import ImageAndSvgField
 class ImageAndSvgFieldTest(TestCase):
     def setUp(self):
         self.field = ImageAndSvgField()
-        self.field_with_size_limit = ImageAndSvgField(
-            max_file_size=1024
-        )  # 1KB limit
+        self.field_with_size_limit = ImageAndSvgField(max_file_size=1024)
 
     def create_test_file(self, content, filename, content_type="text/plain"):
         if isinstance(content, str):
@@ -138,7 +136,7 @@ class ImageAndSvgFieldTest(TestCase):
         self.assertIsNone(result)
 
     def test_file_size_validation(self):
-        large_content = "x" * 2048  # 2KB
+        large_content = "x" * 2048
         large_file = self.create_test_file(large_content, "large.txt")
         large_file.size = 2048
 
@@ -173,7 +171,7 @@ class ImageAndSvgFieldTest(TestCase):
         with self.assertRaises(ValidationError):
             self.field.to_python(exe_file)
 
-    @override_settings(FILE_UPLOAD_MAX_MEMORY_SIZE=1048576)  # 1MB
+    @override_settings(FILE_UPLOAD_MAX_MEMORY_SIZE=1048576)
     def test_default_max_file_size_from_settings(self):
         field = ImageAndSvgField()
         self.assertEqual(field.max_file_size, 1048576)
@@ -181,10 +179,10 @@ class ImageAndSvgFieldTest(TestCase):
     def test_default_max_file_size_fallback(self):
         with patch.object(settings, "FILE_UPLOAD_MAX_MEMORY_SIZE", None):
             field = ImageAndSvgField()
-            self.assertEqual(field.max_file_size, 2621440)  # 2.5MB default
+            self.assertEqual(field.max_file_size, 2621440)
 
     def test_custom_max_file_size(self):
-        custom_size = 5242880  # 5MB
+        custom_size = 5242880
         field = ImageAndSvgField(max_file_size=custom_size)
         self.assertEqual(field.max_file_size, custom_size)
 

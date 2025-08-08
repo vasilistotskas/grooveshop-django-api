@@ -62,7 +62,7 @@ class Command(BaseCommand):
     def get_user_stats(self):
         return {
             "new_users_this_week": User.objects.filter(
-                date_joined__gte=timezone.now() - timedelta(days=7)
+                created_at__gte=timezone.now() - timedelta(days=7)
             ).count(),
             "total_users": User.objects.count(),
         }

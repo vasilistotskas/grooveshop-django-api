@@ -60,7 +60,7 @@ class ProductFactory(CustomDjangoModelFactory):
         ("slug", lambda: fake.slug()),
     ]
 
-    product_code = factory.Faker("uuid4")
+    sku = factory.Faker("uuid4")
     category = factory.LazyFunction(get_or_create_category)
     price = factory.Faker(
         "pydecimal", left_digits=4, right_digits=2, positive=True

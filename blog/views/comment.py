@@ -2,17 +2,12 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
-from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
 )
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.filters import SearchFilter
-from rest_framework.permissions import (
-    IsAuthenticated,
-)
 from rest_framework.response import Response
 
 from blog.filters.comment import BlogCommentFilter
@@ -29,9 +24,10 @@ from blog.serializers.comment import (
 from blog.serializers.post import (
     BlogPostDetailSerializer,
 )
+from core.api.permissions import IsOwnerOrAdmin
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
@@ -81,28 +77,48 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
         "update": BlogCommentDetailSerializer,
         "partial_update": BlogCommentDetailSerializer,
     }
-    filter_backends = [
-        DjangoFilterBackend,
-        PascalSnakeCaseOrderingFilter,
-        SearchFilter,
-    ]
     filterset_class = BlogCommentFilter
     ordering_fields = [
         "id",
         "created_at",
         "updated_at",
-        "likes_count",
-        "replies_count",
+        "level",
+        "lft",
+        "approved",
+        "likes_count_field",
+        "replies_count_field",
     ]
     ordering = ["-created_at"]
-    search_fields = ["translations__content"]
+    search_fields = [
+        "translations__content",
+        "user__email",
+        "user__first_name",
+        "user__last_name",
+        "post__translations__title",
+    ]
 
     def get_queryset(self):
+        from django.db.models import Count
+
         queryset = (
-            BlogComment.objects.select_related("user", "post")
-            .prefetch_related("likes", "translations")
-            .filter(approved=True)
+            BlogComment.objects.select_related(
+                "user", "post", "parent", "post__category", "post__author"
+            )
+            .prefetch_related(
+                "likes",
+                "translations",
+                "children",
+                "post__translations",
+            )
+            .annotate(
+                likes_count_field=Count("likes", distinct=True),
+                replies_count_field=Count("children", distinct=True),
+            )
         )
+
+        if self.action == "list" and not self.request.user.is_staff:
+            queryset = queryset.filter(approved=True)
+
         return queryset
 
     def get_permissions(self):
@@ -117,7 +133,7 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
             "my_comments",
             "my_comment",
         ]:
-            permission_classes.append(IsAuthenticated)
+            permission_classes.append(IsOwnerOrAdmin)
         return [permission() for permission in permission_classes]
 
     @extend_schema(

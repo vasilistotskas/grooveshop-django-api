@@ -1,10 +1,17 @@
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
+from core.filters.camel_case_filters import CamelCaseTimeStampFilterSet
+from core.filters.core import (
+    SortableFilterMixin,
+    UUIDFilterMixin,
+)
 from region.models import Region
 
 
-class RegionFilter(filters.FilterSet):
+class RegionFilter(
+    SortableFilterMixin, UUIDFilterMixin, CamelCaseTimeStampFilterSet
+):
     alpha = filters.CharFilter(
         field_name="alpha",
         lookup_expr="icontains",
@@ -30,32 +37,12 @@ class RegionFilter(filters.FilterSet):
         lookup_expr="icontains",
         help_text=_("Filter by region name (partial match)"),
     )
-    created_after = filters.DateTimeFilter(
-        field_name="created_at",
-        lookup_expr="gte",
-        help_text=_("Filter regions created after this date"),
-    )
-    created_before = filters.DateTimeFilter(
-        field_name="created_at",
-        lookup_expr="lte",
-        help_text=_("Filter regions created before this date"),
-    )
-    updated_after = filters.DateTimeFilter(
-        field_name="updated_at",
-        lookup_expr="gte",
-        help_text=_("Filter regions updated after this date"),
-    )
-    updated_before = filters.DateTimeFilter(
-        field_name="updated_at",
-        lookup_expr="lte",
-        help_text=_("Filter regions updated before this date"),
-    )
 
     class Meta:
         model = Region
         fields = {
             "alpha": ["exact", "icontains"],
             "country": ["exact"],
-            "created_at": ["gte", "lte"],
-            "updated_at": ["gte", "lte"],
+            "sort_order": ["exact", "gte", "lte"],
+            "uuid": ["exact"],
         }

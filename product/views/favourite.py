@@ -1,19 +1,19 @@
 from __future__ import annotations
 
 from django.utils.translation import gettext_lazy as _
-from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.filters import SearchFilter
+
 from rest_framework.response import Response
 
 from core.api.views import BaseModelViewSet
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
 )
+from product.filters.favourite import ProductFavouriteFilter
 from product.models.favourite import ProductFavourite
 from product.serializers.favourite import (
     ProductDetailResponseSerializer,
@@ -27,7 +27,7 @@ from product.serializers.favourite import (
 schema_config = create_schema_view_config(
     model_class=ProductFavourite,
     display_config={
-        "tag": "Product Favourite",
+        "tag": "Product Favourites",
     },
     serializers={
         "list_serializer": ProductFavouriteSerializer,
@@ -42,12 +42,7 @@ class ProductFavouriteViewSet(MultiSerializerMixin, BaseModelViewSet):
     queryset = ProductFavourite.objects.select_related(
         "user", "product"
     ).prefetch_related("product__translations")
-    filter_backends = [
-        DjangoFilterBackend,
-        PascalSnakeCaseOrderingFilter,
-        SearchFilter,
-    ]
-    filterset_fields = ["id", "user_id", "product_id"]
+    filterset_class = ProductFavouriteFilter
     ordering_fields = [
         "id",
         "user_id",
@@ -60,7 +55,6 @@ class ProductFavouriteViewSet(MultiSerializerMixin, BaseModelViewSet):
         "user__username",
         "product__translations__name",
     ]
-
     serializers = {
         "default": ProductFavouriteDetailSerializer,
         "list": ProductFavouriteSerializer,

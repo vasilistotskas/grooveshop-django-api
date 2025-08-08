@@ -53,7 +53,6 @@ class TestSubscriptionUtils:
         assert result is False
 
     @override_settings(
-        SUBSCRIPTION_CONFIRMATION_URL="https://example.com/confirm/{token}/",
         SITE_NAME="Test Site",
         SUPPORT_EMAIL="support@test.com",
         DEFAULT_FROM_EMAIL="noreply@test.com",
@@ -127,7 +126,6 @@ class TestSubscriptionUtils:
         assert result is False
 
     @override_settings(
-        SUBSCRIPTION_CONFIRMATION_URL="https://example.com/confirm/{token}/",
         DEFAULT_FROM_EMAIL="noreply@test.com",
     )
     @patch("user.utils.subscription.render_to_string")

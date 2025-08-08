@@ -1,127 +1,167 @@
-import django_filters
+from django.utils.translation import gettext_lazy as _
+from django_filters import rest_framework as filters
 
+from core.filters.camel_case_filters import CamelCaseTimeStampFilterSet
+from core.filters.core import UUIDFilterMixin
 from user.models.subscription import SubscriptionTopic, UserSubscription
 
 
-class SubscriptionTopicFilter(django_filters.FilterSet):
-    category = django_filters.ChoiceFilter(
-        choices=SubscriptionTopic.TopicCategory.choices
+class SubscriptionTopicFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
+    category = filters.ChoiceFilter(
+        choices=SubscriptionTopic.TopicCategory.choices,
+        help_text=_("Filter by topic category"),
     )
-    is_active = django_filters.BooleanFilter()
-    is_default = django_filters.BooleanFilter()
-    requires_confirmation = django_filters.BooleanFilter()
-
-    slug = django_filters.CharFilter(lookup_expr="icontains")
-    slug_exact = django_filters.CharFilter(
-        field_name="slug", lookup_expr="exact"
+    is_active = filters.BooleanFilter(
+        help_text=_("Filter by active status"),
     )
-
-    created_after = django_filters.DateTimeFilter(
-        field_name="created_at", lookup_expr="gte"
+    is_default = filters.BooleanFilter(
+        help_text=_("Filter by default subscription status"),
     )
-    created_before = django_filters.DateTimeFilter(
-        field_name="created_at", lookup_expr="lte"
-    )
-    updated_after = django_filters.DateTimeFilter(
-        field_name="updated_at", lookup_expr="gte"
-    )
-    updated_before = django_filters.DateTimeFilter(
-        field_name="updated_at", lookup_expr="lte"
+    requires_confirmation = filters.BooleanFilter(
+        help_text=_("Filter by confirmation requirement"),
     )
 
-    name = django_filters.CharFilter(
-        field_name="translations__name", lookup_expr="icontains"
+    slug = filters.CharFilter(
+        lookup_expr="icontains",
+        help_text=_("Filter by slug (partial match)"),
     )
-    description = django_filters.CharFilter(
-        field_name="translations__description", lookup_expr="icontains"
+    slug_exact = filters.CharFilter(
+        field_name="slug",
+        lookup_expr="exact",
+        help_text=_("Filter by exact slug"),
+    )
+
+    name = filters.CharFilter(
+        field_name="translations__name",
+        lookup_expr="icontains",
+        help_text=_("Filter by name (partial match)"),
+    )
+    description = filters.CharFilter(
+        field_name="translations__description",
+        lookup_expr="icontains",
+        help_text=_("Filter by description (partial match)"),
+    )
+
+    # Custom filter methods
+    has_subscribers = filters.BooleanFilter(
+        method="filter_has_subscribers",
+        help_text=_("Filter topics that have subscribers"),
     )
 
     class Meta:
         model = SubscriptionTopic
-        fields = [
-            "category",
-            "is_active",
-            "is_default",
-            "requires_confirmation",
-            "slug",
-            "slug_exact",
-            "created_after",
-            "created_before",
-            "updated_after",
-            "updated_before",
-            "name",
-            "description",
-        ]
+        fields = {
+            "id": ["exact", "in"],
+            "category": ["exact"],
+            "is_active": ["exact"],
+            "is_default": ["exact"],
+            "requires_confirmation": ["exact"],
+            "slug": ["exact", "icontains"],
+            "created_at": ["gte", "lte", "date"],
+            "updated_at": ["gte", "lte", "date"],
+            "uuid": ["exact"],
+        }
+
+    def filter_has_subscribers(self, queryset, name, value):
+        if value is True:
+            return queryset.filter(subscribers__isnull=False).distinct()
+        elif value is False:
+            return queryset.filter(subscribers__isnull=True)
+        return queryset
 
 
-class UserSubscriptionFilter(django_filters.FilterSet):
-    topic = django_filters.ModelChoiceFilter(
-        queryset=SubscriptionTopic.objects.filter(is_active=True)
+class UserSubscriptionFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
+    topic = filters.ModelChoiceFilter(
+        queryset=SubscriptionTopic.objects.filter(is_active=True),
+        help_text=_("Filter by subscription topic"),
     )
-    status = django_filters.ChoiceFilter(
-        choices=UserSubscription.SubscriptionStatus.choices
+    status = filters.ChoiceFilter(
+        choices=UserSubscription.SubscriptionStatus.choices,
+        help_text=_("Filter by subscription status"),
     )
 
-    topic__category = django_filters.ChoiceFilter(
+    topic_category = filters.ChoiceFilter(
         field_name="topic__category",
         choices=SubscriptionTopic.TopicCategory.choices,
+        help_text=_("Filter by topic category"),
     )
 
-    subscribed_after = django_filters.DateTimeFilter(
-        field_name="subscribed_at", lookup_expr="gte"
+    subscribed_after = filters.DateTimeFilter(
+        field_name="subscribed_at",
+        lookup_expr="gte",
+        help_text=_("Filter subscriptions created after this date"),
     )
-    subscribed_before = django_filters.DateTimeFilter(
-        field_name="subscribed_at", lookup_expr="lte"
+    subscribed_before = filters.DateTimeFilter(
+        field_name="subscribed_at",
+        lookup_expr="lte",
+        help_text=_("Filter subscriptions created before this date"),
     )
-    unsubscribed_after = django_filters.DateTimeFilter(
-        field_name="unsubscribed_at", lookup_expr="gte"
+    unsubscribed_after = filters.DateTimeFilter(
+        field_name="unsubscribed_at",
+        lookup_expr="gte",
+        help_text=_("Filter subscriptions unsubscribed after this date"),
     )
-    unsubscribed_before = django_filters.DateTimeFilter(
-        field_name="unsubscribed_at", lookup_expr="lte"
-    )
-    created_after = django_filters.DateTimeFilter(
-        field_name="created_at", lookup_expr="gte"
-    )
-    created_before = django_filters.DateTimeFilter(
-        field_name="created_at", lookup_expr="lte"
-    )
-    updated_after = django_filters.DateTimeFilter(
-        field_name="updated_at", lookup_expr="gte"
-    )
-    updated_before = django_filters.DateTimeFilter(
-        field_name="updated_at", lookup_expr="lte"
+    unsubscribed_before = filters.DateTimeFilter(
+        field_name="unsubscribed_at",
+        lookup_expr="lte",
+        help_text=_("Filter subscriptions unsubscribed before this date"),
     )
 
-    topic__slug = django_filters.CharFilter(
-        field_name="topic__slug", lookup_expr="icontains"
+    topic_slug = filters.CharFilter(
+        field_name="topic__slug",
+        lookup_expr="icontains",
+        help_text=_("Filter by topic slug (partial match)"),
     )
-    topic__slug_exact = django_filters.CharFilter(
-        field_name="topic__slug", lookup_expr="exact"
+    topic_slug_exact = filters.CharFilter(
+        field_name="topic__slug",
+        lookup_expr="exact",
+        help_text=_("Filter by exact topic slug"),
     )
 
-    topic_name = django_filters.CharFilter(
-        field_name="topic__translations__name", lookup_expr="icontains"
+    topic_name = filters.CharFilter(
+        field_name="topic__translations__name",
+        lookup_expr="icontains",
+        help_text=_("Filter by topic name (partial match)"),
     )
-    topic_description = django_filters.CharFilter(
-        field_name="topic__translations__description", lookup_expr="icontains"
+    topic_description = filters.CharFilter(
+        field_name="topic__translations__description",
+        lookup_expr="icontains",
+        help_text=_("Filter by topic description (partial match)"),
+    )
+
+    # Custom filter methods
+    is_confirmed = filters.BooleanFilter(
+        method="filter_is_confirmed",
+        help_text=_("Filter by confirmation status"),
+    )
+    has_metadata = filters.BooleanFilter(
+        method="filter_has_metadata",
+        help_text=_("Filter subscriptions that have metadata"),
     )
 
     class Meta:
         model = UserSubscription
-        fields = [
-            "topic",
-            "status",
-            "topic__category",
-            "subscribed_after",
-            "subscribed_before",
-            "unsubscribed_after",
-            "unsubscribed_before",
-            "created_after",
-            "created_before",
-            "updated_after",
-            "updated_before",
-            "topic__slug",
-            "topic__slug_exact",
-            "topic_name",
-            "topic_description",
-        ]
+        fields = {
+            "id": ["exact", "in"],
+            "topic": ["exact"],
+            "status": ["exact"],
+            "subscribed_at": ["gte", "lte", "date"],
+            "unsubscribed_at": ["gte", "lte", "date"],
+            "created_at": ["gte", "lte", "date"],
+            "updated_at": ["gte", "lte", "date"],
+            "uuid": ["exact"],
+        }
+
+    def filter_is_confirmed(self, queryset, name, value):
+        if value is True:
+            return queryset.filter(confirmation_token="")
+        elif value is False:
+            return queryset.exclude(confirmation_token="")
+        return queryset
+
+    def filter_has_metadata(self, queryset, name, value):
+        if value is True:
+            return queryset.exclude(metadata={})
+        elif value is False:
+            return queryset.filter(metadata={})
+        return queryset

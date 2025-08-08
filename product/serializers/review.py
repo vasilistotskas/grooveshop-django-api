@@ -145,9 +145,3 @@ class ProductReviewWriteSerializer(
             )
 
         return attrs
-
-
-class UserProductReviewRequestSerializer(serializers.Serializer):
-    product = serializers.IntegerField(
-        help_text=_("ID of the product to get user's review for")
-    )

@@ -56,8 +56,8 @@ class Product(
     TaggedModel,
 ):
     id = models.BigAutoField(primary_key=True)
-    product_code = models.CharField(
-        _("Product Code"), unique=True, max_length=100, default=uuid.uuid4
+    sku = models.CharField(
+        _("SKU"), unique=True, max_length=100, default=uuid.uuid4
     )
     category = TreeForeignKey(
         "product.ProductCategory",
@@ -116,7 +116,7 @@ class Product(
             BTreeIndex(
                 fields=["price", "stock"], name="product_price_stock_ix"
             ),
-            BTreeIndex(fields=["product_code"], name="product_product_code_ix"),
+            BTreeIndex(fields=["sku"], name="product_sku_ix"),
             BTreeIndex(fields=["slug"], name="product_slug_ix"),
             BTreeIndex(fields=["price"], name="product_price_ix"),
             BTreeIndex(fields=["stock"], name="product_stock_ix"),
@@ -135,11 +135,11 @@ class Product(
 
     def __repr__(self):
         name = self.safe_translation_getter("name", any_language=True) or ""
-        return f"<Product: {name} ({self.product_code})>"
+        return f"<Product: {name} ({self.sku})>"
 
     def save(self, *args, **kwargs):
-        if not self.product_code:
-            self.product_code = self.generate_unique_product_code()
+        if not self.sku:
+            self.sku = self.generate_unique_sku()
 
         if not self.slug:
             config = SlugifyConfig(
@@ -176,10 +176,10 @@ class Product(
         if self.stock < 0:
             raise ValidationError({"stock": _("Stock cannot be negative.")})
 
-    def generate_unique_product_code(self) -> str:
+    def generate_unique_sku(self) -> str:
         while True:
             unique_code = uuid.uuid4()
-            if not self.objects.filter(product_code=unique_code).exists():
+            if not self.objects.filter(sku=unique_code).exists():
                 return str(unique_code)
 
     def increment_stock(self, quantity: int) -> None:

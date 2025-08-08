@@ -4,16 +4,15 @@ from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
-from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.filters import SearchFilter
+
 from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-from core.filters.custom_filters import PascalSnakeCaseOrderingFilter
+
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
@@ -48,16 +47,10 @@ schema_config = create_schema_view_config(
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class ProductCategoryImageViewSet(MultiSerializerMixin, BaseModelViewSet):
     queryset = ProductCategoryImage.objects.select_related("category")
-    filter_backends = [
-        DjangoFilterBackend,
-        PascalSnakeCaseOrderingFilter,
-        SearchFilter,
-    ]
     filterset_fields = ["id", "category", "image_type", "active"]
     ordering_fields = ["created_at", "image_type", "sort_order"]
     ordering = ["sort_order", "-created_at"]
     search_fields = ["translations__title", "translations__alt_text"]
-
     serializers = {
         "default": ProductCategoryImageDetailSerializer,
         "list": ProductCategoryImageSerializer,
@@ -69,7 +62,6 @@ class ProductCategoryImageViewSet(MultiSerializerMixin, BaseModelViewSet):
         "by_category": ProductCategoryImageSerializer,
         "by_type": ProductCategoryImageSerializer,
     }
-
     response_serializers = {
         "create": ProductCategoryImageDetailSerializer,
         "update": ProductCategoryImageDetailSerializer,

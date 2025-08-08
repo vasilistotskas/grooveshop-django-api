@@ -1,7 +1,7 @@
 from __future__ import annotations
-
+from rest_framework import serializers
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -15,7 +15,10 @@ from notification.serializers.notification import NotificationSerializer
     summary=_("Returns the notifications for a list of ids."),
     description=_("Returns the notifications for a list of ids."),
     tags=["Notifications"],
-    request=None,
+    request=inline_serializer(
+        name="NotificationIdsSerializer",
+        fields={"ids": serializers.ListField(child=serializers.IntegerField())},
+    ),
     responses=NotificationSerializer(many=True),
     methods=["POST"],
 )

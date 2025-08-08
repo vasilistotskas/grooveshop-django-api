@@ -3,6 +3,22 @@
 
 
 
+## v1.22.0 (2025-08-08)
+
+### Bug fixes
+
+* fix: Improve cache detection and update translations
+
+Enhanced cache disabling logic in cache_methods to better detect test environments, including pytest. Updated German, Greek, and English translation files with new line references and metadata. Fixed test assertion message in order payment view test and removed unnecessary blank line in user address filter test. Added .auth-token to .gitignore. ([`8651208`](https://github.com/vasilistotskas/grooveshop-django-api/commit/86512089ed8e839f7f230c1e15313f0863bbbf83))
+
+### Features
+
+* feat: Refactor filters, tests implemented and Bump Versions ([`20bfda6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/20bfda6e0842addd4296919dcc17dbe79b8b5b97))
+
+* feat: Add custom discount action and improve dark mode UI
+
+Introduces a custom discount admin action for products with a dedicated form and template, replacing fixed-percentage discount actions. Updates various admin and frontend templates to use 'dark:bg-gray-900' for improved dark mode consistency. Also updates dependencies in pyproject.toml and adds a new product/forms.py for the discount form. ([`7262a90`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7262a90e5506720b4e6735060b37d59e64890428))
+
 ## v1.21.0 (2025-07-15)
 
 ### Bug fixes

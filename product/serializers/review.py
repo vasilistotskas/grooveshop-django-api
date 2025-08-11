@@ -23,7 +23,7 @@ class ProductReviewSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[ProductReview]
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=ProductReview)
-    user = serializers.PrimaryKeyRelatedField(read_only=True)
+    user = AuthenticationSerializer(read_only=True)
     product = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
@@ -65,7 +65,7 @@ class ProductReviewDetailSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[ProductReview]
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=ProductReview)
-    user = serializers.PrimaryKeyRelatedField(read_only=True)
+    user = AuthenticationSerializer(read_only=True)
     product = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:

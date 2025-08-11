@@ -86,7 +86,23 @@ class SubscriptionTopicViewSet(MultiSerializerMixin, BaseModelViewSet):
         ),
         tags=["Subscription Topics"],
         responses={
-            200: SubscriptionTopicSerializer(many=True),
+            200: {
+                "type": "object",
+                "properties": {
+                    "subscribed": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SubscriptionTopic"
+                        },
+                    },
+                    "available": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SubscriptionTopic"
+                        },
+                    },
+                },
+            },
             401: ErrorResponseSerializer,
         },
     )

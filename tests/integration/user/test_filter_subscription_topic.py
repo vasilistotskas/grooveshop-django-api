@@ -24,6 +24,7 @@ class SubscriptionTopicFilterTest(APITestCase):
             is_active=True,
             is_default=True,
             requires_confirmation=False,
+            set_translations=False,
         )
         self.newsletter_topic.created_at = self.now - timedelta(days=30)
         self.newsletter_topic.save()
@@ -39,6 +40,7 @@ class SubscriptionTopicFilterTest(APITestCase):
             is_active=True,
             is_default=False,
             requires_confirmation=True,
+            set_translations=False,
         )
         self.marketing_topic.created_at = self.now - timedelta(days=15)
         self.marketing_topic.save()
@@ -56,6 +58,7 @@ class SubscriptionTopicFilterTest(APITestCase):
             is_active=False,
             is_default=False,
             requires_confirmation=False,
+            set_translations=False,
         )
         self.product_topic.created_at = self.now - timedelta(days=5)
         self.product_topic.save()
@@ -71,6 +74,7 @@ class SubscriptionTopicFilterTest(APITestCase):
             is_active=True,
             is_default=True,
             requires_confirmation=False,
+            set_translations=False,
         )
         self.system_topic.created_at = self.now - timedelta(hours=2)
         self.system_topic.save()

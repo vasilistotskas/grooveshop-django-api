@@ -131,7 +131,10 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
             ),
         ],
         responses={
-            200: ProductReviewSerializer(many=True),
+            200: {
+                "type": "array",
+                "items": {"$ref": "#/components/schemas/ProductReview"},
+            },
             404: ErrorResponseSerializer,
         },
     )
@@ -161,7 +164,10 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
             ),
         ],
         responses={
-            200: ProductImageSerializer(many=True),
+            200: {
+                "type": "array",
+                "items": {"$ref": "#/components/schemas/ProductImage"},
+            },
             404: ErrorResponseSerializer,
         },
     )
@@ -191,7 +197,10 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
             ),
         ],
         responses={
-            200: TagSerializer(many=True),
+            200: {
+                "type": "array",
+                "items": {"$ref": "#/components/schemas/Tag"},
+            },
             404: ErrorResponseSerializer,
         },
     )

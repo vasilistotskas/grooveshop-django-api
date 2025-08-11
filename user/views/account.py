@@ -191,9 +191,6 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
     search_fields = ["id", "email", "username", "first_name", "last_name"]
 
     def get_filterset_class(self):
-        """Return filterset class based on action."""
-        # During schema generation, we might not have the right context
-        # so we need to be more careful about when to apply action-specific filters
         if not hasattr(self, "action") or getattr(
             self, "swagger_fake_view", False
         ):

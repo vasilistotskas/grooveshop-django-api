@@ -11,7 +11,11 @@ from django.db import DatabaseError, connection
 from django.middleware.csrf import get_token
 from django.shortcuts import redirect
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import (
+    extend_schema,
+    extend_schema_view,
+    OpenApiParameter,
+)
 from redis import Redis, RedisError
 from rest_framework import status
 from rest_framework.decorators import action, api_view
@@ -26,6 +30,19 @@ from core.pagination.page_number import PageNumberPaginator
 from core.utils.views import TranslationsProcessingMixin
 
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
+available_languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
+
+LANGUAGE_PARAMETER = OpenApiParameter(
+    name="language",
+    description=_("Language code for translations (%s)")
+    % ", ".join(available_languages),
+    required=False,
+    type=str,
+    enum=available_languages,
+    default=default_language,
+)
 
 
 class Metadata(SimpleMetadata):
@@ -88,6 +105,13 @@ class PaginationModelViewSet(ModelViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+@extend_schema_view(
+    list=extend_schema(parameters=[LANGUAGE_PARAMETER]),
+    retrieve=extend_schema(parameters=[LANGUAGE_PARAMETER]),
+    create=extend_schema(parameters=[LANGUAGE_PARAMETER]),
+    update=extend_schema(parameters=[LANGUAGE_PARAMETER]),
+    partial_update=extend_schema(parameters=[LANGUAGE_PARAMETER]),
+)
 class TranslationsModelViewSet(TranslationsProcessingMixin, ModelViewSet):
     def get_serializer_context(self):
         context = super().get_serializer_context()

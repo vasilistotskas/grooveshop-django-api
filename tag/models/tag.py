@@ -42,3 +42,17 @@ class Tag(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
 
     def get_ordering_queryset(self):
         return Tag.objects.all()
+
+    def get_usage_count(self):
+        """Get the number of times this tag is used."""
+        return self.taggeditem_set.count()
+
+    def get_content_types(self):
+        """Get the content types this tag is used with."""
+        from django.contrib.contenttypes.models import ContentType
+
+        content_type_ids = self.taggeditem_set.values_list(
+            "content_type_id", flat=True
+        ).distinct()
+        content_types = ContentType.objects.filter(id__in=content_type_ids)
+        return ", ".join([f"{ct.app_label}.{ct.model}" for ct in content_types])

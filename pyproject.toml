@@ -14,8 +14,8 @@ classifiers = [
 ]
 dependencies = [
   "asgiref==3.9.1",
-  "boto3==1.40.5",
-  "charset_normalizer==3.4.2",
+  "boto3==1.40.6",
+  "charset_normalizer==3.4.3",
   "channels[daphne]==4.3.1",
   "channels-redis==4.3.0",
   "cryptography==45.0.6",
@@ -29,7 +29,7 @@ dependencies = [
   "django-cors-headers==4.7.0",
   "django-simple-history==3.10.1",
   "django-filter==25.1",
-  "django-unfold==0.63.0",
+  "django-unfold==0.64.0",
   "django-money==3.5.4",
   "django-mptt==0.17.0",
   "django-parler==2.3.0",
@@ -56,7 +56,7 @@ dependencies = [
   "urllib3==2.5.0",
   "uvicorn==0.35.0",
   "celery[redis] >=5.5.3,<6.0.0",
-  "disposable-email-domains==0.0.129",
+  "disposable-email-domains==0.0.130",
   "django-stubs-ext==5.2.2",
 ]
 
@@ -68,17 +68,17 @@ repository = "https://github.com/vasilistotskas/grooveshop-django-api"
 # ─────────────────────────────────────────────────────────
 [dependency-groups]
 dev = [
-    "coverage[toml]==7.10.2",
+    "coverage[toml]==7.10.3",
     "djangorestframework-stubs==3.16.1",
     "django-debug-toolbar==6.0.0",
     "django-stubs==5.2.2",
     "Faker==37.5.3",
     "factory-boy==3.3.3",
     "gitpython==3.1.45",
-    "types-setuptools==80.9.0.20250801",
-    "pre-commit==4.2.0",
+    "types-setuptools==80.9.0.20250809",
+    "pre-commit==4.3.0",
     "pip-upgrader==1.4.15",
-    "pylint==3.3.7",
+    "pylint==3.3.8",
     "pyjwt==2.10.1",
     "pytest==8.4.1",
     "pytest-asyncio==1.1.0",

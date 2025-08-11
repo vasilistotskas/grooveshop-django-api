@@ -24,19 +24,36 @@ def get_or_create_tag():
 
 
 class TaggedItemFactory(factory.django.DjangoModelFactory):
-    object_id = factory.SelfAttribute("content_object.id")
-    content_type = factory.LazyAttribute(
-        lambda o: ContentType.objects.get_for_model(o.content_object)
-    )
+    tag = factory.LazyFunction(get_or_create_tag)
 
     class Meta:
-        exclude = ["content_object"]
         abstract = True
+
+    @classmethod
+    def _create(cls, model_class, **kwargs):
+        content_object = kwargs.pop("content_object", None)
+
+        if content_object is None:
+            raise ValueError("content_object is required for TaggedItem")
+
+        if hasattr(content_object, "pk") and content_object.pk is None:
+            content_object.save()
+
+        content_type = ContentType.objects.get_for_model(content_object)
+        content_type = ContentType.objects.get(pk=content_type.pk)
+
+        kwargs.update(
+            {
+                "content_type": content_type,
+                "object_id": content_object.pk,
+            }
+        )
+
+        return super()._create(model_class, **kwargs)
 
 
 class TaggedProductFactory(TaggedItemFactory):
     content_object = factory.LazyFunction(get_or_create_product)
-    tag = factory.LazyFunction(get_or_create_tag)
 
     class Meta:
         model = TaggedItem

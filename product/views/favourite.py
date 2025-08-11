@@ -100,7 +100,10 @@ class ProductFavouriteViewSet(MultiSerializerMixin, BaseModelViewSet):
         tags=["Product Favourites"],
         request=ProductFavouriteByProductsRequestSerializer,
         responses={
-            200: ProductFavouriteByProductsResponseSerializer(many=True),
+            200: {
+                "type": "array",
+                "items": {"$ref": "#/components/schemas/ProductFavourite"},
+            },
         },
     )
     @action(detail=False, methods=["POST"])

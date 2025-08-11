@@ -137,7 +137,10 @@ class ProductCategoryImageViewSet(MultiSerializerMixin, BaseModelViewSet):
         description=_("Retrieve all images for a specific category."),
         tags=["Product Category Images"],
         responses={
-            200: ProductCategoryImageSerializer(many=True),
+            200: {
+                "type": "array",
+                "items": {"$ref": "#/components/schemas/ProductCategoryImage"},
+            },
             404: ErrorResponseSerializer,
         },
     )
@@ -170,7 +173,10 @@ class ProductCategoryImageViewSet(MultiSerializerMixin, BaseModelViewSet):
         ),
         tags=["Product Category Images"],
         responses={
-            200: ProductCategoryImageSerializer(many=True),
+            200: {
+                "type": "array",
+                "items": {"$ref": "#/components/schemas/ProductCategoryImage"},
+            },
         },
     )
     @action(detail=False, methods=["get"])

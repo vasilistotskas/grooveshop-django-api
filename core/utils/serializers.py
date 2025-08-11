@@ -9,7 +9,8 @@ from django.utils.functional import Promise
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema
 from parler_rest.fields import TranslatedFieldsField
-from rest_framework import serializers as rf_serializers
+from rest_framework import serializers
+from drf_spectacular.utils import OpenApiParameter
 
 
 class TranslatedFieldExtended(TranslatedFieldsField):
@@ -32,7 +33,7 @@ class TranslatedFieldExtended(TranslatedFieldsField):
                 errors[lang_code] = serializer.errors
 
         if errors:
-            raise rf_serializers.ValidationError(errors)
+            raise serializers.ValidationError(errors)
         return result
 
 
@@ -53,6 +54,7 @@ def create_schema_view_config(
     error_serializer=None,
     additional_responses=None,
     display_config: DisplayConfig | Mapping[str, Any] | None = None,
+    include_language_param: bool = True,
 ):
     """
     Create schema configuration for a ViewSet with translation support.
@@ -66,6 +68,7 @@ def create_schema_view_config(
             - tag: Override for OpenAPI tag (default: model's verbose_name_plural)
             - display_name: Override for singular name (default: model's verbose_name)
             - display_name_plural: Override for plural name (default: model's verbose_name_plural)
+        include_language_param: Whether to include the language query parameter for translation-enabled models
 
     Note:
         This function fully supports Django translations. If your model uses
@@ -120,6 +123,28 @@ def create_schema_view_config(
         else {}
     )
 
+    language_parameter = None
+    if include_language_param:
+        from django.conf import settings
+
+        try:
+            available_languages = [
+                lang["code"]
+                for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+            ]
+            default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
+            language_parameter = OpenApiParameter(
+                name="language",
+                description=_("Language code for translations (%s)")
+                % ", ".join(available_languages),
+                required=False,
+                type=str,
+                enum=available_languages,
+                default=default_language,
+            )
+        except (AttributeError, KeyError):
+            language_parameter = None
+
     config = {
         "list": extend_schema(
             operation_id=f"list{model_name}",
@@ -129,6 +154,7 @@ def create_schema_view_config(
             )
             % {"name": display_name_plural},
             tags=[tag],
+            parameters=[language_parameter] if language_parameter else None,
             responses={
                 200: list_serializer(many=True) if list_serializer else None,
                 **base_error_responses,
@@ -141,6 +167,7 @@ def create_schema_view_config(
             description=_("Create a new %(name)s. Requires authentication.")
             % {"name": display_name},
             tags=[tag],
+            parameters=[language_parameter] if language_parameter else None,
             request=write_serializer,
             responses={
                 201: detail_serializer,
@@ -154,6 +181,7 @@ def create_schema_view_config(
             description=_("Get detailed information about a specific %(name)s.")
             % {"name": display_name},
             tags=[tag],
+            parameters=[language_parameter] if language_parameter else None,
             responses={
                 200: detail_serializer,
                 **{k: v for k, v in base_error_responses.items() if k != 400},
@@ -168,6 +196,7 @@ def create_schema_view_config(
             )
             % {"name": display_name},
             tags=[tag],
+            parameters=[language_parameter] if language_parameter else None,
             request=write_serializer,
             responses={
                 200: detail_serializer,
@@ -183,6 +212,7 @@ def create_schema_view_config(
             )
             % {"name": display_name},
             tags=[tag],
+            parameters=[language_parameter] if language_parameter else None,
             request=write_serializer,
             responses={
                 200: detail_serializer,

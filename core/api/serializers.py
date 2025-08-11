@@ -53,6 +53,20 @@ class Representation(TypedDict):
     value: Any
 
 
+@extend_schema_field(
+    {
+        "type": "object",
+        "description": "Serialized representation of the related content object",
+        "properties": {
+            "id": {"type": "integer", "example": 1},
+            "name": {"type": "string", "example": "Sample Product"},
+            "description": {"type": "string", "example": "Product description"},
+            "price": {"type": "string", "example": "29.99"},
+            "active": {"type": "boolean", "example": True},
+        },
+        "additionalProperties": True,
+    }
+)
 class ContentObjectRelatedField(serializers.RelatedField):
     def to_representation(self, value):
         if isinstance(value, Product):

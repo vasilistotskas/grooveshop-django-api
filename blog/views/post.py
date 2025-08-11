@@ -208,8 +208,20 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
         summary=_("Get related posts"),
         description=_("Get related posts for a blog post."),
         tags=["Blog Posts"],
+        parameters=[
+            OpenApiParameter(
+                name="id",
+                description="A unique integer value identifying this blog post.",
+                required=True,
+                type=int,
+                location=OpenApiParameter.PATH,
+            ),
+        ],
         responses={
-            200: BlogPostSerializer(many=True),
+            200: {
+                "type": "array",
+                "items": {"$ref": "#/components/schemas/BlogPost"},
+            },
             404: ErrorResponseSerializer,
         },
     )

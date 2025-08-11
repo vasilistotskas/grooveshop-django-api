@@ -41,3 +41,31 @@ class CursorPaginator(pagination.CursorPagination):
                 "results": data,
             }
         )
+
+    def get_paginated_response_schema(self, schema):
+        return {
+            "type": "object",
+            "required": ["count", "results"],
+            "properties": {
+                "links": {
+                    "type": "object",
+                    "properties": {
+                        "next": {
+                            "type": "string",
+                            "nullable": True,
+                            "format": "uri",
+                        },
+                        "previous": {
+                            "type": "string",
+                            "nullable": True,
+                            "format": "uri",
+                        },
+                    },
+                },
+                "count": {"type": "integer", "example": 123},
+                "total_pages": {"type": "integer", "example": 123},
+                "page_size": {"type": "integer", "example": 123},
+                "page_total_results": {"type": "integer", "example": 123},
+                "results": schema,
+            },
+        }

@@ -1154,6 +1154,7 @@ SPECTACULAR_SETTINGS = {
     "POSTPROCESSING_HOOKS": [
         "drf_spectacular.contrib.djangorestframework_camel_case.camelize_serializer_fields",
         "drf_spectacular.hooks.postprocess_schema_enums",
+        "core.api.schema.postprocess_schema_parameters_to_accept_strings",
     ],
     "PREPROCESSING_HOOKS": [
         "drf_spectacular.hooks.preprocess_exclude_path_format",

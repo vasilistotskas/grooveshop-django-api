@@ -295,13 +295,43 @@ class TestNotificationUserQuerySet(TestCase):
             self.assertNotIn(notification_user, expired_notifications)
 
     def test_seen_today(self):
+        current_time = timezone.now()
+
+        notification1 = NotificationFactory(
+            kind=NotificationKindEnum.INFO,
+            category=NotificationCategoryEnum.ORDER,
+            priority=NotificationPriorityEnum.HIGH,
+            expiry_date=current_time + timedelta(days=7),
+        )
+
+        notification2 = NotificationFactory(
+            kind=NotificationKindEnum.SUCCESS,
+            category=NotificationCategoryEnum.CART,
+            priority=NotificationPriorityEnum.NORMAL,
+            expiry_date=current_time + timedelta(days=7),
+        )
+
+        new_seen_user = NotificationUserFactory(
+            user=self.user1,
+            notification=notification1,
+            seen=True,
+            seen_at=current_time,
+        )
+
+        new_seen_user2 = NotificationUserFactory(
+            user=self.user2,
+            notification=notification2,
+            seen=True,
+            seen_at=current_time,
+        )
+
         today_seen = NotificationUser.objects.seen_today()
 
         self.assertNotIn(self.old_notification_user, today_seen)
         self.assertNotIn(self.unseen_notification_user, today_seen)
 
-        self.assertIn(self.seen_notification_user, today_seen)
-        self.assertIn(self.user2_seen_notification, today_seen)
+        self.assertIn(new_seen_user, today_seen)
+        self.assertIn(new_seen_user2, today_seen)
 
         self.assertGreaterEqual(today_seen.count(), 2)
 

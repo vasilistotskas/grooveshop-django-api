@@ -3,6 +3,26 @@
 
 
 
+## v1.23.0 (2025-08-11)
+
+### Bug fixes
+
+* fix: seen_today test to use fresh data
+
+The test_seen_today method now creates new Notification and NotificationUser instances with current timestamps, ensuring the test is independent of pre-existing fixtures and more robust. ([`e0cff5e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e0cff5e30cafbaea1d6002eed645391e9549cfc3))
+
+* fix: Update uv.lock ([`43d1f0d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/43d1f0deb7feb934b6ae42784b5770439ca7a084))
+
+### Features
+
+* feat: Add full and short name getters to UserAccount
+
+Introduces get_full_name and get_short_name methods to the UserAccount model for easier access to user's full name and username. ([`1ed3b45`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1ed3b457cc98268ecd60e7930c5ec5c6930f11be))
+
+* feat: Add tag API endpoints and OpenAPI schema improvements
+
+Introduces tag-related API endpoints, filters, views, and serializers, along with integration and unit tests for tag functionality. Enhances OpenAPI schema generation to support string query parameters, adds language parameter support to translation-enabled endpoints, and improves paginated response schemas for all pagination types. Updates core URLs to include tag endpoints and refines serializer schema documentation. ([`844824e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/844824ecdd84255e3de346c7aaf6f2a9e998f245))
+
 ## v1.22.0 (2025-08-08)
 
 ### Bug fixes

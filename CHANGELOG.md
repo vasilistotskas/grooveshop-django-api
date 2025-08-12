@@ -3,6 +3,14 @@
 
 
 
+## v1.23.1 (2025-08-12)
+
+### Bug fixes
+
+* fix: Add ordering OpenAPI parameters to API endpoints
+
+Introduces explicit 'ordering' query parameters to various API endpoints in blog, product, and user views, enhancing schema documentation and client-side sorting capabilities. Refactors filterset class selection logic and updates schema.yml to reflect new ordering options for endpoints. ([`b1df40d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b1df40dba3a493af0e2b846f373fdc980147015a))
+
 ## v1.23.0 (2025-08-11)
 
 ### Bug fixes

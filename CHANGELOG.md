@@ -3,6 +3,18 @@
 
 
 
+## v1.24.0 (2025-08-12)
+
+### Bug fixes
+
+* fix: update uv.lock ([`0fede2e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0fede2e7083b4c68eec6ab311ec6784291a66dbc))
+
+### Features
+
+* feat: Update uv version to 0.8.9 and CI workflow
+
+Bump uv version from 0.8.0 to 0.8.9 in Dockerfile and dev.Dockerfile. Update GitHub Actions workflow to use setup-uv@v6, add workflow_dispatch trigger, and set UV_VERSION and FORCE_COLOR environment variables for improved CI configuration. ([`0927451`](https://github.com/vasilistotskas/grooveshop-django-api/commit/092745157e02060294020701f6a3be7708452d80))
+
 ## v1.23.1 (2025-08-12)
 
 ### Bug fixes

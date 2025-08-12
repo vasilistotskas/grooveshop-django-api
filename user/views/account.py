@@ -5,6 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
+    OpenApiParameter,
 )
 from rest_framework import status
 from rest_framework.decorators import action
@@ -191,11 +192,6 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
     search_fields = ["id", "email", "username", "first_name", "last_name"]
 
     def get_filterset_class(self):
-        if not hasattr(self, "action") or getattr(
-            self, "swagger_fake_view", False
-        ):
-            return UserAccountFilter
-
         action_filter_map = {
             "favourite_products": ProductFavouriteFilter,
             "orders": OrderFilter,
@@ -276,6 +272,27 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         self.check_object_permissions(self.request, obj)
         return obj
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="ordering",
+                type=str,
+                description=_(
+                    "Which field to use when ordering the results. Available fields: id, productId, createdAt, updatedAt, -id, -productId, -createdAt, -updatedAt"
+                ),
+                enum=[
+                    "id",
+                    "productId",
+                    "createdAt",
+                    "updatedAt",
+                    "-id",
+                    "-productId",
+                    "-createdAt",
+                    "-updatedAt",
+                ],
+            ),
+        ]
+    )
     @action(detail=True, methods=["GET"])
     def favourite_products(self, request, pk=None):
         self.ordering_fields = [
@@ -292,6 +309,25 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="ordering",
+                type=str,
+                description=_(
+                    "Which field to use when ordering the results. Available fields: createdAt, updatedAt, status, -createdAt, -updatedAt, -status"
+                ),
+                enum=[
+                    "createdAt",
+                    "updatedAt",
+                    "status",
+                    "-createdAt",
+                    "-updatedAt",
+                    "-status",
+                ],
+            ),
+        ]
+    )
     @action(detail=True, methods=["GET"])
     def orders(self, request, pk=None):
         self.ordering_fields = ["created_at", "updated_at", "status"]
@@ -300,6 +336,27 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="ordering",
+                type=str,
+                description=_(
+                    "Which field to use when ordering the results. Available fields: id, productId, createdAt, updatedAt, -id, -productId, -createdAt, -updatedAt"
+                ),
+                enum=[
+                    "id",
+                    "productId",
+                    "createdAt",
+                    "updatedAt",
+                    "-id",
+                    "-productId",
+                    "-createdAt",
+                    "-updatedAt",
+                ],
+            ),
+        ]
+    )
     @action(detail=True, methods=["GET"])
     def product_reviews(self, request, pk=None):
         self.ordering_fields = [
@@ -316,6 +373,35 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="ordering",
+                type=str,
+                description=_(
+                    "Which field to use when ordering the results. Available fields: id, country, zipcode, floor, locationType, isMain, createdAt, updatedAt, -id, -country, -zipcode, -floor, -locationType, -isMain, -createdAt, -updatedAt"
+                ),
+                enum=[
+                    "id",
+                    "country",
+                    "zipcode",
+                    "floor",
+                    "locationType",
+                    "isMain",
+                    "createdAt",
+                    "updatedAt",
+                    "-id",
+                    "-country",
+                    "-zipcode",
+                    "-floor",
+                    "-locationType",
+                    "-isMain",
+                    "-createdAt",
+                    "-updatedAt",
+                ],
+            ),
+        ]
+    )
     @action(detail=True, methods=["GET"])
     def addresses(self, request, pk=None):
         self.ordering_fields = [
@@ -333,6 +419,18 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="ordering",
+                type=str,
+                description=_(
+                    "Which field to use when ordering the results. Available fields: id, post, createdAt, -id, -post, -createdAt"
+                ),
+                enum=["id", "post", "createdAt", "-id", "-post", "-createdAt"],
+            ),
+        ]
+    )
     @action(detail=True, methods=["GET"])
     def blog_post_comments(self, request, pk=None):
         self.ordering_fields = ["id", "post", "created_at"]
@@ -341,6 +439,29 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="ordering",
+                type=str,
+                description=_(
+                    "Which field to use when ordering the results. Available fields: id, title, createdAt, updatedAt, publishedAt, -id, -title, -createdAt, -updatedAt, -publishedAt"
+                ),
+                enum=[
+                    "id",
+                    "title",
+                    "createdAt",
+                    "updatedAt",
+                    "publishedAt",
+                    "-id",
+                    "-title",
+                    "-createdAt",
+                    "-updatedAt",
+                    "-publishedAt",
+                ],
+            ),
+        ]
+    )
     @action(detail=True, methods=["GET"])
     def liked_blog_posts(self, request, pk=None):
         self.ordering_fields = [
@@ -355,6 +476,18 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="ordering",
+                type=str,
+                description=_(
+                    "Which field to use when ordering the results. Available fields: createdAt, seenAt, -createdAt, -seenAt"
+                ),
+                enum=["createdAt", "seenAt", "-createdAt", "-seenAt"],
+            ),
+        ]
+    )
     @action(detail=True, methods=["GET"])
     def notifications(self, request, pk=None):
         self.ordering_fields = ["created_at", "seen_at"]
@@ -363,6 +496,24 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)
 
+    @extend_schema(
+        methods=["GET"],
+        parameters=[
+            OpenApiParameter(
+                name="ordering",
+                type=str,
+                description=_(
+                    "Which field to use when ordering the results. Available fields: subscribedAt, createdAt, -subscribedAt, -createdAt"
+                ),
+                enum=[
+                    "subscribedAt",
+                    "createdAt",
+                    "-subscribedAt",
+                    "-createdAt",
+                ],
+            ),
+        ],
+    )
     @action(detail=True, methods=["GET", "POST"])
     def subscriptions(self, request, pk=None):
         user = self.get_object()

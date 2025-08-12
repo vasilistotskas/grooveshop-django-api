@@ -9,7 +9,7 @@ from drf_spectacular.utils import (
 )
 from rest_framework import status
 from rest_framework.decorators import action
-
+from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
@@ -21,6 +21,7 @@ from core.utils.serializers import (
 )
 from core.utils.views import cache_methods
 from product.filters.product import ProductFilter
+from product.filters.review import ProductReviewFilter
 from product.models.product import Product
 from product.serializers.image import ProductImageSerializer
 from product.serializers.product import (
@@ -29,6 +30,7 @@ from product.serializers.product import (
     ProductWriteSerializer,
 )
 from product.serializers.review import ProductReviewSerializer
+from tag.filters.tag import TagFilter
 from tag.serializers.tag import TagSerializer
 
 schema_config = create_schema_view_config(
@@ -62,13 +64,15 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
     ordering = ["-created_at"]
     search_fields = ["translations__name", "translations__description", "slug"]
 
-    @property
-    def filterset_class(self):
-        if hasattr(self, "action") and self.action in [
-            "images",
-            "reviews",
-            "tags",
-        ]:
+    def get_filterset_class(self):
+        action_filter_map = {
+            "reviews": ProductReviewFilter,
+            "tags": TagFilter,
+        }
+
+        if self.action in action_filter_map:
+            return action_filter_map[self.action]
+        elif self.action == "images":
             return None
         return ProductFilter
 
@@ -93,6 +97,10 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         return queryset.with_all_annotations()
+
+    @property
+    def filterset_class(self):
+        return self.get_filterset_class()
 
     @extend_schema(
         operation_id="incrementProductViews",
@@ -143,7 +151,7 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
         methods=["GET"],
     )
     def reviews(self, request, pk=None):
-        product = self.get_object()
+        product = get_object_or_404(Product, pk=pk)
         reviews = product.reviews.all()
         serializer = ProductReviewSerializer(
             reviews, many=True, context=self.get_serializer_context()
@@ -176,7 +184,7 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
         methods=["GET"],
     )
     def images(self, request, pk=None):
-        product = self.get_object()
+        product = get_object_or_404(Product, pk=pk)
         images = product.images.all()
         serializer = ProductImageSerializer(
             images, many=True, context=self.get_serializer_context()
@@ -209,7 +217,7 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
         methods=["GET"],
     )
     def tags(self, request, pk=None):
-        product = self.get_object()
+        product = get_object_or_404(Product, pk=pk)
         tags = [tagged_item.tag for tagged_item in product.tags.all()]
         serializer = TagSerializer(
             tags, many=True, context=self.get_serializer_context()

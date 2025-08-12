@@ -315,6 +315,27 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
                 required=False,
                 default=7,
             ),
+            OpenApiParameter(
+                name="ordering",
+                type=str,
+                description=_(
+                    "Which field to use when ordering the results. Available fields: createdAt, updatedAt, publishedAt, viewCount, likesCount, commentsCount, -createdAt, -updatedAt, -publishedAt, -viewCount, -likesCount, -commentsCount"
+                ),
+                enum=[
+                    "createdAt",
+                    "updatedAt",
+                    "publishedAt",
+                    "viewCount",
+                    "likesCount",
+                    "commentsCount",
+                    "-createdAt",
+                    "-updatedAt",
+                    "-publishedAt",
+                    "-viewCount",
+                    "-likesCount",
+                    "-commentsCount",
+                ],
+            ),
         ],
         responses={
             200: BlogPostSerializer(many=True),
@@ -345,6 +366,29 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
             "Get most popular blog posts based on all-time engagement metrics."
         ),
         tags=["Blog Posts"],
+        parameters=[
+            OpenApiParameter(
+                name="ordering",
+                type=str,
+                description=_(
+                    "Which field to use when ordering the results. Available fields: createdAt, updatedAt, publishedAt, viewCount, likesCount, commentsCount, -createdAt, -updatedAt, -publishedAt, -viewCount, -likesCount, -commentsCount"
+                ),
+                enum=[
+                    "createdAt",
+                    "updatedAt",
+                    "publishedAt",
+                    "viewCount",
+                    "likesCount",
+                    "commentsCount",
+                    "-createdAt",
+                    "-updatedAt",
+                    "-publishedAt",
+                    "-viewCount",
+                    "-likesCount",
+                    "-commentsCount",
+                ],
+            ),
+        ],
         responses={
             200: BlogPostSerializer(many=True),
         },
@@ -363,6 +407,31 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
             "Get posts marked as featured, ordered by publication date."
         ),
         tags=["Blog Posts"],
+        parameters=[
+            OpenApiParameter(
+                name="ordering",
+                type=str,
+                description=_(
+                    "Which field to use when ordering the results. Available fields: createdAt, updatedAt, publishedAt, viewCount, likesCount, commentsCount, featured, -createdAt, -updatedAt, -publishedAt, -viewCount, -likesCount, -commentsCount, -featured"
+                ),
+                enum=[
+                    "createdAt",
+                    "updatedAt",
+                    "publishedAt",
+                    "viewCount",
+                    "likesCount",
+                    "commentsCount",
+                    "featured",
+                    "-createdAt",
+                    "-updatedAt",
+                    "-publishedAt",
+                    "-viewCount",
+                    "-likesCount",
+                    "-commentsCount",
+                    "-featured",
+                ],
+            ),
+        ],
         responses={
             200: BlogPostSerializer(many=True),
         },

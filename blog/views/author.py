@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import (
+    extend_schema,
+    extend_schema_view,
+    OpenApiParameter,
+)
 from rest_framework.decorators import action
-from rest_framework.response import Response
 
 from blog.filters.author import BlogAuthorFilter
 from blog.filters.post import BlogPostFilter
@@ -57,16 +60,21 @@ class BlogAuthorViewSet(MultiSerializerMixin, BaseModelViewSet):
     }
 
     def get_filterset_class(self):
-        """Return filterset class based on action."""
-        # During schema generation, we might not have the right context
-        if not hasattr(self, "action") or getattr(
-            self, "swagger_fake_view", False
-        ):
-            return BlogAuthorFilter
-
         if self.action == "posts":
             return BlogPostFilter
         return BlogAuthorFilter
+
+    def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return BlogAuthor.objects.none()
+
+        if self.action == "posts":
+            from rest_framework.generics import get_object_or_404
+
+            author = get_object_or_404(BlogAuthor, id=self.kwargs["pk"])
+            return author.blog_posts.all()
+
+        return BlogAuthor.objects.all()
 
     ordering_fields = [
         "id",
@@ -95,6 +103,27 @@ class BlogAuthorViewSet(MultiSerializerMixin, BaseModelViewSet):
             "Retrieve all blog posts written by this author with proper pagination."
         ),
         tags=["Blog Authors"],
+        parameters=[
+            OpenApiParameter(
+                name="ordering",
+                type=str,
+                description=_(
+                    "Which field to use when ordering the results. Available fields: createdAt, updatedAt, publishedAt, title, viewCount, -createdAt, -updatedAt, -publishedAt, -title, -viewCount"
+                ),
+                enum=[
+                    "createdAt",
+                    "updatedAt",
+                    "publishedAt",
+                    "title",
+                    "viewCount",
+                    "-createdAt",
+                    "-updatedAt",
+                    "-publishedAt",
+                    "-title",
+                    "-viewCount",
+                ],
+            ),
+        ],
         responses={
             200: BlogPostSerializer(many=True),
             404: ErrorResponseSerializer,
@@ -102,17 +131,18 @@ class BlogAuthorViewSet(MultiSerializerMixin, BaseModelViewSet):
     )
     @action(detail=True, methods=["GET"])
     def posts(self, request, pk=None, *args, **kwargs):
-        author = self.get_object()
-        queryset = author.blog_posts.all()
-
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = BlogPostSerializer(
-                page, many=True, context=self.get_serializer_context()
-            )
-            return self.get_paginated_response(serializer.data)
-
-        serializer = BlogPostSerializer(
-            queryset, many=True, context=self.get_serializer_context()
-        )
-        return Response(serializer.data)
+        self.ordering_fields = [
+            "created_at",
+            "updated_at",
+            "published_at",
+            "title",
+            "view_count",
+        ]
+        self.ordering = ["-published_at", "-created_at"]
+        self.search_fields = [
+            "translations__title",
+            "translations__subtitle",
+            "translations__body",
+        ]
+        queryset = self.filter_queryset(self.get_queryset())
+        return self.paginate_and_serialize(queryset, request)

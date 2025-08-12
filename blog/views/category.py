@@ -60,6 +60,25 @@ from core.utils.views import cache_methods
                 required=False,
                 default=False,
             ),
+            OpenApiParameter(
+                name="ordering",
+                type=str,
+                description=_(
+                    "Which field to use when ordering the results. Available fields: createdAt, updatedAt, publishedAt, title, viewsCount, -createdAt, -updatedAt, -publishedAt, -title, -viewsCount"
+                ),
+                enum=[
+                    "createdAt",
+                    "updatedAt",
+                    "publishedAt",
+                    "title",
+                    "viewsCount",
+                    "-createdAt",
+                    "-updatedAt",
+                    "-publishedAt",
+                    "-title",
+                    "-viewsCount",
+                ],
+            ),
         ],
         responses={
             200: BlogPostSerializer(many=True),
@@ -71,6 +90,29 @@ from core.utils.views import cache_methods
         summary=_("Get category children"),
         description=_("Get direct children of this category."),
         tags=["Blog Categories"],
+        parameters=[
+            OpenApiParameter(
+                name="ordering",
+                type=str,
+                description=_(
+                    "Which field to use when ordering the results. Available fields: id, sortOrder, level, name, createdAt, updatedAt, -id, -sortOrder, -level, -name, -createdAt, -updatedAt"
+                ),
+                enum=[
+                    "id",
+                    "sortOrder",
+                    "level",
+                    "name",
+                    "createdAt",
+                    "updatedAt",
+                    "-id",
+                    "-sortOrder",
+                    "-level",
+                    "-name",
+                    "-createdAt",
+                    "-updatedAt",
+                ],
+            ),
+        ],
         responses={
             200: BlogCategorySerializer(many=True),
             404: ErrorResponseSerializer,
@@ -83,6 +125,29 @@ from core.utils.views import cache_methods
             "Get all descendants (children, grandchildren, etc.) of this category."
         ),
         tags=["Blog Categories"],
+        parameters=[
+            OpenApiParameter(
+                name="ordering",
+                type=str,
+                description=_(
+                    "Which field to use when ordering the results. Available fields: id, sortOrder, level, name, createdAt, updatedAt, -id, -sortOrder, -level, -name, -createdAt, -updatedAt"
+                ),
+                enum=[
+                    "id",
+                    "sortOrder",
+                    "level",
+                    "name",
+                    "createdAt",
+                    "updatedAt",
+                    "-id",
+                    "-sortOrder",
+                    "-level",
+                    "-name",
+                    "-createdAt",
+                    "-updatedAt",
+                ],
+            ),
+        ],
         responses={
             200: BlogCategorySerializer(many=True),
             404: ErrorResponseSerializer,
@@ -95,6 +160,29 @@ from core.utils.views import cache_methods
             "Get all ancestors (parent, grandparent, etc.) of this category."
         ),
         tags=["Blog Categories"],
+        parameters=[
+            OpenApiParameter(
+                name="ordering",
+                type=str,
+                description=_(
+                    "Which field to use when ordering the results. Available fields: id, sortOrder, level, name, createdAt, updatedAt, -id, -sortOrder, -level, -name, -createdAt, -updatedAt"
+                ),
+                enum=[
+                    "id",
+                    "sortOrder",
+                    "level",
+                    "name",
+                    "createdAt",
+                    "updatedAt",
+                    "-id",
+                    "-sortOrder",
+                    "-level",
+                    "-name",
+                    "-createdAt",
+                    "-updatedAt",
+                ],
+            ),
+        ],
         responses={
             200: BlogCategorySerializer(many=True),
             404: ErrorResponseSerializer,
@@ -105,6 +193,29 @@ from core.utils.views import cache_methods
         summary=_("Get category siblings"),
         description=_("Get sibling categories (same parent level)."),
         tags=["Blog Categories"],
+        parameters=[
+            OpenApiParameter(
+                name="ordering",
+                type=str,
+                description=_(
+                    "Which field to use when ordering the results. Available fields: id, sortOrder, level, name, createdAt, updatedAt, -id, -sortOrder, -level, -name, -createdAt, -updatedAt"
+                ),
+                enum=[
+                    "id",
+                    "sortOrder",
+                    "level",
+                    "name",
+                    "createdAt",
+                    "updatedAt",
+                    "-id",
+                    "-sortOrder",
+                    "-level",
+                    "-name",
+                    "-createdAt",
+                    "-updatedAt",
+                ],
+            ),
+        ],
         responses={
             200: BlogCategorySerializer(many=True),
             404: ErrorResponseSerializer,
@@ -119,6 +230,29 @@ from core.utils.views import cache_methods
             "navigation menus or category hierarchies."
         ),
         tags=["Blog Categories"],
+        parameters=[
+            OpenApiParameter(
+                name="ordering",
+                type=str,
+                description=_(
+                    "Which field to use when ordering the results. Available fields: id, sortOrder, level, name, createdAt, updatedAt, -id, -sortOrder, -level, -name, -createdAt, -updatedAt"
+                ),
+                enum=[
+                    "id",
+                    "sortOrder",
+                    "level",
+                    "name",
+                    "createdAt",
+                    "updatedAt",
+                    "-id",
+                    "-sortOrder",
+                    "-level",
+                    "-name",
+                    "-createdAt",
+                    "-updatedAt",
+                ],
+            ),
+        ],
         responses={
             200: BlogCategorySerializer(many=True),
         },
@@ -166,13 +300,6 @@ class BlogCategoryViewSet(MultiSerializerMixin, BaseModelViewSet):
     }
 
     def get_filterset_class(self):
-        """Return filterset class based on action."""
-        # During schema generation, we might not have the right context
-        if not hasattr(self, "action") or getattr(
-            self, "swagger_fake_view", False
-        ):
-            return BlogCategoryFilter
-
         if self.action == "posts":
             return BlogPostFilter
         return BlogCategoryFilter

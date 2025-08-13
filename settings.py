@@ -1136,8 +1136,8 @@ SPECTACULAR_SETTINGS = {
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
     "COMPONENT_NO_READ_ONLY_REQUIRED": False,
-    "ENFORCE_NON_BLANK_FIELDS": True,
-    "ENUM_ADD_EXPLICIT_BLANK_NULL_CHOICE": True,
+    "ENFORCE_NON_BLANK_FIELDS": False,
+    "ENUM_ADD_EXPLICIT_BLANK_NULL_CHOICE": False,
     "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAuthenticated"],
     "AUTHENTICATION_WHITELIST": [
         "knox.auth.TokenAuthentication",

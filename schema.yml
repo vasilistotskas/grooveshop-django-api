@@ -20440,35 +20440,42 @@ components:
         twitter:
           type: string
           format: uri
+          nullable: true
           title: Twitter Profile
           maxLength: 200
         linkedin:
           type: string
           format: uri
+          nullable: true
           title: LinkedIn Profile
           maxLength: 200
         facebook:
           type: string
           format: uri
+          nullable: true
           title: Facebook Profile
           maxLength: 200
         instagram:
           type: string
           format: uri
+          nullable: true
           title: Instagram Profile
           maxLength: 200
         website:
           type: string
           format: uri
+          nullable: true
           maxLength: 200
         youtube:
           type: string
           format: uri
+          nullable: true
           title: Youtube Profile
           maxLength: 200
         github:
           type: string
           format: uri
+          nullable: true
           title: Github Profile
           maxLength: 200
         bio:
@@ -20574,44 +20581,48 @@ components:
         twitter:
           type: string
           format: uri
+          nullable: true
           title: Twitter Profile
           maxLength: 200
         linkedin:
           type: string
           format: uri
+          nullable: true
           title: LinkedIn Profile
           maxLength: 200
         facebook:
           type: string
           format: uri
+          nullable: true
           title: Facebook Profile
           maxLength: 200
         instagram:
           type: string
           format: uri
+          nullable: true
           title: Instagram Profile
           maxLength: 200
         website:
           type: string
           format: uri
+          nullable: true
           maxLength: 200
         youtube:
           type: string
           format: uri
+          nullable: true
           title: Youtube Profile
           maxLength: 200
         github:
           type: string
           format: uri
+          nullable: true
           title: Github Profile
           maxLength: 200
         bio:
           type: string
       required:
       - email
-    BlankEnum:
-      enum:
-      - ''
     BlogAuthor:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -23042,13 +23053,9 @@ components:
           type: string
           title: Region Code
         floor:
-          oneOf:
-          - $ref: '#/components/schemas/FloorEnum'
-          - $ref: '#/components/schemas/BlankEnum'
+          $ref: '#/components/schemas/FloorEnum'
         locationType:
-          oneOf:
-          - $ref: '#/components/schemas/LocationTypeEnum'
-          - $ref: '#/components/schemas/BlankEnum'
+          $ref: '#/components/schemas/LocationTypeEnum'
         street:
           type: string
           maxLength: 255
@@ -23149,9 +23156,7 @@ components:
           type: string
           maxLength: 255
         paymentStatus:
-          oneOf:
-          - $ref: '#/components/schemas/PaymentStatusEnum'
-          - $ref: '#/components/schemas/BlankEnum'
+          $ref: '#/components/schemas/PaymentStatusEnum'
         paymentMethod:
           type: string
           maxLength: 50
@@ -23203,13 +23208,9 @@ components:
           type: string
           title: Region Code
         floor:
-          oneOf:
-          - $ref: '#/components/schemas/FloorEnum'
-          - $ref: '#/components/schemas/BlankEnum'
+          $ref: '#/components/schemas/FloorEnum'
         locationType:
-          oneOf:
-          - $ref: '#/components/schemas/LocationTypeEnum'
-          - $ref: '#/components/schemas/BlankEnum'
+          $ref: '#/components/schemas/LocationTypeEnum'
         street:
           type: string
           maxLength: 255
@@ -23312,9 +23313,7 @@ components:
           type: string
           maxLength: 255
         paymentStatus:
-          oneOf:
-          - $ref: '#/components/schemas/PaymentStatusEnum'
-          - $ref: '#/components/schemas/BlankEnum'
+          $ref: '#/components/schemas/PaymentStatusEnum'
         paymentMethod:
           type: string
           maxLength: 50
@@ -23443,13 +23442,9 @@ components:
           minLength: 1
           title: Region Code
         floor:
-          oneOf:
-          - $ref: '#/components/schemas/FloorEnum'
-          - $ref: '#/components/schemas/BlankEnum'
+          $ref: '#/components/schemas/FloorEnum'
         locationType:
-          oneOf:
-          - $ref: '#/components/schemas/LocationTypeEnum'
-          - $ref: '#/components/schemas/BlankEnum'
+          $ref: '#/components/schemas/LocationTypeEnum'
         street:
           type: string
           minLength: 1
@@ -23498,9 +23493,7 @@ components:
           type: string
           maxLength: 255
         paymentStatus:
-          oneOf:
-          - $ref: '#/components/schemas/PaymentStatusEnum'
-          - $ref: '#/components/schemas/BlankEnum'
+          $ref: '#/components/schemas/PaymentStatusEnum'
         paymentMethod:
           type: string
           maxLength: 50
@@ -23789,13 +23782,9 @@ components:
           title: Region Code
           nullable: true
         floor:
-          oneOf:
-          - $ref: '#/components/schemas/FloorEnum'
-          - $ref: '#/components/schemas/BlankEnum'
+          $ref: '#/components/schemas/FloorEnum'
         locationType:
-          oneOf:
-          - $ref: '#/components/schemas/LocationTypeEnum'
-          - $ref: '#/components/schemas/BlankEnum'
+          $ref: '#/components/schemas/LocationTypeEnum'
         street:
           type: string
           minLength: 1
@@ -24898,35 +24887,42 @@ components:
         twitter:
           type: string
           format: uri
+          nullable: true
           title: Twitter Profile
           maxLength: 200
         linkedin:
           type: string
           format: uri
+          nullable: true
           title: LinkedIn Profile
           maxLength: 200
         facebook:
           type: string
           format: uri
+          nullable: true
           title: Facebook Profile
           maxLength: 200
         instagram:
           type: string
           format: uri
+          nullable: true
           title: Instagram Profile
           maxLength: 200
         website:
           type: string
           format: uri
+          nullable: true
           maxLength: 200
         youtube:
           type: string
           format: uri
+          nullable: true
           title: Youtube Profile
           maxLength: 200
         github:
           type: string
           format: uri
+          nullable: true
           title: Github Profile
           maxLength: 200
         bio:
@@ -25218,13 +25214,9 @@ components:
           title: Region Code
           nullable: true
         floor:
-          oneOf:
-          - $ref: '#/components/schemas/FloorEnum'
-          - $ref: '#/components/schemas/BlankEnum'
+          $ref: '#/components/schemas/FloorEnum'
         locationType:
-          oneOf:
-          - $ref: '#/components/schemas/LocationTypeEnum'
-          - $ref: '#/components/schemas/BlankEnum'
+          $ref: '#/components/schemas/LocationTypeEnum'
         street:
           type: string
           minLength: 1
@@ -25777,13 +25769,9 @@ components:
           title: Zip Code
           maxLength: 255
         floor:
-          oneOf:
-          - $ref: '#/components/schemas/FloorEnum'
-          - $ref: '#/components/schemas/BlankEnum'
+          $ref: '#/components/schemas/FloorEnum'
         locationType:
-          oneOf:
-          - $ref: '#/components/schemas/LocationTypeEnum'
-          - $ref: '#/components/schemas/BlankEnum'
+          $ref: '#/components/schemas/LocationTypeEnum'
         phone:
           type: string
           minLength: 1
@@ -28665,13 +28653,9 @@ components:
           title: Zip Code
           maxLength: 255
         floor:
-          oneOf:
-          - $ref: '#/components/schemas/FloorEnum'
-          - $ref: '#/components/schemas/BlankEnum'
+          $ref: '#/components/schemas/FloorEnum'
         locationType:
-          oneOf:
-          - $ref: '#/components/schemas/LocationTypeEnum'
-          - $ref: '#/components/schemas/BlankEnum'
+          $ref: '#/components/schemas/LocationTypeEnum'
         phone:
           type: string
         mobilePhone:
@@ -28748,13 +28732,9 @@ components:
           title: Zip Code
           maxLength: 255
         floor:
-          oneOf:
-          - $ref: '#/components/schemas/FloorEnum'
-          - $ref: '#/components/schemas/BlankEnum'
+          $ref: '#/components/schemas/FloorEnum'
         locationType:
-          oneOf:
-          - $ref: '#/components/schemas/LocationTypeEnum'
-          - $ref: '#/components/schemas/BlankEnum'
+          $ref: '#/components/schemas/LocationTypeEnum'
         phone:
           type: string
         mobilePhone:
@@ -28835,13 +28815,9 @@ components:
           title: Zip Code
           maxLength: 255
         floor:
-          oneOf:
-          - $ref: '#/components/schemas/FloorEnum'
-          - $ref: '#/components/schemas/BlankEnum'
+          $ref: '#/components/schemas/FloorEnum'
         locationType:
-          oneOf:
-          - $ref: '#/components/schemas/LocationTypeEnum'
-          - $ref: '#/components/schemas/BlankEnum'
+          $ref: '#/components/schemas/LocationTypeEnum'
         phone:
           type: string
           minLength: 1

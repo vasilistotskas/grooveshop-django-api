@@ -94,30 +94,30 @@ wheels = [
 
 [[package]]
 name = "boto3"
-version = "1.40.6"
+version = "1.40.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "botocore" },
     { name = "jmespath" },
     { name = "s3transfer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8e/eb/bd2406de26d76f34661aa42ee03109b3914ac7a2cc17d8f9abb958c80e6e/boto3-1.40.6.tar.gz", hash = "sha256:3f2375b7576de603085d7b7491cf2c4ab5c57d12965a5ce295821cdd4d10e950", size = 111944, upload-time = "2025-08-08T19:29:13.638Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/06/0d/1c5c70d2f72bba218c9ed166016e4a8e2fec4783399f98b2c007c510bda8/boto3-1.40.8.tar.gz", hash = "sha256:62959010dfd3d24157f73a8183fca7619ec97fb42ac400477006f7ecb9548d06", size = 111983, upload-time = "2025-08-12T19:21:20.837Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5e/f6/a9d57282f1a79c793077fecfd24273a2bdb35fa1108bdb99c451b5a2cea3/boto3-1.40.6-py3-none-any.whl", hash = "sha256:7685085b8ea679dd858330834c16364c61c5830edb892c5864fb12ed68798708", size = 140062, upload-time = "2025-08-08T19:29:11.538Z" },
+    { url = "https://files.pythonhosted.org/packages/0c/2a/73378c48746908c17251083c1e205ae07f989f82be546b99175d5bf5ca2c/boto3-1.40.8-py3-none-any.whl", hash = "sha256:9f55edd8e2eb5cd86e1c972b5250f9ab0a9555f84632506a2ed131e4a82ea23a", size = 140062, upload-time = "2025-08-12T19:21:19.607Z" },
 ]
 
 [[package]]
 name = "botocore"
-version = "1.40.6"
+version = "1.40.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jmespath" },
     { name = "python-dateutil" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6e/a6/130e049f6b38c02628b765b24b1a3d2016cffd8e363edb7660bbb9f4681d/botocore-1.40.6.tar.gz", hash = "sha256:e132eac967a7526596e31ca571d7f1ef9676c6a9c4f1322446768994ccab64aa", size = 14314806, upload-time = "2025-08-08T19:29:02.028Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/64/43/d83d03afe05d46249d0e65231f7b59eec7900f9af0e395888e4d46f99d04/botocore-1.40.8.tar.gz", hash = "sha256:954fa6e36020ebf58898de80a8f864ba13b74dc26994cf20ccfff2966724b0b9", size = 14321072, upload-time = "2025-08-12T19:21:12.034Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/db/4e/e049c6107eb1f4202e0c49030dc482a6277b7be1e3ee54784434a8a9de3d/botocore-1.40.6-py3-none-any.whl", hash = "sha256:b253f107617791a29ca81c6f0fca20ac1afdba01869eb43017022bbbb8387f34", size = 13980040, upload-time = "2025-08-08T19:28:56.123Z" },
+    { url = "https://files.pythonhosted.org/packages/54/47/778f25ecedaf2c1484710d244ef40a42fe0a2088e5a24e79f68ae6489a4b/botocore-1.40.8-py3-none-any.whl", hash = "sha256:7f0327e08d7c061aaa03e32459e56bcf6daa29cd946e95b1c06be14d61a9a94d", size = 13983180, upload-time = "2025-08-12T19:21:07.665Z" },
 ]
 
 [[package]]
@@ -818,14 +818,14 @@ wheels = [
 
 [[package]]
 name = "django-unfold"
-version = "0.64.0"
+version = "0.64.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7a/d5/ef372763ee48d629264adde3e55d943e010945d07037670b4875d76c745e/django_unfold-0.64.0.tar.gz", hash = "sha256:e5132add849738215a34e1ad01900b04176d2797033b193c377644291180e8e2", size = 1070286, upload-time = "2025-08-11T08:37:05.233Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/36/e1/83920569ec2edf34966f0fb69ba117b594077804add3d75c22e8b9f7d20e/django_unfold-0.64.2.tar.gz", hash = "sha256:f90805e5ebb9af671554fd392af4b81bfdbdedc28b6cd64f1d8c2ae5e14a2d36", size = 1070311, upload-time = "2025-08-12T09:42:52.332Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fe/85/ae10774e5cd3c46f658c291b91d50b5193895efb1d110a20c7a55bce5812/django_unfold-0.64.0-py3-none-any.whl", hash = "sha256:0da0dda0edf242f07f6a88fafbae90b01d15b1045ab5e217d824d0000cd870f0", size = 1178251, upload-time = "2025-08-11T08:37:03.617Z" },
+    { url = "https://files.pythonhosted.org/packages/c3/4a/48b3471f73146caa7ddccf8fd7486d65576f0a6af3d4cd8366f14255cb48/django_unfold-0.64.2-py3-none-any.whl", hash = "sha256:433aaddd071bce0e0c1886c69a41a69f7ab4d30d9dce80ab79f6f2d7ba4c380a", size = 1178278, upload-time = "2025-08-12T09:42:51.069Z" },
 ]
 
 [[package]]
@@ -990,7 +990,7 @@ wheels = [
 
 [[package]]
 name = "grooveshop-django-api"
-version = "1.23.1"
+version = "1.24.0"
 source = { virtual = "." }
 dependencies = [
     { name = "asgiref" },
@@ -1069,7 +1069,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "asgiref", specifier = "==3.9.1" },
-    { name = "boto3", specifier = "==1.40.6" },
+    { name = "boto3", specifier = "==1.40.8" },
     { name = "celery", extras = ["redis"], specifier = ">=5.5.3,<6.0.0" },
     { name = "channels", extras = ["daphne"], specifier = "==4.3.1" },
     { name = "channels-redis", specifier = "==4.3.0" },
@@ -1096,7 +1096,7 @@ requires-dist = [
     { name = "django-storages", specifier = "==1.14.6" },
     { name = "django-stubs-ext", specifier = "==5.2.2" },
     { name = "django-tinymce", specifier = "==4.1.0" },
-    { name = "django-unfold", specifier = "==0.64.0" },
+    { name = "django-unfold", specifier = "==0.64.2" },
     { name = "djangorestframework", specifier = "==3.16.1" },
     { name = "djangorestframework-camel-case", specifier = "==1.4.2" },
     { name = "drf-spectacular", specifier = "==0.28.0" },

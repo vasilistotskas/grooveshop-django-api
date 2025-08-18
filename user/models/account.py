@@ -7,7 +7,6 @@ from django.contrib.auth.models import (
     AbstractBaseUser,
     PermissionsMixin,
 )
-from django.contrib.auth.validators import UnicodeUsernameValidator
 from django.contrib.postgres.indexes import BTreeIndex, GinIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -18,12 +17,13 @@ from core.fields.image import ImageAndSvgField
 from core.models import TimeStampMixinModel, UUIDModel
 from user.managers.account import UserAccountManager
 from user.models.subscription import UserSubscription
+from user.validators import ExtendedUnicodeUsernameValidator
 
 
 class UserAccount(
     AbstractBaseUser, PermissionsMixin, UUIDModel, TimeStampMixinModel
 ):
-    username_validator = UnicodeUsernameValidator()
+    username_validator = ExtendedUnicodeUsernameValidator()
 
     id = models.BigAutoField(primary_key=True)
     username = models.CharField(

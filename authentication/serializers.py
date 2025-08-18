@@ -32,7 +32,7 @@ class UserDetailsSerializer(serializers.ModelSerializer[User]):
 
 
 class AuthenticationSerializer(UserDetailsSerializer):
-    phone = PhoneNumberField(required=False)
+    phone = PhoneNumberField(required=False, allow_blank=True, allow_null=True)
 
     class Meta(UserDetailsSerializer.Meta):
         fields = (

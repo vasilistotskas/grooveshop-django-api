@@ -20403,7 +20403,7 @@ components:
           title: Όνομα χρήστη
           description: Required. 30 characters or fewer.Letters, digits and @/./+/-/_
             only.
-          pattern: ^[\w.@+-]+$
+          pattern: ^[\w.@+#-]+$
           maxLength: 30
         image:
           type: string
@@ -20412,6 +20412,7 @@ components:
           title: Εικόνα
         phone:
           type: string
+          nullable: true
         city:
           type: string
           maxLength: 255
@@ -20541,7 +20542,7 @@ components:
           title: Όνομα χρήστη
           description: Required. 30 characters or fewer.Letters, digits and @/./+/-/_
             only.
-          pattern: ^[\w.@+-]+$
+          pattern: ^[\w.@+#-]+$
           maxLength: 30
         image:
           type: string
@@ -20550,7 +20551,7 @@ components:
           title: Εικόνα
         phone:
           type: string
-          minLength: 1
+          nullable: true
         city:
           type: string
           maxLength: 255
@@ -24847,7 +24848,7 @@ components:
           title: Όνομα χρήστη
           description: Required. 30 characters or fewer.Letters, digits and @/./+/-/_
             only.
-          pattern: ^[\w.@+-]+$
+          pattern: ^[\w.@+#-]+$
           maxLength: 30
         image:
           type: string
@@ -24856,7 +24857,7 @@ components:
           title: Εικόνα
         phone:
           type: string
-          minLength: 1
+          nullable: true
         city:
           type: string
           maxLength: 255

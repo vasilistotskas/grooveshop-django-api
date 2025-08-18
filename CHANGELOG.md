@@ -3,6 +3,20 @@
 
 
 
+## v1.25.0 (2025-08-18)
+
+### Bug fixes
+
+* fix: Make social profile fields nullable in UserAccount
+
+Updated UserAccount model and migration to set social profile URL fields (twitter, linkedin, facebook, instagram, website, youtube, github) as nullable. Adjusted OpenAPI schema to reflect nullable fields and removed explicit blank/null enum choices. Also updated dependencies: boto3 to 1.40.8 and django-unfold to 0.64.2. ([`a7f39f1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a7f39f190f68611c728cb494b3557659f914fc1e))
+
+### Features
+
+* feat: Extend username validation and allow blank phone
+
+Introduces ExtendedUnicodeUsernameValidator to support '#' in usernames and updates model, migration, and OpenAPI schema accordingly. Also allows phone field to be blank or null in authentication serializer and schema. Dependency versions updated in pyproject.toml. ([`3d5dbfe`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3d5dbfe8c8533abd70f1695847633d3d89e038df))
+
 ## v1.24.0 (2025-08-12)
 
 ### Bug fixes

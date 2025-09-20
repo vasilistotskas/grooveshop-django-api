@@ -64,10 +64,10 @@ class ProductImageSerializer(
             return obj.image.url
         return ""
 
-    def get_image_size_kb(self, obj: ProductImage) -> int:
+    def get_image_size_kb(self, obj: ProductImage) -> float:
         if obj.image and hasattr(obj.image, "size"):
             return round(obj.image.size / 1024, 2)
-        return 0
+        return 0.0
 
     def get_alt_text(self, obj: ProductImage) -> str:
         title = obj.safe_translation_getter("title", any_language=True)

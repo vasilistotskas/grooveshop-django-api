@@ -24,7 +24,7 @@ class ProductReviewSerializer(
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=ProductReview)
     user = AuthenticationSerializer(read_only=True)
-    product = serializers.PrimaryKeyRelatedField(read_only=True)
+    product = ProductSerializer(read_only=True)
 
     class Meta:
         model = ProductReview
@@ -48,17 +48,6 @@ class ProductReviewSerializer(
             "published_at",
             "uuid",
         )
-
-    def to_representation(self, instance):
-        rep = super().to_representation(instance)
-
-        if "product" in rep and instance.product:
-            rep["product"] = ProductSerializer(instance.product).data
-
-        if "user" in rep and instance.user:
-            rep["user"] = AuthenticationSerializer(instance.user).data
-
-        return rep
 
 
 class ProductReviewDetailSerializer(
@@ -66,7 +55,7 @@ class ProductReviewDetailSerializer(
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=ProductReview)
     user = AuthenticationSerializer(read_only=True)
-    product = serializers.PrimaryKeyRelatedField(read_only=True)
+    product = ProductSerializer(read_only=True)
 
     class Meta:
         model = ProductReview
@@ -90,17 +79,6 @@ class ProductReviewDetailSerializer(
             "published_at",
             "uuid",
         )
-
-    def to_representation(self, instance):
-        rep = super().to_representation(instance)
-
-        if "product" in rep and instance.product:
-            rep["product"] = ProductSerializer(instance.product).data
-
-        if "user" in rep and instance.user:
-            rep["user"] = AuthenticationSerializer(instance.user).data
-
-        return rep
 
 
 class ProductReviewWriteSerializer(

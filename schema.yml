@@ -7,7 +7,9 @@ paths:
   /api/v1/blog/author:
     get:
       operationId: listBlogAuthor
-      description: Retrieve a list of Blog Authors with filtering and search capabilities.
+      description: 'Retrieve a list of Blog Authors with filtering and search capabilities.
+        Supports multiple pagination strategies: pageNumber (default), cursor, and
+        limitOffset.'
       summary: List Blog Authors
       parameters:
       - in: query
@@ -29,15 +31,33 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       - name: search
         required: false
         in: query
@@ -329,7 +349,9 @@ paths:
   /api/v1/blog/category:
     get:
       operationId: listBlogCategory
-      description: Retrieve a list of Blog Categories with filtering and search capabilities.
+      description: 'Retrieve a list of Blog Categories with filtering and search capabilities.
+        Supports multiple pagination strategies: pageNumber (default), cursor, and
+        limitOffset.'
       summary: List Blog Categories
       parameters:
       - in: query
@@ -351,15 +373,33 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       - name: search
         required: false
         in: query
@@ -1079,7 +1119,9 @@ paths:
   /api/v1/blog/comment:
     get:
       operationId: listBlogComment
-      description: Retrieve a list of Blog Comments with filtering and search capabilities.
+      description: 'Retrieve a list of Blog Comments with filtering and search capabilities.
+        Supports multiple pagination strategies: pageNumber (default), cursor, and
+        limitOffset.'
       summary: List Blog Comments
       parameters:
       - in: query
@@ -1374,15 +1416,33 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       - in: query
         name: parent
         schema:
@@ -3574,7 +3634,9 @@ paths:
   /api/v1/blog/post:
     get:
       operationId: listBlogPost
-      description: Retrieve a list of Blog Posts with filtering and search capabilities.
+      description: 'Retrieve a list of Blog Posts with filtering and search capabilities.
+        Supports multiple pagination strategies: pageNumber (default), cursor, and
+        limitOffset.'
       summary: List Blog Posts
       parameters:
       - in: query
@@ -3742,15 +3804,33 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       - in: query
         name: publishedAfter
         schema:
@@ -4601,18 +4681,6 @@ paths:
         required: true
       tags:
       - Blog Posts
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/BlogPostLikedPostsRequestRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/BlogPostLikedPostsRequestRequest'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BlogPostLikedPostsRequestRequest'
-        required: true
       security:
       - knoxApiToken: []
       - cookieAuth: []
@@ -4622,7 +4690,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BlogPostLikedPostsResponse'
+                $ref: '#/components/schemas/BlogPostDetail'
           description: ''
         '401':
           content:
@@ -5689,7 +5757,9 @@ paths:
   /api/v1/blog/tag:
     get:
       operationId: listBlogTag
-      description: Retrieve a list of Blog Tags with filtering and search capabilities.
+      description: 'Retrieve a list of Blog Tags with filtering and search capabilities.
+        Supports multiple pagination strategies: pageNumber (default), cursor, and
+        limitOffset.'
       summary: List Blog Tags
       parameters:
       - in: query
@@ -5868,15 +5938,33 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       - in: query
         name: post
         schema:
@@ -6975,13 +7063,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/CartItemWriteRequest'
+              $ref: '#/components/schemas/CartItemCreateRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/CartItemWriteRequest'
+              $ref: '#/components/schemas/CartItemCreateRequest'
           application/json:
             schema:
-              $ref: '#/components/schemas/CartItemWriteRequest'
+              $ref: '#/components/schemas/CartItemCreateRequest'
         required: true
       security:
       - knoxApiToken: []
@@ -7108,14 +7196,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/CartItemWriteRequest'
+              $ref: '#/components/schemas/CartItemUpdateRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/CartItemWriteRequest'
+              $ref: '#/components/schemas/CartItemUpdateRequest'
           application/json:
             schema:
-              $ref: '#/components/schemas/CartItemWriteRequest'
-        required: true
+              $ref: '#/components/schemas/CartItemUpdateRequest'
       security:
       - knoxApiToken: []
       - cookieAuth: []
@@ -7197,13 +7284,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedCartItemWriteRequest'
+              $ref: '#/components/schemas/PatchedCartItemUpdateRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedCartItemWriteRequest'
+              $ref: '#/components/schemas/PatchedCartItemUpdateRequest'
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedCartItemWriteRequest'
+              $ref: '#/components/schemas/PatchedCartItemUpdateRequest'
       security:
       - knoxApiToken: []
       - cookieAuth: []
@@ -7711,7 +7798,9 @@ paths:
   /api/v1/country:
     get:
       operationId: listCountry
-      description: Retrieve a list of Countries with filtering and search capabilities.
+      description: 'Retrieve a list of Countries with filtering and search capabilities.
+        Supports multiple pagination strategies: pageNumber (default), cursor, and
+        limitOffset.'
       summary: List Countries
       parameters:
       - in: query
@@ -7977,15 +8066,33 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       - in: query
         name: phoneCode
         schema:
@@ -8351,8 +8458,9 @@ paths:
   /api/v1/notification/user/:
     get:
       operationId: listNotificationUser
-      description: Retrieve a list of Notification Users with filtering and search
-        capabilities.
+      description: 'Retrieve a list of Notification Users with filtering and search
+        capabilities. Supports multiple pagination strategies: pageNumber (default),
+        cursor, and limitOffset.'
       summary: List Notification Users
       parameters:
       - in: query
@@ -8521,15 +8629,33 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       - in: query
         name: recentNotifications
         schema:
@@ -9077,7 +9203,9 @@ paths:
   /api/v1/order:
     get:
       operationId: listOrder
-      description: Retrieve a list of Orders with filtering and search capabilities.
+      description: 'Retrieve a list of Orders with filtering and search capabilities.
+        Supports multiple pagination strategies: pageNumber (default), cursor, and
+        limitOffset.'
       summary: List Orders
       parameters:
       - in: query
@@ -9389,15 +9517,33 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       - in: query
         name: paidAmount_Gte
         schema:
@@ -9816,7 +9962,9 @@ paths:
   /api/v1/order-items:
     get:
       operationId: listOrderItem
-      description: Retrieve a list of Order Items with filtering and search capabilities.
+      description: 'Retrieve a list of Order Items with filtering and search capabilities.
+        Supports multiple pagination strategies: pageNumber (default), cursor, and
+        limitOffset.'
       summary: List Order Items
       parameters:
       - in: query
@@ -10116,15 +10264,33 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       - in: query
         name: price
         schema:
@@ -11856,7 +12022,9 @@ paths:
   /api/v1/pay_way:
     get:
       operationId: listPayWay
-      description: Retrieve a list of Pay Ways with filtering and search capabilities.
+      description: 'Retrieve a list of Pay Ways with filtering and search capabilities.
+        Supports multiple pagination strategies: pageNumber (default), cursor, and
+        limitOffset.'
       summary: List Pay Ways
       parameters:
       - in: query
@@ -12004,15 +12172,33 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       - in: query
         name: providerCode
         schema:
@@ -12426,7 +12612,9 @@ paths:
   /api/v1/product:
     get:
       operationId: listProduct
-      description: Retrieve a list of Products with filtering and search capabilities.
+      description: 'Retrieve a list of Products with filtering and search capabilities.
+        Supports multiple pagination strategies: pageNumber (default), cursor, and
+        limitOffset.'
       summary: List Products
       parameters:
       - in: query
@@ -12721,15 +12909,33 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       - in: query
         name: price
         schema:
@@ -13082,6 +13288,16 @@ paths:
           - type: integer
         description: Product ID
         required: true
+      - in: query
+        name: language
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Language code for translations (el, en, de)
       tags:
       - Products
       security:
@@ -13106,7 +13322,7 @@ paths:
   /api/v1/product/{id}/reviews:
     get:
       operationId: listProductReviews
-      description: Get all reviews for a product.
+      description: Get all reviews for a product with pagination support.
       summary: Get product reviews
       parameters:
       - in: path
@@ -13118,6 +13334,33 @@ paths:
           - type: integer
         description: Product ID
         required: true
+      - in: query
+        name: pageSize
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       tags:
       - Products
       security:
@@ -13129,9 +13372,29 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ProductReview'
+                type: object
+                properties:
+                  links:
+                    type: object
+                    properties:
+                      next:
+                        type: string
+                        nullable: true
+                      previous:
+                        type: string
+                        nullable: true
+                  count:
+                    type: integer
+                  total_pages:
+                    type: integer
+                  page_size:
+                    type: integer
+                  page_total_results:
+                    type: integer
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProductReview'
           description: ''
         '404':
           content:
@@ -13223,8 +13486,9 @@ paths:
   /api/v1/product/category:
     get:
       operationId: listProductCategory
-      description: Retrieve a list of Product Categories with filtering and search
-        capabilities.
+      description: 'Retrieve a list of Product Categories with filtering and search
+        capabilities. Supports multiple pagination strategies: pageNumber (default),
+        cursor, and limitOffset.'
       summary: List Product Categories
       parameters:
       - in: query
@@ -13409,15 +13673,33 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       - in: query
         name: parent
         schema:
@@ -13719,8 +14001,9 @@ paths:
   /api/v1/product/category/image:
     get:
       operationId: listProductCategoryImage
-      description: Retrieve a list of Product Category Images with filtering and search
-        capabilities.
+      description: 'Retrieve a list of Product Category Images with filtering and
+        search capabilities. Supports multiple pagination strategies: pageNumber (default),
+        cursor, and limitOffset.'
       summary: List Product Category Images
       parameters:
       - in: query
@@ -13793,15 +14076,33 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       - name: search
         required: false
         in: query
@@ -14106,8 +14407,9 @@ paths:
   /api/v1/product/favourite:
     get:
       operationId: listProductFavourite
-      description: Retrieve a list of Product Favourites with filtering and search
-        capabilities.
+      description: 'Retrieve a list of Product Favourites with filtering and search
+        capabilities. Supports multiple pagination strategies: pageNumber (default),
+        cursor, and limitOffset.'
       summary: List Product Favourites
       parameters:
       - in: query
@@ -14148,15 +14450,33 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       - in: query
         name: product
         schema:
@@ -14462,7 +14782,9 @@ paths:
   /api/v1/product/image:
     get:
       operationId: listProductImage
-      description: Retrieve a list of Product Images with filtering and search capabilities.
+      description: 'Retrieve a list of Product Images with filtering and search capabilities.
+        Supports multiple pagination strategies: pageNumber (default), cursor, and
+        limitOffset.'
       summary: List Product Images
       parameters:
       - in: query
@@ -14507,15 +14829,33 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       - in: query
         name: product
         schema:
@@ -14751,7 +15091,9 @@ paths:
   /api/v1/product/review:
     get:
       operationId: listProductReview
-      description: Retrieve a list of Product Reviews with filtering and search capabilities.
+      description: 'Retrieve a list of Product Reviews with filtering and search capabilities.
+        Supports multiple pagination strategies: pageNumber (default), cursor, and
+        limitOffset.'
       summary: List Product Reviews
       parameters:
       - in: query
@@ -14874,15 +15216,33 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       - in: query
         name: product
         schema:
@@ -15576,7 +15936,9 @@ paths:
   /api/v1/region:
     get:
       operationId: listRegion
-      description: Retrieve a list of Regions with filtering and search capabilities.
+      description: 'Retrieve a list of Regions with filtering and search capabilities.
+        Supports multiple pagination strategies: pageNumber (default), cursor, and
+        limitOffset.'
       summary: List Regions
       parameters:
       - in: query
@@ -15639,15 +16001,33 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       - name: search
         required: false
         in: query
@@ -16291,7 +16671,9 @@ paths:
   /api/v1/tag:
     get:
       operationId: listTag
-      description: Retrieve a list of Tags with filtering and search capabilities.
+      description: 'Retrieve a list of Tags with filtering and search capabilities.
+        Supports multiple pagination strategies: pageNumber (default), cursor, and
+        limitOffset.'
       summary: List Tags
       parameters:
       - in: query
@@ -16456,15 +16838,33 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       - name: search
         required: false
         in: query
@@ -16920,7 +17320,9 @@ paths:
   /api/v1/tagged-item:
     get:
       operationId: listTaggedItem
-      description: Retrieve a list of Tagged Items with filtering and search capabilities.
+      description: 'Retrieve a list of Tagged Items with filtering and search capabilities.
+        Supports multiple pagination strategies: pageNumber (default), cursor, and
+        limitOffset.'
       summary: List Tagged Items
       parameters:
       - in: query
@@ -17020,15 +17422,33 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       - name: search
         required: false
         in: query
@@ -17464,7 +17884,9 @@ paths:
   /api/v1/user/account:
     get:
       operationId: listUserAccount
-      description: Retrieve a list of User Accounts with filtering and search capabilities.
+      description: 'Retrieve a list of User Accounts with filtering and search capabilities.
+        Supports multiple pagination strategies: pageNumber (default), cursor, and
+        limitOffset.'
       summary: List User Accounts
       parameters:
       - in: query
@@ -17486,15 +17908,33 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       - name: search
         required: false
         in: query
@@ -18514,7 +18954,9 @@ paths:
   /api/v1/user/address:
     get:
       operationId: listUserAddress
-      description: Retrieve a list of User Addresses with filtering and search capabilities.
+      description: 'Retrieve a list of User Addresses with filtering and search capabilities.
+        Supports multiple pagination strategies: pageNumber (default), cursor, and
+        limitOffset.'
       summary: List User Addresses
       parameters:
       - in: query
@@ -18691,15 +19133,33 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       - in: query
         name: phone
         schema:
@@ -19206,8 +19666,9 @@ paths:
   /api/v1/user/subscription:
     get:
       operationId: listUserSubscription
-      description: Retrieve a list of User Subscriptions with filtering and search
-        capabilities.
+      description: 'Retrieve a list of User Subscriptions with filtering and search
+        capabilities. Supports multiple pagination strategies: pageNumber (default),
+        cursor, and limitOffset.'
       summary: List User Subscriptions
       parameters:
       - in: query
@@ -19299,15 +19760,33 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       - name: search
         required: false
         in: query
@@ -19769,8 +20248,9 @@ paths:
   /api/v1/user/subscription/topic:
     get:
       operationId: listSubscriptionTopic
-      description: Retrieve a list of Subscription Topics with filtering and search
-        capabilities.
+      description: 'Retrieve a list of Subscription Topics with filtering and search
+        capabilities. Supports multiple pagination strategies: pageNumber (default),
+        cursor, and limitOffset.'
       summary: List Subscription Topics
       parameters:
       - in: query
@@ -19906,15 +20386,33 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       - in: query
         name: requiresConfirmation
         schema:
@@ -22273,6 +22771,19 @@ components:
       - vatPercent
       - vatValue
       - weightInfo
+    CartItemCreateRequest:
+      type: object
+      description: Serializer for creating cart items - cart comes from context, only
+        product and quantity required.
+      properties:
+        product:
+          type: integer
+        quantity:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+      required:
+      - product
     CartItemDetail:
       type: object
       properties:
@@ -22401,20 +22912,14 @@ components:
       - vatPercent
       - vatValue
       - weightInfo
-    CartItemWriteRequest:
+    CartItemUpdateRequest:
       type: object
+      description: Serializer for updating cart items - only quantity is required.
       properties:
-        cart:
-          type: integer
-        product:
-          type: integer
         quantity:
           type: integer
           maximum: 2147483647
           minimum: 0
-      required:
-      - cart
-      - product
     CartWriteRequest:
       type: object
       properties:
@@ -25110,13 +25615,10 @@ components:
                   type: string
         active:
           type: boolean
-    PatchedCartItemWriteRequest:
+    PatchedCartItemUpdateRequest:
       type: object
+      description: Serializer for updating cart items - only quantity is required.
       properties:
-        cart:
-          type: integer
-        product:
-          type: integer
         quantity:
           type: integer
           maximum: 2147483647
@@ -27272,7 +27774,8 @@ components:
           type: string
           readOnly: true
         imageSizeKb:
-          type: integer
+          type: number
+          format: double
           readOnly: true
         altText:
           type: string
@@ -27343,7 +27846,8 @@ components:
           type: string
           readOnly: true
         imageSizeKb:
-          type: integer
+          type: number
+          format: double
           readOnly: true
         altText:
           type: string
@@ -27515,7 +28019,8 @@ components:
           type: integer
           readOnly: true
         product:
-          type: integer
+          allOf:
+          - $ref: '#/components/schemas/Product'
           readOnly: true
         user:
           allOf:
@@ -27583,7 +28088,8 @@ components:
           type: integer
           readOnly: true
         product:
-          type: integer
+          allOf:
+          - $ref: '#/components/schemas/Product'
           readOnly: true
         user:
           allOf:

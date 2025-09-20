@@ -292,9 +292,3 @@ class BlogCommentLikedCommentsResponseSerializer(serializers.Serializer):
         child=serializers.IntegerField(),
         help_text=_("List of comment IDs that are liked by the current user"),
     )
-
-
-class BlogCommentMyCommentRequestSerializer(serializers.Serializer):
-    post = serializers.IntegerField(
-        help_text=_("Blog post ID to find comment for")
-    )

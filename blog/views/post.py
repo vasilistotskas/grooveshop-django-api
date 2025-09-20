@@ -156,9 +156,9 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
         summary=_("Toggle post like"),
         description=_("Like or unlike a blog post. Toggles the like status."),
         tags=["Blog Posts"],
-        request=BlogPostLikedPostsRequestSerializer,
+        request=None,
         responses={
-            200: BlogPostLikedPostsResponseSerializer,
+            200: BlogPostDetailSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
         },

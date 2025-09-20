@@ -107,6 +107,11 @@ class UserAddressViewSet(MultiSerializerMixin, BaseModelViewSet):
         "validate_address": ValidateAddressResponseSerializer,
         "bulk_delete": BulkDeleteAddressesResponseSerializer,
     }
+    response_serializers = {
+        "create": UserAddressDetailSerializer,
+        "update": UserAddressDetailSerializer,
+        "partial_update": UserAddressDetailSerializer,
+    }
     permission_classes = [IsOwnerOrAdmin]
     filterset_class = UserAddressFilter
     ordering_fields = [

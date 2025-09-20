@@ -44,6 +44,32 @@ LANGUAGE_PARAMETER = OpenApiParameter(
     default=default_language,
 )
 
+PAGINATION_TYPE_PARAMETER = OpenApiParameter(
+    name="pagination_type",
+    description=_("Pagination strategy type"),
+    required=False,
+    type=str,
+    enum=["pageNumber", "cursor", "limitOffset"],
+    default="pageNumber",
+)
+
+PAGINATION_PARAMETER = OpenApiParameter(
+    name="pagination",
+    description=_("Enable or disable pagination"),
+    required=False,
+    type=str,
+    enum=["true", "false"],
+    default="true",
+)
+
+PAGE_SIZE_PARAMETER = OpenApiParameter(
+    name="page_size",
+    description=_("Number of results to return per page"),
+    required=False,
+    type=int,
+    default=20,
+)
+
 
 class Metadata(SimpleMetadata):
     def determine_metadata(self, request, view):
@@ -63,15 +89,17 @@ class PaginationModelViewSet(ModelViewSet):
                 self._paginator = None
             else:
                 pagination_type = self.request.query_params.get(
-                    "pagination_type", ""
+                    "pagination_type", "pageNumber"
                 ).lower()
                 paginator_mapping = {
+                    "pagenumber": PageNumberPaginator,
                     "page_number": PageNumberPaginator,
+                    "limitoffset": LimitOffsetPaginator,
                     "limit_offset": LimitOffsetPaginator,
                     "cursor": CursorPaginator,
                 }
                 self._paginator = paginator_mapping.get(
-                    pagination_type, self.pagination_class
+                    pagination_type, PageNumberPaginator
                 )()
 
         return self._paginator
@@ -106,7 +134,14 @@ class PaginationModelViewSet(ModelViewSet):
 
 
 @extend_schema_view(
-    list=extend_schema(parameters=[LANGUAGE_PARAMETER]),
+    list=extend_schema(
+        parameters=[
+            LANGUAGE_PARAMETER,
+            PAGINATION_TYPE_PARAMETER,
+            PAGINATION_PARAMETER,
+            PAGE_SIZE_PARAMETER,
+        ]
+    ),
     retrieve=extend_schema(parameters=[LANGUAGE_PARAMETER]),
     create=extend_schema(parameters=[LANGUAGE_PARAMETER]),
     update=extend_schema(parameters=[LANGUAGE_PARAMETER]),

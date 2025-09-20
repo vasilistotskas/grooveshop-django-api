@@ -432,33 +432,6 @@ class BlogCommentViewSetTestCase(TestURLFixerMixin, APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    def test_my_comment_action_authenticated(self):
-        self.client.force_authenticate(user=self.user)
-        payload = {"post": self.post.id}
-
-        url = reverse("blog-comment-my-comment")
-        response = self.client.post(url, payload, format="json")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        self.assertEqual(response.data["post"]["id"], self.post.id)
-
-    def test_my_comment_action_post_not_found(self):
-        self.client.force_authenticate(user=self.user)
-        payload = {"post": 9999}
-
-        url = reverse("blog-comment-my-comment")
-        response = self.client.post(url, payload, format="json")
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-    def test_my_comment_action_comment_not_found(self):
-        self.client.force_authenticate(user=self.user)
-        other_post = BlogPostFactory(author=self.author)
-        payload = {"post": other_post.id}
-
-        url = reverse("blog-comment-my-comment")
-        response = self.client.post(url, payload, format="json")
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
     def test_filtering_functionality(self):
         url = self.get_comment_list_url()
         response = self.client.get(url, {"post": self.post.id})

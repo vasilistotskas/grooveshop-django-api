@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.conf import settings
+from django.db.models import Case, When, IntegerField, Q
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import (
     extend_schema,
@@ -53,6 +54,8 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
     ordering_fields = [
         "price",
         "created_at",
+        "active",
+        "availability_priority",
         "discount_value_amount",
         "final_price_amount",
         "price_save_percent_field",
@@ -61,7 +64,7 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
         "view_count",
         "stock",
     ]
-    ordering = ["-created_at"]
+    ordering = ["-availability_priority", "id"]
     search_fields = ["translations__name", "translations__description", "slug"]
 
     def get_filterset_class(self):
@@ -96,6 +99,13 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
+        queryset = queryset.annotate(
+            availability_priority=Case(
+                When(Q(active=True) & Q(stock__gt=0), then=1),
+                default=0,
+                output_field=IntegerField(),
+            )
+        )
         return queryset.with_all_annotations()
 
     @property
@@ -128,7 +138,7 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
     @extend_schema(
         operation_id="listProductReviews",
         summary=_("Get product reviews"),
-        description=_("Get all reviews for a product."),
+        description=_("Get all reviews for a product with pagination support."),
         tags=["Products"],
         parameters=[
             OpenApiParameter(
@@ -137,11 +147,50 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
                 location=OpenApiParameter.PATH,
                 description="Product ID",
             ),
+            OpenApiParameter(
+                name="pagination_type",
+                description=_("Pagination strategy type"),
+                required=False,
+                type=str,
+                enum=["pageNumber", "cursor", "limitOffset"],
+                default="pageNumber",
+            ),
+            OpenApiParameter(
+                name="pagination",
+                description=_("Enable or disable pagination"),
+                required=False,
+                type=str,
+                enum=["true", "false"],
+                default="true",
+            ),
+            OpenApiParameter(
+                name="page_size",
+                description=_("Number of results to return per page"),
+                required=False,
+                type=int,
+                default=20,
+            ),
         ],
         responses={
             200: {
-                "type": "array",
-                "items": {"$ref": "#/components/schemas/ProductReview"},
+                "type": "object",
+                "properties": {
+                    "links": {
+                        "type": "object",
+                        "properties": {
+                            "next": {"type": "string", "nullable": True},
+                            "previous": {"type": "string", "nullable": True},
+                        },
+                    },
+                    "count": {"type": "integer"},
+                    "total_pages": {"type": "integer"},
+                    "page_size": {"type": "integer"},
+                    "page_total_results": {"type": "integer"},
+                    "results": {
+                        "type": "array",
+                        "items": {"$ref": "#/components/schemas/ProductReview"},
+                    },
+                },
             },
             404: ErrorResponseSerializer,
         },
@@ -153,10 +202,9 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
     def reviews(self, request, pk=None):
         product = get_object_or_404(Product, pk=pk)
         reviews = product.reviews.all()
-        serializer = ProductReviewSerializer(
-            reviews, many=True, context=self.get_serializer_context()
+        return self.paginate_and_serialize(
+            reviews, request, serializer_class=ProductReviewSerializer
         )
-        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @extend_schema(
         operation_id="listProductImages",
@@ -169,6 +217,15 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
                 type=int,
                 location=OpenApiParameter.PATH,
                 description="Product ID",
+            ),
+            OpenApiParameter(
+                name="language",
+                description=_("Language code for translations (el, en, de)"),
+                required=False,
+                type=str,
+                enum=["el", "en", "de"],
+                default="el",
+                location=OpenApiParameter.QUERY,
             ),
         ],
         responses={

@@ -1,4 +1,5 @@
 import importlib
+import uuid
 
 import factory
 from django.apps import apps
@@ -10,11 +11,16 @@ from blog.factories.tag import BlogTagFactory
 from blog.models.post import BlogPost
 from core.factories import CustomDjangoModelFactory
 
+
 fake = Faker()
 
 available_languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
 ]
+
+
+def generate_unique_blog_filename():
+    return f"blog_post_{uuid.uuid4().hex[:8]}.jpg"
 
 
 def get_or_create_category():
@@ -61,10 +67,10 @@ class BlogPostFactory(CustomDjangoModelFactory):
     ]
 
     image = factory.django.ImageField(
-        filename="blog_image.jpg",
-        color=factory.Faker("color"),
-        width=1280,
-        height=720,
+        filename=factory.LazyFunction(generate_unique_blog_filename),
+        width=1200,
+        height=630,
+        color="purple",
     )
     category = factory.LazyFunction(get_or_create_category)
     author = factory.LazyFunction(get_or_create_author)

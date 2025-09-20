@@ -72,7 +72,7 @@ services:
       - grooveshop-backbone
   meilisearch:
     container_name: meilisearch
-    image: getmeili/meilisearch:v1.10
+    image: getmeili/meilisearch:v1.17.1
     env_file:
       - ./docker/meilisearch/.env
     volumes:

@@ -23,10 +23,7 @@ class UserAccountFactory(factory.django.DjangoModelFactory):
     address = factory.Faker("address")
     place = factory.Faker("address")
     image = factory.django.ImageField(
-        filename="user_image.jpg",
-        color=factory.Faker("color"),
-        width=800,
-        height=800,
+        filename="user_image.jpg", width=800, height=800, color="blue"
     )
     birth_date = factory.Faker("date_of_birth")
     twitter = factory.Faker("url")

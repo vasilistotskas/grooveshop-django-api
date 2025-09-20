@@ -187,11 +187,6 @@ urlpatterns = [
         name="blog-comment-my-comments",
     ),
     path(
-        "blog/comment/my_comment",
-        BlogCommentViewSet.as_view({"post": "my_comment"}),
-        name="blog-comment-my-comment",
-    ),
-    path(
         "blog/tag",
         BlogTagViewSet.as_view({"get": "list", "post": "create"}),
         name="blog-tag-list",

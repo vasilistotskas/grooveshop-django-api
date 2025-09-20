@@ -1,7 +1,7 @@
+import uuid
 import factory
 from django.apps import apps
 from django.conf import settings
-from django.core.files.base import ContentFile
 from factory import fuzzy
 from factory.django import DjangoModelFactory
 
@@ -39,13 +39,13 @@ class ProductCategoryImageFactory(DjangoModelFactory):
     active = True
     sort_order = factory.Sequence(lambda n: n)
 
-    image = factory.LazyAttribute(
-        lambda obj: ContentFile(
-            factory.django.ImageField()._make_data(
-                {"width": 300, "height": 200, "color": "blue"}
-            ),
-            name=f"category_{obj.category.id}_{obj.image_type}.jpg",
-        )
+    image = factory.django.ImageField(
+        filename=factory.LazyFunction(
+            lambda: f"category_{uuid.uuid4().hex[:8]}.jpg"
+        ),
+        width=300,
+        height=200,
+        color="blue",
     )
 
     class Params:

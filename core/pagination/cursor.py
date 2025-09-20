@@ -5,7 +5,7 @@ from rest_framework.response import Response
 
 
 class CursorPaginator(pagination.CursorPagination):
-    page_size = 100
+    page_size = 20
     max_page_size = 100
     page_size_query_param = "page_size"
     cursor_query_param = "cursor"
@@ -16,16 +16,29 @@ class CursorPaginator(pagination.CursorPagination):
     has_previous = False
 
     def paginate_queryset(self, queryset, request, view=None):
+        page_size_param = request.query_params.get(
+            self.page_size_query_param
+        ) or request.query_params.get("page_size")
+        if page_size_param:
+            try:
+                self.page_size = min(int(page_size_param), self.max_page_size)
+            except (ValueError, TypeError):
+                pass
+
         self.total_items = queryset.count()
+
+        page = super().paginate_queryset(queryset, request, view)
+        self.page = page
+
         self.total_pages = self.get_total_pages()
-        super().paginate_queryset(queryset, request, view)
-        return self.page
+
+        return page
 
     def get_total_pages(self):
-        total_pages = math.ceil(self.total_items / self.page_size)
-        if self.total_items % self.page_size != 0:
-            total_pages += 1
-        return total_pages
+        if self.total_items == 0:
+            return 1
+        actual_page_size = getattr(self, "page_size", 20)
+        return math.ceil(self.total_items / actual_page_size)
 
     def get_paginated_response(self, data):
         return Response(

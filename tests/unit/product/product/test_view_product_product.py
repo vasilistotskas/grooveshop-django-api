@@ -94,6 +94,8 @@ class ProductViewSetTestCase(TestCase):
         expected_fields = [
             "price",
             "created_at",
+            "active",
+            "availability_priority",
             "discount_value_amount",
             "final_price_amount",
             "price_save_percent_field",
@@ -115,7 +117,9 @@ class ProductViewSetTestCase(TestCase):
         self.assertEqual(set(self.viewset.search_fields), set(expected_fields))
 
     def test_default_ordering(self):
-        self.assertEqual(self.viewset.ordering, ["-created_at"])
+        self.assertEqual(
+            self.viewset.ordering, ["-availability_priority", "id"]
+        )
 
     def test_filterset_class_configuration(self):
         self.assertEqual(self.viewset.filterset_class, ProductFilter)

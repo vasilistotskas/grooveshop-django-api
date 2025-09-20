@@ -9,8 +9,8 @@ x-common-vols: &common-vols
   - type: volume
     source: staticfiles
     target: /home/app/staticfiles
-  - type: volume
-    source: mediafiles
+  - type: bind
+    source: ./mediafiles
     target: /home/app/mediafiles
   - type: volume
     source: backups

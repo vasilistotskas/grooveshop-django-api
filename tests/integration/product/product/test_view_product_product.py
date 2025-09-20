@@ -406,15 +406,17 @@ class ProductViewSetTestCase(APITestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIsInstance(response.data, list)
+
+        self.assertIn("results", response.data)
+        self.assertIsInstance(response.data["results"], list)
 
         product_reviews = [
             r for r in self.reviews if r.product_id == self.product.pk
         ]
-        self.assertEqual(len(response.data), len(product_reviews))
+        self.assertEqual(len(response.data["results"]), len(product_reviews))
 
-        if response.data:
-            review_data = response.data[0]
+        if response.data["results"]:
+            review_data = response.data["results"][0]
             expected_fields = {"id", "product", "user", "rate", "status"}
             self.assertTrue(expected_fields.issubset(set(review_data.keys())))
 

@@ -12,12 +12,10 @@ from rest_framework.response import Response
 
 from blog.filters.comment import BlogCommentFilter
 from blog.models.comment import BlogComment
-from blog.models.post import BlogPost
 from blog.serializers.comment import (
     BlogCommentDetailSerializer,
     BlogCommentLikedCommentsRequestSerializer,
     BlogCommentLikedCommentsResponseSerializer,
-    BlogCommentMyCommentRequestSerializer,
     BlogCommentSerializer,
     BlogCommentWriteSerializer,
 )
@@ -70,7 +68,6 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
         "post": BlogPostDetailSerializer,
         "liked_comments": BlogCommentLikedCommentsResponseSerializer,
         "my_comments": BlogCommentSerializer,
-        "my_comment": BlogCommentDetailSerializer,
     }
     response_serializers = {
         "create": BlogCommentDetailSerializer,
@@ -131,7 +128,6 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
             "update_likes",
             "liked_comments",
             "my_comments",
-            "my_comment",
         ]:
             permission_classes.append(IsOwnerOrAdmin)
         return [permission() for permission in permission_classes]
@@ -283,41 +279,3 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
     def my_comments(self, request):
         queryset = self.get_queryset().filter(user=request.user)
         return self.paginate_and_serialize(queryset, request)
-
-    @extend_schema(
-        operation_id="getMyBlogComment",
-        summary=_("Get current user's comment"),
-        description=_(
-            "Get the comment made by the currently authenticated user for a specific post."
-        ),
-        tags=["Blog Comments"],
-        request=BlogCommentMyCommentRequestSerializer,
-        responses={
-            200: BlogCommentDetailSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    )
-    @action(detail=False, methods=["POST"])
-    def my_comment(self, request, *args, **kwargs) -> Response:
-        serializer = BlogCommentMyCommentRequestSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        post_id = serializer.validated_data["post"]
-
-        try:
-            post = BlogPost.objects.get(id=post_id)
-        except BlogPost.DoesNotExist:
-            return Response(
-                {"error": "Post not found"}, status=status.HTTP_404_NOT_FOUND
-            )
-
-        try:
-            comment = self.get_queryset().get(user=request.user, post=post)
-            serializer = self.get_serializer(comment)
-            return Response(serializer.data)
-        except BlogComment.DoesNotExist:
-            return Response(
-                {"error": "Comment not found for this post"},
-                status=status.HTTP_404_NOT_FOUND,
-            )

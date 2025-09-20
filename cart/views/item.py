@@ -17,7 +17,8 @@ from cart.models import CartItem
 from cart.serializers.item import (
     CartItemDetailSerializer,
     CartItemSerializer,
-    CartItemWriteSerializer,
+    CartItemCreateSerializer,
+    CartItemUpdateSerializer,
 )
 from cart.services import CartService
 from core.api.serializers import ErrorResponseSerializer
@@ -50,7 +51,7 @@ cart_item_schema_config = create_schema_view_config(
     serializers={
         "list_serializer": CartItemSerializer,
         "detail_serializer": CartItemDetailSerializer,
-        "write_serializer": CartItemWriteSerializer,
+        "write_serializer": CartItemCreateSerializer,
     },
     error_serializer=ErrorResponseSerializer,
     display_config={
@@ -86,7 +87,7 @@ cart_item_schema_config.update(
             ),
             tags=["Cart Items"],
             parameters=GUEST_CART_HEADERS,
-            request=CartItemWriteSerializer,
+            request=CartItemCreateSerializer,
             responses={
                 201: CartItemDetailSerializer,
                 400: ErrorResponseSerializer,
@@ -117,7 +118,7 @@ cart_item_schema_config.update(
             ),
             tags=["Cart Items"],
             parameters=GUEST_CART_HEADERS,
-            request=CartItemWriteSerializer,
+            request=CartItemUpdateSerializer,
             responses={
                 200: CartItemDetailSerializer,
                 400: ErrorResponseSerializer,
@@ -134,7 +135,7 @@ cart_item_schema_config.update(
             ),
             tags=["Cart Items"],
             parameters=GUEST_CART_HEADERS,
-            request=CartItemWriteSerializer,
+            request=CartItemUpdateSerializer,
             responses={
                 200: CartItemDetailSerializer,
                 400: ErrorResponseSerializer,
@@ -169,9 +170,9 @@ class CartItemViewSet(MultiSerializerMixin, BaseModelViewSet):
         "default": CartItemDetailSerializer,
         "list": CartItemSerializer,
         "retrieve": CartItemDetailSerializer,
-        "create": CartItemWriteSerializer,
-        "update": CartItemWriteSerializer,
-        "partial_update": CartItemWriteSerializer,
+        "create": CartItemCreateSerializer,
+        "update": CartItemUpdateSerializer,
+        "partial_update": CartItemUpdateSerializer,
     }
     response_serializers = {
         "create": CartItemDetailSerializer,
@@ -212,8 +213,10 @@ class CartItemViewSet(MultiSerializerMixin, BaseModelViewSet):
         return CartItem.objects.filter(cart=self.cart_service.cart)
 
     def get_object(self):
+        pk = self.kwargs.get("pk")
+
         try:
-            obj = super().get_object()
+            obj = CartItem.objects.get(pk=pk)
 
             if obj.cart != self.cart_service.cart:
                 self.permission_denied(
@@ -225,12 +228,7 @@ class CartItemViewSet(MultiSerializerMixin, BaseModelViewSet):
 
             return obj
         except CartItem.DoesNotExist:
-            self.permission_denied(
-                self.request,
-                message=_(
-                    "You do not have permission to access this cart item."
-                ),
-            )
+            raise Http404(_("No CartItem matches the given query."))
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -241,49 +239,10 @@ class CartItemViewSet(MultiSerializerMixin, BaseModelViewSet):
         if not self.cart_service.cart:
             self.cart_service.get_or_create_cart()
 
-        data = request.data.copy()
-        data["cart"] = self.cart_service.cart.id
-
-        serializer = self.get_serializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-
-        response_serializer = CartItemDetailSerializer(
-            serializer.instance, context=self.get_serializer_context()
-        )
-        headers = self.get_success_headers(response_serializer.data)
-
-        return Response(
-            response_serializer.data,
-            status=status.HTTP_201_CREATED,
-            headers=headers,
-        )
+        return super().create(request, *args, **kwargs)
 
     def update(self, request, *args, **kwargs):
-        partial = kwargs.pop("partial", False)
-
-        try:
-            instance = self.get_object()
-
-            serializer = self.get_serializer(
-                instance, data=request.data, partial=partial
-            )
-            serializer.is_valid(raise_exception=True)
-            self.perform_update(serializer)
-
-            response_serializer = CartItemDetailSerializer(
-                serializer.instance, context=self.get_serializer_context()
-            )
-            return Response(response_serializer.data)
-        except Http404:
-            return Response(
-                {
-                    "detail": _(
-                        "You do not have permission to update this cart item."
-                    )
-                },
-                status=status.HTTP_403_FORBIDDEN,
-            )
+        return super().update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
         try:

@@ -198,3 +198,119 @@ class CartItemWriteSerializer(serializers.ModelSerializer[CartItem]):
         model = CartItem
         fields = ("id", "cart", "product", "quantity")
         read_only_fields = ("id",)
+
+
+class CartItemCreateSerializer(serializers.ModelSerializer[CartItem]):
+    def validate_quantity(self, value: int) -> int:
+        if value <= 0:
+            raise serializers.ValidationError(
+                _("Quantity must be greater than zero.")
+            )
+        if value > 999:
+            raise serializers.ValidationError(_("Quantity cannot exceed 999."))
+        return value
+
+    def validate(self, data: dict) -> dict:
+        product = data.get("product")
+        quantity = data.get("quantity", 1)
+
+        if product:
+            if not product.active:
+                raise serializers.ValidationError(
+                    _("Product '{product_name}' is not available.").format(
+                        product_name=product.safe_translation_getter(
+                            "name", any_language=True
+                        ),
+                    )
+                )
+
+            if product.stock < quantity:
+                raise serializers.ValidationError(
+                    _(
+                        "Not enough stock for '{product_name}'. Available: {product_stock}, Requested: {quantity}"
+                    ).format(
+                        product_name=product.safe_translation_getter(
+                            "name", any_language=True
+                        ),
+                        product_stock=product.stock,
+                        quantity=quantity,
+                    )
+                )
+        return data
+
+    def create(self, validated_data: dict) -> CartItem:
+        cart = self.context.get("cart") or validated_data.get("cart")
+        product = validated_data.get("product")
+        quantity = validated_data.get("quantity")
+
+        if not cart:
+            raise serializers.ValidationError(_("Cart is not provided."))
+
+        existing_item = CartItem.objects.filter(
+            cart=cart, product=product
+        ).first()
+
+        if existing_item:
+            new_quantity = existing_item.quantity + quantity
+            if product.stock < new_quantity:
+                raise serializers.ValidationError(
+                    _(
+                        "Not enough stock to add {quantity} more. Current in cart: {existing_item_quantity}, Available: {product_stock}"
+                    ).format(
+                        quantity=quantity,
+                        existing_item_quantity=existing_item.quantity,
+                        product_stock=product.stock,
+                    )
+                )
+            existing_item.quantity = new_quantity
+            existing_item.save()
+            return existing_item
+        else:
+            return CartItem.objects.create(
+                cart=cart, product=product, quantity=quantity
+            )
+
+    class Meta:
+        model = CartItem
+        fields = ("product", "quantity")
+
+
+class CartItemUpdateSerializer(serializers.ModelSerializer[CartItem]):
+    def validate_quantity(self, value: int) -> int:
+        if value <= 0:
+            raise serializers.ValidationError(
+                _("Quantity must be greater than zero.")
+            )
+        if value > 999:
+            raise serializers.ValidationError(_("Quantity cannot exceed 999."))
+        return value
+
+    def validate(self, data: dict) -> dict:
+        instance = self.instance
+        if instance:
+            product = instance.product
+            quantity = data.get("quantity", instance.quantity)
+
+            if product and product.stock < quantity:
+                raise serializers.ValidationError(
+                    _(
+                        "Not enough stock for '{product_name}'. Available: {product_stock}, Requested: {quantity}"
+                    ).format(
+                        product_name=product.safe_translation_getter(
+                            "name", any_language=True
+                        ),
+                        product_stock=product.stock,
+                        quantity=quantity,
+                    )
+                )
+        return data
+
+    def update(self, instance: CartItem, validated_data: dict) -> CartItem:
+        quantity = validated_data.get("quantity", instance.quantity)
+        instance.quantity = quantity
+        instance.save()
+        return instance
+
+    class Meta:
+        model = CartItem
+        fields = ("quantity",)

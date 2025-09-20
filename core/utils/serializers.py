@@ -55,6 +55,7 @@ def create_schema_view_config(
     additional_responses=None,
     display_config: DisplayConfig | Mapping[str, Any] | None = None,
     include_language_param: bool = True,
+    include_pagination_params: bool = True,
 ):
     """
     Create schema configuration for a ViewSet with translation support.
@@ -69,6 +70,7 @@ def create_schema_view_config(
             - display_name: Override for singular name (default: model's verbose_name)
             - display_name_plural: Override for plural name (default: model's verbose_name_plural)
         include_language_param: Whether to include the language query parameter for translation-enabled models
+        include_pagination_params: Whether to include pagination query parameters for list endpoints
 
     Note:
         This function fully supports Django translations. If your model uses
@@ -145,16 +147,56 @@ def create_schema_view_config(
         except (AttributeError, KeyError):
             language_parameter = None
 
+    pagination_parameters = []
+    if include_pagination_params:
+        pagination_type_parameter = OpenApiParameter(
+            name="pagination_type",
+            description=_("Pagination strategy type"),
+            required=False,
+            type=str,
+            enum=["pageNumber", "cursor", "limitOffset"],
+            default="pageNumber",
+        )
+
+        pagination_parameter = OpenApiParameter(
+            name="pagination",
+            description=_("Enable or disable pagination"),
+            required=False,
+            type=str,
+            enum=["true", "false"],
+            default="true",
+        )
+
+        page_size_parameter = OpenApiParameter(
+            name="page_size",
+            description=_("Number of results to return per page"),
+            required=False,
+            type=int,
+            default=20,
+        )
+
+        pagination_parameters = [
+            pagination_type_parameter,
+            pagination_parameter,
+            page_size_parameter,
+        ]
+
+    list_parameters = []
+    if language_parameter:
+        list_parameters.append(language_parameter)
+    list_parameters.extend(pagination_parameters)
+
     config = {
         "list": extend_schema(
             operation_id=f"list{model_name}",
             summary=_("List %(name)s") % {"name": display_name_plural},
             description=_(
-                "Retrieve a list of %(name)s with filtering and search capabilities."
+                "Retrieve a list of %(name)s with filtering and search capabilities. "
+                "Supports multiple pagination strategies: pageNumber (default), cursor, and limitOffset."
             )
             % {"name": display_name_plural},
             tags=[tag],
-            parameters=[language_parameter] if language_parameter else None,
+            parameters=list_parameters,
             responses={
                 200: list_serializer(many=True) if list_serializer else None,
                 **base_error_responses,

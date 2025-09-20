@@ -1,4 +1,5 @@
 import importlib
+import uuid
 
 import factory
 from django.apps import apps
@@ -6,9 +7,14 @@ from django.conf import settings
 
 from product.models.product import ProductImage
 
+
 available_languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
 ]
+
+
+def generate_unique_filename():
+    return f"product_image_{uuid.uuid4().hex[:8]}.jpg"
 
 
 def get_or_create_product():
@@ -37,16 +43,15 @@ class ProductImageTranslationFactory(factory.django.DjangoModelFactory):
 class ProductImageFactory(factory.django.DjangoModelFactory):
     product = factory.LazyFunction(get_or_create_product)
     image = factory.django.ImageField(
-        filename="product_image.jpg",
-        color=factory.Faker("color"),
+        filename=factory.LazyFunction(generate_unique_filename),
         width=1280,
         height=720,
+        color="red",
     )
     is_main = factory.Faker("boolean")
 
     class Meta:
         model = ProductImage
-        django_get_or_create = ("product", "image")
         skip_postgeneration_save = True
 
     @factory.post_generation

@@ -1,3 +1,5 @@
+import uuid
+
 import factory
 from django.apps import apps
 from django.conf import settings
@@ -11,6 +13,10 @@ fake = Faker()
 available_languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
 ]
+
+
+def generate_unique_blog_category_filename():
+    return f"blog_category_{uuid.uuid4().hex[:8]}.jpg"
 
 
 class BlogCategoryTranslationFactory(factory.django.DjangoModelFactory):
@@ -32,10 +38,11 @@ class BlogCategoryFactory(CustomDjangoModelFactory):
     ]
 
     image = factory.django.ImageField(
-        filename="blog_category.jpg",
-        color=factory.Faker("color"),
+        filename=factory.LazyFunction(generate_unique_blog_category_filename),
         width=1920,
         height=1080,
+        color="green",
+        format="JPEG",
     )
     parent = None
 

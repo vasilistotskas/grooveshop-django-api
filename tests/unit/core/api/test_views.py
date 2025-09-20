@@ -19,7 +19,6 @@ from product.serializers.product import ProductSerializer
 
 
 class PaginationModelViewSetTestCase(TestCase):
-
     def setUp(self):
         self.factory = RequestFactory()
         self.viewset = PaginationModelViewSet()
@@ -108,9 +107,7 @@ class PaginationModelViewSetTestCase(TestCase):
         request = self.factory.get("/api/test/")
         django_request = Request(request)
 
-        self.viewset.paginate_and_serialize(
-            mock_queryset, django_request
-        )
+        self.viewset.paginate_and_serialize(mock_queryset, django_request)
 
         mock_paginate_queryset.assert_called_once_with(mock_queryset)
         mock_get_paginated_response.assert_called_once()
@@ -140,7 +137,6 @@ class PaginationModelViewSetTestCase(TestCase):
 
 
 class BaseModelViewSetTestCase(TestCase):
-
     def setUp(self):
         self.factory = RequestFactory()
         self.viewset = BaseModelViewSet()
@@ -199,7 +195,6 @@ class BaseModelViewSetTestCase(TestCase):
 
 
 class MetadataTestCase(TestCase):
-
     def setUp(self):
         self.metadata = Metadata()
         self.factory = RequestFactory()

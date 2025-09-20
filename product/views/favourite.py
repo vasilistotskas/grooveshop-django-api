@@ -67,10 +67,10 @@ class ProductFavouriteViewSet(MultiSerializerMixin, BaseModelViewSet):
     }
 
     def create(self, request, *args, **kwargs):
-        return super().create(request, *args, **kwargs)
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(user=request.user)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @extend_schema(
         operation_id="getProductFavouriteProduct",

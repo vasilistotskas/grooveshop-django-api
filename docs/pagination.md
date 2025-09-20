@@ -114,7 +114,7 @@ const fetchProducts = async (paginationType = 'pageNumber', page = 1, pageSize =
     page: page.toString(),
     page_size: pageSize.toString()
   });
-  
+
   const response = await fetch(`/api/products/?${params}`);
   return response.json();
 };
@@ -133,27 +133,27 @@ export const useProducts = () => {
     pageSize?: number;
     cursor?: string;
   } = {}) => {
-    const { 
-      paginationType = 'pageNumber', 
-      page = 1, 
+    const {
+      paginationType = 'pageNumber',
+      page = 1,
       pageSize = 20,
-      cursor 
+      cursor
     } = options;
-    
+
     const query: Record<string, string> = {
       pagination_type: paginationType,
       page_size: pageSize.toString()
     };
-    
+
     if (paginationType === 'cursor' && cursor) {
       query.cursor = cursor;
     } else if (paginationType !== 'cursor') {
       query.page = page.toString();
     }
-    
+
     return await $fetch('/api/products/', { query });
   };
-  
+
   return { fetchProducts };
 };
 ```

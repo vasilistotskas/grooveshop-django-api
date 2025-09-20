@@ -32,6 +32,9 @@ class BlogPostTranslationSerializer(
     def get_main_image_path(self, obj):
         return obj.master.main_image_path if obj.master else ""
 
+    def get_slug(self, obj):
+        return obj.master.slug if obj.master else ""
+
     def get_matches_position(self, obj):
         return self.context.get("_matchesPosition", {})
 
@@ -46,6 +49,7 @@ class ProductTranslationSerializer(
     serializers.ModelSerializer[ProductTranslation]
 ):
     main_image_path = serializers.SerializerMethodField()
+    slug = serializers.SerializerMethodField()
     matches_position = serializers.SerializerMethodField()
     ranking_score = serializers.SerializerMethodField()
     formatted = serializers.SerializerMethodField()
@@ -58,6 +62,7 @@ class ProductTranslationSerializer(
             "name",
             "description",
             "master",
+            "slug",
             "main_image_path",
             "matches_position",
             "ranking_score",
@@ -66,6 +71,9 @@ class ProductTranslationSerializer(
 
     def get_main_image_path(self, obj):
         return obj.master.main_image_path if obj.master else ""
+
+    def get_slug(self, obj):
+        return obj.master.slug if obj.master else ""
 
     def get_matches_position(self, obj):
         return self.context.get("_matchesPosition", {})
@@ -96,6 +104,7 @@ class ProductMeiliSearchResultSerializer(serializers.Serializer):
     name = serializers.CharField()
     description = serializers.CharField()
     master = serializers.IntegerField()
+    slug = serializers.CharField()
     main_image_path = serializers.CharField()
     matches_position = serializers.JSONField()
     ranking_score = serializers.FloatField(allow_null=True)

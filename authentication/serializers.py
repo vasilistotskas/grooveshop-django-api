@@ -34,6 +34,12 @@ class UserDetailsSerializer(serializers.ModelSerializer[User]):
 class AuthenticationSerializer(UserDetailsSerializer):
     phone = PhoneNumberField(required=False, allow_blank=True, allow_null=True)
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if data.get("image") == "":
+            data["image"] = None
+        return data
+
     class Meta(UserDetailsSerializer.Meta):
         fields = (
             *UserDetailsSerializer.Meta.fields,

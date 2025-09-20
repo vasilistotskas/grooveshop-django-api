@@ -3098,48 +3098,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
-  /api/v1/blog/comment/my_comment:
-    post:
-      operationId: getMyBlogComment
-      description: Get the comment made by the currently authenticated user for a
-        specific post.
-      summary: Get current user's comment
-      tags:
-      - Blog Comments
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/BlogCommentMyCommentRequestRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/BlogCommentMyCommentRequestRequest'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BlogCommentMyCommentRequestRequest'
-        required: true
-      security:
-      - knoxApiToken: []
-      - cookieAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BlogCommentDetail'
-          description: ''
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
   /api/v1/blog/comment/my_comments:
     get:
       operationId: listMyBlogComments
@@ -21849,14 +21807,6 @@ components:
           description: List of comment IDs that are liked by the current user
       required:
       - likedCommentIds
-    BlogCommentMyCommentRequestRequest:
-      type: object
-      properties:
-        post:
-          type: integer
-          description: Blog post ID to find comment for
-      required:
-      - post
     BlogCommentWriteRequest:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -22773,8 +22723,6 @@ components:
       - weightInfo
     CartItemCreateRequest:
       type: object
-      description: Serializer for creating cart items - cart comes from context, only
-        product and quantity required.
       properties:
         product:
           type: integer
@@ -22914,7 +22862,6 @@ components:
       - weightInfo
     CartItemUpdateRequest:
       type: object
-      description: Serializer for updating cart items - only quantity is required.
       properties:
         quantity:
           type: integer
@@ -25617,7 +25564,6 @@ components:
           type: boolean
     PatchedCartItemUpdateRequest:
       type: object
-      description: Serializer for updating cart items - only quantity is required.
       properties:
         quantity:
           type: integer
@@ -27663,6 +27609,10 @@ components:
           exclusiveMinimum: true
           nullable: true
           readOnly: true
+        productSlug:
+          type: string
+          nullable: true
+          readOnly: true
         createdAt:
           type: string
           format: date-time
@@ -27677,6 +27627,7 @@ components:
       - product
       - productName
       - productPrice
+      - productSlug
       - userId
       - userUsername
       - uuid
@@ -27719,6 +27670,10 @@ components:
           exclusiveMinimum: true
           nullable: true
           readOnly: true
+        productSlug:
+          type: string
+          nullable: true
+          readOnly: true
         createdAt:
           type: string
           format: date-time
@@ -27740,6 +27695,7 @@ components:
       - product
       - productName
       - productPrice
+      - productSlug
       - updatedAt
       - user
       - userId
@@ -27993,6 +27949,8 @@ components:
           type: string
         master:
           type: integer
+        slug:
+          type: string
         mainImagePath:
           type: string
         matchesPosition: {}
@@ -28011,6 +27969,7 @@ components:
       - matchesPosition
       - name
       - rankingScore
+      - slug
     ProductReview:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.

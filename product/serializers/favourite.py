@@ -20,6 +20,7 @@ class ProductFavouriteSerializer(serializers.ModelSerializer[ProductFavourite]):
     )
     product_name = serializers.SerializerMethodField(read_only=True)
     product_price = serializers.SerializerMethodField(read_only=True)
+    product_slug = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ProductFavourite
@@ -30,6 +31,7 @@ class ProductFavouriteSerializer(serializers.ModelSerializer[ProductFavourite]):
             "product",
             "product_name",
             "product_price",
+            "product_slug",
             "created_at",
             "uuid",
         )
@@ -52,6 +54,12 @@ class ProductFavouriteSerializer(serializers.ModelSerializer[ProductFavourite]):
             return (
                 float(obj.product.price.amount) if obj.product.price else None
             )
+        return None
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_product_slug(self, obj) -> str:
+        if obj.product and hasattr(obj.product, "slug"):
+            return obj.product.slug
         return None
 
 

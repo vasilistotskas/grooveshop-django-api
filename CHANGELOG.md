@@ -3,6 +3,20 @@
 
 
 
+## v1.26.0 (2025-09-20)
+
+### Bug fixes
+
+* fix: Update translations and pagination docs; improve favourite logic
+
+Updated German and Greek translation files with new and revised messages, including support for tag filters and ordering fields. Improved pagination documentation for clarity. Enhanced favourite product serializer and view logic. Updated schema and search serializer for consistency with new API features. Adjusted unit tests to reflect these changes. ([`2fbe52a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2fbe52a9a300b2e2b832dea34f67a5f92f3b27c1))
+
+### Features
+
+* feat: Add flexible API pagination and update dependencies
+
+Introduces support for multiple pagination strategies (page number, cursor, limit/offset) across all list endpoints, with new query parameters and documentation. Refactors pagination logic, updates OpenAPI schema, and improves serializer and view handling for pagination. Removes unused blog comment endpoint, enhances product review serialization, and updates various factories for unique image filenames. Upgrades several dependencies and MeiliSearch version, and adds a management command to clear MeiliSearch indexes. ([`86c85d3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/86c85d3b15affe18a0444012d5d112bf3d80d5dc))
+
 ## v1.25.0 (2025-08-18)
 
 ### Bug fixes

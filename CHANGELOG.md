@@ -3,6 +3,14 @@
 
 
 
+## v1.27.0 (2025-09-22)
+
+### Features
+
+* feat: Refactor serializer config and logging, update tasks
+
+Refactors API view and schema configuration to use explicit request/response serializer configs, replacing the previous 'serializers' dict pattern across all relevant views. Adds new logging configuration for Docker and Kubernetes environments, introduces a HostnameFilter, and creates a core/logging.py utility. Updates the log cleanup Celery task to only run in Docker development, renames it, and improves file selection logic. Adjusts Celery beat schedule to conditionally include the new log cleanup task. Updates product favourite serializers and schema to simplify product fields and response structure. Adds Twisted to dependencies and makes minor schema and test updates. ([`5e6d24e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5e6d24e0595e87ed89794258f650cae6c30dd14e))
+
 ## v1.26.0 (2025-09-20)
 
 ### Bug fixes

@@ -27,6 +27,8 @@ from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
+    RequestSerializersConfig,
+    ResponseSerializersConfig,
 )
 from core.utils.views import cache_methods
 from order.enum.status import OrderStatus
@@ -39,6 +41,20 @@ from order.serializers.order import (
 )
 from order.services import OrderService, OrderServiceError
 
+req_serializers: RequestSerializersConfig = {
+    "create": OrderWriteSerializer,
+    "update": OrderWriteSerializer,
+    "partial_update": OrderWriteSerializer,
+}
+
+res_serializers: ResponseSerializersConfig = {
+    "create": OrderDetailSerializer,
+    "list": OrderSerializer,
+    "retrieve": OrderDetailSerializer,
+    "update": OrderDetailSerializer,
+    "partial_update": OrderDetailSerializer,
+}
+
 
 @extend_schema_view(
     **create_schema_view_config(
@@ -46,11 +62,8 @@ from order.services import OrderService, OrderServiceError
         display_config={
             "tag": "Orders",
         },
-        serializers={
-            "list_serializer": OrderSerializer,
-            "detail_serializer": OrderDetailSerializer,
-            "write_serializer": OrderWriteSerializer,
-        },
+        request_serializers=req_serializers,
+        response_serializers=res_serializers,
     ),
     retrieve_by_uuid=extend_schema(
         operation_id="retrieveOrderByUuid",

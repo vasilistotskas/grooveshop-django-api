@@ -38,11 +38,27 @@ from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
+    RequestSerializersConfig,
+    ResponseSerializersConfig,
 )
 from core.utils.views import cache_methods
 
 if TYPE_CHECKING:
     from blog.strategies.related_posts_strategy import RelatedPostsStrategy
+
+req_serializers: RequestSerializersConfig = {
+    "create": BlogPostWriteSerializer,
+    "update": BlogPostWriteSerializer,
+    "partial_update": BlogPostWriteSerializer,
+}
+
+res_serializers: ResponseSerializersConfig = {
+    "create": BlogPostDetailSerializer,
+    "list": BlogPostSerializer,
+    "retrieve": BlogPostDetailSerializer,
+    "update": BlogPostDetailSerializer,
+    "partial_update": BlogPostDetailSerializer,
+}
 
 
 @extend_schema_view(
@@ -51,17 +67,9 @@ if TYPE_CHECKING:
         display_config={
             "tag": "Blog Post",
         },
-        serializers={
-            "list_serializer": BlogPostSerializer,
-            "detail_serializer": BlogPostDetailSerializer,
-            "write_serializer": BlogPostWriteSerializer,
-        },
+        request_serializers=req_serializers,
+        response_serializers=res_serializers,
         error_serializer=ErrorResponseSerializer,
-        additional_responses={
-            "create": {201: BlogPostDetailSerializer},
-            "update": {200: BlogPostDetailSerializer},
-            "partial_update": {200: BlogPostDetailSerializer},
-        },
     )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
@@ -83,11 +91,8 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
         "popular": BlogPostSerializer,
         "featured": BlogPostSerializer,
     }
-    response_serializers = {
-        "create": BlogPostDetailSerializer,
-        "update": BlogPostDetailSerializer,
-        "partial_update": BlogPostDetailSerializer,
-    }
+    response_serializers = res_serializers
+    request_serializers = req_serializers
 
     filterset_class = BlogPostFilter
     ordering_fields = [

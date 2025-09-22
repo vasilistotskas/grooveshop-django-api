@@ -1,17 +1,23 @@
 from __future__ import annotations
 
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import (
+    extend_schema,
+    extend_schema_view,
+)
 from rest_framework import status
 from rest_framework.decorators import action
 
 from rest_framework.response import Response
 
+from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
+    RequestSerializersConfig,
+    ResponseSerializersConfig,
 )
 from product.filters.favourite import ProductFavouriteFilter
 from product.models.favourite import ProductFavourite
@@ -24,16 +30,27 @@ from product.serializers.favourite import (
     ProductFavouriteWriteSerializer,
 )
 
+req_serializers: RequestSerializersConfig = {
+    "create": ProductFavouriteWriteSerializer,
+    "update": ProductFavouriteWriteSerializer,
+    "partial_update": ProductFavouriteWriteSerializer,
+}
+
+res_serializers: ResponseSerializersConfig = {
+    "create": ProductFavouriteWriteSerializer,
+    "list": ProductFavouriteSerializer,
+    "retrieve": ProductFavouriteDetailSerializer,
+    "update": ProductFavouriteWriteSerializer,
+    "partial_update": ProductFavouriteWriteSerializer,
+}
+
 schema_config = create_schema_view_config(
     model_class=ProductFavourite,
     display_config={
         "tag": "Product Favourites",
     },
-    serializers={
-        "list_serializer": ProductFavouriteSerializer,
-        "detail_serializer": ProductFavouriteDetailSerializer,
-        "write_serializer": ProductFavouriteWriteSerializer,
-    },
+    request_serializers=req_serializers,
+    response_serializers=res_serializers,
 )
 
 
@@ -65,6 +82,8 @@ class ProductFavouriteViewSet(MultiSerializerMixin, BaseModelViewSet):
         "product": ProductDetailResponseSerializer,
         "favourites_by_products": ProductFavouriteByProductsResponseSerializer,
     }
+    response_serializers = res_serializers
+    request_serializers = req_serializers
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -102,9 +121,20 @@ class ProductFavouriteViewSet(MultiSerializerMixin, BaseModelViewSet):
         responses={
             200: {
                 "type": "array",
-                "items": {"$ref": "#/components/schemas/ProductFavourite"},
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "userId": {"type": "integer"},
+                        "productId": {"type": "integer"},
+                        "createdAt": {"type": "string", "format": "date-time"},
+                    },
+                    "required": ["id", "userId", "productId", "createdAt"],
+                },
             },
+            404: ErrorResponseSerializer,
         },
+        parameters=[],
     )
     @action(detail=False, methods=["POST"])
     def favourites_by_products(self, request, *args, **kwargs):

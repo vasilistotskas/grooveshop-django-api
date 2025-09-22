@@ -29,8 +29,25 @@ from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
+    RequestSerializersConfig,
+    ResponseSerializersConfig,
 )
 from core.utils.views import cache_methods
+
+
+req_serializers: RequestSerializersConfig = {
+    "create": BlogCommentWriteSerializer,
+    "update": BlogCommentWriteSerializer,
+    "partial_update": BlogCommentWriteSerializer,
+}
+
+res_serializers: ResponseSerializersConfig = {
+    "create": BlogCommentDetailSerializer,
+    "list": BlogCommentSerializer,
+    "retrieve": BlogCommentDetailSerializer,
+    "update": BlogCommentDetailSerializer,
+    "partial_update": BlogCommentDetailSerializer,
+}
 
 
 @extend_schema_view(
@@ -39,17 +56,9 @@ from core.utils.views import cache_methods
         display_config={
             "tag": "Blog Comments",
         },
-        serializers={
-            "list_serializer": BlogCommentSerializer,
-            "detail_serializer": BlogCommentDetailSerializer,
-            "write_serializer": BlogCommentWriteSerializer,
-        },
+        request_serializers=req_serializers,
+        response_serializers=res_serializers,
         error_serializer=ErrorResponseSerializer,
-        additional_responses={
-            "create": {201: BlogCommentDetailSerializer},
-            "update": {200: BlogCommentDetailSerializer},
-            "partial_update": {200: BlogCommentDetailSerializer},
-        },
     )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])

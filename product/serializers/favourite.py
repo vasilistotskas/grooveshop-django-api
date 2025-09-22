@@ -4,6 +4,8 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
+from core.api.schema import generate_schema_multi_lang
+from core.utils.serializers import TranslatedFieldExtended
 from product.models.favourite import ProductFavourite
 from product.models.product import Product
 from product.serializers.product import (
@@ -13,14 +15,17 @@ from product.serializers.product import (
 User = get_user_model()
 
 
+@extend_schema_field(generate_schema_multi_lang(Product))
+class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
+    pass
+
+
 class ProductFavouriteSerializer(serializers.ModelSerializer[ProductFavourite]):
     user_id = serializers.IntegerField(source="user.id", read_only=True)
     user_username = serializers.CharField(
         source="user.username", read_only=True
     )
-    product_name = serializers.SerializerMethodField(read_only=True)
-    product_price = serializers.SerializerMethodField(read_only=True)
-    product_slug = serializers.SerializerMethodField(read_only=True)
+    product = ProductDetailSerializer(read_only=True)
 
     class Meta:
         model = ProductFavourite
@@ -29,42 +34,12 @@ class ProductFavouriteSerializer(serializers.ModelSerializer[ProductFavourite]):
             "user_id",
             "user_username",
             "product",
-            "product_name",
-            "product_price",
-            "product_slug",
             "created_at",
             "uuid",
         )
 
-    @extend_schema_field(serializers.CharField(allow_null=True))
-    def get_product_name(self, obj) -> str:
-        if obj.product:
-            return obj.product.safe_translation_getter(
-                "name", any_language=True
-            )
-        return None
-
-    @extend_schema_field(
-        serializers.DecimalField(
-            max_digits=10, decimal_places=2, allow_null=True
-        )
-    )
-    def get_product_price(self, obj):
-        if obj.product and hasattr(obj.product, "price"):
-            return (
-                float(obj.product.price.amount) if obj.product.price else None
-            )
-        return None
-
-    @extend_schema_field(serializers.CharField(allow_null=True))
-    def get_product_slug(self, obj) -> str:
-        if obj.product and hasattr(obj.product, "slug"):
-            return obj.product.slug
-        return None
-
 
 class ProductFavouriteDetailSerializer(ProductFavouriteSerializer):
-    product = ProductDetailSerializer(read_only=True)
     user = serializers.StringRelatedField(read_only=True)
 
     class Meta(ProductFavouriteSerializer.Meta):
@@ -82,7 +57,11 @@ class ProductFavouriteWriteSerializer(
 
     class Meta:
         model = ProductFavourite
-        fields = ("product",)
+        fields = (
+            "id",
+            "product",
+        )
+        read_only_fields = ("id",)
 
     def validate(self, attrs):
         user = self.context["request"].user

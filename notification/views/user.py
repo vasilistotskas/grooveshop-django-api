@@ -14,6 +14,8 @@ from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
+    RequestSerializersConfig,
+    ResponseSerializersConfig,
 )
 from core.utils.views import cache_methods
 from notification.filters import NotificationUserFilter
@@ -28,6 +30,20 @@ from notification.serializers.user import (
     NotificationUserWriteSerializer,
 )
 
+req_serializers: RequestSerializersConfig = {
+    "create": NotificationUserWriteSerializer,
+    "update": NotificationUserWriteSerializer,
+    "partial_update": NotificationUserWriteSerializer,
+}
+
+res_serializers: ResponseSerializersConfig = {
+    "create": NotificationUserDetailSerializer,
+    "list": NotificationUserSerializer,
+    "retrieve": NotificationUserDetailSerializer,
+    "update": NotificationUserDetailSerializer,
+    "partial_update": NotificationUserDetailSerializer,
+}
+
 
 @extend_schema_view(
     **create_schema_view_config(
@@ -35,11 +51,8 @@ from notification.serializers.user import (
         display_config={
             "tag": "Notification Users",
         },
-        serializers={
-            "list_serializer": NotificationUserSerializer,
-            "detail_serializer": NotificationUserDetailSerializer,
-            "write_serializer": NotificationUserWriteSerializer,
-        },
+        request_serializers=req_serializers,
+        response_serializers=res_serializers,
     ),
     unseen_count=extend_schema(
         operation_id="getNotificationUserUnseenCount",

@@ -17,6 +17,8 @@ from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
+    RequestSerializersConfig,
+    ResponseSerializersConfig,
 )
 from core.utils.views import cache_methods
 from user.filters.address import UserAddressFilter
@@ -30,6 +32,20 @@ from user.serializers.address import (
     ValidateAddressResponseSerializer,
 )
 
+req_serializers: RequestSerializersConfig = {
+    "create": UserAddressWriteSerializer,
+    "update": UserAddressWriteSerializer,
+    "partial_update": UserAddressWriteSerializer,
+}
+
+res_serializers: ResponseSerializersConfig = {
+    "create": UserAddressDetailSerializer,
+    "list": UserAddressSerializer,
+    "retrieve": UserAddressDetailSerializer,
+    "update": UserAddressDetailSerializer,
+    "partial_update": UserAddressDetailSerializer,
+}
+
 
 @extend_schema_view(
     **create_schema_view_config(
@@ -37,11 +53,8 @@ from user.serializers.address import (
         display_config={
             "tag": "User Addresses",
         },
-        serializers={
-            "list_serializer": UserAddressSerializer,
-            "detail_serializer": UserAddressDetailSerializer,
-            "write_serializer": UserAddressWriteSerializer,
-        },
+        request_serializers=req_serializers,
+        response_serializers=res_serializers,
         error_serializer=ErrorResponseSerializer,
     ),
     set_main=extend_schema(

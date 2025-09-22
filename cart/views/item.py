@@ -27,6 +27,8 @@ from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
+    RequestSerializersConfig,
+    ResponseSerializersConfig,
 )
 
 GUEST_CART_HEADERS = [
@@ -46,13 +48,24 @@ GUEST_CART_HEADERS = [
     ),
 ]
 
+req_serializers: RequestSerializersConfig = {
+    "create": CartItemCreateSerializer,
+    "update": CartItemUpdateSerializer,
+    "partial_update": CartItemUpdateSerializer,
+}
+
+res_serializers: ResponseSerializersConfig = {
+    "create": CartItemDetailSerializer,
+    "list": CartItemSerializer,
+    "retrieve": CartItemDetailSerializer,
+    "update": CartItemDetailSerializer,
+    "partial_update": CartItemDetailSerializer,
+}
+
 cart_item_schema_config = create_schema_view_config(
     model_class=CartItem,
-    serializers={
-        "list_serializer": CartItemSerializer,
-        "detail_serializer": CartItemDetailSerializer,
-        "write_serializer": CartItemCreateSerializer,
-    },
+    request_serializers=req_serializers,
+    response_serializers=res_serializers,
     error_serializer=ErrorResponseSerializer,
     display_config={
         "tag": "Cart Items",

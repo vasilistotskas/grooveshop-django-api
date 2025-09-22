@@ -19,6 +19,8 @@ from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
+    RequestSerializersConfig,
+    ResponseSerializersConfig,
 )
 from core.utils.views import cache_methods
 from product.filters.product import ProductFilter
@@ -34,16 +36,27 @@ from product.serializers.review import ProductReviewSerializer
 from tag.filters.tag import TagFilter
 from tag.serializers.tag import TagSerializer
 
+req_serializers: RequestSerializersConfig = {
+    "create": ProductWriteSerializer,
+    "update": ProductWriteSerializer,
+    "partial_update": ProductWriteSerializer,
+}
+
+res_serializers: ResponseSerializersConfig = {
+    "create": ProductDetailSerializer,
+    "list": ProductSerializer,
+    "retrieve": ProductDetailSerializer,
+    "update": ProductDetailSerializer,
+    "partial_update": ProductDetailSerializer,
+}
+
 schema_config = create_schema_view_config(
     model_class=Product,
     display_config={
         "tag": "Products",
     },
-    serializers={
-        "list_serializer": ProductSerializer,
-        "detail_serializer": ProductDetailSerializer,
-        "write_serializer": ProductWriteSerializer,
-    },
+    request_serializers=req_serializers,
+    response_serializers=res_serializers,
 )
 
 

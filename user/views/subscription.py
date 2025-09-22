@@ -21,6 +21,8 @@ from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
+    RequestSerializersConfig,
+    ResponseSerializersConfig,
 )
 from user.filters.subscription import (
     SubscriptionTopicFilter,
@@ -42,6 +44,20 @@ logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
+subscription_topic_req_serializers: RequestSerializersConfig = {
+    "create": SubscriptionTopicWriteSerializer,
+    "update": SubscriptionTopicWriteSerializer,
+    "partial_update": SubscriptionTopicWriteSerializer,
+}
+
+subscription_topic_res_serializers: ResponseSerializersConfig = {
+    "create": SubscriptionTopicDetailSerializer,
+    "list": SubscriptionTopicSerializer,
+    "retrieve": SubscriptionTopicDetailSerializer,
+    "update": SubscriptionTopicDetailSerializer,
+    "partial_update": SubscriptionTopicDetailSerializer,
+}
+
 
 @extend_schema_view(
     **create_schema_view_config(
@@ -49,11 +65,8 @@ User = get_user_model()
         display_config={
             "tag": "Subscription Topics",
         },
-        serializers={
-            "list_serializer": SubscriptionTopicSerializer,
-            "detail_serializer": SubscriptionTopicDetailSerializer,
-            "write_serializer": SubscriptionTopicWriteSerializer,
-        },
+        request_serializers=subscription_topic_req_serializers,
+        response_serializers=subscription_topic_res_serializers,
     )
 )
 class SubscriptionTopicViewSet(MultiSerializerMixin, BaseModelViewSet):
@@ -238,17 +251,29 @@ class SubscriptionTopicViewSet(MultiSerializerMixin, BaseModelViewSet):
             )
 
 
+user_subscription_req_serializers: RequestSerializersConfig = {
+    "create": UserSubscriptionWriteSerializer,
+    "update": UserSubscriptionWriteSerializer,
+    "partial_update": UserSubscriptionWriteSerializer,
+}
+
+user_subscription_res_serializers: ResponseSerializersConfig = {
+    "create": UserSubscriptionDetailSerializer,
+    "list": UserSubscriptionSerializer,
+    "retrieve": UserSubscriptionDetailSerializer,
+    "update": UserSubscriptionDetailSerializer,
+    "partial_update": UserSubscriptionDetailSerializer,
+}
+
+
 @extend_schema_view(
     **create_schema_view_config(
         model_class=UserSubscription,
         display_config={
             "tag": "User Subscription",
         },
-        serializers={
-            "list_serializer": UserSubscriptionSerializer,
-            "detail_serializer": UserSubscriptionDetailSerializer,
-            "write_serializer": UserSubscriptionWriteSerializer,
-        },
+        request_serializers=user_subscription_req_serializers,
+        response_serializers=user_subscription_res_serializers,
     )
 )
 class UserSubscriptionViewSet(MultiSerializerMixin, BaseModelViewSet):

@@ -24,8 +24,24 @@ from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
+    RequestSerializersConfig,
+    ResponseSerializersConfig,
 )
 from core.utils.views import cache_methods
+
+req_serializers: RequestSerializersConfig = {
+    "create": BlogAuthorWriteSerializer,
+    "update": BlogAuthorWriteSerializer,
+    "partial_update": BlogAuthorWriteSerializer,
+}
+
+res_serializers: ResponseSerializersConfig = {
+    "create": BlogAuthorDetailSerializer,
+    "list": BlogAuthorSerializer,
+    "retrieve": BlogAuthorDetailSerializer,
+    "update": BlogAuthorDetailSerializer,
+    "partial_update": BlogAuthorDetailSerializer,
+}
 
 
 @extend_schema_view(
@@ -34,11 +50,8 @@ from core.utils.views import cache_methods
         display_config={
             "tag": "Blog Authors",
         },
-        serializers={
-            "list_serializer": BlogAuthorSerializer,
-            "detail_serializer": BlogAuthorDetailSerializer,
-            "write_serializer": BlogAuthorWriteSerializer,
-        },
+        request_serializers=req_serializers,
+        response_serializers=res_serializers,
     )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])

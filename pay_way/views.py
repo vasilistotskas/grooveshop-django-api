@@ -10,6 +10,8 @@ from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
+    RequestSerializersConfig,
+    ResponseSerializersConfig,
 )
 from core.utils.views import cache_methods
 from pay_way.filters import PayWayFilter
@@ -20,6 +22,20 @@ from pay_way.serializers import (
     PayWayWriteSerializer,
 )
 
+req_serializers: RequestSerializersConfig = {
+    "create": PayWayWriteSerializer,
+    "update": PayWayWriteSerializer,
+    "partial_update": PayWayWriteSerializer,
+}
+
+res_serializers: ResponseSerializersConfig = {
+    "create": PayWayDetailSerializer,
+    "list": PayWaySerializer,
+    "retrieve": PayWayDetailSerializer,
+    "update": PayWayDetailSerializer,
+    "partial_update": PayWayDetailSerializer,
+}
+
 
 @extend_schema_view(
     **create_schema_view_config(
@@ -27,11 +43,8 @@ from pay_way.serializers import (
         display_config={
             "tag": "Payment methods",
         },
-        serializers={
-            "list_serializer": PayWaySerializer,
-            "detail_serializer": PayWayDetailSerializer,
-            "write_serializer": PayWayWriteSerializer,
-        },
+        request_serializers=req_serializers,
+        response_serializers=res_serializers,
         error_serializer=ErrorResponseSerializer,
     )
 )

@@ -477,57 +477,70 @@ SCHEDULE_PRESETS = {
     "every_hour": crontab(minute="0"),
 }
 
-CELERY_BEAT_SCHEDULE = {
-    "monitor-system-health": {
-        "task": "core.tasks.monitor_system_health",
-        "schedule": SCHEDULE_PRESETS["every_30_min"],
-    },
-    "scheduled-database-backup": {
-        "task": "core.tasks.scheduled_database_backup",
-        "schedule": SCHEDULE_PRESETS["daily_3am"],
-    },
-    "cleanup-old-backups": {
-        "task": "core.tasks.cleanup_old_backups",
-        "schedule": SCHEDULE_PRESETS["weekly_sunday_5am"],
-        "kwargs": {"days": 30, "backup_dir": "backups"},
-    },
-    "clear-log-files": {
-        "task": "core.tasks.clear_log_files_task",
-        "schedule": SCHEDULE_PRESETS["daily_4am"],
-        "kwargs": {"days": 30},
-    },
-    "clear-duplicate-history": {
-        "task": "core.tasks.clear_duplicate_history_task",
-        "schedule": SCHEDULE_PRESETS["daily_5am"],
-        "kwargs": {"excluded_fields": [], "minutes": None},
-    },
-    "clear-old-history": {
-        "task": "core.tasks.clear_old_history_task",
-        "schedule": SCHEDULE_PRESETS["weekly_sunday_3am"],
-        "kwargs": {"days": 365},
-    },
-    "clear-expired-sessions": {
-        "task": "core.tasks.clear_expired_sessions_task",
-        "schedule": SCHEDULE_PRESETS["weekly_monday_4am"],
-    },
-    "send-inactive-user-notifications": {
-        "task": "core.tasks.send_inactive_user_notifications",
-        "schedule": SCHEDULE_PRESETS["monthly_first_6am"],
-    },
-    "clear-all-cache": {
-        "task": "core.tasks.clear_all_cache_task",
-        "schedule": SCHEDULE_PRESETS["monthly_first_4am"],
-    },
-    "clear-carts-for-none-users": {
-        "task": "core.tasks.clear_carts_for_none_users_task",
-        "schedule": SCHEDULE_PRESETS["bimonthly_4am"],
-    },
-    "clear-expired-notifications": {
-        "task": "core.tasks.clear_expired_notifications_task",
-        "schedule": SCHEDULE_PRESETS["bimonthly_6am"],
-        "kwargs": {"days": 365},
-    },
-}
+
+def get_celery_beat_schedule():
+    base_schedule = {
+        "monitor-system-health": {
+            "task": "core.tasks.monitor_system_health",
+            "schedule": SCHEDULE_PRESETS["every_30_min"],
+        },
+        "scheduled-database-backup": {
+            "task": "core.tasks.scheduled_database_backup",
+            "schedule": SCHEDULE_PRESETS["daily_3am"],
+        },
+        "cleanup-old-backups": {
+            "task": "core.tasks.cleanup_old_backups",
+            "schedule": SCHEDULE_PRESETS["weekly_sunday_5am"],
+            "kwargs": {"days": 30, "backup_dir": "backups"},
+        },
+        "clear-duplicate-history": {
+            "task": "core.tasks.clear_duplicate_history_task",
+            "schedule": SCHEDULE_PRESETS["daily_5am"],
+            "kwargs": {"excluded_fields": [], "minutes": None},
+        },
+        "clear-old-history": {
+            "task": "core.tasks.clear_old_history_task",
+            "schedule": SCHEDULE_PRESETS["weekly_sunday_3am"],
+            "kwargs": {"days": 365},
+        },
+        "clear-expired-sessions": {
+            "task": "core.tasks.clear_expired_sessions_task",
+            "schedule": SCHEDULE_PRESETS["weekly_monday_4am"],
+        },
+        "send-inactive-user-notifications": {
+            "task": "core.tasks.send_inactive_user_notifications",
+            "schedule": SCHEDULE_PRESETS["monthly_first_6am"],
+        },
+        "clear-all-cache": {
+            "task": "core.tasks.clear_all_cache_task",
+            "schedule": SCHEDULE_PRESETS["monthly_first_4am"],
+        },
+        "clear-carts-for-none-users": {
+            "task": "core.tasks.clear_carts_for_none_users_task",
+            "schedule": SCHEDULE_PRESETS["bimonthly_4am"],
+        },
+        "clear-expired-notifications": {
+            "task": "core.tasks.clear_expired_notifications_task",
+            "schedule": SCHEDULE_PRESETS["bimonthly_6am"],
+            "kwargs": {"days": 365},
+        },
+    }
+
+    if path.exists("/.dockerenv") and not getenv("KUBERNETES_SERVICE_HOST"):
+        base_schedule.update(
+            {
+                "clear-development-logs": {
+                    "task": "core.tasks.clear_development_log_files_task",
+                    "schedule": SCHEDULE_PRESETS["daily_4am"],
+                    "kwargs": {"days": 7},
+                },
+            }
+        )
+
+    return base_schedule
+
+
+CELERY_BEAT_SCHEDULE = get_celery_beat_schedule()
 
 CHANNEL_LAYERS = {
     "default": {
@@ -1272,67 +1285,131 @@ RELATED_POSTS_STRATEGIES = [
 RELATED_POSTS_LIMIT = 8
 
 # Logging
-timestamp = datetime.datetime.now(tz=datetime.UTC).strftime("%d-%m-%Y")
-log_dir = path.join(BASE_DIR, "logs")
-makedirs(log_dir, exist_ok=True)
-
-django_log_file_path = path.join(log_dir, f"django_logs_{timestamp}.log")
+IS_KUBERNETES = getenv("KUBERNETES_SERVICE_HOST") is not None
+IS_DOCKER = path.exists("/.dockerenv")
+IS_DEVELOPMENT = DEBUG or SYSTEM_ENV == "dev"
 
 logging_level = getenv("LOGGING_LEVEL", "INFO")
-backup_count = int(getenv("LOG_BACKUP_COUNT", "30"))
 
-LOGGING = {
-    "version": 1,
-    "formatters": {
-        "standard": {
-            "format": "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s",
-            "datefmt": "%d/%b/%Y %H:%M:%S",
+if IS_KUBERNETES:
+    LOGGING = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "json": {
+                "format": '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "module": "%(module)s", "function": "%(funcName)s", "line": %(lineno)d, "process": "%(process)d", "thread": "%(thread)d", "pod": "%(hostname)s", "message": "%(message)s"}',
+                "datefmt": "%Y-%m-%dT%H:%M:%S",
+            },
+            "console": {
+                "format": "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(funcName)s: %(message)s",
+                "datefmt": "%Y-%m-%d %H:%M:%S",
+            },
         },
-        "verbose": {
-            "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
-            "style": "{",
+        "filters": {
+            "add_hostname": {
+                "()": "core.logging.HostnameFilter",
+            },
         },
-        "simple": {
-            "format": "[%(asctime)s] %(levelname)s | %(funcName)s | %(name)s | %(message)s",
-            "datefmt": "%Y-%m-%d %H:%M:%S",
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "formatter": "json"
+                if SYSTEM_ENV == "production"
+                else "console",
+                "level": logging_level,
+                "filters": ["add_hostname"],
+            },
         },
-        "json": {
-            "format": '{"timestamp": "%(asctime)s", "level": "%(levelname)s",'
-            ' "module": "%(module)s", "message": "%(message)s"}',
-            "datefmt": "%Y-%m-%dT%H:%M:%S",
-        },
-    },
-    "filters": {
-        "require_debug_true": {
-            "()": "django.utils.log.RequireDebugTrue",
-        },
-        "require_debug_false": {
-            "()": "django.utils.log.RequireDebugFalse",
-        },
-    },
-    "handlers": {
-        "file": {
-            "class": "logging.handlers.TimedRotatingFileHandler",
-            "filename": django_log_file_path,
-            "when": "midnight",
-            "interval": 1,
-            "backupCount": backup_count,
+        "root": {
+            "handlers": ["console"],
             "level": logging_level,
-            "formatter": "verbose",
         },
-        "console": {
-            "class": "logging.StreamHandler",
-            "formatter": "verbose",
+        "loggers": {
+            "django": {
+                "level": "WARNING",
+                "propagate": True,
+            },
+            "celery": {
+                "level": logging_level,
+                "propagate": True,
+            },
         },
-    },
-    "loggers": {
-        "django": {
-            "handlers": ["console", "file"],
+    }
+
+elif IS_DOCKER or IS_DEVELOPMENT:
+    log_dir = path.join(BASE_DIR, "logs")
+    makedirs(log_dir, exist_ok=True)
+
+    container_id = getenv("HOSTNAME", "dev")[:12]
+    app_log_file = path.join(log_dir, f"grooveshop_{container_id}.log")
+
+    backup_count = int(getenv("LOG_BACKUP_COUNT", "30"))
+
+    LOGGING = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "verbose": {
+                "format": "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(funcName)s: %(message)s",
+                "datefmt": "%Y-%m-%d %H:%M:%S",
+            },
+            "simple": {
+                "format": "[%(asctime)s] %(levelname)s %(name)s: %(message)s",
+                "datefmt": "%H:%M:%S",
+            },
+        },
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "formatter": "simple",
+                "level": "INFO",
+            },
+            "app_file": {
+                "class": "logging.handlers.RotatingFileHandler",
+                "filename": app_log_file,
+                "maxBytes": 10 * 1024 * 1024,
+                "backupCount": backup_count,
+                "level": logging_level,
+                "formatter": "verbose",
+            },
+        },
+        "root": {
+            "handlers": ["console", "app_file"],
             "level": logging_level,
-            "propagate": True,
         },
-    },
-}
+        "loggers": {
+            "django": {
+                "level": "WARNING",
+                "propagate": True,
+            },
+            "celery": {
+                "level": logging_level,
+                "propagate": True,
+            },
+        },
+    }
+
+else:
+    LOGGING = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "simple": {
+                "format": "[%(asctime)s] %(levelname)s %(name)s: %(message)s",
+                "datefmt": "%Y-%m-%d %H:%M:%S",
+            },
+        },
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "formatter": "simple",
+            },
+        },
+        "root": {
+            "handlers": ["console"],
+            "level": "INFO",
+        },
+    }
 
 # PAYMENT SETTINGS
 STRIPE_API_KEY = "sk_test_example"

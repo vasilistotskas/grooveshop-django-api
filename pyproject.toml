@@ -58,6 +58,7 @@ dependencies = [
   "celery[redis] >=5.5.3,<6.0.0",
   "disposable-email-domains==0.0.137",
   "django-stubs-ext==5.2.5",
+  "twisted[http2,tls]==25.5.0",
 ]
 
 [project.urls]

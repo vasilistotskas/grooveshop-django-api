@@ -13,6 +13,8 @@ from core.utils.serializers import (
     MultiSerializerMixin,
     TranslatedFieldExtended,
     create_schema_view_config,
+    RequestSerializersConfig,
+    ResponseSerializersConfig,
 )
 
 
@@ -242,16 +244,27 @@ class TestMultiSerializerMixin(TestCase):
 
 class TestCreateSchemaViewConfig(TestCase):
     def test_basic_config_generation(self):
+        req_serializers: RequestSerializersConfig = {
+            "create": DummyTestWriteSerializer,
+            "update": DummyTestWriteSerializer,
+            "partial_update": DummyTestWriteSerializer,
+        }
+
+        res_serializers: ResponseSerializersConfig = {
+            "create": DummyTestDetailSerializer,
+            "list": DummyTestSerializer,
+            "retrieve": DummyTestDetailSerializer,
+            "update": DummyTestDetailSerializer,
+            "partial_update": DummyTestDetailSerializer,
+        }
+
         config = create_schema_view_config(
             model_class=MockSerializerModel,
             display_config={
                 "tag": "Test Models",
             },
-            serializers={
-                "list_serializer": DummyTestSerializer,
-                "detail_serializer": DummyTestDetailSerializer,
-                "write_serializer": DummyTestWriteSerializer,
-            },
+            request_serializers=req_serializers,
+            response_serializers=res_serializers,
         )
 
         assert "list" in config
@@ -266,16 +279,27 @@ class TestCreateSchemaViewConfig(TestCase):
             assert hasattr(decorator, "__name__")
 
     def test_config_with_error_serializer(self):
+        req_serializers: RequestSerializersConfig = {
+            "create": DummyTestWriteSerializer,
+            "update": DummyTestWriteSerializer,
+            "partial_update": DummyTestWriteSerializer,
+        }
+
+        res_serializers: ResponseSerializersConfig = {
+            "create": DummyTestDetailSerializer,
+            "list": DummyTestSerializer,
+            "retrieve": DummyTestDetailSerializer,
+            "update": DummyTestDetailSerializer,
+            "partial_update": DummyTestDetailSerializer,
+        }
+
         config = create_schema_view_config(
             model_class=MockSerializerModel,
             display_config={
                 "tag": "Test Models",
             },
-            serializers={
-                "list_serializer": DummyTestSerializer,
-                "detail_serializer": DummyTestDetailSerializer,
-                "write_serializer": DummyTestWriteSerializer,
-            },
+            request_serializers=req_serializers,
+            response_serializers=res_serializers,
             error_serializer=DummyTestSerializer,
         )
 
@@ -297,16 +321,27 @@ class TestCreateSchemaViewConfig(TestCase):
             "create": {409: DummyTestSerializer},
         }
 
+        req_serializers: RequestSerializersConfig = {
+            "create": DummyTestWriteSerializer,
+            "update": DummyTestWriteSerializer,
+            "partial_update": DummyTestWriteSerializer,
+        }
+
+        res_serializers: ResponseSerializersConfig = {
+            "create": DummyTestDetailSerializer,
+            "list": DummyTestSerializer,
+            "retrieve": DummyTestDetailSerializer,
+            "update": DummyTestDetailSerializer,
+            "partial_update": DummyTestDetailSerializer,
+        }
+
         config = create_schema_view_config(
             model_class=MockSerializerModel,
             display_config={
                 "tag": "Test Models",
             },
-            serializers={
-                "list_serializer": DummyTestSerializer,
-                "detail_serializer": DummyTestDetailSerializer,
-                "write_serializer": DummyTestWriteSerializer,
-            },
+            request_serializers=req_serializers,
+            response_serializers=res_serializers,
             additional_responses=additional_responses,
         )
 
@@ -323,16 +358,27 @@ class TestCreateSchemaViewConfig(TestCase):
             assert callable(config[operation])
 
     def test_config_request_response_serializers(self):
+        req_serializers: RequestSerializersConfig = {
+            "create": DummyTestWriteSerializer,
+            "update": DummyTestWriteSerializer,
+            "partial_update": DummyTestWriteSerializer,
+        }
+
+        res_serializers: ResponseSerializersConfig = {
+            "create": DummyTestDetailSerializer,
+            "list": DummyTestSerializer,
+            "retrieve": DummyTestDetailSerializer,
+            "update": DummyTestDetailSerializer,
+            "partial_update": DummyTestDetailSerializer,
+        }
+
         config = create_schema_view_config(
             model_class=MockSerializerModel,
             display_config={
                 "tag": "Test Models",
             },
-            serializers={
-                "list_serializer": DummyTestSerializer,
-                "detail_serializer": DummyTestDetailSerializer,
-                "write_serializer": DummyTestWriteSerializer,
-            },
+            request_serializers=req_serializers,
+            response_serializers=res_serializers,
         )
 
         crud_operations = [
@@ -348,16 +394,27 @@ class TestCreateSchemaViewConfig(TestCase):
             assert callable(config[operation])
 
     def test_config_function_returns_decorator(self):
+        req_serializers: RequestSerializersConfig = {
+            "create": DummyTestWriteSerializer,
+            "update": DummyTestWriteSerializer,
+            "partial_update": DummyTestWriteSerializer,
+        }
+
+        res_serializers: ResponseSerializersConfig = {
+            "create": DummyTestDetailSerializer,
+            "list": DummyTestSerializer,
+            "retrieve": DummyTestDetailSerializer,
+            "update": DummyTestDetailSerializer,
+            "partial_update": DummyTestDetailSerializer,
+        }
+
         config = create_schema_view_config(
             model_class=MockSerializerModel,
             display_config={
                 "tag": "Test Models",
             },
-            serializers={
-                "list_serializer": DummyTestSerializer,
-                "detail_serializer": DummyTestDetailSerializer,
-                "write_serializer": DummyTestWriteSerializer,
-            },
+            request_serializers=req_serializers,
+            response_serializers=res_serializers,
         )
 
         @config["list"]

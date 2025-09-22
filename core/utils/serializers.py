@@ -48,9 +48,25 @@ class DisplayConfig(TypedDict):
     display_name_plural: NotRequired[str]
 
 
+class RequestSerializersConfig(TypedDict):
+    create: NotRequired[type[serializers.Serializer]]
+    update: NotRequired[type[serializers.Serializer]]
+    partial_update: NotRequired[type[serializers.Serializer]]
+
+
+class ResponseSerializersConfig(TypedDict):
+    create: NotRequired[type[serializers.Serializer]]
+    list: NotRequired[type[serializers.Serializer]]
+    retrieve: NotRequired[type[serializers.Serializer]]
+    update: NotRequired[type[serializers.Serializer]]
+    partial_update: NotRequired[type[serializers.Serializer]]
+    destroy: NotRequired[type[serializers.Serializer]]
+
+
 def create_schema_view_config(
     model_class: type[models.Model],
-    serializers: dict | None = None,
+    request_serializers: RequestSerializersConfig | None = None,
+    response_serializers: ResponseSerializersConfig | None = None,
     error_serializer=None,
     additional_responses=None,
     display_config: DisplayConfig | Mapping[str, Any] | None = None,
@@ -62,7 +78,8 @@ def create_schema_view_config(
 
     Args:
         model_class: The Django model class
-        serializers: Dict with keys: list_serializer, detail_serializer, write_serializer
+        request_serializers: Dict with keys: create, update, partial_update
+        response_serializers: Dict with keys: create, list, retrieve, update, partial_update, destroy
         error_serializer: Serializer for error responses
         additional_responses: Dict with additional responses per action
         display_config: DisplayConfig or dict with optional keys:
@@ -77,8 +94,10 @@ def create_schema_view_config(
         gettext_lazy for verbose_name/verbose_name_plural, all generated
         summaries and descriptions will be properly translated.
     """
-    if serializers is None:
-        serializers = {}
+    if request_serializers is None:
+        request_serializers = {}
+    if response_serializers is None:
+        response_serializers = {}
     if additional_responses is None:
         additional_responses = {}
     if display_config is None:
@@ -108,10 +127,6 @@ def create_schema_view_config(
             tag = model_class._meta.verbose_name_plural
         else:
             tag = camel_to_words(model_name)
-
-    list_serializer = serializers.get("list_serializer")
-    detail_serializer = serializers.get("detail_serializer")
-    write_serializer = serializers.get("write_serializer")
 
     base_error_responses = (
         {
@@ -186,6 +201,21 @@ def create_schema_view_config(
         list_parameters.append(language_parameter)
     list_parameters.extend(pagination_parameters)
 
+    create_request_serializer = request_serializers.get("create")
+    update_request_serializer = request_serializers.get("update")
+    partial_update_request_serializer = request_serializers.get(
+        "partial_update"
+    )
+
+    create_response_serializer = response_serializers.get("create")
+    list_response_serializer = response_serializers.get("list")
+    retrieve_response_serializer = response_serializers.get("retrieve")
+    update_response_serializer = response_serializers.get("update")
+    partial_update_response_serializer = response_serializers.get(
+        "partial_update"
+    )
+    destroy_response_serializer = response_serializers.get("destroy")
+
     config = {
         "list": extend_schema(
             operation_id=f"list{model_name}",
@@ -198,7 +228,9 @@ def create_schema_view_config(
             tags=[tag],
             parameters=list_parameters,
             responses={
-                200: list_serializer(many=True) if list_serializer else None,
+                200: list_response_serializer(many=True)
+                if list_response_serializer
+                else None,
                 **base_error_responses,
                 **additional_responses.get("list", {}),
             },
@@ -210,9 +242,9 @@ def create_schema_view_config(
             % {"name": display_name},
             tags=[tag],
             parameters=[language_parameter] if language_parameter else None,
-            request=write_serializer,
+            request=create_request_serializer,
             responses={
-                201: detail_serializer,
+                201: create_response_serializer,
                 **base_error_responses,
                 **additional_responses.get("create", {}),
             },
@@ -225,7 +257,7 @@ def create_schema_view_config(
             tags=[tag],
             parameters=[language_parameter] if language_parameter else None,
             responses={
-                200: detail_serializer,
+                200: retrieve_response_serializer,
                 **{k: v for k, v in base_error_responses.items() if k != 400},
                 **additional_responses.get("retrieve", {}),
             },
@@ -239,9 +271,9 @@ def create_schema_view_config(
             % {"name": display_name},
             tags=[tag],
             parameters=[language_parameter] if language_parameter else None,
-            request=write_serializer,
+            request=update_request_serializer,
             responses={
-                200: detail_serializer,
+                200: update_response_serializer,
                 **base_error_responses,
                 **additional_responses.get("update", {}),
             },
@@ -255,9 +287,9 @@ def create_schema_view_config(
             % {"name": display_name},
             tags=[tag],
             parameters=[language_parameter] if language_parameter else None,
-            request=write_serializer,
+            request=partial_update_request_serializer,
             responses={
-                200: detail_serializer,
+                200: partial_update_response_serializer,
                 **base_error_responses,
                 **additional_responses.get("partial_update", {}),
             },
@@ -269,7 +301,7 @@ def create_schema_view_config(
             % {"name": display_name},
             tags=[tag],
             responses={
-                204: None,
+                204: destroy_response_serializer,
                 **{
                     k: v
                     for k, v in base_error_responses.items()

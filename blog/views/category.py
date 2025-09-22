@@ -27,8 +27,25 @@ from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
+    RequestSerializersConfig,
+    ResponseSerializersConfig,
 )
 from core.utils.views import cache_methods
+
+
+req_serializers: RequestSerializersConfig = {
+    "create": BlogCategoryWriteSerializer,
+    "update": BlogCategoryWriteSerializer,
+    "partial_update": BlogCategoryWriteSerializer,
+}
+
+res_serializers: ResponseSerializersConfig = {
+    "create": BlogCategoryDetailSerializer,
+    "list": BlogCategorySerializer,
+    "retrieve": BlogCategoryDetailSerializer,
+    "update": BlogCategoryDetailSerializer,
+    "partial_update": BlogCategoryDetailSerializer,
+}
 
 
 @extend_schema_view(
@@ -37,11 +54,8 @@ from core.utils.views import cache_methods
         display_config={
             "tag": "Blog Categories",
         },
-        serializers={
-            "list_serializer": BlogCategorySerializer,
-            "detail_serializer": BlogCategoryDetailSerializer,
-            "write_serializer": BlogCategoryWriteSerializer,
-        },
+        request_serializers=req_serializers,
+        response_serializers=res_serializers,
     ),
     posts=extend_schema(
         operation_id="listBlogCategoryPosts",

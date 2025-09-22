@@ -7,7 +7,7 @@ from django.conf import settings
 from django.test import TestCase
 
 from core import celery
-from core.tasks import clear_log_files_task
+from core.tasks import clear_development_log_files_task
 
 
 class CeleryConfigTestCase(TestCase):
@@ -35,7 +35,7 @@ class CleanupLogFilesTaskTest(TestCase):
         self.logs_path = path.join(settings.BASE_DIR, "logs")
         makedirs(self.logs_path, exist_ok=True)
 
-        self.old_file = path.join(self.logs_path, "logs_01-01-2000.log")
+        self.old_file = path.join(self.logs_path, "logs_01-01-2000.log.1")
         self.new_file = path.join(self.logs_path, "logs_01-01-3000.log")
 
         with open(self.old_file, "w") as f:
@@ -56,14 +56,50 @@ class CleanupLogFilesTaskTest(TestCase):
             remove(self.new_file)
         super().tearDown()
 
-    def test_cleanup_log_files_task(self):
-        clear_log_files_task(self.days)
+    @patch("core.tasks.os.getenv")
+    @patch("core.tasks.os.path.exists")
+    def test_cleanup_log_files_task(self, mock_exists, mock_getenv):
+        mock_getenv.side_effect = lambda key, default=None: {
+            "KUBERNETES_SERVICE_HOST": None,
+        }.get(key, default)
+
+        def mock_exists_side_effect(path):
+            if path == "/.dockerenv":
+                return True
+            elif str(path).endswith("logs"):
+                return True
+            else:
+                import pathlib
+
+                return pathlib.Path(path).exists()
+
+        mock_exists.side_effect = mock_exists_side_effect
+
+        clear_development_log_files_task(self.days)
 
         self.assertFalse(path.exists(self.old_file))
         self.assertTrue(path.exists(self.new_file))
 
-    def test_does_not_remove_recent_logs(self):
-        recent_file = path.join(self.logs_path, "logs_01-01-2021.log")
+    @patch("core.tasks.os.getenv")
+    @patch("core.tasks.os.path.exists")
+    def test_does_not_remove_recent_logs(self, mock_exists, mock_getenv):
+        mock_getenv.side_effect = lambda key, default=None: {
+            "KUBERNETES_SERVICE_HOST": None,
+        }.get(key, default)
+
+        def mock_exists_side_effect(path):
+            if path == "/.dockerenv":
+                return True
+            elif str(path).endswith("logs"):
+                return True
+            else:
+                import pathlib
+
+                return pathlib.Path(path).exists()
+
+        mock_exists.side_effect = mock_exists_side_effect
+
+        recent_file = path.join(self.logs_path, "logs_01-01-2021.log.1")
         with open(recent_file, "w") as f:
             f.write("Recent file")
 
@@ -73,9 +109,40 @@ class CleanupLogFilesTaskTest(TestCase):
         ).timestamp()
         os.utime(recent_file, (recent_time, recent_time))
 
-        clear_log_files_task(self.days)
+        clear_development_log_files_task(self.days)
 
         self.assertTrue(path.exists(recent_file))
 
         if path.exists(recent_file):
             remove(recent_file)
+
+    @patch("core.tasks.os.getenv")
+    @patch("core.tasks.os.path.exists")
+    def test_skips_in_kubernetes_environment(self, mock_exists, mock_getenv):
+        mock_getenv.side_effect = lambda key, default=None: {
+            "KUBERNETES_SERVICE_HOST": "10.0.0.1",
+        }.get(key, default)
+
+        result = clear_development_log_files_task(self.days)
+
+        self.assertEqual(result["status"], "skipped")
+        self.assertEqual(result["reason"], "kubernetes environment detected")
+
+    @patch("core.tasks.os.getenv")
+    @patch("core.tasks.os.path.exists")
+    def test_skips_outside_docker_environment(self, mock_exists, mock_getenv):
+        mock_getenv.side_effect = lambda key, default=None: {
+            "KUBERNETES_SERVICE_HOST": None,
+        }.get(key, default)
+
+        def mock_exists_side_effect(path):
+            if path == "/.dockerenv":
+                return False
+            return os.path.exists(path)
+
+        mock_exists.side_effect = mock_exists_side_effect
+
+        result = clear_development_log_files_task(self.days)
+
+        self.assertEqual(result["status"], "skipped")
+        self.assertEqual(result["reason"], "not in docker environment")

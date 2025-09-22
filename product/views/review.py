@@ -13,6 +13,8 @@ from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
+    RequestSerializersConfig,
+    ResponseSerializersConfig,
 )
 from product.enum.review import ReviewStatus
 from product.filters.review import ProductReviewFilter
@@ -24,6 +26,20 @@ from product.serializers.review import (
     ProductReviewWriteSerializer,
 )
 
+req_serializers: RequestSerializersConfig = {
+    "create": ProductReviewWriteSerializer,
+    "update": ProductReviewWriteSerializer,
+    "partial_update": ProductReviewWriteSerializer,
+}
+
+res_serializers: ResponseSerializersConfig = {
+    "create": ProductReviewDetailSerializer,
+    "list": ProductReviewSerializer,
+    "retrieve": ProductReviewDetailSerializer,
+    "update": ProductReviewDetailSerializer,
+    "partial_update": ProductReviewDetailSerializer,
+}
+
 
 @extend_schema_view(
     **create_schema_view_config(
@@ -31,11 +47,8 @@ from product.serializers.review import (
         display_config={
             "tag": "Product Reviews",
         },
-        serializers={
-            "list_serializer": ProductReviewSerializer,
-            "detail_serializer": ProductReviewDetailSerializer,
-            "write_serializer": ProductReviewWriteSerializer,
-        },
+        request_serializers=req_serializers,
+        response_serializers=res_serializers,
         error_serializer=ErrorResponseSerializer,
     )
 )

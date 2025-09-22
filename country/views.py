@@ -9,6 +9,8 @@ from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
+    RequestSerializersConfig,
+    ResponseSerializersConfig,
 )
 from core.utils.views import cache_methods
 from country.filters import CountryFilter
@@ -19,6 +21,20 @@ from country.serializers import (
     CountryWriteSerializer,
 )
 
+req_serializers: RequestSerializersConfig = {
+    "create": CountryWriteSerializer,
+    "update": CountryWriteSerializer,
+    "partial_update": CountryWriteSerializer,
+}
+
+res_serializers: ResponseSerializersConfig = {
+    "create": CountryDetailSerializer,
+    "list": CountrySerializer,
+    "retrieve": CountryDetailSerializer,
+    "update": CountryDetailSerializer,
+    "partial_update": CountryDetailSerializer,
+}
+
 
 @extend_schema_view(
     **create_schema_view_config(
@@ -26,11 +42,8 @@ from country.serializers import (
         display_config={
             "tag": "Countries",
         },
-        serializers={
-            "list_serializer": CountrySerializer,
-            "detail_serializer": CountryDetailSerializer,
-            "write_serializer": CountryWriteSerializer,
-        },
+        request_serializers=req_serializers,
+        response_serializers=res_serializers,
     )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])

@@ -223,6 +223,10 @@ class BaseModelViewSet(TranslationsModelViewSet, PaginationModelViewSet):
         )
         return Response(response_serializer.data)
 
+    def partial_update(self, request, *args, **kwargs):
+        kwargs["partial"] = True
+        return self.update(request, *args, **kwargs)
+
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
         response_serializer_class = self.get_response_serializer_class()

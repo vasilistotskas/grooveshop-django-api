@@ -9,6 +9,8 @@ from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
+    RequestSerializersConfig,
+    ResponseSerializersConfig,
 )
 from core.utils.views import cache_methods
 from product.models.image import ProductImage
@@ -18,6 +20,20 @@ from product.serializers.image import (
     ProductImageWriteSerializer,
 )
 
+req_serializers: RequestSerializersConfig = {
+    "create": ProductImageWriteSerializer,
+    "update": ProductImageWriteSerializer,
+    "partial_update": ProductImageWriteSerializer,
+}
+
+res_serializers: ResponseSerializersConfig = {
+    "create": ProductImageDetailSerializer,
+    "list": ProductImageSerializer,
+    "retrieve": ProductImageDetailSerializer,
+    "update": ProductImageDetailSerializer,
+    "partial_update": ProductImageDetailSerializer,
+}
+
 
 @extend_schema_view(
     **create_schema_view_config(
@@ -25,11 +41,8 @@ from product.serializers.image import (
         display_config={
             "tag": "Product Images",
         },
-        serializers={
-            "list_serializer": ProductImageSerializer,
-            "detail_serializer": ProductImageDetailSerializer,
-            "write_serializer": ProductImageWriteSerializer,
-        },
+        request_serializers=req_serializers,
+        response_serializers=res_serializers,
     )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])

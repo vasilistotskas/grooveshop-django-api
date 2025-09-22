@@ -22,7 +22,7 @@ from core.tasks import (
     clear_duplicate_history_task,
     clear_expired_notifications_task,
     clear_expired_sessions_task,
-    clear_log_files_task,
+    clear_development_log_files_task,
     clear_old_history_task,
     monitor_system_health,
     scheduled_database_backup,
@@ -321,8 +321,9 @@ class TestClearLogFilesTask(TestCase):
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     @override_settings(BASE_DIR=Path(__file__).parent)
-    @patch("core.tasks.os.path.join")
+    @patch("core.tasks.os.getenv")
     @patch("core.tasks.os.path.exists")
+    @patch("core.tasks.os.path.join")
     @patch("core.tasks.os.listdir")
     @patch("core.tasks.os.path.isfile")
     @patch("core.tasks.os.path.getmtime")
@@ -337,14 +338,27 @@ class TestClearLogFilesTask(TestCase):
         mock_getmtime,
         mock_isfile,
         mock_listdir,
-        mock_exists,
         mock_join,
+        mock_exists,
+        mock_getenv,
     ):
+        mock_getenv.side_effect = lambda key, default=None: {
+            "KUBERNETES_SERVICE_HOST": None,
+        }.get(key, default)
+
+        def mock_exists_side_effect(path):
+            if path == "/.dockerenv":
+                return True
+            elif path == self.logs_path:
+                return True
+            return False
+
+        mock_exists.side_effect = mock_exists_side_effect
         mock_join.return_value = self.logs_path
-        mock_exists.return_value = True
         mock_listdir.return_value = [
-            "old_log.log",
-            "recent_log.log",
+            "old_log.log.1",
+            "recent_log.log.2",
+            "current_log.log",
             "not_a_file",
         ]
 
@@ -355,55 +369,112 @@ class TestClearLogFilesTask(TestCase):
             return "not_a_file" not in path
 
         def mock_getmtime_side_effect(path):
-            if "old_log.log" in path:
+            if "old_log.log.1" in path:
                 return old_time
             return recent_time
 
         def mock_getsize_side_effect(path):
-            return 1024 if "old_log.log" in path else 512
+            return 1024 if "old_log.log.1" in path else 512
 
         mock_isfile.side_effect = mock_isfile_side_effect
         mock_getmtime.side_effect = mock_getmtime_side_effect
         mock_getsize.side_effect = mock_getsize_side_effect
 
-        result = clear_log_files_task(days=30)
+        result = clear_development_log_files_task(days=30)
 
         self.assertEqual(result["status"], "success")
-        self.assertIn("status", result)
         self.assertIn("deleted_count", result)
-        mock_isfile.assert_called()
         mock_getmtime.assert_called()
 
     @override_settings(BASE_DIR=Path(__file__).parent)
-    @patch("core.tasks.os.path.join")
+    @patch("core.tasks.os.getenv")
     @patch("core.tasks.os.path.exists")
+    @patch("core.tasks.os.path.join")
     @patch("core.tasks.logger")
     def test_clear_log_files_no_logs_directory(
-        self, mock_logger, mock_exists, mock_join
+        self, mock_logger, mock_join, mock_exists, mock_getenv
     ):
-        mock_join.return_value = "/nonexistent/logs"
-        mock_exists.return_value = False
+        mock_getenv.side_effect = lambda key, default=None: {
+            "KUBERNETES_SERVICE_HOST": None,
+        }.get(key, default)
 
-        result = clear_log_files_task()
+        def mock_exists_side_effect(path):
+            if path == "/.dockerenv":
+                return True
+            elif path == "/nonexistent/logs":
+                return False
+            return False
+
+        mock_exists.side_effect = mock_exists_side_effect
+        mock_join.return_value = "/nonexistent/logs"
+
+        result = clear_development_log_files_task()
 
         self.assertEqual(result["status"], "skipped")
         self.assertEqual(result["reason"], "logs directory not found")
         mock_logger.warning.assert_called()
 
-    @override_settings(BASE_DIR=Path(__file__).parent)
-    @patch("core.tasks.os.path.join")
+    @patch("core.tasks.os.getenv")
     @patch("core.tasks.os.path.exists")
+    def test_clear_log_files_kubernetes_environment(
+        self, mock_exists, mock_getenv
+    ):
+        mock_getenv.side_effect = lambda key, default=None: {
+            "KUBERNETES_SERVICE_HOST": "10.0.0.1",
+        }.get(key, default)
+
+        result = clear_development_log_files_task()
+
+        self.assertEqual(result["status"], "skipped")
+        self.assertEqual(result["reason"], "kubernetes environment detected")
+
+    @patch("core.tasks.os.getenv")
+    @patch("core.tasks.os.path.exists")
+    def test_clear_log_files_non_docker_environment(
+        self, mock_exists, mock_getenv
+    ):
+        mock_getenv.side_effect = lambda key, default=None: {
+            "KUBERNETES_SERVICE_HOST": None,
+        }.get(key, default)
+
+        def mock_exists_side_effect(path):
+            if path == "/.dockerenv":
+                return False
+            return False
+
+        mock_exists.side_effect = mock_exists_side_effect
+
+        result = clear_development_log_files_task()
+
+        self.assertEqual(result["status"], "skipped")
+        self.assertEqual(result["reason"], "not in docker environment")
+
+    @override_settings(BASE_DIR=Path(__file__).parent)
+    @patch("core.tasks.os.getenv")
+    @patch("core.tasks.os.path.exists")
+    @patch("core.tasks.os.path.join")
     @patch("core.tasks.os.listdir")
     @patch("core.tasks.logger")
     def test_clear_log_files_os_error(
-        self, mock_logger, mock_listdir, mock_exists, mock_join
+        self, mock_logger, mock_listdir, mock_join, mock_exists, mock_getenv
     ):
+        mock_getenv.side_effect = lambda key, default=None: {
+            "KUBERNETES_SERVICE_HOST": None,
+        }.get(key, default)
+
+        def mock_exists_side_effect(path):
+            if path == "/.dockerenv":
+                return True
+            elif path == self.logs_path:
+                return True
+            return False
+
+        mock_exists.side_effect = mock_exists_side_effect
         mock_join.return_value = self.logs_path
-        mock_exists.return_value = True
         mock_listdir.side_effect = OSError("Permission denied")
 
         with self.assertRaises(OSError):
-            clear_log_files_task()
+            clear_development_log_files_task()
 
         mock_logger.exception.assert_called()
 

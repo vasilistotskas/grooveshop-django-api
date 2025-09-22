@@ -16,6 +16,8 @@ from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
+    RequestSerializersConfig,
+    ResponseSerializersConfig,
 )
 from core.utils.views import cache_methods
 from product.models.category_image import ProductCategoryImage
@@ -30,16 +32,27 @@ from product.serializers.category_image import (
 if TYPE_CHECKING:
     from django.db.models import QuerySet
 
+req_serializers: RequestSerializersConfig = {
+    "create": ProductCategoryImageWriteSerializer,
+    "update": ProductCategoryImageWriteSerializer,
+    "partial_update": ProductCategoryImageWriteSerializer,
+}
+
+res_serializers: ResponseSerializersConfig = {
+    "create": ProductCategoryImageDetailSerializer,
+    "list": ProductCategoryImageSerializer,
+    "retrieve": ProductCategoryImageDetailSerializer,
+    "update": ProductCategoryImageDetailSerializer,
+    "partial_update": ProductCategoryImageDetailSerializer,
+}
+
 schema_config = create_schema_view_config(
     model_class=ProductCategoryImage,
     display_config={
         "tag": "Product Category Images",
     },
-    serializers={
-        "list_serializer": ProductCategoryImageSerializer,
-        "detail_serializer": ProductCategoryImageDetailSerializer,
-        "write_serializer": ProductCategoryImageWriteSerializer,
-    },
+    request_serializers=req_serializers,
+    response_serializers=res_serializers,
 )
 
 

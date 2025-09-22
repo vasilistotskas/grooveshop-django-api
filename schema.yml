@@ -7226,16 +7226,6 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
-      - in: query
-        name: language
-        schema:
-          type: string
-          enum:
-          - de
-          - el
-          - en
-          default: el
-        description: Language code for translations (el, en, de)
       tags:
       - Cart Items
       requestBody:
@@ -14537,7 +14527,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProductFavouriteDetail'
+                $ref: '#/components/schemas/ProductFavouriteWrite'
           description: ''
   /api/v1/product/favourite/{id}:
     get:
@@ -14616,7 +14606,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProductFavouriteDetail'
+                $ref: '#/components/schemas/ProductFavouriteWrite'
           description: ''
     patch:
       operationId: partialUpdateProductFavourite
@@ -14660,7 +14650,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProductFavouriteDetail'
+                $ref: '#/components/schemas/ProductFavouriteWrite'
           description: ''
     delete:
       operationId: destroyProductFavourite
@@ -14735,7 +14725,28 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/ProductFavourite'
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    userId:
+                      type: integer
+                    productId:
+                      type: integer
+                    createdAt:
+                      type: string
+                      format: date-time
+                  required:
+                  - id
+                  - userId
+                  - productId
+                  - createdAt
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
           description: ''
   /api/v1/product/image:
     get:
@@ -27595,23 +27606,8 @@ components:
           type: string
           readOnly: true
         product:
-          type: integer
-        productName:
-          type: string
-          nullable: true
-          readOnly: true
-        productPrice:
-          type: number
-          format: double
-          maximum: 100000000
-          minimum: -100000000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
-          nullable: true
-          readOnly: true
-        productSlug:
-          type: string
-          nullable: true
+          allOf:
+          - $ref: '#/components/schemas/ProductDetail'
           readOnly: true
         createdAt:
           type: string
@@ -27625,9 +27621,6 @@ components:
       - createdAt
       - id
       - product
-      - productName
-      - productPrice
-      - productSlug
       - userId
       - userUsername
       - uuid
@@ -27657,23 +27650,6 @@ components:
           allOf:
           - $ref: '#/components/schemas/ProductDetail'
           readOnly: true
-        productName:
-          type: string
-          nullable: true
-          readOnly: true
-        productPrice:
-          type: number
-          format: double
-          maximum: 100000000
-          minimum: -100000000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
-          nullable: true
-          readOnly: true
-        productSlug:
-          type: string
-          nullable: true
-          readOnly: true
         createdAt:
           type: string
           format: date-time
@@ -27693,14 +27669,22 @@ components:
       - createdAt
       - id
       - product
-      - productName
-      - productPrice
-      - productSlug
       - updatedAt
       - user
       - userId
       - userUsername
       - uuid
+    ProductFavouriteWrite:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        product:
+          type: integer
+      required:
+      - id
+      - product
     ProductFavouriteWriteRequest:
       type: object
       properties:

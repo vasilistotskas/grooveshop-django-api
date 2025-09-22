@@ -95,14 +95,20 @@ class ProductFavouriteViewSetTestCase(APITestCase):
                 "user_id",
                 "user_username",
                 "product",
-                "product_name",
-                "product_price",
                 "created_at",
                 "uuid",
             }
             self.assertTrue(
                 expected_fields.issubset(set(favourite_data.keys()))
             )
+
+            if "product" in favourite_data and favourite_data["product"]:
+                product_fields = {"id", "translations", "price"}
+                self.assertTrue(
+                    product_fields.issubset(
+                        set(favourite_data["product"].keys())
+                    )
+                )
 
     def test_retrieve_uses_correct_serializer(self):
         url = self.get_product_favourite_detail_url(self.product_favourite.id)
@@ -234,7 +240,7 @@ class ProductFavouriteViewSetTestCase(APITestCase):
 
         response = self.client.get(url, {"product_id": self.product.id})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        product_ids = [fav["product"] for fav in response.data["results"]]
+        product_ids = [fav["product"]["id"] for fav in response.data["results"]]
         self.assertTrue(all(pid == self.product.id for pid in product_ids))
 
     def test_ordering_functionality(self):

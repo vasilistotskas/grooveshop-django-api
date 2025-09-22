@@ -25,6 +25,8 @@ from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
+    RequestSerializersConfig,
+    ResponseSerializersConfig,
 )
 from notification.filters import NotificationUserFilter
 from notification.serializers.user import NotificationUserSerializer
@@ -48,6 +50,20 @@ from user.utils.subscription import get_user_subscription_summary
 
 User = get_user_model()
 
+req_serializers: RequestSerializersConfig = {
+    "create": AuthenticationSerializer,
+    "update": AuthenticationSerializer,
+    "partial_update": AuthenticationSerializer,
+}
+
+res_serializers: ResponseSerializersConfig = {
+    "create": AuthenticationSerializer,
+    "list": AuthenticationSerializer,
+    "retrieve": AuthenticationSerializer,
+    "update": AuthenticationSerializer,
+    "partial_update": AuthenticationSerializer,
+}
+
 
 @extend_schema_view(
     **create_schema_view_config(
@@ -55,11 +71,8 @@ User = get_user_model()
         display_config={
             "tag": "User Accounts",
         },
-        serializers={
-            "list_serializer": AuthenticationSerializer,
-            "detail_serializer": AuthenticationSerializer,
-            "write_serializer": AuthenticationSerializer,
-        },
+        request_serializers=req_serializers,
+        response_serializers=res_serializers,
         error_serializer=ErrorResponseSerializer,
     ),
     favourite_products=extend_schema(

@@ -18,6 +18,8 @@ from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
+    RequestSerializersConfig,
+    ResponseSerializersConfig,
 )
 from core.utils.views import cache_methods
 from order.enum.status import OrderStatus
@@ -32,17 +34,29 @@ from order.serializers.item import (
 )
 
 
+req_serializers: RequestSerializersConfig = {
+    "create": OrderItemWriteSerializer,
+    "update": OrderItemWriteSerializer,
+    "partial_update": OrderItemWriteSerializer,
+}
+
+res_serializers: ResponseSerializersConfig = {
+    "create": OrderItemDetailSerializer,
+    "list": OrderItemSerializer,
+    "retrieve": OrderItemDetailSerializer,
+    "update": OrderItemDetailSerializer,
+    "partial_update": OrderItemDetailSerializer,
+}
+
+
 @extend_schema_view(
     **create_schema_view_config(
         model_class=OrderItem,
         display_config={
             "tag": "Order Items",
         },
-        serializers={
-            "list_serializer": OrderItemSerializer,
-            "detail_serializer": OrderItemDetailSerializer,
-            "write_serializer": OrderItemWriteSerializer,
-        },
+        request_serializers=req_serializers,
+        response_serializers=res_serializers,
     ),
     refund=extend_schema(
         operation_id="refundOrderItem",

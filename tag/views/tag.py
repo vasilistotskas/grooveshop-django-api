@@ -16,8 +16,24 @@ from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
+    RequestSerializersConfig,
+    ResponseSerializersConfig,
 )
 from core.utils.views import cache_methods
+
+req_serializers: RequestSerializersConfig = {
+    "create": TagWriteSerializer,
+    "update": TagWriteSerializer,
+    "partial_update": TagWriteSerializer,
+}
+
+res_serializers: ResponseSerializersConfig = {
+    "create": TagDetailSerializer,
+    "list": TagSerializer,
+    "retrieve": TagDetailSerializer,
+    "update": TagDetailSerializer,
+    "partial_update": TagDetailSerializer,
+}
 
 
 @extend_schema_view(
@@ -26,17 +42,9 @@ from core.utils.views import cache_methods
         display_config={
             "tag": "Tags",
         },
-        serializers={
-            "list_serializer": TagSerializer,
-            "detail_serializer": TagDetailSerializer,
-            "write_serializer": TagWriteSerializer,
-        },
+        request_serializers=req_serializers,
+        response_serializers=res_serializers,
         error_serializer=ErrorResponseSerializer,
-        additional_responses={
-            "create": {201: TagDetailSerializer},
-            "update": {200: TagDetailSerializer},
-            "partial_update": {200: TagDetailSerializer},
-        },
     )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])

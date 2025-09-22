@@ -295,7 +295,24 @@ def clear_carts_for_none_users_task():
     retry_backoff=True,
 )
 @track_task_metrics
-def clear_log_files_task(days=30):
+def clear_development_log_files_task(days=7):
+    """
+    Clean up log files in development Docker environment only.
+    This task only runs in Docker development, not in Kubernetes.
+    """
+    # Skip if running in Kubernetes
+    if os.getenv("KUBERNETES_SERVICE_HOST"):
+        logger.info("Skipping log cleanup - running in Kubernetes")
+        return {
+            "status": "skipped",
+            "reason": "kubernetes environment detected",
+        }
+
+    # Skip if not in Docker
+    if not os.path.exists("/.dockerenv"):
+        logger.info("Skipping log cleanup - not in Docker environment")
+        return {"status": "skipped", "reason": "not in docker environment"}
+
     logs_path = os.path.join(settings.BASE_DIR, "logs")
 
     if not os.path.exists(logs_path):
@@ -315,6 +332,23 @@ def clear_log_files_task(days=30):
             file_path = os.path.join(logs_path, filename)
 
             if not os.path.isfile(file_path):
+                continue
+
+            # Clean up rotated log files and backup files
+            # This includes files like: django_abc123.log.1, grooveshop_def456.log.2, etc.
+            # But preserves current active log files like: django_abc123.log
+            should_cleanup = (
+                filename.endswith(".log.1")
+                or filename.endswith(".log.2")
+                or filename.endswith(".log.3")
+                or filename.endswith(".log.4")
+                or filename.endswith(".log.5")
+                or "backup" in filename.lower()
+                or filename.endswith(".bak")
+                or filename.endswith(".old")
+            )
+
+            if not should_cleanup:
                 continue
 
             try:
@@ -342,12 +376,13 @@ def clear_log_files_task(days=30):
         logger.exception(f"Error accessing logs directory: {e}")
         raise
 
-    message = f"Deleted {len(deleted_files)} log files older than {days} days"
+    message = f"Deleted {len(deleted_files)} development log files older than {days} days"
     logger.info(
         message,
         extra={
             "deleted_count": len(deleted_files),
             "total_size": sum(f["size"] for f in deleted_files),
+            "environment": "docker_development",
         },
     )
 

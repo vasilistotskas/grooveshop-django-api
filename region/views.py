@@ -14,6 +14,8 @@ from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     MultiSerializerMixin,
     create_schema_view_config,
+    RequestSerializersConfig,
+    ResponseSerializersConfig,
 )
 from core.utils.views import cache_methods
 from region.filters import RegionFilter
@@ -24,6 +26,20 @@ from region.serializers import (
     RegionWriteSerializer,
 )
 
+req_serializers: RequestSerializersConfig = {
+    "create": RegionWriteSerializer,
+    "update": RegionWriteSerializer,
+    "partial_update": RegionWriteSerializer,
+}
+
+res_serializers: ResponseSerializersConfig = {
+    "create": RegionDetailSerializer,
+    "list": RegionSerializer,
+    "retrieve": RegionDetailSerializer,
+    "update": RegionDetailSerializer,
+    "partial_update": RegionDetailSerializer,
+}
+
 
 @extend_schema_view(
     **create_schema_view_config(
@@ -31,11 +47,8 @@ from region.serializers import (
         display_config={
             "tag": "Regions",
         },
-        serializers={
-            "list_serializer": RegionSerializer,
-            "detail_serializer": RegionDetailSerializer,
-            "write_serializer": RegionWriteSerializer,
-        },
+        request_serializers=req_serializers,
+        response_serializers=res_serializers,
         error_serializer=ErrorResponseSerializer,
     ),
     get_regions_by_country_alpha_2=extend_schema(
@@ -68,6 +81,11 @@ class RegionViewSet(MultiSerializerMixin, BaseModelViewSet):
         "partial_update": RegionWriteSerializer,
         "retrieve": RegionDetailSerializer,
         "get_regions_by_country_alpha_2": RegionSerializer,
+    }
+    response_serializers = {
+        "create": RegionDetailSerializer,
+        "update": RegionDetailSerializer,
+        "partial_update": RegionDetailSerializer,
     }
 
     @action(

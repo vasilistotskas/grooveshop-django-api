@@ -70,6 +70,7 @@ services:
       retries: 5
     networks:
       - grooveshop-backbone
+
   meilisearch:
     container_name: meilisearch
     image: getmeili/meilisearch:v1.17.1
@@ -87,6 +88,15 @@ services:
       retries: 3
     networks:
       - grooveshop-backbone
+
+  meilisearch-mcp:
+    container_name: meilisearch-mcp
+    image: getmeili/meilisearch-mcp:latest
+    env_file:
+      - ./docker/meilisearch/.env
+    networks:
+      - grooveshop-backbone
+
   redisinsight:
     container_name: redisinsight
     image: redislabs/redisinsight:latest

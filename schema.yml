@@ -22401,6 +22401,8 @@ components:
           type: string
         master:
           type: integer
+        slug:
+          type: string
         mainImagePath:
           type: string
         matchesPosition: {}
@@ -22409,8 +22411,11 @@ components:
           format: double
           nullable: true
         formatted: {}
+        contentType:
+          type: string
       required:
       - body
+      - contentType
       - formatted
       - id
       - languageCode
@@ -22418,6 +22423,7 @@ components:
       - master
       - matchesPosition
       - rankingScore
+      - slug
       - subtitle
       - title
     BlogPostWriteRequest:
@@ -28139,7 +28145,10 @@ components:
           format: double
           nullable: true
         formatted: {}
+        contentType:
+          type: string
       required:
+      - contentType
       - description
       - formatted
       - id

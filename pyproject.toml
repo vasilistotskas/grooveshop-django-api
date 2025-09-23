@@ -14,7 +14,7 @@ classifiers = [
 ]
 dependencies = [
   "asgiref==3.9.1",
-  "boto3==1.40.35",
+  "boto3==1.40.36",
   "charset_normalizer==3.4.3",
   "channels[daphne]==4.3.1",
   "channels-redis==4.3.0",
@@ -29,7 +29,7 @@ dependencies = [
   "django-cors-headers==4.9.0",
   "django-simple-history==3.10.1",
   "django-filter==25.1",
-  "django-unfold==0.65.0",
+  "django-unfold==0.66.0",
   "django-money==3.5.4",
   "django-mptt==0.18.0",
   "django-parler==2.3.0",
@@ -69,7 +69,7 @@ repository = "https://github.com/vasilistotskas/grooveshop-django-api"
 # ─────────────────────────────────────────────────────────
 [dependency-groups]
 dev = [
-    "coverage[toml]==7.10.6",
+    "coverage[toml]==7.10.7",
     "djangorestframework-stubs==3.16.3",
     "django-debug-toolbar==6.0.0",
     "django-stubs==5.2.5",

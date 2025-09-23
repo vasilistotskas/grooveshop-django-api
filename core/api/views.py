@@ -159,6 +159,7 @@ class TranslationsModelViewSet(TranslationsProcessingMixin, ModelViewSet):
     def partial_update(self, request, *args, **kwargs):
         return super().partial_update(request, *args, **kwargs)
 
+
 @extend_schema_view(
     list=extend_schema(
         parameters=[

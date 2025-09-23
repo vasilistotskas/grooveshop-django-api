@@ -13,6 +13,11 @@ paths:
       summary: List Blog Authors
       parameters:
       - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Cursor for pagination
+      - in: query
         name: language
         schema:
           type: string
@@ -1184,6 +1189,11 @@ paths:
           type: string
           format: date-time
         description: Filter items created before this date
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Cursor for pagination
       - in: query
         name: descendantOf
         schema:
@@ -3669,6 +3679,11 @@ paths:
         description: Filter items that are currently published (published_at <= now
           and is_published=True)
       - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Cursor for pagination
+      - in: query
         name: featured
         schema:
           oneOf:
@@ -5760,6 +5775,11 @@ paths:
           format: date-time
         description: Filter items created before this date
       - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Cursor for pagination
+      - in: query
         name: hasLikedPosts
         schema:
           oneOf:
@@ -6712,6 +6732,11 @@ paths:
           format: date-time
         description: Filter items created before this date
       - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Cursor for pagination
+      - in: query
         name: id
         schema:
           oneOf:
@@ -6754,6 +6779,16 @@ paths:
             - '0'
           - type: boolean
         description: Filter items in active carts (24hr)
+      - in: query
+        name: language
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Language code for translations (el, en, de)
       - in: query
         name: maxDiscountPercent
         schema:
@@ -6827,15 +6862,33 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       - in: query
         name: product
         schema:
@@ -7088,6 +7141,16 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
+      - in: query
+        name: language
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Language code for translations (el, en, de)
       tags:
       - Cart Items
       security:
@@ -7226,6 +7289,16 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
+      - in: query
+        name: language
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Language code for translations (el, en, de)
       tags:
       - Cart Items
       requestBody:
@@ -7394,6 +7467,11 @@ paths:
           format: date-time
         description: Filter items created before this date
       - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Cursor for pagination
+      - in: query
         name: daysInactive
         schema:
           oneOf:
@@ -7493,6 +7571,16 @@ paths:
           - type: boolean
         description: Filter guest carts (True) or user carts (False)
       - in: query
+        name: language
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Language code for translations (el, en, de)
+      - in: query
         name: lastActivity
         schema:
           type: string
@@ -7582,15 +7670,33 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
       - name: search
         required: false
         in: query
@@ -7852,6 +7958,11 @@ paths:
           type: string
           format: date-time
         description: Filter items created before this date
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Cursor for pagination
       - in: query
         name: hasAllData
         schema:
@@ -8438,6 +8549,11 @@ paths:
           type: string
           format: date-time
         description: Filter items created before this date
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Cursor for pagination
       - in: query
         name: hasSeenAt
         schema:
@@ -9237,6 +9353,11 @@ paths:
           format: date-time
         description: Filter items created before this date
       - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Cursor for pagination
+      - in: query
         name: customerNotes
         schema:
           type: string
@@ -9954,6 +10075,11 @@ paths:
           type: string
           format: date-time
         description: Filter items created before this date
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Cursor for pagination
       - in: query
         name: hasNotes
         schema:
@@ -12018,6 +12144,11 @@ paths:
           - type: number
         description: Filter by minimum cost
       - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Cursor for pagination
+      - in: query
         name: description
         schema:
           type: string
@@ -12616,6 +12747,11 @@ paths:
           type: string
           format: date-time
         description: Filter items created before this date
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Cursor for pagination
       - in: query
         name: deletedAt_Date
         schema:
@@ -13486,6 +13622,11 @@ paths:
           format: date-time
         description: Filter items created before this date
       - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Cursor for pagination
+      - in: query
         name: descendantOf
         schema:
           oneOf:
@@ -13973,6 +14114,11 @@ paths:
             pattern: ^-?\d+$
           - type: integer
       - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Cursor for pagination
+      - in: query
         name: id
         schema:
           oneOf:
@@ -14373,6 +14519,11 @@ paths:
           format: date-time
         description: Filter items created before this date
       - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Cursor for pagination
+      - in: query
         name: id
         schema:
           oneOf:
@@ -14762,6 +14913,11 @@ paths:
           type: string
           format: date-time
       - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Cursor for pagination
+      - in: query
         name: id
         schema:
           oneOf:
@@ -15110,6 +15266,11 @@ paths:
           - type: boolean
         description: Filter items that are currently published (published_at <= now
           and is_published=True)
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Cursor for pagination
       - in: query
         name: hasComment
         schema:
@@ -15947,6 +16108,11 @@ paths:
           format: date-time
         description: Filter items created before this date
       - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Cursor for pagination
+      - in: query
         name: language
         schema:
           type: string
@@ -16695,6 +16861,11 @@ paths:
           format: date-time
         description: Filter items created before this date
       - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Cursor for pagination
+      - in: query
         name: hasLabel
         schema:
           oneOf:
@@ -17332,6 +17503,11 @@ paths:
           format: date-time
         description: Filter items created before this date
       - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Cursor for pagination
+      - in: query
         name: id
         schema:
           oneOf:
@@ -17858,6 +18034,11 @@ paths:
         limitOffset.'
       summary: List User Accounts
       parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Cursor for pagination
       - in: query
         name: language
         schema:
@@ -18980,6 +19161,11 @@ paths:
           format: date-time
         description: Filter items created before this date
       - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Cursor for pagination
+      - in: query
         name: firstName
         schema:
           type: string
@@ -19668,6 +19854,11 @@ paths:
           format: date-time
         description: Filter items created before this date
       - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Cursor for pagination
+      - in: query
         name: hasMetadata
         schema:
           oneOf:
@@ -20271,6 +20462,11 @@ paths:
           type: string
           format: date-time
         description: Filter items created before this date
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Cursor for pagination
       - in: query
         name: description
         schema:

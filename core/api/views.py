@@ -70,6 +70,13 @@ PAGE_SIZE_PARAMETER = OpenApiParameter(
     default=20,
 )
 
+CURSOR_PARAMETER = OpenApiParameter(
+    name="cursor",
+    description=_("Cursor for pagination"),
+    required=False,
+    type=str,
+)
+
 
 class Metadata(SimpleMetadata):
     def determine_metadata(self, request, view):
@@ -133,20 +140,6 @@ class PaginationModelViewSet(ModelViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-@extend_schema_view(
-    list=extend_schema(
-        parameters=[
-            LANGUAGE_PARAMETER,
-            PAGINATION_TYPE_PARAMETER,
-            PAGINATION_PARAMETER,
-            PAGE_SIZE_PARAMETER,
-        ]
-    ),
-    retrieve=extend_schema(parameters=[LANGUAGE_PARAMETER]),
-    create=extend_schema(parameters=[LANGUAGE_PARAMETER]),
-    update=extend_schema(parameters=[LANGUAGE_PARAMETER]),
-    partial_update=extend_schema(parameters=[LANGUAGE_PARAMETER]),
-)
 class TranslationsModelViewSet(TranslationsProcessingMixin, ModelViewSet):
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -166,7 +159,21 @@ class TranslationsModelViewSet(TranslationsProcessingMixin, ModelViewSet):
     def partial_update(self, request, *args, **kwargs):
         return super().partial_update(request, *args, **kwargs)
 
-
+@extend_schema_view(
+    list=extend_schema(
+        parameters=[
+            LANGUAGE_PARAMETER,
+            PAGINATION_TYPE_PARAMETER,
+            PAGINATION_PARAMETER,
+            PAGE_SIZE_PARAMETER,
+            CURSOR_PARAMETER,
+        ]
+    ),
+    retrieve=extend_schema(parameters=[LANGUAGE_PARAMETER]),
+    create=extend_schema(parameters=[LANGUAGE_PARAMETER]),
+    update=extend_schema(parameters=[LANGUAGE_PARAMETER]),
+    partial_update=extend_schema(parameters=[LANGUAGE_PARAMETER]),
+)
 class BaseModelViewSet(TranslationsModelViewSet, PaginationModelViewSet):
     metadata_class = Metadata
 

@@ -3,6 +3,18 @@
 
 
 
+## v1.28.0 (2025-09-23)
+
+### Features
+
+* feat: Add content_type and slug fields to serializers and schema
+
+Introduces 'content_type' and 'slug' fields to BlogPost and Product serializers, MeiliSearch result serializers, and OpenAPI schema definitions. Updates dependencies: boto3 to 1.40.36, django-unfold to 0.66.0, and coverage to 7.10.7. Adds meilisearch-mcp service to infra.compose.yml for extended search capabilities. ([`1ca7115`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1ca71151d4af578483147b01eb9db0d09c0b7fef))
+
+* feat: Add cursor parameter for pagination to API schema
+
+Introduces a 'cursor' query parameter for pagination in the OpenAPI schema and view definitions. Updates core/api/views.py to define and include CURSOR_PARAMETER in BaseModelViewSet, and updates schema.yml to document the new parameter across relevant endpoints. ([`c81b071`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c81b071cd99242dcb3f3edfa56926e0be8df40b4))
+
 ## v1.27.0 (2025-09-22)
 
 ### Features

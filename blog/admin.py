@@ -740,7 +740,7 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
     def image_preview(self, obj):
         if obj.image:
             return format_html(
-                '<img src="{}" style="max-height: 40px; max-width: 80px; border-radius: 4px; object-fit: cover;" />',
+                '<img src="{}" style="max-height: 100px; max-width: 80px; border-radius: 4px; object-fit: cover;" />',
                 obj.image.url,
             )
         return format_html(

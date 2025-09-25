@@ -31,8 +31,8 @@ class BlogPostSerializer(
     author = PrimaryKeyRelatedField(queryset=BlogAuthor.objects.all())
     translations = TranslatedFieldsFieldExtend(shared_model=BlogPost)
 
-    reading_time = serializers.SerializerMethodField()
-    content_preview = serializers.SerializerMethodField()
+    reading_time = serializers.SerializerMethodField(required=False)
+    content_preview = serializers.SerializerMethodField(required=False)
 
     class Meta:
         model = BlogPost

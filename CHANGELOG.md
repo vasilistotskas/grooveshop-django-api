@@ -3,6 +3,12 @@
 
 
 
+## v1.29.1 (2025-09-25)
+
+### Bug fixes
+
+* fix: missing migrations ([`503ffb6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/503ffb66af3bd224f471164701c5a10551859dda))
+
 ## v1.29.0 (2025-09-25)
 
 ### Features

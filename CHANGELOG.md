@@ -3,6 +3,14 @@
 
 
 
+## v1.29.2 (2025-09-25)
+
+### Bug fixes
+
+* fix: Increase image preview size and update serializer fields
+
+Raised the max-height of image previews in the blog admin from 40px to 100px for better visibility. Updated BlogPostSerializer to set 'required=False' for 'reading_time' and 'content_preview' SerializerMethodFields, making them optional. ([`295f707`](https://github.com/vasilistotskas/grooveshop-django-api/commit/295f7072b6c93e1c221f5640ebde9547638b2dc3))
+
 ## v1.29.1 (2025-09-25)
 
 ### Bug fixes

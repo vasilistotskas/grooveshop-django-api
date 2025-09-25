@@ -9,6 +9,7 @@ from product.models.product import ProductTranslation
 class BlogPostTranslationSerializer(
     serializers.ModelSerializer[BlogPostTranslation]
 ):
+    slug = serializers.SerializerMethodField()
     main_image_path = serializers.SerializerMethodField()
     matches_position = serializers.SerializerMethodField()
     ranking_score = serializers.SerializerMethodField()
@@ -19,6 +20,7 @@ class BlogPostTranslationSerializer(
         model = BlogPostTranslation
         fields = (
             "id",
+            "slug",
             "language_code",
             "title",
             "subtitle",
@@ -30,6 +32,9 @@ class BlogPostTranslationSerializer(
             "formatted",
             "content_type",
         )
+
+    def get_slug(self, obj):
+        return obj.master.slug if obj.master else ""
 
     def get_main_image_path(self, obj):
         return obj.master.main_image_path if obj.master else ""
@@ -50,6 +55,7 @@ class BlogPostTranslationSerializer(
 class ProductTranslationSerializer(
     serializers.ModelSerializer[ProductTranslation]
 ):
+    slug = serializers.SerializerMethodField()
     main_image_path = serializers.SerializerMethodField()
     matches_position = serializers.SerializerMethodField()
     ranking_score = serializers.SerializerMethodField()
@@ -60,6 +66,7 @@ class ProductTranslationSerializer(
         model = ProductTranslation
         fields = (
             "id",
+            "slug",
             "language_code",
             "name",
             "description",
@@ -70,6 +77,9 @@ class ProductTranslationSerializer(
             "formatted",
             "content_type",
         )
+
+    def get_slug(self, obj):
+        return obj.master.slug if obj.master else ""
 
     def get_main_image_path(self, obj):
         return obj.master.main_image_path if obj.master else ""

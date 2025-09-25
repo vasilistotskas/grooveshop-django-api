@@ -65,6 +65,7 @@ def snake_to_camel(snake_str):
 
 class CamelCaseOrderingFilterExtension(OpenApiFilterExtension):
     target_class = "core.filters.camel_case_ordering.CamelCaseOrderingFilter"
+    match_subclasses = True
 
     def get_schema_operation_parameters(self, auto_schema, *args, **kwargs):
         parameters = super().get_schema_operation_parameters(
@@ -75,18 +76,51 @@ class CamelCaseOrderingFilterExtension(OpenApiFilterExtension):
             parameters = []
 
         view = auto_schema.view
+
         if hasattr(view, "ordering_fields") and view.ordering_fields:
             camel_fields = []
             for field in view.ordering_fields:
                 camel_field = snake_to_camel(field)
                 camel_fields.extend([camel_field, f"-{camel_field}"])
 
-            for param in parameters:
-                if param.get("name") == "ordering":
-                    param["description"] = (
-                        f"Which field to use when ordering the results. "
-                        f"Available fields: {', '.join(camel_fields)}"
+            ordering_param_exists = any(
+                param.get("name") == "ordering" for param in parameters
+            )
+
+            if ordering_param_exists:
+                for param in parameters:
+                    if param.get("name") == "ordering":
+                        param["description"] = (
+                            f"Which field to use when ordering the results. "
+                            f"Available fields: {', '.join(camel_fields)}"
+                        )
+                        if "schema" not in param:
+                            param["schema"] = {}
+                        param["schema"]["enum"] = camel_fields
+            else:
+                filter_instance = None
+                if hasattr(view, "filter_backends"):
+                    for backend in view.filter_backends:
+                        if issubclass(backend, CamelCaseOrderingFilter):
+                            filter_instance = backend()
+                            break
+
+                if filter_instance:
+                    ordering_param_name = getattr(
+                        filter_instance, "ordering_param", "ordering"
                     )
-                    param["schema"]["enum"] = camel_fields
+
+                    parameters.append(
+                        {
+                            "name": ordering_param_name,
+                            "in": "query",
+                            "required": False,
+                            "description": (
+                                f"Which field to use when ordering the results. "
+                                f"Available fields: {', '.join(camel_fields)}"
+                            ),
+                            "schema": {"type": "string", "enum": camel_fields},
+                        }
+                    )
 
         return parameters

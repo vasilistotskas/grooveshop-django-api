@@ -5,7 +5,6 @@ from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
-    OpenApiParameter,
 )
 from rest_framework.decorators import action
 
@@ -56,7 +55,7 @@ res_serializers: ResponseSerializersConfig = {
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class BlogAuthorViewSet(MultiSerializerMixin, BaseModelViewSet):
-    queryset = BlogAuthor.objects.all()
+    queryset = BlogAuthor.objects.none()
     serializers = {
         "default": BlogAuthorDetailSerializer,
         "list": BlogAuthorSerializer,
@@ -78,9 +77,6 @@ class BlogAuthorViewSet(MultiSerializerMixin, BaseModelViewSet):
         return BlogAuthorFilter
 
     def get_queryset(self):
-        if getattr(self, "swagger_fake_view", False):
-            return BlogAuthor.objects.none()
-
         if self.action == "posts":
             from rest_framework.generics import get_object_or_404
 
@@ -116,27 +112,6 @@ class BlogAuthorViewSet(MultiSerializerMixin, BaseModelViewSet):
             "Retrieve all blog posts written by this author with proper pagination."
         ),
         tags=["Blog Authors"],
-        parameters=[
-            OpenApiParameter(
-                name="ordering",
-                type=str,
-                description=_(
-                    "Which field to use when ordering the results. Available fields: createdAt, updatedAt, publishedAt, title, viewCount, -createdAt, -updatedAt, -publishedAt, -title, -viewCount"
-                ),
-                enum=[
-                    "createdAt",
-                    "updatedAt",
-                    "publishedAt",
-                    "title",
-                    "viewCount",
-                    "-createdAt",
-                    "-updatedAt",
-                    "-publishedAt",
-                    "-title",
-                    "-viewCount",
-                ],
-            ),
-        ],
         responses={
             200: BlogPostSerializer(many=True),
             404: ErrorResponseSerializer,
@@ -144,18 +119,9 @@ class BlogAuthorViewSet(MultiSerializerMixin, BaseModelViewSet):
     )
     @action(detail=True, methods=["GET"])
     def posts(self, request, pk=None, *args, **kwargs):
-        self.ordering_fields = [
-            "created_at",
-            "updated_at",
-            "published_at",
-            "title",
-            "view_count",
-        ]
-        self.ordering = ["-published_at", "-created_at"]
-        self.search_fields = [
-            "translations__title",
-            "translations__subtitle",
-            "translations__body",
-        ]
+        self.ordering_fields = []
+        self.ordering = []
+        self.search_fields = []
+
         queryset = self.filter_queryset(self.get_queryset())
         return self.paginate_and_serialize(queryset, request)

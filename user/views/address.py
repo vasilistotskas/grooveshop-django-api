@@ -107,6 +107,7 @@ res_serializers: ResponseSerializersConfig = {
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class UserAddressViewSet(MultiSerializerMixin, BaseModelViewSet):
+    queryset = UserAddress.objects.none()
     serializer_class = None
     serializers = {
         "default": UserAddressDetailSerializer,
@@ -148,9 +149,6 @@ class UserAddressViewSet(MultiSerializerMixin, BaseModelViewSet):
     ]
 
     def get_queryset(self):
-        if getattr(self, "swagger_fake_view", False):
-            return UserAddress.objects.none()
-
         return UserAddress.objects.filter(
             user=self.request.user
         ).select_related("country", "region")

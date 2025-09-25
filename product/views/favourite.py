@@ -105,6 +105,11 @@ class ProductFavouriteViewSet(MultiSerializerMixin, BaseModelViewSet):
     @action(detail=True, methods=["GET"])
     def product(self, request, *args, **kwargs):
         product_favourite = self.get_object()
+
+        self.ordering_fields = []
+        self.ordering = []
+        self.search_fields = []
+
         serializer = self.get_serializer(
             product_favourite.product, context=self.get_serializer_context()
         )

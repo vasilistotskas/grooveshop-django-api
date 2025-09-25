@@ -210,9 +210,6 @@ DJANGO_SETTINGS_MODULE = "settings"
 python_files = ["test_*.py", "*_test.py", "testing/python/*.py"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-env = [
-    "MEILI_OFFLINE=True",
-]
 testpaths = ["tests"]
 timeout = 600
 addopts = "-vs --tb=short --maxfail=0"

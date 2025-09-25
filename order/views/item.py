@@ -75,7 +75,7 @@ res_serializers: ResponseSerializersConfig = {
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class OrderItemViewSet(MultiSerializerMixin, BaseModelViewSet):
-    queryset = OrderItem.objects.all()
+    queryset = OrderItem.objects.none()
     serializers = {
         "default": OrderItemDetailSerializer,
         "list": OrderItemSerializer,
@@ -111,9 +111,6 @@ class OrderItemViewSet(MultiSerializerMixin, BaseModelViewSet):
     ]
 
     def get_queryset(self):
-        if getattr(self, "swagger_fake_view", False):
-            return OrderItem.objects.none()
-
         user = self.request.user
 
         if user.is_staff or user.is_superuser:

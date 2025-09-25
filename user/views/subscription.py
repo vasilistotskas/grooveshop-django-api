@@ -277,6 +277,7 @@ user_subscription_res_serializers: ResponseSerializersConfig = {
     )
 )
 class UserSubscriptionViewSet(MultiSerializerMixin, BaseModelViewSet):
+    queryset = UserSubscription.objects.none()
     serializers = {
         "default": UserSubscriptionDetailSerializer,
         "list": UserSubscriptionSerializer,
@@ -311,9 +312,6 @@ class UserSubscriptionViewSet(MultiSerializerMixin, BaseModelViewSet):
     ]
 
     def get_queryset(self):
-        if getattr(self, "swagger_fake_view", False):
-            return UserSubscription.objects.none()
-
         return UserSubscription.objects.filter(
             user=self.request.user
         ).select_related("topic")

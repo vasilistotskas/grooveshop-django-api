@@ -27,6 +27,32 @@ paths:
           - en
           default: el
         description: Language code for translations (el, en, de)
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, user_FirstName, -user_FirstName,
+          user_LastName, -user_LastName, user_Email, -user_Email, user_CreatedAt,
+          -user_CreatedAt, website, -website'
+        schema:
+          type: string
+          enum:
+          - id
+          - -id
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
+          - user_FirstName
+          - -user_FirstName
+          - user_LastName
+          - -user_LastName
+          - user_Email
+          - -user_Email
+          - user_CreatedAt
+          - -user_CreatedAt
+          - website
+          - -website
       - name: page
         required: false
         in: query
@@ -290,24 +316,32 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
-      - in: query
-        name: ordering
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, user_FirstName, -user_FirstName,
+          user_LastName, -user_LastName, user_Email, -user_Email, user_CreatedAt,
+          -user_CreatedAt, website, -website'
         schema:
           type: string
           enum:
-          - -createdAt
-          - -publishedAt
-          - -title
-          - -updatedAt
-          - -viewCount
+          - id
+          - -id
           - createdAt
-          - publishedAt
-          - title
+          - -createdAt
           - updatedAt
-          - viewCount
-        description: 'Which field to use when ordering the results. Available fields:
-          createdAt, updatedAt, publishedAt, title, viewCount, -createdAt, -updatedAt,
-          -publishedAt, -title, -viewCount'
+          - -updatedAt
+          - user_FirstName
+          - -user_FirstName
+          - user_LastName
+          - -user_LastName
+          - user_Email
+          - -user_Email
+          - user_CreatedAt
+          - -user_CreatedAt
+          - website
+          - -website
       - name: page
         required: false
         in: query
@@ -369,6 +403,33 @@ paths:
           - en
           default: el
         description: Language code for translations (el, en, de)
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, sortOrder, -sortOrder,
+          level, -level, lft, -lft, rght, -rght, treeId, -treeId, name, -name'
+        schema:
+          type: string
+          enum:
+          - id
+          - -id
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
+          - sortOrder
+          - -sortOrder
+          - level
+          - -level
+          - lft
+          - -lft
+          - rght
+          - -rght
+          - treeId
+          - -treeId
+          - name
+          - -name
       - name: page
         required: false
         in: query
@@ -632,26 +693,33 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
-      - in: query
-        name: ordering
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, sortOrder, -sortOrder,
+          level, -level, lft, -lft, rght, -rght, treeId, -treeId, name, -name'
         schema:
           type: string
           enum:
-          - -createdAt
-          - -id
-          - -level
-          - -name
-          - -sortOrder
-          - -updatedAt
-          - createdAt
           - id
-          - level
-          - name
-          - sortOrder
+          - -id
+          - createdAt
+          - -createdAt
           - updatedAt
-        description: 'Which field to use when ordering the results. Available fields:
-          id, sortOrder, level, name, createdAt, updatedAt, -id, -sortOrder, -level,
-          -name, -createdAt, -updatedAt'
+          - -updatedAt
+          - sortOrder
+          - -sortOrder
+          - level
+          - -level
+          - lft
+          - -lft
+          - rght
+          - -rght
+          - treeId
+          - -treeId
+          - name
+          - -name
       - name: page
         required: false
         in: query
@@ -709,26 +777,33 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
-      - in: query
-        name: ordering
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, sortOrder, -sortOrder,
+          level, -level, lft, -lft, rght, -rght, treeId, -treeId, name, -name'
         schema:
           type: string
           enum:
-          - -createdAt
-          - -id
-          - -level
-          - -name
-          - -sortOrder
-          - -updatedAt
-          - createdAt
           - id
-          - level
-          - name
-          - sortOrder
+          - -id
+          - createdAt
+          - -createdAt
           - updatedAt
-        description: 'Which field to use when ordering the results. Available fields:
-          id, sortOrder, level, name, createdAt, updatedAt, -id, -sortOrder, -level,
-          -name, -createdAt, -updatedAt'
+          - -updatedAt
+          - sortOrder
+          - -sortOrder
+          - level
+          - -level
+          - lft
+          - -lft
+          - rght
+          - -rght
+          - treeId
+          - -treeId
+          - name
+          - -name
       - name: page
         required: false
         in: query
@@ -786,26 +861,33 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
-      - in: query
-        name: ordering
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, sortOrder, -sortOrder,
+          level, -level, lft, -lft, rght, -rght, treeId, -treeId, name, -name'
         schema:
           type: string
           enum:
-          - -createdAt
-          - -id
-          - -level
-          - -name
-          - -sortOrder
-          - -updatedAt
-          - createdAt
           - id
-          - level
-          - name
-          - sortOrder
+          - -id
+          - createdAt
+          - -createdAt
           - updatedAt
-        description: 'Which field to use when ordering the results. Available fields:
-          id, sortOrder, level, name, createdAt, updatedAt, -id, -sortOrder, -level,
-          -name, -createdAt, -updatedAt'
+          - -updatedAt
+          - sortOrder
+          - -sortOrder
+          - level
+          - -level
+          - lft
+          - -lft
+          - rght
+          - -rght
+          - treeId
+          - -treeId
+          - name
+          - -name
       - name: page
         required: false
         in: query
@@ -864,24 +946,33 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
-      - in: query
-        name: ordering
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, sortOrder, -sortOrder,
+          level, -level, lft, -lft, rght, -rght, treeId, -treeId, name, -name'
         schema:
           type: string
           enum:
-          - -createdAt
-          - -publishedAt
-          - -title
-          - -updatedAt
-          - -viewsCount
+          - id
+          - -id
           - createdAt
-          - publishedAt
-          - title
+          - -createdAt
           - updatedAt
-          - viewsCount
-        description: 'Which field to use when ordering the results. Available fields:
-          createdAt, updatedAt, publishedAt, title, viewsCount, -createdAt, -updatedAt,
-          -publishedAt, -title, -viewsCount'
+          - -updatedAt
+          - sortOrder
+          - -sortOrder
+          - level
+          - -level
+          - lft
+          - -lft
+          - rght
+          - -rght
+          - treeId
+          - -treeId
+          - name
+          - -name
       - name: page
         required: false
         in: query
@@ -951,26 +1042,33 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
-      - in: query
-        name: ordering
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, sortOrder, -sortOrder,
+          level, -level, lft, -lft, rght, -rght, treeId, -treeId, name, -name'
         schema:
           type: string
           enum:
-          - -createdAt
-          - -id
-          - -level
-          - -name
-          - -sortOrder
-          - -updatedAt
-          - createdAt
           - id
-          - level
-          - name
-          - sortOrder
+          - -id
+          - createdAt
+          - -createdAt
           - updatedAt
-        description: 'Which field to use when ordering the results. Available fields:
-          id, sortOrder, level, name, createdAt, updatedAt, -id, -sortOrder, -level,
-          -name, -createdAt, -updatedAt'
+          - -updatedAt
+          - sortOrder
+          - -sortOrder
+          - level
+          - -level
+          - lft
+          - -lft
+          - rght
+          - -rght
+          - treeId
+          - -treeId
+          - name
+          - -name
       - name: page
         required: false
         in: query
@@ -1064,26 +1162,33 @@ paths:
         menus or category hierarchies.
       summary: Get complete category tree
       parameters:
-      - in: query
-        name: ordering
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, sortOrder, -sortOrder,
+          level, -level, lft, -lft, rght, -rght, treeId, -treeId, name, -name'
         schema:
           type: string
           enum:
-          - -createdAt
-          - -id
-          - -level
-          - -name
-          - -sortOrder
-          - -updatedAt
-          - createdAt
           - id
-          - level
-          - name
-          - sortOrder
+          - -id
+          - createdAt
+          - -createdAt
           - updatedAt
-        description: 'Which field to use when ordering the results. Available fields:
-          id, sortOrder, level, name, createdAt, updatedAt, -id, -sortOrder, -level,
-          -name, -createdAt, -updatedAt'
+          - -updatedAt
+          - sortOrder
+          - -sortOrder
+          - level
+          - -level
+          - lft
+          - -lft
+          - rght
+          - -rght
+          - treeId
+          - -treeId
+          - name
+          - -name
       - name: page
         required: false
         in: query
@@ -1417,6 +1522,32 @@ paths:
             - '0'
           - type: boolean
         description: Order comments by most replies first
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, level, -level, lft,
+          -lft, approved, -approved, likesCountField, -likesCountField, repliesCountField,
+          -repliesCountField'
+        schema:
+          type: string
+          enum:
+          - id
+          - -id
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
+          - level
+          - -level
+          - lft
+          - -lft
+          - approved
+          - -approved
+          - likesCountField
+          - -likesCountField
+          - repliesCountField
+          - -repliesCountField
       - name: page
         required: false
         in: query
@@ -2311,6 +2442,32 @@ paths:
             - '0'
           - type: boolean
         description: Order comments by most replies first
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, level, -level, lft,
+          -lft, approved, -approved, likesCountField, -likesCountField, repliesCountField,
+          -repliesCountField'
+        schema:
+          type: string
+          enum:
+          - id
+          - -id
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
+          - level
+          - -level
+          - lft
+          - -lft
+          - approved
+          - -approved
+          - likesCountField
+          - -likesCountField
+          - repliesCountField
+          - -repliesCountField
       - name: page
         required: false
         in: query
@@ -2811,6 +2968,32 @@ paths:
             - '0'
           - type: boolean
         description: Order comments by most replies first
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, level, -level, lft,
+          -lft, approved, -approved, likesCountField, -likesCountField, repliesCountField,
+          -repliesCountField'
+        schema:
+          type: string
+          enum:
+          - id
+          - -id
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
+          - level
+          - -level
+          - lft
+          - -lft
+          - approved
+          - -approved
+          - likesCountField
+          - -likesCountField
+          - repliesCountField
+          - -repliesCountField
       - name: page
         required: false
         in: query
@@ -3387,6 +3570,32 @@ paths:
             - '0'
           - type: boolean
         description: Order comments by most replies first
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, level, -level, lft,
+          -lft, approved, -approved, likesCountField, -likesCountField, repliesCountField,
+          -repliesCountField'
+        schema:
+          type: string
+          enum:
+          - id
+          - -id
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
+          - level
+          - -level
+          - lft
+          - -lft
+          - approved
+          - -approved
+          - likesCountField
+          - -likesCountField
+          - repliesCountField
+          - -repliesCountField
       - name: page
         required: false
         in: query
@@ -3768,6 +3977,34 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Filter by minimum number of views
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, publishedAt, -publishedAt,
+          viewCount, -viewCount, likesCountField, -likesCountField, commentsCountField,
+          -commentsCountField, tagsCountField, -tagsCountField, featured, -featured'
+        schema:
+          type: string
+          enum:
+          - id
+          - -id
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
+          - publishedAt
+          - -publishedAt
+          - viewCount
+          - -viewCount
+          - likesCountField
+          - -likesCountField
+          - commentsCountField
+          - -commentsCountField
+          - tagsCountField
+          - -tagsCountField
+          - featured
+          - -featured
       - name: page
         required: false
         in: query
@@ -4295,89 +4532,6 @@ paths:
       description: Get all comments for a blog post.
       summary: Get post comments
       parameters:
-      - in: query
-        name: author
-        schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-        description: Filter by author ID
-      - in: query
-        name: authorEmail
-        schema:
-          type: string
-        description: Filter by author email (case-insensitive)
-      - in: query
-        name: authorName
-        schema:
-          type: string
-        description: Filter by author full name (case-insensitive)
-      - in: query
-        name: category
-        schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-        description: Filter by category ID
-      - in: query
-        name: categoryName
-        schema:
-          type: string
-        description: Filter by category name (case-insensitive)
-      - in: query
-        name: createdAfter
-        schema:
-          type: string
-          format: date-time
-        description: Filter items created after this date
-      - in: query
-        name: createdAt_Date
-        schema:
-          type: string
-          format: date
-      - in: query
-        name: createdAt_Gte
-        schema:
-          type: string
-          format: date-time
-      - in: query
-        name: createdAt_Lte
-        schema:
-          type: string
-          format: date-time
-      - in: query
-        name: createdBefore
-        schema:
-          type: string
-          format: date-time
-        description: Filter items created before this date
-      - in: query
-        name: currentlyPublished
-        schema:
-          oneOf:
-          - type: string
-            enum:
-            - 'true'
-            - 'false'
-            - '1'
-            - '0'
-          - type: boolean
-        description: Filter items that are currently published (published_at <= now
-          and is_published=True)
-      - in: query
-        name: featured
-        schema:
-          oneOf:
-          - type: string
-            enum:
-            - 'true'
-            - 'false'
-            - '1'
-            - '0'
-          - type: boolean
-        description: Filter by featured status
       - in: path
         name: id
         schema:
@@ -4386,69 +4540,34 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
-      - in: query
-        name: id
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, publishedAt, -publishedAt,
+          viewCount, -viewCount, likesCountField, -likesCountField, commentsCountField,
+          -commentsCountField, tagsCountField, -tagsCountField, featured, -featured'
         schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-      - in: query
-        name: id_In
-        schema:
-          oneOf:
-          - type: string
-            description: Comma-separated values
-          - type: array
-            items:
-              type: integer
-        description: Οι πολλαπλές τιμές πρέπει να διαχωρίζονται με κόμμα.
-        explode: false
-        style: form
-      - in: query
-        name: isPublished
-        schema:
-          oneOf:
-          - type: string
-            enum:
-            - 'true'
-            - 'false'
-            - '1'
-            - '0'
-          - type: boolean
-        description: Filter by published status
-      - in: query
-        name: minComments
-        schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+(\.\d+)?$
-          - type: number
-        description: Filter by minimum number of comments
-      - in: query
-        name: minLikes
-        schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+(\.\d+)?$
-          - type: number
-        description: Filter by minimum number of likes
-      - in: query
-        name: minTags
-        schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+(\.\d+)?$
-          - type: number
-        description: Filter by minimum number of tags
-      - in: query
-        name: minViewCount
-        schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-        description: Filter by minimum number of views
+          type: string
+          enum:
+          - id
+          - -id
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
+          - publishedAt
+          - -publishedAt
+          - viewCount
+          - -viewCount
+          - likesCountField
+          - -likesCountField
+          - commentsCountField
+          - -commentsCountField
+          - tagsCountField
+          - -tagsCountField
+          - featured
+          - -featured
       - name: page
         required: false
         in: query
@@ -4468,121 +4587,28 @@ paths:
             pattern: ^-?\d+$
           - type: integer
       - in: query
-        name: publishedAfter
+        name: parent
         schema:
           type: string
-          format: date-time
-        description: Filter items published after this date
+        description: Parent comment ID
       - in: query
-        name: publishedAt_Date
+        name: parent_Isnull
         schema:
-          type: string
-          format: date
-      - in: query
-        name: publishedAt_Gte
-        schema:
-          type: string
-          format: date-time
-      - in: query
-        name: publishedAt_Lte
-        schema:
-          type: string
-          format: date-time
-      - in: query
-        name: publishedBefore
-        schema:
-          type: string
-          format: date-time
-        description: Filter items published before this date
+          oneOf:
+          - type: string
+            enum:
+            - 'true'
+            - 'false'
+            - '1'
+            - '0'
+          - type: boolean
+        description: Filter comments with no parent
       - name: search
         required: false
         in: query
         description: A search term.
         schema:
           type: string
-      - in: query
-        name: slug
-        schema:
-          type: string
-      - in: query
-        name: slug_Icontains
-        schema:
-          type: string
-      - in: query
-        name: tagName
-        schema:
-          type: string
-        description: Filter by tag label (case-insensitive)
-      - in: query
-        name: tags
-        schema:
-          oneOf:
-          - type: string
-            description: Comma-separated values
-          - type: array
-            items:
-              type: integer
-        description: Filter by tag IDs (comma-separated)
-        explode: true
-        style: form
-      - in: query
-        name: title
-        schema:
-          type: string
-        description: Filter by title (case-insensitive)
-      - in: query
-        name: updatedAfter
-        schema:
-          type: string
-          format: date-time
-        description: Filter items updated after this date
-      - in: query
-        name: updatedAt_Date
-        schema:
-          type: string
-          format: date
-      - in: query
-        name: updatedAt_Gte
-        schema:
-          type: string
-          format: date-time
-      - in: query
-        name: updatedAt_Lte
-        schema:
-          type: string
-          format: date-time
-      - in: query
-        name: updatedBefore
-        schema:
-          type: string
-          format: date-time
-        description: Filter items updated before this date
-      - in: query
-        name: uuid
-        schema:
-          type: string
-          format: uuid
-      - in: query
-        name: viewCount
-        schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-      - in: query
-        name: viewCount_Gte
-        schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-      - in: query
-        name: viewCount_Lte
-        schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
       tags:
       - Blog Posts
       security:
@@ -4874,29 +4900,34 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Filter by minimum number of views
-      - in: query
-        name: ordering
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, publishedAt, -publishedAt,
+          viewCount, -viewCount, likesCountField, -likesCountField, commentsCountField,
+          -commentsCountField, tagsCountField, -tagsCountField, featured, -featured'
         schema:
           type: string
           enum:
-          - -commentsCount
-          - -createdAt
-          - -featured
-          - -likesCount
-          - -publishedAt
-          - -updatedAt
-          - -viewCount
-          - commentsCount
+          - id
+          - -id
           - createdAt
-          - featured
-          - likesCount
-          - publishedAt
+          - -createdAt
           - updatedAt
+          - -updatedAt
+          - publishedAt
+          - -publishedAt
           - viewCount
-        description: 'Which field to use when ordering the results. Available fields:
-          createdAt, updatedAt, publishedAt, viewCount, likesCount, commentsCount,
-          featured, -createdAt, -updatedAt, -publishedAt, -viewCount, -likesCount,
-          -commentsCount, -featured'
+          - -viewCount
+          - likesCountField
+          - -likesCountField
+          - commentsCountField
+          - -commentsCountField
+          - tagsCountField
+          - -tagsCountField
+          - featured
+          - -featured
       - name: page
         required: false
         in: query
@@ -5232,26 +5263,34 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Filter by minimum number of views
-      - in: query
-        name: ordering
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, publishedAt, -publishedAt,
+          viewCount, -viewCount, likesCountField, -likesCountField, commentsCountField,
+          -commentsCountField, tagsCountField, -tagsCountField, featured, -featured'
         schema:
           type: string
           enum:
-          - -commentsCount
-          - -createdAt
-          - -likesCount
-          - -publishedAt
-          - -updatedAt
-          - -viewCount
-          - commentsCount
+          - id
+          - -id
           - createdAt
-          - likesCount
-          - publishedAt
+          - -createdAt
           - updatedAt
+          - -updatedAt
+          - publishedAt
+          - -publishedAt
           - viewCount
-        description: 'Which field to use when ordering the results. Available fields:
-          createdAt, updatedAt, publishedAt, viewCount, likesCount, commentsCount,
-          -createdAt, -updatedAt, -publishedAt, -viewCount, -likesCount, -commentsCount'
+          - -viewCount
+          - likesCountField
+          - -likesCountField
+          - commentsCountField
+          - -commentsCountField
+          - tagsCountField
+          - -tagsCountField
+          - featured
+          - -featured
       - name: page
         required: false
         in: query
@@ -5560,26 +5599,34 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Filter by minimum number of views
-      - in: query
-        name: ordering
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, publishedAt, -publishedAt,
+          viewCount, -viewCount, likesCountField, -likesCountField, commentsCountField,
+          -commentsCountField, tagsCountField, -tagsCountField, featured, -featured'
         schema:
           type: string
           enum:
-          - -commentsCount
-          - -createdAt
-          - -likesCount
-          - -publishedAt
-          - -updatedAt
-          - -viewCount
-          - commentsCount
+          - id
+          - -id
           - createdAt
-          - likesCount
-          - publishedAt
+          - -createdAt
           - updatedAt
+          - -updatedAt
+          - publishedAt
+          - -publishedAt
           - viewCount
-        description: 'Which field to use when ordering the results. Available fields:
-          createdAt, updatedAt, publishedAt, viewCount, likesCount, commentsCount,
-          -createdAt, -updatedAt, -publishedAt, -viewCount, -likesCount, -commentsCount'
+          - -viewCount
+          - likesCountField
+          - -likesCountField
+          - commentsCountField
+          - -commentsCountField
+          - tagsCountField
+          - -tagsCountField
+          - featured
+          - -featured
       - name: page
         required: false
         in: query
@@ -5907,6 +5954,27 @@ paths:
         schema:
           type: string
         description: Filter tags with names starting with
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, active, -active, createdAt, -createdAt, updatedAt, -updatedAt,
+          sortOrder, -sortOrder, name, -name'
+        schema:
+          type: string
+          enum:
+          - id
+          - -id
+          - active
+          - -active
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
+          - sortOrder
+          - -sortOrder
+          - name
+          - -name
       - name: page
         required: false
         in: query
@@ -6853,6 +6921,29 @@ paths:
             pattern: ^-?\d+(\.\d+)?$
           - type: number
         description: Filter by minimum total price (quantity * price)
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, quantity, -quantity,
+          cart_Id, -cart_Id, cart_LastActivity, -cart_LastActivity, product_Id, -product_Id'
+        schema:
+          type: string
+          enum:
+          - id
+          - -id
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
+          - quantity
+          - -quantity
+          - cart_Id
+          - -cart_Id
+          - cart_LastActivity
+          - -cart_LastActivity
+          - product_Id
+          - -product_Id
       - name: page
         required: false
         in: query
@@ -7661,6 +7752,25 @@ paths:
             pattern: ^-?\d+(\.\d+)?$
           - type: number
         description: Filter carts with at least X unique items
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, user, -user, createdAt, -createdAt, updatedAt, -updatedAt, lastActivity,
+          -lastActivity'
+        schema:
+          type: string
+          enum:
+          - id
+          - -id
+          - user
+          - -user
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
+          - lastActivity
+          - -lastActivity
       - name: page
         required: false
         in: query
@@ -8116,6 +8226,32 @@ paths:
         schema:
           type: string
         description: Filter countries with names starting with
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          alpha2, -alpha2, alpha3, -alpha3, isoCc, -isoCc, phoneCode, -phoneCode,
+          createdAt, -createdAt, updatedAt, -updatedAt, sortOrder, -sortOrder, translations_Name,
+          -translations_Name'
+        schema:
+          type: string
+          enum:
+          - alpha2
+          - -alpha2
+          - alpha3
+          - -alpha3
+          - isoCc
+          - -isoCc
+          - phoneCode
+          - -phoneCode
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
+          - sortOrder
+          - -sortOrder
+          - translations_Name
+          - -translations_Name
       - name: page
         required: false
         in: query
@@ -8684,6 +8820,46 @@ paths:
         schema:
           type: string
         description: Filter by notification kind
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, user, -user, user_Email, -user_Email, user_FirstName, -user_FirstName,
+          user_LastName, -user_LastName, notification, -notification, notification_Kind,
+          -notification_Kind, notification_Category, -notification_Category, notification_Priority,
+          -notification_Priority, notification_CreatedAt, -notification_CreatedAt,
+          seen, -seen, seenAt, -seenAt, createdAt, -createdAt, updatedAt, -updatedAt'
+        schema:
+          type: string
+          enum:
+          - id
+          - -id
+          - user
+          - -user
+          - user_Email
+          - -user_Email
+          - user_FirstName
+          - -user_FirstName
+          - user_LastName
+          - -user_LastName
+          - notification
+          - -notification
+          - notification_Kind
+          - -notification_Kind
+          - notification_Category
+          - -notification_Category
+          - notification_Priority
+          - -notification_Priority
+          - notification_CreatedAt
+          - -notification_CreatedAt
+          - seen
+          - -seen
+          - seenAt
+          - -seenAt
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
       - name: page
         required: false
         in: query
@@ -9577,6 +9753,37 @@ paths:
             - '0'
           - type: boolean
         description: Filter orders that need processing
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, status, -status,
+          statusUpdatedAt, -statusUpdatedAt, paidAmount, -paidAmount, shippingPrice,
+          -shippingPrice, paymentStatus, -paymentStatus, user_FirstName, -user_FirstName,
+          user_LastName, -user_LastName'
+        schema:
+          type: string
+          enum:
+          - id
+          - -id
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
+          - status
+          - -status
+          - statusUpdatedAt
+          - -statusUpdatedAt
+          - paidAmount
+          - -paidAmount
+          - shippingPrice
+          - -shippingPrice
+          - paymentStatus
+          - -paymentStatus
+          - user_FirstName
+          - -user_FirstName
+          - user_LastName
+          - -user_LastName
       - name: page
         required: false
         in: query
@@ -10292,6 +10499,27 @@ paths:
         schema:
           type: string
         description: Filter by multiple order statuses (comma-separated)
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, quantity, -quantity,
+          price, -price, sortOrder, -sortOrder'
+        schema:
+          type: string
+          enum:
+          - id
+          - -id
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
+          - quantity
+          - -quantity
+          - price
+          - -price
+          - sortOrder
+          - -sortOrder
       - in: query
         name: originalQuantity
         schema:
@@ -11639,6 +11867,37 @@ paths:
             - '0'
           - type: boolean
         description: Filter orders that need processing
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, status, -status,
+          statusUpdatedAt, -statusUpdatedAt, paidAmount, -paidAmount, shippingPrice,
+          -shippingPrice, paymentStatus, -paymentStatus, user_FirstName, -user_FirstName,
+          user_LastName, -user_LastName'
+        schema:
+          type: string
+          enum:
+          - id
+          - -id
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
+          - status
+          - -status
+          - statusUpdatedAt
+          - -statusUpdatedAt
+          - paidAmount
+          - -paidAmount
+          - shippingPrice
+          - -shippingPrice
+          - paymentStatus
+          - -paymentStatus
+          - user_FirstName
+          - -user_FirstName
+          - user_LastName
+          - -user_LastName
       - name: page
         required: false
         in: query
@@ -12242,6 +12501,34 @@ paths:
         schema:
           type: string
         description: Filter by name (partial match)
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, cost, -cost, freeThreshold,
+          -freeThreshold, providerCode, -providerCode, isOnlinePayment, -isOnlinePayment,
+          requiresConfirmation, -requiresConfirmation, sortOrder, -sortOrder'
+        schema:
+          type: string
+          enum:
+          - id
+          - -id
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
+          - cost
+          - -cost
+          - freeThreshold
+          - -freeThreshold
+          - providerCode
+          - -providerCode
+          - isOnlinePayment
+          - -isOnlinePayment
+          - requiresConfirmation
+          - -requiresConfirmation
+          - sortOrder
+          - -sortOrder
       - name: page
         required: false
         in: query
@@ -12984,6 +13271,40 @@ paths:
             pattern: ^-?\d+(\.\d+)?$
           - type: number
         description: Minimum weight
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          price, -price, createdAt, -createdAt, active, -active, availabilityPriority,
+          -availabilityPriority, discountValueAmount, -discountValueAmount, finalPriceAmount,
+          -finalPriceAmount, priceSavePercentField, -priceSavePercentField, reviewAverageField,
+          -reviewAverageField, likesCountField, -likesCountField, viewCount, -viewCount,
+          stock, -stock'
+        schema:
+          type: string
+          enum:
+          - price
+          - -price
+          - createdAt
+          - -createdAt
+          - active
+          - -active
+          - availabilityPriority
+          - -availabilityPriority
+          - discountValueAmount
+          - -discountValueAmount
+          - finalPriceAmount
+          - -finalPriceAmount
+          - priceSavePercentField
+          - -priceSavePercentField
+          - reviewAverageField
+          - -reviewAverageField
+          - likesCountField
+          - -likesCountField
+          - viewCount
+          - -viewCount
+          - stock
+          - -stock
       - name: page
         required: false
         in: query
@@ -13753,6 +14074,31 @@ paths:
             pattern: ^-?\d+(\.\d+)?$
           - type: number
         description: Minimum number of products (recursive)
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, sortOrder, -sortOrder, level, -level, lft, -lft, rght, -rght, treeId,
+          -treeId, createdAt, -createdAt, updatedAt, -updatedAt'
+        schema:
+          type: string
+          enum:
+          - id
+          - -id
+          - sortOrder
+          - -sortOrder
+          - level
+          - -level
+          - lft
+          - -lft
+          - rght
+          - -rght
+          - treeId
+          - -treeId
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
       - name: page
         required: false
         in: query
@@ -14161,6 +14507,20 @@ paths:
           - en
           default: el
         description: Language code for translations (el, en, de)
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          createdAt, -createdAt, imageType, -imageType, sortOrder, -sortOrder'
+        schema:
+          type: string
+          enum:
+          - createdAt
+          - -createdAt
+          - imageType
+          - -imageType
+          - sortOrder
+          - -sortOrder
       - name: page
         required: false
         in: query
@@ -14540,6 +14900,25 @@ paths:
           - en
           default: el
         description: Language code for translations (el, en, de)
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, userId, -userId, productId, -productId, createdAt, -createdAt,
+          updatedAt, -updatedAt'
+        schema:
+          type: string
+          enum:
+          - id
+          - -id
+          - userId
+          - -userId
+          - productId
+          - -productId
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
       - name: page
         required: false
         in: query
@@ -14945,6 +15324,25 @@ paths:
           - en
           default: el
         description: Language code for translations (el, en, de)
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, isMain, -isMain,
+          sortOrder, -sortOrder'
+        schema:
+          type: string
+          enum:
+          - id
+          - -id
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
+          - isMain
+          - -isMain
+          - sortOrder
+          - -sortOrder
       - name: page
         required: false
         in: query
@@ -15337,6 +15735,34 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Filter by minimum rating (alias)
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, userId, -userId, productId, -productId, rate, -rate, status, -status,
+          isPublished, -isPublished, createdAt, -createdAt, updatedAt, -updatedAt,
+          publishedAt, -publishedAt'
+        schema:
+          type: string
+          enum:
+          - id
+          - -id
+          - userId
+          - -userId
+          - productId
+          - -productId
+          - rate
+          - -rate
+          - status
+          - -status
+          - isPublished
+          - -isPublished
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
+          - publishedAt
+          - -publishedAt
       - name: page
         required: false
         in: query
@@ -16127,6 +16553,20 @@ paths:
         schema:
           type: string
         description: Filter by region name (partial match)
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          createdAt, -createdAt, alpha, -alpha, sortOrder, -sortOrder'
+        schema:
+          type: string
+          enum:
+          - createdAt
+          - -createdAt
+          - alpha
+          - -alpha
+          - sortOrder
+          - -sortOrder
       - name: page
         required: false
         in: query
@@ -16626,6 +17066,20 @@ paths:
         schema:
           type: string
         description: Filter by region name (partial match)
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          createdAt, -createdAt, alpha, -alpha, sortOrder, -sortOrder'
+        schema:
+          type: string
+          enum:
+          - createdAt
+          - -createdAt
+          - alpha
+          - -alpha
+          - sortOrder
+          - -sortOrder
       - name: page
         required: false
         in: query
@@ -16969,6 +17423,27 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         description: Filter tags used for specific object ID
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, active, -active, createdAt, -createdAt, updatedAt, -updatedAt,
+          sortOrder, -sortOrder, translations_Label, -translations_Label'
+        schema:
+          type: string
+          enum:
+          - id
+          - -id
+          - active
+          - -active
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
+          - sortOrder
+          - -sortOrder
+          - translations_Label
+          - -translations_Label
       - name: page
         required: false
         in: query
@@ -17558,6 +18033,25 @@ paths:
         description: Filter by multiple object IDs (comma-separated)
         explode: false
         style: form
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, objectId, -objectId,
+          tag_Translations_Label, -tag_Translations_Label'
+        schema:
+          type: string
+          enum:
+          - id
+          - -id
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
+          - objectId
+          - -objectId
+          - tag_Translations_Label
+          - -tag_Translations_Label
       - name: page
         required: false
         in: query
@@ -18049,6 +18543,25 @@ paths:
           - en
           default: el
         description: Language code for translations (el, en, de)
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, email, -email, username, -username, createdAt, -createdAt, updatedAt,
+          -updatedAt'
+        schema:
+          type: string
+          enum:
+          - id
+          - -id
+          - email
+          - -email
+          - username
+          - -username
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
       - name: page
         required: false
         in: query
@@ -18154,13 +18667,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/AuthenticationRequest'
+              $ref: '#/components/schemas/UserWriteRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/AuthenticationRequest'
+              $ref: '#/components/schemas/UserWriteRequest'
           application/json:
             schema:
-              $ref: '#/components/schemas/AuthenticationRequest'
+              $ref: '#/components/schemas/UserWriteRequest'
         required: true
       security:
       - knoxApiToken: []
@@ -18291,13 +18804,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/AuthenticationRequest'
+              $ref: '#/components/schemas/UserWriteRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/AuthenticationRequest'
+              $ref: '#/components/schemas/UserWriteRequest'
           application/json:
             schema:
-              $ref: '#/components/schemas/AuthenticationRequest'
+              $ref: '#/components/schemas/UserWriteRequest'
         required: true
       security:
       - knoxApiToken: []
@@ -18368,13 +18881,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/PatchedAuthenticationRequest'
+              $ref: '#/components/schemas/PatchedUserWriteRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/PatchedAuthenticationRequest'
+              $ref: '#/components/schemas/PatchedUserWriteRequest'
           application/json:
             schema:
-              $ref: '#/components/schemas/PatchedAuthenticationRequest'
+              $ref: '#/components/schemas/PatchedUserWriteRequest'
       security:
       - knoxApiToken: []
       - cookieAuth: []
@@ -18468,30 +18981,25 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
-      - in: query
-        name: ordering
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, email, -email, username, -username, createdAt, -createdAt, updatedAt,
+          -updatedAt'
         schema:
           type: string
           enum:
-          - -country
-          - -createdAt
-          - -floor
-          - -id
-          - -isMain
-          - -locationType
-          - -updatedAt
-          - -zipcode
-          - country
-          - createdAt
-          - floor
           - id
-          - isMain
-          - locationType
+          - -id
+          - email
+          - -email
+          - username
+          - -username
+          - createdAt
+          - -createdAt
           - updatedAt
-          - zipcode
-        description: 'Which field to use when ordering the results. Available fields:
-          id, country, zipcode, floor, locationType, isMain, createdAt, updatedAt,
-          -id, -country, -zipcode, -floor, -locationType, -isMain, -createdAt, -updatedAt'
+          - -updatedAt
       - name: page
         required: false
         in: query
@@ -18560,19 +19068,25 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
-      - in: query
-        name: ordering
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, email, -email, username, -username, createdAt, -createdAt, updatedAt,
+          -updatedAt'
         schema:
           type: string
           enum:
-          - -createdAt
-          - -id
-          - -post
-          - createdAt
           - id
-          - post
-        description: 'Which field to use when ordering the results. Available fields:
-          id, post, createdAt, -id, -post, -createdAt'
+          - -id
+          - email
+          - -email
+          - username
+          - -username
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
       - name: page
         required: false
         in: query
@@ -18703,21 +19217,25 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
-      - in: query
-        name: ordering
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, email, -email, username, -username, createdAt, -createdAt, updatedAt,
+          -updatedAt'
         schema:
           type: string
           enum:
-          - -createdAt
-          - -id
-          - -productId
-          - -updatedAt
-          - createdAt
           - id
-          - productId
+          - -id
+          - email
+          - -email
+          - username
+          - -username
+          - createdAt
+          - -createdAt
           - updatedAt
-        description: 'Which field to use when ordering the results. Available fields:
-          id, productId, createdAt, updatedAt, -id, -productId, -createdAt, -updatedAt'
+          - -updatedAt
       - name: page
         required: false
         in: query
@@ -18786,24 +19304,25 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
-      - in: query
-        name: ordering
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, email, -email, username, -username, createdAt, -createdAt, updatedAt,
+          -updatedAt'
         schema:
           type: string
           enum:
-          - -createdAt
-          - -id
-          - -publishedAt
-          - -title
-          - -updatedAt
-          - createdAt
           - id
-          - publishedAt
-          - title
+          - -id
+          - email
+          - -email
+          - username
+          - -username
+          - createdAt
+          - -createdAt
           - updatedAt
-        description: 'Which field to use when ordering the results. Available fields:
-          id, title, createdAt, updatedAt, publishedAt, -id, -title, -createdAt, -updatedAt,
-          -publishedAt'
+          - -updatedAt
       - name: page
         required: false
         in: query
@@ -18872,17 +19391,25 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
-      - in: query
-        name: ordering
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, email, -email, username, -username, createdAt, -createdAt, updatedAt,
+          -updatedAt'
         schema:
           type: string
           enum:
-          - -createdAt
-          - -seenAt
+          - id
+          - -id
+          - email
+          - -email
+          - username
+          - -username
           - createdAt
-          - seenAt
-        description: 'Which field to use when ordering the results. Available fields:
-          createdAt, seenAt, -createdAt, -seenAt'
+          - -createdAt
+          - updatedAt
+          - -updatedAt
       - name: page
         required: false
         in: query
@@ -18951,19 +19478,25 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
-      - in: query
-        name: ordering
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, email, -email, username, -username, createdAt, -createdAt, updatedAt,
+          -updatedAt'
         schema:
           type: string
           enum:
-          - -createdAt
-          - -status
-          - -updatedAt
+          - id
+          - -id
+          - email
+          - -email
+          - username
+          - -username
           - createdAt
-          - status
+          - -createdAt
           - updatedAt
-        description: 'Which field to use when ordering the results. Available fields:
-          createdAt, updatedAt, status, -createdAt, -updatedAt, -status'
+          - -updatedAt
       - name: page
         required: false
         in: query
@@ -19032,21 +19565,25 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
-      - in: query
-        name: ordering
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, email, -email, username, -username, createdAt, -createdAt, updatedAt,
+          -updatedAt'
         schema:
           type: string
           enum:
-          - -createdAt
-          - -id
-          - -productId
-          - -updatedAt
-          - createdAt
           - id
-          - productId
+          - -id
+          - email
+          - -email
+          - username
+          - -username
+          - createdAt
+          - -createdAt
           - updatedAt
-        description: 'Which field to use when ordering the results. Available fields:
-          id, productId, createdAt, updatedAt, -id, -productId, -createdAt, -updatedAt'
+          - -updatedAt
       - name: page
         required: false
         in: query
@@ -19279,6 +19816,27 @@ paths:
         name: mobilePhone_Icontains
         schema:
           type: string
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, updatedAt, -updatedAt, city, -city, zipcode,
+          -zipcode, isMain, -isMain'
+        schema:
+          type: string
+          enum:
+          - id
+          - -id
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
+          - city
+          - -city
+          - zipcode
+          - -zipcode
+          - isMain
+          - -isMain
       - name: page
         required: false
         in: query
@@ -19911,6 +20469,27 @@ paths:
           - en
           default: el
         description: Language code for translations (el, en, de)
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          subscribedAt, -subscribedAt, unsubscribedAt, -unsubscribedAt, createdAt,
+          -createdAt, updatedAt, -updatedAt, status, -status, topic_Category, -topic_Category'
+        schema:
+          type: string
+          enum:
+          - subscribedAt
+          - -subscribedAt
+          - unsubscribedAt
+          - -unsubscribedAt
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
+          - status
+          - -status
+          - topic_Category
+          - -topic_Category
       - name: page
         required: false
         in: query
@@ -20542,6 +21121,23 @@ paths:
         schema:
           type: string
         description: Filter by name (partial match)
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          category, -category, createdAt, -createdAt, updatedAt, -updatedAt, slug,
+          -slug'
+        schema:
+          type: string
+          enum:
+          - category
+          - -category
+          - createdAt
+          - -createdAt
+          - updatedAt
+          - -updatedAt
+          - slug
+          - -slug
       - name: page
         required: false
         in: query
@@ -25492,107 +26088,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/UserSubscription'
-    PatchedAuthenticationRequest:
-      type: object
-      properties:
-        email:
-          type: string
-          format: email
-          minLength: 1
-          title: Διεύθυνση ηλεκτρονικού ταχυδρομείου
-          maxLength: 254
-        firstName:
-          type: string
-          maxLength: 255
-        lastName:
-          type: string
-          maxLength: 255
-        username:
-          type: string
-          nullable: true
-          title: Όνομα χρήστη
-          description: Required. 30 characters or fewer.Letters, digits and @/./+/-/_
-            only.
-          pattern: ^[\w.@+#-]+$
-          maxLength: 30
-        image:
-          type: string
-          format: binary
-          nullable: true
-          title: Εικόνα
-        phone:
-          type: string
-          nullable: true
-        city:
-          type: string
-          maxLength: 255
-        zipcode:
-          type: string
-          title: Zip Code
-          maxLength: 255
-        address:
-          type: string
-          maxLength: 255
-        place:
-          type: string
-          maxLength: 255
-        country:
-          type: string
-          minLength: 1
-          title: Country Code Alpha 2
-          nullable: true
-        region:
-          type: string
-          minLength: 1
-          title: Region Code
-          nullable: true
-        birthDate:
-          type: string
-          format: date
-          nullable: true
-        twitter:
-          type: string
-          format: uri
-          nullable: true
-          title: Twitter Profile
-          maxLength: 200
-        linkedin:
-          type: string
-          format: uri
-          nullable: true
-          title: LinkedIn Profile
-          maxLength: 200
-        facebook:
-          type: string
-          format: uri
-          nullable: true
-          title: Facebook Profile
-          maxLength: 200
-        instagram:
-          type: string
-          format: uri
-          nullable: true
-          title: Instagram Profile
-          maxLength: 200
-        website:
-          type: string
-          format: uri
-          nullable: true
-          maxLength: 200
-        youtube:
-          type: string
-          format: uri
-          nullable: true
-          title: Youtube Profile
-          maxLength: 200
-        github:
-          type: string
-          format: uri
-          nullable: true
-          title: Github Profile
-          maxLength: 200
-        bio:
-          type: string
     PatchedBlogAuthorWriteRequest:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -26465,6 +26960,107 @@ components:
           $ref: '#/components/schemas/SubscriptionStatus'
         metadata:
           description: Additional subscription preferences or data
+    PatchedUserWriteRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          title: Διεύθυνση ηλεκτρονικού ταχυδρομείου
+          maxLength: 254
+        firstName:
+          type: string
+          maxLength: 255
+        lastName:
+          type: string
+          maxLength: 255
+        username:
+          type: string
+          nullable: true
+          title: Όνομα χρήστη
+          description: Required. 30 characters or fewer.Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+#-]+$
+          maxLength: 30
+        image:
+          type: string
+          format: binary
+          nullable: true
+          title: Εικόνα
+        phone:
+          type: string
+          nullable: true
+        city:
+          type: string
+          maxLength: 255
+        zipcode:
+          type: string
+          title: Zip Code
+          maxLength: 255
+        address:
+          type: string
+          maxLength: 255
+        place:
+          type: string
+          maxLength: 255
+        country:
+          type: string
+          minLength: 1
+          title: Country Code Alpha 2
+          nullable: true
+        region:
+          type: string
+          minLength: 1
+          title: Region Code
+          nullable: true
+        birthDate:
+          type: string
+          format: date
+          nullable: true
+        twitter:
+          type: string
+          format: uri
+          nullable: true
+          title: Twitter Profile
+          maxLength: 200
+        linkedin:
+          type: string
+          format: uri
+          nullable: true
+          title: LinkedIn Profile
+          maxLength: 200
+        facebook:
+          type: string
+          format: uri
+          nullable: true
+          title: Facebook Profile
+          maxLength: 200
+        instagram:
+          type: string
+          format: uri
+          nullable: true
+          title: Instagram Profile
+          maxLength: 200
+        website:
+          type: string
+          format: uri
+          nullable: true
+          maxLength: 200
+        youtube:
+          type: string
+          format: uri
+          nullable: true
+          title: Youtube Profile
+          maxLength: 200
+        github:
+          type: string
+          format: uri
+          nullable: true
+          title: Github Profile
+          maxLength: 200
+        bio:
+          type: string
     PayWay:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -29625,6 +30221,109 @@ components:
           description: Additional subscription preferences or data
       required:
       - topic
+    UserWriteRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          title: Διεύθυνση ηλεκτρονικού ταχυδρομείου
+          maxLength: 254
+        firstName:
+          type: string
+          maxLength: 255
+        lastName:
+          type: string
+          maxLength: 255
+        username:
+          type: string
+          nullable: true
+          title: Όνομα χρήστη
+          description: Required. 30 characters or fewer.Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+#-]+$
+          maxLength: 30
+        image:
+          type: string
+          format: binary
+          nullable: true
+          title: Εικόνα
+        phone:
+          type: string
+          nullable: true
+        city:
+          type: string
+          maxLength: 255
+        zipcode:
+          type: string
+          title: Zip Code
+          maxLength: 255
+        address:
+          type: string
+          maxLength: 255
+        place:
+          type: string
+          maxLength: 255
+        country:
+          type: string
+          minLength: 1
+          title: Country Code Alpha 2
+          nullable: true
+        region:
+          type: string
+          minLength: 1
+          title: Region Code
+          nullable: true
+        birthDate:
+          type: string
+          format: date
+          nullable: true
+        twitter:
+          type: string
+          format: uri
+          nullable: true
+          title: Twitter Profile
+          maxLength: 200
+        linkedin:
+          type: string
+          format: uri
+          nullable: true
+          title: LinkedIn Profile
+          maxLength: 200
+        facebook:
+          type: string
+          format: uri
+          nullable: true
+          title: Facebook Profile
+          maxLength: 200
+        instagram:
+          type: string
+          format: uri
+          nullable: true
+          title: Instagram Profile
+          maxLength: 200
+        website:
+          type: string
+          format: uri
+          nullable: true
+          maxLength: 200
+        youtube:
+          type: string
+          format: uri
+          nullable: true
+          title: Youtube Profile
+          maxLength: 200
+        github:
+          type: string
+          format: uri
+          nullable: true
+          title: Github Profile
+          maxLength: 200
+        bio:
+          type: string
+      required:
+      - email
     UsernameUpdateRequest:
       type: object
       properties:

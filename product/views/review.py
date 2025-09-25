@@ -170,6 +170,11 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
     @action(detail=True, methods=["GET"])
     def product(self, request, *args, **kwargs):
         review = self.get_object()
+
+        self.ordering_fields = []
+        self.ordering = []
+        self.search_fields = []
+
         product = review.product
         serializer = ProductSerializer(
             product, context=self.get_serializer_context()

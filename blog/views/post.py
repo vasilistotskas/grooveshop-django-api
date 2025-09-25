@@ -4,7 +4,6 @@ from datetime import timedelta
 from functools import cached_property
 from importlib import import_module
 from typing import TYPE_CHECKING
-
 from django.conf import settings
 from django.db.models import F
 from django.utils import timezone
@@ -19,6 +18,7 @@ from rest_framework.decorators import action
 
 from rest_framework.response import Response
 
+from blog.filters.comment import BlogCommentFilter
 from blog.filters.post import BlogPostFilter
 from blog.models.post import BlogPost
 from blog.serializers.comment import BlogCommentSerializer
@@ -94,7 +94,6 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
     response_serializers = res_serializers
     request_serializers = req_serializers
 
-    filterset_class = BlogPostFilter
     ordering_fields = [
         "id",
         "created_at",
@@ -131,10 +130,14 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
         )
         return queryset
 
-    def get_serializer_class(self):
-        if hasattr(super(), "get_serializer_class"):
-            return super().get_serializer_class()
-        return self.serializers.get(self.action, BlogPostSerializer)
+    def get_filterset_class(self):
+        if self.action == "comments":
+            return None
+        return BlogPostFilter
+
+    @property
+    def filterset_class(self):
+        return self.get_filterset_class()
 
     @cached_property
     def related_posts_strategy(self):
@@ -276,6 +279,20 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
         summary=_("Get post comments"),
         description=_("Get all comments for a blog post."),
         tags=["Blog Posts"],
+        parameters=[
+            OpenApiParameter(
+                name="parent",
+                type=str,
+                description="Parent comment ID",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="parent__isnull",
+                type=bool,
+                description="Filter comments with no parent",
+                required=False,
+            ),
+        ],
         responses={
             200: BlogCommentSerializer(many=True),
             404: ErrorResponseSerializer,
@@ -284,22 +301,26 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
     @action(detail=True, methods=["GET"])
     def comments(self, request, pk=None):
         post = self.get_object()
+
+        self.ordering_fields = []
+        self.ordering = []
+        self.search_fields = []
+
         queryset = post.comments.select_related(
             "user", "parent"
         ).prefetch_related("translations", "likes")
 
-        parent_id = request.query_params.get("parent", None)
-        if parent_id is not None:
-            if parent_id.lower() == "none":
-                queryset = queryset.filter(parent__isnull=True)
-            else:
-                try:
-                    queryset = queryset.filter(parent_id=int(parent_id))
-                except (ValueError, TypeError):
-                    return Response(
-                        {"detail": _("Invalid parent ID.")},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
+        comment_filterset = BlogCommentFilter(
+            data=request.GET, queryset=queryset, request=request
+        )
+
+        if comment_filterset.is_valid():
+            queryset = comment_filterset.qs
+        else:
+            return Response(
+                {"filter_errors": comment_filterset.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         return self.paginate_and_serialize(queryset, request)
 
@@ -319,27 +340,6 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
                 description="Number of days to look back for trending calculation",
                 required=False,
                 default=7,
-            ),
-            OpenApiParameter(
-                name="ordering",
-                type=str,
-                description=_(
-                    "Which field to use when ordering the results. Available fields: createdAt, updatedAt, publishedAt, viewCount, likesCount, commentsCount, -createdAt, -updatedAt, -publishedAt, -viewCount, -likesCount, -commentsCount"
-                ),
-                enum=[
-                    "createdAt",
-                    "updatedAt",
-                    "publishedAt",
-                    "viewCount",
-                    "likesCount",
-                    "commentsCount",
-                    "-createdAt",
-                    "-updatedAt",
-                    "-publishedAt",
-                    "-viewCount",
-                    "-likesCount",
-                    "-commentsCount",
-                ],
             ),
         ],
         responses={
@@ -371,29 +371,6 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
             "Get most popular blog posts based on all-time engagement metrics."
         ),
         tags=["Blog Posts"],
-        parameters=[
-            OpenApiParameter(
-                name="ordering",
-                type=str,
-                description=_(
-                    "Which field to use when ordering the results. Available fields: createdAt, updatedAt, publishedAt, viewCount, likesCount, commentsCount, -createdAt, -updatedAt, -publishedAt, -viewCount, -likesCount, -commentsCount"
-                ),
-                enum=[
-                    "createdAt",
-                    "updatedAt",
-                    "publishedAt",
-                    "viewCount",
-                    "likesCount",
-                    "commentsCount",
-                    "-createdAt",
-                    "-updatedAt",
-                    "-publishedAt",
-                    "-viewCount",
-                    "-likesCount",
-                    "-commentsCount",
-                ],
-            ),
-        ],
         responses={
             200: BlogPostSerializer(many=True),
         },
@@ -412,31 +389,6 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
             "Get posts marked as featured, ordered by publication date."
         ),
         tags=["Blog Posts"],
-        parameters=[
-            OpenApiParameter(
-                name="ordering",
-                type=str,
-                description=_(
-                    "Which field to use when ordering the results. Available fields: createdAt, updatedAt, publishedAt, viewCount, likesCount, commentsCount, featured, -createdAt, -updatedAt, -publishedAt, -viewCount, -likesCount, -commentsCount, -featured"
-                ),
-                enum=[
-                    "createdAt",
-                    "updatedAt",
-                    "publishedAt",
-                    "viewCount",
-                    "likesCount",
-                    "commentsCount",
-                    "featured",
-                    "-createdAt",
-                    "-updatedAt",
-                    "-publishedAt",
-                    "-viewCount",
-                    "-likesCount",
-                    "-commentsCount",
-                    "-featured",
-                ],
-            ),
-        ],
         responses={
             200: BlogPostSerializer(many=True),
         },

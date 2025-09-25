@@ -230,6 +230,10 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
     )
     @action(detail=True, methods=["GET"])
     def post(self, request, pk=None):
+        self.ordering_fields = []
+        self.ordering = []
+        self.search_fields = []
+
         comment = self.get_object()
         post = comment.post
         serializer = BlogPostDetailSerializer(

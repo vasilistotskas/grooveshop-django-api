@@ -3,6 +3,14 @@
 
 
 
+## v1.29.0 (2025-09-25)
+
+### Features
+
+* feat: blog API ordering and filter schema generation
+
+Removed hardcoded OpenAPI ordering parameters from blog views and centralized ordering parameter schema generation in CamelCaseOrderingFilterExtension. Updated blog post comment filtering to use BlogCommentFilter and improved error handling. Added UserWriteSerializer for user updates with email and username uniqueness validation. Updated translations and improved code consistency across views. ([`999990d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/999990d3bedde2ed1e23a787ed01325ab2aa65f2))
+
 ## v1.28.0 (2025-09-23)
 
 ### Features

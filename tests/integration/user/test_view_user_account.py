@@ -5,7 +5,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from authentication.serializers import AuthenticationSerializer
+from user.serializers.account import UserDetailsSerializer
 from core.utils.testing import TestURLFixerMixin
 from user.factories.account import UserAccountFactory
 
@@ -33,13 +33,13 @@ class UserAccountViewSetTestCase(TestURLFixerMixin, APITestCase):
 
         if isinstance(response.data, dict) and "results" in response.data:
             users = User.objects.all()
-            serializer = AuthenticationSerializer(
+            serializer = UserDetailsSerializer(
                 users, many=True, context={"request": response.wsgi_request}
             )
             self.assertEqual(response.data["results"], serializer.data)
         else:
             users = User.objects.all()
-            serializer = AuthenticationSerializer(
+            serializer = UserDetailsSerializer(
                 users, many=True, context={"request": response.wsgi_request}
             )
             self.assertEqual(response.data, serializer.data)

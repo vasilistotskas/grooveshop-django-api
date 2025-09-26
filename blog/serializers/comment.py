@@ -10,7 +10,7 @@ from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
-from authentication.serializers import AuthenticationSerializer
+from user.serializers.account import UserDetailsSerializer
 from blog.models.comment import BlogComment
 from blog.models.post import BlogPost
 from core.api.schema import generate_schema_multi_lang
@@ -27,7 +27,7 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
 class BlogCommentSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[BlogComment]
 ):
-    user = AuthenticationSerializer(read_only=True)
+    user = UserDetailsSerializer(read_only=True)
     content_preview = serializers.SerializerMethodField(
         help_text=_("First 150 characters of the comment content")
     )
@@ -148,7 +148,7 @@ class BlogCommentDetailSerializer(BlogCommentSerializer):
             return {
                 "id": obj.parent.id,
                 "content_preview": self.get_content_preview(obj.parent),
-                "user": AuthenticationSerializer(obj.parent.user).data,
+                "user": UserDetailsSerializer(obj.parent.user).data,
                 "created_at": obj.parent.created_at,
             }
         return None
@@ -188,7 +188,7 @@ class BlogCommentDetailSerializer(BlogCommentSerializer):
             {
                 "id": ancestor.id,
                 "content_preview": self.get_content_preview(ancestor),
-                "user": AuthenticationSerializer(ancestor.user).data,
+                "user": UserDetailsSerializer(ancestor.user).data,
             }
             for ancestor in ancestors
         ]

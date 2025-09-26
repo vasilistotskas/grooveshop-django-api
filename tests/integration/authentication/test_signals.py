@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 from allauth.socialaccount.models import SocialAccount, SocialLogin
 from django.test import TestCase
 
-from authentication.signals import populate_profile
+from user.signals import populate_profile
 
 
 class PopulateProfileTest(TestCase):

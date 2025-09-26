@@ -4,7 +4,7 @@ from drf_spectacular.utils import extend_schema_field
 from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 
-from authentication.serializers import AuthenticationSerializer
+from user.serializers.account import UserDetailsSerializer
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
 from product.models.product import Product
@@ -23,7 +23,7 @@ class ProductReviewSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[ProductReview]
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=ProductReview)
-    user = AuthenticationSerializer(read_only=True)
+    user = UserDetailsSerializer(read_only=True)
     product = ProductSerializer(read_only=True)
 
     class Meta:
@@ -54,7 +54,7 @@ class ProductReviewDetailSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[ProductReview]
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=ProductReview)
-    user = AuthenticationSerializer(read_only=True)
+    user = UserDetailsSerializer(read_only=True)
     product = ProductSerializer(read_only=True)
 
     class Meta:

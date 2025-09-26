@@ -7,7 +7,7 @@ from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
-from authentication.serializers import AuthenticationSerializer
+from user.serializers.account import UserDetailsSerializer
 from blog.models.author import BlogAuthor
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
@@ -26,6 +26,17 @@ class BlogAuthorSerializer(
 ):
     user = PrimaryKeyRelatedField(queryset=User.objects.all())
     translations = TranslatedFieldsFieldExtend(shared_model=BlogAuthor)
+    website = serializers.SerializerMethodField()
+
+    @extend_schema_field(
+        {
+            "type": "string",
+            "maxLength": 200,
+            "description": _("URL link or empty string"),
+        }
+    )
+    def get_website(self, obj):
+        return obj.website
 
     class Meta:
         model = BlogAuthor
@@ -50,7 +61,7 @@ class BlogAuthorSerializer(
 
 
 class BlogAuthorDetailSerializer(BlogAuthorSerializer):
-    user = AuthenticationSerializer(read_only=True)
+    user = UserDetailsSerializer(read_only=True)
     recent_posts = serializers.SerializerMethodField()
     top_posts = serializers.SerializerMethodField()
 

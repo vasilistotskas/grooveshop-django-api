@@ -103,7 +103,6 @@ LOCAL_APPS = [
     "pay_way",
     "cart",
     "notification",
-    "authentication",
     "contact",
     "tag",
     "meili",
@@ -235,7 +234,7 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.UserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon": None if DEBUG else "50000/day",
+        "anon": None if DEBUG else "100000/day",
         "user": None if DEBUG else "150000/day",
         "burst": None if DEBUG else "5/minute",
     },

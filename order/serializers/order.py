@@ -133,7 +133,7 @@ class OrderDetailSerializer(OrderSerializer):
             {
                 "change_type": "CREATED",
                 "timestamp": obj.created_at,
-                "description": "Order was created",
+                "description": _("Order was created"),
                 "user": None,
                 "previous_value": None,
                 "new_value": None,

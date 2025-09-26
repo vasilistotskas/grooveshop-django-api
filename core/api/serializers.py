@@ -1,7 +1,7 @@
 import decimal
 import importlib
 from typing import Any, TypedDict
-
+from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_field
 from measurement.base import BidimensionalMeasure, MeasureBase
 from rest_framework import serializers
@@ -56,7 +56,9 @@ class Representation(TypedDict):
 @extend_schema_field(
     {
         "type": "object",
-        "description": "Serialized representation of the related content object",
+        "description": _(
+            "Serialized representation of the related content object"
+        ),
         "properties": {
             "id": {"type": "integer", "example": 1},
             "name": {"type": "string", "example": "Sample Product"},

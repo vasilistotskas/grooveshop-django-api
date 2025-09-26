@@ -434,7 +434,9 @@ class OrderAdmin(ModelAdmin):
                     "financial_summary",
                 ),
                 "classes": ("wide",),
-                "description": "⚠️ Note: Ensure all money fields use the same currency (EUR preferred) to avoid calculation errors.",
+                "description": _(
+                    "⚠️ Note: Ensure all money fields use the same currency (EUR preferred) to avoid calculation errors."
+                ),
             },
         ),
         (
@@ -446,7 +448,9 @@ class OrderAdmin(ModelAdmin):
                     "shipping_carrier",
                 ),
                 "classes": ("wide",),
-                "description": "💡 Shipping price currency should match item currencies to avoid total calculation errors.",
+                "description": _(
+                    "💡 Shipping price currency should match item currencies to avoid total calculation errors."
+                ),
             },
         ),
         (

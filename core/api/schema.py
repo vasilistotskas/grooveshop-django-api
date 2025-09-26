@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.utils.translation import gettext_lazy as _
 
 
 def generate_schema_multi_lang(model_instance):
@@ -66,7 +67,7 @@ def postprocess_schema_parameters_to_accept_strings(
                         "oneOf": [
                             {
                                 "type": "string",
-                                "description": "Comma-separated values",
+                                "description": _("Comma-separated values"),
                             },
                             original_array_schema,
                         ]

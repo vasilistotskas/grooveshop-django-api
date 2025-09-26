@@ -12,8 +12,8 @@ from rest_framework.decorators import action
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 
-from authentication.serializers import (
-    AuthenticationSerializer,
+from user.serializers.account import (
+    UserDetailsSerializer,
     UserWriteSerializer,
 )
 from blog.filters.comment import BlogCommentFilter
@@ -25,7 +25,6 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
-    MultiSerializerMixin,
     create_schema_view_config,
     RequestSerializersConfig,
     ResponseSerializersConfig,
@@ -52,7 +51,6 @@ from user.utils.subscription import get_user_subscription_summary
 
 User = get_user_model()
 
-# Updated configurations to use separate serializers for write operations
 req_serializers: RequestSerializersConfig = {
     "create": UserWriteSerializer,
     "update": UserWriteSerializer,
@@ -60,11 +58,11 @@ req_serializers: RequestSerializersConfig = {
 }
 
 res_serializers: ResponseSerializersConfig = {
-    "create": AuthenticationSerializer,  # Return full data after creation
-    "list": AuthenticationSerializer,
-    "retrieve": AuthenticationSerializer,
-    "update": AuthenticationSerializer,  # Return full data after update
-    "partial_update": AuthenticationSerializer,  # Return full data after partial update
+    "create": UserDetailsSerializer,
+    "list": UserDetailsSerializer,
+    "retrieve": UserDetailsSerializer,
+    "update": UserDetailsSerializer,
+    "partial_update": UserDetailsSerializer,
 }
 
 
@@ -201,7 +199,7 @@ res_serializers: ResponseSerializersConfig = {
         },
     ),
 )
-class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
+class UserAccountViewSet(BaseModelViewSet):
     queryset = User.objects.none()
     permission_classes = [IsOwnerOrAdmin]
     ordering_fields = ["id", "email", "username", "created_at", "updated_at"]
@@ -225,7 +223,7 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         return UserAccountFilter
 
     serializers = {
-        "default": AuthenticationSerializer,
+        "default": UserDetailsSerializer,
         "favourite_products": ProductFavouriteSerializer,
         "orders": OrderSerializer,
         "product_reviews": ProductReviewSerializer,
@@ -244,11 +242,11 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
     }
 
     response_serializers: ResponseSerializersConfig = {
-        "create": AuthenticationSerializer,
-        "list": AuthenticationSerializer,
-        "retrieve": AuthenticationSerializer,
-        "update": AuthenticationSerializer,
-        "partial_update": AuthenticationSerializer,
+        "create": UserDetailsSerializer,
+        "list": UserDetailsSerializer,
+        "retrieve": UserDetailsSerializer,
+        "update": UserDetailsSerializer,
+        "partial_update": UserDetailsSerializer,
     }
 
     def get_queryset(self):

@@ -3,7 +3,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
-from authentication.serializers import AuthenticationSerializer
+from user.serializers.account import UserDetailsSerializer
 from notification.models.user import NotificationUser
 from notification.serializers.notification import NotificationSerializer
 
@@ -42,7 +42,7 @@ class NotificationUserSerializer(serializers.ModelSerializer[NotificationUser]):
 
 
 class NotificationUserDetailSerializer(NotificationUserSerializer):
-    user = AuthenticationSerializer(read_only=True)
+    user = UserDetailsSerializer(read_only=True)
     notification = NotificationSerializer(read_only=True)
 
     class Meta(NotificationUserSerializer.Meta):

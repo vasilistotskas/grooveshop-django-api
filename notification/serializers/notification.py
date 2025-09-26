@@ -20,6 +20,17 @@ class NotificationSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[Notification]
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=Notification)
+    link = serializers.SerializerMethodField()
+
+    @extend_schema_field(
+        {
+            "type": "string",
+            "maxLength": 200,
+            "description": _("URL link or empty string"),
+        }
+    )
+    def get_link(self, obj):
+        return obj.link
 
     class Meta:
         model = Notification

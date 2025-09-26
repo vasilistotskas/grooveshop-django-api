@@ -139,12 +139,6 @@ jobs:
           uv run pytest --cov=. --cov-report=term --cov-report=html --cov-config=pyproject.toml
         timeout-minutes: 15
 
-      - name: Upload coverage to Coveralls
-        if: matrix.db == 'postgres'
-        run: uv run coveralls --service=github
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Store Pull Request comment to be posted
         uses: actions/upload-artifact@v4
         if: steps.coverage_comment.outputs.COMMENT_FILE_WRITTEN == 'true'

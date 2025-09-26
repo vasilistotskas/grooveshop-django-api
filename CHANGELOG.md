@@ -3,6 +3,18 @@
 
 
 
+## v1.30.0 (2025-09-26)
+
+### Bug fixes
+
+* fix: remove coveralls ([`525a38b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/525a38b93fb656796b926da4003845eb6cf3823d))
+
+### Features
+
+* feat: Update dependencies and disable DB health checks
+
+Bumped versions for asgiref, boto3, phonenumbers, uvicorn, and ruff in pyproject.toml. Disabled database connection health checks and atomic requests in settings.py by setting CONN_HEALTH_CHECKS and ATOMIC_REQUESTS to False and CONN_MAX_AGE to 0. These changes may be for local development or testing purposes. ([`667d89b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/667d89b791e6ca3ef11035c2a06a40fb2c707057))
+
 ## v1.29.2 (2025-09-25)
 
 ### Bug fixes

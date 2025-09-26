@@ -3,6 +3,16 @@
 
 
 
+## v1.31.0 (2025-09-26)
+
+### Bug fixes
+
+* fix: missing import ([`8ab65d5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8ab65d5815e09c5e24f067bad60a4b14ed1022ed))
+
+### Features
+
+* feat: extend_schema_field at serializer urls, authentication app removed and added some translations ([`76e777d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/76e777d87c73654ef1ac474c1d67d8499c05e7dc))
+
 ## v1.30.0 (2025-09-26)
 
 ### Bug fixes

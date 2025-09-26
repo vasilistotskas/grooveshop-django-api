@@ -25,6 +25,7 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
+    MultiSerializerMixin,
     create_schema_view_config,
     RequestSerializersConfig,
     ResponseSerializersConfig,
@@ -199,7 +200,7 @@ res_serializers: ResponseSerializersConfig = {
         },
     ),
 )
-class UserAccountViewSet(BaseModelViewSet):
+class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
     queryset = User.objects.none()
     permission_classes = [IsOwnerOrAdmin]
     ordering_fields = ["id", "email", "username", "created_at", "updated_at"]

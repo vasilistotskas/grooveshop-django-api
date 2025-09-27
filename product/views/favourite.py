@@ -12,9 +12,7 @@ from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-
 from core.utils.serializers import (
-    MultiSerializerMixin,
     create_schema_view_config,
     RequestSerializersConfig,
     ResponseSerializersConfig,
@@ -34,6 +32,7 @@ req_serializers: RequestSerializersConfig = {
     "create": ProductFavouriteWriteSerializer,
     "update": ProductFavouriteWriteSerializer,
     "partial_update": ProductFavouriteWriteSerializer,
+    "favourites_by_products": ProductFavouriteByProductsRequestSerializer,
 }
 
 res_serializers: ResponseSerializersConfig = {
@@ -42,6 +41,8 @@ res_serializers: ResponseSerializersConfig = {
     "retrieve": ProductFavouriteDetailSerializer,
     "update": ProductFavouriteWriteSerializer,
     "partial_update": ProductFavouriteWriteSerializer,
+    "product": ProductDetailResponseSerializer,
+    "favourites_by_products": ProductFavouriteByProductsResponseSerializer,
 }
 
 schema_config = create_schema_view_config(
@@ -55,7 +56,7 @@ schema_config = create_schema_view_config(
 
 
 @extend_schema_view(**schema_config)
-class ProductFavouriteViewSet(MultiSerializerMixin, BaseModelViewSet):
+class ProductFavouriteViewSet(BaseModelViewSet):
     queryset = ProductFavourite.objects.select_related(
         "user", "product"
     ).prefetch_related("product__translations")
@@ -72,24 +73,28 @@ class ProductFavouriteViewSet(MultiSerializerMixin, BaseModelViewSet):
         "user__username",
         "product__translations__name",
     ]
-    serializers = {
-        "default": ProductFavouriteDetailSerializer,
-        "list": ProductFavouriteSerializer,
-        "retrieve": ProductFavouriteDetailSerializer,
-        "create": ProductFavouriteWriteSerializer,
-        "update": ProductFavouriteWriteSerializer,
-        "partial_update": ProductFavouriteWriteSerializer,
-        "product": ProductDetailResponseSerializer,
-        "favourites_by_products": ProductFavouriteByProductsResponseSerializer,
-    }
     response_serializers = res_serializers
     request_serializers = req_serializers
 
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save(user=request.user)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        req_serializer = self.get_request_serializer()
+        request_serializer = req_serializer(
+            data=request.data, context=self.get_serializer_context()
+        )
+        request_serializer.is_valid(raise_exception=True)
+        request_serializer.save(user=request.user)
+
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(
+            request_serializer.instance, context=self.get_serializer_context()
+        )
+
+        headers = self.get_success_headers(response_serializer.data)
+        return Response(
+            response_serializer.data,
+            status=status.HTTP_201_CREATED,
+            headers=headers,
+        )
 
     @extend_schema(
         operation_id="getProductFavouriteProduct",
@@ -110,10 +115,11 @@ class ProductFavouriteViewSet(MultiSerializerMixin, BaseModelViewSet):
         self.ordering = []
         self.search_fields = []
 
-        serializer = self.get_serializer(
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(
             product_favourite.product, context=self.get_serializer_context()
         )
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
 
     @extend_schema(
         operation_id="getProductFavouritesByProducts",
@@ -144,15 +150,15 @@ class ProductFavouriteViewSet(MultiSerializerMixin, BaseModelViewSet):
     @action(detail=False, methods=["POST"])
     def favourites_by_products(self, request, *args, **kwargs):
         user = request.user
-        serializer = ProductFavouriteByProductsRequestSerializer(
-            data=request.data
-        )
-        serializer.is_valid(raise_exception=True)
+        request_serializer_class = self.get_request_serializer()
+        request_serializer = request_serializer_class(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
 
-        product_ids = serializer.validated_data["product_ids"]
+        product_ids = request_serializer.validated_data["product_ids"]
         favourites = ProductFavourite.objects.filter(
             user=user, product_id__in=product_ids
         ).select_related("user", "product")
 
-        response_serializer = self.get_serializer(favourites, many=True)
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(favourites, many=True)
         return Response(response_serializer.data, status=status.HTTP_200_OK)

@@ -2,15 +2,12 @@ import json
 from unittest.mock import Mock
 
 import pytest
-from django.core.exceptions import ImproperlyConfigured
 from django.db import models
 from django.test import TestCase
 from rest_framework import serializers
 from rest_framework.test import APIRequestFactory
 from rest_framework.viewsets import ModelViewSet
-
 from core.utils.serializers import (
-    MultiSerializerMixin,
     TranslatedFieldExtended,
     create_schema_view_config,
     RequestSerializersConfig,
@@ -61,14 +58,7 @@ class DummyTestWriteSerializer(serializers.Serializer):
     description = serializers.CharField(required=False)
 
 
-class DummyTestViewSet(MultiSerializerMixin, ModelViewSet):
-    serializers = {
-        "list": DummyTestSerializer,
-        "retrieve": DummyTestDetailSerializer,
-        "create": DummyTestWriteSerializer,
-        "update": DummyTestWriteSerializer,
-        "partial_update": DummyTestWriteSerializer,
-    }
+class DummyTestViewSet(ModelViewSet):
     response_serializers = {
         "create": DummyTestDetailSerializer,
         "update": DummyTestDetailSerializer,
@@ -80,26 +70,12 @@ class DummyTestViewSet(MultiSerializerMixin, ModelViewSet):
     }
 
 
-class DummyTestViewSetWithDefault(MultiSerializerMixin, ModelViewSet):
-    serializers = {
-        "default": DummyTestSerializer,
-        "list": DummyTestSerializer,
-    }
-
-
 class DummyTestViewSetWithSerializerClass(ModelViewSet):
     serializer_class = DummyTestSerializer
 
 
-class DummyTestViewSetMissingSerializers(MultiSerializerMixin, ModelViewSet):
+class DummyTestViewSetMissingSerializers(ModelViewSet):
     pass
-
-
-class DummyTestViewSetConflictingConfig(MultiSerializerMixin, ModelViewSet):
-    serializer_class = DummyTestSerializer
-    serializers = {
-        "list": DummyTestSerializer,
-    }
 
 
 @pytest.fixture
@@ -128,118 +104,6 @@ class TestTranslatedFieldExtended(TestCase):
             "fr": {"field1": "valeur1", "field2": 456},
         }
         self.assertEqual(result, expected_result)
-
-
-class TestMultiSerializerMixin(TestCase):
-    def test_get_serializer_class_for_action(self):
-        viewset = DummyTestViewSet()
-
-        viewset.action = "list"
-        assert viewset.get_serializer_class() == DummyTestSerializer
-
-        viewset.action = "retrieve"
-        assert viewset.get_serializer_class() == DummyTestDetailSerializer
-
-        viewset.action = "create"
-        assert viewset.get_serializer_class() == DummyTestWriteSerializer
-
-    def test_get_serializer_class_with_default(self):
-        viewset = DummyTestViewSetWithDefault()
-
-        viewset.action = "list"
-        assert viewset.get_serializer_class() == DummyTestSerializer
-
-        viewset.action = "retrieve"
-        assert viewset.get_serializer_class() == DummyTestSerializer
-
-    def test_get_request_serializer_class(self):
-        viewset = DummyTestViewSet()
-
-        viewset.action = "create"
-        assert (
-            viewset.get_request_serializer_class() == DummyTestWriteSerializer
-        )
-
-        viewset.action = "list"
-        assert viewset.get_request_serializer_class() == DummyTestSerializer
-
-    def test_get_response_serializer_class(self):
-        viewset = DummyTestViewSet()
-
-        viewset.action = "create"
-        assert (
-            viewset.get_response_serializer_class() == DummyTestDetailSerializer
-        )
-
-        viewset.action = "list"
-        assert viewset.get_response_serializer_class() == DummyTestSerializer
-
-    def test_get_serializer_for_schema(self):
-        viewset = DummyTestViewSet()
-        viewset.action = "list"
-
-        schema_info = viewset.get_serializer_for_schema("create")
-        assert schema_info["request"] == DummyTestWriteSerializer
-        assert schema_info["response"] == DummyTestDetailSerializer
-
-        schema_info = viewset.get_serializer_for_schema("list")
-        assert schema_info["request"] == DummyTestSerializer
-        assert schema_info["response"] == DummyTestSerializer
-
-        assert viewset.action == "list"
-
-    def test_improper_configuration_conflicting_serializers(self):
-        viewset = DummyTestViewSetConflictingConfig()
-        viewset.action = "list"
-
-        with pytest.raises(ImproperlyConfigured) as exc_info:
-            viewset.get_serializer_class()
-
-        assert (
-            "should only define either `serializer_class` or `serializers`"
-            in str(exc_info.value)
-        )
-
-    def test_improper_configuration_missing_serializers(self):
-        viewset = DummyTestViewSetMissingSerializers()
-        viewset.action = "list"
-
-        viewset.serializers = None
-
-        with pytest.raises(ImproperlyConfigured) as exc_info:
-            viewset.get_serializer_class()
-
-        assert "is missing the serializers attribute" in str(exc_info.value)
-
-    def test_improper_configuration_no_serializer_found(self):
-        viewset = DummyTestViewSet()
-        viewset.action = "destroy"
-
-        viewset.serializers = {
-            "list": DummyTestSerializer,
-            "retrieve": DummyTestDetailSerializer,
-        }
-
-        with pytest.raises(ImproperlyConfigured) as exc_info:
-            viewset.get_serializer_class()
-
-        assert "No serializer found for action 'destroy'" in str(exc_info.value)
-
-    def test_get_serializer_context(self):
-        mock_request = Mock()
-        mock_request.user = Mock()
-        mock_request.query_params = {}
-
-        viewset = DummyTestViewSet()
-        viewset.action = "list"
-        viewset.request = mock_request
-        viewset.format_kwarg = None
-
-        context = viewset.get_serializer_context()
-
-        assert context["action"] == "list"
-        assert context["view"] == viewset
-        assert context["request"] == mock_request
 
 
 class TestCreateSchemaViewConfig(TestCase):

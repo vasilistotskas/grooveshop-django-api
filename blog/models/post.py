@@ -93,6 +93,10 @@ class BlogPost(
 
     @property
     def comments_count(self) -> int:
+        return self.comments.filter(approved=True).count()
+
+    @property
+    def all_comments_count(self) -> int:
         return self.comments.count()
 
     @property

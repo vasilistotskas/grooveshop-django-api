@@ -11,7 +11,6 @@ from core.api.permissions import IsOwnerOrAdmin
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
-    MultiSerializerMixin,
     create_schema_view_config,
     RequestSerializersConfig,
     ResponseSerializersConfig,
@@ -38,6 +37,8 @@ res_serializers: ResponseSerializersConfig = {
     "retrieve": ProductReviewDetailSerializer,
     "update": ProductReviewDetailSerializer,
     "partial_update": ProductReviewDetailSerializer,
+    "user_product_review": ProductReviewDetailSerializer,
+    "product": ProductSerializer,
 }
 
 
@@ -52,7 +53,7 @@ res_serializers: ResponseSerializersConfig = {
         error_serializer=ErrorResponseSerializer,
     )
 )
-class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
+class ProductReviewViewSet(BaseModelViewSet):
     filterset_class = ProductReviewFilter
     ordering_fields = [
         "id",
@@ -73,20 +74,8 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
         "user__last_name",
         "translations__comment",
     ]
-    serializers = {
-        "default": ProductReviewDetailSerializer,
-        "list": ProductReviewSerializer,
-        "retrieve": ProductReviewDetailSerializer,
-        "create": ProductReviewWriteSerializer,
-        "update": ProductReviewWriteSerializer,
-        "partial_update": ProductReviewWriteSerializer,
-        "product": ProductSerializer,
-    }
-    response_serializers = {
-        "create": ProductReviewDetailSerializer,
-        "update": ProductReviewDetailSerializer,
-        "partial_update": ProductReviewDetailSerializer,
-    }
+    response_serializers = res_serializers
+    request_serializers = req_serializers
 
     def get_queryset(self):
         queryset = ProductReview.objects.with_product_details()
@@ -144,10 +133,11 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
             review = ProductReview.objects.get(
                 user_id=user_id, product_id=kwargs["pk"]
             )
-            review_serializer = ProductReviewDetailSerializer(
+            response_serializer_class = self.get_response_serializer()
+            response_serializer = response_serializer_class(
                 review, context=self.get_serializer_context()
             )
-            return Response(review_serializer.data, status=status.HTTP_200_OK)
+            return Response(response_serializer.data, status=status.HTTP_200_OK)
 
         except ProductReview.DoesNotExist:
             return Response(
@@ -176,7 +166,8 @@ class ProductReviewViewSet(MultiSerializerMixin, BaseModelViewSet):
         self.search_fields = []
 
         product = review.product
-        serializer = ProductSerializer(
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(
             product, context=self.get_serializer_context()
         )
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)

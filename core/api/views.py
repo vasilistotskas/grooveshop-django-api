@@ -1,7 +1,8 @@
 import base64
 import hashlib
+import logging
 import os
-
+from django.core.exceptions import ImproperlyConfigured
 from celery import Celery
 from celery.exceptions import CeleryError
 from cryptography.hazmat.backends import default_backend
@@ -22,12 +23,18 @@ from rest_framework.decorators import action, api_view
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
-
+from django.db import transaction
 from core.api.serializers import HealthCheckResponseSerializer
 from core.pagination.cursor import CursorPaginator
 from core.pagination.limit_offset import LimitOffsetPaginator
 from core.pagination.page_number import PageNumberPaginator
+from core.utils.serializers import (
+    RequestSerializersConfig,
+    ResponseSerializersConfig,
+)
 from core.utils.views import TranslationsProcessingMixin
+
+logger = logging.getLogger(__name__)
 
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 available_languages = [
@@ -78,6 +85,191 @@ CURSOR_PARAMETER = OpenApiParameter(
 )
 
 
+class RequestResponseSerializerMixin:
+    action = None
+    default_actions = [
+        "list",
+        "retrieve",
+        "create",
+        "update",
+        "partial_update",
+        "destroy",
+    ]
+    request_serializers: RequestSerializersConfig = {}
+    response_serializers: ResponseSerializersConfig = {}
+
+    def get_serializer_class(self):
+        """
+        Return the serializer class for this action.
+
+        This method is used by DRF's built-in methods and schema generation.
+        It prioritizes response serializers since they're more commonly needed
+        for general serialization tasks.
+        """
+        has_explicit_serializer_class = (
+            hasattr(self, "serializer_class")
+            and self.serializer_class is not None
+        )
+
+        # Handle edge case where action might be None or empty
+        current_action = getattr(self, "action", None)
+        if not current_action:
+            if has_explicit_serializer_class:
+                return self.serializer_class
+            raise ImproperlyConfigured(
+                f"No action defined for {self.__class__.__name__} and no default serializer_class. "
+                "Ensure the view has a valid action or define serializer_class."
+            )
+
+        # Try to get response serializer for current action first
+        if hasattr(self, "response_serializers") and self.response_serializers:
+            response_serializer_class = self.response_serializers.get(
+                current_action
+            )
+            if response_serializer_class is not None:
+                return response_serializer_class
+
+        # For write operations, try request serializers as fallback
+        if (
+            hasattr(self, "request")
+            and self.request.method in ["POST", "PUT", "PATCH"]
+            and hasattr(self, "request_serializers")
+            and self.request_serializers
+        ):
+            request_serializer_class = self.request_serializers.get(
+                current_action
+            )
+            if request_serializer_class is not None:
+                return request_serializer_class
+
+        # Fall back to the default serializer class if available
+        if has_explicit_serializer_class:
+            return self.serializer_class
+
+        # If no serializer is found, raise an error
+        raise ImproperlyConfigured(
+            "No serializer found for action '{action}' and no default serializer defined. "
+            "Define {cls}.response_serializers['{action}'], {cls}.request_serializers['{action}'], "
+            "or set {cls}.serializer_class, or override {cls}.get_serializer_class().".format(
+                action=current_action, cls=self.__class__.__name__
+            )
+        )
+
+    def get_request_serializer(self, *args, **kwargs):
+        """
+        Get the serializer CLASS for request data validation.
+        Returns a class, not an instance.
+
+        Note: *args, **kwargs are kept for compatibility but not used
+        since this returns a class.
+        """
+        if hasattr(self, "request_serializers") and self.request_serializers:
+            request_serializer_class = self.request_serializers.get(self.action)
+            if request_serializer_class is not None:
+                return request_serializer_class
+
+        # Fall back to the main serializer class
+        return self.get_serializer_class()
+
+    def get_response_serializer(self, *args, **kwargs):
+        """
+        Get the serializer CLASS for response data formatting.
+        Returns a class, not an instance.
+
+        Note: *args, **kwargs are kept for compatibility with existing code
+        but are not used since this returns a class.
+        """
+        if hasattr(self, "response_serializers") and self.response_serializers:
+            response_serializer_class = self.response_serializers.get(
+                self.action
+            )
+            if response_serializer_class is not None:
+                return response_serializer_class
+
+        # Fall back to the main serializer class
+        return self.get_serializer_class()
+
+    def get_serializer_for_schema(self, action_name=None):
+        """
+        Get serializer classes for OpenAPI schema generation.
+        Returns a dict with 'request' and 'response' keys containing classes.
+        """
+        if action_name is None:
+            action_name = self.action
+
+        original_action = self.action
+        self.action = action_name
+
+        try:
+            request_serializer_class = None
+            response_serializer_class = None
+
+            # Get request serializer class
+            if (
+                hasattr(self, "request_serializers")
+                and self.request_serializers
+            ):
+                request_serializer_class = self.request_serializers.get(
+                    action_name
+                )
+
+            # Get response serializer class
+            if (
+                hasattr(self, "response_serializers")
+                and self.response_serializers
+            ):
+                response_serializer_class = self.response_serializers.get(
+                    action_name
+                )
+
+            # Use the main get_serializer_class as fallback, but handle errors gracefully
+            fallback_class = None
+            try:
+                fallback_class = self.get_serializer_class()
+            except ImproperlyConfigured:
+                # If no fallback is available, we'll handle this below
+                pass
+
+            if request_serializer_class is None:
+                request_serializer_class = fallback_class
+            if response_serializer_class is None:
+                response_serializer_class = fallback_class
+
+            # Ensure we have at least something for schema generation
+            if (
+                request_serializer_class is None
+                and response_serializer_class is None
+            ):
+                raise ImproperlyConfigured(
+                    f"No serializers found for action '{action_name}' in {self.__class__.__name__}. "
+                    "Define request_serializers, response_serializers, or serializer_class."
+                )
+
+            return {
+                "request": request_serializer_class,
+                "response": response_serializer_class,
+            }
+        finally:
+            self.action = original_action
+
+    def get_serializer_context(self):
+        """
+        Extra context provided to the serializer class.
+        """
+        context = (
+            super().get_serializer_context()
+            if hasattr(super(), "get_serializer_context")
+            else {}
+        )
+        context.update(
+            {
+                "action": self.action,
+                "view": self,
+            }
+        )
+        return context
+
+
 class Metadata(SimpleMetadata):
     def determine_metadata(self, request, view):
         metadata = super().determine_metadata(request, view)
@@ -120,6 +312,11 @@ class PaginationModelViewSet(ModelViewSet):
 
         if serializer_class is None:
             serializer_class = self.get_serializer_class()
+
+        if serializer_class is None and hasattr(
+            self, "get_response_serializer"
+        ):
+            serializer_class = self.get_response_serializer()
 
         if pagination_param == "false":
             serializer = serializer_class(
@@ -175,61 +372,67 @@ class TranslationsModelViewSet(TranslationsProcessingMixin, ModelViewSet):
     update=extend_schema(parameters=[LANGUAGE_PARAMETER]),
     partial_update=extend_schema(parameters=[LANGUAGE_PARAMETER]),
 )
-class BaseModelViewSet(TranslationsModelViewSet, PaginationModelViewSet):
+class BaseModelViewSet(
+    RequestResponseSerializerMixin,
+    TranslationsModelViewSet,
+    PaginationModelViewSet,
+):
     metadata_class = Metadata
 
-    def get_response_serializer_class(self):
-        if hasattr(super(), "get_response_serializer_class"):
-            return super().get_response_serializer_class()
-        return self.get_serializer_class()
-
-    def get_request_serializer_class(self):
-        if hasattr(super(), "get_request_serializer_class"):
-            return super().get_request_serializer_class()
-        return self.get_serializer_class()
-
     def create(self, request, *args, **kwargs):
-        request_serializer_class = self.get_request_serializer_class()
-        serializer = request_serializer_class(
-            data=request.data, context=self.get_serializer_context()
-        )
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
+        try:
+            with transaction.atomic():
+                req_serializer = self.get_request_serializer()
+                request_serializer = req_serializer(
+                    data=request.data, context=self.get_serializer_context()
+                )
+                request_serializer.is_valid(raise_exception=True)
+                self.perform_create(request_serializer)
 
-        response_serializer_class = self.get_response_serializer_class()
-        response_serializer = response_serializer_class(
-            serializer.instance, context=self.get_serializer_context()
-        )
+                response_serializer_class = self.get_response_serializer()
+                response_serializer = response_serializer_class(
+                    request_serializer.instance,
+                    context=self.get_serializer_context(),
+                )
 
-        headers = self.get_success_headers(response_serializer.data)
-        return Response(
-            response_serializer.data,
-            status=status.HTTP_201_CREATED,
-            headers=headers,
-        )
+                headers = self.get_success_headers(response_serializer.data)
+                return Response(
+                    response_serializer.data,
+                    status=status.HTTP_201_CREATED,
+                    headers=headers,
+                )
+        except Exception as e:
+            logger.error(f"Error in create: {e}", exc_info=True)
+            raise
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
 
-        request_serializer_class = self.get_request_serializer_class()
-        serializer = request_serializer_class(
-            instance,
-            data=request.data,
-            partial=partial,
-            context=self.get_serializer_context(),
-        )
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
+        try:
+            with transaction.atomic():
+                req_serializer = self.get_request_serializer()
+                request_serializer = req_serializer(
+                    instance,
+                    data=request.data,
+                    partial=partial,
+                    context=self.get_serializer_context(),
+                )
+                request_serializer.is_valid(raise_exception=True)
+                self.perform_update(request_serializer)
 
-        if getattr(instance, "_prefetched_objects_cache", None):
-            instance._prefetched_objects_cache = {}
+                if getattr(instance, "_prefetched_objects_cache", None):
+                    instance._prefetched_objects_cache = {}
 
-        response_serializer_class = self.get_response_serializer_class()
-        response_serializer = response_serializer_class(
-            serializer.instance, context=self.get_serializer_context()
-        )
-        return Response(response_serializer.data)
+                response_serializer_class = self.get_response_serializer()
+                response_serializer = response_serializer_class(
+                    request_serializer.instance,
+                    context=self.get_serializer_context(),
+                )
+                return Response(response_serializer.data)
+        except Exception as e:
+            logger.error(f"Error in update: {e}", exc_info=True)
+            raise
 
     def partial_update(self, request, *args, **kwargs):
         kwargs["partial"] = True
@@ -237,16 +440,18 @@ class BaseModelViewSet(TranslationsModelViewSet, PaginationModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
-        response_serializer_class = self.get_response_serializer_class()
-        serializer = response_serializer_class(
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(
             instance, context=self.get_serializer_context()
         )
-        return Response(serializer.data)
+        return Response(response_serializer.data)
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
+        response_serializer_class = self.get_response_serializer()
+
         return self.paginate_and_serialize(
-            queryset, request, serializer_class=self.get_serializer_class()
+            queryset, request, serializer_class=response_serializer_class
         )
 
     @action(detail=False, methods=["GET"])

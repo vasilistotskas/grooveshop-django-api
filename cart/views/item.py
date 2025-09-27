@@ -25,7 +25,6 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
-    MultiSerializerMixin,
     create_schema_view_config,
     RequestSerializersConfig,
     ResponseSerializersConfig,
@@ -177,21 +176,10 @@ cart_item_schema_config.update(
 
 
 @extend_schema_view(**cart_item_schema_config)
-class CartItemViewSet(MultiSerializerMixin, BaseModelViewSet):
+class CartItemViewSet(BaseModelViewSet):
     queryset = CartItem.objects.all()
-    serializers = {
-        "default": CartItemDetailSerializer,
-        "list": CartItemSerializer,
-        "retrieve": CartItemDetailSerializer,
-        "create": CartItemCreateSerializer,
-        "update": CartItemUpdateSerializer,
-        "partial_update": CartItemUpdateSerializer,
-    }
-    response_serializers = {
-        "create": CartItemDetailSerializer,
-        "update": CartItemDetailSerializer,
-        "partial_update": CartItemDetailSerializer,
-    }
+    response_serializers = res_serializers
+    request_serializers = req_serializers
     filterset_class = CartItemFilter
     ordering_fields = [
         "id",

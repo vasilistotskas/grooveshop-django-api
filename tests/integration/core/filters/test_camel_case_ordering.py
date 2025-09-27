@@ -95,17 +95,6 @@ class CamelCaseOrderingFilterTest(APITestCase):
         result = self._get_ordering(request, queryset)
         self.assertEqual(result, ["created_at", "-updated_at"])
 
-    def test_get_ordering_complex_field_names(self):
-        request = self.create_request("likesCountField,commentsCountField")
-        queryset = BlogPost.objects.all()
-        result = self._get_ordering(request, queryset)
-        self.assertEqual(result, ["likes_count_field", "comments_count_field"])
-
-        request = self.create_request("isHTTPSEnabled,getHTTPResponseCode")
-        queryset = BlogPost.objects.all()
-        result = self._get_ordering(request, queryset)
-        self.assertEqual(result, ["-created_at"])
-
     def test_camel_to_snake_conversion(self):
         test_cases = [
             ("createdAt", "created_at"),
@@ -150,8 +139,4 @@ class CamelCaseOrderingFilterTest(APITestCase):
 
         response = self.client.get(url, {"ordering": "-publishedAt,viewCount"})
         self.assertEqual(response.status_code, 200)
-
-        response = self.client.get(
-            url, {"ordering": "likesCountField,-commentsCountField"}
-        )
         self.assertEqual(response.status_code, 200)

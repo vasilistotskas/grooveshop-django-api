@@ -25,11 +25,12 @@ class NotificationSerializer(
     @extend_schema_field(
         {
             "type": "string",
+            "nullable": True,
             "maxLength": 200,
             "description": _("URL link or empty string"),
         }
     )
-    def get_link(self, obj):
+    def get_link(self, obj) -> str | None:
         return obj.link
 
     class Meta:

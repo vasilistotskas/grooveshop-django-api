@@ -7,7 +7,6 @@ from drf_spectacular.utils import extend_schema_view
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
-    MultiSerializerMixin,
     create_schema_view_config,
     RequestSerializersConfig,
     ResponseSerializersConfig,
@@ -47,21 +46,10 @@ res_serializers: ResponseSerializersConfig = {
     )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
-class CountryViewSet(MultiSerializerMixin, BaseModelViewSet):
+class CountryViewSet(BaseModelViewSet):
     queryset = Country.objects.all()
-    serializers = {
-        "default": CountryDetailSerializer,
-        "list": CountrySerializer,
-        "retrieve": CountryDetailSerializer,
-        "create": CountryWriteSerializer,
-        "update": CountryWriteSerializer,
-        "partial_update": CountryWriteSerializer,
-    }
-    response_serializers = {
-        "create": CountryDetailSerializer,
-        "update": CountryDetailSerializer,
-        "partial_update": CountryDetailSerializer,
-    }
+    response_serializers = res_serializers
+    request_serializers = req_serializers
     filterset_class = CountryFilter
     ordering_fields = [
         "alpha_2",

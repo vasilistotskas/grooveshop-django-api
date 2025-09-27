@@ -14,7 +14,6 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
-    MultiSerializerMixin,
     create_schema_view_config,
     RequestSerializersConfig,
     ResponseSerializersConfig,
@@ -48,21 +47,10 @@ res_serializers: ResponseSerializersConfig = {
     )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
-class BlogTagViewSet(MultiSerializerMixin, BaseModelViewSet):
+class BlogTagViewSet(BaseModelViewSet):
     queryset = BlogTag.objects.all()
-    serializers = {
-        "default": BlogTagDetailSerializer,
-        "list": BlogTagSerializer,
-        "retrieve": BlogTagDetailSerializer,
-        "create": BlogTagWriteSerializer,
-        "update": BlogTagWriteSerializer,
-        "partial_update": BlogTagWriteSerializer,
-    }
-    response_serializers = {
-        "create": BlogTagDetailSerializer,
-        "update": BlogTagDetailSerializer,
-        "partial_update": BlogTagDetailSerializer,
-    }
+    response_serializers = res_serializers
+    request_serializers = req_serializers
     filterset_class = BlogTagFilter
     ordering_fields = [
         "id",

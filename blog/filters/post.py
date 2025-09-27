@@ -1,4 +1,4 @@
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
@@ -24,22 +24,19 @@ class BlogPostFilter(
         help_text=_("Filter by author email (case-insensitive)"),
     )
     min_likes = filters.NumberFilter(
-        field_name="likes_count_field",
-        lookup_expr="gte",
+        method="filter_min_likes",
         label="Minimum Likes Count",
         help_text=_("Filter by minimum number of likes"),
     )
     min_comments = filters.NumberFilter(
-        field_name="comments_count_field",
-        lookup_expr="gte",
+        method="filter_min_comments",
         label="Minimum Comments Count",
-        help_text=_("Filter by minimum number of comments"),
+        help_text=_("Filter by minimum number of approved comments"),
     )
     min_tags = filters.NumberFilter(
-        field_name="tags_count_field",
-        lookup_expr="gte",
+        method="filter_min_tags",
         label="Minimum Tags Count",
-        help_text=_("Filter by minimum number of tags"),
+        help_text=_("Filter by minimum number of active tags"),
     )
     featured = filters.BooleanFilter(
         field_name="featured",
@@ -109,10 +106,39 @@ class BlogPostFilter(
         self.filters["tags"].queryset = BlogTag.objects.all()
 
     def filter_author_name(self, queryset, name, value):
+        """Filter posts by author full name (case-insensitive)."""
         if value:
             return queryset.filter(
                 Q(author__user__first_name__icontains=value)
                 | Q(author__user__last_name__icontains=value)
                 | Q(author__user__username__icontains=value)
             )
+        return queryset
+
+    def filter_min_likes(self, queryset, name, value):
+        """Filter posts with minimum number of likes."""
+        if value is not None:
+            return queryset.annotate(
+                likes_count_annotation=Count("likes", distinct=True)
+            ).filter(likes_count_annotation__gte=value)
+        return queryset
+
+    def filter_min_comments(self, queryset, name, value):
+        """Filter posts with minimum number of approved comments."""
+        if value is not None:
+            return queryset.annotate(
+                comments_count_annotation=Count(
+                    "comments", distinct=True, filter=Q(comments__approved=True)
+                )
+            ).filter(comments_count_annotation__gte=value)
+        return queryset
+
+    def filter_min_tags(self, queryset, name, value):
+        """Filter posts with minimum number of active tags."""
+        if value is not None:
+            return queryset.annotate(
+                tags_count_annotation=Count(
+                    "tags", distinct=True, filter=Q(tags__active=True)
+                )
+            ).filter(tags_count_annotation__gte=value)
         return queryset

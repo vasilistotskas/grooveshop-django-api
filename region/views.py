@@ -12,7 +12,6 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
-    MultiSerializerMixin,
     create_schema_view_config,
     RequestSerializersConfig,
     ResponseSerializersConfig,
@@ -38,6 +37,7 @@ res_serializers: ResponseSerializersConfig = {
     "retrieve": RegionDetailSerializer,
     "update": RegionDetailSerializer,
     "partial_update": RegionDetailSerializer,
+    "get_regions_by_country_alpha_2": RegionSerializer,
 }
 
 
@@ -68,25 +68,14 @@ res_serializers: ResponseSerializersConfig = {
     settings.DEFAULT_CACHE_TTL,
     methods=["list", "retrieve", "get_regions_by_country_alpha_2"],
 )
-class RegionViewSet(MultiSerializerMixin, BaseModelViewSet):
+class RegionViewSet(BaseModelViewSet):
     queryset = Region.objects.all()
     filterset_class = RegionFilter
     ordering_fields = ["created_at", "alpha", "sort_order"]
     ordering = ["-created_at"]
     search_fields = ["alpha", "translations__name", "country__alpha_2"]
-    serializers = {
-        "list": RegionSerializer,
-        "create": RegionWriteSerializer,
-        "update": RegionWriteSerializer,
-        "partial_update": RegionWriteSerializer,
-        "retrieve": RegionDetailSerializer,
-        "get_regions_by_country_alpha_2": RegionSerializer,
-    }
-    response_serializers = {
-        "create": RegionDetailSerializer,
-        "update": RegionDetailSerializer,
-        "partial_update": RegionDetailSerializer,
-    }
+    response_serializers = res_serializers
+    request_serializers = req_serializers
 
     @action(
         detail=True,
@@ -94,5 +83,6 @@ class RegionViewSet(MultiSerializerMixin, BaseModelViewSet):
     )
     def get_regions_by_country_alpha_2(self, request, pk=None, *args, **kwargs):
         regions = Region.objects.filter(country__alpha_2=pk)
-        serializer = self.get_serializer(regions, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(regions, many=True)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)

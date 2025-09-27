@@ -14,7 +14,6 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
-    MultiSerializerMixin,
     create_schema_view_config,
     RequestSerializersConfig,
     ResponseSerializersConfig,
@@ -48,21 +47,10 @@ res_serializers: ResponseSerializersConfig = {
     )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
-class TagViewSet(MultiSerializerMixin, BaseModelViewSet):
+class TagViewSet(BaseModelViewSet):
     queryset = Tag.objects.all()
-    serializers = {
-        "default": TagDetailSerializer,
-        "list": TagSerializer,
-        "retrieve": TagDetailSerializer,
-        "create": TagWriteSerializer,
-        "update": TagWriteSerializer,
-        "partial_update": TagWriteSerializer,
-    }
-    response_serializers = {
-        "create": TagDetailSerializer,
-        "update": TagDetailSerializer,
-        "partial_update": TagDetailSerializer,
-    }
+    response_serializers = res_serializers
+    request_serializers = req_serializers
     filterset_class = TagFilter
     ordering_fields = [
         "id",

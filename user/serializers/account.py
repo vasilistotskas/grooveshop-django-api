@@ -100,78 +100,79 @@ class UserDetailsSerializer(UserSerializer):
     @extend_schema_field(
         {
             "type": "string",
+            "nullable": True,
             "maxLength": 200,
             "description": _("URL link or empty string"),
         }
     )
-    def get_twitter(self, obj):
+    def get_twitter(self, obj) -> str | None:
         return obj.twitter
 
     @extend_schema_field(
         {
             "type": "string",
+            "nullable": True,
             "maxLength": 200,
             "description": _("URL link or empty string"),
         }
     )
-    def get_linkedin(self, obj):
+    def get_linkedin(self, obj) -> str | None:
         return obj.linkedin
 
     @extend_schema_field(
         {
             "type": "string",
+            "nullable": True,
             "maxLength": 200,
             "description": _("URL link or empty string"),
         }
     )
-    def get_facebook(self, obj):
+    def get_facebook(self, obj) -> str | None:
         return obj.facebook
 
     @extend_schema_field(
         {
             "type": "string",
+            "nullable": True,
             "maxLength": 200,
             "description": _("URL link or empty string"),
         }
     )
-    def get_instagram(self, obj):
+    def get_instagram(self, obj) -> str | None:
         return obj.instagram
 
     @extend_schema_field(
         {
             "type": "string",
+            "nullable": True,
             "maxLength": 200,
             "description": _("URL link or empty string"),
         }
     )
-    def get_website(self, obj):
+    def get_website(self, obj) -> str | None:
         return obj.website
 
     @extend_schema_field(
         {
             "type": "string",
+            "nullable": True,
             "maxLength": 200,
             "description": _("URL link or empty string"),
         }
     )
-    def get_youtube(self, obj):
+    def get_youtube(self, obj) -> str | None:
         return obj.youtube
 
     @extend_schema_field(
         {
             "type": "string",
+            "nullable": True,
             "maxLength": 200,
             "description": _("URL link or empty string"),
         }
     )
-    def get_github(self, obj):
+    def get_github(self, obj) -> str | None:
         return obj.github
-
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        if data.get("image") == "":
-            data["image"] = None
-        return data
 
     class Meta(UserSerializer.Meta):
         fields = (
@@ -179,7 +180,6 @@ class UserDetailsSerializer(UserSerializer):
             "id",
             "email",
             "username",
-            "image",
             "first_name",
             "last_name",
             "phone",

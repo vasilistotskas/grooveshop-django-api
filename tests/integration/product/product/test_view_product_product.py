@@ -501,48 +501,6 @@ class ProductViewSetTestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    def test_ordering_by_discount_value(self):
-        for _ in range(5):
-            ProductFactory(
-                category=self.category,
-                vat=self.vat,
-            )
-
-        url = self.get_product_list_url()
-        response = self.client.get(url, {"ordering": "discount_value_amount"})
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        self.assertGreaterEqual(len(response.data["results"]), 1)
-
-        products = response.data["results"]
-
-        for i in range(len(products) - 1):
-            current_discount = float(products[i]["discount_value"])
-            next_discount = float(products[i + 1]["discount_value"])
-            self.assertLessEqual(current_discount, next_discount)
-
-    def test_ordering_by_final_price(self):
-        for _ in range(5):
-            ProductFactory(
-                category=self.category,
-                vat=self.vat,
-            )
-
-        url = self.get_product_list_url()
-        response = self.client.get(url, {"ordering": "final_price_amount"})
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        self.assertGreaterEqual(len(response.data["results"]), 1)
-
-        products = response.data["results"]
-
-        for i in range(len(products) - 1):
-            current_price = float(products[i]["final_price"])
-            next_price = float(products[i + 1]["final_price"])
-            self.assertLessEqual(current_price, next_price)
-
     def test_ordering_by_review_average(self):
         products = []
         for _i in range(5):

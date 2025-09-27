@@ -24,7 +24,6 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
-    MultiSerializerMixin,
     create_schema_view_config,
     RequestSerializersConfig,
     ResponseSerializersConfig,
@@ -155,20 +154,11 @@ cart_schema_config.update(
 
 
 @extend_schema_view(**cart_schema_config)
-class CartViewSet(MultiSerializerMixin, BaseModelViewSet):
+class CartViewSet(BaseModelViewSet):
     cart_service: CartService
     queryset = Cart.objects.all()
-    serializers = {
-        "default": CartDetailSerializer,
-        "list": CartSerializer,
-        "retrieve": CartDetailSerializer,
-        "update": CartWriteSerializer,
-        "partial_update": CartWriteSerializer,
-    }
-    response_serializers = {
-        "update": CartDetailSerializer,
-        "partial_update": CartDetailSerializer,
-    }
+    response_serializers = res_serializers
+    request_serializers = req_serializers
     filterset_class = CartFilter
     ordering_fields = [
         "id",
@@ -215,20 +205,23 @@ class CartViewSet(MultiSerializerMixin, BaseModelViewSet):
         cart = self.cart_service.get_or_create_cart()
         if not cart:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        serializer = self.get_serializer(cart)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(cart)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
 
     def update(self, request, *args, **kwargs):
         cart = self.cart_service.get_or_create_cart()
         if not cart:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        serializer = self.get_serializer(
+        request_serializer_class = self.get_request_serializer()
+        request_serializer = request_serializer_class(
             cart, data=request.data, partial=kwargs.pop("partial", False)
         )
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
+        request_serializer.is_valid(raise_exception=True)
+        self.perform_update(request_serializer)
 
-        response_serializer = CartDetailSerializer(
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(
             cart, context=self.get_serializer_context()
         )
         return Response(response_serializer.data)

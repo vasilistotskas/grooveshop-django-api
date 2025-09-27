@@ -31,13 +31,11 @@ class ProductFilter(
         help_text="Maximum price",
     )
     min_final_price = filters.NumberFilter(
-        field_name="final_price_amount",
-        lookup_expr="gte",
+        method="filter_min_final_price",
         help_text="Minimum final price (after VAT and discount)",
     )
     max_final_price = filters.NumberFilter(
-        field_name="final_price_amount",
-        lookup_expr="lte",
+        method="filter_max_final_price",
         help_text="Maximum final price (after VAT and discount)",
     )
 
@@ -67,13 +65,11 @@ class ProductFilter(
         help_text="Maximum discount percentage",
     )
     min_discount = filters.NumberFilter(
-        field_name="discount_value_amount",
-        lookup_expr="gte",
+        method="filter_min_discount",
         help_text="Minimum discount value amount",
     )
     max_discount = filters.NumberFilter(
-        field_name="discount_value_amount",
-        lookup_expr="lte",
+        method="filter_max_discount",
         help_text="Maximum discount value amount",
     )
     has_discount = filters.BooleanFilter(
@@ -103,24 +99,20 @@ class ProductFilter(
     )
 
     min_review_average = filters.NumberFilter(
-        field_name="review_average_field",
-        lookup_expr="gte",
+        method="filter_min_review_average",
         help_text="Minimum review average rating",
     )
     max_review_average = filters.NumberFilter(
-        field_name="review_average_field",
-        lookup_expr="lte",
+        method="filter_max_review_average",
         help_text="Maximum review average rating",
     )
 
     min_likes = filters.NumberFilter(
-        field_name="likes_count_field",
-        lookup_expr="gte",
+        method="filter_min_likes",
         help_text="Minimum likes count",
     )
     max_likes = filters.NumberFilter(
-        field_name="likes_count_field",
-        lookup_expr="lte",
+        method="filter_max_likes",
         help_text="Maximum likes count",
     )
 
@@ -182,3 +174,67 @@ class ProductFilter(
         if value:
             return queryset.filter(discount_percent__gt=0)
         return queryset.filter(discount_percent=0)
+
+    def filter_min_final_price(self, queryset, name, value):
+        """Filter products with minimum final price"""
+        if value is not None:
+            return queryset.with_final_price_annotation().filter(
+                final_price_annotation__gte=value
+            )
+        return queryset
+
+    def filter_max_final_price(self, queryset, name, value):
+        """Filter products with maximum final price"""
+        if value is not None:
+            return queryset.with_final_price_annotation().filter(
+                final_price_annotation__lte=value
+            )
+        return queryset
+
+    def filter_min_discount(self, queryset, name, value):
+        """Filter products with minimum discount value"""
+        if value is not None:
+            return queryset.with_discount_value_annotation().filter(
+                discount_value_annotation__gte=value
+            )
+        return queryset
+
+    def filter_max_discount(self, queryset, name, value):
+        """Filter products with maximum discount value"""
+        if value is not None:
+            return queryset.with_discount_value_annotation().filter(
+                discount_value_annotation__lte=value
+            )
+        return queryset
+
+    def filter_min_review_average(self, queryset, name, value):
+        """Filter products with minimum review average"""
+        if value is not None:
+            return queryset.with_review_average_annotation().filter(
+                review_average_annotation__gte=value
+            )
+        return queryset
+
+    def filter_max_review_average(self, queryset, name, value):
+        """Filter products with maximum review average"""
+        if value is not None:
+            return queryset.with_review_average_annotation().filter(
+                review_average_annotation__lte=value
+            )
+        return queryset
+
+    def filter_min_likes(self, queryset, name, value):
+        """Filter products with minimum likes count"""
+        if value is not None:
+            return queryset.with_likes_count_annotation().filter(
+                likes_count_annotation__gte=value
+            )
+        return queryset
+
+    def filter_max_likes(self, queryset, name, value):
+        """Filter products with maximum likes count"""
+        if value is not None:
+            return queryset.with_likes_count_annotation().filter(
+                likes_count_annotation__lte=value
+            )
+        return queryset

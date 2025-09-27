@@ -155,9 +155,11 @@ class PopularityFilter(DropdownFilter):
             case "trending":
                 filter_kwargs = {"view_count__gt": 100}
             case "loved":
-                filter_kwargs = {"likes_count_field__gt": 10}
+                queryset = queryset.with_likes_count_annotation()
+                filter_kwargs = {"likes_count_annotation__gt": 10}
             case "well_reviewed":
-                filter_kwargs = {"review_average_field__gt": 7.0}
+                queryset = queryset.with_review_average_annotation()
+                filter_kwargs = {"review_average_annotation__gt": 7.0}
             case "new_arrivals":
                 thirty_days_ago = timezone.now() - timedelta(days=30)
                 filter_kwargs = {"created_at__gte": thirty_days_ago}
@@ -174,13 +176,15 @@ class LikesCountFilter(RangeNumericListFilter):
     def queryset(self, request, queryset):
         filters = {}
 
+        queryset = queryset.with_likes_count_annotation()
+
         value_from = self.used_parameters.get(f"{self.parameter_name}_from")
         if value_from and value_from != "":
-            filters["likes_count_field__gte"] = value_from
+            filters["likes_count_annotation__gte"] = value_from
 
         value_to = self.used_parameters.get(f"{self.parameter_name}_to")
         if value_to and value_to != "":
-            filters["likes_count_field__lte"] = value_to
+            filters["likes_count_annotation__lte"] = value_to
 
         return queryset.filter(**filters) if filters else queryset
 
@@ -198,13 +202,15 @@ class ReviewAverageFilter(RangeNumericListFilter):
     def queryset(self, request, queryset):
         filters = {}
 
+        queryset = queryset.with_review_average_annotation()
+
         value_from = self.used_parameters.get(f"{self.parameter_name}_from")
         if value_from and value_from != "":
-            filters["review_average_field__gte"] = value_from
+            filters["review_average_annotation__gte"] = value_from
 
         value_to = self.used_parameters.get(f"{self.parameter_name}_to")
         if value_to and value_to != "":
-            filters["review_average_field__lte"] = value_to
+            filters["review_average_annotation__lte"] = value_to
 
         return queryset.filter(**filters) if filters else queryset
 
@@ -396,7 +402,8 @@ class ProductAdmin(
         return (
             super()
             .get_queryset(request)
-            .with_all_annotations()
+            .with_likes_count_annotation()
+            .with_review_average_annotation()
             .select_related("category", "vat", "changed_by")
             .prefetch_related("images", "reviews", "favourited_by")
         )
@@ -534,8 +541,8 @@ class ProductAdmin(
 
     def performance_metrics(self, obj):
         views = obj.view_count
-        likes = getattr(obj, "likes_count_field", 0) or 0
-        rating = getattr(obj, "review_average_field", 0) or 0
+        likes = obj.likes_count
+        rating = obj.review_average
         rating_formatted = "{:.1f}".format(float(rating))
 
         return format_html(
@@ -674,9 +681,9 @@ class ProductAdmin(
 
     def performance_summary(self, obj):
         views = obj.view_count
-        likes = getattr(obj, "likes_count_field", 0) or 0
-        rating = getattr(obj, "review_average_field", 0) or 0
-        review_count = obj.reviews.count()
+        likes = obj.likes_count
+        rating = obj.review_average
+        review_count = obj.review_count
         favorites_count = obj.favourited_by.count()
 
         rating_formatted = "{:.1f}".format(float(rating))
@@ -711,7 +718,7 @@ class ProductAdmin(
         last_updated = now - obj.updated_at
 
         views = obj.view_count
-        likes = getattr(obj, "likes_count_field", 0) or 0
+        likes = obj.likes_count
         engagement_rate = (likes / max(views, 1)) * 100
         engagement_formatted = "{:.1f}".format(engagement_rate)
 

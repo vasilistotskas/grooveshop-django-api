@@ -7,6 +7,7 @@ from rest_framework.relations import PrimaryKeyRelatedField
 
 from core.utils.email import is_disposable_domain
 from country.models import Country
+from order.enum.status import OrderStatus
 from order.models.history import OrderHistory
 from order.models.item import OrderItem
 from order.models.order import Order
@@ -406,3 +407,12 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
             "tracking_number",
             "shipping_carrier",
         )
+
+
+class AddTrackingSerializer(serializers.Serializer):
+    tracking_number = serializers.CharField(max_length=100)
+    shipping_carrier = serializers.CharField(max_length=50)
+
+
+class UpdateStatusSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=OrderStatus.choices)

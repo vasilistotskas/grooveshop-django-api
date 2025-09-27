@@ -12,7 +12,6 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
-    MultiSerializerMixin,
     create_schema_view_config,
     RequestSerializersConfig,
     ResponseSerializersConfig,
@@ -34,6 +33,8 @@ req_serializers: RequestSerializersConfig = {
     "create": NotificationUserWriteSerializer,
     "update": NotificationUserWriteSerializer,
     "partial_update": NotificationUserWriteSerializer,
+    "mark_as_seen": NotificationUserActionSerializer,
+    "mark_as_unseen": NotificationUserActionSerializer,
 }
 
 res_serializers: ResponseSerializersConfig = {
@@ -42,6 +43,11 @@ res_serializers: ResponseSerializersConfig = {
     "retrieve": NotificationUserDetailSerializer,
     "update": NotificationUserDetailSerializer,
     "partial_update": NotificationUserDetailSerializer,
+    "unseen_count": NotificationCountResponseSerializer,
+    "mark_all_as_seen": NotificationSuccessResponseSerializer,
+    "mark_all_as_unseen": NotificationSuccessResponseSerializer,
+    "mark_as_seen": NotificationSuccessResponseSerializer,
+    "mark_as_unseen": NotificationSuccessResponseSerializer,
 }
 
 
@@ -121,23 +127,11 @@ res_serializers: ResponseSerializersConfig = {
     ),
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
-class NotificationUserViewSet(MultiSerializerMixin, BaseModelViewSet):
+class NotificationUserViewSet(BaseModelViewSet):
     queryset = NotificationUser.objects.optimized_for_list()
-    serializers = {
-        "default": NotificationUserDetailSerializer,
-        "list": NotificationUserSerializer,
-        "retrieve": NotificationUserDetailSerializer,
-        "create": NotificationUserWriteSerializer,
-        "update": NotificationUserWriteSerializer,
-        "partial_update": NotificationUserWriteSerializer,
-        "mark_as_seen": NotificationUserActionSerializer,
-        "mark_as_unseen": NotificationUserActionSerializer,
-    }
-    response_serializers = {
-        "create": NotificationUserDetailSerializer,
-        "update": NotificationUserDetailSerializer,
-        "partial_update": NotificationUserDetailSerializer,
-    }
+    request_serializers = req_serializers
+    response_serializers = res_serializers
+
     filterset_class = NotificationUserFilter
     ordering_fields = [
         "id",
@@ -182,8 +176,11 @@ class NotificationUserViewSet(MultiSerializerMixin, BaseModelViewSet):
                 status=status.HTTP_204_NO_CONTENT,
             )
 
-        serializer = NotificationCountResponseSerializer({"count": count})
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        response_data = {"count": count}
+
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(response_data)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["POST"])
     def mark_all_as_seen(self, request):
@@ -195,8 +192,11 @@ class NotificationUserViewSet(MultiSerializerMixin, BaseModelViewSet):
 
         self.queryset.filter(user=request.user, seen=False).update(seen=True)
 
-        serializer = NotificationSuccessResponseSerializer({"success": True})
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        response_data = {"success": True}
+
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(response_data)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["POST"])
     def mark_all_as_unseen(self, request):
@@ -208,8 +208,11 @@ class NotificationUserViewSet(MultiSerializerMixin, BaseModelViewSet):
 
         self.queryset.filter(user=request.user, seen=True).update(seen=False)
 
-        serializer = NotificationSuccessResponseSerializer({"success": True})
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        response_data = {"success": True}
+
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(response_data)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["POST"])
     def mark_as_seen(self, request):
@@ -219,7 +222,8 @@ class NotificationUserViewSet(MultiSerializerMixin, BaseModelViewSet):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        serializer = self.get_serializer(data=request.data)
+        request_serializer_class = self.get_request_serializer()
+        serializer = request_serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         notification_user_ids = serializer.validated_data.get(
             "notification_user_ids"
@@ -235,8 +239,11 @@ class NotificationUserViewSet(MultiSerializerMixin, BaseModelViewSet):
             id__in=notification_user_ids, user=request.user
         ).update(seen=True)
 
-        serializer = NotificationSuccessResponseSerializer({"success": True})
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        response_data = {"success": True}
+
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(response_data)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["POST"])
     def mark_as_unseen(self, request):
@@ -246,7 +253,8 @@ class NotificationUserViewSet(MultiSerializerMixin, BaseModelViewSet):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        serializer = self.get_serializer(data=request.data)
+        request_serializer_class = self.get_request_serializer()
+        serializer = request_serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         notification_user_ids = serializer.validated_data.get(
             "notification_user_ids"
@@ -262,5 +270,8 @@ class NotificationUserViewSet(MultiSerializerMixin, BaseModelViewSet):
             id__in=notification_user_ids, user=request.user
         ).update(seen=False)
 
-        serializer = NotificationSuccessResponseSerializer({"success": True})
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        response_data = {"success": True}
+
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(response_data)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)

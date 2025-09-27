@@ -5,9 +5,7 @@ from drf_spectacular.utils import extend_schema_view
 
 
 from core.api.views import BaseModelViewSet
-
 from core.utils.serializers import (
-    MultiSerializerMixin,
     create_schema_view_config,
     RequestSerializersConfig,
     ResponseSerializersConfig,
@@ -46,21 +44,10 @@ res_serializers: ResponseSerializersConfig = {
     )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
-class ProductImageViewSet(MultiSerializerMixin, BaseModelViewSet):
+class ProductImageViewSet(BaseModelViewSet):
     queryset = ProductImage.objects.all()
-    serializers = {
-        "default": ProductImageDetailSerializer,
-        "list": ProductImageSerializer,
-        "retrieve": ProductImageDetailSerializer,
-        "create": ProductImageWriteSerializer,
-        "update": ProductImageWriteSerializer,
-        "partial_update": ProductImageWriteSerializer,
-    }
-    response_serializers = {
-        "create": ProductImageDetailSerializer,
-        "update": ProductImageDetailSerializer,
-        "partial_update": ProductImageDetailSerializer,
-    }
+    response_serializers = res_serializers
+    request_serializers = req_serializers
     filterset_fields = [
         "id",
         "product",

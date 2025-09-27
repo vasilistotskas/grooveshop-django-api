@@ -1342,7 +1342,8 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter comments that have replies (true) or no replies (false)
+        description: Filter comments that have approved replies (true) or no replies
+          (false)
       - in: query
         name: id
         schema:
@@ -1385,7 +1386,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter leaf comments (no replies)
+        description: Filter leaf comments (no approved replies)
       - in: query
         name: language
         schema:
@@ -1473,7 +1474,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter comments with at most this many replies
+        description: Filter comments with at most this many approved replies
       - in: query
         name: minContentLength
         schema:
@@ -1497,7 +1498,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter comments with at least this many replies
+        description: Filter comments with at least this many approved replies
       - in: query
         name: mostLiked
         schema:
@@ -1521,14 +1522,13 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Order comments by most replies first
+        description: Order comments by most approved replies first
       - name: ordering
         in: query
         required: false
         description: 'Which field to use when ordering the results. Available fields:
           id, -id, createdAt, -createdAt, updatedAt, -updatedAt, level, -level, lft,
-          -lft, approved, -approved, likesCountField, -likesCountField, repliesCountField,
-          -repliesCountField'
+          -lft, approved, -approved'
         schema:
           type: string
           enum:
@@ -1544,10 +1544,6 @@ paths:
           - -lft
           - approved
           - -approved
-          - likesCountField
-          - -likesCountField
-          - repliesCountField
-          - -repliesCountField
       - name: page
         required: false
         in: query
@@ -2264,7 +2260,8 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter comments that have replies (true) or no replies (false)
+        description: Filter comments that have approved replies (true) or no replies
+          (false)
       - in: path
         name: id
         schema:
@@ -2315,7 +2312,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter leaf comments (no replies)
+        description: Filter leaf comments (no approved replies)
       - in: query
         name: level
         schema:
@@ -2393,7 +2390,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter comments with at most this many replies
+        description: Filter comments with at most this many approved replies
       - in: query
         name: minContentLength
         schema:
@@ -2417,7 +2414,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter comments with at least this many replies
+        description: Filter comments with at least this many approved replies
       - in: query
         name: mostLiked
         schema:
@@ -2441,14 +2438,13 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Order comments by most replies first
+        description: Order comments by most approved replies first
       - name: ordering
         in: query
         required: false
         description: 'Which field to use when ordering the results. Available fields:
           id, -id, createdAt, -createdAt, updatedAt, -updatedAt, level, -level, lft,
-          -lft, approved, -approved, likesCountField, -likesCountField, repliesCountField,
-          -repliesCountField'
+          -lft, approved, -approved'
         schema:
           type: string
           enum:
@@ -2464,10 +2460,6 @@ paths:
           - -lft
           - approved
           - -approved
-          - likesCountField
-          - -likesCountField
-          - repliesCountField
-          - -repliesCountField
       - name: page
         required: false
         in: query
@@ -2790,7 +2782,8 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter comments that have replies (true) or no replies (false)
+        description: Filter comments that have approved replies (true) or no replies
+          (false)
       - in: path
         name: id
         schema:
@@ -2841,7 +2834,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter leaf comments (no replies)
+        description: Filter leaf comments (no approved replies)
       - in: query
         name: level
         schema:
@@ -2919,7 +2912,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter comments with at most this many replies
+        description: Filter comments with at most this many approved replies
       - in: query
         name: minContentLength
         schema:
@@ -2943,7 +2936,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter comments with at least this many replies
+        description: Filter comments with at least this many approved replies
       - in: query
         name: mostLiked
         schema:
@@ -2967,14 +2960,13 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Order comments by most replies first
+        description: Order comments by most approved replies first
       - name: ordering
         in: query
         required: false
         description: 'Which field to use when ordering the results. Available fields:
           id, -id, createdAt, -createdAt, updatedAt, -updatedAt, level, -level, lft,
-          -lft, approved, -approved, likesCountField, -likesCountField, repliesCountField,
-          -repliesCountField'
+          -lft, approved, -approved'
         schema:
           type: string
           enum:
@@ -2990,10 +2982,6 @@ paths:
           - -lft
           - approved
           - -approved
-          - likesCountField
-          - -likesCountField
-          - repliesCountField
-          - -repliesCountField
       - name: page
         required: false
         in: query
@@ -3216,18 +3204,6 @@ paths:
         required: true
       tags:
       - Blog Comments
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/BlogCommentDetailRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/BlogCommentDetailRequest'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BlogCommentDetailRequest'
-        required: true
       security:
       - knoxApiToken: []
       - cookieAuth: []
@@ -3400,7 +3376,8 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter comments that have replies (true) or no replies (false)
+        description: Filter comments that have approved replies (true) or no replies
+          (false)
       - in: query
         name: id
         schema:
@@ -3443,7 +3420,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter leaf comments (no replies)
+        description: Filter leaf comments (no approved replies)
       - in: query
         name: level
         schema:
@@ -3521,7 +3498,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter comments with at most this many replies
+        description: Filter comments with at most this many approved replies
       - in: query
         name: minContentLength
         schema:
@@ -3545,7 +3522,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter comments with at least this many replies
+        description: Filter comments with at least this many approved replies
       - in: query
         name: mostLiked
         schema:
@@ -3569,14 +3546,13 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Order comments by most replies first
+        description: Order comments by most approved replies first
       - name: ordering
         in: query
         required: false
         description: 'Which field to use when ordering the results. Available fields:
           id, -id, createdAt, -createdAt, updatedAt, -updatedAt, level, -level, lft,
-          -lft, approved, -approved, likesCountField, -likesCountField, repliesCountField,
-          -repliesCountField'
+          -lft, approved, -approved'
         schema:
           type: string
           enum:
@@ -3592,10 +3568,6 @@ paths:
           - -lft
           - approved
           - -approved
-          - likesCountField
-          - -likesCountField
-          - repliesCountField
-          - -repliesCountField
       - name: page
         required: false
         in: query
@@ -3952,7 +3924,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by minimum number of comments
+        description: Filter by minimum number of approved comments
       - in: query
         name: minLikes
         schema:
@@ -3968,7 +3940,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by minimum number of tags
+        description: Filter by minimum number of active tags
       - in: query
         name: minViewCount
         schema:
@@ -3982,8 +3954,7 @@ paths:
         required: false
         description: 'Which field to use when ordering the results. Available fields:
           id, -id, createdAt, -createdAt, updatedAt, -updatedAt, publishedAt, -publishedAt,
-          viewCount, -viewCount, likesCountField, -likesCountField, commentsCountField,
-          -commentsCountField, tagsCountField, -tagsCountField, featured, -featured'
+          viewCount, -viewCount, featured, -featured'
         schema:
           type: string
           enum:
@@ -3997,12 +3968,6 @@ paths:
           - -publishedAt
           - viewCount
           - -viewCount
-          - likesCountField
-          - -likesCountField
-          - commentsCountField
-          - -commentsCountField
-          - tagsCountField
-          - -tagsCountField
           - featured
           - -featured
       - name: page
@@ -4545,8 +4510,7 @@ paths:
         required: false
         description: 'Which field to use when ordering the results. Available fields:
           id, -id, createdAt, -createdAt, updatedAt, -updatedAt, publishedAt, -publishedAt,
-          viewCount, -viewCount, likesCountField, -likesCountField, commentsCountField,
-          -commentsCountField, tagsCountField, -tagsCountField, featured, -featured'
+          viewCount, -viewCount, featured, -featured'
         schema:
           type: string
           enum:
@@ -4560,12 +4524,6 @@ paths:
           - -publishedAt
           - viewCount
           - -viewCount
-          - likesCountField
-          - -likesCountField
-          - commentsCountField
-          - -commentsCountField
-          - tagsCountField
-          - -tagsCountField
           - featured
           - -featured
       - name: page
@@ -4875,7 +4833,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by minimum number of comments
+        description: Filter by minimum number of approved comments
       - in: query
         name: minLikes
         schema:
@@ -4891,7 +4849,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by minimum number of tags
+        description: Filter by minimum number of active tags
       - in: query
         name: minViewCount
         schema:
@@ -4905,8 +4863,7 @@ paths:
         required: false
         description: 'Which field to use when ordering the results. Available fields:
           id, -id, createdAt, -createdAt, updatedAt, -updatedAt, publishedAt, -publishedAt,
-          viewCount, -viewCount, likesCountField, -likesCountField, commentsCountField,
-          -commentsCountField, tagsCountField, -tagsCountField, featured, -featured'
+          viewCount, -viewCount, featured, -featured'
         schema:
           type: string
           enum:
@@ -4920,12 +4877,6 @@ paths:
           - -publishedAt
           - viewCount
           - -viewCount
-          - likesCountField
-          - -likesCountField
-          - commentsCountField
-          - -commentsCountField
-          - tagsCountField
-          - -tagsCountField
           - featured
           - -featured
       - name: page
@@ -5238,7 +5189,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by minimum number of comments
+        description: Filter by minimum number of approved comments
       - in: query
         name: minLikes
         schema:
@@ -5254,7 +5205,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by minimum number of tags
+        description: Filter by minimum number of active tags
       - in: query
         name: minViewCount
         schema:
@@ -5268,8 +5219,7 @@ paths:
         required: false
         description: 'Which field to use when ordering the results. Available fields:
           id, -id, createdAt, -createdAt, updatedAt, -updatedAt, publishedAt, -publishedAt,
-          viewCount, -viewCount, likesCountField, -likesCountField, commentsCountField,
-          -commentsCountField, tagsCountField, -tagsCountField, featured, -featured'
+          viewCount, -viewCount, featured, -featured'
         schema:
           type: string
           enum:
@@ -5283,12 +5233,6 @@ paths:
           - -publishedAt
           - viewCount
           - -viewCount
-          - likesCountField
-          - -likesCountField
-          - commentsCountField
-          - -commentsCountField
-          - tagsCountField
-          - -tagsCountField
           - featured
           - -featured
       - name: page
@@ -5574,7 +5518,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by minimum number of comments
+        description: Filter by minimum number of approved comments
       - in: query
         name: minLikes
         schema:
@@ -5590,7 +5534,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by minimum number of tags
+        description: Filter by minimum number of active tags
       - in: query
         name: minViewCount
         schema:
@@ -5604,8 +5548,7 @@ paths:
         required: false
         description: 'Which field to use when ordering the results. Available fields:
           id, -id, createdAt, -createdAt, updatedAt, -updatedAt, publishedAt, -publishedAt,
-          viewCount, -viewCount, likesCountField, -likesCountField, commentsCountField,
-          -commentsCountField, tagsCountField, -tagsCountField, featured, -featured'
+          viewCount, -viewCount, featured, -featured'
         schema:
           type: string
           enum:
@@ -5619,12 +5562,6 @@ paths:
           - -publishedAt
           - viewCount
           - -viewCount
-          - likesCountField
-          - -likesCountField
-          - commentsCountField
-          - -commentsCountField
-          - tagsCountField
-          - -tagsCountField
           - featured
           - -featured
       - name: page
@@ -9267,13 +9204,14 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/NotificationUserDetailRequest'
+              $ref: '#/components/schemas/NotificationSuccessResponseRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/NotificationUserDetailRequest'
+              $ref: '#/components/schemas/NotificationSuccessResponseRequest'
           application/json:
             schema:
-              $ref: '#/components/schemas/NotificationUserDetailRequest'
+              $ref: '#/components/schemas/NotificationSuccessResponseRequest'
+        required: true
       security:
       - knoxApiToken: []
       - cookieAuth: []
@@ -9302,13 +9240,14 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/NotificationUserDetailRequest'
+              $ref: '#/components/schemas/NotificationSuccessResponseRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/NotificationUserDetailRequest'
+              $ref: '#/components/schemas/NotificationSuccessResponseRequest'
           application/json:
             schema:
-              $ref: '#/components/schemas/NotificationUserDetailRequest'
+              $ref: '#/components/schemas/NotificationSuccessResponseRequest'
+        required: true
       security:
       - knoxApiToken: []
       - cookieAuth: []
@@ -13276,10 +13215,7 @@ paths:
         required: false
         description: 'Which field to use when ordering the results. Available fields:
           price, -price, createdAt, -createdAt, active, -active, availabilityPriority,
-          -availabilityPriority, discountValueAmount, -discountValueAmount, finalPriceAmount,
-          -finalPriceAmount, priceSavePercentField, -priceSavePercentField, reviewAverageField,
-          -reviewAverageField, likesCountField, -likesCountField, viewCount, -viewCount,
-          stock, -stock'
+          -availabilityPriority, viewCount, -viewCount, stock, -stock'
         schema:
           type: string
           enum:
@@ -13291,16 +13227,6 @@ paths:
           - -active
           - availabilityPriority
           - -availabilityPriority
-          - discountValueAmount
-          - -discountValueAmount
-          - finalPriceAmount
-          - -finalPriceAmount
-          - priceSavePercentField
-          - -priceSavePercentField
-          - reviewAverageField
-          - -reviewAverageField
-          - likesCountField
-          - -likesCountField
           - viewCount
           - -viewCount
           - stock
@@ -18614,7 +18540,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedAuthenticationList'
+                $ref: '#/components/schemas/PaginatedUserDetailsList'
           description: ''
         '400':
           content:
@@ -18683,7 +18609,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Authentication'
+                $ref: '#/components/schemas/UserDetails'
           description: ''
         '400':
           content:
@@ -18749,7 +18675,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Authentication'
+                $ref: '#/components/schemas/UserDetails'
           description: ''
         '401':
           content:
@@ -18820,7 +18746,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Authentication'
+                $ref: '#/components/schemas/UserDetails'
           description: ''
         '400':
           content:
@@ -18896,7 +18822,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Authentication'
+                $ref: '#/components/schemas/UserDetails'
           description: ''
         '400':
           content:
@@ -21459,13 +21385,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/SubscriptionTopicDetailRequest'
+              $ref: '#/components/schemas/UserSubscriptionRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/SubscriptionTopicDetailRequest'
+              $ref: '#/components/schemas/UserSubscriptionRequest'
           application/json:
             schema:
-              $ref: '#/components/schemas/SubscriptionTopicDetailRequest'
+              $ref: '#/components/schemas/UserSubscriptionRequest'
         required: true
       security:
       - knoxApiToken: []
@@ -21521,13 +21447,13 @@ paths:
         content:
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/SubscriptionTopicDetailRequest'
+              $ref: '#/components/schemas/DetailRequest'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/SubscriptionTopicDetailRequest'
+              $ref: '#/components/schemas/DetailRequest'
           application/json:
             schema:
-              $ref: '#/components/schemas/SubscriptionTopicDetailRequest'
+              $ref: '#/components/schemas/DetailRequest'
         required: true
       security:
       - knoxApiToken: []
@@ -21635,254 +21561,6 @@ components:
       description: |-
         * `subscribe` - subscribe
         * `unsubscribe` - unsubscribe
-    Authentication:
-      type: object
-      properties:
-        pk:
-          type: integer
-          readOnly: true
-          title: Id
-        email:
-          type: string
-          format: email
-          title: Διεύθυνση ηλεκτρονικού ταχυδρομείου
-          maxLength: 254
-        firstName:
-          type: string
-          maxLength: 255
-        lastName:
-          type: string
-          maxLength: 255
-        id:
-          type: integer
-          readOnly: true
-        username:
-          type: string
-          nullable: true
-          title: Όνομα χρήστη
-          description: Required. 30 characters or fewer.Letters, digits and @/./+/-/_
-            only.
-          pattern: ^[\w.@+#-]+$
-          maxLength: 30
-        image:
-          type: string
-          format: uri
-          nullable: true
-          title: Εικόνα
-        phone:
-          type: string
-          nullable: true
-        city:
-          type: string
-          maxLength: 255
-        zipcode:
-          type: string
-          title: Zip Code
-          maxLength: 255
-        address:
-          type: string
-          maxLength: 255
-        place:
-          type: string
-          maxLength: 255
-        country:
-          type: string
-          title: Country Code Alpha 2
-          nullable: true
-        region:
-          type: string
-          title: Region Code
-          nullable: true
-        birthDate:
-          type: string
-          format: date
-          nullable: true
-        twitter:
-          type: string
-          format: uri
-          nullable: true
-          title: Twitter Profile
-          maxLength: 200
-        linkedin:
-          type: string
-          format: uri
-          nullable: true
-          title: LinkedIn Profile
-          maxLength: 200
-        facebook:
-          type: string
-          format: uri
-          nullable: true
-          title: Facebook Profile
-          maxLength: 200
-        instagram:
-          type: string
-          format: uri
-          nullable: true
-          title: Instagram Profile
-          maxLength: 200
-        website:
-          type: string
-          format: uri
-          nullable: true
-          maxLength: 200
-        youtube:
-          type: string
-          format: uri
-          nullable: true
-          title: Youtube Profile
-          maxLength: 200
-        github:
-          type: string
-          format: uri
-          nullable: true
-          title: Github Profile
-          maxLength: 200
-        bio:
-          type: string
-        isActive:
-          type: boolean
-          readOnly: true
-          title: Active
-        isStaff:
-          type: boolean
-          readOnly: true
-          title: Staff
-        isSuperuser:
-          type: boolean
-          readOnly: true
-          title: Κατάσταση υπερχρήστη
-          description: Υποδηλώνει ότι ο συγκεκριμένος χρήστης έχει όλα τα δικαιώματα
-            χωρίς να χρειάζεται να τα παραχωρήσετε ξεχωριστά.
-        createdAt:
-          type: string
-          format: date-time
-          readOnly: true
-        updatedAt:
-          type: string
-          format: date-time
-          readOnly: true
-        uuid:
-          type: string
-          format: uuid
-          readOnly: true
-        mainImagePath:
-          type: string
-          readOnly: true
-      required:
-      - createdAt
-      - email
-      - id
-      - isActive
-      - isStaff
-      - isSuperuser
-      - mainImagePath
-      - pk
-      - updatedAt
-      - uuid
-    AuthenticationRequest:
-      type: object
-      properties:
-        email:
-          type: string
-          format: email
-          minLength: 1
-          title: Διεύθυνση ηλεκτρονικού ταχυδρομείου
-          maxLength: 254
-        firstName:
-          type: string
-          maxLength: 255
-        lastName:
-          type: string
-          maxLength: 255
-        username:
-          type: string
-          nullable: true
-          title: Όνομα χρήστη
-          description: Required. 30 characters or fewer.Letters, digits and @/./+/-/_
-            only.
-          pattern: ^[\w.@+#-]+$
-          maxLength: 30
-        image:
-          type: string
-          format: binary
-          nullable: true
-          title: Εικόνα
-        phone:
-          type: string
-          nullable: true
-        city:
-          type: string
-          maxLength: 255
-        zipcode:
-          type: string
-          title: Zip Code
-          maxLength: 255
-        address:
-          type: string
-          maxLength: 255
-        place:
-          type: string
-          maxLength: 255
-        country:
-          type: string
-          minLength: 1
-          title: Country Code Alpha 2
-          nullable: true
-        region:
-          type: string
-          minLength: 1
-          title: Region Code
-          nullable: true
-        birthDate:
-          type: string
-          format: date
-          nullable: true
-        twitter:
-          type: string
-          format: uri
-          nullable: true
-          title: Twitter Profile
-          maxLength: 200
-        linkedin:
-          type: string
-          format: uri
-          nullable: true
-          title: LinkedIn Profile
-          maxLength: 200
-        facebook:
-          type: string
-          format: uri
-          nullable: true
-          title: Facebook Profile
-          maxLength: 200
-        instagram:
-          type: string
-          format: uri
-          nullable: true
-          title: Instagram Profile
-          maxLength: 200
-        website:
-          type: string
-          format: uri
-          nullable: true
-          maxLength: 200
-        youtube:
-          type: string
-          format: uri
-          nullable: true
-          title: Youtube Profile
-          maxLength: 200
-        github:
-          type: string
-          format: uri
-          nullable: true
-          title: Github Profile
-          maxLength: 200
-        bio:
-          type: string
-      required:
-      - email
     BlogAuthor:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -21916,8 +21594,10 @@ components:
           type: integer
         website:
           type: string
-          format: uri
+          nullable: true
           maxLength: 200
+          description: URL link or empty string
+          readOnly: true
         createdAt:
           type: string
           format: date-time
@@ -21945,6 +21625,7 @@ components:
       - updatedAt
       - user
       - uuid
+      - website
     BlogAuthorDetail:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -21976,12 +21657,14 @@ components:
           readOnly: true
         user:
           allOf:
-          - $ref: '#/components/schemas/Authentication'
+          - $ref: '#/components/schemas/UserDetails'
           readOnly: true
         website:
           type: string
-          format: uri
+          nullable: true
           maxLength: 200
+          description: URL link or empty string
+          readOnly: true
         createdAt:
           type: string
           format: date-time
@@ -22021,6 +21704,7 @@ components:
       - updatedAt
       - user
       - uuid
+      - website
     BlogAuthorWriteRequest:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -22340,7 +22024,7 @@ components:
                   type: string
         user:
           allOf:
-          - $ref: '#/components/schemas/Authentication'
+          - $ref: '#/components/schemas/UserDetails'
           readOnly: true
         contentPreview:
           type: string
@@ -22358,7 +22042,7 @@ components:
         hasReplies:
           type: boolean
           readOnly: true
-          description: Whether this comment has replies
+          description: Whether this comment has approved replies
         approved:
           type: boolean
           readOnly: true
@@ -22431,7 +22115,7 @@ components:
                   type: string
         user:
           allOf:
-          - $ref: '#/components/schemas/Authentication'
+          - $ref: '#/components/schemas/UserDetails'
           readOnly: true
         contentPreview:
           type: string
@@ -22449,7 +22133,7 @@ components:
         hasReplies:
           type: boolean
           readOnly: true
-          description: Whether this comment has replies
+          description: Whether this comment has approved replies
         approved:
           type: boolean
           readOnly: true
@@ -22493,7 +22177,7 @@ components:
             contentPreview:
               type: string
             user:
-              $ref: '#/components/schemas/Authentication'
+              $ref: '#/components/schemas/UserDetails'
             createdAt:
               type: string
               format: date-time
@@ -22509,7 +22193,7 @@ components:
           items:
             $ref: '#/components/schemas/BlogComment'
           readOnly: true
-          description: Direct child comments (replies)
+          description: Direct approved child comments (replies)
         ancestorsPath:
           type: array
           items:
@@ -22520,7 +22204,7 @@ components:
               contentPreview:
                 type: string
               user:
-                $ref: '#/components/schemas/Authentication'
+                $ref: '#/components/schemas/UserDetails'
             required:
             - id
             - contentPreview
@@ -22534,14 +22218,14 @@ components:
               type: integer
             treeId:
               type: integer
-            positionInTree:
+            approvedDescendantsCount:
               type: integer
             siblingsCount:
               type: integer
           required:
           - level
           - treeId
-          - positionInTree
+          - approvedDescendantsCount
           - siblingsCount
           readOnly: true
           description: Position information in the comment tree
@@ -22566,30 +22250,6 @@ components:
       - user
       - userHasLiked
       - uuid
-    BlogCommentDetailRequest:
-      type: object
-      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
-      properties:
-        translations:
-          type: object
-          properties:
-            el:
-              type: object
-              properties:
-                content:
-                  type: string
-            en:
-              type: object
-              properties:
-                content:
-                  type: string
-            de:
-              type: object
-              properties:
-                content:
-                  type: string
-      required:
-      - translations
     BlogCommentLikedCommentsRequestRequest:
       type: object
       properties:
@@ -23956,6 +23616,14 @@ components:
       - alpha2
       - alpha3
       - translations
+    DetailRequest:
+      type: object
+      properties:
+        detail:
+          type: string
+          minLength: 1
+      required:
+      - detail
     DocumentTypeEnum:
       enum:
       - RECEIPT
@@ -24095,8 +23763,10 @@ components:
           readOnly: true
         link:
           type: string
-          format: uri
+          nullable: true
           maxLength: 200
+          description: URL link or empty string
+          readOnly: true
         kind:
           $ref: '#/components/schemas/KindEnum'
         expiryDate:
@@ -24118,6 +23788,7 @@ components:
       required:
       - createdAt
       - id
+      - link
       - translations
       - updatedAt
       - uuid
@@ -24146,47 +23817,15 @@ components:
           description: Information message about notifications
       required:
       - info
-    NotificationRequest:
-      type: object
-      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
-      properties:
-        translations:
-          type: object
-          properties:
-            el:
-              type: object
-              properties:
-                title:
-                  type: string
-                message:
-                  type: string
-            en:
-              type: object
-              properties:
-                title:
-                  type: string
-                message:
-                  type: string
-            de:
-              type: object
-              properties:
-                title:
-                  type: string
-                message:
-                  type: string
-        link:
-          type: string
-          format: uri
-          maxLength: 200
-        kind:
-          $ref: '#/components/schemas/KindEnum'
-        expiryDate:
-          type: string
-          format: date-time
-          nullable: true
-      required:
-      - translations
     NotificationSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Whether the operation was successful
+      required:
+      - success
+    NotificationSuccessResponseRequest:
       type: object
       properties:
         success:
@@ -24247,7 +23886,7 @@ components:
           readOnly: true
         user:
           allOf:
-          - $ref: '#/components/schemas/Authentication'
+          - $ref: '#/components/schemas/UserDetails'
           readOnly: true
         notification:
           allOf:
@@ -24278,15 +23917,6 @@ components:
       - updatedAt
       - user
       - uuid
-    NotificationUserDetailRequest:
-      type: object
-      properties:
-        seen:
-          type: boolean
-        seenAt:
-          type: string
-          format: date-time
-          nullable: true
     NotificationUserWriteRequest:
       type: object
       properties:
@@ -25138,44 +24768,6 @@ components:
       - street
       - streetNumber
       - zipcode
-    PaginatedAuthenticationList:
-      type: object
-      required:
-      - count
-      - results
-      properties:
-        links:
-          type: object
-          properties:
-            next:
-              type: string
-              nullable: true
-              format: uri
-              example: http://api.example.org/accounts/?page=4
-            previous:
-              type: string
-              nullable: true
-              format: uri
-              example: http://api.example.org/accounts/?page=2
-        count:
-          type: integer
-          example: 123
-        totalPages:
-          type: integer
-          example: 123
-        pageSize:
-          type: integer
-          example: 123
-        pageTotalResults:
-          type: integer
-          example: 123
-        page:
-          type: integer
-          example: 123
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/Authentication'
     PaginatedBlogAuthorList:
       type: object
       required:
@@ -26050,6 +25642,44 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/UserAddress'
+    PaginatedUserDetailsList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        links:
+          type: object
+          properties:
+            next:
+              type: string
+              nullable: true
+              format: uri
+              example: http://api.example.org/accounts/?page=4
+            previous:
+              type: string
+              nullable: true
+              format: uri
+              example: http://api.example.org/accounts/?page=2
+        count:
+          type: integer
+          example: 123
+        totalPages:
+          type: integer
+          example: 123
+        pageSize:
+          type: integer
+          example: 123
+        pageTotalResults:
+          type: integer
+          example: 123
+        page:
+          type: integer
+          example: 123
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserDetails'
     PaginatedUserSubscriptionList:
       type: object
       required:
@@ -28768,7 +28398,7 @@ components:
           readOnly: true
         user:
           allOf:
-          - $ref: '#/components/schemas/Authentication'
+          - $ref: '#/components/schemas/UserDetails'
           readOnly: true
         rate:
           allOf:
@@ -28837,7 +28467,7 @@ components:
           readOnly: true
         user:
           allOf:
-          - $ref: '#/components/schemas/Authentication'
+          - $ref: '#/components/schemas/UserDetails'
           readOnly: true
         rate:
           allOf:
@@ -29392,67 +29022,6 @@ components:
       - translations
       - updatedAt
       - uuid
-    SubscriptionTopicDetailRequest:
-      type: object
-      description: Serializer that saves :class:`TranslatedFieldsField` automatically.
-      properties:
-        translations:
-          type: object
-          properties:
-            el:
-              type: object
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-            en:
-              type: object
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-            de:
-              type: object
-              properties:
-                name:
-                  type: string
-                description:
-                  type: string
-        slug:
-          type: string
-          minLength: 1
-          description: Unique identifier for the topic (e.g., 'weekly-newsletter')
-          maxLength: 50
-          pattern: ^[-a-zA-Z0-9_]+$
-        category:
-          allOf:
-          - $ref: '#/components/schemas/CategoryEnum'
-          description: |-
-            Category of the subscription topic
-
-            * `MARKETING` - Marketing Campaigns
-            * `PRODUCT` - Product Updates
-            * `ACCOUNT` - Account Updates
-            * `SYSTEM` - System Notifications
-            * `NEWSLETTER` - Newsletter
-            * `PROMOTIONAL` - Promotional
-            * `OTHER` - Other
-        isActive:
-          type: boolean
-          title: Active
-          description: Whether this topic is currently available for subscription
-        isDefault:
-          type: boolean
-          title: Default Subscription
-          description: Whether new users are automatically subscribed to this topic
-        requiresConfirmation:
-          type: boolean
-          description: Whether subscription to this topic requires email confirmation
-      required:
-      - slug
-      - translations
     SubscriptionTopicRequest:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -30102,6 +29671,154 @@ components:
       - title
       - user
       - zipcode
+    UserDetails:
+      type: object
+      properties:
+        pk:
+          type: integer
+          readOnly: true
+          title: Id
+        email:
+          type: string
+          format: email
+          title: Διεύθυνση ηλεκτρονικού ταχυδρομείου
+          maxLength: 254
+        firstName:
+          type: string
+          maxLength: 255
+        lastName:
+          type: string
+          maxLength: 255
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          nullable: true
+          title: Όνομα χρήστη
+          description: Required. 30 characters or fewer.Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+#-]+$
+          maxLength: 30
+        phone:
+          type: string
+          nullable: true
+        city:
+          type: string
+          maxLength: 255
+        zipcode:
+          type: string
+          title: Zip Code
+          maxLength: 255
+        address:
+          type: string
+          maxLength: 255
+        place:
+          type: string
+          maxLength: 255
+        country:
+          type: string
+          title: Country Code Alpha 2
+          nullable: true
+        region:
+          type: string
+          title: Region Code
+          nullable: true
+        birthDate:
+          type: string
+          format: date
+          nullable: true
+        twitter:
+          type: string
+          nullable: true
+          maxLength: 200
+          description: URL link or empty string
+          readOnly: true
+        linkedin:
+          type: string
+          nullable: true
+          maxLength: 200
+          description: URL link or empty string
+          readOnly: true
+        facebook:
+          type: string
+          nullable: true
+          maxLength: 200
+          description: URL link or empty string
+          readOnly: true
+        instagram:
+          type: string
+          nullable: true
+          maxLength: 200
+          description: URL link or empty string
+          readOnly: true
+        website:
+          type: string
+          nullable: true
+          maxLength: 200
+          description: URL link or empty string
+          readOnly: true
+        youtube:
+          type: string
+          nullable: true
+          maxLength: 200
+          description: URL link or empty string
+          readOnly: true
+        github:
+          type: string
+          nullable: true
+          maxLength: 200
+          description: URL link or empty string
+          readOnly: true
+        bio:
+          type: string
+        isActive:
+          type: boolean
+          readOnly: true
+          title: Active
+        isStaff:
+          type: boolean
+          readOnly: true
+          title: Staff
+        isSuperuser:
+          type: boolean
+          readOnly: true
+          title: Κατάσταση υπερχρήστη
+          description: Υποδηλώνει ότι ο συγκεκριμένος χρήστης έχει όλα τα δικαιώματα
+            χωρίς να χρειάζεται να τα παραχωρήσετε ξεχωριστά.
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        mainImagePath:
+          type: string
+          readOnly: true
+      required:
+      - createdAt
+      - email
+      - facebook
+      - github
+      - id
+      - instagram
+      - isActive
+      - isStaff
+      - isSuperuser
+      - linkedin
+      - mainImagePath
+      - pk
+      - twitter
+      - updatedAt
+      - uuid
+      - website
+      - youtube
     UserSubscription:
       type: object
       properties:
@@ -30200,6 +29917,17 @@ components:
       - updatedAt
       - user
     UserSubscriptionDetailRequest:
+      type: object
+      properties:
+        topic:
+          type: integer
+        status:
+          $ref: '#/components/schemas/SubscriptionStatus'
+        metadata:
+          description: Additional subscription preferences or data
+      required:
+      - topic
+    UserSubscriptionRequest:
       type: object
       properties:
         topic:

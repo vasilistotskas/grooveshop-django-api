@@ -35,7 +35,7 @@ class BlogCommentSerializer(
         help_text=_("Whether this comment is a reply to another comment")
     )
     has_replies = serializers.SerializerMethodField(
-        help_text=_("Whether this comment has replies")
+        help_text=_("Whether this comment has approved replies")
     )
     is_edited = serializers.SerializerMethodField(
         help_text=_("Whether this comment has been edited")
@@ -57,7 +57,7 @@ class BlogCommentSerializer(
         return obj.parent is not None
 
     def get_has_replies(self, obj: BlogComment) -> bool:
-        return obj.get_children().exists()
+        return obj.get_children().filter(approved=True).exists()
 
     def get_is_edited(self, obj: BlogComment) -> bool:
         return obj.updated_at > obj.created_at + timedelta(minutes=5)
@@ -113,7 +113,7 @@ class BlogCommentDetailSerializer(BlogCommentSerializer):
         help_text=_("Parent comment if this is a reply")
     )
     children_comments = serializers.SerializerMethodField(
-        help_text=_("Direct child comments (replies)")
+        help_text=_("Direct approved child comments (replies)")
     )
     ancestors_path = serializers.SerializerMethodField(
         help_text=_("Path from root comment to this comment")
@@ -137,7 +137,7 @@ class BlogCommentDetailSerializer(BlogCommentSerializer):
             "properties": {
                 "id": {"type": "integer"},
                 "content_preview": {"type": "string"},
-                "user": {"$ref": "#/components/schemas/Authentication"},
+                "user": {"$ref": "#/components/schemas/UserDetails"},
                 "created_at": {"type": "string", "format": "date-time"},
             },
             "required": ["id", "content_preview", "user", "created_at"],
@@ -159,9 +159,14 @@ class BlogCommentDetailSerializer(BlogCommentSerializer):
         )
     )
     def get_children_comments(self, obj: BlogComment):
+        request = self.context.get("request")
         children = (
             obj.get_children().select_related("user").order_by("created_at")
         )
+
+        if not (request and request.user.is_staff):
+            children = children.filter(approved=True)
+
         if children.exists():
             return BlogCommentSerializer(
                 children, many=True, context=self.context
@@ -176,14 +181,19 @@ class BlogCommentDetailSerializer(BlogCommentSerializer):
                 "properties": {
                     "id": {"type": "integer"},
                     "content_preview": {"type": "string"},
-                    "user": {"$ref": "#/components/schemas/Authentication"},
+                    "user": {"$ref": "#/components/schemas/UserDetails"},
                 },
                 "required": ["id", "content_preview", "user"],
             },
         }
     )
     def get_ancestors_path(self, obj: BlogComment):
+        request = self.context.get("request")
         ancestors = obj.get_ancestors().select_related("user")
+
+        if not (request and request.user.is_staff):
+            ancestors = ancestors.filter(approved=True)
+
         return [
             {
                 "id": ancestor.id,
@@ -199,13 +209,13 @@ class BlogCommentDetailSerializer(BlogCommentSerializer):
             "properties": {
                 "level": {"type": "integer"},
                 "tree_id": {"type": "integer"},
-                "position_in_tree": {"type": "integer"},
+                "approved_descendants_count": {"type": "integer"},
                 "siblings_count": {"type": "integer"},
             },
             "required": [
                 "level",
                 "tree_id",
-                "position_in_tree",
+                "approved_descendants_count",
                 "siblings_count",
             ],
         }
@@ -214,8 +224,8 @@ class BlogCommentDetailSerializer(BlogCommentSerializer):
         return {
             "level": obj.level,
             "tree_id": obj.tree_id,
-            "position_in_tree": obj.get_descendant_count(),
-            "siblings_count": obj.get_siblings().count(),
+            "approved_descendants_count": obj.approved_descendants_count,
+            "siblings_count": obj.get_siblings().filter(approved=True).count(),
         }
 
     class Meta(BlogCommentSerializer.Meta):

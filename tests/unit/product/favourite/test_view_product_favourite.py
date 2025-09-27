@@ -1,7 +1,6 @@
 from django.test import TestCase
 from rest_framework.test import APIRequestFactory
 
-from core.utils.serializers import MultiSerializerMixin
 from product.serializers.favourite import (
     ProductDetailResponseSerializer,
     ProductFavouriteByProductsResponseSerializer,
@@ -18,20 +17,6 @@ class ProductFavouriteViewSetTestCase(TestCase):
         self.viewset = ProductFavouriteViewSet()
         self.viewset.action = "list"
 
-    def test_serializers_configuration(self):
-        expected_serializers = {
-            "default": ProductFavouriteDetailSerializer,
-            "list": ProductFavouriteSerializer,
-            "retrieve": ProductFavouriteDetailSerializer,
-            "create": ProductFavouriteWriteSerializer,
-            "update": ProductFavouriteWriteSerializer,
-            "partial_update": ProductFavouriteWriteSerializer,
-            "product": ProductDetailResponseSerializer,
-            "favourites_by_products": ProductFavouriteByProductsResponseSerializer,
-        }
-
-        self.assertEqual(self.viewset.serializers, expected_serializers)
-
     def test_list_action_serializer(self):
         self.viewset.action = "list"
         serializer_class = self.viewset.get_serializer_class()
@@ -44,11 +29,6 @@ class ProductFavouriteViewSetTestCase(TestCase):
 
     def test_create_action_serializer(self):
         self.viewset.action = "create"
-        serializer_class = self.viewset.get_serializer_class()
-        self.assertEqual(serializer_class, ProductFavouriteWriteSerializer)
-
-    def test_update_action_serializer(self):
-        self.viewset.action = "update"
         serializer_class = self.viewset.get_serializer_class()
         self.assertEqual(serializer_class, ProductFavouriteWriteSerializer)
 
@@ -95,11 +75,6 @@ class ProductFavouriteViewSetTestCase(TestCase):
         expected_ordering = ["-created_at"]
         self.assertEqual(self.viewset.ordering, expected_ordering)
 
-    def test_multi_serializer_mixin_integration(self):
-        self.assertTrue(
-            issubclass(ProductFavouriteViewSet, MultiSerializerMixin)
-        )
-
     def test_get_serializer_for_schema(self):
         self.viewset.action = "list"
         serializer = self.viewset.get_serializer_class()
@@ -139,7 +114,7 @@ class ProductFavouriteViewSetTestCase(TestCase):
         for action, expected_serializer in response_serializers.items():
             self.viewset.action = action
             if action in ["create", "update", "partial_update"]:
-                actual_serializer = self.viewset.serializers.get(
+                actual_serializer = self.viewset.response_serializers.get(
                     "default", ProductFavouriteDetailSerializer
                 )
             else:

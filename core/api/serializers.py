@@ -98,6 +98,10 @@ class HealthCheckResponseSerializer(serializers.Serializer):
     celery = serializers.BooleanField()
 
 
+class DetailSerializer(serializers.Serializer):
+    detail = serializers.CharField()
+
+
 @extend_schema_field(
     {
         "type": "object",
@@ -108,8 +112,7 @@ class HealthCheckResponseSerializer(serializers.Serializer):
         "example": {"detail": "Error message", "error": "Error code"},
     }
 )
-class ErrorResponseSerializer(serializers.Serializer):
-    detail = serializers.CharField()
+class ErrorResponseSerializer(DetailSerializer):
     error = serializers.CharField(required=False)
 
 

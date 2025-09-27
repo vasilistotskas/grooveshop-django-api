@@ -25,7 +25,6 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
-    MultiSerializerMixin,
     create_schema_view_config,
     RequestSerializersConfig,
     ResponseSerializersConfig,
@@ -37,6 +36,7 @@ req_serializers: RequestSerializersConfig = {
     "create": BlogCategoryWriteSerializer,
     "update": BlogCategoryWriteSerializer,
     "partial_update": BlogCategoryWriteSerializer,
+    "reorder": BlogCategoryReorderRequestSerializer,
 }
 
 res_serializers: ResponseSerializersConfig = {
@@ -45,6 +45,13 @@ res_serializers: ResponseSerializersConfig = {
     "retrieve": BlogCategoryDetailSerializer,
     "update": BlogCategoryDetailSerializer,
     "partial_update": BlogCategoryDetailSerializer,
+    "posts": BlogPostSerializer,
+    "children": BlogCategorySerializer,
+    "descendants": BlogCategorySerializer,
+    "ancestors": BlogCategorySerializer,
+    "siblings": BlogCategorySerializer,
+    "tree": BlogCategorySerializer,
+    "reorder": BlogCategoryReorderResponseSerializer,
 }
 
 
@@ -156,28 +163,10 @@ res_serializers: ResponseSerializersConfig = {
     settings.DEFAULT_CACHE_TTL,
     methods=["list", "retrieve", "posts", "tree", "ancestors", "descendants"],
 )
-class BlogCategoryViewSet(MultiSerializerMixin, BaseModelViewSet):
+class BlogCategoryViewSet(BaseModelViewSet):
     queryset = BlogCategory.objects.all()
-    serializers = {
-        "default": BlogCategoryDetailSerializer,
-        "list": BlogCategorySerializer,
-        "retrieve": BlogCategoryDetailSerializer,
-        "create": BlogCategoryWriteSerializer,
-        "update": BlogCategoryWriteSerializer,
-        "partial_update": BlogCategoryWriteSerializer,
-        "posts": BlogPostSerializer,
-        "children": BlogCategorySerializer,
-        "descendants": BlogCategorySerializer,
-        "ancestors": BlogCategorySerializer,
-        "siblings": BlogCategorySerializer,
-        "tree": BlogCategorySerializer,
-        "reorder": BlogCategoryReorderResponseSerializer,
-    }
-    response_serializers = {
-        "create": BlogCategoryDetailSerializer,
-        "update": BlogCategoryDetailSerializer,
-        "partial_update": BlogCategoryDetailSerializer,
-    }
+    response_serializers = res_serializers
+    request_serializers = req_serializers
 
     def get_filterset_class(self):
         if self.action == "posts":

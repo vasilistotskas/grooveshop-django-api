@@ -25,7 +25,6 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
-    MultiSerializerMixin,
     create_schema_view_config,
     RequestSerializersConfig,
     ResponseSerializersConfig,
@@ -56,6 +55,8 @@ req_serializers: RequestSerializersConfig = {
     "create": UserWriteSerializer,
     "update": UserWriteSerializer,
     "partial_update": UserWriteSerializer,
+    "change_username": UsernameUpdateSerializer,
+    "subscriptions": None,
 }
 
 res_serializers: ResponseSerializersConfig = {
@@ -64,6 +65,16 @@ res_serializers: ResponseSerializersConfig = {
     "retrieve": UserDetailsSerializer,
     "update": UserDetailsSerializer,
     "partial_update": UserDetailsSerializer,
+    "favourite_products": ProductFavouriteSerializer,
+    "orders": OrderSerializer,
+    "product_reviews": ProductReviewSerializer,
+    "addresses": UserAddressSerializer,
+    "blog_post_comments": BlogCommentSerializer,
+    "liked_blog_posts": BlogPostSerializer,
+    "notifications": NotificationUserSerializer,
+    "subscriptions": UserSubscriptionSerializer,
+    "change_username": UsernameUpdateResponseSerializer,
+    "subscription_summary": UserSubscriptionSummaryResponseSerializer,
 }
 
 
@@ -200,8 +211,10 @@ res_serializers: ResponseSerializersConfig = {
         },
     ),
 )
-class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
+class UserAccountViewSet(BaseModelViewSet):
     queryset = User.objects.none()
+    request_serializers = req_serializers
+    response_serializers = res_serializers
     permission_classes = [IsOwnerOrAdmin]
     ordering_fields = ["id", "email", "username", "created_at", "updated_at"]
     ordering = ["-created_at"]
@@ -222,33 +235,6 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         if self.action in action_filter_map:
             return action_filter_map[self.action]
         return UserAccountFilter
-
-    serializers = {
-        "default": UserDetailsSerializer,
-        "favourite_products": ProductFavouriteSerializer,
-        "orders": OrderSerializer,
-        "product_reviews": ProductReviewSerializer,
-        "addresses": UserAddressSerializer,
-        "blog_post_comments": BlogCommentSerializer,
-        "liked_blog_posts": BlogPostSerializer,
-        "notifications": NotificationUserSerializer,
-        "subscriptions": UserSubscriptionSerializer,
-        "change_username": UsernameUpdateSerializer,
-    }
-
-    request_serializers: RequestSerializersConfig = {
-        "create": UserWriteSerializer,
-        "update": UserWriteSerializer,
-        "partial_update": UserWriteSerializer,
-    }
-
-    response_serializers: ResponseSerializersConfig = {
-        "create": UserDetailsSerializer,
-        "list": UserDetailsSerializer,
-        "retrieve": UserDetailsSerializer,
-        "update": UserDetailsSerializer,
-        "partial_update": UserDetailsSerializer,
-    }
 
     def get_queryset(self):
         match self.action:
@@ -305,7 +291,11 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         self.search_fields = []
 
         queryset = self.filter_queryset(self.get_queryset())
-        return self.paginate_and_serialize(queryset, request)
+
+        response_serializer_class = self.get_response_serializer()
+        return self.paginate_and_serialize(
+            queryset, request, serializer_class=response_serializer_class
+        )
 
     @action(detail=True, methods=["GET"])
     def orders(self, request, pk=None):
@@ -314,7 +304,11 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         self.search_fields = []
 
         queryset = self.filter_queryset(self.get_queryset())
-        return self.paginate_and_serialize(queryset, request)
+
+        response_serializer_class = self.get_response_serializer()
+        return self.paginate_and_serialize(
+            queryset, request, serializer_class=response_serializer_class
+        )
 
     @action(detail=True, methods=["GET"])
     def product_reviews(self, request, pk=None):
@@ -323,7 +317,11 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         self.search_fields = []
 
         queryset = self.filter_queryset(self.get_queryset())
-        return self.paginate_and_serialize(queryset, request)
+
+        response_serializer_class = self.get_response_serializer()
+        return self.paginate_and_serialize(
+            queryset, request, serializer_class=response_serializer_class
+        )
 
     @action(detail=True, methods=["GET"])
     def addresses(self, request, pk=None):
@@ -332,7 +330,11 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         self.search_fields = []
 
         queryset = self.filter_queryset(self.get_queryset())
-        return self.paginate_and_serialize(queryset, request)
+
+        response_serializer_class = self.get_response_serializer()
+        return self.paginate_and_serialize(
+            queryset, request, serializer_class=response_serializer_class
+        )
 
     @action(detail=True, methods=["GET"])
     def blog_post_comments(self, request, pk=None):
@@ -341,7 +343,11 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         self.search_fields = []
 
         queryset = self.filter_queryset(self.get_queryset())
-        return self.paginate_and_serialize(queryset, request)
+
+        response_serializer_class = self.get_response_serializer()
+        return self.paginate_and_serialize(
+            queryset, request, serializer_class=response_serializer_class
+        )
 
     @action(detail=True, methods=["GET"])
     def liked_blog_posts(self, request, pk=None):
@@ -350,7 +356,11 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         self.search_fields = []
 
         queryset = self.filter_queryset(self.get_queryset())
-        return self.paginate_and_serialize(queryset, request)
+
+        response_serializer_class = self.get_response_serializer()
+        return self.paginate_and_serialize(
+            queryset, request, serializer_class=response_serializer_class
+        )
 
     @action(detail=True, methods=["GET"])
     def notifications(self, request, pk=None):
@@ -359,7 +369,11 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
         self.search_fields = []
 
         queryset = self.filter_queryset(self.get_queryset())
-        return self.paginate_and_serialize(queryset, request)
+
+        response_serializer_class = self.get_response_serializer()
+        return self.paginate_and_serialize(
+            queryset, request, serializer_class=response_serializer_class
+        )
 
     @action(detail=True, methods=["GET", "POST"])
     def subscriptions(self, request, pk=None):
@@ -371,7 +385,11 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
             self.search_fields = []
 
             queryset = self.filter_queryset(self.get_queryset())
-            return self.paginate_and_serialize(queryset, request)
+
+            response_serializer_class = self.get_response_serializer()
+            return self.paginate_and_serialize(
+                queryset, request, serializer_class=response_serializer_class
+            )
 
         elif request.method == "POST":
             topic_id = request.data.get("topic_id")
@@ -411,16 +429,20 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            serializer = UserSubscriptionSerializer(subscription)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            response_serializer_class = self.get_response_serializer()
+            response_serializer = response_serializer_class(subscription)
+            return Response(
+                response_serializer.data, status=status.HTTP_201_CREATED
+            )
 
     @action(detail=True, methods=["POST"])
     def change_username(self, request, pk=None):
         user = self.get_object()
 
-        serializer = UsernameUpdateSerializer(data=request.data)
-        if serializer.is_valid():
-            new_username = serializer.validated_data["username"]
+        request_serializer_class = self.get_request_serializer()
+        request_serializer = request_serializer_class(data=request.data)
+        if request_serializer.is_valid():
+            new_username = request_serializer.validated_data["username"]
 
             if (
                 User.objects.filter(username=new_username)
@@ -435,12 +457,15 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
             user.username = new_username
             user.save()
 
-            return Response(
-                {"detail": _("Username updated successfully.")},
-                status=status.HTTP_200_OK,
-            )
+            response_data = {"detail": _("Username updated successfully.")}
 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            response_serializer_class = self.get_response_serializer()
+            response_serializer = response_serializer_class(response_data)
+            return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+        return Response(
+            request_serializer.errors, status=status.HTTP_400_BAD_REQUEST
+        )
 
     @action(detail=True, methods=["GET"])
     def subscription_summary(self, request, pk=None):
@@ -450,4 +475,7 @@ class UserAccountViewSet(MultiSerializerMixin, BaseModelViewSet):
 
         user = self.get_object()
         summary = get_user_subscription_summary(user)
-        return Response(summary)
+
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(summary)
+        return Response(response_serializer.data)

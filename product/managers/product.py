@@ -38,16 +38,16 @@ class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
     def exclude_deleted(self):
         return self.exclude(is_deleted=True)
 
-    def with_discount_value(self):
+    def with_discount_value_annotation(self):
         return self.annotate(
-            discount_value_amount=F("price")
+            discount_value_annotation=F("price")
             * F("discount_percent")
             / Value(100, output_field=DecimalField())
         )
 
-    def with_vat_value(self):
+    def with_vat_value_annotation(self):
         return self.annotate(
-            vat_value_amount=Case(
+            vat_value_annotation=Case(
                 When(
                     vat__isnull=False,
                     then=F("price")
@@ -58,21 +58,23 @@ class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
             )
         )
 
-    def with_final_price(self):
-        queryset = self.with_discount_value().with_vat_value()
+    def with_final_price_annotation(self):
+        queryset = (
+            self.with_discount_value_annotation().with_vat_value_annotation()
+        )
         return queryset.annotate(
-            final_price_amount=F("price")
-            + F("vat_value_amount")
-            - F("discount_value_amount")
+            final_price_annotation=F("price")
+            + F("vat_value_annotation")
+            - F("discount_value_annotation")
         )
 
-    def with_price_save_percent(self):
-        queryset = self.with_discount_value()
+    def with_price_save_percent_annotation(self):
+        queryset = self.with_discount_value_annotation()
         return queryset.annotate(
-            price_save_percent_field=Case(
+            price_save_percent_annotation=Case(
                 When(
                     price__gt=0,
-                    then=F("discount_value_amount")
+                    then=F("discount_value_annotation")
                     / F("price")
                     * Value(100, output_field=DecimalField()),
                 ),
@@ -80,7 +82,7 @@ class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
             )
         )
 
-    def with_likes_count(self):
+    def with_likes_count_annotation(self):
         likes_subquery = (
             ProductFavourite.objects.filter(product_id=OuterRef("pk"))
             .values("product_id")
@@ -89,10 +91,10 @@ class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
         )
 
         return self.annotate(
-            likes_count_field=Coalesce(Subquery(likes_subquery), Value(0))
+            likes_count_annotation=Coalesce(Subquery(likes_subquery), Value(0))
         )
 
-    def with_review_average(self):
+    def with_review_average_annotation(self):
         reviews_avg_subquery = (
             ProductReview.objects.filter(product_id=OuterRef("pk"))
             .values("product_id")
@@ -103,18 +105,10 @@ class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
         )
 
         return self.annotate(
-            review_average_field=Coalesce(
+            review_average_annotation=Coalesce(
                 Subquery(reviews_avg_subquery),
                 Value(0, output_field=FloatField()),
             )
-        )
-
-    def with_all_annotations(self):
-        return (
-            self.with_final_price()
-            .with_price_save_percent()
-            .with_likes_count()
-            .with_review_average()
         )
 
 
@@ -134,23 +128,20 @@ class ProductManager(TranslatableManager):
     def out_of_stock(self):
         return self.get_queryset().out_of_stock()
 
-    def with_discount_value(self):
-        return self.get_queryset().with_discount_value()
+    def with_discount_value_annotation(self):
+        return self.get_queryset().with_discount_value_annotation()
 
-    def with_vat_value(self):
-        return self.get_queryset().with_vat_value()
+    def with_vat_value_annotation(self):
+        return self.get_queryset().with_vat_value_annotation()
 
-    def with_final_price(self):
-        return self.get_queryset().with_final_price()
+    def with_final_price_annotation(self):
+        return self.get_queryset().with_final_price_annotation()
 
-    def with_price_save_percent(self):
-        return self.get_queryset().with_price_save_percent()
+    def with_price_save_percent_annotation(self):
+        return self.get_queryset().with_price_save_percent_annotation()
 
-    def with_likes_count(self):
-        return self.get_queryset().with_likes_count()
+    def with_likes_count_annotation(self):
+        return self.get_queryset().with_likes_count_annotation()
 
-    def with_review_average(self):
-        return self.get_queryset().with_review_average()
-
-    def with_all_annotations(self):
-        return self.get_queryset().with_all_annotations()
+    def with_review_average_annotation(self):
+        return self.get_queryset().with_review_average_annotation()

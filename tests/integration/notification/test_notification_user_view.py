@@ -471,6 +471,7 @@ class NotificationUserViewSetTestCase(TestURLFixerMixin, APITestCase):
         url = reverse("notification-user-mark-as-seen")
         data = {"notification_user_ids": [nu1.id]}
         response = self.client.post(url, data, format="json")
+        print("======= response =========", response.data)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["success"], True)

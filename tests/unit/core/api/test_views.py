@@ -1,7 +1,3 @@
-"""
-Test pagination API parameters and functionality.
-"""
-
 from unittest.mock import Mock, patch
 from django.test import TestCase, RequestFactory
 from rest_framework import status
@@ -146,11 +142,11 @@ class BaseModelViewSetTestCase(TestCase):
         self.assertEqual(self.viewset.metadata_class, Metadata)
 
     def test_get_response_serializer_class_default(self):
-        result = self.viewset.get_response_serializer_class()
+        result = self.viewset.get_response_serializer()
         self.assertEqual(result, ProductSerializer)
 
     def test_get_request_serializer_class_default(self):
-        result = self.viewset.get_request_serializer_class()
+        result = self.viewset.get_request_serializer()
         self.assertEqual(result, ProductSerializer)
 
     @patch.object(BaseModelViewSet, "filter_queryset")

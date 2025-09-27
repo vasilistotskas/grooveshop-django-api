@@ -1,4 +1,4 @@
-from django.db.models import Count, Q, F
+from django.db.models import Count, Q
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
@@ -140,21 +140,21 @@ class BlogCommentFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
     has_replies = filters.BooleanFilter(
         method="filter_has_replies",
         help_text=_(
-            "Filter comments that have replies (true) or no replies (false)"
+            "Filter comments that have approved replies (true) or no replies (false)"
         ),
     )
     min_replies = filters.NumberFilter(
         method="filter_min_replies",
-        help_text=_("Filter comments with at least this many replies"),
+        help_text=_("Filter comments with at least this many approved replies"),
     )
     max_replies = filters.NumberFilter(
         method="filter_max_replies",
-        help_text=_("Filter comments with at most this many replies"),
+        help_text=_("Filter comments with at most this many approved replies"),
     )
 
     is_leaf = filters.BooleanFilter(
         method="filter_is_leaf",
-        help_text=_("Filter leaf comments (no replies)"),
+        help_text=_("Filter leaf comments (no approved replies)"),
     )
     ancestor_of = filters.NumberFilter(
         method="filter_ancestor_of",
@@ -175,7 +175,7 @@ class BlogCommentFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
     )
     most_replied = filters.BooleanFilter(
         method="filter_most_replied",
-        help_text=_("Order comments by most replies first"),
+        help_text=_("Order comments by most approved replies first"),
     )
 
     class Meta:
@@ -282,39 +282,55 @@ class BlogCommentFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         return queryset
 
     def filter_has_replies(self, queryset, name, value):
-        """Filter comments based on whether they have replies."""
+        """Filter comments based on whether they have approved replies."""
         if value is True:
             return queryset.annotate(
-                reply_count=Count("children", distinct=True)
-            ).filter(reply_count__gt=0)
+                approved_reply_count=Count(
+                    "children", filter=Q(children__approved=True), distinct=True
+                )
+            ).filter(approved_reply_count__gt=0)
         elif value is False:
             return queryset.annotate(
-                reply_count=Count("children", distinct=True)
-            ).filter(reply_count=0)
+                approved_reply_count=Count(
+                    "children", filter=Q(children__approved=True), distinct=True
+                )
+            ).filter(approved_reply_count=0)
         return queryset
 
     def filter_min_replies(self, queryset, name, value):
-        """Filter comments with minimum number of replies."""
+        """Filter comments with minimum number of approved replies."""
         if value is not None:
             return queryset.annotate(
-                reply_count=Count("children", distinct=True)
-            ).filter(reply_count__gte=value)
+                approved_reply_count=Count(
+                    "children", filter=Q(children__approved=True), distinct=True
+                )
+            ).filter(approved_reply_count__gte=value)
         return queryset
 
     def filter_max_replies(self, queryset, name, value):
-        """Filter comments with maximum number of replies."""
+        """Filter comments with maximum number of approved replies."""
         if value is not None:
             return queryset.annotate(
-                reply_count=Count("children", distinct=True)
-            ).filter(reply_count__lte=value)
+                approved_reply_count=Count(
+                    "children", filter=Q(children__approved=True), distinct=True
+                )
+            ).filter(approved_reply_count__lte=value)
         return queryset
 
     def filter_is_leaf(self, queryset, name, value):
-        """Filter leaf nodes (comments without replies)."""
+        """Filter leaf nodes (comments without approved replies)."""
         if value is True:
-            return queryset.filter(lft=F("rght") - 1)
+            return queryset.annotate(
+                approved_reply_count=Count(
+                    "children", filter=Q(children__approved=True), distinct=True
+                )
+            ).filter(approved_reply_count=0)
         elif value is False:
-            return queryset.exclude(lft=F("rght") - 1)
+            return queryset.annotate(
+                approved_reply_count=Count(
+                    "children", filter=Q(children__approved=True), distinct=True
+                )
+            ).filter(approved_reply_count__gt=0)
         return queryset
 
     def filter_ancestor_of(self, queryset, name, value):
@@ -340,11 +356,17 @@ class BlogCommentFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
     def filter_most_liked(self, queryset, name, value):
         """Order comments by most likes."""
         if value is True:
-            return queryset.order_by("-likes_count_field", "-created_at")
+            return queryset.annotate(
+                like_count=Count("likes", distinct=True)
+            ).order_by("-like_count", "-created_at")
         return queryset
 
     def filter_most_replied(self, queryset, name, value):
-        """Order comments by most replies."""
+        """Order comments by most approved replies."""
         if value is True:
-            return queryset.order_by("-replies_count_field", "-created_at")
+            return queryset.annotate(
+                approved_reply_count=Count(
+                    "children", filter=Q(children__approved=True), distinct=True
+                )
+            ).order_by("-approved_reply_count", "-created_at")
         return queryset

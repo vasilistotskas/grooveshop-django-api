@@ -5,7 +5,7 @@ from functools import cached_property
 from importlib import import_module
 from typing import TYPE_CHECKING
 from django.conf import settings
-from django.db.models import F
+from django.db.models import F, Count, Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import (
@@ -36,7 +36,6 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
-    MultiSerializerMixin,
     create_schema_view_config,
     RequestSerializersConfig,
     ResponseSerializersConfig,
@@ -50,6 +49,9 @@ req_serializers: RequestSerializersConfig = {
     "create": BlogPostWriteSerializer,
     "update": BlogPostWriteSerializer,
     "partial_update": BlogPostWriteSerializer,
+    "liked_posts": BlogPostLikedPostsRequestSerializer,
+    "update_likes": None,
+    "update_view_count": None,
 }
 
 res_serializers: ResponseSerializersConfig = {
@@ -58,6 +60,14 @@ res_serializers: ResponseSerializersConfig = {
     "retrieve": BlogPostDetailSerializer,
     "update": BlogPostDetailSerializer,
     "partial_update": BlogPostDetailSerializer,
+    "update_likes": BlogPostDetailSerializer,
+    "update_view_count": BlogPostDetailSerializer,
+    "related_posts": BlogPostSerializer,
+    "liked_posts": BlogPostLikedPostsResponseSerializer,
+    "comments": BlogCommentSerializer,
+    "trending": BlogPostSerializer,
+    "popular": BlogPostSerializer,
+    "featured": BlogPostSerializer,
 }
 
 
@@ -73,26 +83,10 @@ res_serializers: ResponseSerializersConfig = {
     )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
-class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
+class BlogPostViewSet(BaseModelViewSet):
     queryset = BlogPost.objects.all()
-    serializers = {
-        "default": BlogPostDetailSerializer,
-        "list": BlogPostSerializer,
-        "retrieve": BlogPostDetailSerializer,
-        "create": BlogPostWriteSerializer,
-        "update": BlogPostWriteSerializer,
-        "partial_update": BlogPostWriteSerializer,
-        "update_likes": BlogPostLikedPostsResponseSerializer,
-        "update_view_count": BlogPostDetailSerializer,
-        "liked_posts": BlogPostLikedPostsResponseSerializer,
-        "related_posts": BlogPostSerializer,
-        "comments": BlogCommentSerializer,
-        "trending": BlogPostSerializer,
-        "popular": BlogPostSerializer,
-        "featured": BlogPostSerializer,
-    }
-    response_serializers = res_serializers
     request_serializers = req_serializers
+    response_serializers = res_serializers
 
     ordering_fields = [
         "id",
@@ -100,9 +94,6 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
         "updated_at",
         "published_at",
         "view_count",
-        "likes_count_field",
-        "comments_count_field",
-        "tags_count_field",
         "featured",
     ]
     ordering = ["-created_at"]
@@ -115,18 +106,14 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
     ]
 
     def get_queryset(self):
-        queryset = (
-            BlogPost.objects.select_related(
-                "author__user", "category", "author"
-            )
-            .prefetch_related(
-                "tags__translations",
-                "likes",
-                "comments",
-                "translations",
-                "category__translations",
-            )
-            .with_all_annotations()
+        queryset = BlogPost.objects.select_related(
+            "author__user", "category", "author"
+        ).prefetch_related(
+            "tags__translations",
+            "likes",
+            "comments",
+            "translations",
+            "category__translations",
         )
         return queryset
 
@@ -188,10 +175,11 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
             post.likes.add(user)
         post.save()
 
-        serializer = BlogPostDetailSerializer(
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(
             post, context=self.get_serializer_context()
         )
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
 
     @extend_schema(
         operation_id="incrementBlogPostViews",
@@ -208,8 +196,12 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
         post = self.get_object()
         post.view_count += 1
         post.save(update_fields=["view_count"])
-        serializer = self.get_serializer(post)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(
+            post, context=self.get_serializer_context()
+        )
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
 
     @extend_schema(
         operation_id="listBlogPostRelated",
@@ -239,8 +231,11 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
         strategy = self.get_related_posts_strategy()
         related_posts = strategy.get_related_posts(post)
 
-        serializer = self.get_serializer(related_posts, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(
+            related_posts, many=True, context=self.get_serializer_context()
+        )
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
 
     @extend_schema(
         operation_id="checkBlogPostLikes",
@@ -255,23 +250,24 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
     )
     @action(detail=False, methods=["POST"])
     def liked_posts(self, request, *args, **kwargs):
-        serializer = BlogPostLikedPostsRequestSerializer(data=request.data)
-        if not serializer.is_valid():
+        request_serializer_class = self.get_request_serializer()
+        request_serializer = request_serializer_class(data=request.data)
+        if not request_serializer.is_valid():
             return Response(
-                serializer.errors, status=status.HTTP_400_BAD_REQUEST
+                request_serializer.errors, status=status.HTTP_400_BAD_REQUEST
             )
 
         user = request.user
-        post_ids = serializer.validated_data["post_ids"]
+        post_ids = request_serializer.validated_data["post_ids"]
 
         liked_post_ids = BlogPost.objects.filter(
             likes=user, id__in=post_ids
         ).values_list("id", flat=True)
 
         response_data = {"post_ids": list(liked_post_ids)}
-        response_serializer = BlogPostLikedPostsResponseSerializer(
-            response_data
-        )
+
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(response_data)
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 
     @extend_schema(
@@ -310,6 +306,10 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
             "user", "parent"
         ).prefetch_related("translations", "likes")
 
+        # Filter out unapproved comments for non-staff users
+        if not request.user.is_staff:
+            queryset = queryset.filter(approved=True)
+
         comment_filterset = BlogCommentFilter(
             data=request.GET, queryset=queryset, request=request
         )
@@ -322,7 +322,10 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        return self.paginate_and_serialize(queryset, request)
+        response_serializer_class = self.get_response_serializer()
+        return self.paginate_and_serialize(
+            queryset, request, serializer_class=response_serializer_class
+        )
 
     @extend_schema(
         operation_id="listTrendingBlogPosts",
@@ -355,14 +358,21 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
             self.get_queryset()
             .filter(published_at__gte=cutoff_date)
             .annotate(
+                likes_count_annotation=Count("likes", distinct=True),
+                comments_count_annotation=Count(
+                    "comments", distinct=True, filter=Q(comments__approved=True)
+                ),
                 trending_score=F("view_count")
-                + (F("likes_count_field") * 2)
-                + (F("comments_count_field") * 3)
+                + (F("likes_count_annotation") * 2)
+                + (F("comments_count_annotation") * 3),
             )
             .order_by("-trending_score")
         )
 
-        return self.paginate_and_serialize(queryset, request)
+        response_serializer_class = self.get_response_serializer()
+        return self.paginate_and_serialize(
+            queryset, request, serializer_class=response_serializer_class
+        )
 
     @extend_schema(
         operation_id="listPopularBlogPosts",
@@ -377,10 +387,16 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
     )
     @action(detail=False, methods=["GET"])
     def popular(self, request):
-        queryset = self.get_queryset().order_by(
-            "-likes_count_field", "-view_count"
+        queryset = (
+            self.get_queryset()
+            .annotate(likes_count_annotation=Count("likes", distinct=True))
+            .order_by("-likes_count_annotation", "-view_count")
         )
-        return self.paginate_and_serialize(queryset, request)
+
+        response_serializer_class = self.get_response_serializer()
+        return self.paginate_and_serialize(
+            queryset, request, serializer_class=response_serializer_class
+        )
 
     @extend_schema(
         operation_id="listFeaturedBlogPosts",
@@ -398,4 +414,8 @@ class BlogPostViewSet(MultiSerializerMixin, BaseModelViewSet):
         queryset = (
             self.get_queryset().filter(featured=True).order_by("-published_at")
         )
-        return self.paginate_and_serialize(queryset, request)
+
+        response_serializer_class = self.get_response_serializer()
+        return self.paginate_and_serialize(
+            queryset, request, serializer_class=response_serializer_class
+        )

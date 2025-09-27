@@ -15,9 +15,7 @@ from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-
 from core.utils.serializers import (
-    MultiSerializerMixin,
     create_schema_view_config,
     RequestSerializersConfig,
     ResponseSerializersConfig,
@@ -48,6 +46,10 @@ res_serializers: ResponseSerializersConfig = {
     "retrieve": ProductDetailSerializer,
     "update": ProductDetailSerializer,
     "partial_update": ProductDetailSerializer,
+    "update_view_count": ProductDetailSerializer,
+    "reviews": ProductReviewSerializer,
+    "images": ProductImageSerializer,
+    "tags": TagSerializer,
 }
 
 schema_config = create_schema_view_config(
@@ -62,18 +64,16 @@ schema_config = create_schema_view_config(
 
 @extend_schema_view(**schema_config)
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
-class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
+class ProductViewSet(BaseModelViewSet):
     queryset = Product.objects.all()
+    request_serializers = req_serializers
+    response_serializers = res_serializers
+
     ordering_fields = [
         "price",
         "created_at",
         "active",
         "availability_priority",
-        "discount_value_amount",
-        "final_price_amount",
-        "price_save_percent_field",
-        "review_average_field",
-        "likes_count_field",
         "view_count",
         "stock",
     ]
@@ -92,24 +92,6 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
             return None
         return ProductFilter
 
-    serializers = {
-        "default": ProductDetailSerializer,
-        "list": ProductSerializer,
-        "retrieve": ProductDetailSerializer,
-        "create": ProductWriteSerializer,
-        "update": ProductWriteSerializer,
-        "partial_update": ProductWriteSerializer,
-        "update_view_count": ProductDetailSerializer,
-        "reviews": ProductReviewSerializer,
-        "images": ProductImageSerializer,
-        "tags": TagSerializer,
-    }
-    response_serializers = {
-        "create": ProductDetailSerializer,
-        "update": ProductDetailSerializer,
-        "partial_update": ProductDetailSerializer,
-    }
-
     def get_queryset(self):
         queryset = super().get_queryset()
         queryset = queryset.annotate(
@@ -119,7 +101,7 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
                 output_field=IntegerField(),
             )
         )
-        return queryset.with_all_annotations()
+        return queryset
 
     @property
     def filterset_class(self):
@@ -143,10 +125,12 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
         product = self.get_object()
         product.view_count += 1
         product.save()
-        serializer = ProductDetailSerializer(
+
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(
             product, context=self.get_serializer_context()
         )
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
 
     @extend_schema(
         operation_id="listProductReviews",
@@ -215,8 +199,10 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
     def reviews(self, request, pk=None):
         product = get_object_or_404(Product, pk=pk)
         reviews = product.reviews.all()
+
+        response_serializer_class = self.get_response_serializer()
         return self.paginate_and_serialize(
-            reviews, request, serializer_class=ProductReviewSerializer
+            reviews, request, serializer_class=response_serializer_class
         )
 
     @extend_schema(
@@ -256,10 +242,12 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
     def images(self, request, pk=None):
         product = get_object_or_404(Product, pk=pk)
         images = product.images.all()
-        serializer = ProductImageSerializer(
+
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(
             images, many=True, context=self.get_serializer_context()
         )
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
 
     @extend_schema(
         operation_id="listProductTags",
@@ -289,7 +277,9 @@ class ProductViewSet(MultiSerializerMixin, BaseModelViewSet):
     def tags(self, request, pk=None):
         product = get_object_or_404(Product, pk=pk)
         tags = [tagged_item.tag for tagged_item in product.tags.all()]
-        serializer = TagSerializer(
+
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(
             tags, many=True, context=self.get_serializer_context()
         )
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)

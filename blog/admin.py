@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.db import models
+from django.db.models import Count, Q
 from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
@@ -31,13 +32,17 @@ class LikesCountFilter(RangeNumericListFilter):
     def queryset(self, request, queryset):
         filters = {}
 
+        queryset = queryset.annotate(
+            likes_count_annotation=Count("likes", distinct=True)
+        )
+
         value_from = self.used_parameters.get(f"{self.parameter_name}_from")
         if value_from and value_from != "":
-            filters["likes_count_field__gte"] = value_from
+            filters["likes_count_annotation__gte"] = value_from
 
         value_to = self.used_parameters.get(f"{self.parameter_name}_to")
         if value_to and value_to != "":
-            filters["likes_count_field__lte"] = value_to
+            filters["likes_count_annotation__lte"] = value_to
 
         return queryset.filter(**filters) if filters else queryset
 
@@ -55,13 +60,19 @@ class CommentsCountFilter(RangeNumericListFilter):
     def queryset(self, request, queryset):
         filters = {}
 
+        queryset = queryset.annotate(
+            comments_count_annotation=Count(
+                "comments", distinct=True, filter=Q(comments__approved=True)
+            )
+        )
+
         value_from = self.used_parameters.get(f"{self.parameter_name}_from")
         if value_from and value_from != "":
-            filters["comments_count_field__gte"] = value_from
+            filters["comments_count_annotation__gte"] = value_from
 
         value_to = self.used_parameters.get(f"{self.parameter_name}_to")
         if value_to and value_to != "":
-            filters["comments_count_field__lte"] = value_to
+            filters["comments_count_annotation__lte"] = value_to
 
         return queryset.filter(**filters) if filters else queryset
 
@@ -79,13 +90,19 @@ class TagsCountFilter(RangeNumericListFilter):
     def queryset(self, request, queryset):
         filters = {}
 
+        queryset = queryset.annotate(
+            tags_count_annotation=Count(
+                "tags", distinct=True, filter=Q(tags__active=True)
+            )
+        )
+
         value_from = self.used_parameters.get(f"{self.parameter_name}_from")
         if value_from and value_from != "":
-            filters["tags_count_field__gte"] = value_from
+            filters["tags_count_annotation__gte"] = value_from
 
         value_to = self.used_parameters.get(f"{self.parameter_name}_to")
         if value_to and value_to != "":
-            filters["tags_count_field__lte"] = value_to
+            filters["tags_count_annotation__lte"] = value_to
 
         return queryset.filter(**filters) if filters else queryset
 
@@ -103,13 +120,22 @@ class PostsCountFilter(RangeNumericListFilter):
     def queryset(self, request, queryset):
         filters = {}
 
+        if hasattr(queryset.model, "blog_posts"):
+            queryset = queryset.annotate(
+                posts_count_annotation=Count("blog_posts", distinct=True)
+            )
+        else:
+            queryset = queryset.annotate(
+                posts_count_annotation=Count("posts", distinct=True)
+            )
+
         value_from = self.used_parameters.get(f"{self.parameter_name}_from")
         if value_from and value_from != "":
-            filters["posts_count_field__gte"] = value_from
+            filters["posts_count_annotation__gte"] = value_from
 
         value_to = self.used_parameters.get(f"{self.parameter_name}_to")
         if value_to and value_to != "":
-            filters["posts_count_field__lte"] = value_to
+            filters["posts_count_annotation__lte"] = value_to
 
         return queryset.filter(**filters) if filters else queryset
 
@@ -598,7 +624,13 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
     inlines = [BlogPostTranslationInline, BlogCommentInline]
 
     def get_queryset(self, request):
-        return super().get_queryset(request).with_all_annotations()
+        return (
+            super()
+            .get_queryset(request)
+            .with_likes_count_annotation()
+            .with_comments_count_annotation()
+            .with_tags_count_annotation()
+        )
 
     def title_display(self, obj):
         title = (

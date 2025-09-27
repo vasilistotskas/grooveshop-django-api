@@ -16,7 +16,6 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
-    MultiSerializerMixin,
     create_schema_view_config,
     RequestSerializersConfig,
     ResponseSerializersConfig,
@@ -33,11 +32,11 @@ from order.serializers.item import (
     OrderItemRefundResponseSerializer,
 )
 
-
 req_serializers: RequestSerializersConfig = {
     "create": OrderItemWriteSerializer,
     "update": OrderItemWriteSerializer,
     "partial_update": OrderItemWriteSerializer,
+    "refund": OrderItemRefundSerializer,
 }
 
 res_serializers: ResponseSerializersConfig = {
@@ -46,6 +45,7 @@ res_serializers: ResponseSerializersConfig = {
     "retrieve": OrderItemDetailSerializer,
     "update": OrderItemDetailSerializer,
     "partial_update": OrderItemDetailSerializer,
+    "refund": OrderItemRefundResponseSerializer,
 }
 
 
@@ -74,23 +74,10 @@ res_serializers: ResponseSerializersConfig = {
     ),
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
-class OrderItemViewSet(MultiSerializerMixin, BaseModelViewSet):
+class OrderItemViewSet(BaseModelViewSet):
     queryset = OrderItem.objects.none()
-    serializers = {
-        "default": OrderItemDetailSerializer,
-        "list": OrderItemSerializer,
-        "retrieve": OrderItemDetailSerializer,
-        "create": OrderItemWriteSerializer,
-        "update": OrderItemWriteSerializer,
-        "partial_update": OrderItemWriteSerializer,
-        "refund": OrderItemDetailSerializer,
-    }
-    response_serializers = {
-        "create": OrderItemDetailSerializer,
-        "update": OrderItemDetailSerializer,
-        "partial_update": OrderItemDetailSerializer,
-        "refund": OrderItemRefundResponseSerializer,
-    }
+    request_serializers = req_serializers
+    response_serializers = res_serializers
     permission_classes = [IsAuthenticated]
     filterset_class = OrderItemFilter
     ordering_fields = [
@@ -170,8 +157,10 @@ class OrderItemViewSet(MultiSerializerMixin, BaseModelViewSet):
                 {"detail": _("This item has already been fully refunded.")}
             )
 
-        serializer = OrderItemRefundSerializer(
-            data=request.data, context={"item": order_item}
+        request_serializer_class = self.get_request_serializer()
+        serializer = request_serializer_class(
+            data=request.data,
+            context={"item": order_item, **self.get_serializer_context()},
         )
         serializer.is_valid(raise_exception=True)
 
@@ -186,14 +175,16 @@ class OrderItemViewSet(MultiSerializerMixin, BaseModelViewSet):
 
             refunded_amount = order_item.refund(quantity)
 
-            serializer = OrderItemRefundResponseSerializer(
-                {
-                    "detail": _("Refund processed successfully."),
-                    "refunded_amount": refunded_amount,
-                    "item": order_item,
-                }
-            )
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            response_data = {
+                "detail": _("Refund processed successfully."),
+                "refunded_amount": refunded_amount,
+                "item": order_item,
+            }
+
+            response_serializer_class = self.get_response_serializer()
+            response_serializer = response_serializer_class(response_data)
+            return Response(response_serializer.data, status=status.HTTP_200_OK)
+
         except ValidationError as e:
             logger = logging.getLogger(__name__)
 

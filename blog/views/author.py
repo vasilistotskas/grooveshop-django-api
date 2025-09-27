@@ -21,7 +21,6 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
-    MultiSerializerMixin,
     create_schema_view_config,
     RequestSerializersConfig,
     ResponseSerializersConfig,
@@ -40,6 +39,7 @@ res_serializers: ResponseSerializersConfig = {
     "retrieve": BlogAuthorDetailSerializer,
     "update": BlogAuthorDetailSerializer,
     "partial_update": BlogAuthorDetailSerializer,
+    "posts": BlogPostSerializer,
 }
 
 
@@ -54,22 +54,10 @@ res_serializers: ResponseSerializersConfig = {
     )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
-class BlogAuthorViewSet(MultiSerializerMixin, BaseModelViewSet):
+class BlogAuthorViewSet(BaseModelViewSet):
     queryset = BlogAuthor.objects.none()
-    serializers = {
-        "default": BlogAuthorDetailSerializer,
-        "list": BlogAuthorSerializer,
-        "retrieve": BlogAuthorDetailSerializer,
-        "create": BlogAuthorWriteSerializer,
-        "update": BlogAuthorWriteSerializer,
-        "partial_update": BlogAuthorWriteSerializer,
-        "posts": BlogPostSerializer,
-    }
-    response_serializers = {
-        "create": BlogAuthorDetailSerializer,
-        "update": BlogAuthorDetailSerializer,
-        "partial_update": BlogAuthorDetailSerializer,
-    }
+    response_serializers = res_serializers
+    request_serializers = req_serializers
 
     def get_filterset_class(self):
         if self.action == "posts":

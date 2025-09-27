@@ -6,9 +6,7 @@ from drf_spectacular.utils import extend_schema_view
 
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-
 from core.utils.serializers import (
-    MultiSerializerMixin,
     create_schema_view_config,
     RequestSerializersConfig,
     ResponseSerializersConfig,
@@ -49,21 +47,10 @@ res_serializers: ResponseSerializersConfig = {
     )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
-class PayWayViewSet(MultiSerializerMixin, BaseModelViewSet):
+class PayWayViewSet(BaseModelViewSet):
     queryset = PayWay.objects.all()
-    serializers = {
-        "default": PayWayDetailSerializer,
-        "list": PayWaySerializer,
-        "retrieve": PayWayDetailSerializer,
-        "create": PayWayWriteSerializer,
-        "update": PayWayWriteSerializer,
-        "partial_update": PayWayWriteSerializer,
-    }
-    response_serializers = {
-        "create": PayWayDetailSerializer,
-        "update": PayWayDetailSerializer,
-        "partial_update": PayWayDetailSerializer,
-    }
+    response_serializers = res_serializers
+    request_serializers = req_serializers
     filterset_class = PayWayFilter
     ordering_fields = [
         "id",

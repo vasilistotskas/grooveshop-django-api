@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.conf import settings
+from django.db.models import Count
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import (
     extend_schema,
@@ -27,18 +28,17 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
-    MultiSerializerMixin,
     create_schema_view_config,
     RequestSerializersConfig,
     ResponseSerializersConfig,
 )
 from core.utils.views import cache_methods
 
-
 req_serializers: RequestSerializersConfig = {
     "create": BlogCommentWriteSerializer,
     "update": BlogCommentWriteSerializer,
     "partial_update": BlogCommentWriteSerializer,
+    "liked_comments": BlogCommentLikedCommentsRequestSerializer,
 }
 
 res_serializers: ResponseSerializersConfig = {
@@ -47,6 +47,12 @@ res_serializers: ResponseSerializersConfig = {
     "retrieve": BlogCommentDetailSerializer,
     "update": BlogCommentDetailSerializer,
     "partial_update": BlogCommentDetailSerializer,
+    "replies": BlogCommentSerializer,
+    "thread": BlogCommentSerializer,
+    "update_likes": BlogCommentDetailSerializer,
+    "post": BlogPostDetailSerializer,
+    "liked_comments": BlogCommentLikedCommentsResponseSerializer,
+    "my_comments": BlogCommentSerializer,
 }
 
 
@@ -62,27 +68,11 @@ res_serializers: ResponseSerializersConfig = {
     )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
-class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
+class BlogCommentViewSet(BaseModelViewSet):
     queryset = BlogComment.objects.all()
-    serializers = {
-        "default": BlogCommentDetailSerializer,
-        "list": BlogCommentSerializer,
-        "retrieve": BlogCommentDetailSerializer,
-        "create": BlogCommentWriteSerializer,
-        "update": BlogCommentWriteSerializer,
-        "partial_update": BlogCommentWriteSerializer,
-        "replies": BlogCommentSerializer,
-        "thread": BlogCommentSerializer,
-        "update_likes": BlogCommentDetailSerializer,
-        "post": BlogPostDetailSerializer,
-        "liked_comments": BlogCommentLikedCommentsResponseSerializer,
-        "my_comments": BlogCommentSerializer,
-    }
-    response_serializers = {
-        "create": BlogCommentDetailSerializer,
-        "update": BlogCommentDetailSerializer,
-        "partial_update": BlogCommentDetailSerializer,
-    }
+    request_serializers = req_serializers
+    response_serializers = res_serializers
+
     filterset_class = BlogCommentFilter
     ordering_fields = [
         "id",
@@ -91,8 +81,6 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
         "level",
         "lft",
         "approved",
-        "likes_count_field",
-        "replies_count_field",
     ]
     ordering = ["-created_at"]
     search_fields = [
@@ -104,25 +92,16 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
     ]
 
     def get_queryset(self):
-        from django.db.models import Count
-
-        queryset = (
-            BlogComment.objects.select_related(
-                "user", "post", "parent", "post__category", "post__author"
-            )
-            .prefetch_related(
-                "likes",
-                "translations",
-                "children",
-                "post__translations",
-            )
-            .annotate(
-                likes_count_field=Count("likes", distinct=True),
-                replies_count_field=Count("children", distinct=True),
-            )
+        queryset = BlogComment.objects.select_related(
+            "user", "post", "parent", "post__category", "post__author"
+        ).prefetch_related(
+            "likes",
+            "translations",
+            "children",
+            "post__translations",
         )
 
-        if self.action == "list" and not self.request.user.is_staff:
+        if not self.request.user.is_staff:
             queryset = queryset.filter(approved=True)
 
         return queryset
@@ -163,7 +142,11 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
             .filter(approved=True)
             .order_by("created_at")
         )
-        return self.paginate_and_serialize(queryset, request)
+
+        response_serializer_class = self.get_response_serializer()
+        return self.paginate_and_serialize(
+            queryset, request, serializer_class=response_serializer_class
+        )
 
     @extend_schema(
         operation_id="getBlogCommentThread",
@@ -179,19 +162,38 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
     @action(detail=True, methods=["GET"])
     def thread(self, request, pk=None):
         comment = self.get_object()
-        ancestors = comment.get_ancestors().select_related("user", "post")
-        descendants = comment.get_descendants().select_related("user", "post")
+
+        if self.request.user.is_staff:
+            ancestors = comment.get_ancestors().select_related("user", "post")
+            descendants = comment.get_descendants().select_related(
+                "user", "post"
+            )
+        else:
+            ancestors = (
+                comment.get_ancestors()
+                .select_related("user", "post")
+                .filter(approved=True)
+            )
+            descendants = (
+                comment.get_descendants()
+                .select_related("user", "post")
+                .filter(approved=True)
+            )
 
         queryset = [*list(ancestors), comment, *list(descendants)]
         queryset = sorted(queryset, key=lambda x: x.created_at)
 
-        return self.paginate_and_serialize(queryset, request)
+        response_serializer_class = self.get_response_serializer()
+        return self.paginate_and_serialize(
+            queryset, request, serializer_class=response_serializer_class
+        )
 
     @extend_schema(
         operation_id="toggleBlogCommentLike",
         summary=_("Toggle comment like"),
         description=_("Like or unlike a comment. Toggles the like status."),
         tags=["Blog Comments"],
+        request=None,
         responses={
             200: BlogCommentDetailSerializer,
             401: ErrorResponseSerializer,
@@ -212,8 +214,11 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
 
         comment.refresh_from_db()
 
-        serializer = self.get_serializer(comment)
-        data = serializer.data
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(
+            comment, context=self.get_serializer_context()
+        )
+        data = response_serializer.data.copy()
         data["action"] = "liked" if liked else "unliked"
 
         return Response(data, status=status.HTTP_200_OK)
@@ -236,10 +241,12 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
 
         comment = self.get_object()
         post = comment.post
-        serializer = BlogPostDetailSerializer(
-            post, context={"request": request}
+
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(
+            post, context=self.get_serializer_context()
         )
-        return Response(serializer.data)
+        return Response(response_serializer.data)
 
     @extend_schema(
         operation_id="checkBlogCommentLikes",
@@ -257,23 +264,23 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
     )
     @action(detail=False, methods=["POST"])
     def liked_comments(self, request, *args, **kwargs):
-        serializer = BlogCommentLikedCommentsRequestSerializer(
-            data=request.data
-        )
+        request_serializer_class = self.get_request_serializer()
+        serializer = request_serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         comment_ids = serializer.validated_data["comment_ids"]
         user = request.user
 
-        liked_ids = list(
-            BlogComment.objects.filter(
-                id__in=comment_ids, likes=user
-            ).values_list("id", flat=True)
-        )
+        queryset = BlogComment.objects.filter(id__in=comment_ids, likes=user)
+        if not self.request.user.is_staff:
+            queryset = queryset.filter(approved=True)
 
-        response_serializer = BlogCommentLikedCommentsResponseSerializer(
-            {"liked_comment_ids": liked_ids}
-        )
+        liked_ids = list(queryset.values_list("id", flat=True))
+
+        response_data = {"liked_comment_ids": liked_ids}
+
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(response_data)
         return Response(response_serializer.data)
 
     @extend_schema(
@@ -291,4 +298,28 @@ class BlogCommentViewSet(MultiSerializerMixin, BaseModelViewSet):
     @action(detail=False, methods=["GET"])
     def my_comments(self, request):
         queryset = self.get_queryset().filter(user=request.user)
-        return self.paginate_and_serialize(queryset, request)
+
+        if (
+            hasattr(queryset.query.where, "children")
+            and queryset.query.where.children
+        ):
+            queryset = (
+                BlogComment.objects.select_related(
+                    "user", "post", "parent", "post__category", "post__author"
+                )
+                .prefetch_related(
+                    "likes",
+                    "translations",
+                    "children",
+                    "post__translations",
+                )
+                .annotate(
+                    likes_count_field=Count("likes", distinct=True),
+                )
+                .filter(user=request.user)
+            )
+
+        response_serializer_class = self.get_response_serializer()
+        return self.paginate_and_serialize(
+            queryset, request, serializer_class=response_serializer_class
+        )

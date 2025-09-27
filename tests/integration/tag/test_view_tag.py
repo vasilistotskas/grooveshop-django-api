@@ -378,7 +378,6 @@ class TagViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertIn("active", response.data)
 
     def test_sort_order_auto_assignment(self):
-        """Test that sort_order is auto-assigned regardless of provided value."""
         payload = {
             "active": True,
             "sort_order": -1,

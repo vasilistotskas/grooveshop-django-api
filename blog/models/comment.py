@@ -84,4 +84,8 @@ class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel, MPTTModel):
 
     @property
     def replies_count(self) -> int:
-        return self.get_descendant_count()
+        return self.get_children().filter(approved=True).count()
+
+    @property
+    def approved_descendants_count(self) -> int:
+        return self.get_descendants().filter(approved=True).count()

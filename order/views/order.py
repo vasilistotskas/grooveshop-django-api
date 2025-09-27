@@ -25,7 +25,6 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
-    MultiSerializerMixin,
     create_schema_view_config,
     RequestSerializersConfig,
     ResponseSerializersConfig,
@@ -38,6 +37,8 @@ from order.serializers.order import (
     OrderDetailSerializer,
     OrderSerializer,
     OrderWriteSerializer,
+    AddTrackingSerializer,
+    UpdateStatusSerializer,
 )
 from order.services import OrderService, OrderServiceError
 
@@ -45,6 +46,8 @@ req_serializers: RequestSerializersConfig = {
     "create": OrderWriteSerializer,
     "update": OrderWriteSerializer,
     "partial_update": OrderWriteSerializer,
+    "add_tracking": AddTrackingSerializer,
+    "update_status": UpdateStatusSerializer,
 }
 
 res_serializers: ResponseSerializersConfig = {
@@ -53,6 +56,11 @@ res_serializers: ResponseSerializersConfig = {
     "retrieve": OrderDetailSerializer,
     "update": OrderDetailSerializer,
     "partial_update": OrderDetailSerializer,
+    "retrieve_by_uuid": OrderDetailSerializer,
+    "cancel": OrderDetailSerializer,
+    "my_orders": OrderSerializer,
+    "add_tracking": OrderDetailSerializer,
+    "update_status": OrderDetailSerializer,
 }
 
 
@@ -129,26 +137,11 @@ res_serializers: ResponseSerializersConfig = {
     ),
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
-class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
+class OrderViewSet(BaseModelViewSet):
     queryset = Order.objects.all()
-    serializers = {
-        "default": OrderDetailSerializer,
-        "list": OrderSerializer,
-        "retrieve": OrderDetailSerializer,
-        "create": OrderWriteSerializer,
-        "update": OrderWriteSerializer,
-        "partial_update": OrderWriteSerializer,
-        "retrieve_by_uuid": OrderDetailSerializer,
-        "cancel": OrderDetailSerializer,
-        "add_tracking": OrderDetailSerializer,
-        "update_status": OrderDetailSerializer,
-        "my_orders": OrderSerializer,
-    }
-    response_serializers = {
-        "create": OrderDetailSerializer,
-        "update": OrderDetailSerializer,
-        "partial_update": OrderDetailSerializer,
-    }
+    request_serializers = req_serializers
+    response_serializers = res_serializers
+
     filterset_class = OrderFilter
     ordering_fields = [
         "id",
@@ -240,29 +233,31 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(
+        request_serializer_class = self.get_request_serializer()
+        request_serializer = request_serializer_class(
             data=request.data, context={"request": request}
         )
 
-        if not serializer.is_valid():
+        if not request_serializer.is_valid():
             return Response(
-                serializer.errors, status=status.HTTP_400_BAD_REQUEST
+                request_serializer.errors, status=status.HTTP_400_BAD_REQUEST
             )
 
         try:
             user = request.user if request.user.is_authenticated else None
-            validated_data = serializer.validated_data.copy()
+            validated_data = request_serializer.validated_data.copy()
 
             if user and "user" not in validated_data:
                 validated_data["user"] = user
 
-            order = serializer.create(validated_data)
+            order = request_serializer.create(validated_data)
 
-            result_serializer = OrderDetailSerializer(
+            response_serializer_class = self.get_response_serializer()
+            response_serializer = response_serializer_class(
                 order, context={"request": request}
             )
             return Response(
-                result_serializer.data, status=status.HTTP_201_CREATED
+                response_serializer.data, status=status.HTTP_201_CREATED
             )
 
         except OrderServiceError as e:
@@ -309,7 +304,8 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
             ) from e
 
         self.check_object_permissions(request, order)
-        serializer = self.get_serializer(order)
+        response_serializer_class = self.get_response_serializer()
+        serializer = response_serializer_class(order)
         return Response(serializer.data)
 
     @action(detail=True, methods=["POST"])
@@ -324,7 +320,8 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
 
         try:
             canceled_order = OrderService.cancel_order(order)
-            serializer = self.get_serializer(canceled_order)
+            response_serializer_class = self.get_response_serializer()
+            serializer = response_serializer_class(canceled_order)
             return Response(serializer.data)
         except OrderServiceError as e:
             logger = logging.getLogger(__name__)
@@ -362,11 +359,13 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
         filtered_qs = self.filter_queryset(user_orders)
 
         page = self.paginate_queryset(filtered_qs)
+        response_serializer_class = self.get_response_serializer()
         if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+            return self.paginate_and_serialize(
+                page, request, serializer_class=response_serializer_class
+            )
 
-        serializer = self.get_serializer(filtered_qs, many=True)
+        serializer = response_serializer_class(filtered_qs, many=True)
         return Response(serializer.data)
 
     @action(detail=True, methods=["POST"])
@@ -376,18 +375,13 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
         if not request.user.is_staff:
             raise PermissionDenied(_("Only staff can add tracking information"))
 
-        tracking_number = request.data.get("tracking_number")
-        shipping_carrier = request.data.get("shipping_carrier")
+        request_serializer_class = self.get_request_serializer()
+        request_serializer = request_serializer_class(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
 
-        if not tracking_number:
-            raise ValidationError(
-                {"tracking_number": _("Tracking number is required")}
-            )
-
-        if not shipping_carrier:
-            raise ValidationError(
-                {"shipping_carrier": _("Shipping carrier is required")}
-            )
+        validated_data = request_serializer.validated_data
+        tracking_number = validated_data["tracking_number"]
+        shipping_carrier = validated_data["shipping_carrier"]
 
         try:
             order.add_tracking_info(tracking_number, shipping_carrier)
@@ -413,8 +407,12 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
                     OrderService.update_order_status(order, OrderStatus.SHIPPED)
 
             order = OrderService.get_order_by_id(order.id)
-            serializer = self.get_serializer(order)
-            return Response(serializer.data)
+
+            response_serializer_class = self.get_response_serializer()
+            response_serializer = response_serializer_class(
+                order, context=self.get_serializer_context()
+            )
+            return Response(response_serializer.data)
 
         except OrderServiceError as e:
             logger = logging.getLogger(__name__)
@@ -446,17 +444,24 @@ class OrderViewSet(MultiSerializerMixin, BaseModelViewSet):
         if not request.user.is_staff:
             raise PermissionDenied(_("Only staff can update order status"))
 
-        status_value = request.data.get("status")
-        if not status_value:
-            raise ValidationError({"status": _("Status is required")})
+        request_serializer_class = self.get_request_serializer()
+        request_serializer = request_serializer_class(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+
+        validated_data = request_serializer.validated_data
+        status_value = validated_data["status"]
 
         try:
             OrderService.update_order_status(order, status_value)
 
             order = OrderService.get_order_by_id(order.id)
 
-            serializer = self.get_serializer(order)
-            return Response(serializer.data)
+            response_serializer_class = self.get_response_serializer()
+            response_serializer = response_serializer_class(
+                order, context=self.get_serializer_context()
+            )
+            return Response(response_serializer.data)
+
         except ValueError as e:
             logger = logging.getLogger(__name__)
 

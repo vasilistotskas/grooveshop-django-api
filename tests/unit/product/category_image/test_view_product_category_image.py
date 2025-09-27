@@ -23,49 +23,30 @@ class TestProductCategoryImageViewSetSerializers(TestCase):
         serializer_class = self.viewset.get_serializer_class()
         self.assertEqual(serializer_class, ProductCategoryImageSerializer)
 
-    def test_retrieve_serializer_selection(self):
-        self.viewset.action = "retrieve"
-        serializer_class = self.viewset.get_serializer_class()
-        self.assertEqual(serializer_class, ProductCategoryImageDetailSerializer)
-
-        self.viewset.action = "create"
-        serializer_class = self.viewset.get_serializer_class()
-        self.assertEqual(serializer_class, ProductCategoryImageWriteSerializer)
-
-    def test_update_serializer_selection(self):
-        self.viewset.action = "update"
-        serializer_class = self.viewset.get_serializer_class()
-        self.assertEqual(serializer_class, ProductCategoryImageWriteSerializer)
-
-    def test_partial_update_serializer_selection(self):
-        self.viewset.action = "partial_update"
-        serializer_class = self.viewset.get_serializer_class()
-        self.assertEqual(serializer_class, ProductCategoryImageWriteSerializer)
-
     def test_request_serializer_class(self):
         self.viewset.action = "list"
-        request_serializer = self.viewset.get_request_serializer_class()
+        request_serializer = self.viewset.get_request_serializer()
         self.assertEqual(request_serializer, ProductCategoryImageSerializer)
 
         self.viewset.action = "create"
-        request_serializer = self.viewset.get_request_serializer_class()
+        request_serializer = self.viewset.get_request_serializer()
         self.assertEqual(
             request_serializer, ProductCategoryImageWriteSerializer
         )
 
     def test_response_serializer_class(self):
         self.viewset.action = "list"
-        response_serializer = self.viewset.get_response_serializer_class()
+        response_serializer = self.viewset.get_response_serializer()
         self.assertEqual(response_serializer, ProductCategoryImageSerializer)
 
         self.viewset.action = "create"
-        response_serializer = self.viewset.get_response_serializer_class()
+        response_serializer = self.viewset.get_response_serializer()
         self.assertEqual(
             response_serializer, ProductCategoryImageDetailSerializer
         )
 
         self.viewset.action = "update"
-        response_serializer = self.viewset.get_response_serializer_class()
+        response_serializer = self.viewset.get_response_serializer()
         self.assertEqual(
             response_serializer, ProductCategoryImageDetailSerializer
         )

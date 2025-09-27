@@ -31,11 +31,12 @@ class BlogAuthorSerializer(
     @extend_schema_field(
         {
             "type": "string",
+            "nullable": True,
             "maxLength": 200,
             "description": _("URL link or empty string"),
         }
     )
-    def get_website(self, obj):
+    def get_website(self, obj) -> str | None:
         return obj.website
 
     class Meta:

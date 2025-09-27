@@ -12,9 +12,7 @@ from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-
 from core.utils.serializers import (
-    MultiSerializerMixin,
     create_schema_view_config,
     RequestSerializersConfig,
     ResponseSerializersConfig,
@@ -36,6 +34,7 @@ req_serializers: RequestSerializersConfig = {
     "create": ProductCategoryImageWriteSerializer,
     "update": ProductCategoryImageWriteSerializer,
     "partial_update": ProductCategoryImageWriteSerializer,
+    "bulk_update": ProductCategoryImageBulkUpdateSerializer,
 }
 
 res_serializers: ResponseSerializersConfig = {
@@ -44,6 +43,9 @@ res_serializers: ResponseSerializersConfig = {
     "retrieve": ProductCategoryImageDetailSerializer,
     "update": ProductCategoryImageDetailSerializer,
     "partial_update": ProductCategoryImageDetailSerializer,
+    "bulk_update": ProductCategoryImageBulkResponseSerializer,
+    "by_category": ProductCategoryImageSerializer,
+    "by_type": ProductCategoryImageSerializer,
 }
 
 schema_config = create_schema_view_config(
@@ -58,28 +60,14 @@ schema_config = create_schema_view_config(
 
 @extend_schema_view(**schema_config)
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
-class ProductCategoryImageViewSet(MultiSerializerMixin, BaseModelViewSet):
+class ProductCategoryImageViewSet(BaseModelViewSet):
     queryset = ProductCategoryImage.objects.select_related("category")
+    request_serializers = req_serializers
+    response_serializers = res_serializers
     filterset_fields = ["id", "category", "image_type", "active"]
     ordering_fields = ["created_at", "image_type", "sort_order"]
     ordering = ["sort_order", "-created_at"]
     search_fields = ["translations__title", "translations__alt_text"]
-    serializers = {
-        "default": ProductCategoryImageDetailSerializer,
-        "list": ProductCategoryImageSerializer,
-        "retrieve": ProductCategoryImageDetailSerializer,
-        "create": ProductCategoryImageWriteSerializer,
-        "update": ProductCategoryImageWriteSerializer,
-        "partial_update": ProductCategoryImageWriteSerializer,
-        "bulk_update": ProductCategoryImageBulkUpdateSerializer,
-        "by_category": ProductCategoryImageSerializer,
-        "by_type": ProductCategoryImageSerializer,
-    }
-    response_serializers = {
-        "create": ProductCategoryImageDetailSerializer,
-        "update": ProductCategoryImageDetailSerializer,
-        "partial_update": ProductCategoryImageDetailSerializer,
-    }
 
     def get_queryset(self) -> QuerySet[ProductCategoryImage]:
         queryset = super().get_queryset()
@@ -114,17 +102,20 @@ class ProductCategoryImageViewSet(MultiSerializerMixin, BaseModelViewSet):
     )
     @action(detail=False, methods=["patch"])
     def bulk_update(self, request):
-        serializer = ProductCategoryImageBulkUpdateSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        request_serializer_class = self.get_request_serializer()
+        request_serializer = request_serializer_class(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
 
-        image_ids = serializer.validated_data["image_ids"]
+        image_ids = request_serializer.validated_data["image_ids"]
         update_data = {}
 
-        if "active" in serializer.validated_data:
-            update_data["active"] = serializer.validated_data["active"]
+        if "active" in request_serializer.validated_data:
+            update_data["active"] = request_serializer.validated_data["active"]
 
-        if "sort_order" in serializer.validated_data:
-            update_data["sort_order"] = serializer.validated_data["sort_order"]
+        if "sort_order" in request_serializer.validated_data:
+            update_data["sort_order"] = request_serializer.validated_data[
+                "sort_order"
+            ]
 
         if not update_data:
             return Response(
@@ -142,7 +133,9 @@ class ProductCategoryImageViewSet(MultiSerializerMixin, BaseModelViewSet):
             "updated_count": updated_count,
         }
 
-        return Response(response_data, status=status.HTTP_200_OK)
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(response_data)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
 
     @extend_schema(
         operation_id="getProductCategoryImagesByCategory",
@@ -175,8 +168,12 @@ class ProductCategoryImageViewSet(MultiSerializerMixin, BaseModelViewSet):
             )
 
         images = ProductCategoryImage.objects.filter(category_id=category_id)
-        serializer = ProductCategoryImageSerializer(images, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(
+            images, many=True, context=self.get_serializer_context()
+        )
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
 
     @extend_schema(
         operation_id="getProductCategoryImagesByType",
@@ -202,5 +199,9 @@ class ProductCategoryImageViewSet(MultiSerializerMixin, BaseModelViewSet):
             )
 
         images = ProductCategoryImage.objects.filter(image_type=image_type)
-        serializer = ProductCategoryImageSerializer(images, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(
+            images, many=True, context=self.get_serializer_context()
+        )
+        return Response(response_serializer.data, status=status.HTTP_200_OK)

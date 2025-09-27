@@ -5,16 +5,18 @@ from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema, extend_schema_view
-from rest_framework import serializers, status
+from rest_framework import status
 from rest_framework.decorators import action
 
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
-from rest_framework.viewsets import GenericViewSet
 
 from core.api.serializers import ErrorResponseSerializer
-
-from core.utils.serializers import MultiSerializerMixin
+from core.api.views import BaseModelViewSet
+from core.utils.serializers import (
+    RequestSerializersConfig,
+    ResponseSerializersConfig,
+)
 from core.utils.views import cache_methods
 from order.filters import OrderFilter
 from order.models import Order
@@ -29,6 +31,17 @@ from pay_way.models import PayWay
 from pay_way.services import PayWayService
 
 logger = logging.getLogger(__name__)
+
+req_serializers: RequestSerializersConfig = {
+    "process_payment": ProcessPaymentRequestSerializer,
+    "refund_payment": RefundRequestSerializer,
+}
+
+res_serializers: ResponseSerializersConfig = {
+    "process_payment": ProcessPaymentResponseSerializer,
+    "check_payment_status": PaymentStatusResponseSerializer,
+    "refund_payment": RefundResponseSerializer,
+}
 
 
 @extend_schema_view(
@@ -77,20 +90,11 @@ logger = logging.getLogger(__name__)
     ),
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["check_payment_status"])
-class OrderPaymentViewSet(MultiSerializerMixin, GenericViewSet):
+class OrderPaymentViewSet(BaseModelViewSet):
     queryset = Order.objects.all()
     lookup_field = "pk"
-    serializers = {
-        "default": serializers.Serializer,
-        "process_payment": ProcessPaymentRequestSerializer,
-        "check_payment_status": PaymentStatusResponseSerializer,
-        "refund_payment": RefundRequestSerializer,
-    }
-    response_serializers = {
-        "process_payment": ProcessPaymentResponseSerializer,
-        "check_payment_status": PaymentStatusResponseSerializer,
-        "refund_payment": RefundResponseSerializer,
-    }
+    request_serializers = req_serializers
+    response_serializers = res_serializers
     filterset_class = OrderFilter
     ordering_fields = [
         "id",
@@ -172,11 +176,15 @@ class OrderPaymentViewSet(MultiSerializerMixin, GenericViewSet):
     def process_payment(self, request: HttpRequest, pk: str) -> Response:
         order = get_object_or_404(Order, pk=pk)
 
+        request_serializer_class = self.get_request_serializer()
+        request_serializer = request_serializer_class(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+
         validation_error = self._validate_process(request, order)
         if validation_error:
             return validation_error
 
-        payment_data = request.data.get("payment_data", {})
+        payment_data = request_serializer.validated_data.get("payment_data", {})
         try:
             success, response_data = PayWayService.process_payment(
                 pay_way=order.pay_way, order=order, **payment_data
@@ -199,21 +207,25 @@ class OrderPaymentViewSet(MultiSerializerMixin, GenericViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            return Response(
-                {
-                    "detail": _("Payment processing initiated."),
-                    "order_id": order.id,
-                    "payment_status": order.payment_status,
-                    "payment_id": response_data.get("payment_id", ""),
-                    "requires_confirmation": order.pay_way.requires_confirmation,
-                    "is_online_payment": order.pay_way.is_online_payment,
-                    "provider_data": {
-                        k: v
-                        for k, v in response_data.items()
-                        if k not in ["payment_id", "status", "error"]
-                    },
-                }
+            response_data_formatted = {
+                "detail": _("Payment processing initiated."),
+                "order_id": order.id,
+                "payment_status": order.payment_status,
+                "payment_id": response_data.get("payment_id", ""),
+                "requires_confirmation": order.pay_way.requires_confirmation,
+                "is_online_payment": order.pay_way.is_online_payment,
+                "provider_data": {
+                    k: v
+                    for k, v in response_data.items()
+                    if k not in ["payment_id", "status", "error"]
+                },
+            }
+
+            response_serializer_class = self.get_response_serializer()
+            response_serializer = response_serializer_class(
+                response_data_formatted
             )
+            return Response(response_serializer.data)
 
         except Exception:
             logger.exception(
@@ -264,14 +276,16 @@ class OrderPaymentViewSet(MultiSerializerMixin, GenericViewSet):
                 order=order,
             )
 
-            return Response(
-                {
-                    "order_id": order.id,
-                    "payment_status": payment_status,
-                    "is_paid": order.is_paid,
-                    "status_details": status_data,
-                }
-            )
+            response_data = {
+                "order_id": order.id,
+                "payment_status": payment_status,
+                "is_paid": order.is_paid,
+                "status_details": status_data,
+            }
+
+            response_serializer_class = self.get_response_serializer()
+            response_serializer = response_serializer_class(response_data)
+            return Response(response_serializer.data)
 
         except Exception:
             logger.exception(
@@ -294,6 +308,10 @@ class OrderPaymentViewSet(MultiSerializerMixin, GenericViewSet):
     ) -> Response:
         order = get_object_or_404(Order, pk=pk)
 
+        request_serializer_class = self.get_request_serializer()
+        request_serializer = request_serializer_class(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+
         if not order.is_paid:
             return Response(
                 {"detail": _("This order has not been paid.")},
@@ -307,12 +325,13 @@ class OrderPaymentViewSet(MultiSerializerMixin, GenericViewSet):
             )
 
         amount = None
-        if "amount" in request.data and "currency" in request.data:
+        validated_data = request_serializer.validated_data
+        if "amount" in validated_data and "currency" in validated_data:
             from djmoney.money import Money  # noqa: PLC0415
 
             amount = Money(
-                amount=request.data.get("amount"),
-                currency=request.data.get("currency"),
+                amount=validated_data.get("amount"),
+                currency=validated_data.get("currency"),
             )
 
         try:
@@ -339,15 +358,19 @@ class OrderPaymentViewSet(MultiSerializerMixin, GenericViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            return Response(
-                {
-                    "detail": _("Payment refund initiated."),
-                    "order_id": order.id,
-                    "payment_status": order.payment_status,
-                    "refund_id": response_data.get("refund_id", ""),
-                    "refund_details": response_data,
-                }
+            response_data_formatted = {
+                "detail": _("Payment refund initiated."),
+                "order_id": order.id,
+                "payment_status": order.payment_status,
+                "refund_id": response_data.get("refund_id", ""),
+                "refund_details": response_data,
+            }
+
+            response_serializer_class = self.get_response_serializer()
+            response_serializer = response_serializer_class(
+                response_data_formatted
             )
+            return Response(response_serializer.data)
 
         except Exception:
             logger.exception(

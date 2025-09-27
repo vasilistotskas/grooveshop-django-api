@@ -3,7 +3,6 @@ import re
 from collections.abc import Mapping
 from typing import Any, NotRequired, TypedDict
 
-from django.core.exceptions import ImproperlyConfigured
 from django.db import models
 from django.utils.functional import Promise
 from django.utils.translation import gettext_lazy as _
@@ -48,19 +47,8 @@ class DisplayConfig(TypedDict):
     display_name_plural: NotRequired[str]
 
 
-class RequestSerializersConfig(TypedDict):
-    create: NotRequired[type[serializers.Serializer]]
-    update: NotRequired[type[serializers.Serializer]]
-    partial_update: NotRequired[type[serializers.Serializer]]
-
-
-class ResponseSerializersConfig(TypedDict):
-    create: NotRequired[type[serializers.Serializer]]
-    list: NotRequired[type[serializers.Serializer]]
-    retrieve: NotRequired[type[serializers.Serializer]]
-    update: NotRequired[type[serializers.Serializer]]
-    partial_update: NotRequired[type[serializers.Serializer]]
-    destroy: NotRequired[type[serializers.Serializer]]
+type RequestSerializersConfig = dict[str, type[serializers.Serializer]]
+type ResponseSerializersConfig = dict[str, type[serializers.Serializer]]
 
 
 def create_schema_view_config(
@@ -313,101 +301,3 @@ def create_schema_view_config(
     }
 
     return config
-
-
-class MultiSerializerMixin:
-    action = None
-    serializers = {
-        "default": None,
-        "list": None,
-        "create": None,
-        "retrieve": None,
-        "update": None,
-        "partial_update": None,
-        "destroy": None,
-    }
-    request_serializers = {}
-    response_serializers = {}
-
-    def get_serializer_class(self):
-        has_explicit_serializer_class = (
-            hasattr(self, "serializer_class")
-            and self.serializer_class is not None
-        )
-
-        if hasattr(self, "serializers") and has_explicit_serializer_class:
-            raise ImproperlyConfigured(
-                "{cls} should only define either `serializer_class` or "
-                "`serializers`.".format(cls=self.__class__.__name__)
-            )
-
-        if not hasattr(self, "serializers") or self.serializers is None:
-            raise ImproperlyConfigured(
-                "{cls} is missing the serializers attribute. Define "
-                "{cls}.serializers, or override "
-                "{cls}.get_serializer_class().".format(
-                    cls=self.__class__.__name__
-                )
-            )
-
-        serializer_class = self.serializers.get(self.action)
-        if serializer_class is None:
-            serializer_class = self.serializers.get("default")
-
-        if serializer_class is None:
-            raise ImproperlyConfigured(
-                "No serializer found for action '{action}' and no default serializer defined. "
-                "Define {cls}.serializers['{action}'] or {cls}.serializers['default'], "
-                "or override {cls}.get_serializer_class().".format(
-                    action=self.action, cls=self.__class__.__name__
-                )
-            )
-
-        return serializer_class
-
-    def get_request_serializer_class(self):
-        if hasattr(self, "request_serializers") and self.request_serializers:
-            request_serializer = self.request_serializers.get(self.action)
-            if request_serializer is not None:
-                return request_serializer
-
-        return self.get_serializer_class()
-
-    def get_response_serializer_class(self):
-        if hasattr(self, "response_serializers") and self.response_serializers:
-            response_serializer = self.response_serializers.get(self.action)
-            if response_serializer is not None:
-                return response_serializer
-
-        return self.get_serializer_class()
-
-    def get_serializer_for_schema(self, action_name=None):
-        if action_name is None:
-            action_name = self.action
-
-        original_action = self.action
-        self.action = action_name
-
-        try:
-            request_serializer = self.get_request_serializer_class()
-            response_serializer = self.get_response_serializer_class()
-            return {
-                "request": request_serializer,
-                "response": response_serializer,
-            }
-        finally:
-            self.action = original_action
-
-    def get_serializer_context(self):
-        context = (
-            super().get_serializer_context()
-            if hasattr(super(), "get_serializer_context")
-            else {}
-        )
-        context.update(
-            {
-                "action": self.action,
-                "view": self,
-            }
-        )
-        return context

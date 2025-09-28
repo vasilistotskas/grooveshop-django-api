@@ -102,13 +102,8 @@ class NotificationCountResponseSerializer(serializers.Serializer):
     )
 
 
-class NotificationInfoResponseSerializer(serializers.Serializer):
-    info = serializers.CharField(
-        help_text=_("Information message about notifications")
-    )
-
-
 class NotificationSuccessResponseSerializer(serializers.Serializer):
     success = serializers.BooleanField(
-        help_text=_("Whether the operation was successful")
+        help_text=_("Whether the operation was successful"),
+        required=False,
     )

@@ -14,6 +14,7 @@ from order.models.order import Order
 from order.serializers.item import (
     OrderItemCreateSerializer,
     OrderItemSerializer,
+    OrderItemDetailSerializer,
 )
 from order.signals import order_created
 from pay_way.models import PayWay
@@ -35,7 +36,7 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
         max_digits=11, decimal_places=2, read_only=True
     )
     phone = PhoneNumberField()
-    mobile_phone = PhoneNumberField(required=False)
+    mobile_phone = PhoneNumberField(required=False, allow_blank=True)
     status_display = serializers.SerializerMethodField("get_status_display")
     can_be_canceled = serializers.BooleanField(read_only=True)
     is_paid = serializers.BooleanField(read_only=True)
@@ -99,6 +100,7 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
 
 
 class OrderDetailSerializer(OrderSerializer):
+    items = OrderItemDetailSerializer(many=True)
     order_timeline = serializers.SerializerMethodField(
         help_text="Order status timeline and history"
     )
@@ -109,7 +111,7 @@ class OrderDetailSerializer(OrderSerializer):
         help_text="Tracking and shipping details"
     )
     phone = PhoneNumberField(read_only=True)
-    mobile_phone = PhoneNumberField(read_only=True)
+    mobile_phone = PhoneNumberField(read_only=True, allow_blank=True)
 
     @extend_schema_field(
         {
@@ -181,7 +183,8 @@ class OrderDetailSerializer(OrderSerializer):
         extras_total = (
             obj.total_price_extra.amount if obj.total_price_extra else 0
         )
-        grand_total = items_total + shipping_total + extras_total
+
+        grand_total = items_total + shipping_total
 
         return {
             "items_subtotal": items_total,
@@ -202,21 +205,34 @@ class OrderDetailSerializer(OrderSerializer):
     @extend_schema_field(
         {
             "type": "object",
+            "nullable": True,
             "properties": {
-                "tracking_number": {"type": "string"},
-                "shipping_carrier": {"type": "string"},
+                "tracking_number": {
+                    "type": "string",
+                    "nullable": True,
+                },
+                "shipping_carrier": {
+                    "type": "string",
+                    "nullable": True,
+                },
                 "has_tracking": {"type": "boolean"},
-                "estimated_delivery": {"type": "string"},
-                "tracking_url": {"type": "string"},
+                "estimated_delivery": {
+                    "type": "string",
+                    "nullable": True,
+                },
+                "tracking_url": {
+                    "type": "string",
+                    "nullable": True,
+                },
             },
         }
     )
-    def get_tracking_details(self, obj) -> dict:
+    def get_tracking_details(self, obj) -> dict | None:
         return {
             "tracking_number": obj.tracking_number,
             "shipping_carrier": obj.shipping_carrier,
             "has_tracking": bool(obj.tracking_number),
-            "estimated_delivery": None,  # @TODO - Would be calculated based on shipping method
+            "estimated_delivery": "",  # @TODO - Would be calculated based on shipping method
             "tracking_url": f"https://track.carrier.com/{obj.tracking_number}"
             if obj.tracking_number
             else None,
@@ -264,7 +280,7 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
         max_digits=11, decimal_places=2, read_only=True
     )
     phone = PhoneNumberField()
-    mobile_phone = PhoneNumberField(required=False)
+    mobile_phone = PhoneNumberField(required=False, allow_blank=True)
     payment_id = serializers.CharField(required=False)
     payment_status = serializers.CharField(required=False)
     payment_method = serializers.CharField(required=False)
@@ -346,7 +362,7 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
         for item_data in items_data:
             product = item_data.get("product")
             item_to_create = item_data.copy()
-            item_to_create["price"] = product.price
+            item_to_create["price"] = product.final_price
             OrderItem.objects.create(order=order, **item_to_create)
 
         order.paid_amount = order.calculate_order_total_amount()
@@ -369,7 +385,7 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
             for item_data in items_data:
                 product = item_data.get("product")
                 item_to_create = item_data.copy()
-                item_to_create["price"] = product.price
+                item_to_create["price"] = product.final_price
                 OrderItem.objects.create(order=instance, **item_to_create)
 
         return instance

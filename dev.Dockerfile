@@ -33,7 +33,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
          --home   ${APP_PATH} \
          --shell  /bin/bash \
          appuser \
-    && mkdir -p ${APP_PATH}/.cache/uv ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles \
+    && mkdir -p ${APP_PATH}/.cache/uv ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles ${APP_PATH}/logs ${APP_PATH}/backups \
     && chown -R appuser:appgroup ${APP_PATH} \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*

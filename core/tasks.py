@@ -590,9 +590,9 @@ def backup_database_task(
             "Starting database backup",
             extra={
                 "output_dir": output_dir,
-                "filename": filename,
+                "backup_filename": filename,
                 "compress": compress,
-                "format": format_type,
+                "backup_format": format_type,
             },
         )
 
@@ -650,22 +650,22 @@ def backup_database_task(
             extra={
                 "duration": duration,
                 "file_size": file_size,
-                "backup_file": str(backup_file) if backup_file else None,
+                "backup_file_path": str(backup_file) if backup_file else None,
             },
         )
 
         return {
             "status": "success",
-            "message": success_message,
+            "result_message": success_message,
             "duration": duration,
             "file_size": file_size,
             "backup_file": str(backup_file) if backup_file else None,
             "timestamp": start_time.isoformat(),
             "parameters": {
                 "output_dir": output_dir,
-                "filename": filename,
+                "backup_filename": filename,
                 "compress": compress,
-                "format": format_type,
+                "backup_format": format_type,
             },
         }
 
@@ -673,7 +673,7 @@ def backup_database_task(
         logger.error(f"Django command error in backup_database: {e}")
         return {
             "status": "error",
-            "message": str(e),
+            "result_message": str(e),
             "error_type": "CommandError",
         }
     except Exception:
@@ -705,9 +705,16 @@ def scheduled_database_backup():
         )
 
         if result.result.get("status") == "success":
+            safe_logging_extra = {
+                "backup_status": result.result.get("status"),
+                "backup_duration": result.result.get("duration"),
+                "backup_file_size": result.result.get("file_size"),
+                "backup_timestamp": result.result.get("timestamp"),
+            }
+
             logger.info(
                 "Scheduled database backup completed successfully",
-                extra=result.result,
+                extra=safe_logging_extra,
             )
 
             cleanup_old_backups.delay(days=7, backup_dir="backups/scheduled")
@@ -715,7 +722,7 @@ def scheduled_database_backup():
             return result.result
         else:
             raise Exception(
-                f"Backup failed: {result.result.get('message', 'Unknown error')}"
+                f"Backup failed: {result.result.get('result_message', 'Unknown error')}"
             )
 
     except Exception as e:

@@ -21,7 +21,6 @@ from notification.filters import NotificationUserFilter
 from notification.models.user import NotificationUser
 from notification.serializers.user import (
     NotificationCountResponseSerializer,
-    NotificationInfoResponseSerializer,
     NotificationSuccessResponseSerializer,
     NotificationUserActionSerializer,
     NotificationUserDetailSerializer,
@@ -69,7 +68,6 @@ res_serializers: ResponseSerializersConfig = {
         tags=["Notification Users"],
         responses={
             200: NotificationCountResponseSerializer,
-            204: NotificationInfoResponseSerializer,
             401: ErrorResponseSerializer,
         },
     ),
@@ -165,15 +163,19 @@ class NotificationUserViewSet(BaseModelViewSet):
     def unseen_count(self, request):
         if request.user.is_anonymous:
             return Response(
-                {"error": _("User is not authenticated.")},
+                {
+                    "error": _("User is not authenticated."),
+                    "count": 0,
+                },
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
         count = self.queryset.filter(user=request.user, seen=False).count()
         if count == 0:
             return Response(
-                {"info": _("No unseen notifications.")},
-                status=status.HTTP_204_NO_CONTENT,
+                {
+                    "count": 0,
+                },
             )
 
         response_data = {"count": count}
@@ -186,7 +188,10 @@ class NotificationUserViewSet(BaseModelViewSet):
     def mark_all_as_seen(self, request):
         if request.user.is_anonymous:
             return Response(
-                {"error": _("User is not authenticated.")},
+                {
+                    "error": _("User is not authenticated."),
+                    "success": False,
+                },
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
@@ -202,7 +207,10 @@ class NotificationUserViewSet(BaseModelViewSet):
     def mark_all_as_unseen(self, request):
         if request.user.is_anonymous:
             return Response(
-                {"error": _("User is not authenticated.")},
+                {
+                    "error": _("User is not authenticated."),
+                    "success": False,
+                },
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
@@ -218,7 +226,10 @@ class NotificationUserViewSet(BaseModelViewSet):
     def mark_as_seen(self, request):
         if request.user.is_anonymous:
             return Response(
-                {"error": _("User is not authenticated.")},
+                {
+                    "error": _("User is not authenticated."),
+                    "success": False,
+                },
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
@@ -231,7 +242,10 @@ class NotificationUserViewSet(BaseModelViewSet):
 
         if not notification_user_ids:
             return Response(
-                {"error": _("No notification user ids provided.")},
+                {
+                    "error": _("No notification user ids provided."),
+                    "success": False,
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -249,7 +263,10 @@ class NotificationUserViewSet(BaseModelViewSet):
     def mark_as_unseen(self, request):
         if request.user.is_anonymous:
             return Response(
-                {"error": _("User is not authenticated.")},
+                {
+                    "error": _("User is not authenticated."),
+                    "success": False,
+                },
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
@@ -262,7 +279,10 @@ class NotificationUserViewSet(BaseModelViewSet):
 
         if not notification_user_ids:
             return Response(
-                {"error": _("No notification user ids provided.")},
+                {
+                    "error": _("No notification user ids provided."),
+                    "success": False,
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

@@ -16,7 +16,7 @@ class UserAddressSerializer(serializers.ModelSerializer[UserAddress]):
     country = PrimaryKeyRelatedField(queryset=Country.objects.all())
     region = PrimaryKeyRelatedField(queryset=Region.objects.all())
     phone = PhoneNumberField()
-    mobile_phone = PhoneNumberField(required=False)
+    mobile_phone = PhoneNumberField(required=False, allow_blank=True)
 
     class Meta:
         model = UserAddress
@@ -63,7 +63,7 @@ class UserAddressWriteSerializer(serializers.ModelSerializer[UserAddress]):
         queryset=Region.objects.all(), required=False
     )
     phone = PhoneNumberField()
-    mobile_phone = PhoneNumberField(required=False)
+    mobile_phone = PhoneNumberField(required=False, allow_blank=True)
 
     def validate_phone(self, value: str) -> str:
         if not value and not self.initial_data.get("mobile_phone"):

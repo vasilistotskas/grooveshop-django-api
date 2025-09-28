@@ -3,6 +3,28 @@
 
 
 
+## v1.32.0 (2025-09-28)
+
+### Bug fixes
+
+* fix: Update test to check for 'count' in response data
+
+Changed assertion in NotificationUserViewSetTestCase to verify 'count' key in response data instead of 'info', reflecting updated API response structure. ([`31b0bc2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/31b0bc2c79d28c282b719b83d2cf2e6c54dec24b))
+
+* fix: tests for notification, product, and backup tasks
+
+Changed expected status code in notification user view test to 200 OK. Removed ordering tests by review average and likes count from product view tests. Updated backup database task tests to check 'result_message' instead of 'message'. ([`a8b5769`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a8b57698ad50a804b2dbd5b4a36d22ebd7d5f3c2))
+
+### Features
+
+* feat: notification and order APIs, update serializers
+
+Standardized response fields and error handling in notification views and serializers, removed unused NotificationInfoResponseSerializer, and updated notification URLs to remove trailing slashes. Added 'seen' query parameter to notifications_by_ids endpoint. In order and address serializers, allowed blank values for mobile_phone fields and improved tracking details schema. Order item creation now uses product.final_price. Updated OpenAPI schema to reflect these changes. ([`3df05d8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3df05d895dd5139d9cba343333c8739b139b0ea2))
+
+* feat: blog and core views, filters, and serializers
+
+Replaces MultiSerializerMixin with request/response serializer configs in all viewsets, updates blog filters and managers to use approved/active counts for comments and tags, and ensures non-staff users only see approved comments. Refactors serializer logic for DRF actions, improves annotation usage, and updates related tests and OpenAPI schema. This standardizes serializer handling and improves filtering accuracy for likes, comments, and tags throughout the blog and core apps. ([`13b63e2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/13b63e2a7799cc225fbd1d21abddc3e68c4a5713))
+
 ## v1.31.0 (2025-09-26)
 
 ### Bug fixes

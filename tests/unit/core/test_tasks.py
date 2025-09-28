@@ -712,7 +712,7 @@ class TestBackupDatabaseTask(TestCase):
         self.assertEqual(result["status"], "success")
         self.assertEqual(result["file_size"], 1024000)
         self.assertIn(
-            "Database backup completed successfully", result["message"]
+            "Database backup completed successfully", result["result_message"]
         )
 
         mock_call_command.assert_called_once_with(
@@ -737,7 +737,7 @@ class TestBackupDatabaseTask(TestCase):
 
         self.assertEqual(result["status"], "error")
         self.assertEqual(result["error_type"], "CommandError")
-        self.assertIn("Backup failed", result["message"])
+        self.assertIn("Backup failed", result["result_message"])
 
     @patch("core.tasks.management.call_command")
     @patch("core.tasks.Path")

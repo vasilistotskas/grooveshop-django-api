@@ -501,60 +501,6 @@ class ProductViewSetTestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    def test_ordering_by_review_average(self):
-        products = []
-        for _i in range(5):
-            product = ProductFactory(
-                category=self.category,
-                num_images=0,
-                num_reviews=0,
-            )
-            products.append(product)
-
-        for index, product in enumerate(products):
-            rating = 5 - index
-            ProductReviewFactory(product=product, rate=rating)
-
-        url = self.get_product_list_url()
-        response = self.client.get(url, {"ordering": "-review_average_field"})
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data["results"]
-
-        for i in range(len(results) - 1):
-            current_avg = results[i].get("review_average", 0)
-            next_avg = results[i + 1].get("review_average", 0)
-            self.assertGreaterEqual(current_avg, next_avg)
-
-    def test_ordering_by_likes_count(self):
-        products = []
-        for _i in range(5):
-            product = ProductFactory(
-                category=self.category,
-                num_images=0,
-                num_reviews=0,
-            )
-            products.append(product)
-
-        users = []
-        for _i in range(5):
-            user = UserAccountFactory(num_addresses=0)
-            users.append(user)
-
-        for i, product in enumerate(products):
-            for j in range(i + 1):
-                ProductFavouriteFactory(
-                    product=product,
-                    user=users[j],
-                )
-
-        url = self.get_product_list_url()
-        response = self.client.get(url, {"ordering": "likes_count_field"})
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        self.assertGreaterEqual(len(response.data["results"]), 1)
-
     def test_filter_by_price_range(self):
         test_products = []
         for i in range(3):

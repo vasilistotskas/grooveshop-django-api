@@ -408,7 +408,7 @@ class NotificationUserViewSetTestCase(TestURLFixerMixin, APITestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn("info", response.data)
+        self.assertIn("count", response.data)
 
     def test_unseen_count_unauthenticated(self):
         url = reverse("notification-user-unseen-count")

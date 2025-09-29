@@ -49,6 +49,7 @@ admin.site.unregister(ClockedSchedule)
 
 for model, model_admin in dict(admin.site._registry).items():
     if model._meta.app_label not in [
+        "djstripe",
         "knox",
         "socialaccount",
         "mfa",

@@ -3,9 +3,10 @@ from typing import Any
 
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
-
+from djstripe.event_handlers import djstripe_receiver
+from djstripe.models import Event
 from order.enum.document_type import OrderDocumentTypeEnum
-from order.enum.status import OrderStatus
+from order.enum.status import OrderStatus, PaymentStatus
 from order.models.history import OrderHistory, OrderItemHistory
 from order.models.item import OrderItem
 from order.models.order import Order
@@ -374,4 +375,136 @@ def handle_order_returned(
     except Exception as e:
         logger.error(
             f"Error handling order_returned signal: {e}", exc_info=True
+        )
+
+
+@djstripe_receiver("payment_intent.succeeded")
+def handle_stripe_payment_succeeded(sender, **kwargs):
+    print("Handling stripe payment succeeded")
+    try:
+        event: Event = kwargs.get("event")
+        payment_intent_data = event.data["object"]
+        payment_intent_id = payment_intent_data["id"]
+
+        logger.info(f"Stripe payment succeeded: {payment_intent_id}")
+
+        try:
+            order = Order.objects.get(payment_id=payment_intent_id)
+        except Order.DoesNotExist:
+            logger.error(
+                f"Order not found for payment_intent: {payment_intent_id}"
+            )
+            return
+
+        order.mark_as_paid(
+            payment_id=payment_intent_id, payment_method="stripe"
+        )
+
+        if order.status == OrderStatus.PENDING:
+            OrderService.update_order_status(order, OrderStatus.PROCESSING)
+
+        OrderHistory.log_payment_update(
+            order=order,
+            previous_value={"payment_status": "pending"},
+            new_value={
+                "payment_status": "completed",
+                "payment_id": payment_intent_id,
+            },
+        )
+
+        logger.info(f"Order {order.id} marked as paid successfully")
+
+    except Exception as e:
+        logger.error(
+            f"Error handling payment_intent.succeeded: {e}", exc_info=True
+        )
+
+
+@djstripe_receiver("payment_intent.payment_failed")
+def handle_stripe_payment_failed(sender, **kwargs):
+    print("Handling stripe payment failed")
+    try:
+        event: Event = kwargs.get("event")
+        payment_intent_data = event.data["object"]
+        payment_intent_id = payment_intent_data["id"]
+
+        logger.info(f"Stripe payment failed: {payment_intent_id}")
+
+        try:
+            order = Order.objects.get(payment_id=payment_intent_id)
+        except Order.DoesNotExist:
+            logger.error(
+                f"Order not found for payment_intent: {payment_intent_id}"
+            )
+            return
+
+        order.payment_status = PaymentStatus.FAILED
+        order.save(update_fields=["payment_status"])
+
+        OrderHistory.log_payment_update(
+            order=order,
+            previous_value={"payment_status": "pending"},
+            new_value={
+                "payment_status": "failed",
+                "payment_id": payment_intent_id,
+            },
+        )
+
+        logger.info(f"Order {order.id} payment marked as failed")
+
+    except Exception as e:
+        logger.error(
+            f"Error handling payment_intent.payment_failed: {e}", exc_info=True
+        )
+
+
+@djstripe_receiver("payment_intent.requires_action")
+def handle_stripe_payment_requires_action(sender, **kwargs):
+    print("Handling stripe payment requires action")
+    try:
+        event: Event = kwargs.get("event")
+        payment_intent_data = event.data["object"]
+        payment_intent_id = payment_intent_data["id"]
+
+        logger.info(f"Stripe payment requires action: {payment_intent_id}")
+
+        try:
+            order = Order.objects.get(payment_id=payment_intent_id)
+        except Order.DoesNotExist:
+            logger.error(
+                f"Order not found for payment_intent: {payment_intent_id}"
+            )
+            return
+
+        order.payment_status = PaymentStatus.PENDING
+        order.save(update_fields=["payment_status"])
+
+        OrderHistory.log_note(
+            order=order,
+            note=f"Payment requires additional action (3D Secure, etc.) - Payment ID: {payment_intent_id}",
+        )
+
+    except Exception as e:
+        logger.error(
+            f"Error handling payment_intent.requires_action: {e}", exc_info=True
+        )
+
+
+@djstripe_receiver("charge.dispute.created")
+def handle_stripe_dispute_created(sender, **kwargs):
+    print("Handling stripe dispute created")
+    try:
+        event: Event = kwargs.get("event")
+        dispute_data = event.data["object"]
+        charge_id = dispute_data["charge"]
+
+        logger.warning(f"Stripe dispute created for charge: {charge_id}")
+
+        # Try to find the order by looking for the charge
+        # This might require additional logic depending on setup
+        # For now, just log the dispute for manual review
+
+    except Exception as e:
+        logger.error(
+            f"Error handling charge.dispute.created: {e}", exc_info=True
         )

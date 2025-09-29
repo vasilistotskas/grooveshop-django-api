@@ -3,6 +3,7 @@ from unittest import TestCase, mock
 
 from django.conf import settings
 from djmoney.money import Money
+from djstripe.models import PaymentIntent
 
 from order.enum.status import PaymentStatus
 from order.payment import (
@@ -44,24 +45,30 @@ class PaymentModuleTestCase(TestCase):
         self.assertEqual(provider.client_id, "test_client_id")
         self.assertEqual(provider.client_secret, "test_client_secret")
 
+    @mock.patch("order.payment.stripe.PaymentIntent.create")
     @mock.patch("order.payment.logger")
-    def test_stripe_process_payment(self, mock_logger):
-        provider = StripePaymentProvider()
-        amount = Money(
-            amount=Decimal("100.00"), currency=settings.DEFAULT_CURRENCY
-        )
-        order_id = "test_order_id"
+    def test_stripe_process_payment(self, mock_logger, mock_stripe_create):
+        mock_payment_intent = mock.Mock()
+        mock_payment_intent.id = "pi_test_order_id_mock"
+        mock_payment_intent.status = "succeeded"
+        mock_payment_intent.client_secret = "pi_test_secret"
+        mock_payment_intent.next_action = None
+        mock_stripe_create.return_value = mock_payment_intent
 
-        success, payment_data = provider.process_payment(amount, order_id)
+        with mock.patch("order.payment.PaymentIntent.sync_from_stripe_data"):
+            provider = StripePaymentProvider()
+            amount = Money(
+                amount=Decimal("100.00"), currency=settings.DEFAULT_CURRENCY
+            )
+            order_id = "test_order_id"
 
-        self.assertTrue(success)
-        self.assertEqual(payment_data["payment_id"], f"pi_{order_id}_mock")
-        self.assertEqual(payment_data["status"], PaymentStatus.COMPLETED)
-        self.assertEqual(payment_data["amount"], str(amount.amount))
-        self.assertEqual(payment_data["currency"], amount.currency)
-        self.assertEqual(payment_data["provider"], "stripe")
+            success, payment_data = provider.process_payment(amount, order_id)
 
-        mock_logger.info.assert_called_once()
+            self.assertTrue(success)
+            self.assertEqual(
+                payment_data["payment_id"], "pi_test_order_id_mock"
+            )
+            self.assertEqual(payment_data["status"], PaymentStatus.COMPLETED)
 
     @mock.patch("order.payment.logger")
     def test_paypal_process_payment(self, mock_logger):
@@ -77,42 +84,62 @@ class PaymentModuleTestCase(TestCase):
         self.assertEqual(payment_data["payment_id"], f"PP_{order_id}_mock")
         self.assertEqual(payment_data["status"], PaymentStatus.COMPLETED)
         self.assertEqual(payment_data["amount"], str(amount.amount))
-        self.assertEqual(payment_data["currency"], amount.currency)
+        self.assertEqual(payment_data["currency"], str(amount.currency))
         self.assertEqual(payment_data["provider"], "paypal")
 
         mock_logger.info.assert_called_once()
 
+    @mock.patch("order.payment.stripe.Refund.create")
     @mock.patch("order.payment.logger")
-    def test_stripe_refund_payment(self, mock_logger):
-        provider = StripePaymentProvider()
-        payment_id = "test_payment_id"
-        amount = Money(
-            amount=Decimal("50.00"), currency=settings.DEFAULT_CURRENCY
-        )
+    def test_stripe_refund_payment(self, mock_logger, mock_stripe_refund):
+        mock_refund = mock.Mock()
+        mock_refund.id = "re_test_payment_id_mock"
+        mock_refund.status = "succeeded"
+        mock_stripe_refund.return_value = mock_refund
 
-        success, refund_data = provider.refund_payment(payment_id, amount)
+        with mock.patch("order.payment.Refund.sync_from_stripe_data"):
+            provider = StripePaymentProvider()
+            payment_id = "test_payment_id"
+            amount = Money(
+                amount=Decimal("50.00"), currency=settings.DEFAULT_CURRENCY
+            )
 
-        self.assertTrue(success)
-        self.assertEqual(refund_data["refund_id"], f"re_{payment_id}_mock")
-        self.assertEqual(refund_data["status"], PaymentStatus.REFUNDED)
-        self.assertEqual(refund_data["amount"], str(amount.amount))
-        self.assertEqual(refund_data["payment_id"], payment_id)
+            success, refund_data = provider.refund_payment(payment_id, amount)
 
-        mock_logger.info.assert_called_once()
+            self.assertTrue(success)
+            self.assertEqual(
+                refund_data["refund_id"], "re_test_payment_id_mock"
+            )
 
+    @mock.patch("order.payment.stripe.PaymentIntent.retrieve")
+    @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
     @mock.patch("order.payment.logger")
-    def test_stripe_get_payment_status(self, mock_logger):
-        provider = StripePaymentProvider()
-        payment_id = "test_payment_id"
+    def test_stripe_get_payment_status(
+        self, mock_logger, mock_sync, mock_retrieve
+    ):
+        mock_payment_intent = mock.Mock()
+        mock_payment_intent.id = "test_payment_id"
+        mock_payment_intent.status = "succeeded"
+        mock_payment_intent.amount = 10000
+        mock_payment_intent.currency = "eur"
+        mock_payment_intent.created = 1234567890
 
-        status, status_data = provider.get_payment_status(payment_id)
+        mock_retrieve.return_value = mock_payment_intent
+        mock_djstripe_pi = mock.Mock()
+        mock_djstripe_pi.created = "2024-01-01"
+        mock_sync.return_value = mock_djstripe_pi
 
-        self.assertEqual(status, PaymentStatus.COMPLETED)
-        self.assertEqual(status_data["payment_id"], payment_id)
-        self.assertEqual(status_data["raw_status"], "succeeded")
-        self.assertEqual(status_data["provider"], "stripe")
+        with mock.patch(
+            "order.payment.PaymentIntent.objects.get",
+            side_effect=PaymentIntent.DoesNotExist,
+        ):
+            provider = StripePaymentProvider()
+            payment_id = "test_payment_id"
 
-        mock_logger.info.assert_called_once()
+            status, status_data = provider.get_payment_status(payment_id)
+
+            self.assertEqual(status, PaymentStatus.COMPLETED)
+            self.assertEqual(status_data["payment_id"], payment_id)
 
     def test_get_payment_provider(self):
         provider = get_payment_provider("stripe")

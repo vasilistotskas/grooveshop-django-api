@@ -139,6 +139,7 @@ THIRD_PARTY_APPS = [
     "knox",
     "simple_history",
     "csp",
+    "djstripe",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -1149,7 +1150,7 @@ SPECTACULAR_SETTINGS = {
     "COMPONENT_SPLIT_REQUEST": True,
     "COMPONENT_NO_READ_ONLY_REQUIRED": False,
     "ENFORCE_NON_BLANK_FIELDS": False,
-    "ENUM_ADD_EXPLICIT_BLANK_NULL_CHOICE": False,
+    "ENUM_ADD_EXPLICIT_BLANK_NULL_CHOICE": True,
     "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAuthenticated"],
     "AUTHENTICATION_WHITELIST": [
         "knox.auth.TokenAuthentication",
@@ -1411,10 +1412,14 @@ else:
     }
 
 # PAYMENT SETTINGS
-STRIPE_API_KEY = "sk_test_example"
-STRIPE_WEBHOOK_SECRET = "whsec_example"
-PAYPAL_CLIENT_ID = "client_id_example"
-PAYPAL_CLIENT_SECRET = "client_secret_example"
+# Stripe Configuration (dj-stripe format)
+STRIPE_LIVE_SECRET_KEY = getenv("STRIPE_LIVE_SECRET_KEY", "sk_live_...")
+STRIPE_TEST_SECRET_KEY = getenv("STRIPE_TEST_SECRET_KEY", "sk_test_...")
+STRIPE_LIVE_MODE = not DEBUG
+DJSTRIPE_FOREIGN_KEY_TO_FIELD = "id"
+DJSTRIPE_WEBHOOK_VALIDATION = "verify_signature"
+DJSTRIPE_WEBHOOK_SECRET = getenv("DJSTRIPE_WEBHOOK_SECRET", "whsec_...")
+
 
 # SHIPPING SETTINGS
 FEDEX_API_KEY = "fedex_api_key_example"

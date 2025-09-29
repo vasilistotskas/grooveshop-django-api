@@ -40,7 +40,12 @@ from order.serializers.order import (
     AddTrackingSerializer,
     UpdateStatusSerializer,
 )
+from order.serializers.payment import (
+    CreatePaymentIntentRequestSerializer,
+    CreatePaymentIntentResponseSerializer,
+)
 from order.services import OrderService, OrderServiceError
+from pay_way.services import PayWayService
 
 req_serializers: RequestSerializersConfig = {
     "create": OrderWriteSerializer,
@@ -48,6 +53,7 @@ req_serializers: RequestSerializersConfig = {
     "partial_update": OrderWriteSerializer,
     "add_tracking": AddTrackingSerializer,
     "update_status": UpdateStatusSerializer,
+    "create_payment_intent": CreatePaymentIntentRequestSerializer,
 }
 
 res_serializers: ResponseSerializersConfig = {
@@ -61,6 +67,7 @@ res_serializers: ResponseSerializersConfig = {
     "my_orders": OrderSerializer,
     "add_tracking": OrderDetailSerializer,
     "update_status": OrderDetailSerializer,
+    "create_payment_intent": CreatePaymentIntentResponseSerializer,
 }
 
 
@@ -130,6 +137,21 @@ res_serializers: ResponseSerializersConfig = {
         tags=["Orders"],
         responses={
             200: OrderDetailSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    create_payment_intent=extend_schema(
+        operation_id="createOrderPaymentIntent",
+        summary=_("Create a payment intent for an order"),
+        description=_(
+            "Create a payment intent for Stripe payments on an existing order"
+        ),
+        tags=["Orders"],
+        request=CreatePaymentIntentRequestSerializer,
+        responses={
+            200: CreatePaymentIntentResponseSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
@@ -250,8 +272,38 @@ class OrderViewSet(BaseModelViewSet):
             if user and "user" not in validated_data:
                 validated_data["user"] = user
 
+            # Create order first
             order = request_serializer.create(validated_data)
 
+            # If PayWay is Stripe and this is an immediate payment request
+            if (
+                order.pay_way
+                and order.pay_way.provider_code == "stripe"
+                and request.data.get("process_payment", False)
+            ):
+                # Process payment immediately
+                payment_data = request.data.get("payment_data", {})
+                success, payment_response = PayWayService.process_payment(
+                    pay_way=order.pay_way, order=order, **payment_data
+                )
+
+                if not success:
+                    logger = logging.getLogger(__name__)
+                    # If payment fails, you might want to keep the order but mark it appropriately
+                    logger.warning(
+                        f"Payment failed for order {order.id}: {payment_response}"
+                    )
+                    # Don't return error, let frontend handle the payment flow
+
+                # Add payment info to response
+                response_data = OrderDetailSerializer(
+                    order, context={"request": request}
+                ).data
+                response_data["payment_info"] = payment_response
+
+                return Response(response_data, status=status.HTTP_201_CREATED)
+
+            # For non-Stripe or deferred payment orders
             response_serializer_class = self.get_response_serializer()
             response_serializer = response_serializer_class(
                 order, context={"request": request}
@@ -262,11 +314,7 @@ class OrderViewSet(BaseModelViewSet):
 
         except OrderServiceError as e:
             logger = logging.getLogger(__name__)
-
-            logger.error(
-                "Error creating order: %s",
-                str(e),
-            )
+            logger.error("Error creating order: %s", str(e))
             raise ValidationError(
                 {
                     "detail": _(
@@ -276,11 +324,7 @@ class OrderViewSet(BaseModelViewSet):
             ) from e
         except Exception as e:
             logger = logging.getLogger(__name__)
-
-            logger.error(
-                "Error creating order: %s",
-                str(e),
-            )
+            logger.error("Error creating order: %s", str(e))
             return Response(
                 {
                     "detail": _(
@@ -289,6 +333,69 @@ class OrderViewSet(BaseModelViewSet):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+    @action(detail=True, methods=["POST"])
+    def create_payment_intent(self, request, *args, **kwargs):
+        print("Creating payment intent for order...")
+        order = self.get_object()
+
+        if order.is_paid:
+            return Response(
+                {"detail": _("This order has already been paid.")},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not order.pay_way or order.pay_way.provider_code != "stripe":
+            return Response(
+                {
+                    "detail": _(
+                        "This order is not configured for Stripe payments."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Use the request serializer for validation
+        request_serializer_class = self.get_request_serializer()
+        request_serializer = request_serializer_class(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+
+        validated_data = request_serializer.validated_data
+        print("Validated data:", validated_data)
+
+        # Merge payment_data with other fields for backwards compatibility
+        payment_data = validated_data.get("payment_data", {})
+        print("Payment data:", payment_data)
+
+        # Add individual fields to payment_data if they're provided
+        if validated_data.get("payment_method_id"):
+            payment_data["payment_method_id"] = validated_data[
+                "payment_method_id"
+            ]
+        if validated_data.get("customer_id"):
+            payment_data["customer_id"] = validated_data["customer_id"]
+        if validated_data.get("return_url"):
+            payment_data["return_url"] = validated_data["return_url"]
+
+        success, payment_response = PayWayService.process_payment(
+            pay_way=order.pay_way, order=order, **payment_data
+        )
+
+        if not success:
+            return Response(
+                {
+                    "detail": _("Failed to create payment intent."),
+                    "error": payment_response,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Use the response serializer for consistent response format
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(data=payment_response)
+        response_serializer.is_valid(raise_exception=True)
+
+        return Response(response_serializer.validated_data)
 
     @action(detail=True, methods=["GET"])
     def retrieve_by_uuid(self, request, *args, **kwargs):

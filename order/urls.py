@@ -28,6 +28,11 @@ urlpatterns = [
         name="order-retrieve-by-uuid",
     ),
     path(
+        "order/<int:pk>/create_payment_intent",
+        OrderViewSet.as_view({"post": "create_payment_intent"}),
+        name="order-create-payment-intent",
+    ),
+    path(
         "order/<int:pk>/cancel",
         OrderViewSet.as_view({"post": "cancel"}),
         name="order-cancel",

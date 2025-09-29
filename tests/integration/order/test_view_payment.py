@@ -77,13 +77,13 @@ class OrderPaymentViewSetTestCase(TestCase):
         self.paid_order = OrderFactory(
             user=self.user,
             pay_way=self.stripe_pay_way,
-            payment_status=PaymentStatus.COMPLETED,
             payment_id="PAID_123",
             payment_method="Stripe",
             status="COMPLETED",
         )
-        self.paid_order.paid_amount = self.paid_order.total_price
-        self.paid_order.save()
+        self.paid_order.payment_status = PaymentStatus.COMPLETED
+        self.paid_order.paid_amount = Money(100, settings.DEFAULT_CURRENCY)
+        self.paid_order.save(update_fields=["payment_status", "paid_amount"])
 
     @mock.patch(
         "order.models.order.Order.is_paid", new_callable=mock.PropertyMock
@@ -208,6 +208,12 @@ class OrderPaymentViewSetTestCase(TestCase):
             self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_process_payment_already_paid(self):
+        self.paid_order.refresh_from_db()
+        self.assertTrue(
+            self.paid_order.is_paid,
+            "Order should be marked as paid before test",
+        )
+
         view = OrderPaymentViewSet.as_view({"post": "process_payment"})
         request = self.factory.post(
             f"/api/v1/order/{self.paid_order.pk}/process_payment",

@@ -12,6 +12,17 @@ class ProcessPaymentRequestSerializer(serializers.Serializer):
         help_text=_("Additional payment data required by the payment provider"),
     )
 
+    payment_method_id = serializers.CharField(
+        required=False, help_text=_("Stripe Payment Method ID (pm_...)")
+    )
+    customer_id = serializers.CharField(
+        required=False, help_text=_("Stripe Customer ID (cus_...)")
+    )
+    return_url = serializers.URLField(
+        required=False,
+        help_text=_("URL to redirect to after payment confirmation"),
+    )
+
 
 class ProcessPaymentResponseSerializer(serializers.Serializer):
     detail = serializers.CharField()
@@ -21,6 +32,19 @@ class ProcessPaymentResponseSerializer(serializers.Serializer):
     requires_confirmation = serializers.BooleanField()
     is_online_payment = serializers.BooleanField()
     provider_data = serializers.DictField()
+
+    client_secret = serializers.CharField(
+        required=False,
+        help_text=_(
+            "Stripe PaymentIntent client secret for frontend confirmation"
+        ),
+    )
+    requires_action = serializers.BooleanField(
+        default=False,
+        help_text=_(
+            "Whether the payment requires additional action (3D Secure, etc.)"
+        ),
+    )
 
 
 class PaymentStatusResponseSerializer(serializers.Serializer):
@@ -50,3 +74,51 @@ class RefundResponseSerializer(serializers.Serializer):
     payment_status = serializers.CharField()
     refund_id = serializers.CharField()
     refund_details = serializers.DictField()
+
+
+class CreatePaymentIntentRequestSerializer(serializers.Serializer):
+    """
+    Serializer for creating a Stripe PaymentIntent.
+    For manual confirmation flow, we only need optional payment_data.
+    """
+
+    payment_data = serializers.DictField(
+        required=False,
+        default=dict,
+        help_text=_("Additional payment data required by the payment provider"),
+    )
+
+
+class CreatePaymentIntentResponseSerializer(serializers.Serializer):
+    payment_id = serializers.CharField(
+        help_text=_("Payment intent ID from the payment provider")
+    )
+
+    status = serializers.CharField(help_text=_("Payment status"))
+
+    amount = serializers.CharField(help_text=_("Payment amount"))
+
+    currency = serializers.CharField(help_text=_("Payment currency"))
+
+    provider = serializers.CharField(help_text=_("Payment provider name"))
+
+    client_secret = serializers.CharField(
+        required=False,
+        help_text=_(
+            "Stripe PaymentIntent client secret for frontend confirmation"
+        ),
+    )
+
+    requires_action = serializers.BooleanField(
+        required=False,
+        default=False,
+        help_text=_(
+            "Whether the payment requires additional action (3D Secure, etc.)"
+        ),
+    )
+
+    next_action = serializers.DictField(
+        required=False,
+        allow_null=True,
+        help_text=_("Next action required for payment completion"),
+    )

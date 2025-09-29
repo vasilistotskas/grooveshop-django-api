@@ -130,6 +130,7 @@ class OrderModelTestCase(TestCase):
 
     def test_is_paid_property_true(self):
         self.order.payment_status = PaymentStatus.COMPLETED
+        self.order.paid_amount = Money("100.00", settings.DEFAULT_CURRENCY)
 
         result = Order.is_paid.__get__(self.order)
 

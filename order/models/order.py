@@ -269,7 +269,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
                 self.payment_status
                 and self.payment_status == PaymentStatus.COMPLETED
             )
-            or (self.paid_amount and self.paid_amount.amount > 0)
+            and (self.paid_amount and self.paid_amount.amount > 0)
         )
 
     @property

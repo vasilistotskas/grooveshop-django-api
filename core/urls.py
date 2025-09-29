@@ -28,6 +28,7 @@ urlpatterns = [
     path("robots.txt", robots_txt, name="robots-txt"),
     path("csp_report/", csp_report, name="csp-report"),
     path("i18n/", include("django.conf.urls.i18n")),
+    path("stripe/", include("djstripe.urls", namespace="djstripe")),
 ]
 
 urlpatterns += i18n_patterns(

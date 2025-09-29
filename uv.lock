@@ -566,6 +566,19 @@ wheels = [
 ]
 
 [[package]]
+name = "dj-stripe"
+version = "2.10.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django" },
+    { name = "stripe" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a7/d7/677039cd97b2671a4daa42351aec647db357df4ce4ba81f2f94672a620fc/dj_stripe-2.10.1.tar.gz", hash = "sha256:0d6cd5b5314cc5c8284d0c4ebe27259beda7d2d035cbd0372f0557ed81306ed0", size = 132594, upload-time = "2025-08-29T16:26:07.972Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2f/cf/c1ba935ac02c774dca510636420a99fef67502102194bc35923aeeab2f23/dj_stripe-2.10.1-py3-none-any.whl", hash = "sha256:8b96a1bc668319c6e2157ac45c6ad71f4fef25db92a234e24454b6c03b947a05", size = 156214, upload-time = "2025-08-29T16:26:06.472Z" },
+]
+
+[[package]]
 name = "django"
 version = "5.2.6"
 source = { registry = "https://pypi.org/simple" }
@@ -1042,7 +1055,7 @@ wheels = [
 
 [[package]]
 name = "grooveshop-django-api"
-version = "1.31.0"
+version = "1.32.0"
 source = { virtual = "." }
 dependencies = [
     { name = "asgiref" },
@@ -1053,6 +1066,7 @@ dependencies = [
     { name = "charset-normalizer" },
     { name = "cryptography" },
     { name = "disposable-email-domains" },
+    { name = "dj-stripe" },
     { name = "django" },
     { name = "django-admin-thumbnails" },
     { name = "django-allauth" },
@@ -1129,6 +1143,7 @@ requires-dist = [
     { name = "charset-normalizer", specifier = "==3.4.3" },
     { name = "cryptography", specifier = "==46.0.1" },
     { name = "disposable-email-domains", specifier = "==0.0.137" },
+    { name = "dj-stripe", specifier = "==2.10.1" },
     { name = "django", specifier = "==5.2.6" },
     { name = "django-admin-thumbnails", specifier = "==0.2.9" },
     { name = "django-allauth", specifier = "==65.11.2" },
@@ -2307,6 +2322,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/e5/40/edede8dd6977b0d3da179a342c198ed100dd2aba4be081861ee5911e4da4/sqlparse-0.5.3.tar.gz", hash = "sha256:09f67787f56a0b16ecdbde1bfc7f5d9c3371ca683cfeaa8e6ff60b4807ec9272", size = 84999, upload-time = "2024-12-10T12:05:30.728Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a9/5c/bfd6bd0bf979426d405cc6e71eceb8701b148b16c21d2dc3c261efc61c7b/sqlparse-0.5.3-py3-none-any.whl", hash = "sha256:cf2196ed3418f3ba5de6af7e82c694a9fbdbfecccdfc72e281548517081f16ca", size = 44415, upload-time = "2024-12-10T12:05:27.824Z" },
+]
+
+[[package]]
+name = "stripe"
+version = "12.5.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/bd/92/f1b72783e13662026efc7d3f0fc201230edab55edd1604326a97162d8ce4/stripe-12.5.1.tar.gz", hash = "sha256:5407d092c355c31393e767d2dcb2d5a8c3980caa9a073acb32d0ccb3c01b04b5", size = 1432826, upload-time = "2025-09-05T13:27:07.976Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1d/8d/f4c2f047eedc943aea573cb56af2c9481b2d97ee8de9819f8c5d87e9ba34/stripe-12.5.1-py2.py3-none-any.whl", hash = "sha256:39b47b331dfe933ce6cf6bd654e0ae9ba082caa9d1dd8d0ae9ae48293975f115", size = 1664067, upload-time = "2025-09-05T13:27:05.559Z" },
 ]
 
 [[package]]

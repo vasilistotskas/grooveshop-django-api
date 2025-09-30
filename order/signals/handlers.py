@@ -508,3 +508,118 @@ def handle_stripe_dispute_created(sender, **kwargs):
         logger.error(
             f"Error handling charge.dispute.created: {e}", exc_info=True
         )
+
+
+@djstripe_receiver("checkout.session.completed")
+def handle_stripe_checkout_completed(sender, **kwargs):
+    print("Handling stripe checkout session completed")
+    try:
+        event: Event = kwargs.get("event")
+        session_data = event.data["object"]
+        session_id = session_data["id"]
+        payment_intent_id = session_data.get("payment_intent")
+        payment_status = session_data.get("payment_status")
+
+        logger.info(f"Checkout session completed: {session_id}")
+
+        order_id = session_data.get("metadata", {}).get("order_id")
+
+        if not order_id:
+            logger.warning(f"No order_id in session metadata: {session_id}")
+            return
+
+        try:
+            order = Order.objects.get(id=order_id)
+        except Order.DoesNotExist:
+            logger.error(f"Order {order_id} not found for session {session_id}")
+            return
+
+        if payment_status == "paid" and payment_intent_id:
+            order.mark_as_paid(
+                payment_id=payment_intent_id, payment_method="stripe"
+            )
+
+            if order.status == OrderStatus.PENDING:
+                OrderService.update_order_status(order, OrderStatus.PROCESSING)
+
+            if not order.metadata:
+                order.metadata = {}
+            order.metadata["stripe_checkout_session_id"] = session_id
+            order.metadata["stripe_payment_intent_id"] = payment_intent_id
+            order.save(update_fields=["metadata"])
+
+            OrderHistory.log_payment_update(
+                order=order,
+                previous_value={"payment_status": "pending"},
+                new_value={
+                    "payment_status": "completed",
+                    "payment_id": payment_intent_id,
+                    "checkout_session_id": session_id,
+                },
+            )
+
+            logger.info(
+                f"Order {order_id} marked as paid via checkout session {session_id}"
+            )
+
+        elif payment_status == "unpaid":
+            order.payment_status = PaymentStatus.PENDING
+            order.save(update_fields=["payment_status"])
+
+            OrderHistory.log_note(
+                order=order,
+                note=f"Checkout session completed but payment is unpaid: {session_id}",
+            )
+
+            logger.warning(
+                f"Checkout session completed but payment is unpaid: {session_id}"
+            )
+
+    except Exception as e:
+        logger.error(
+            f"Error handling checkout.session.completed: {e}", exc_info=True
+        )
+
+
+@djstripe_receiver("checkout.session.expired")
+def handle_stripe_checkout_expired(sender, **kwargs):
+    print("Handling stripe checkout session expired")
+    try:
+        event: Event = kwargs.get("event")
+        session_data = event.data["object"]
+        session_id = session_data["id"]
+        order_id = session_data.get("metadata", {}).get("order_id")
+
+        logger.info(f"Checkout session expired: {session_id}")
+
+        if not order_id:
+            return
+
+        try:
+            order = Order.objects.get(id=order_id)
+
+            if not order.is_paid:
+                if not order.metadata:
+                    order.metadata = {}
+                order.metadata["stripe_checkout_expired"] = True
+                order.metadata["stripe_checkout_session_id"] = session_id
+                order.save(update_fields=["metadata"])
+
+                OrderHistory.log_note(
+                    order=order,
+                    note=f"Checkout session expired: {session_id}",
+                )
+
+                logger.info(
+                    f"Marked order {order_id} checkout session as expired"
+                )
+
+        except Order.DoesNotExist:
+            logger.error(
+                f"Order {order_id} not found for expired session {session_id}"
+            )
+
+    except Exception as e:
+        logger.error(
+            f"Error handling checkout.session.expired: {e}", exc_info=True
+        )

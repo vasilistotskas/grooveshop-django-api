@@ -33,6 +33,7 @@ from core.utils.views import cache_methods
 from order.enum.status import OrderStatus
 from order.filters import OrderFilter
 from order.models.order import Order
+from order.payment import get_payment_provider
 from order.serializers.order import (
     OrderDetailSerializer,
     OrderSerializer,
@@ -43,6 +44,8 @@ from order.serializers.order import (
 from order.serializers.payment import (
     CreatePaymentIntentRequestSerializer,
     CreatePaymentIntentResponseSerializer,
+    CreateCheckoutSessionRequestSerializer,
+    CreateCheckoutSessionResponseSerializer,
 )
 from order.services import OrderService, OrderServiceError
 from pay_way.services import PayWayService
@@ -54,6 +57,7 @@ req_serializers: RequestSerializersConfig = {
     "add_tracking": AddTrackingSerializer,
     "update_status": UpdateStatusSerializer,
     "create_payment_intent": CreatePaymentIntentRequestSerializer,
+    "create_checkout_session": CreateCheckoutSessionRequestSerializer,
 }
 
 res_serializers: ResponseSerializersConfig = {
@@ -68,6 +72,7 @@ res_serializers: ResponseSerializersConfig = {
     "add_tracking": OrderDetailSerializer,
     "update_status": OrderDetailSerializer,
     "create_payment_intent": CreatePaymentIntentResponseSerializer,
+    "create_checkout_session": CreateCheckoutSessionResponseSerializer,
 }
 
 
@@ -152,6 +157,22 @@ res_serializers: ResponseSerializersConfig = {
         request=CreatePaymentIntentRequestSerializer,
         responses={
             200: CreatePaymentIntentResponseSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    create_checkout_session=extend_schema(
+        operation_id="createOrderCheckoutSession",
+        summary=_("Create a Stripe Checkout Session for an order"),
+        description=_(
+            "Create a Stripe Checkout Session for hosted payment page. "
+            "The customer will be redirected to Stripe's checkout page to complete payment."
+        ),
+        tags=["Orders"],
+        request=CreateCheckoutSessionRequestSerializer,
+        responses={
+            200: CreateCheckoutSessionResponseSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
@@ -272,16 +293,13 @@ class OrderViewSet(BaseModelViewSet):
             if user and "user" not in validated_data:
                 validated_data["user"] = user
 
-            # Create order first
             order = request_serializer.create(validated_data)
 
-            # If PayWay is Stripe and this is an immediate payment request
             if (
                 order.pay_way
                 and order.pay_way.provider_code == "stripe"
                 and request.data.get("process_payment", False)
             ):
-                # Process payment immediately
                 payment_data = request.data.get("payment_data", {})
                 success, payment_response = PayWayService.process_payment(
                     pay_way=order.pay_way, order=order, **payment_data
@@ -295,7 +313,6 @@ class OrderViewSet(BaseModelViewSet):
                     )
                     # Don't return error, let frontend handle the payment flow
 
-                # Add payment info to response
                 response_data = OrderDetailSerializer(
                     order, context={"request": request}
                 ).data
@@ -303,7 +320,6 @@ class OrderViewSet(BaseModelViewSet):
 
                 return Response(response_data, status=status.HTTP_201_CREATED)
 
-            # For non-Stripe or deferred payment orders
             response_serializer_class = self.get_response_serializer()
             response_serializer = response_serializer_class(
                 order, context={"request": request}
@@ -355,7 +371,6 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Use the request serializer for validation
         request_serializer_class = self.get_request_serializer()
         request_serializer = request_serializer_class(data=request.data)
         request_serializer.is_valid(raise_exception=True)
@@ -363,11 +378,9 @@ class OrderViewSet(BaseModelViewSet):
         validated_data = request_serializer.validated_data
         print("Validated data:", validated_data)
 
-        # Merge payment_data with other fields for backwards compatibility
         payment_data = validated_data.get("payment_data", {})
         print("Payment data:", payment_data)
 
-        # Add individual fields to payment_data if they're provided
         if validated_data.get("payment_method_id"):
             payment_data["payment_method_id"] = validated_data[
                 "payment_method_id"
@@ -390,9 +403,77 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Use the response serializer for consistent response format
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(data=payment_response)
+        response_serializer.is_valid(raise_exception=True)
+
+        return Response(response_serializer.validated_data)
+
+    @action(detail=True, methods=["POST"])
+    def create_checkout_session(self, request, *args, **kwargs):
+        order = self.get_object()
+
+        if order.is_paid:
+            return Response(
+                {"detail": _("This order has already been paid.")},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not order.pay_way or order.pay_way.provider_code != "stripe":
+            return Response(
+                {
+                    "detail": _(
+                        "This order is not configured for Stripe payments."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        request_serializer_class = self.get_request_serializer()
+        request_serializer = request_serializer_class(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+
+        validated_data = request_serializer.validated_data
+
+        checkout_params = {
+            "success_url": validated_data["success_url"],
+            "cancel_url": validated_data["cancel_url"],
+            "customer_email": validated_data.get("customer_email", order.email),
+            "description": validated_data.get(
+                "description", f"Payment for Order #{order.id}"
+            ),
+        }
+
+        if request.user.is_authenticated:
+            # You may want to get the stripe customer from your user model
+            # checkout_params["customer_id"] = request.user.stripe_customer_id
+
+            # For dj-stripe subscriber linking
+            checkout_params["subscriber_id"] = request.user.id
+
+        provider = get_payment_provider(order.pay_way.provider_code)
+
+        success, checkout_response = provider.create_checkout_session(
+            amount=order.total_price, order_id=str(order.id), **checkout_params
+        )
+
+        if not success:
+            return Response(
+                {
+                    "detail": _("Failed to create checkout session."),
+                    "error": checkout_response,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        order.metadata = order.metadata or {}
+        order.metadata["stripe_checkout_session_id"] = checkout_response[
+            "session_id"
+        ]
+        order.save(update_fields=["metadata"])
+
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(data=checkout_response)
         response_serializer.is_valid(raise_exception=True)
 
         return Response(response_serializer.validated_data)

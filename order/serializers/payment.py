@@ -122,3 +122,20 @@ class CreatePaymentIntentResponseSerializer(serializers.Serializer):
         allow_null=True,
         help_text=_("Next action required for payment completion"),
     )
+
+
+class CreateCheckoutSessionRequestSerializer(serializers.Serializer):
+    success_url = serializers.URLField(required=True)
+    cancel_url = serializers.URLField(required=True)
+    customer_email = serializers.EmailField(required=False)
+    customer_id = serializers.CharField(required=False)
+    description = serializers.CharField(required=False, max_length=500)
+
+
+class CreateCheckoutSessionResponseSerializer(serializers.Serializer):
+    session_id = serializers.CharField()
+    checkout_url = serializers.URLField()
+    status = serializers.CharField()
+    amount = serializers.CharField()
+    currency = serializers.CharField()
+    provider = serializers.CharField()

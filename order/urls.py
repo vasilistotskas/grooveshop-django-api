@@ -33,6 +33,11 @@ urlpatterns = [
         name="order-create-payment-intent",
     ),
     path(
+        "order/<int:pk>/create_checkout_session",
+        OrderViewSet.as_view({"post": "create_checkout_session"}),
+        name="order-create-checkout-session",
+    ),
+    path(
         "order/<int:pk>/cancel",
         OrderViewSet.as_view({"post": "cancel"}),
         name="order-cancel",

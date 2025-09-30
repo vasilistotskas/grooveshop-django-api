@@ -15,13 +15,18 @@ from djmoney.money import Money
 from phonenumber_field.modelfields import PhoneNumberField
 
 from core.enum import FloorChoicesEnum, LocationChoicesEnum
-from core.models import SoftDeleteModel, TimeStampMixinModel, UUIDModel
+from core.models import (
+    SoftDeleteModel,
+    TimeStampMixinModel,
+    UUIDModel,
+    MetaDataModel,
+)
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
 from order.managers.order import OrderManager
 
 
-class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel):
+class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     id = models.BigAutoField(primary_key=True)
     user = models.ForeignKey(
         "user.UserAccount",

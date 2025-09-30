@@ -49,12 +49,7 @@ class Command(BaseCommand):
                 "sort_order": 1,
                 "configuration": {
                     "accepted_payment_methods": [
-                        "card",
-                        "apple_pay",
-                        "google_pay",
-                        "sepa_debit",
-                        "ideal",
-                        "bancontact",
+                        "*",
                     ],
                     "capture_method": "automatic",
                     "setup_future_usage": None,

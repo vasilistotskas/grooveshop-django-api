@@ -31,6 +31,12 @@ class PaymentProvider(ABC):
     ) -> tuple[PaymentStatus, dict[str, Any]]:
         pass
 
+    @abstractmethod
+    def create_checkout_session(
+        self, amount: Money, order_id: str, **kwargs
+    ) -> tuple[bool, dict[str, Any]]:
+        pass
+
 
 class StripePaymentProvider(PaymentProvider):
     def __init__(self):
@@ -52,6 +58,111 @@ class StripePaymentProvider(PaymentProvider):
             "canceled": PaymentStatus.CANCELED,
         }
         return status_mapping.get(stripe_status, PaymentStatus.FAILED)
+
+    def create_checkout_session(
+        self, amount: Money, order_id: str, **kwargs
+    ) -> tuple[bool, dict[str, Any]]:
+        try:
+            logger.info(
+                "Creating Stripe Checkout Session",
+                extra={
+                    "amount": str(amount.amount),
+                    "currency": str(amount.currency),
+                    "order_id": order_id,
+                },
+            )
+
+            stripe_amount = int(amount.amount * 100)
+            currency_code = str(amount.currency).lower()
+
+            success_url = kwargs.get("success_url")
+            cancel_url = kwargs.get("cancel_url")
+
+            if not success_url or not cancel_url:
+                raise ValueError("success_url and cancel_url are required")
+
+            checkout_session_data = {
+                "mode": "payment",
+                "success_url": success_url,
+                "cancel_url": cancel_url,
+                "line_items": [
+                    {
+                        "price_data": {
+                            "currency": currency_code,
+                            "unit_amount": stripe_amount,
+                            "product_data": {
+                                "name": f"Order #{order_id}",
+                                "description": kwargs.get(
+                                    "description", "Order payment"
+                                ),
+                            },
+                        },
+                        "quantity": 1,
+                    }
+                ],
+                "metadata": {
+                    "order_id": order_id,
+                    "source": "django_app",
+                },
+                "payment_intent_data": {
+                    "metadata": {
+                        "order_id": order_id,
+                    }
+                },
+            }
+
+            customer_id = kwargs.get("customer_id")
+            if customer_id:
+                checkout_session_data["customer"] = customer_id
+            else:
+                checkout_session_data["customer_creation"] = "always"
+
+            customer_email = kwargs.get("customer_email")
+            if customer_email and not customer_id:
+                checkout_session_data["customer_email"] = customer_email
+
+            subscriber_id = kwargs.get("subscriber_id")
+            if subscriber_id:
+                subscriber_key = getattr(
+                    settings,
+                    "DJSTRIPE_SUBSCRIBER_CUSTOMER_KEY",
+                    "djstripe_subscriber",
+                )
+                checkout_session_data["metadata"][subscriber_key] = str(
+                    subscriber_id
+                )
+
+            session = stripe.checkout.Session.create(**checkout_session_data)
+
+            logger.info(
+                "Stripe Checkout Session created successfully",
+                extra={
+                    "session_id": session.id,
+                    "order_id": order_id,
+                },
+            )
+
+            return True, {
+                "session_id": session.id,
+                "checkout_url": session.url,
+                "status": "created",
+                "amount": str(amount.amount),
+                "currency": str(amount.currency),
+                "provider": "stripe",
+            }
+
+        except stripe.StripeError as e:
+            logger.error(
+                f"Stripe Checkout Session creation failed: {e}",
+                extra={"order_id": order_id, "error": str(e)},
+            )
+            return False, {"error": str(e), "stripe_error": True}
+        except Exception as e:
+            logger.error(
+                f"Checkout Session creation failed: {e}",
+                extra={"order_id": order_id, "error": str(e)},
+            )
+            return False, {"error": str(e)}
 
     def process_payment(
         self, amount: Money, order_id: str, **kwargs
@@ -190,12 +301,9 @@ class StripePaymentProvider(PaymentProvider):
 
             try:
                 djstripe_pi = PaymentIntent.objects.get(id=payment_id)
-                # Get fresh data from Stripe API
                 stripe_pi = stripe.PaymentIntent.retrieve(payment_id)
-                # Update local model with fresh data
                 djstripe_pi = PaymentIntent.sync_from_stripe_data(stripe_pi)
             except PaymentIntent.DoesNotExist:
-                # If not in local DB, retrieve from Stripe and sync
                 stripe_pi = stripe.PaymentIntent.retrieve(payment_id)
                 djstripe_pi = PaymentIntent.sync_from_stripe_data(stripe_pi)
 
@@ -231,6 +339,11 @@ class PayPalPaymentProvider(PaymentProvider):
         self.client_id = getattr(settings, "PAYPAL_CLIENT_ID", "")
         self.client_secret = getattr(settings, "PAYPAL_CLIENT_SECRET", "")
 
+    def create_checkout_session(
+        self, amount: Money, order_id: str, **kwargs
+    ) -> tuple[bool, dict[str, Any]]:
+        return False, {"error": "Checkout sessions not supported for PayPal"}
+
     def process_payment(
         self, amount: Money, order_id: str, **kwargs
     ) -> tuple[bool, dict[str, Any]]:
@@ -244,7 +357,6 @@ class PayPalPaymentProvider(PaymentProvider):
                 },
             )
 
-            # Mock response for demonstration
             payment_data = {
                 "payment_id": f"PP_{order_id}_mock",
                 "status": PaymentStatus.COMPLETED,
@@ -274,7 +386,6 @@ class PayPalPaymentProvider(PaymentProvider):
                 },
             )
 
-            # Mock response
             refund_data = {
                 "refund_id": f"PP_RE_{payment_id}_mock",
                 "status": PaymentStatus.REFUNDED,
@@ -300,7 +411,6 @@ class PayPalPaymentProvider(PaymentProvider):
                 extra={"payment_id": payment_id},
             )
 
-            # Mock response
             status = PaymentStatus.COMPLETED
             status_data = {
                 "payment_id": payment_id,

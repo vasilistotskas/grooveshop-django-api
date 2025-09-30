@@ -13,15 +13,18 @@ def generate_random_password(
     if use_special_chars:
         chars += string.punctuation
 
-    if use_digits:
-        password = random.choice(string.digits) + "".join(
-            random.choice(chars) for _ in range(length - 1)
-        )
-    else:
-        password = "".join(random.choice(chars) for _ in range(length))
+    password_parts = []
 
-    password_list = list(password)
-    random.shuffle(password_list)
-    password = "".join(password_list)
+    if use_digits:
+        password_parts.append(random.choice(string.digits))
+
+    if use_special_chars:
+        password_parts.append(random.choice(string.punctuation))
+
+    remaining_length = length - len(password_parts)
+    password_parts.extend(random.choice(chars) for _ in range(remaining_length))
+
+    random.shuffle(password_parts)
+    password = "".join(password_parts)
 
     return password

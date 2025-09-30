@@ -41,11 +41,13 @@ class PaymentProvider(ABC):
 class StripePaymentProvider(PaymentProvider):
     def __init__(self):
         if hasattr(settings, "STRIPE_LIVE_MODE") and settings.STRIPE_LIVE_MODE:
+            self.api_key = settings.STRIPE_LIVE_SECRET_KEY
             stripe.api_key = settings.STRIPE_LIVE_SECRET_KEY
         else:
+            self.api_key = settings.STRIPE_TEST_SECRET_KEY
             stripe.api_key = settings.STRIPE_TEST_SECRET_KEY
 
-        self.webhook_secret = getattr(settings, "STRIPE_WEBHOOK_SECRET", "")
+        self.webhook_secret = getattr(settings, "DJSTRIPE_WEBHOOK_SECRET", "")
 
     def _map_stripe_status(self, stripe_status: str) -> PaymentStatus:
         status_mapping = {

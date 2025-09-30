@@ -27,8 +27,9 @@ class PaymentModuleTestCase(TestCase):
 
     @mock.patch("order.payment.settings")
     def test_stripe_payment_provider_init(self, mock_settings):
-        mock_settings.STRIPE_API_KEY = "test_api_key"
-        mock_settings.STRIPE_WEBHOOK_SECRET = "test_webhook_secret"
+        mock_settings.STRIPE_TEST_SECRET_KEY = "test_api_key"
+        mock_settings.DJSTRIPE_WEBHOOK_SECRET = "test_webhook_secret"
+        mock_settings.STRIPE_LIVE_MODE = False
 
         provider = StripePaymentProvider()
 

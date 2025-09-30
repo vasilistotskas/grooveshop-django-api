@@ -13,7 +13,6 @@ from order.models.item import OrderItem
 from order.models.order import Order
 from order.serializers.item import (
     OrderItemCreateSerializer,
-    OrderItemSerializer,
     OrderItemDetailSerializer,
 )
 from order.signals import order_created
@@ -23,7 +22,7 @@ from region.models import Region
 
 
 class OrderSerializer(serializers.ModelSerializer[Order]):
-    items = OrderItemSerializer(many=True)
+    items = OrderItemDetailSerializer(many=True)
     country = PrimaryKeyRelatedField(queryset=Country.objects.all())
     region = PrimaryKeyRelatedField(queryset=Region.objects.all())
     pay_way = PrimaryKeyRelatedField(queryset=PayWay.objects.all())

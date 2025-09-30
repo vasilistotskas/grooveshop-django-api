@@ -3,6 +3,22 @@
 
 
 
+## v1.33.0 (2025-09-30)
+
+### Features
+
+* feat: Update Stripe config and order item serializer usage
+
+Refactored StripePaymentProvider to use DJSTRIPE_WEBHOOK_SECRET and store API key in an instance variable. Updated OrderSerializer to use OrderItemDetailSerializer for items, and changed schema.yml to reference OrderItemDetail. Improved password generation to ensure inclusion of digits and special characters when requested. Adjusted related unit test to match new Stripe settings. ([`966c06a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/966c06a2c53d201d2eeeb25bfe5fbe4fbfeda58b))
+
+* feat: Add Stripe Checkout Session support for orders
+
+Introduces Stripe Checkout Session creation for orders, including new API endpoint, serializers, payment provider logic, and signal handlers for session events. Adds metadata fields to the Order model and updates OpenAPI schema documentation. ([`cc6ec0c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cc6ec0c2508ee2d6f88eb7bbce74747c4b895bde))
+
+* feat: Integrate Stripe payments with dj-stripe and add payment intent API
+
+Added dj-stripe integration for Stripe payments, including new environment variables and settings. Implemented Stripe payment processing, refund, and status retrieval using dj-stripe models. Added management command for PayWay setup, new API endpoint to create Stripe payment intents, and corresponding serializers. Updated order payment logic, signals for Stripe webhook events, and OpenAPI schema. Improved tests for Stripe payment and refund flows. ([`5e63ebe`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5e63ebe58962a09978dba0441be98dca6c9b9eb8))
+
 ## v1.32.0 (2025-09-28)
 
 ### Bug fixes

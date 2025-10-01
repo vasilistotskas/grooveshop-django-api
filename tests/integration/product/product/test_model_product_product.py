@@ -379,25 +379,19 @@ class ProductQuerySetTestCase(TestCase):
 
     def test_manager_methods(self):
         """Test that manager methods work correctly"""
-        # Test likes count annotation
         likes_queryset = Product.objects.with_likes_count_annotation()
         self.assertTrue(likes_queryset.exists())
 
-        # Test review average annotation
         review_queryset = Product.objects.with_review_average_annotation()
         self.assertTrue(review_queryset.exists())
 
-        # Test final price annotation
         price_queryset = Product.objects.with_final_price_annotation()
         self.assertTrue(price_queryset.exists())
 
     def test_filtering_with_annotations(self):
         """Test that annotations work correctly with filtering"""
-        # Create products with different like counts
         user3 = UserAccountFactory(num_addresses=0)
-        ProductFavouriteFactory(
-            product=self.product1, user=user3
-        )  # Now has 3 likes
+        ProductFavouriteFactory(product=self.product1, user=user3)
 
         queryset = Product.objects.with_likes_count_annotation().filter(
             likes_count_annotation__gte=2

@@ -431,3 +431,141 @@ class AddTrackingSerializer(serializers.Serializer):
 
 class UpdateStatusSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=OrderStatus.choices)
+
+
+class CreatePaymentIntentRequestSerializer(serializers.Serializer):
+    payment_data = serializers.DictField(
+        required=False,
+        default=dict,
+        help_text=_("Additional payment data required by the payment provider"),
+    )
+
+
+class CreatePaymentIntentResponseSerializer(serializers.Serializer):
+    payment_id = serializers.CharField(
+        help_text=_("Payment intent ID from the payment provider")
+    )
+
+    status = serializers.CharField(help_text=_("Payment status"))
+
+    amount = serializers.CharField(help_text=_("Payment amount"))
+
+    currency = serializers.CharField(help_text=_("Payment currency"))
+
+    provider = serializers.CharField(help_text=_("Payment provider name"))
+
+    client_secret = serializers.CharField(
+        required=False,
+        help_text=_(
+            "Stripe PaymentIntent client secret for frontend confirmation"
+        ),
+    )
+
+    requires_action = serializers.BooleanField(
+        required=False,
+        default=False,
+        help_text=_(
+            "Whether the payment requires additional action (3D Secure, etc.)"
+        ),
+    )
+
+    next_action = serializers.DictField(
+        required=False,
+        allow_null=True,
+        help_text=_("Next action required for payment completion"),
+    )
+
+
+class CreateCheckoutSessionRequestSerializer(serializers.Serializer):
+    success_url = serializers.URLField(required=True)
+    cancel_url = serializers.URLField(required=True)
+    customer_email = serializers.EmailField(required=False)
+    customer_id = serializers.CharField(required=False)
+    description = serializers.CharField(required=False, max_length=500)
+
+
+class CreateCheckoutSessionResponseSerializer(serializers.Serializer):
+    session_id = serializers.CharField()
+    checkout_url = serializers.URLField()
+    status = serializers.CharField()
+    amount = serializers.CharField()
+    currency = serializers.CharField()
+    provider = serializers.CharField()
+
+
+class RefundOrderRequestSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        required=False,
+        allow_null=True,
+        help_text=_("Partial refund amount. Leave empty for full refund."),
+    )
+    currency = serializers.CharField(
+        max_length=3,
+        required=False,
+        allow_null=True,
+        help_text=_(
+            "Currency code (e.g., USD, EUR). Required if amount is provided."
+        ),
+    )
+    reason = serializers.CharField(
+        max_length=500,
+        required=False,
+        allow_blank=True,
+        help_text=_("Reason for the refund"),
+    )
+
+    def validate(self, attrs):
+        amount = attrs.get("amount")
+        currency = attrs.get("currency")
+
+        if amount is not None and not currency:
+            raise serializers.ValidationError(
+                {"currency": _("Currency is required when amount is provided")}
+            )
+
+        if amount is not None and amount <= 0:
+            raise serializers.ValidationError(
+                {"amount": _("Refund amount must be greater than 0")}
+            )
+
+        return attrs
+
+
+class RefundOrderResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    refund_id = serializers.CharField(required=False)
+    status = serializers.CharField()
+    amount = serializers.CharField()
+    payment_id = serializers.CharField(required=False)
+    stripe_status = serializers.CharField(required=False)
+    error = serializers.CharField(required=False)
+    message = serializers.CharField(required=False)
+
+
+class PaymentStatusResponseSerializer(serializers.Serializer):
+    payment_id = serializers.CharField()
+    status = serializers.CharField()
+    raw_status = serializers.CharField(required=False)
+    provider = serializers.CharField()
+    amount = serializers.DecimalField(
+        max_digits=10, decimal_places=2, required=False
+    )
+    currency = serializers.CharField(required=False)
+    created = serializers.IntegerField(required=False)
+    last_updated = serializers.DateTimeField(required=False, allow_null=True)
+    error = serializers.CharField(required=False)
+
+
+class CancelOrderRequestSerializer(serializers.Serializer):
+    reason = serializers.CharField(
+        max_length=500,
+        required=False,
+        allow_blank=True,
+        help_text="Reason for canceling the order",
+    )
+    refund_payment = serializers.BooleanField(
+        default=True,
+        help_text="Whether to automatically refund the payment if the order is paid",
+    )

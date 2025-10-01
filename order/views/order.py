@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import contextlib
 import logging
 import uuid
 
 from django.conf import settings
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
+from djmoney.money import Money
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
@@ -16,39 +16,40 @@ from rest_framework.exceptions import (
     PermissionDenied,
     ValidationError,
 )
-
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 
 from core.api.permissions import IsOwnerOrAdmin
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-
 from core.utils.serializers import (
-    create_schema_view_config,
     RequestSerializersConfig,
     ResponseSerializersConfig,
+    create_schema_view_config,
 )
 from core.utils.views import cache_methods
-from order.enum.status import OrderStatus
 from order.filters import OrderFilter
 from order.models.order import Order
 from order.payment import get_payment_provider
 from order.serializers.order import (
+    AddTrackingSerializer,
+    CancelOrderRequestSerializer,
+    CreateCheckoutSessionRequestSerializer,
+    CreateCheckoutSessionResponseSerializer,
+    CreatePaymentIntentRequestSerializer,
+    CreatePaymentIntentResponseSerializer,
     OrderDetailSerializer,
     OrderSerializer,
     OrderWriteSerializer,
-    AddTrackingSerializer,
+    PaymentStatusResponseSerializer,
+    RefundOrderRequestSerializer,
+    RefundOrderResponseSerializer,
     UpdateStatusSerializer,
-)
-from order.serializers.payment import (
-    CreatePaymentIntentRequestSerializer,
-    CreatePaymentIntentResponseSerializer,
-    CreateCheckoutSessionRequestSerializer,
-    CreateCheckoutSessionResponseSerializer,
 )
 from order.services import OrderService, OrderServiceError
 from pay_way.services import PayWayService
+
+logger = logging.getLogger(__name__)
 
 req_serializers: RequestSerializersConfig = {
     "create": OrderWriteSerializer,
@@ -58,6 +59,8 @@ req_serializers: RequestSerializersConfig = {
     "update_status": UpdateStatusSerializer,
     "create_payment_intent": CreatePaymentIntentRequestSerializer,
     "create_checkout_session": CreateCheckoutSessionRequestSerializer,
+    "cancel": CancelOrderRequestSerializer,
+    "refund_order": RefundOrderRequestSerializer,
 }
 
 res_serializers: ResponseSerializersConfig = {
@@ -73,15 +76,15 @@ res_serializers: ResponseSerializersConfig = {
     "update_status": OrderDetailSerializer,
     "create_payment_intent": CreatePaymentIntentResponseSerializer,
     "create_checkout_session": CreateCheckoutSessionResponseSerializer,
+    "refund_order": RefundOrderResponseSerializer,
+    "payment_status": PaymentStatusResponseSerializer,
 }
 
 
 @extend_schema_view(
     **create_schema_view_config(
         model_class=Order,
-        display_config={
-            "tag": "Orders",
-        },
+        display_config={"tag": "Orders"},
         request_serializers=req_serializers,
         response_serializers=res_serializers,
     ),
@@ -104,6 +107,7 @@ res_serializers: ResponseSerializersConfig = {
         summary=_("Cancel an order"),
         description=_("Cancel an existing order and restore product stock"),
         tags=["Orders"],
+        request=CancelOrderRequestSerializer,
         responses={
             200: OrderDetailSerializer,
             400: ErrorResponseSerializer,
@@ -128,6 +132,7 @@ res_serializers: ResponseSerializersConfig = {
         summary=_("Add tracking information to an order"),
         description=_("Add tracking information to an existing order"),
         tags=["Orders"],
+        request=AddTrackingSerializer,
         responses={
             200: OrderDetailSerializer,
             400: ErrorResponseSerializer,
@@ -140,6 +145,7 @@ res_serializers: ResponseSerializersConfig = {
         summary=_("Update the status of an order"),
         description=_("Update the status of an existing order"),
         tags=["Orders"],
+        request=UpdateStatusSerializer,
         responses={
             200: OrderDetailSerializer,
             400: ErrorResponseSerializer,
@@ -173,6 +179,38 @@ res_serializers: ResponseSerializersConfig = {
         request=CreateCheckoutSessionRequestSerializer,
         responses={
             200: CreateCheckoutSessionResponseSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    refund_order=extend_schema(
+        operation_id="refundOrder",
+        summary=_("Refund an order payment"),
+        description=_(
+            "Process a full or partial refund for an order's payment. "
+            "Only available for paid orders with valid payment providers."
+        ),
+        tags=["Orders"],
+        request=RefundOrderRequestSerializer,
+        responses={
+            200: RefundOrderResponseSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    ),
+    payment_status=extend_schema(
+        operation_id="getOrderPaymentStatus",
+        summary=_("Get payment status for an order"),
+        description=_(
+            "Retrieve the current payment status from the payment provider. "
+            "This fetches the latest status directly from Stripe/PayPal."
+        ),
+        tags=["Orders"],
+        responses={
+            200: PaymentStatusResponseSerializer,
             400: ErrorResponseSerializer,
             401: ErrorResponseSerializer,
             404: ErrorResponseSerializer,
@@ -218,7 +256,7 @@ class OrderViewSet(BaseModelViewSet):
     permission_classes = [IsOwnerOrAdmin]
 
     def get_permissions(self):
-        if self.action in [
+        owner_or_admin_actions = {
             "list",
             "retrieve",
             "update",
@@ -227,11 +265,16 @@ class OrderViewSet(BaseModelViewSet):
             "retrieve_by_uuid",
             "cancel",
             "my_orders",
-        ]:
+            "payment_status",
+        }
+        admin_only_actions = {"add_tracking", "update_status", "refund_order"}
+        public_actions = {"create"}
+
+        if self.action in owner_or_admin_actions:
             self.permission_classes = [IsOwnerOrAdmin]
-        elif self.action in ["add_tracking", "update_status"]:
+        elif self.action in admin_only_actions:
             self.permission_classes = [IsAdminUser]
-        elif self.action == "create":
+        elif self.action in public_actions:
             self.permission_classes = []
         else:
             self.permission_classes = [IsAdminUser]
@@ -280,11 +323,7 @@ class OrderViewSet(BaseModelViewSet):
         request_serializer = request_serializer_class(
             data=request.data, context={"request": request}
         )
-
-        if not request_serializer.is_valid():
-            return Response(
-                request_serializer.errors, status=status.HTTP_400_BAD_REQUEST
-            )
+        request_serializer.is_valid(raise_exception=True)
 
         try:
             user = request.user if request.user.is_authenticated else None
@@ -306,12 +345,11 @@ class OrderViewSet(BaseModelViewSet):
                 )
 
                 if not success:
-                    logger = logging.getLogger(__name__)
-                    # If payment fails, you might want to keep the order but mark it appropriately
                     logger.warning(
-                        f"Payment failed for order {order.id}: {payment_response}"
+                        "Payment failed for order %s: %s",
+                        order.id,
+                        payment_response,
                     )
-                    # Don't return error, let frontend handle the payment flow
 
                 response_data = OrderDetailSerializer(
                     order, context={"request": request}
@@ -329,8 +367,7 @@ class OrderViewSet(BaseModelViewSet):
             )
 
         except OrderServiceError as e:
-            logger = logging.getLogger(__name__)
-            logger.error("Error creating order: %s", str(e))
+            logger.error("Error creating order: %s", e)
             raise ValidationError(
                 {
                     "detail": _(
@@ -339,8 +376,7 @@ class OrderViewSet(BaseModelViewSet):
                 }
             ) from e
         except Exception as e:
-            logger = logging.getLogger(__name__)
-            logger.error("Error creating order: %s", str(e))
+            logger.error("Error creating order: %s", e, exc_info=True)
             return Response(
                 {
                     "detail": _(
@@ -352,7 +388,7 @@ class OrderViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["POST"])
     def create_payment_intent(self, request, *args, **kwargs):
-        print("Creating payment intent for order...")
+        """Create a payment intent for an order."""
         order = self.get_object()
 
         if order.is_paid:
@@ -376,10 +412,8 @@ class OrderViewSet(BaseModelViewSet):
         request_serializer.is_valid(raise_exception=True)
 
         validated_data = request_serializer.validated_data
-        print("Validated data:", validated_data)
 
         payment_data = validated_data.get("payment_data", {})
-        print("Payment data:", payment_data)
 
         if validated_data.get("payment_method_id"):
             payment_data["payment_method_id"] = validated_data[
@@ -411,6 +445,7 @@ class OrderViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["POST"])
     def create_checkout_session(self, request, *args, **kwargs):
+        """Create a Stripe Checkout Session for an order."""
         order = self.get_object()
 
         if order.is_paid:
@@ -445,10 +480,6 @@ class OrderViewSet(BaseModelViewSet):
         }
 
         if request.user.is_authenticated:
-            # You may want to get the stripe customer from your user model
-            # checkout_params["customer_id"] = request.user.stripe_customer_id
-
-            # For dj-stripe subscriber linking
             checkout_params["subscriber_id"] = request.user.id
 
         provider = get_payment_provider(order.pay_way.provider_code)
@@ -466,7 +497,8 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        order.metadata = order.metadata or {}
+        if not order.metadata:
+            order.metadata = {}
         order.metadata["stripe_checkout_session_id"] = checkout_response[
             "session_id"
         ]
@@ -480,6 +512,7 @@ class OrderViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["GET"])
     def retrieve_by_uuid(self, request, *args, **kwargs):
+        """Retrieve an order by UUID."""
         uuid_str = kwargs.get("uuid")
         if not uuid_str:
             raise NotFound(_("UUID parameter is required"))
@@ -498,6 +531,7 @@ class OrderViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["POST"])
     def cancel(self, request, *args, **kwargs):
+        """Cancel an order and optionally process refund."""
         order = self.get_object()
 
         user = request.user
@@ -506,30 +540,39 @@ class OrderViewSet(BaseModelViewSet):
                 _("You do not have permission to cancel this order")
             )
 
+        request_serializer_class = self.get_request_serializer()
+        request_serializer = request_serializer_class(
+            data=request.data if request.data else {}
+        )
+        request_serializer.is_valid(raise_exception=True)
+
+        validated_data = request_serializer.validated_data
+        cancellation_reason = validated_data.get("reason", "")
+        should_refund = validated_data.get("refund_payment", True)
+
         try:
-            canceled_order = OrderService.cancel_order(order)
-            response_serializer_class = self.get_response_serializer()
-            serializer = response_serializer_class(canceled_order)
-            return Response(serializer.data)
-        except OrderServiceError as e:
-            logger = logging.getLogger(__name__)
-
-            logger.error(f"Error canceling order: {e}")
-            raise ValidationError(
-                {
-                    "detail": _(
-                        "An error occurred while processing your request."
-                    )
-                }
-            ) from e
-        except Exception as e:
-            logger = logging.getLogger(__name__)
-
-            logger.error(
-                "Error canceling order: %s",
-                str(e),
+            canceled_order, refund_info = OrderService.cancel_order(
+                order=order,
+                reason=cancellation_reason,
+                refund_payment=should_refund,
+                canceled_by=user.id if user.is_authenticated else None,
             )
 
+            response_serializer_class = self.get_response_serializer()
+            serializer = response_serializer_class(
+                canceled_order, context={"request": request}
+            )
+            response_data = serializer.data
+
+            if refund_info:
+                response_data["refund_info"] = refund_info
+
+            return Response(response_data)
+
+        except ValueError as e:
+            raise ValidationError({"detail": str(e)}) from e
+        except Exception as e:
+            logger.error("Error canceling order: %s", e, exc_info=True)
             return Response(
                 {"detail": _("An unexpected error occurred")},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -537,6 +580,7 @@ class OrderViewSet(BaseModelViewSet):
 
     @action(detail=False, methods=["GET"])
     def my_orders(self, request, *args, **kwargs):
+        """List current user's orders."""
         if not request.user.is_authenticated:
             raise NotAuthenticated(
                 _("Authentication is required to view your orders")
@@ -558,6 +602,7 @@ class OrderViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["POST"])
     def add_tracking(self, request, *args, **kwargs):
+        """Add tracking information to an order."""
         order = self.get_object()
 
         if not request.user.is_staff:
@@ -572,29 +617,12 @@ class OrderViewSet(BaseModelViewSet):
         shipping_carrier = validated_data["shipping_carrier"]
 
         try:
-            order.add_tracking_info(tracking_number, shipping_carrier)
-
-            if (
-                order.status
-                in {
-                    OrderStatus.DELIVERED,
-                    OrderStatus.COMPLETED,
-                    OrderStatus.RETURNED,
-                    OrderStatus.REFUNDED,
-                }
-                or order.status == OrderStatus.SHIPPED
-            ):
-                pass
-            elif order.status == OrderStatus.PROCESSING:
-                OrderService.update_order_status(order, OrderStatus.SHIPPED)
-            elif order.status == OrderStatus.PENDING:
-                OrderService.update_order_status(order, OrderStatus.PROCESSING)
-                OrderService.update_order_status(order, OrderStatus.SHIPPED)
-            else:
-                with contextlib.suppress(OrderServiceError):
-                    OrderService.update_order_status(order, OrderStatus.SHIPPED)
-
-            order = OrderService.get_order_by_id(order.id)
+            order = OrderService.add_tracking_info(
+                order=order,
+                tracking_number=tracking_number,
+                shipping_carrier=shipping_carrier,
+                auto_update_status=True,
+            )
 
             response_serializer_class = self.get_response_serializer()
             response_serializer = response_serializer_class(
@@ -602,23 +630,9 @@ class OrderViewSet(BaseModelViewSet):
             )
             return Response(response_serializer.data)
 
-        except OrderServiceError as e:
-            logger = logging.getLogger(__name__)
-
-            logger.error(f"Error adding tracking information: {e}")
-            raise ValidationError(
-                {
-                    "detail": _(
-                        "An error occurred while processing your request."
-                    )
-                }
-            ) from e
         except Exception as e:
-            logger = logging.getLogger(__name__)
-
             logger.error(
-                "Error adding tracking information: %s",
-                str(e),
+                "Error adding tracking information: %s", e, exc_info=True
             )
             return Response(
                 {"detail": _("An unexpected error occurred")},
@@ -627,6 +641,7 @@ class OrderViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["POST"])
     def update_status(self, request, *args, **kwargs):
+        """Update the status of an order."""
         order = self.get_object()
 
         if not request.user.is_staff:
@@ -651,20 +666,7 @@ class OrderViewSet(BaseModelViewSet):
             return Response(response_serializer.data)
 
         except ValueError as e:
-            logger = logging.getLogger(__name__)
-
-            logger.error(f"Error updating order status: {e}")
-            raise ValidationError(
-                {
-                    "detail": _(
-                        "An error occurred while processing your request."
-                    )
-                }
-            ) from e
-        except OrderServiceError as e:
-            logger = logging.getLogger(__name__)
-
-            logger.error(f"Error updating order status: {e}")
+            logger.error("Error updating order status: %s", e)
             raise ValidationError(
                 {
                     "detail": _(
@@ -673,13 +675,114 @@ class OrderViewSet(BaseModelViewSet):
                 }
             ) from e
         except Exception as e:
-            logger = logging.getLogger(__name__)
-
-            logger.error(
-                "Error updating order status: %s",
-                str(e),
-            )
+            logger.error("Error updating order status: %s", e, exc_info=True)
             return Response(
                 {"detail": _("An unexpected error occurred")},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=True, methods=["POST"])
+    def refund_order(self, request, *args, **kwargs):
+        """Process full or partial refund for an order."""
+        order = self.get_object()
+
+        request_serializer_class = self.get_request_serializer()
+        request_serializer = request_serializer_class(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+
+        validated_data = request_serializer.validated_data
+
+        refund_amount = None
+        if validated_data.get("amount"):
+            currency = validated_data.get(
+                "currency", str(order.total_price.currency)
+            )
+            refund_amount = Money(validated_data["amount"], currency)
+
+        try:
+            success, response_data = OrderService.refund_order(
+                order=order,
+                amount=refund_amount,
+                reason=validated_data.get("reason", ""),
+                refunded_by=request.user.id
+                if request.user.is_authenticated
+                else None,
+            )
+
+            if not success:
+                return Response(
+                    {
+                        "detail": _("Failed to process refund."),
+                        "error": response_data.get("error"),
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            response_data["success"] = True
+            response_data["message"] = _("Refund processed successfully.")
+
+            response_serializer_class = self.get_response_serializer()
+            response_serializer = response_serializer_class(data=response_data)
+            response_serializer.is_valid(raise_exception=True)
+
+            return Response(response_serializer.validated_data)
+
+        except ValueError as e:
+            return Response(
+                {"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(
+                "Error processing refund for order %s: %s",
+                order.id,
+                e,
+                exc_info=True,
+            )
+            return Response(
+                {
+                    "detail": _(
+                        "An error occurred while processing the refund."
+                    ),
+                    "error": str(e),
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=True, methods=["GET"])
+    def payment_status(self, request, *args, **kwargs):
+        """Get current payment status from payment provider."""
+        order = self.get_object()
+
+        try:
+            payment_status_enum, status_data = OrderService.get_payment_status(
+                order
+            )
+
+            response_data = {"status": payment_status_enum.value, **status_data}
+
+            response_serializer_class = self.get_response_serializer()
+            response_serializer = response_serializer_class(data=response_data)
+            response_serializer.is_valid(raise_exception=True)
+
+            return Response(response_serializer.validated_data)
+
+        except ValueError as e:
+            return Response(
+                {"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(
+                "Error getting payment status for order %s: %s",
+                order.id,
+                e,
+                exc_info=True,
+            )
+            return Response(
+                {
+                    "detail": _(
+                        "An error occurred while fetching payment status."
+                    ),
+                    "error": str(e),
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )

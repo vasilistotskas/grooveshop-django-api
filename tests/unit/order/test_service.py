@@ -58,6 +58,7 @@ class OrderServiceTestCase(TestCase):
             return_value=Money("135.00", settings.DEFAULT_CURRENCY)
         )
         self.order.paid_amount = Money("0.00", settings.DEFAULT_CURRENCY)
+        self.order.metadata = {}
 
     @patch("order.signals.order_created.send")
     def test_create_order(self, mock_signal):
@@ -154,6 +155,8 @@ class OrderServiceTestCase(TestCase):
     def test_cancel_order(self, mock_signal):
         self.order.status = OrderStatus.PENDING
         self.order.can_be_canceled = True
+        self.order.is_paid = False
+        self.order.payment_id = None
 
         item1 = Mock()
         item1.product = self.product1
@@ -166,9 +169,15 @@ class OrderServiceTestCase(TestCase):
         self.order.items.select_related.return_value = self.order.items
         self.order.items.all.return_value = [item1, item2]
 
-        OrderService.cancel_order(self.order)
+        canceled_order, refund_info = OrderService.cancel_order(
+            self.order,
+            reason="Test cancellation",
+            refund_payment=True,
+            canceled_by=self.user.id,
+        )
 
-        self.assertEqual(self.order.status, OrderStatus.CANCELED)
+        self.assertEqual(canceled_order.status, OrderStatus.CANCELED)
+        self.assertIsNone(refund_info)
 
         mock_signal.assert_called_once()
 

@@ -602,6 +602,9 @@ class OrderAdmin(ModelAdmin):
     created_display.short_description = _("Created")
 
     def urgency_indicator(self, obj):
+        if not obj.created_at:
+            return "Available after creation."
+
         now = timezone.now()
         age = now - obj.created_at
 
@@ -916,6 +919,9 @@ class OrderAdmin(ModelAdmin):
     shipping_summary.short_description = _("Shipping Summary")
 
     def order_analytics(self, obj):
+        if not obj.created_at:
+            return "Available after creation."
+
         now = timezone.now()
         age = now - obj.created_at
 

@@ -713,6 +713,9 @@ class ProductAdmin(
     performance_summary.short_description = _("Performance Summary")
 
     def product_analytics(self, obj):
+        if not obj.created_at:
+            return "Available after creation."
+
         now = timezone.now()
         age = now - obj.created_at
         last_updated = now - obj.updated_at

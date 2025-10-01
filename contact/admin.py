@@ -345,6 +345,9 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
     priority_badge.short_description = _("Priority")
 
     def contact_analytics(self, obj):
+        if not obj.created_at:
+            return "Available after creation."
+
         now = timezone.now()
         age = now - obj.created_at
         words = len((obj.message or "").split())

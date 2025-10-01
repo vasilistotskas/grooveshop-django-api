@@ -448,6 +448,9 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
     engagement_stats.short_description = _("Engagement")
 
     def timing_info(self, obj):
+        if not obj.created_at:
+            return "Available after creation."
+
         now = timezone.now()
         age = now - obj.created_at
 
@@ -488,6 +491,9 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
     timing_info.short_description = _("Timing")
 
     def notification_analytics(self, obj):
+        if not obj.created_at:
+            return "Available after creation."
+
         now = timezone.now()
         age = now - obj.created_at
 
@@ -713,6 +719,9 @@ class NotificationUserAdmin(ModelAdmin):
     notification_info.short_description = _("Notification")
 
     def seen_status(self, obj):
+        if not obj.created_at:
+            return "Available after creation."
+
         if obj.seen:
             time_diff = ""
             if obj.seen_at:
@@ -786,6 +795,9 @@ class NotificationUserAdmin(ModelAdmin):
     priority_indicator.short_description = _("Priority")
 
     def timing_display(self, obj):
+        if not obj.created_at:
+            return "Available after creation."
+
         now = timezone.now()
         age = now - obj.created_at
 
@@ -816,6 +828,9 @@ class NotificationUserAdmin(ModelAdmin):
     timing_display.short_description = _("Timing")
 
     def user_notification_analytics(self, obj):
+        if not obj.created_at:
+            return "Available after creation."
+
         now = timezone.now()
         age = now - obj.created_at
 

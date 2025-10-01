@@ -211,15 +211,31 @@ class OrderServiceTestCase(TestCase):
         order.status = OrderStatus.PENDING.value
         order.payment_status = PaymentStatus.COMPLETED
         order.payment_id = "test_payment_123"
-        order.save(update_fields=["status", "payment_status", "payment_id"])
+
+        test_currency = order.shipping_price.currency
+        order.paid_amount = Money(
+            amount=Decimal("100.00"), currency=test_currency
+        )
+
+        order.save(
+            update_fields=[
+                "status",
+                "payment_status",
+                "payment_id",
+                "paid_amount",
+            ]
+        )
 
         product = ProductFactory(stock=10)
-        test_currency = order.shipping_price.currency
         order.items.create(
             product=product,
             price=Money(amount=Decimal("50.00"), currency=test_currency),
             quantity=2,
         )
+
+        self.assertIsNotNone(order.pay_way, "Order must have a payment method")
+        self.assertIsNotNone(order.payment_id, "Order must have a payment ID")
+        self.assertTrue(order.is_paid, "Order must be marked as paid")
 
         with patch.object(OrderService, "refund_order") as mock_refund:
             mock_refund.return_value = (
@@ -330,7 +346,7 @@ class OrderServiceTestCase(TestCase):
             OrderService.refund_order(order=order)
 
         self.assertIn(
-            "This order has no payment ID to refund.", str(context.exception)
+            "This order has not been paid yet.", str(context.exception)
         )
 
     @patch("order.payment.get_payment_provider")

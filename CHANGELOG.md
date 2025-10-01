@@ -3,6 +3,24 @@
 
 
 
+## v1.34.0 (2025-10-01)
+
+### Bug fixes
+
+* fix: Improve order payment and refund test assertions
+
+Added assertions to verify order payment method, payment ID, and paid status in the service order tests. Updated refund error message assertion to check for unpaid order message. Also ensured paid_amount is set and saved with order updates. ([`c6fa60c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c6fa60c78b58d8a620177085cb90de25fef017e1))
+
+* fix: Update order service tests and patch signal import
+
+Patched the signal import path in the cancel order test to use 'order.signals.handlers.order_canceled.send'. Updated assertion in refund_order_not_paid test to check for missing payment ID message. Removed redundant docstrings from several test methods for clarity. ([`9a39a34`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9a39a34c99e428b5028315cf8fd41b7a87d673e3))
+
+### Features
+
+* feat: Refactor order payment and refund handling
+
+Removed payment-related views and serializers from the order app, consolidating payment and refund logic into the OrderService and OrderViewSet. Added new serializers for payment intent, checkout session, refund, and payment status to order/serializers/order.py. Updated signal handlers and logging for clarity and consistency. Enhanced cancellation and refund workflows, including metadata updates and Stripe webhook handling. Cleaned up admin and test files to support these changes. ([`5ebb9b8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ebb9b8beef7415e233144e1d4b411bbcd772fa0))
+
 ## v1.33.0 (2025-09-30)
 
 ### Features

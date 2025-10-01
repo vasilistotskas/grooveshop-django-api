@@ -205,9 +205,8 @@ class OrderServiceTestCase(TestCase):
         product.refresh_from_db()
         self.assertEqual(product.stock, 10)
 
-    @patch("order.signals.order_canceled.send")
+    @patch("order.signals.handlers.order_canceled.send")
     def test_cancel_order_with_refund(self, mock_signal):
-        """Test canceling a paid order with automatic refund."""
         order = OrderFactory()
         order.status = OrderStatus.PENDING.value
         order.payment_status = PaymentStatus.COMPLETED
@@ -257,7 +256,6 @@ class OrderServiceTestCase(TestCase):
 
     @patch("order.payment.get_payment_provider")
     def test_refund_order(self, mock_get_provider):
-        """Test refunding an order."""
         order = OrderFactory()
         order.payment_status = PaymentStatus.COMPLETED
         order.payment_id = "test_payment_123"
@@ -293,7 +291,6 @@ class OrderServiceTestCase(TestCase):
 
     @patch("order.payment.get_payment_provider")
     def test_refund_order_partial(self, mock_get_provider):
-        """Test partial refund."""
         order = OrderFactory()
         order.payment_status = PaymentStatus.COMPLETED
         order.payment_id = "test_payment_123"
@@ -325,7 +322,6 @@ class OrderServiceTestCase(TestCase):
         self.assertEqual(order.metadata["refunds"][0]["amount"], "25.00")
 
     def test_refund_order_not_paid(self):
-        """Test refund fails for unpaid order."""
         order = OrderFactory()
         order.payment_status = PaymentStatus.PENDING
         order.save()
@@ -333,11 +329,12 @@ class OrderServiceTestCase(TestCase):
         with self.assertRaises(ValueError) as context:
             OrderService.refund_order(order=order)
 
-        self.assertIn("has not been paid", str(context.exception))
+        self.assertIn(
+            "This order has no payment ID to refund.", str(context.exception)
+        )
 
     @patch("order.payment.get_payment_provider")
     def test_get_payment_status(self, mock_get_provider):
-        """Test getting payment status from provider."""
         order = OrderFactory()
         order.payment_id = "test_payment_123"
         order.payment_status = PaymentStatus.PENDING
@@ -362,7 +359,6 @@ class OrderServiceTestCase(TestCase):
         self.assertEqual(order.payment_status, PaymentStatus.COMPLETED)
 
     def test_add_tracking_info(self):
-        """Test adding tracking information."""
         order = OrderFactory()
         order.status = OrderStatus.PROCESSING.value
         order.save()

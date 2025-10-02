@@ -3,6 +3,14 @@
 
 
 
+## v1.35.0 (2025-10-02)
+
+### Features
+
+* feat: Add auto-approve option for blog comments
+
+Introduces BLOG_COMMENT_AUTO_APPROVE environment variable and setting to allow automatic approval of new blog comments. Updates the comment serializer to set approved status based on this setting. Also updates several dependencies: boto3, botocore, django, and django-phonenumber-field, and increases CONN_MAX_AGE to 600. ([`ccbe74a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ccbe74abe562d471228eaf55a3747fea5930ce0a))
+
 ## v1.34.1 (2025-10-02)
 
 ### Bug fixes

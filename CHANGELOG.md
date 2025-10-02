@@ -3,6 +3,20 @@
 
 
 
+## v1.34.1 (2025-10-02)
+
+### Bug fixes
+
+* fix: Reduce REST API default page size to 12
+
+Changed the REST_FRAMEWORK PAGE_SIZE setting from 52 to 12 to provide smaller paginated responses by default. ([`9dac1e8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9dac1e868e4d00cf6c5f3c6277999e8c3d2fbc8d))
+
+### Chores
+
+* chore: order API schemas and update Celery settings
+
+Replaced several order-related request schemas in the OpenAPI spec with more specific types, removed payment/refund endpoints and related schemas, and added new request objects for tracking, canceling, and updating order status. Updated Celery configuration in settings.py for improved reliability, task handling, and resource management. ([`5fe74f4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5fe74f41e2458b4818ebc04a4214224dec205382))
+
 ## v1.34.0 (2025-10-01)
 
 ### Bug fixes

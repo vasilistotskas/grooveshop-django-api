@@ -14,12 +14,12 @@ classifiers = [
 ]
 dependencies = [
   "asgiref==3.9.2",
-  "boto3==1.40.42",
+  "boto3==1.40.43",
   "charset_normalizer==3.4.3",
   "channels[daphne]==4.3.1",
   "channels-redis==4.3.0",
   "cryptography==46.0.2",
-  "django==5.2.6",
+  "django==5.2.7",
   "django-admin-thumbnails==0.2.9",
   "django-allauth==65.11.2",
   "django-csp==4.0",
@@ -34,7 +34,7 @@ dependencies = [
   "django-mptt==0.18.0",
   "django-parler==2.3.0",
   "django-parler-rest==2.2.0",
-  "django-phonenumber-field==8.1.0",
+  "django-phonenumber-field==8.2.0",
   "django-rosetta==0.10.2",
   "django-rest-knox==5.0.2",
   "django-storages==1.14.6",

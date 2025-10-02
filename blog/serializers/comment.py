@@ -266,6 +266,12 @@ class BlogCommentWriteSerializer(
     def create(self, validated_data: Any) -> BlogComment:
         if "user" not in validated_data:
             validated_data["user"] = self.context["request"].user
+
+        from django.conf import settings
+
+        if getattr(settings, "BLOG_COMMENT_AUTO_APPROVE", False):
+            validated_data["approved"] = True
+
         return super().create(validated_data)
 
     class Meta:

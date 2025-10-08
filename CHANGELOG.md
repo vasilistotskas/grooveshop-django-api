@@ -3,6 +3,14 @@
 
 
 
+## v1.37.0 (2025-10-08)
+
+### Features
+
+* feat: Add Meilisearch management commands and update dependencies
+
+Introduces Django management commands for inspecting, reindexing, and updating Meilisearch indices. Also updates several dependencies in pyproject.toml, including boto3, django-phonenumber-field, django-stubs, django-stubs-ext, Faker, and ruff. ([`69f8469`](https://github.com/vasilistotskas/grooveshop-django-api/commit/69f846977624b020e3a540eaa82160cb776a9348))
+
 ## v1.36.0 (2025-10-08)
 
 ### Bug fixes

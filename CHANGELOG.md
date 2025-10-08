@@ -3,6 +3,18 @@
 
 
 
+## v1.36.0 (2025-10-08)
+
+### Bug fixes
+
+* fix: order test missing payment id ([`4a25a59`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4a25a59c81854ff8b98301c0326fcc1578e5410e))
+
+### Features
+
+* feat: Add multilanguage search support and remove CSP package
+
+Introduces multilanguage search capabilities for products and blog posts, including new utility functions and API parameter changes (language -> language_code). Adds and updates synonym lists for English, Greek, and German in search models. Removes Content Security Policy (CSP) middleware, settings, and related views/tests. Updates dependencies and MeiliSearch queryset to support locale filtering. Adds comprehensive integration and unit tests for multilanguage search. ([`1e2a140`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1e2a14091d83acab4932287a8e92519eb8ee79bb))
+
 ## v1.35.0 (2025-10-02)
 
 ### Features

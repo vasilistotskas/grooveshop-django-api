@@ -340,7 +340,8 @@ class OrderServiceTestCase(TestCase):
     def test_refund_order_not_paid(self):
         order = OrderFactory()
         order.payment_status = PaymentStatus.PENDING
-        order.save()
+        order.payment_id = "test_payment_123"
+        order.save(update_fields=["payment_status", "payment_id"])
 
         with self.assertRaises(ValueError) as context:
             OrderService.refund_order(order=order)

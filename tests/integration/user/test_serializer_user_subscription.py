@@ -246,7 +246,7 @@ class UserSubscriptionSerializerTest(TestCase):
             status=UserSubscription.SubscriptionStatus.ACTIVE,
         )
 
-        new_metadata = {"frequency": "daily", "language": "en"}
+        new_metadata = {"frequency": "daily", "language_code": "en"}
 
         serializer = UserSubscriptionSerializer(
             subscription, data={"metadata": new_metadata}, partial=True

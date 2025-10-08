@@ -139,15 +139,32 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
             "exactness",
         ]
         synonyms = {
+            # English synonyms
             "blog": ["article", "post"],
             "article": ["blog", "post"],
             "post": ["blog", "article"],
             "tutorial": ["guide", "how-to"],
             "guide": ["tutorial", "how-to"],
             "how-to": ["tutorial", "guide"],
+            "review": ["analysis", "evaluation"],
+            "analysis": ["review", "evaluation"],
+            # Greek synonyms
+            "άρθρο": ["blog", "ανάρτηση"],
+            "ανάρτηση": ["άρθρο", "blog"],
+            "οδηγός": ["tutorial", "εγχειρίδιο"],
+            "εγχειρίδιο": ["οδηγός", "tutorial"],
+            "αξιολόγηση": ["κριτική", "ανάλυση"],
+            "κριτική": ["αξιολόγηση", "ανάλυση"],
             "υπερθέρμανση": ["καίει", "καίγεται"],
             "καίει": ["καίγεται", "υπερθέρμανση"],
             "καίγεται": ["καίει", "υπερθέρμανση"],
+            # German synonyms
+            "artikel": ["blog", "beitrag"],
+            "beitrag": ["artikel", "blog"],
+            "anleitung": ["tutorial", "leitfaden"],
+            "leitfaden": ["anleitung", "tutorial"],
+            "bewertung": ["analyse", "rezension"],
+            "rezension": ["bewertung", "analyse"],
         }
         typo_tolerance = {
             "enabled": True,

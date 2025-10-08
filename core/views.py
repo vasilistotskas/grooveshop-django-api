@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 from uuid import uuid4
@@ -48,17 +47,6 @@ class HomeView(View):
 
     def get(self, request):
         return render(request, self.template_name, {})
-
-
-@csrf_exempt
-def csp_report(request):
-    if request.method == "POST":
-        try:
-            report = json.loads(request.body.decode("utf-8"))
-            logger.warning(f"CSP Violation: {json.dumps(report, indent=2)}")
-        except json.JSONDecodeError:
-            logger.error("Failed to decode CSP report")
-    return HttpResponse(status=204)
 
 
 @csrf_exempt

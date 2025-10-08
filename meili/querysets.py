@@ -186,6 +186,10 @@ class IndexQuerySet:
         self.__attributes_to_search_on.append(*attributes)
         return self
 
+    def locales(self, *locales: str):
+        self.__locales = list(locales)
+        return self
+
     def search(self, q: str = ""):
         results = self.index.search(
             q,

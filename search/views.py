@@ -24,7 +24,7 @@ from search.serializers import (
     summary=_("Search blog posts"),
     description=_(
         "Search blog posts using MeiliSearch. Provides full-text search with "
-        "highlighting, ranking, and faceting capabilities."
+        "highlighting, ranking, and faceting capabilities. Results can be filtered by language."
     ),
     tags=["Search"],
     responses={
@@ -36,14 +36,23 @@ from search.serializers import (
             name="query",
             type=str,
             location=OpenApiParameter.QUERY,
-            description="Search query string",
+            description=_("Search query string"),
             required=True,
+        ),
+        OpenApiParameter(
+            name="language_code",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            description=_(
+                "Language code to filter results (e.g., 'en', 'el', 'de'). If not provided, searches all languages."
+            ),
+            required=False,
         ),
         OpenApiParameter(
             name="limit",
             type=int,
             location=OpenApiParameter.QUERY,
-            description="Maximum number of results to return",
+            description=_("Maximum number of results to return"),
             required=False,
             default=10,
         ),
@@ -51,7 +60,7 @@ from search.serializers import (
             name="offset",
             type=int,
             location=OpenApiParameter.QUERY,
-            description="Number of results to skip",
+            description=_("Number of results to skip"),
             required=False,
             default=0,
         ),
@@ -61,16 +70,23 @@ from search.serializers import (
 def blog_post_meili_search(request):
     query = request.query_params.get("query")
     if not query:
-        raise ValidationError({"error": "A search query is required."})
+        raise ValidationError({"error": _("A search query is required.")})
 
     limit = int(request.query_params.get("limit", 10))
     offset = int(request.query_params.get("offset", 0))
+    language_code = request.query_params.get("language_code")
 
     decoded_query = unquote(query)
 
-    enriched_results = BlogPostTranslation.meilisearch.paginate(
+    search_qs = BlogPostTranslation.meilisearch.paginate(
         limit=limit, offset=offset
-    ).search(q=decoded_query)
+    )
+
+    if language_code:
+        search_qs = search_qs.filter(language_code=language_code)
+        search_qs = search_qs.locales(language_code)
+
+    enriched_results = search_qs.search(q=decoded_query)
 
     serialized_data = []
     for result in enriched_results["results"]:
@@ -98,7 +114,7 @@ def blog_post_meili_search(request):
     summary=_("Search products"),
     description=_(
         "Search products using MeiliSearch. Provides full-text search with "
-        "highlighting, ranking, and faceting capabilities."
+        "highlighting, ranking, and faceting capabilities. Results can be filtered by language."
     ),
     tags=["Search"],
     responses={
@@ -110,14 +126,23 @@ def blog_post_meili_search(request):
             name="query",
             type=str,
             location=OpenApiParameter.QUERY,
-            description="Search query string",
+            description=_("Search query string"),
             required=True,
+        ),
+        OpenApiParameter(
+            name="language_code",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            description=_(
+                "Language code to filter results (e.g., 'en', 'el', 'de'). If not provided, searches all languages."
+            ),
+            required=False,
         ),
         OpenApiParameter(
             name="limit",
             type=int,
             location=OpenApiParameter.QUERY,
-            description="Maximum number of results to return",
+            description=_("Maximum number of results to return"),
             required=False,
             default=10,
         ),
@@ -125,7 +150,7 @@ def blog_post_meili_search(request):
             name="offset",
             type=int,
             location=OpenApiParameter.QUERY,
-            description="Number of results to skip",
+            description=_("Number of results to skip"),
             required=False,
             default=0,
         ),
@@ -135,16 +160,23 @@ def blog_post_meili_search(request):
 def product_meili_search(request):
     query = request.query_params.get("query")
     if not query:
-        raise ValidationError({"error": "A search query is required."})
+        raise ValidationError({"error": _("A search query is required.")})
 
     limit = int(request.query_params.get("limit", 10))
     offset = int(request.query_params.get("offset", 0))
+    language_code = request.query_params.get("language_code")
 
     decoded_query = unquote(query)
 
-    enriched_results = ProductTranslation.meilisearch.paginate(
+    search_qs = ProductTranslation.meilisearch.paginate(
         limit=limit, offset=offset
-    ).search(q=decoded_query)
+    )
+
+    if language_code:
+        search_qs = search_qs.filter(language_code=language_code)
+        search_qs = search_qs.locales(language_code)
+
+    enriched_results = search_qs.search(q=decoded_query)
 
     serialized_data = []
     for result in enriched_results["results"]:

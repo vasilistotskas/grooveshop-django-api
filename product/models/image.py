@@ -53,12 +53,13 @@ class ProductImage(
     def get_ordering_queryset(self):
         return self.product.images.all()
 
-    def clean(self):
-        if self.is_main:
+    def save(self, *args, **kwargs):
+        if self.is_main and self.product_id:
             ProductImage.objects.filter(
-                product=self.product, is_main=True
-            ).update(is_main=False)
-        super().clean()
+                product_id=self.product_id, is_main=True
+            ).exclude(pk=self.pk).update(is_main=False)
+
+        super().save(*args, **kwargs)
 
     @property
     def main_image_path(self) -> str:

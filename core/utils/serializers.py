@@ -139,7 +139,7 @@ def create_schema_view_config(
             ]
             default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
             language_parameter = OpenApiParameter(
-                name="language",
+                name="language_code",
                 description=_("Language code for translations (%s)")
                 % ", ".join(available_languages),
                 required=False,

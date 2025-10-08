@@ -42,7 +42,7 @@ available_languages = [
 ]
 
 LANGUAGE_PARAMETER = OpenApiParameter(
-    name="language",
+    name="language_code",
     description=_("Language code for translations (%s)")
     % ", ".join(available_languages),
     required=False,
@@ -340,8 +340,8 @@ class PaginationModelViewSet(ModelViewSet):
 class TranslationsModelViewSet(TranslationsProcessingMixin, ModelViewSet):
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        context["language"] = self.request.query_params.get(
-            "language", default_language
+        context["language_code"] = self.request.query_params.get(
+            "language_code", default_language
         )
         return context
 

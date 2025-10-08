@@ -8,7 +8,6 @@ from celery.schedules import crontab
 from corsheaders.defaults import (
     default_headers,
 )
-from csp.constants import SELF, UNSAFE_EVAL, UNSAFE_INLINE
 from django.templatetags.static import static
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
@@ -61,7 +60,6 @@ NUXT_BASE_URL = getenv("NUXT_BASE_URL", "http://localhost:3000")
 NUXT_BASE_DOMAIN = getenv("NUXT_BASE_DOMAIN", "localhost:3000")
 MEDIA_STREAM_BASE_URL = getenv("MEDIA_STREAM_BASE_URL", "http://localhost:3003")
 STATIC_BASE_URL = getenv("STATIC_BASE_URL", "http://localhost:8000")
-CSP_STATIC_BASE_URL = getenv("STATIC_BASE_URL", "http://localhost:8000")
 
 ALLOWED_HOSTS: list[str] = []
 
@@ -138,7 +136,6 @@ THIRD_PARTY_APPS = [
     "extra_settings",
     "knox",
     "simple_history",
-    "csp",
     "djstripe",
 ]
 
@@ -151,7 +148,6 @@ MIDDLEWARE = [
     "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
-    "csp.middleware.CSPMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -651,71 +647,6 @@ if DEBUG:
             "http://localhost:3000",
         ]
     )
-
-# CSP
-CONTENT_SECURITY_POLICY = {
-    "DIRECTIVES": {
-        "default-src": [
-            SELF,
-            STATIC_BASE_URL,
-            "https://static.cloudflareinsights.com",
-        ],
-        "style-src": [
-            SELF,
-            STATIC_BASE_URL,
-            UNSAFE_INLINE,
-            "https://cdn.jsdelivr.net",
-            "https://cdn.redoc.ly",
-        ],
-        "style-src-elem": [
-            SELF,
-            STATIC_BASE_URL,
-            UNSAFE_INLINE,
-            "https://fonts.googleapis.com",
-            "https://cdn.jsdelivr.net",
-            "https://cdn.redoc.ly",
-        ],
-        "script-src": [
-            SELF,
-            STATIC_BASE_URL,
-            "https://static.cloudflareinsights.com",
-            "https://cdn.jsdelivr.net",
-            "https://cdn.redoc.ly",
-            UNSAFE_EVAL,
-        ],
-        "script-src-elem": [
-            SELF,
-            STATIC_BASE_URL,
-            UNSAFE_INLINE,
-            "https://static.cloudflareinsights.com",
-            "https://cdn.jsdelivr.net",
-            "https://cdn.redoc.ly",
-            UNSAFE_EVAL,
-        ],
-        "worker-src": [
-            SELF,
-            "blob:",
-        ],
-        "img-src": [
-            SELF,
-            "data:",
-            STATIC_BASE_URL,
-            "https://cdn.jsdelivr.net",
-            "https://cdn.redoc.ly",
-        ],
-        "connect-src": [
-            SELF,
-            STATIC_BASE_URL,
-            "https://static.cloudflareinsights.com",
-        ],
-        "font-src": [SELF, STATIC_BASE_URL, "https://fonts.gstatic.com"],
-        "base-uri": [SELF],
-        "form-action": [SELF],
-        "frame-ancestors": [SELF],
-        "frame-src": [SELF, "https://www.youtube.com"],
-        "report-uri": "/csp_report/",
-    },
-}
 
 # Security Settings
 SECURE_SSL_REDIRECT = getenv("SECURE_SSL_REDIRECT", "False") == "True"

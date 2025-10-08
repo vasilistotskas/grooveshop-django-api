@@ -337,7 +337,24 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "final_price:desc",
             "exactness",
         ]
-        synonyms: dict = {}
+        synonyms = {
+            # English synonyms
+            "laptop": ["notebook", "portable computer"],
+            "notebook": ["laptop", "portable computer"],
+            "phone": ["mobile", "smartphone", "cellphone"],
+            "mobile": ["phone", "smartphone", "cellphone"],
+            "smartphone": ["phone", "mobile", "cellphone", "handy"],
+            # Greek synonyms
+            "υπολογιστής": ["κομπιούτερ", "pc"],
+            "κομπιούτερ": ["υπολογιστής", "pc"],
+            "τηλέφωνο": ["κινητό"],
+            "κινητό": ["τηλέφωνο"],
+            # German synonyms
+            "handy": ["smartphone", "mobiltelefon"],
+            "mobiltelefon": ["handy", "smartphone"],
+            "computer": ["rechner", "pc"],
+            "rechner": ["computer", "pc"],
+        }
         typo_tolerance = {
             "enabled": True,
             "minWordSizeForTypos": {"oneTypo": 3, "twoTypos": 5},

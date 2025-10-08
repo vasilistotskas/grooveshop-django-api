@@ -218,7 +218,7 @@ class ProductViewSet(BaseModelViewSet):
                 description="Product ID",
             ),
             OpenApiParameter(
-                name="language",
+                name="language_code",
                 description=_("Language code for translations (el, en, de)"),
                 required=False,
                 type=str,

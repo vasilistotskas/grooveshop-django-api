@@ -8,7 +8,6 @@ from django.test import RequestFactory, TestCase, override_settings
 from core.views import (
     HomeView,
     ManageTOTPSvgView,
-    csp_report,
     robots_txt,
     upload_image,
 )
@@ -101,71 +100,6 @@ class TestHomeView(TestCase):
             self.view.get(request)
 
             mock_render.assert_called_once_with(request, "home.html", {})
-
-
-class TestCSPReport(TestCase):
-    def setUp(self):
-        self.factory = RequestFactory()
-
-    def test_get_request(self):
-        request = self.factory.get("/csp-report/")
-
-        response = csp_report(request)
-
-        self.assertEqual(response.status_code, 204)
-
-    @patch("core.views.logger")
-    def test_post_request_valid_json(self, mock_logger):
-        report_data = {
-            "csp-report": {
-                "violated-directive": "script-src",
-                "blocked-uri": "https://evil.com/script.js",
-                "document-uri": "https://example.com/page",
-            }
-        }
-
-        request = self.factory.post(
-            "/csp-report/",
-            data=json.dumps(report_data),
-            content_type="application/json",
-        )
-
-        response = csp_report(request)
-
-        mock_logger.warning.assert_called_once()
-        call_args = mock_logger.warning.call_args[0][0]
-        self.assertIn("CSP Violation:", call_args)
-
-        self.assertEqual(response.status_code, 204)
-
-    @patch("core.views.logger")
-    def test_post_request_invalid_json(self, mock_logger):
-        request = self.factory.post(
-            "/csp-report/",
-            data="invalid json{",
-            content_type="application/json",
-        )
-
-        response = csp_report(request)
-
-        mock_logger.error.assert_called_once_with("Failed to decode CSP report")
-
-        self.assertEqual(response.status_code, 204)
-
-    @patch("core.views.logger")
-    def test_post_request_empty_body(self, mock_logger):
-        request = self.factory.post(
-            "/csp-report/", data="", content_type="application/json"
-        )
-
-        response = csp_report(request)
-
-        mock_logger.error.assert_called_once_with("Failed to decode CSP report")
-
-        self.assertEqual(response.status_code, 204)
-
-    def test_csrf_exempt_decorator(self):
-        self.assertTrue(hasattr(csp_report, "csrf_exempt"))
 
 
 class TestUploadImage(TestCase):
@@ -389,24 +323,3 @@ class TestViewsEdgeCases(TestCase):
             self.assertIsInstance(response, HttpResponse)
         except Exception as e:
             self.fail(f"robots_txt should handle request gracefully: {e}")
-
-    def test_csp_report_with_large_payload(self):
-        large_data = {
-            "csp-report": {
-                "violated-directive": "script-src",
-                "blocked-uri": "https://evil.com/script.js",
-                "document-uri": "https://example.com/page",
-                "large-data": "x" * 10000,
-            }
-        }
-
-        request = self.factory.post(
-            "/csp-report/",
-            data=json.dumps(large_data),
-            content_type="application/json",
-        )
-
-        with patch("core.views.logger"):
-            response = csp_report(request)
-
-            self.assertEqual(response.status_code, 204)

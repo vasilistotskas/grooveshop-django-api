@@ -669,7 +669,7 @@ INDEX_MAXIMUM_EXPR_COUNT = 8000
 
 DATABASES = {
     "default": {
-        "ATOMIC_REQUESTS": SYSTEM_ENV == "production",
+        "ATOMIC_REQUESTS": False,
         "CONN_HEALTH_CHECKS": SYSTEM_ENV == "production",
         "TIME_ZONE": getenv("TIME_ZONE", "Europe/Athens"),
         "ENGINE": "django.db.backends.postgresql",
@@ -678,13 +678,6 @@ DATABASES = {
         "USER": getenv("DB_USER", "postgres"),
         "PASSWORD": getenv("DB_PASSWORD", "postgres"),
         "PORT": getenv("DB_PORT", "5432"),
-        "OPTIONS": {
-            "pool": {
-                "min_size": 2,
-                "max_size": 8,
-                "timeout": 60,
-            },
-        },
     },
 }
 

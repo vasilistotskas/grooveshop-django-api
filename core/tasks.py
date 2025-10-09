@@ -12,7 +12,7 @@ from django.core import management
 from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
 from django.core.mail import send_mail
-from django.db import connections, models, transaction
+from django.db import connections, models, transaction, close_old_connections
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -183,18 +183,20 @@ def clear_duplicate_history_task(excluded_fields=None, minutes=None):
 )
 @track_task_metrics
 def clear_old_history_task(days=365):
+    close_old_connections()
+
     try:
         logger.info(
             f"Starting old history cleanup for entries older than {days} days"
         )
 
         command_args = ["clean_old_history"]
-
         if days is not None:
             command_args.extend(["--days", str(days)])
-
         command_args.append("--auto")
-        management.call_command(*command_args)
+
+        with transaction.atomic():
+            management.call_command(*command_args)
 
         logger.info(
             f"Successfully cleaned history entries older than {days} days"
@@ -214,6 +216,8 @@ def clear_old_history_task(days=365):
     except Exception:
         logger.exception("Unexpected error in clear_old_history")
         raise
+    finally:
+        close_old_connections()
 
 
 @celery_app.task(

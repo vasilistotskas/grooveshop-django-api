@@ -9,6 +9,8 @@ from django.test import TestCase
 from core import celery
 from core.tasks import clear_development_log_files_task
 
+_real_path_exists = os.path.exists
+
 
 class CeleryConfigTestCase(TestCase):
     @patch("core.celery.Celery")
@@ -63,15 +65,10 @@ class CleanupLogFilesTaskTest(TestCase):
             "KUBERNETES_SERVICE_HOST": None,
         }.get(key, default)
 
-        def mock_exists_side_effect(path):
-            if path == "/.dockerenv":
+        def mock_exists_side_effect(check_path):
+            if check_path == "/.dockerenv":
                 return True
-            elif str(path).endswith("logs"):
-                return True
-            else:
-                import pathlib
-
-                return pathlib.Path(path).exists()
+            return _real_path_exists(check_path)
 
         mock_exists.side_effect = mock_exists_side_effect
 
@@ -87,15 +84,10 @@ class CleanupLogFilesTaskTest(TestCase):
             "KUBERNETES_SERVICE_HOST": None,
         }.get(key, default)
 
-        def mock_exists_side_effect(path):
-            if path == "/.dockerenv":
+        def mock_exists_side_effect(check_path):
+            if check_path == "/.dockerenv":
                 return True
-            elif str(path).endswith("logs"):
-                return True
-            else:
-                import pathlib
-
-                return pathlib.Path(path).exists()
+            return _real_path_exists(check_path)
 
         mock_exists.side_effect = mock_exists_side_effect
 

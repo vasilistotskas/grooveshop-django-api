@@ -65,7 +65,12 @@ class ImageAndSvgField(ImageField):
             if err.code != "invalid_image":
                 raise
 
-            if not self.is_svg(data):
+            try:
+                is_svg_valid = self.is_svg(data)
+            except ValidationError:
+                raise
+
+            if not is_svg_valid:
                 raise ValidationError(
                     _(
                         "Upload a valid image. The file you uploaded was either not an image or a corrupted image."
@@ -138,4 +143,4 @@ class ImageAndSvgField(ImageField):
                     else:
                         f.seek(0)
                 except OSError:
-                    return False
+                    pass

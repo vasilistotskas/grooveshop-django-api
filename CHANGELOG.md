@@ -3,6 +3,14 @@
 
 
 
+## v1.38.0 (2025-10-09)
+
+### Features
+
+* feat: Upgrade to Python 3.14 and update dependencies
+
+Bump Python version to 3.14.0 across Dockerfiles, config, and documentation. Update development dependencies: add pydantic 2.12.0, rpds-py 0.27.1, and msgpack 1.1.2. Improve image and SVG validation logic, refactor Celery task database connection handling, and simplify test mocks. Remove custom database pool options and set ATOMIC_REQUESTS to False in settings. ([`b8c4c76`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b8c4c764ca084c2ea0dd46393046977857322117))
+
 ## v1.37.0 (2025-10-08)
 
 ### Features

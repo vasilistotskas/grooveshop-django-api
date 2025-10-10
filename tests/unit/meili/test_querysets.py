@@ -52,10 +52,10 @@ class TestIndexQuerySet:
         assert queryset._IndexQuerySet__attributes_to_highlight == ["*"]
         assert queryset._IndexQuerySet__highlight_pre_tag == "<mark>"
         assert queryset._IndexQuerySet__highlight_post_tag == "</mark>"
-        assert not queryset._IndexQuerySet__show_matches_position
+        assert queryset._IndexQuerySet__show_matches_position
         assert queryset._IndexQuerySet__sort == []
         assert queryset._IndexQuerySet__matching_strategy == "last"
-        assert not queryset._IndexQuerySet__show_ranking_score
+        assert queryset._IndexQuerySet__show_ranking_score
         assert queryset._IndexQuerySet__attributes_to_search_on == ["*"]
         assert queryset._IndexQuerySet__locales == []
 
@@ -477,7 +477,10 @@ class TestIndexQuerySet:
         mock_obj1.pk = 1
         mock_obj2 = MagicMock()
         mock_obj2.pk = 2
-        MockModel.objects.filter.return_value = [mock_obj1, mock_obj2]
+
+        mock_queryset = MagicMock()
+        mock_queryset.order_by.return_value = [mock_obj1, mock_obj2]
+        MockModel.objects.filter.return_value = mock_queryset
 
         queryset = IndexQuerySet(MockModel)
         results = queryset.search("test query")
@@ -494,10 +497,10 @@ class TestIndexQuerySet:
             "attributesToHighlight": ["*"],
             "highlightPreTag": "<mark>",
             "highlightPostTag": "</mark>",
-            "showMatchesPosition": False,
+            "showMatchesPosition": True,
             "sort": [],
             "matchingStrategy": "last",
-            "showRankingScore": False,
+            "showRankingScore": True,
             "attributesToSearchOn": ["*"],
             "locales": [],
         }
@@ -520,7 +523,10 @@ class TestIndexQuerySet:
 
         mock_search_results = {"hits": [], "estimatedTotalHits": 0}
         self.mock_index.search.return_value = mock_search_results
-        MockModel.objects.filter.return_value = []
+
+        mock_queryset = MagicMock()
+        mock_queryset.order_by.return_value = []
+        MockModel.objects.filter.return_value = mock_queryset
 
         queryset = IndexQuerySet(MockModel)
         _ = queryset.search()
@@ -547,7 +553,10 @@ class TestIndexQuerySet:
 
         mock_obj = MagicMock()
         mock_obj.pk = 1
-        MockModel.objects.filter.return_value = [mock_obj]
+
+        mock_queryset = MagicMock()
+        mock_queryset.order_by.return_value = [mock_obj]
+        MockModel.objects.filter.return_value = mock_queryset
 
         queryset = IndexQuerySet(MockModel)
         queryset.filter(category="electronics", price__gte=100)

@@ -59,9 +59,9 @@ class IndexMixin(models.Model):
         primary_key: str = "pk"
         include_pk_in_search: bool = False
 
-    def __init_subclass__(cls) -> None:
-        index_name = getattr(cls.MeiliMeta, "index_name", cls.__name__)
-        primary_key = getattr(cls.MeiliMeta, "primary_key", "pk")
+    @classmethod
+    def get_meili_settings(cls) -> MeiliIndexSettings:
+        """Extract MeiliIndexSettings from the model's MeiliMeta configuration."""
         displayed_fields = getattr(cls.MeiliMeta, "displayed_fields", None)
         searchable_fields = getattr(cls.MeiliMeta, "searchable_fields", None)
         filterable_fields = getattr(cls.MeiliMeta, "filterable_fields", None)
@@ -74,41 +74,70 @@ class IndexMixin(models.Model):
         faceting = getattr(cls.MeiliMeta, "faceting", None)
         pagination = getattr(cls.MeiliMeta, "pagination", None)
         supports_geo = getattr(cls.MeiliMeta, "supports_geo", False)
-        include_pk_in_search = getattr(
-            cls.MeiliMeta, "include_pk_in_search", False
-        )
 
         if supports_geo:
             filterable_fields = ("_geo",) + (filterable_fields or ())
             sortable_fields = ("_geo",) + (sortable_fields or ())
 
+        return MeiliIndexSettings(
+            displayed_fields=displayed_fields,
+            searchable_fields=searchable_fields,
+            filterable_fields=filterable_fields,
+            sortable_fields=sortable_fields,
+            ranking_rules=ranking_rules,
+            stop_words=stop_words,
+            synonyms=synonyms,
+            distinct_attribute=distinct_attribute,
+            typo_tolerance=typo_tolerance,
+            faceting=faceting,
+            pagination=pagination,
+        )
+
+    @classmethod
+    def update_meili_settings(cls) -> None:
+        """Update Meilisearch index settings from the model's MeiliMeta configuration."""
+        index_name = cls._meilisearch["index_name"]
+        index_settings = cls.get_meili_settings()
+
+        _client.with_settings(
+            index_name=index_name,
+            index_settings=index_settings,
+        )
+
+        if _client.tasks:
+            for task in _client.tasks:
+                task_uid = getattr(task, "task_uid", None) or getattr(
+                    task, "uid", None
+                )
+                if task_uid:
+                    finished = _client.wait_for_task(task_uid)
+                    if finished.status == "failed":
+                        raise Exception(finished.error)
+            _client.flush_tasks()
+
+    def __init_subclass__(cls) -> None:
+        index_name = getattr(cls.MeiliMeta, "index_name", cls.__name__)
+        primary_key = getattr(cls.MeiliMeta, "primary_key", "pk")
+        supports_geo = getattr(cls.MeiliMeta, "supports_geo", False)
+        include_pk_in_search = getattr(
+            cls.MeiliMeta, "include_pk_in_search", False
+        )
+
+        index_settings = cls.get_meili_settings()
+
         if settings.MEILISEARCH.get("OFFLINE", False):
             cls._meilisearch = _Meili(
                 primary_key=primary_key,
                 index_name=index_name,
-                displayed_fields=displayed_fields,
-                searchable_fields=searchable_fields,
-                filterable_fields=filterable_fields,
-                sortable_fields=sortable_fields,
+                displayed_fields=index_settings.displayed_fields,
+                searchable_fields=index_settings.searchable_fields,
+                filterable_fields=index_settings.filterable_fields,
+                sortable_fields=index_settings.sortable_fields,
                 supports_geo=supports_geo,
                 include_pk_in_search=include_pk_in_search,
                 tasks=[],
             )
         else:
-            index_settings = MeiliIndexSettings(
-                displayed_fields=displayed_fields,
-                searchable_fields=searchable_fields,
-                filterable_fields=filterable_fields,
-                sortable_fields=sortable_fields,
-                ranking_rules=ranking_rules,
-                stop_words=stop_words,
-                synonyms=synonyms,
-                distinct_attribute=distinct_attribute,
-                typo_tolerance=typo_tolerance,
-                faceting=faceting,
-                pagination=pagination,
-            )
-
             try:
                 _client.create_index(index_name, primary_key).with_settings(
                     index_name=index_name,
@@ -121,10 +150,10 @@ class IndexMixin(models.Model):
         cls._meilisearch = _Meili(
             primary_key=primary_key,
             index_name=index_name,
-            displayed_fields=displayed_fields,
-            searchable_fields=searchable_fields,
-            filterable_fields=filterable_fields,
-            sortable_fields=sortable_fields,
+            displayed_fields=index_settings.displayed_fields,
+            searchable_fields=index_settings.searchable_fields,
+            filterable_fields=index_settings.filterable_fields,
+            sortable_fields=index_settings.sortable_fields,
             supports_geo=supports_geo,
             include_pk_in_search=include_pk_in_search,
             tasks=[task for task in _client.tasks],

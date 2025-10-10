@@ -56,10 +56,10 @@ class TestMultilanguageSearch:
         mock_obj1.pk = 1
         mock_obj2 = MagicMock()
         mock_obj2.pk = 2
-        MockTranslationModel.objects.filter.return_value = [
-            mock_obj1,
-            mock_obj2,
-        ]
+
+        mock_queryset = MagicMock()
+        mock_queryset.order_by.return_value = [mock_obj1, mock_obj2]
+        MockTranslationModel.objects.filter.return_value = mock_queryset
 
         queryset = IndexQuerySet(MockTranslationModel)
         queryset.filter(language_code="en")
@@ -81,7 +81,10 @@ class TestMultilanguageSearch:
 
         mock_obj = MagicMock()
         mock_obj.pk = 1
-        MockTranslationModel.objects.filter.return_value = [mock_obj]
+
+        mock_queryset = MagicMock()
+        mock_queryset.order_by.return_value = [mock_obj]
+        MockTranslationModel.objects.filter.return_value = mock_queryset
 
         queryset = IndexQuerySet(MockTranslationModel)
         queryset.locales("el")
@@ -97,7 +100,10 @@ class TestMultilanguageSearch:
 
         mock_search_results = {"hits": [], "estimatedTotalHits": 0}
         self.mock_index.search.return_value = mock_search_results
-        MockTranslationModel.objects.filter.return_value = []
+
+        mock_queryset = MagicMock()
+        mock_queryset.order_by.return_value = []
+        MockTranslationModel.objects.filter.return_value = mock_queryset
 
         queryset = IndexQuerySet(MockTranslationModel)
         queryset.locales("en", "el", "de")
@@ -127,11 +133,10 @@ class TestMultilanguageSearch:
         mock_obj2.pk = 2
         mock_obj3 = MagicMock()
         mock_obj3.pk = 3
-        MockTranslationModel.objects.filter.return_value = [
-            mock_obj1,
-            mock_obj2,
-            mock_obj3,
-        ]
+
+        mock_queryset = MagicMock()
+        mock_queryset.order_by.return_value = [mock_obj1, mock_obj2, mock_obj3]
+        MockTranslationModel.objects.filter.return_value = mock_queryset
 
         queryset = IndexQuerySet(MockTranslationModel)
         results = queryset.search("test")
@@ -151,7 +156,10 @@ class TestMultilanguageSearch:
 
         mock_obj = MagicMock()
         mock_obj.pk = 1
-        MockTranslationModel.objects.filter.return_value = [mock_obj]
+
+        mock_queryset = MagicMock()
+        mock_queryset.order_by.return_value = [mock_obj]
+        MockTranslationModel.objects.filter.return_value = mock_queryset
 
         queryset = IndexQuerySet(MockTranslationModel)
         queryset.filter(language_code="el").locales("el")
@@ -174,7 +182,10 @@ class TestMultilanguageSearch:
 
         mock_obj = MagicMock()
         mock_obj.pk = 1
-        MockTranslationModel.objects.filter.return_value = [mock_obj]
+
+        mock_queryset = MagicMock()
+        mock_queryset.order_by.return_value = [mock_obj]
+        MockTranslationModel.objects.filter.return_value = mock_queryset
 
         queryset = IndexQuerySet(MockTranslationModel)
         queryset.filter(language_code="en", active=True, likes_count__gte=10)
@@ -204,7 +215,10 @@ class TestMultilanguageSearch:
 
         mock_obj = MagicMock()
         mock_obj.pk = 1
-        MockTranslationModel.objects.filter.return_value = [mock_obj]
+
+        mock_queryset = MagicMock()
+        mock_queryset.order_by.return_value = [mock_obj]
+        MockTranslationModel.objects.filter.return_value = mock_queryset
 
         queryset = IndexQuerySet(MockTranslationModel)
         queryset.filter(language_code="el").locales("el")
@@ -233,7 +247,10 @@ class TestMultilanguageSearch:
 
         mock_obj = MagicMock()
         mock_obj.pk = 1
-        MockTranslationModel.objects.filter.return_value = [mock_obj]
+
+        mock_queryset = MagicMock()
+        mock_queryset.order_by.return_value = [mock_obj]
+        MockTranslationModel.objects.filter.return_value = mock_queryset
 
         queryset = IndexQuerySet(MockTranslationModel)
         queryset.filter(language_code="de").locales("de")
@@ -256,7 +273,10 @@ class TestMultilanguageSearch:
 
         mock_obj = MagicMock()
         mock_obj.pk = 1
-        MockTranslationModel.objects.filter.return_value = [mock_obj]
+
+        mock_queryset = MagicMock()
+        mock_queryset.order_by.return_value = [mock_obj]
+        MockTranslationModel.objects.filter.return_value = mock_queryset
 
         queryset = IndexQuerySet(MockTranslationModel)
         queryset.filter(language_code="en")

@@ -35,6 +35,10 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         Model = self._resolve_model(options["model"])
+
+        self.stdout.write(f"Updating settings for {options['model']}...")
+        self._update_settings(Model)
+
         tasks = []
         for qs in batch_qs(Model.objects.all(), options["batch_size"]):
             tasks.append(
@@ -52,6 +56,10 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(f"Synced index for {options['model']}")
         )
+
+    def _update_settings(self, Model):
+        """Update settings for a single model's index using the model's method."""
+        Model.update_meili_settings()
 
     def _serialize(self, model: IndexMixin) -> dict:
         serialized = model.meili_serialize()

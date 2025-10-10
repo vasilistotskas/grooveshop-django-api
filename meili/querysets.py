@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING, Literal, NamedTuple
 
 from meili._client import client
+from django.db.models import Case, When
 
 if TYPE_CHECKING:
     from .models import IndexMixin
@@ -37,10 +38,10 @@ class IndexQuerySet:
         self.__attributes_to_highlight: list[str] = ["*"]
         self.__highlight_pre_tag: str = "<mark>"
         self.__highlight_post_tag: str = "</mark>"
-        self.__show_matches_position: bool = False
+        self.__show_matches_position: bool = True
         self.__sort: list[str] = []
         self.__matching_strategy: Literal["last", "all"] = "last"
-        self.__show_ranking_score: bool = False
+        self.__show_ranking_score: bool = True
         self.__attributes_to_search_on: list[str] = ["*"]
         self.__locales: list[str] = []
 
@@ -216,8 +217,12 @@ class IndexQuerySet:
 
         id_field = getattr(self.model.MeiliMeta, "primary_key", "id")
         hits = results.get("hits", [])
-        filtered_objects = self.model.objects.filter(
-            pk__in=[hit[id_field] for hit in hits]
+        pk_list = [hit[id_field] for hit in hits]
+        preserved_order = Case(
+            *[When(pk=pk, then=pos) for pos, pk in enumerate(pk_list)]
+        )
+        filtered_objects = self.model.objects.filter(pk__in=pk_list).order_by(
+            preserved_order
         )
 
         enriched_results = []

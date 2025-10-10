@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 from django.core.management import call_command
 from django.test import TestCase
 
-from core.management.commands.clear_meilisearch import Command
+from meili.management.commands.meilisearch_drop import Command
 
 
 class TestClearMeiliSearchCommand(TestCase):
@@ -17,9 +17,9 @@ class TestClearMeiliSearchCommand(TestCase):
             == "Clears all MeiliSearch indexes and data (equivalent to clearing the MeiliSearch database)"
         )
 
-    @patch("core.management.commands.clear_meilisearch._client")
+    @patch("meili.management.commands.meilisearch_drop._client")
     @patch("builtins.input", return_value="yes")
-    def test_clear_meilisearch_success(self, mock_input, mock_client):
+    def test_meilisearch_drop_success(self, mock_input, mock_client):
         mock_index1 = MagicMock()
         mock_index1.uid = "test_index_1"
         mock_index2 = MagicMock()
@@ -36,7 +36,7 @@ class TestClearMeiliSearchCommand(TestCase):
         mock_client.wait_for_task.return_value = mock_finished_task
 
         output = StringIO()
-        call_command("clear_meilisearch", stdout=output)
+        call_command("meilisearch_drop", stdout=output)
 
         output_content = output.getvalue()
         assert "Found 2 indexes to delete" in output_content
@@ -44,28 +44,28 @@ class TestClearMeiliSearchCommand(TestCase):
         assert "Deleted index: test_index_2" in output_content
         assert "Successfully deleted 2 indexes" in output_content
 
-    @patch("core.management.commands.clear_meilisearch._client")
-    def test_clear_meilisearch_force_flag(self, mock_client):
+    @patch("meili.management.commands.meilisearch_drop._client")
+    def test_meilisearch_drop_force_flag(self, mock_client):
         mock_client.get_indexes.return_value = []
 
         output = StringIO()
-        call_command("clear_meilisearch", "--force", stdout=output)
+        call_command("meilisearch_drop", "--force", stdout=output)
 
         output_content = output.getvalue()
         assert "No indexes found in MeiliSearch" in output_content
 
-    @patch("core.management.commands.clear_meilisearch._client")
+    @patch("meili.management.commands.meilisearch_drop._client")
     @patch("builtins.input", return_value="no")
-    def test_clear_meilisearch_cancelled(self, mock_input, mock_client):
+    def test_meilisearch_drop_cancelled(self, mock_input, mock_client):
         output = StringIO()
-        call_command("clear_meilisearch", stdout=output)
+        call_command("meilisearch_drop", stdout=output)
 
         output_content = output.getvalue()
         assert "Operation cancelled" in output_content
 
-    @patch("core.management.commands.clear_meilisearch._client")
+    @patch("meili.management.commands.meilisearch_drop._client")
     @patch("builtins.input", return_value="yes")
-    def test_clear_meilisearch_with_failed_deletion(
+    def test_meilisearch_drop_with_failed_deletion(
         self, mock_input, mock_client
     ):
         mock_index = MagicMock()
@@ -83,7 +83,7 @@ class TestClearMeiliSearchCommand(TestCase):
 
         output = StringIO()
         stderr = StringIO()
-        call_command("clear_meilisearch", stdout=output, stderr=stderr)
+        call_command("meilisearch_drop", stdout=output, stderr=stderr)
 
         stderr_content = stderr.getvalue()
         assert (
@@ -91,22 +91,22 @@ class TestClearMeiliSearchCommand(TestCase):
             in stderr_content
         )
 
-    @patch("core.management.commands.clear_meilisearch._client")
+    @patch("meili.management.commands.meilisearch_drop._client")
     @patch("builtins.input", return_value="yes")
-    def test_clear_meilisearch_with_exception(self, mock_input, mock_client):
+    def test_meilisearch_drop_with_exception(self, mock_input, mock_client):
         mock_client.get_indexes.side_effect = Exception("Connection error")
 
         output = StringIO()
         stderr = StringIO()
-        call_command("clear_meilisearch", stdout=output, stderr=stderr)
+        call_command("meilisearch_drop", stdout=output, stderr=stderr)
 
         stderr_content = stderr.getvalue()
         assert "Error clearing MeiliSearch: Connection error" in stderr_content
 
-    @patch("core.management.commands.clear_meilisearch._client")
-    @patch("core.management.commands.clear_meilisearch.apps")
+    @patch("meili.management.commands.meilisearch_drop._client")
+    @patch("meili.management.commands.meilisearch_drop.apps")
     @patch("builtins.input", return_value="yes")
-    def test_clear_meilisearch_with_recreate(
+    def test_meilisearch_drop_with_recreate(
         self, mock_input, mock_apps, mock_client
     ):
         mock_index = MagicMock()
@@ -136,7 +136,7 @@ class TestClearMeiliSearchCommand(TestCase):
         mock_apps.get_app_configs.return_value = [mock_app_config]
 
         output = StringIO()
-        call_command("clear_meilisearch", "--recreate", stdout=output)
+        call_command("meilisearch_drop", "--recreate", stdout=output)
 
         output_content = output.getvalue()
         assert "Recreating indexes..." in output_content

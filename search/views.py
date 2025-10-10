@@ -11,6 +11,7 @@ from rest_framework.response import Response
 
 from blog.models.post import BlogPostTranslation
 from core.api.serializers import ErrorResponseSerializer
+from core.utils.greeklish import expand_greeklish_query
 from product.models.product import ProductTranslation
 from search.serializers import (
     BlogPostMeiliSearchResponseSerializer,
@@ -77,6 +78,9 @@ def blog_post_meili_search(request):
     language_code = request.query_params.get("language_code")
 
     decoded_query = unquote(query)
+
+    if language_code == "el":
+        decoded_query = expand_greeklish_query(decoded_query, max_variants=5)
 
     search_qs = BlogPostTranslation.meilisearch.paginate(
         limit=limit, offset=offset
@@ -167,6 +171,9 @@ def product_meili_search(request):
     language_code = request.query_params.get("language_code")
 
     decoded_query = unquote(query)
+
+    if language_code == "el":
+        decoded_query = expand_greeklish_query(decoded_query, max_variants=5)
 
     search_qs = ProductTranslation.meilisearch.paginate(
         limit=limit, offset=offset

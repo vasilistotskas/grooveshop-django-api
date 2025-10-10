@@ -18,7 +18,7 @@ paths:
           type: string
         description: Cursor for pagination
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -114,7 +114,7 @@ paths:
       summary: Create a Blog Author
       parameters:
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -163,7 +163,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -199,7 +199,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -247,7 +247,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -394,7 +394,7 @@ paths:
       summary: List Blog Categories
       parameters:
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -491,7 +491,7 @@ paths:
       summary: Create a Blog Category
       parameters:
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -540,7 +540,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -576,7 +576,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -624,7 +624,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -1388,7 +1388,7 @@ paths:
           - type: boolean
         description: Filter leaf comments (no approved replies)
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -1804,7 +1804,7 @@ paths:
       summary: Create a Blog Comment
       parameters:
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -1882,7 +1882,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -1941,7 +1941,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -2018,7 +2018,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -3908,7 +3908,7 @@ paths:
           - type: boolean
         description: Filter by published status
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -4171,7 +4171,7 @@ paths:
       summary: Create a Blog Post
       parameters:
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -4250,7 +4250,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -4310,7 +4310,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -4388,7 +4388,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -5819,7 +5819,7 @@ paths:
         explode: false
         style: form
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -6116,7 +6116,7 @@ paths:
       summary: Create a Blog Tag
       parameters:
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -6195,7 +6195,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -6255,7 +6255,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -6333,7 +6333,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -6785,7 +6785,7 @@ paths:
           - type: boolean
         description: Filter items in active carts (24hr)
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -7170,7 +7170,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -7318,7 +7318,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -7599,7 +7599,7 @@ paths:
           - type: boolean
         description: Filter guest carts (True) or user carts (False)
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -8133,7 +8133,7 @@ paths:
           - type: integer
         description: Filter countries with ISO code greater than or equal to
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -8353,7 +8353,7 @@ paths:
       summary: Create a Country
       parameters:
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -8401,7 +8401,7 @@ paths:
         description: A unique value identifying this Country.
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -8436,7 +8436,7 @@ paths:
         description: A unique value identifying this Country.
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -8483,7 +8483,7 @@ paths:
         description: A unique value identifying this Country.
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -8685,7 +8685,7 @@ paths:
         explode: false
         style: form
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -9031,7 +9031,7 @@ paths:
       summary: Create a Notification User
       parameters:
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -9077,7 +9077,7 @@ paths:
           type: string
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -9110,7 +9110,7 @@ paths:
           type: string
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -9155,7 +9155,7 @@ paths:
           type: string
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -9654,7 +9654,7 @@ paths:
           - type: boolean
         description: Filter paid/unpaid orders
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -10147,7 +10147,7 @@ paths:
       summary: Create a Ταξινόμηση
       parameters:
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -10324,7 +10324,7 @@ paths:
           - type: boolean
         description: Filter by refund status
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -10802,7 +10802,7 @@ paths:
       summary: Create a Order Item
       parameters:
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -10850,7 +10850,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -10885,7 +10885,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -10932,7 +10932,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -11061,7 +11061,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -11096,7 +11096,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -11143,7 +11143,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -12391,7 +12391,7 @@ paths:
           - type: boolean
         description: Filter by online payment status
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -12571,7 +12571,7 @@ paths:
       summary: Create a Pay Way
       parameters:
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -12647,7 +12647,7 @@ paths:
           type: string
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -12704,7 +12704,7 @@ paths:
           type: string
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -12779,7 +12779,7 @@ paths:
           type: string
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -13022,7 +13022,7 @@ paths:
             - '0'
           - type: boolean
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -13381,7 +13381,7 @@ paths:
       summary: Create a Product
       parameters:
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -13430,7 +13430,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -13466,7 +13466,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -13514,7 +13514,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -13585,7 +13585,7 @@ paths:
         description: Product ID
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -13902,7 +13902,7 @@ paths:
           - type: boolean
         description: Filter root categories (no parent)
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -14136,7 +14136,7 @@ paths:
       summary: Create a Product Category
       parameters:
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -14185,7 +14185,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -14221,7 +14221,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -14269,7 +14269,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -14389,7 +14389,7 @@ paths:
           * `PROMOTIONAL` - Promotional Image
           * `SEASONAL` - Seasonal Image
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -14473,7 +14473,7 @@ paths:
       summary: Create a Product Category Image
       parameters:
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -14522,7 +14522,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -14558,7 +14558,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -14606,7 +14606,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -14782,7 +14782,7 @@ paths:
             pattern: ^-?\d+$
           - type: integer
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -14916,7 +14916,7 @@ paths:
       summary: Create a Product Favourite
       parameters:
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -14962,7 +14962,7 @@ paths:
           type: string
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -14995,7 +14995,7 @@ paths:
           type: string
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -15040,7 +15040,7 @@ paths:
           type: string
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -15206,7 +15206,7 @@ paths:
             - '0'
           - type: boolean
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -15314,7 +15314,7 @@ paths:
       summary: Create a Product Image
       parameters:
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -15363,7 +15363,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -15399,7 +15399,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -15447,7 +15447,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -15601,7 +15601,7 @@ paths:
           - type: boolean
         description: Filter by published status
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -15992,7 +15992,7 @@ paths:
       summary: Create a Product Review
       parameters:
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -16070,7 +16070,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -16130,7 +16130,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -16207,7 +16207,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -16430,7 +16430,7 @@ paths:
           type: string
         description: Cursor for pagination
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -16587,7 +16587,7 @@ paths:
       summary: Create a Region
       parameters:
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -16665,7 +16665,7 @@ paths:
         description: A unique value identifying this Region.
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -16724,7 +16724,7 @@ paths:
         description: A unique value identifying this Region.
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -16801,7 +16801,7 @@ paths:
         description: A unique value identifying this Region.
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -17056,9 +17056,16 @@ paths:
     get:
       operationId: api_v1_search_blog_post_retrieve
       description: Search blog posts using MeiliSearch. Provides full-text search
-        with highlighting, ranking, and faceting capabilities.
+        with highlighting, ranking, and faceting capabilities. Results can be filtered
+        by language.
       summary: Search blog posts
       parameters:
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+        description: Language code to filter results (e.g., 'en', 'el', 'de'). If
+          not provided, searches all languages.
       - in: query
         name: limit
         schema:
@@ -17104,9 +17111,16 @@ paths:
     get:
       operationId: api_v1_search_product_retrieve
       description: Search products using MeiliSearch. Provides full-text search with
-        highlighting, ranking, and faceting capabilities.
+        highlighting, ranking, and faceting capabilities. Results can be filtered
+        by language.
       summary: Search products
       parameters:
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+        description: Language code to filter results (e.g., 'en', 'el', 'de'). If
+          not provided, searches all languages.
       - in: query
         name: limit
         schema:
@@ -17269,7 +17283,7 @@ paths:
           type: string
         description: Filter tags with labels starting with
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -17503,7 +17517,7 @@ paths:
       summary: Create a Tag
       parameters:
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -17582,7 +17596,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -17642,7 +17656,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -17720,7 +17734,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -17893,7 +17907,7 @@ paths:
         explode: false
         style: form
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -18091,7 +18105,7 @@ paths:
       summary: Create a Tagged Item
       parameters:
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -18170,7 +18184,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -18230,7 +18244,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -18308,7 +18322,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -18425,7 +18439,7 @@ paths:
           type: string
         description: Cursor for pagination
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -18543,7 +18557,7 @@ paths:
       summary: Create a User Account
       parameters:
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -18621,7 +18635,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -18680,7 +18694,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -18757,7 +18771,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -19666,7 +19680,7 @@ paths:
           - type: boolean
         description: Filter by main address status
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -19914,7 +19928,7 @@ paths:
       summary: Create a User Address
       parameters:
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -19992,7 +20006,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -20051,7 +20065,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -20128,7 +20142,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -20351,7 +20365,7 @@ paths:
           - type: boolean
         description: Filter by confirmation status
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -20593,7 +20607,7 @@ paths:
       summary: Create a User Subscription
       parameters:
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -20641,7 +20655,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -20676,7 +20690,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -20723,7 +20737,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -20998,7 +21012,7 @@ paths:
           - type: boolean
         description: Filter by default subscription status
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -21147,7 +21161,7 @@ paths:
       summary: Create a Subscription Topic
       parameters:
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -21195,7 +21209,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -21230,7 +21244,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:
@@ -21277,7 +21291,7 @@ paths:
           - type: integer
         required: true
       - in: query
-        name: language
+        name: languageCode
         schema:
           type: string
           enum:

@@ -3,6 +3,18 @@
 
 
 
+## v1.39.0 (2025-10-10)
+
+### Bug fixes
+
+* fix: lint ([`0540d97`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0540d97553436567cf84394d80367977ec4c3b2e))
+
+### Features
+
+* feat: Improve Meilisearch commands and add Greeklish utils
+
+Moved and renamed Meilisearch management commands for clarity and modularity, consolidating sync, clear, drop, and inspect operations. Added a new Greeklish-to-Greek converter utility for search, with supporting tests. Improved Meilisearch queryset result ordering and enabled ranking score/match position in search results. Updated schema.yml to use 'languageCode' instead of 'language' for query parameters. ([`527f7b1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/527f7b1325edb2bfea01759f645893a6da811aa8))
+
 ## v1.38.0 (2025-10-09)
 
 ### Features

@@ -306,9 +306,7 @@ class TestPerformanceConsiderations:
 
     def test_default_max_variants(self):
         """Should use reasonable default for max_variants."""
-        expanded = expand_greeklish_query(
-            "krifa"
-        )
+        expanded = expand_greeklish_query("krifa")
 
         variants_count = len(expanded.split())
         assert variants_count <= 3

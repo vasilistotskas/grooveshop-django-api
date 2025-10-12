@@ -73,7 +73,7 @@ services:
 
   meilisearch:
     container_name: meilisearch
-    image: getmeili/meilisearch:v1.17.1
+    image: getmeili/meilisearch:v1.22.3
     env_file:
       - ./docker/meilisearch/.env
     volumes:

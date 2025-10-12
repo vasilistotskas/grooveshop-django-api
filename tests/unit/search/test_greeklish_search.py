@@ -310,6 +310,11 @@ class TestGreeklishVariantGeneration(TestCase):
             "ypologistis": "υπολογιστής",
             "tilefono": "τηλέφωνο",
             "internet": "ίντερνετ",
+            "fortistis": "Φορτιστής",
+            "fortisths": "Φορτιστής",
+            "othoni": "Οθόνη",
+            "kinito": "κινητό",
+            "kinhto": "κινητό",
         }
 
         for greeklish, expected_greek in test_words.items():

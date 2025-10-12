@@ -32,8 +32,8 @@ ARG GID
 ARG APP_PATH
 
 RUN apk add --no-cache \
-    postgresql16 \
-    postgresql16-client \
+    postgresql-17 \
+    postgresql-client-17 \
     gzip \
     && addgroup -g ${GID} -S app \
     && adduser -u ${UID} -S app -G app \

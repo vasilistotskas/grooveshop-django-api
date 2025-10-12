@@ -1,7 +1,7 @@
 services:
   db:
     container_name: postgresql_db
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     restart: no
     volumes:
       - postgres_data:/var/lib/postgresql/data/

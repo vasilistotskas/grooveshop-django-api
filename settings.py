@@ -41,8 +41,6 @@ INTERNAL_IPS = [
     "0.0.0.0",
 ]
 
-DATA_UPLOAD_MAX_NUMBER_FIELDS = 22500
-FILE_UPLOAD_MAX_MEMORY_SIZE = 2621440
 
 SERIALIZATION_MODULES = {"json": "djmoney.serializers"}
 
@@ -686,8 +684,8 @@ if SYSTEM_ENV == "ci":
         "default": {
             "ENGINE": "django.db.backends.postgresql",
             "NAME": "postgres",
-            "USER": getenv("DB_USER", "devuser"),
-            "PASSWORD": getenv("DB_PASSWORD", "changeme"),
+            "USER": getenv("DB_USER", "postgres"),
+            "PASSWORD": getenv("DB_PASSWORD", "postgres"),
             "HOST": "127.0.0.1",
             "PORT": "5432",
         }
@@ -1220,7 +1218,7 @@ TINYMCE_DEFAULT_CONFIG = {
 
 TINYMCE_COMPRESSOR = False
 
-DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880
+FILE_UPLOAD_MAX_MEMORY_SIZE = 2621440
 
 BLOG_COMMENT_AUTO_APPROVE = bool(getenv("BLOG_COMMENT_AUTO_APPROVE", "True"))
 

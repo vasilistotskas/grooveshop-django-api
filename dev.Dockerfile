@@ -23,8 +23,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $VERSION_CODENAME-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
-    postgresql-client-16 \
-    postgresql-16 \
+    postgresql-client-17 \
+    postgresql-17 \
     gzip \
     && addgroup --system --gid ${GID} appgroup \
     && adduser --system \

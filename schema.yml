@@ -24666,6 +24666,7 @@ components:
         user:
           type: integer
           nullable: true
+          description: User ID. Leave empty for guest orders.
         country:
           type: string
           minLength: 1
@@ -25996,6 +25997,7 @@ components:
         user:
           type: integer
           nullable: true
+          description: User ID. Leave empty for guest orders.
         country:
           type: string
           minLength: 1

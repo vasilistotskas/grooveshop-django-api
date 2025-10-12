@@ -282,3 +282,260 @@ class OrderViewSetTestCase(APITestCase):
 
         self.order1.refresh_from_db()
         self.assertEqual(self.order1.status, OrderStatus.PENDING.value)
+
+
+class GuestOrderTestCase(APITestCase):
+    """Test case for guest (unauthenticated) order functionality."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = UserAccountFactory(num_addresses=0)
+        self.admin_user = User.objects.create_user(
+            username="adminuser",
+            email="admin@example.com",
+            password="adminpassword",
+            is_staff=True,
+            is_superuser=True,
+        )
+
+        self.country = CountryFactory(num_regions=0)
+        self.region = RegionFactory(country=self.country)
+        self.pay_way = PayWayFactory()
+
+        self.product1 = ProductFactory.create(
+            stock=20, num_images=0, num_reviews=0, active=True
+        )
+        self.product2 = ProductFactory.create(
+            stock=15, num_images=0, num_reviews=0, active=True
+        )
+
+        self.checkout_url = reverse("order-list")
+        self.guest_checkout_data = {
+            "email": "guest@example.com",
+            "first_name": "Guest",
+            "last_name": "User",
+            "phone": "+12025550195",
+            "street": "Guest Street",
+            "street_number": "456",
+            "city": "GuestCity",
+            "zipcode": "54321",
+            "country": self.country.alpha_2,
+            "region": self.region.alpha,
+            "pay_way": self.pay_way.id,
+            "shipping_price": "10.00",
+            "items": [
+                {"product": self.product1.id, "quantity": 1},
+                {"product": self.product2.id, "quantity": 1},
+            ],
+        }
+
+    @patch("order.signals.order_created.send")
+    def test_guest_can_create_order(self, mock_signal):
+        """Test that a guest (unauthenticated) user can create an order."""
+        # Ensure client is not authenticated
+        self.client.force_authenticate(user=None)
+
+        response = self.client.post(
+            self.checkout_url,
+            data=json.dumps(self.guest_checkout_data),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Order.objects.count(), 1)
+
+        # Verify the order has no user associated
+        order = Order.objects.first()
+        self.assertIsNone(order.user)
+        self.assertEqual(order.email, "guest@example.com")
+        self.assertEqual(order.first_name, "Guest")
+        self.assertEqual(order.last_name, "User")
+
+        # Verify signal was called
+        self.assertTrue(mock_signal.called)
+
+    def test_guest_can_retrieve_order_by_uuid(self):
+        """Test that a guest can retrieve their order using UUID."""
+        # Create a guest order (no user)
+        guest_order = OrderFactory(user=None, email="guest@example.com")
+
+        order_uuid_url = reverse(
+            "order-retrieve-by-uuid", kwargs={"uuid": str(guest_order.uuid)}
+        )
+
+        # Unauthenticated request
+        self.client.force_authenticate(user=None)
+        response = self.client.get(order_uuid_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["uuid"], str(guest_order.uuid))
+        self.assertEqual(response.data["email"], "guest@example.com")
+        self.assertIsNone(response.data["user"])
+
+    def test_guest_cannot_retrieve_authenticated_user_order(self):
+        """Test that a guest cannot retrieve an order that belongs to a registered user."""
+        # Create an order with a user
+        user_order = OrderFactory(user=self.user, email=self.user.email)
+
+        order_uuid_url = reverse(
+            "order-retrieve-by-uuid", kwargs={"uuid": str(user_order.uuid)}
+        )
+
+        # Unauthenticated request
+        self.client.force_authenticate(user=None)
+        response = self.client.get(order_uuid_url)
+
+        # Should be forbidden since the order belongs to a registered user
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_guest_can_cancel_their_order(self):
+        """Test that a guest can cancel their own order using UUID."""
+        # Create a guest order
+        guest_order = OrderFactory(
+            user=None, email="guest@example.com", status=OrderStatus.PENDING
+        )
+
+        cancel_url = reverse("order-cancel", kwargs={"pk": guest_order.pk})
+
+        # Unauthenticated request
+        self.client.force_authenticate(user=None)
+        response = self.client.post(
+            cancel_url,
+            data=json.dumps({"reason": "Changed my mind"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        guest_order.refresh_from_db()
+        self.assertEqual(guest_order.status, OrderStatus.CANCELED)
+
+    def test_guest_cannot_cancel_authenticated_user_order(self):
+        """Test that a guest cannot cancel an order that belongs to a registered user."""
+        # Create an order with a user
+        user_order = OrderFactory(
+            user=self.user, email=self.user.email, status=OrderStatus.PENDING
+        )
+
+        cancel_url = reverse("order-cancel", kwargs={"pk": user_order.pk})
+
+        # Unauthenticated request
+        self.client.force_authenticate(user=None)
+        response = self.client.post(
+            cancel_url,
+            data=json.dumps({"reason": "Trying to cancel"}),
+            content_type="application/json",
+        )
+
+        # Should be forbidden
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        user_order.refresh_from_db()
+        self.assertEqual(user_order.status, OrderStatus.PENDING)
+
+    def test_authenticated_user_cannot_access_guest_order_by_id(self):
+        """Test that an authenticated user cannot access a guest order by ID."""
+        # Create a guest order
+        guest_order = OrderFactory(user=None, email="guest@example.com")
+
+        order_detail_url = reverse(
+            "order-detail", kwargs={"pk": guest_order.pk}
+        )
+
+        # Authenticated as a different user
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(order_detail_url)
+
+        # Should be forbidden since authenticated users need ownership
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_admin_can_access_guest_order(self):
+        """Test that admin users can access guest orders."""
+        # Create a guest order
+        guest_order = OrderFactory(user=None, email="guest@example.com")
+
+        order_detail_url = reverse(
+            "order-detail", kwargs={"pk": guest_order.pk}
+        )
+
+        # Authenticated as admin
+        self.client.force_authenticate(user=self.admin_user)
+        response = self.client.get(order_detail_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], guest_order.id)
+        self.assertIsNone(response.data["user"])
+
+    def test_guest_order_with_payment_intent(self):
+        """Test that a guest can create a payment intent for their order."""
+        # Create a guest order with Stripe payment method
+        stripe_pay_way = PayWayFactory(provider_code="stripe")
+        guest_order = OrderFactory(
+            user=None,
+            email="guest@example.com",
+            pay_way=stripe_pay_way,
+            payment_status="pending",
+        )
+
+        product = ProductFactory(stock=10)
+        guest_order.items.create(
+            product=product,
+            price=Money(
+                amount=Decimal("50.00"), currency=settings.DEFAULT_CURRENCY
+            ),
+            quantity=2,
+        )
+
+        # Refresh to get calculated totals
+        guest_order.refresh_from_db()
+
+        payment_intent_url = reverse(
+            "order-create-payment-intent", kwargs={"pk": guest_order.pk}
+        )
+
+        # Unauthenticated request
+        self.client.force_authenticate(user=None)
+
+        with patch(
+            "pay_way.services.PayWayService.process_payment"
+        ) as mock_payment:
+            mock_payment.return_value = (
+                True,
+                {
+                    "payment_id": "pi_test123",
+                    "status": "requires_payment_method",
+                    "amount": "100.00",
+                    "currency": "EUR",
+                    "provider": "stripe",
+                    "client_secret": "pi_test123_secret",
+                },
+            )
+
+            response = self.client.post(
+                payment_intent_url,
+                data=json.dumps({}),
+                content_type="application/json",
+            )
+
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertIn("payment_id", response.data)
+
+    def test_guest_cannot_list_orders(self):
+        """Test that guests cannot list orders (no access to list endpoint)."""
+        self.client.force_authenticate(user=None)
+
+        orders_url = reverse("order-list")
+        response = self.client.get(orders_url)
+
+        # Should be unauthorized
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_guest_cannot_access_my_orders(self):
+        """Test that guests cannot access my_orders endpoint."""
+        self.client.force_authenticate(user=None)
+
+        my_orders_url = reverse("order-my-orders")
+        response = self.client.get(my_orders_url)
+
+        # Should be unauthorized
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

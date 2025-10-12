@@ -304,7 +304,6 @@ def clear_development_log_files_task(days=7):
     Clean up log files in development Docker environment only.
     This task only runs in Docker development, not in Kubernetes.
     """
-    # Skip if running in Kubernetes
     if os.getenv("KUBERNETES_SERVICE_HOST"):
         logger.info("Skipping log cleanup - running in Kubernetes")
         return {
@@ -312,7 +311,6 @@ def clear_development_log_files_task(days=7):
             "reason": "kubernetes environment detected",
         }
 
-    # Skip if not in Docker
     if not os.path.exists("/.dockerenv"):
         logger.info("Skipping log cleanup - not in Docker environment")
         return {"status": "skipped", "reason": "not in docker environment"}
@@ -338,15 +336,9 @@ def clear_development_log_files_task(days=7):
             if not os.path.isfile(file_path):
                 continue
 
-            # Clean up rotated log files and backup files
-            # This includes files like: django_abc123.log.1, grooveshop_def456.log.2, etc.
-            # But preserves current active log files like: django_abc123.log
             should_cleanup = (
-                filename.endswith(".log.1")
-                or filename.endswith(".log.2")
-                or filename.endswith(".log.3")
-                or filename.endswith(".log.4")
-                or filename.endswith(".log.5")
+                filename.endswith(".log")
+                or ".log." in filename
                 or "backup" in filename.lower()
                 or filename.endswith(".bak")
                 or filename.endswith(".old")

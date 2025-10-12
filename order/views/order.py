@@ -19,7 +19,7 @@ from rest_framework.exceptions import (
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 
-from core.api.permissions import IsOwnerOrAdmin
+from core.api.permissions import IsOwnerOrAdmin, IsOwnerOrAdminOrGuest
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
@@ -253,7 +253,6 @@ class OrderViewSet(BaseModelViewSet):
         "tracking_number",
         "payment_id",
     ]
-    permission_classes = [IsOwnerOrAdmin]
 
     def get_permissions(self):
         owner_or_admin_actions = {
@@ -262,16 +261,22 @@ class OrderViewSet(BaseModelViewSet):
             "update",
             "partial_update",
             "destroy",
+            "my_orders",
+        }
+        guest_allowed_actions = {
             "retrieve_by_uuid",
             "cancel",
-            "my_orders",
             "payment_status",
+            "create_payment_intent",
+            "create_checkout_session",
         }
         admin_only_actions = {"add_tracking", "update_status", "refund_order"}
         public_actions = {"create"}
 
         if self.action in owner_or_admin_actions:
             self.permission_classes = [IsOwnerOrAdmin]
+        elif self.action in guest_allowed_actions:
+            self.permission_classes = [IsOwnerOrAdminOrGuest]
         elif self.action in admin_only_actions:
             self.permission_classes = [IsAdminUser]
         elif self.action in public_actions:
@@ -282,15 +287,39 @@ class OrderViewSet(BaseModelViewSet):
         return super().get_permissions()
 
     def check_object_permissions(self, request, obj):
-        super().check_object_permissions(request, obj)
-
-        if request.user.is_staff:
+        if (
+            request.user
+            and request.user.is_authenticated
+            and request.user.is_staff
+        ):
+            super().check_object_permissions(request, obj)
             return
 
-        if obj.user_id != request.user.id:
-            raise PermissionDenied(
-                _("You do not have permission to access this order.")
-            )
+        if obj.user_id is None:
+            guest_allowed_actions = {
+                "retrieve_by_uuid",
+                "cancel",
+                "payment_status",
+                "create_payment_intent",
+                "create_checkout_session",
+            }
+            if self.action not in guest_allowed_actions:
+                raise PermissionDenied(
+                    _("Guest orders can only be accessed via UUID.")
+                )
+            return
+
+        if request.user and request.user.is_authenticated:
+            if obj.user_id != request.user.id:
+                raise PermissionDenied(
+                    _("You do not have permission to access this order.")
+                )
+            super().check_object_permissions(request, obj)
+            return
+
+        raise PermissionDenied(
+            _("You do not have permission to access this order.")
+        )
 
     def get_object(self):
         lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
@@ -305,11 +334,15 @@ class OrderViewSet(BaseModelViewSet):
             ):
                 try:
                     uuid.UUID(order_id)
-                    return OrderService.get_order_by_uuid(order_id)
+                    obj = OrderService.get_order_by_uuid(order_id)
+                    self.check_object_permissions(self.request, obj)
+                    return obj
                 except (ValueError, TypeError):
                     pass
 
-            return OrderService.get_order_by_id(int(order_id))
+            obj = OrderService.get_order_by_id(int(order_id))
+            self.check_object_permissions(self.request, obj)
+            return obj
         except Order.DoesNotExist as e:
             raise NotFound(
                 _("Order with ID {order_id} not found").format(
@@ -535,7 +568,17 @@ class OrderViewSet(BaseModelViewSet):
         order = self.get_object()
 
         user = request.user
-        if not user.is_staff and (not order.user or order.user.id != user.id):
+
+        is_admin = user and user.is_authenticated and user.is_staff
+        is_owner = (
+            user
+            and user.is_authenticated
+            and order.user
+            and order.user.id == user.id
+        )
+        is_guest_order = order.user is None
+
+        if not (is_admin or is_owner or is_guest_order):
             raise PermissionDenied(
                 _("You do not have permission to cancel this order")
             )
@@ -555,7 +598,7 @@ class OrderViewSet(BaseModelViewSet):
                 order=order,
                 reason=cancellation_reason,
                 refund_payment=should_refund,
-                canceled_by=user.id if user.is_authenticated else None,
+                canceled_by=user.id if user and user.is_authenticated else None,
             )
 
             response_serializer_class = self.get_response_serializer()

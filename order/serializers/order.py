@@ -422,6 +422,13 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
             "tracking_number",
             "shipping_carrier",
         )
+        extra_kwargs = {
+            "user": {
+                "required": False,
+                "allow_null": True,
+                "help_text": _("User ID. Leave empty for guest orders."),
+            }
+        }
 
 
 class AddTrackingSerializer(serializers.Serializer):

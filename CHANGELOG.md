@@ -3,6 +3,14 @@
 
 
 
+## v1.42.0 (2025-10-12)
+
+### Features
+
+* feat: Upgrade to PostgreSQL 17
+
+Update all Docker and CI configurations to use PostgreSQL 17 instead of 16. ([`8a8acf7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8a8acf7cba116565a43b67ca84f2cf814f50baec))
+
 ## v1.41.0 (2025-10-12)
 
 ### Features

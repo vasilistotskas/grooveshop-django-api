@@ -3,6 +3,14 @@
 
 
 
+## v1.40.0 (2025-10-12)
+
+### Features
+
+* feat: Add guest order support and permissions for orders
+
+Introduces guest (unauthenticated) order creation and management, including a new IsOwnerOrAdminOrGuest permission class. Updates order view logic to allow guests to create, retrieve, and cancel their own orders via UUID, while restricting access to authenticated users and admins as appropriate. Enhances serializers and schema documentation for guest orders, and adds comprehensive integration tests for guest order scenarios. ([`0fdb3d6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0fdb3d66f926a1c14879482488f2b25df12c6430))
+
 ## v1.39.0 (2025-10-10)
 
 ### Bug fixes

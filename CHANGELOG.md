@@ -3,6 +3,14 @@
 
 
 
+## v1.41.0 (2025-10-12)
+
+### Features
+
+* feat: Update Meilisearch version and expand Greeklish tests
+
+Bump Meilisearch version from 1.17.1 to 1.22.3 in CI and Docker Compose. Add more Greeklish-to-Greek test cases for 'Φορτιστής', 'κινητό', and 'Οθόνη' in both integration and unit tests. Remove obsolete pagination documentation. ([`6f865ca`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6f865caa269b20a499bc04c56ac94db39ceddf8d))
+
 ## v1.40.0 (2025-10-12)
 
 ### Features

@@ -3,6 +3,12 @@
 
 
 
+## v1.43.0 (2025-10-13)
+
+### Features
+
+* feat: remove session_key from cart ([`0382682`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0382682648b8a2cc77cfba07f384d638efcfd2e3))
+
 ## v1.42.0 (2025-10-12)
 
 ### Features

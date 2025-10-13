@@ -1,5 +1,4 @@
 import importlib
-import uuid
 
 import factory
 from django.contrib.auth import get_user_model
@@ -31,7 +30,6 @@ def get_or_create_user():
 class CartFactory(factory.django.DjangoModelFactory):
     user = factory.LazyFunction(get_or_create_user)
     last_activity = factory.LazyFunction(timezone.now)
-    session_key = factory.LazyFunction(lambda: str(uuid.uuid4()))
 
     class Meta:
         model = Cart
@@ -43,7 +41,6 @@ class CartFactory(factory.django.DjangoModelFactory):
         is_guest = kwargs.pop("is_guest", False)
         if is_guest:
             kwargs["user"] = None
-            kwargs["session_key"] = kwargs.get("session_key") or fake.uuid4()
         return super()._create(model_class, *args, **kwargs)
 
     @factory.post_generation

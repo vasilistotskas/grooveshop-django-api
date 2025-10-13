@@ -1,4 +1,3 @@
-import uuid
 from typing import TYPE_CHECKING
 
 from django.contrib.auth import get_user_model
@@ -95,10 +94,7 @@ class GuestCartModelTestCase(TestCase):
         product_1: Product = products[0]
         product_2: Product = products[1]
 
-        self.session_key = str(uuid.uuid4())
-        self.cart = CartFactory(
-            user=None, session_key=self.session_key, num_cart_items=0
-        )
+        self.cart = CartFactory(user=None, num_cart_items=0)
         self.cart_item_1 = CartItemFactory(
             cart=self.cart, product=product_1, quantity=2
         )
@@ -108,11 +104,10 @@ class GuestCartModelTestCase(TestCase):
 
     def test_fields(self):
         self.assertIsNone(self.cart.user)
-        self.assertEqual(self.cart.session_key, self.session_key)
         self.assertEqual(self.cart.last_activity.date(), timezone.now().date())
 
     def test_str_representation(self):
-        expected_str = f"Guest Cart ({self.session_key[:8]}...) - Items: {self.cart.total_items} - Total: {self.cart.total_price}"
+        expected_str = f"Guest Cart {self.cart.id} - Items: {self.cart.total_items} - Total: {self.cart.total_price}"
         self.assertEqual(str(self.cart), expected_str)
 
     def test_get_items(self):
@@ -128,15 +123,12 @@ class GuestCartModelTestCase(TestCase):
         self.assertEqual(self.cart.total_items_unique, 2)
 
     def test_create_guest_cart(self):
-        session_key = str(uuid.uuid4())
-        cart = Cart.objects.create(session_key=session_key)
+        cart = Cart.objects.create()
         self.assertIsNotNone(cart)
         self.assertIsNone(cart.user)
-        self.assertEqual(cart.session_key, session_key)
 
     def test_add_item_to_guest_cart(self):
-        session_key = str(uuid.uuid4())
-        cart = Cart.objects.create(session_key=session_key)
+        cart = Cart.objects.create()
         product = ProductFactory(num_images=0, num_reviews=0)
         cart_item = CartItem.objects.create(
             cart=cart, product=product, quantity=3
@@ -144,4 +136,3 @@ class GuestCartModelTestCase(TestCase):
         self.assertEqual(cart_item.quantity, 3)
         self.assertEqual(cart_item.product, product)
         self.assertIsNone(cart_item.cart.user)
-        self.assertEqual(cart_item.cart.session_key, session_key)

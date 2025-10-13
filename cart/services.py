@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from enum import Enum, unique
 from typing import TYPE_CHECKING
 
@@ -53,10 +52,8 @@ class CartService:
     def _extract_cart_info(self):
         if hasattr(self.request, "META"):
             self.cart_id = self.request.META.get("HTTP_X_CART_ID")
-            self.session_key = self.request.META.get("HTTP_X_SESSION_KEY")
         else:
             self.cart_id = self.request.headers.get("X-Cart-Id")
-            self.session_key = self.request.headers.get("X-Session-Key")
 
         if self.cart_id:
             try:
@@ -75,10 +72,43 @@ class CartService:
             yield from self.cart_items
 
     def _initialize_cart(self):
-        self.cart = self.get_or_create_cart()
+        if self.request.user.is_authenticated and self.cart_id:
+            guest_cart = Cart.objects.filter(
+                id=self.cart_id, user__isnull=True
+            ).first()
+            if guest_cart:
+                self.cart = self.get_or_create_cart()
+            else:
+                self.cart = self.get_existing_cart()
+        else:
+            self.cart = self.get_existing_cart()
+
         self.cart_items = self.cart.get_items() if self.cart else []
         if self.cart:
             self.cart.refresh_last_activity()
+
+    def get_existing_cart(self):
+        user = self.request.user
+
+        if user.is_authenticated:
+            cart = Cart.objects.filter(user=user).first()
+
+            if cart and self.cart_id:
+                guest_cart = Cart.objects.filter(
+                    id=self.cart_id, user__isnull=True
+                ).first()
+
+                if guest_cart:
+                    self.merge_carts(guest_cart, cart)
+
+            return cart
+        else:
+            if self.cart_id:
+                return Cart.objects.filter(
+                    id=self.cart_id, user__isnull=True
+                ).first()
+
+            return None
 
     def get_or_create_cart(self):
         user = self.request.user
@@ -96,30 +126,14 @@ class CartService:
 
             return cart
         else:
-            cart = None
-
             if self.cart_id:
                 cart = Cart.objects.filter(
                     id=self.cart_id, user__isnull=True
                 ).first()
+                if cart:
+                    return cart
 
-                if (
-                    cart
-                    and self.session_key
-                    and cart.session_key != self.session_key
-                ):
-                    cart = None
-
-            if not cart and self.session_key:
-                cart = Cart.objects.filter(
-                    session_key=self.session_key, user__isnull=True
-                ).first()
-
-            if not cart:
-                session_key = self.session_key or str(uuid.uuid4())
-                cart = Cart.objects.create(session_key=session_key)
-
-            return cart
+            return Cart.objects.create(user=None)
 
     def merge_carts(self, source_cart: Cart, target_cart: Cart = None):
         if not target_cart:

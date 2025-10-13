@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-09-26 00:13+0300\n"
+"POT-Creation-Date: 2025-10-13 21:18+0300\n"
 "PO-Revision-Date: 2023-07-12 12:32+0300\n"
 "Last-Translator:   <bill@bill.gr>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -33,92 +33,84 @@ msgstr ""
 msgid "Deleted %(deleted_keys)s keys for %(class_name)s"
 msgstr ""
 
-#: .\authentication\serializers.py:73
-msgid "A user with this email already exists."
-msgstr ""
-
-#: .\authentication\serializers.py:82
-msgid "A user with this username already exists."
-msgstr ""
-
-#: .\blog\admin.py:28
+#: .\blog\admin.py:29
 msgid "Likes"
 msgstr ""
 
-#: .\blog\admin.py:52
+#: .\blog\admin.py:57
 msgid "Comments"
 msgstr ""
 
-#: .\blog\admin.py:76 .\tag\admin.py:111 .\tag\admin.py:786
+#: .\blog\admin.py:87 .\tag\admin.py:111 .\tag\admin.py:786
 #: .\tag\models\tag.py:27
 msgid "Tags"
 msgstr ""
 
-#: .\blog\admin.py:100 .\blog\admin.py:251 .\blog\admin.py:353
+#: .\blog\admin.py:117 .\blog\admin.py:277 .\blog\admin.py:379
 msgid "Posts"
 msgstr ""
 
-#: .\blog\admin.py:124
+#: .\blog\admin.py:150
 msgid "Publish Status"
 msgstr ""
 
-#: .\blog\admin.py:129
+#: .\blog\admin.py:155
 msgid "Published"
 msgstr ""
 
-#: .\blog\admin.py:130
+#: .\blog\admin.py:156
 msgid "Draft"
 msgstr ""
 
-#: .\blog\admin.py:131
+#: .\blog\admin.py:157
 msgid "Scheduled"
 msgstr ""
 
-#: .\blog\admin.py:172
+#: .\blog\admin.py:198
 msgid "Content Preview"
 msgstr ""
 
-#: .\blog\admin.py:202 .\pay_way\admin.py:181
+#: .\blog\admin.py:228 .\pay_way\admin.py:181
 msgid "Basic Information"
 msgstr ""
 
-#: .\blog\admin.py:209
+#: .\blog\admin.py:235
 msgid "Biography"
 msgstr ""
 
-#: .\blog\admin.py:216 .\blog\admin.py:412
+#: .\blog\admin.py:242 .\blog\admin.py:438
 msgid "Statistics"
 msgstr ""
 
-#: .\blog\admin.py:234 .\blog\admin.py:945 .\notification\admin.py:692
-#: .\product\admin.py:1288 .\product\admin.py:1462 .\user\admin.py:925
+#: .\blog\admin.py:260 .\blog\admin.py:977 .\notification\admin.py:698
+#: .\product\admin.py:1298 .\product\admin.py:1472 .\user\admin.py:925
 #: .\user\models\subscription.py:102
 msgid "User"
 msgstr ""
 
-#: .\blog\admin.py:242 .\blog\models\author.py:18 .\user\models\account.py:91
+#: .\blog\admin.py:268 .\blog\models\author.py:18 .\user\models\account.py:91
 msgid "Bio"
 msgstr ""
 
-#: .\blog\admin.py:263
+#: .\blog\admin.py:289
 msgid "Total Likes"
 msgstr ""
 
-#: .\blog\admin.py:275 .\blog\models\author.py:16 .\user\models\account.py:88
+#: .\blog\admin.py:301 .\blog\models\author.py:16 .\user\models\account.py:88
 msgid "Website"
 msgstr ""
 
-#: .\blog\admin.py:303 .\tag\admin.py:161
+#: .\blog\admin.py:329 .\tag\admin.py:161
 msgid "Tag Information"
 msgstr ""
 
-#: .\blog\admin.py:310 .\blog\admin.py:405 .\blog\admin.py:557
-#: .\product\admin.py:1533 .\product\admin.py:1672 .\region\admin.py:378
+#: .\blog\admin.py:336 .\blog\admin.py:431 .\blog\admin.py:583
+#: .\product\admin.py:1543 .\product\admin.py:1682 .\region\admin.py:378
 #: .\tag\admin.py:164
 msgid "Organization"
 msgstr ""
 
-#: .\blog\admin.py:327 .\blog\models\category.py:34 .\blog\models\tag.py:16
+#: .\blog\admin.py:353 .\blog\models\category.py:34 .\blog\models\tag.py:16
 #: .\contact\models.py:14 .\country\models.py:48 .\pay_way\admin.py:239
 #: .\pay_way\models.py:67 .\product\models\category.py:37
 #: .\product\models\product.py:293 .\region\models.py:19
@@ -126,184 +118,184 @@ msgstr ""
 msgid "Name"
 msgstr ""
 
-#: .\blog\admin.py:344 .\blog\admin.py:679 .\blog\admin.py:980
-#: .\notification\admin.py:412 .\notification\admin.py:649
-#: .\notification\admin.py:757 .\order\admin.py:690 .\order\models\order.py:84
-#: .\pay_way\admin.py:274 .\product\admin.py:618 .\product\admin.py:1104
-#: .\product\admin.py:1352 .\product\admin.py:1627
+#: .\blog\admin.py:370 .\blog\admin.py:711 .\blog\admin.py:1012
+#: .\notification\admin.py:412 .\notification\admin.py:655
+#: .\notification\admin.py:766 .\order\admin.py:697 .\order\models\order.py:89
+#: .\pay_way\admin.py:274 .\product\admin.py:625 .\product\admin.py:1114
+#: .\product\admin.py:1362 .\product\admin.py:1637
 #: .\product\models\review.py:29 .\tag\admin.py:278 .\user\admin.py:444
 #: .\user\admin.py:807 .\user\admin.py:962 .\user\models\subscription.py:111
 msgid "Status"
 msgstr ""
 
-#: .\blog\admin.py:384 .\product\admin.py:986
+#: .\blog\admin.py:410 .\product\admin.py:996
 msgid "Category Information"
 msgstr ""
 
-#: .\blog\admin.py:391
+#: .\blog\admin.py:417
 msgid "URL"
 msgstr ""
 
-#: .\blog\admin.py:398 .\blog\admin.py:550
+#: .\blog\admin.py:424 .\blog\admin.py:576
 msgid "Media"
 msgstr ""
 
-#: .\blog\admin.py:445 .\blog\models\category.py:24 .\blog\models\post.py:29
-#: .\product\admin.py:1119 .\product\models\category_image.py:26
+#: .\blog\admin.py:471 .\blog\models\category.py:24 .\blog\models\post.py:29
+#: .\product\admin.py:1129 .\product\models\category_image.py:26
 #: .\product\models\image.py:25 .\user\models\account.py:79
 msgid "Image"
 msgstr ""
 
-#: .\blog\admin.py:454
+#: .\blog\admin.py:480
 msgid "Direct Posts"
 msgstr ""
 
-#: .\blog\admin.py:463
+#: .\blog\admin.py:489
 msgid "Total Posts (Tree)"
 msgstr ""
 
-#: .\blog\admin.py:543 .\blog\models\comment.py:44 .\pay_way\admin.py:189
-#: .\product\admin.py:993 .\product\admin.py:1220 .\product\admin.py:1526
-#: .\product\admin.py:1665
+#: .\blog\admin.py:569 .\blog\models\comment.py:44 .\pay_way\admin.py:189
+#: .\product\admin.py:1003 .\product\admin.py:1230 .\product\admin.py:1536
+#: .\product\admin.py:1675
 msgid "Content"
 msgstr ""
 
-#: .\blog\admin.py:564
+#: .\blog\admin.py:590
 msgid "Publishing"
 msgstr ""
 
-#: .\blog\admin.py:576 .\blog\admin.py:703 .\blog\admin.py:909
-#: .\blog\admin.py:999 .\notification\admin.py:448 .\user\admin.py:482
+#: .\blog\admin.py:602 .\blog\admin.py:735 .\blog\admin.py:941
+#: .\blog\admin.py:1031 .\notification\admin.py:448 .\user\admin.py:482
 msgid "Engagement"
 msgstr ""
 
-#: .\blog\admin.py:583 .\product\admin.py:1000
+#: .\blog\admin.py:609 .\product\admin.py:1010
 msgid "SEO"
 msgstr ""
 
-#: .\blog\admin.py:590 .\cart\admin.py:496 .\notification\enum.py:30
+#: .\blog\admin.py:616 .\cart\admin.py:481 .\notification\enum.py:30
 msgid "System"
 msgstr ""
 
-#: .\blog\admin.py:613 .\blog\models\post.py:110
+#: .\blog\admin.py:645 .\blog\models\post.py:114
 #: .\notification\models\notification.py:55
 #: .\product\models\category_image.py:36 .\product\models\image.py:28
 #: .\user\models\address.py:20
 msgid "Title"
 msgstr ""
 
-#: .\blog\admin.py:629 .\notification\admin.py:363
-#: .\notification\models\notification.py:31 .\product\admin.py:466
-#: .\product\admin.py:1068 .\product\admin.py:1570 .\user\admin.py:798
+#: .\blog\admin.py:661 .\notification\admin.py:363
+#: .\notification\models\notification.py:31 .\product\admin.py:473
+#: .\product\admin.py:1078 .\product\admin.py:1580 .\user\admin.py:798
 #: .\user\models\subscription.py:30 .\vat\admin.py:235
 msgid "Category"
 msgstr ""
 
-#: .\blog\admin.py:642
+#: .\blog\admin.py:674
 msgid "Author"
 msgstr ""
 
-#: .\blog\admin.py:654 .\blog\models\post.py:49
+#: .\blog\admin.py:686 .\blog\models\post.py:49
 msgid "Featured"
 msgstr ""
 
-#: .\blog\admin.py:738
+#: .\blog\admin.py:770
 msgid "SEO Score"
 msgstr ""
 
-#: .\blog\admin.py:758
+#: .\blog\admin.py:790
 msgid "Mark selected posts as featured"
 msgstr ""
 
-#: .\blog\admin.py:766
+#: .\blog\admin.py:798
 #, python-format
 msgid "%(count)d posts were successfully marked as featured."
 msgstr ""
 
-#: .\blog\admin.py:771
+#: .\blog\admin.py:803
 msgid "Remove featured mark from selected posts"
 msgstr ""
 
-#: .\blog\admin.py:779
+#: .\blog\admin.py:811
 #, python-format
 msgid "%(count)d posts were successfully unmarked as featured."
 msgstr ""
 
-#: .\blog\admin.py:784
+#: .\blog\admin.py:816
 msgid "Publish selected posts"
 msgstr ""
 
-#: .\blog\admin.py:794
+#: .\blog\admin.py:826
 #, python-format
 msgid "%(count)d posts were successfully published."
 msgstr ""
 
-#: .\blog\admin.py:799
+#: .\blog\admin.py:831
 msgid "Unpublish selected posts"
 msgstr ""
 
-#: .\blog\admin.py:807
+#: .\blog\admin.py:839
 #, python-format
 msgid "%(count)d posts were successfully unpublished."
 msgstr ""
 
-#: .\blog\admin.py:812
+#: .\blog\admin.py:844
 msgid "Increment view count by 100"
 msgstr ""
 
-#: .\blog\admin.py:823
+#: .\blog\admin.py:855
 #, python-format
 msgid "View count increased by 100 for %(count)d posts."
 msgstr ""
 
-#: .\blog\admin.py:828
+#: .\blog\admin.py:860
 msgid "Reset view count to zero"
 msgstr ""
 
-#: .\blog\admin.py:836
+#: .\blog\admin.py:868
 #, python-format
 msgid "View count reset to zero for %(count)d posts."
 msgstr ""
 
-#: .\blog\admin.py:888
+#: .\blog\admin.py:920
 msgid "Comment Content"
 msgstr ""
 
-#: .\blog\admin.py:895
+#: .\blog\admin.py:927
 msgid "Relations"
 msgstr ""
 
-#: .\blog\admin.py:902
+#: .\blog\admin.py:934
 msgid "Moderation"
 msgstr ""
 
-#: .\blog\admin.py:963
+#: .\blog\admin.py:995
 msgid "Post"
 msgstr ""
 
-#: .\blog\admin.py:1002
+#: .\blog\admin.py:1034
 msgid "Approve selected comments"
 msgstr ""
 
-#: .\blog\admin.py:1010
+#: .\blog\admin.py:1042
 #, python-format
 msgid "%(count)d comments were successfully approved."
 msgstr ""
 
-#: .\blog\admin.py:1015
+#: .\blog\admin.py:1047
 msgid "Unapprove selected comments"
 msgstr ""
 
-#: .\blog\admin.py:1023
+#: .\blog\admin.py:1055
 #, python-format
 msgid "%(count)d comments were successfully unapproved."
 msgstr ""
 
-#: .\blog\admin.py:1028
+#: .\blog\admin.py:1060
 msgid "Mark as spam and delete"
 msgstr ""
 
-#: .\blog\admin.py:1037
+#: .\blog\admin.py:1069
 #, python-format
 msgid "%(count)d comments were marked as spam and deleted."
 msgstr ""
@@ -406,7 +398,7 @@ msgstr ""
 msgid "Filter by tree ID (MPTT internal)"
 msgstr ""
 
-#: .\blog\filters\category.py:51 .\blog\filters\post.py:58
+#: .\blog\filters\category.py:51 .\blog\filters\post.py:55
 msgid "Filter by category name (case-insensitive)"
 msgstr ""
 
@@ -559,19 +551,19 @@ msgid "Filter comments liked by specific user ID"
 msgstr ""
 
 #: .\blog\filters\comment.py:143
-msgid "Filter comments that have replies (true) or no replies (false)"
+msgid "Filter comments that have approved replies (true) or no replies (false)"
 msgstr ""
 
 #: .\blog\filters\comment.py:148
-msgid "Filter comments with at least this many replies"
+msgid "Filter comments with at least this many approved replies"
 msgstr ""
 
 #: .\blog\filters\comment.py:152
-msgid "Filter comments with at most this many replies"
+msgid "Filter comments with at most this many approved replies"
 msgstr ""
 
 #: .\blog\filters\comment.py:157
-msgid "Filter leaf comments (no replies)"
+msgid "Filter leaf comments (no approved replies)"
 msgstr ""
 
 #: .\blog\filters\comment.py:162
@@ -587,7 +579,7 @@ msgid "Order comments by most likes first"
 msgstr ""
 
 #: .\blog\filters\comment.py:178
-msgid "Order comments by most replies first"
+msgid "Order comments by most approved replies first"
 msgstr ""
 
 #: .\blog\filters\post.py:19
@@ -598,43 +590,43 @@ msgstr ""
 msgid "Filter by author email (case-insensitive)"
 msgstr ""
 
-#: .\blog\filters\post.py:30
+#: .\blog\filters\post.py:29
 msgid "Filter by minimum number of likes"
 msgstr ""
 
-#: .\blog\filters\post.py:36
-msgid "Filter by minimum number of comments"
+#: .\blog\filters\post.py:34
+msgid "Filter by minimum number of approved comments"
 msgstr ""
 
-#: .\blog\filters\post.py:42
-msgid "Filter by minimum number of tags"
+#: .\blog\filters\post.py:39
+msgid "Filter by minimum number of active tags"
 msgstr ""
 
-#: .\blog\filters\post.py:47
+#: .\blog\filters\post.py:44
 msgid "Filter by featured status"
 msgstr ""
 
-#: .\blog\filters\post.py:53
+#: .\blog\filters\post.py:50
 msgid "Filter by minimum number of views"
 msgstr ""
 
-#: .\blog\filters\post.py:63
+#: .\blog\filters\post.py:60
 msgid "Filter by tag label (case-insensitive)"
 msgstr ""
 
-#: .\blog\filters\post.py:67
+#: .\blog\filters\post.py:64
 msgid "Filter by author full name (case-insensitive)"
 msgstr ""
 
-#: .\blog\filters\post.py:73
+#: .\blog\filters\post.py:70
 msgid "Filter by category ID"
 msgstr ""
 
-#: .\blog\filters\post.py:78
+#: .\blog\filters\post.py:75
 msgid "Filter by author ID"
 msgstr ""
 
-#: .\blog\filters\post.py:83
+#: .\blog\filters\post.py:80
 msgid "Filter by tag IDs (comma-separated)"
 msgstr ""
 
@@ -721,8 +713,8 @@ msgstr ""
 msgid "Slug"
 msgstr ""
 
-#: .\blog\models\category.py:35 .\order\admin.py:305 .\order\admin.py:1396
-#: .\order\admin.py:1510 .\order\models\history.py:25
+#: .\blog\models\category.py:35 .\order\admin.py:305 .\order\admin.py:1406
+#: .\order\admin.py:1520 .\order\models\history.py:25
 #: .\order\models\history.py:230 .\pay_way\models.py:73
 #: .\product\models\category.py:38 .\product\models\product.py:294
 #: .\user\models\subscription.py:64
@@ -761,19 +753,19 @@ msgstr ""
 msgid "Blog Posts"
 msgstr ""
 
-#: .\blog\models\post.py:112
+#: .\blog\models\post.py:116
 msgid "Subtitle"
 msgstr ""
 
-#: .\blog\models\post.py:114
+#: .\blog\models\post.py:118
 msgid "Body"
 msgstr ""
 
-#: .\blog\models\post.py:120
+#: .\blog\models\post.py:124
 msgid "Blog Post Translation"
 msgstr ""
 
-#: .\blog\models\post.py:121
+#: .\blog\models\post.py:125
 msgid "Blog Post Translations"
 msgstr ""
 
@@ -795,11 +787,20 @@ msgstr ""
 msgid "Blog Tags"
 msgstr ""
 
-#: .\blog\serializers\author.py:110
+#: .\blog\serializers\author.py:36
+#: .\notification\serializers\notification.py:30
+#: .\user\serializers\account.py:105 .\user\serializers\account.py:116
+#: .\user\serializers\account.py:127 .\user\serializers\account.py:138
+#: .\user\serializers\account.py:149 .\user\serializers\account.py:160
+#: .\user\serializers\account.py:171
+msgid "URL link or empty string"
+msgstr ""
+
+#: .\blog\serializers\author.py:122
 msgid "This user already has an author profile."
 msgstr ""
 
-#: .\blog\serializers\author.py:119
+#: .\blog\serializers\author.py:131
 msgid "Website must start with http:// or https://"
 msgstr ""
 
@@ -863,7 +864,7 @@ msgid "Whether this comment is a reply to another comment"
 msgstr ""
 
 #: .\blog\serializers\comment.py:38
-msgid "Whether this comment has replies"
+msgid "Whether this comment has approved replies"
 msgstr ""
 
 #: .\blog\serializers\comment.py:41
@@ -883,7 +884,7 @@ msgid "Parent comment if this is a reply"
 msgstr ""
 
 #: .\blog\serializers\comment.py:116
-msgid "Direct child comments (replies)"
+msgid "Direct approved child comments (replies)"
 msgstr ""
 
 #: .\blog\serializers\comment.py:119
@@ -894,23 +895,23 @@ msgstr ""
 msgid "Position information in the comment tree"
 msgstr ""
 
-#: .\blog\serializers\comment.py:248 .\blog\serializers\comment.py:252
+#: .\blog\serializers\comment.py:258 .\blog\serializers\comment.py:262
 msgid "Parent comment must belong to the same post."
 msgstr ""
 
-#: .\blog\serializers\comment.py:275
+#: .\blog\serializers\comment.py:291
 msgid "List of comment IDs to check like status for"
 msgstr ""
 
-#: .\blog\serializers\comment.py:281
+#: .\blog\serializers\comment.py:297
 msgid "At least one comment ID is required."
 msgstr ""
 
-#: .\blog\serializers\comment.py:285
+#: .\blog\serializers\comment.py:301
 msgid "Cannot check more than 100 comments at once."
 msgstr ""
 
-#: .\blog\serializers\comment.py:293
+#: .\blog\serializers\comment.py:309
 msgid "List of comment IDs that are liked by the current user"
 msgstr ""
 
@@ -938,195 +939,195 @@ msgstr ""
 msgid "Sort order cannot be negative."
 msgstr ""
 
-#: .\blog\views\author.py:110
+#: .\blog\views\author.py:98
 msgid "Get author's blog posts"
 msgstr ""
 
-#: .\blog\views\author.py:112
+#: .\blog\views\author.py:100
 msgid "Retrieve all blog posts written by this author with proper pagination."
 msgstr ""
 
-#: .\blog\views\category.py:62
+#: .\blog\views\category.py:69
 msgid "Get category's blog posts"
 msgstr ""
 
-#: .\blog\views\category.py:64
+#: .\blog\views\category.py:71
 msgid ""
 "Retrieve all blog posts in this category and its subcategories. Use "
 "'recursive=true' to include posts from all descendant categories."
 msgstr ""
 
-#: .\blog\views\category.py:85
+#: .\blog\views\category.py:92
 msgid "Get category children"
 msgstr ""
 
-#: .\blog\views\category.py:86
+#: .\blog\views\category.py:93
 msgid "Get direct children of this category."
 msgstr ""
 
-#: .\blog\views\category.py:95
+#: .\blog\views\category.py:102
 msgid "Get category descendants"
 msgstr ""
 
-#: .\blog\views\category.py:97
+#: .\blog\views\category.py:104
 msgid "Get all descendants (children, grandchildren, etc.) of this category."
 msgstr ""
 
-#: .\blog\views\category.py:107
+#: .\blog\views\category.py:114
 msgid "Get category ancestors"
 msgstr ""
 
-#: .\blog\views\category.py:109
+#: .\blog\views\category.py:116
 msgid "Get all ancestors (parent, grandparent, etc.) of this category."
 msgstr ""
 
-#: .\blog\views\category.py:119
+#: .\blog\views\category.py:126
 msgid "Get category siblings"
 msgstr ""
 
-#: .\blog\views\category.py:120
+#: .\blog\views\category.py:127
 msgid "Get sibling categories (same parent level)."
 msgstr ""
 
-#: .\blog\views\category.py:129
+#: .\blog\views\category.py:136
 msgid "Get complete category tree"
 msgstr ""
 
-#: .\blog\views\category.py:131
+#: .\blog\views\category.py:138
 msgid ""
 "Get the complete category tree structure with nested relationships. This is "
 "more efficient than using list?tree=true for displaying navigation menus or "
 "category hierarchies."
 msgstr ""
 
-#: .\blog\views\category.py:142
+#: .\blog\views\category.py:149
 msgid "Reorder categories"
 msgstr ""
 
-#: .\blog\views\category.py:144
+#: .\blog\views\category.py:151
 msgid "Batch reorder categories by updating their sort_order values."
 msgstr ""
 
-#: .\blog\views\category.py:331
+#: .\blog\views\category.py:320
 msgid "Categories reordered successfully."
 msgstr ""
 
-#: .\blog\views\comment.py:146
+#: .\blog\views\comment.py:125
 msgid "Get comment replies"
 msgstr ""
 
-#: .\blog\views\comment.py:148
+#: .\blog\views\comment.py:127
 msgid "Get all replies (children) of this comment in threaded structure."
 msgstr ""
 
-#: .\blog\views\comment.py:170
+#: .\blog\views\comment.py:153
 msgid "Get comment thread"
 msgstr ""
 
-#: .\blog\views\comment.py:172
+#: .\blog\views\comment.py:155
 msgid ""
 "Get the complete thread (all ancestors and descendants) of this comment."
 msgstr ""
 
-#: .\blog\views\comment.py:192
+#: .\blog\views\comment.py:193
 msgid "Toggle comment like"
 msgstr ""
 
-#: .\blog\views\comment.py:193
+#: .\blog\views\comment.py:194
 msgid "Like or unlike a comment. Toggles the like status."
 msgstr ""
 
-#: .\blog\views\comment.py:223
+#: .\blog\views\comment.py:228
 msgid "Get comment's blog post"
 msgstr ""
 
-#: .\blog\views\comment.py:224
+#: .\blog\views\comment.py:229
 msgid "Get the blog post that this comment belongs to."
 msgstr ""
 
-#: .\blog\views\comment.py:246
+#: .\blog\views\comment.py:253
 msgid "Check bulk like status"
 msgstr ""
 
-#: .\blog\views\comment.py:248
+#: .\blog\views\comment.py:255
 msgid "Check which comments from a list are liked by the current user."
 msgstr ""
 
-#: .\blog\views\comment.py:281
+#: .\blog\views\comment.py:288
 msgid "Get current user's comments"
 msgstr ""
 
-#: .\blog\views\comment.py:283
+#: .\blog\views\comment.py:290
 msgid "Get all comments made by the currently authenticated user."
 msgstr ""
 
-#: .\blog\views\post.py:164
+#: .\blog\views\post.py:151
 msgid "Toggle post like"
 msgstr ""
 
-#: .\blog\views\post.py:165
+#: .\blog\views\post.py:152
 msgid "Like or unlike a blog post. Toggles the like status."
 msgstr ""
 
-#: .\blog\views\post.py:178
+#: .\blog\views\post.py:165
 msgid "Authentication credentials were not provided."
 msgstr ""
 
-#: .\blog\views\post.py:198
+#: .\blog\views\post.py:186
 msgid "Increment post view count"
 msgstr ""
 
-#: .\blog\views\post.py:199
+#: .\blog\views\post.py:187
 msgid "Increment the view count for a blog post."
 msgstr ""
 
-#: .\blog\views\post.py:216
+#: .\blog\views\post.py:208
 msgid "Get related posts"
 msgstr ""
 
-#: .\blog\views\post.py:217
+#: .\blog\views\post.py:209
 msgid "Get related posts for a blog post."
 msgstr ""
 
-#: .\blog\views\post.py:247
+#: .\blog\views\post.py:242
 msgid "Get liked posts"
 msgstr ""
 
-#: .\blog\views\post.py:248
+#: .\blog\views\post.py:243
 msgid "Get all posts that the authenticated user has liked."
 msgstr ""
 
-#: .\blog\views\post.py:279
+#: .\blog\views\post.py:275
 msgid "Get post comments"
 msgstr ""
 
-#: .\blog\views\post.py:280
+#: .\blog\views\post.py:276
 msgid "Get all comments for a blog post."
 msgstr ""
 
-#: .\blog\views\post.py:329
+#: .\blog\views\post.py:332
 msgid "Get trending posts"
 msgstr ""
 
-#: .\blog\views\post.py:331
+#: .\blog\views\post.py:334
 msgid ""
 "Get trending blog posts based on recent engagement metrics. Combines views, "
 "likes, and comments from recent time period."
 msgstr ""
 
-#: .\blog\views\post.py:369
+#: .\blog\views\post.py:379
 msgid "Get popular posts"
 msgstr ""
 
-#: .\blog\views\post.py:371
+#: .\blog\views\post.py:381
 msgid "Get most popular blog posts based on all-time engagement metrics."
 msgstr ""
 
-#: .\blog\views\post.py:387
+#: .\blog\views\post.py:403
 msgid "Get featured posts"
 msgstr ""
 
-#: .\blog\views\post.py:389
+#: .\blog\views\post.py:405
 msgid "Get posts marked as featured, ordered by publication date."
 msgstr ""
 
@@ -1166,9 +1167,9 @@ msgstr ""
 msgid "Old (7+ days)"
 msgstr ""
 
-#: .\cart\admin.py:129 .\cart\admin.py:543 .\notification\enum.py:26
-#: .\order\admin.py:238 .\order\admin.py:1185 .\product\admin.py:438
-#: .\product\admin.py:1272 .\product\admin.py:1478 .\product\admin.py:1713
+#: .\cart\admin.py:129 .\cart\admin.py:528 .\notification\enum.py:26
+#: .\order\admin.py:238 .\order\admin.py:1195 .\product\admin.py:445
+#: .\product\admin.py:1282 .\product\admin.py:1488 .\product\admin.py:1723
 #: .\product\models\product.py:110
 msgid "Product"
 msgstr ""
@@ -1177,96 +1178,96 @@ msgstr ""
 msgid "Unit Price"
 msgstr ""
 
-#: .\cart\admin.py:165 .\cart\admin.py:379
+#: .\cart\admin.py:165 .\cart\admin.py:365
 #: .\core\templates\admin\product\apply_discount.html:139 .\order\admin.py:254
 msgid "Total"
 msgstr ""
 
-#: .\cart\admin.py:179 .\cart\admin.py:600
+#: .\cart\admin.py:179 .\cart\admin.py:585
 msgid "Discount"
 msgstr ""
 
-#: .\cart\admin.py:229 .\cart\admin.py:282
+#: .\cart\admin.py:227 .\cart\admin.py:274
 msgid "Cart Owner"
 msgstr ""
 
-#: .\cart\admin.py:236 .\cart\admin.py:343
+#: .\cart\admin.py:234 .\cart\admin.py:329
 msgid "Activity"
 msgstr ""
 
-#: .\cart\admin.py:243
+#: .\cart\admin.py:241
 msgid "Summary"
 msgstr ""
 
-#: .\cart\admin.py:306 .\pay_way\admin.py:298 .\product\admin.py:1611
-#: .\product\admin.py:1729
+#: .\cart\admin.py:292 .\pay_way\admin.py:298 .\product\admin.py:1621
+#: .\product\admin.py:1739
 msgid "Type"
 msgstr ""
 
-#: .\cart\admin.py:356
+#: .\cart\admin.py:342
 msgid "Items"
 msgstr ""
 
-#: .\cart\admin.py:410
+#: .\cart\admin.py:396
 msgid "Cart Summary"
 msgstr ""
 
-#: .\cart\admin.py:439 .\order\admin.py:894
+#: .\cart\admin.py:425 .\order\admin.py:901
 msgid "Financial Summary"
 msgstr ""
 
-#: .\cart\admin.py:482 .\cart\models\item.py:26
+#: .\cart\admin.py:467 .\cart\models\item.py:26
 msgid "Cart Item"
 msgstr ""
 
-#: .\cart\admin.py:489
+#: .\cart\admin.py:474
 msgid "Pricing Information"
 msgstr ""
 
-#: .\cart\admin.py:526 .\cart\models\cart.py:38 .\notification\enum.py:25
+#: .\cart\admin.py:511 .\cart\models\cart.py:30 .\notification\enum.py:25
 msgid "Cart"
 msgstr ""
 
-#: .\cart\admin.py:555
+#: .\cart\admin.py:540
 msgid "Qty"
 msgstr ""
 
-#: .\cart\admin.py:586 .\order\admin.py:1221 .\pay_way\admin.py:204
-#: .\product\admin.py:322 .\product\admin.py:498
+#: .\cart\admin.py:571 .\order\admin.py:1231 .\pay_way\admin.py:204
+#: .\product\admin.py:328 .\product\admin.py:505
 msgid "Pricing"
 msgstr ""
 
-#: .\cart\admin.py:619
+#: .\cart\admin.py:604
 msgid "Pricing Breakdown"
 msgstr ""
 
-#: .\cart\admin.py:644
+#: .\cart\admin.py:629
 msgid "Savings"
 msgstr ""
 
-#: .\cart\admin.py:647
+#: .\cart\admin.py:632
 msgid "Increase quantity by 1"
 msgstr ""
 
-#: .\cart\admin.py:657
+#: .\cart\admin.py:642
 #, python-format
 msgid "Quantity increased for %(count)d items."
 msgstr ""
 
-#: .\cart\admin.py:662
+#: .\cart\admin.py:647
 msgid "Decrease quantity by 1"
 msgstr ""
 
-#: .\cart\admin.py:675
+#: .\cart\admin.py:660
 #, python-format
 msgid "Quantity decreased for %(count)d items."
 msgstr ""
 
-#: .\cart\admin.py:680
+#: .\cart\admin.py:665
 msgid "Remove from cart"
 msgstr ""
 
-#: .\cart\admin.py:689
+#: .\cart\admin.py:674
 #, python-format
 msgid "%(count)d items were removed from carts."
 msgstr ""
@@ -1283,79 +1284,67 @@ msgstr ""
 msgid "Filter by active users"
 msgstr ""
 
-#: .\cart\filters\cart.py:41
-msgid "Filter by exact session key"
-msgstr ""
-
-#: .\cart\filters\cart.py:46
-msgid "Filter by session key prefix"
-msgstr ""
-
-#: .\cart\filters\cart.py:50
-msgid "Filter carts with/without session keys"
-msgstr ""
-
-#: .\cart\filters\cart.py:55
+#: .\cart\filters\cart.py:40
 msgid "Filter guest carts (True) or user carts (False)"
 msgstr ""
 
-#: .\cart\filters\cart.py:64
+#: .\cart\filters\cart.py:49
 msgid "Filter by cart type"
 msgstr ""
 
-#: .\cart\filters\cart.py:69
+#: .\cart\filters\cart.py:54
 msgid "Filter by exact last activity date"
 msgstr ""
 
-#: .\cart\filters\cart.py:74
+#: .\cart\filters\cart.py:59
 msgid "Filter carts with last activity after this date"
 msgstr ""
 
-#: .\cart\filters\cart.py:79
+#: .\cart\filters\cart.py:64
 msgid "Filter carts with last activity before this date"
 msgstr ""
 
-#: .\cart\filters\cart.py:84
+#: .\cart\filters\cart.py:69
 msgid "Filter active/abandoned carts (based on 30-day inactivity)"
 msgstr ""
 
-#: .\cart\filters\cart.py:89
+#: .\cart\filters\cart.py:74
 msgid "Filter abandoned carts (inactive for 30+ days)"
 msgstr ""
 
-#: .\cart\filters\cart.py:93
+#: .\cart\filters\cart.py:78
 msgid "Filter carts inactive for at least X days"
 msgstr ""
 
-#: .\cart\filters\cart.py:98
+#: .\cart\filters\cart.py:83
 msgid "Filter carts that have/don't have items"
 msgstr ""
 
-#: .\cart\filters\cart.py:102
+#: .\cart\filters\cart.py:87
 msgid "Filter carts with at least X total items (quantity)"
 msgstr ""
 
-#: .\cart\filters\cart.py:106
+#: .\cart\filters\cart.py:91
 msgid "Filter carts with at most X total items (quantity)"
 msgstr ""
 
-#: .\cart\filters\cart.py:110
+#: .\cart\filters\cart.py:95
 msgid "Filter carts with at least X unique items"
 msgstr ""
 
-#: .\cart\filters\cart.py:114
+#: .\cart\filters\cart.py:99
 msgid "Filter carts with at most X unique items"
 msgstr ""
 
-#: .\cart\filters\cart.py:119
+#: .\cart\filters\cart.py:104
 msgid "Filter carts with total value at least X"
 msgstr ""
 
-#: .\cart\filters\cart.py:123
+#: .\cart\filters\cart.py:108
 msgid "Filter carts with total value at most X"
 msgstr ""
 
-#: .\cart\filters\cart.py:127
+#: .\cart\filters\cart.py:112
 msgid "Filter carts with/without discounted items"
 msgstr ""
 
@@ -1368,129 +1357,117 @@ msgid "Filter by cart UUID"
 msgstr ""
 
 #: .\cart\filters\item.py:25
-msgid "Filter by cart session key"
-msgstr ""
-
-#: .\cart\filters\item.py:30
 msgid "Filter by cart user ID"
 msgstr ""
 
-#: .\cart\filters\item.py:35
+#: .\cart\filters\item.py:30
 msgid "Filter by cart user email (partial match)"
 msgstr ""
 
-#: .\cart\filters\item.py:39
+#: .\cart\filters\item.py:34
 msgid "Filter by cart user name (first or last)"
 msgstr ""
 
-#: .\cart\filters\item.py:43
+#: .\cart\filters\item.py:38
 msgid "Filter items in guest carts"
 msgstr ""
 
-#: .\cart\filters\item.py:49 .\order\filters.py:440
+#: .\cart\filters\item.py:44 .\order\filters.py:440
 #: .\product\filters\review.py:34 .\product\filters\review.py:38
 msgid "Filter by product ID"
 msgstr ""
 
-#: .\cart\filters\item.py:53
+#: .\cart\filters\item.py:48
 msgid "Filter by product UUID"
 msgstr ""
 
-#: .\cart\filters\item.py:58
+#: .\cart\filters\item.py:53
 msgid "Filter by product sku (exact match)"
 msgstr ""
 
-#: .\cart\filters\item.py:63 .\product\filters\review.py:86
+#: .\cart\filters\item.py:58 .\product\filters\review.py:86
 msgid "Filter by product name (partial match)"
 msgstr ""
 
-#: .\cart\filters\item.py:67 .\order\filters.py:458
+#: .\cart\filters\item.py:62 .\order\filters.py:458
 #: .\product\filters\review.py:90
 msgid "Filter by product category ID"
 msgstr ""
 
-#: .\cart\filters\item.py:71
+#: .\cart\filters\item.py:66
 msgid "Filter by product category slug"
 msgstr ""
 
-#: .\cart\filters\item.py:75 .\order\filters.py:467
+#: .\cart\filters\item.py:70 .\order\filters.py:467
 #: .\product\filters\review.py:94
 msgid "Filter by product active status"
 msgstr ""
 
-#: .\cart\filters\item.py:80 .\order\filters.py:541
+#: .\cart\filters\item.py:75 .\order\filters.py:541
 msgid "Filter by exact quantity"
 msgstr ""
 
-#: .\cart\filters\item.py:85 .\order\filters.py:531
+#: .\cart\filters\item.py:80 .\order\filters.py:531
 msgid "Filter by minimum quantity"
 msgstr ""
 
-#: .\cart\filters\item.py:90 .\order\filters.py:536
+#: .\cart\filters\item.py:85 .\order\filters.py:536
 msgid "Filter by maximum quantity"
 msgstr ""
 
-#: .\cart\filters\item.py:96
+#: .\cart\filters\item.py:91
 msgid "Filter by minimum product price"
 msgstr ""
 
-#: .\cart\filters\item.py:101
+#: .\cart\filters\item.py:96
 msgid "Filter by maximum product price"
 msgstr ""
 
-#: .\cart\filters\item.py:105
+#: .\cart\filters\item.py:100
 msgid "Filter by minimum total price (quantity * price)"
 msgstr ""
 
-#: .\cart\filters\item.py:109
+#: .\cart\filters\item.py:104
 msgid "Filter by maximum total price (quantity * price)"
 msgstr ""
 
-#: .\cart\filters\item.py:114
+#: .\cart\filters\item.py:109
 msgid "Filter items with product discounts"
 msgstr ""
 
-#: .\cart\filters\item.py:119
+#: .\cart\filters\item.py:114
 msgid "Filter by minimum discount percentage"
 msgstr ""
 
-#: .\cart\filters\item.py:124
+#: .\cart\filters\item.py:119
 msgid "Filter by maximum discount percentage"
 msgstr ""
 
-#: .\cart\filters\item.py:129
+#: .\cart\filters\item.py:124
 msgid "Filter items in active carts (24hr)"
 msgstr ""
 
-#: .\cart\filters\item.py:133
+#: .\cart\filters\item.py:128
 msgid "Filter items in abandoned carts (30+ days)"
 msgstr ""
 
-#: .\cart\filters\item.py:138
+#: .\cart\filters\item.py:133
 msgid "Filter by cart last activity after date"
 msgstr ""
 
-#: .\cart\filters\item.py:143
+#: .\cart\filters\item.py:138
 msgid "Filter by cart last activity before date"
 msgstr ""
 
-#: .\cart\models\cart.py:27
-msgid "Session Key"
-msgstr ""
-
-#: .\cart\models\cart.py:30
-msgid "Session key for guest users"
-msgstr ""
-
-#: .\cart\models\cart.py:33 .\user\admin.py:494
+#: .\cart\models\cart.py:25 .\user\admin.py:494
 msgid "Last Activity"
 msgstr ""
 
-#: .\cart\models\cart.py:39
+#: .\cart\models\cart.py:31
 msgid "Carts"
 msgstr ""
 
-#: .\cart\models\item.py:21 .\order\admin.py:1207 .\order\models\item.py:28
+#: .\cart\models\item.py:21 .\order\admin.py:1217 .\order\models\item.py:28
 msgid "Quantity"
 msgstr ""
 
@@ -1498,7 +1475,7 @@ msgstr ""
 msgid "Cart Items"
 msgstr ""
 
-#: .\cart\serializers\cart.py:61
+#: .\cart\serializers\cart.py:60
 msgid "Product recommendations based on cart contents"
 msgstr ""
 
@@ -1526,7 +1503,7 @@ msgid "Product '{product_name}' is not available."
 msgstr ""
 
 #: .\cart\serializers\item.py:153 .\cart\serializers\item.py:230
-#: .\cart\serializers\item.py:297 .\order\serializers\order.py:322
+#: .\cart\serializers\item.py:297 .\order\serializers\order.py:338
 #, python-brace-format
 msgid ""
 "Not enough stock for '{product_name}'. Available: {product_stock}, "
@@ -1544,130 +1521,129 @@ msgid ""
 "{existing_item_quantity}, Available: {product_stock}"
 msgstr ""
 
-#: .\cart\views\cart.py:69
+#: .\cart\views\cart.py:61
 msgid "cart"
 msgstr ""
 
-#: .\cart\views\cart.py:70
+#: .\cart\views\cart.py:62
 msgid "carts"
 msgstr ""
 
-#: .\cart\views\cart.py:78 .\cart\views\cart.py:91
+#: .\cart\views\cart.py:70 .\cart\views\cart.py:83
 msgid "Get cart"
 msgstr ""
 
-#: .\cart\views\cart.py:80 .\cart\views\cart.py:93
+#: .\cart\views\cart.py:72 .\cart\views\cart.py:85
 msgid ""
-"Get a cart. For guest users, include X-Cart-Id and X-Session-Key headers to "
-"maintain cart session."
-msgstr ""
-
-#: .\cart\views\cart.py:104 .\cart\views\cart.py:118
-msgid "Update cart"
-msgstr ""
-
-#: .\cart\views\cart.py:106 .\cart\views\cart.py:120
-msgid ""
-"Update a cart. For guest users, include X-Cart-Id and X-Session-Key headers "
-"to maintain cart session."
-msgstr ""
-
-#: .\cart\views\cart.py:132
-msgid "Delete cart"
-msgstr ""
-
-#: .\cart\views\cart.py:134
-msgid ""
-"Delete a cart. For guest users, include X-Cart-Id and X-Session-Key headers "
-"to maintain cart session."
-msgstr ""
-
-#: .\cart\views\cart.py:146
-msgid "Create cart"
-msgstr ""
-
-#: .\cart\views\cart.py:147
-msgid "Cart creation is not allowed via API."
-msgstr ""
-
-#: .\cart\views\item.py:72
-msgid "cart item"
-msgstr ""
-
-#: .\cart\views\item.py:73
-msgid "cart items"
-msgstr ""
-
-#: .\cart\views\item.py:81
-msgid "List cart items"
-msgstr ""
-
-#: .\cart\views\item.py:83
-msgid ""
-"Retrieve a list of cart items with filtering and search capabilities. For "
-"guest users, include X-Cart-Id and X-Session-Key headers to maintain cart "
+"Get a cart. For guest users, include X-Cart-Id header to maintain cart "
 "session."
 msgstr ""
 
-#: .\cart\views\item.py:97
+#: .\cart\views\cart.py:96 .\cart\views\cart.py:110
+msgid "Update cart"
+msgstr ""
+
+#: .\cart\views\cart.py:98 .\cart\views\cart.py:112
+msgid ""
+"Update a cart. For guest users, include X-Cart-Id header to maintain cart "
+"session."
+msgstr ""
+
+#: .\cart\views\cart.py:124
+msgid "Delete cart"
+msgstr ""
+
+#: .\cart\views\cart.py:126
+msgid ""
+"Delete a cart. For guest users, include X-Cart-Id header to maintain cart "
+"session."
+msgstr ""
+
+#: .\cart\views\cart.py:138
+msgid "Create cart"
+msgstr ""
+
+#: .\cart\views\cart.py:139
+msgid "Cart creation is not allowed via API."
+msgstr ""
+
+#: .\cart\views\item.py:64
+msgid "cart item"
+msgstr ""
+
+#: .\cart\views\item.py:65
+msgid "cart items"
+msgstr ""
+
+#: .\cart\views\item.py:73
+msgid "List cart items"
+msgstr ""
+
+#: .\cart\views\item.py:75
+msgid ""
+"Retrieve a list of cart items with filtering and search capabilities. For "
+"guest users, include X-Cart-Id header to maintain cart session."
+msgstr ""
+
+#: .\cart\views\item.py:89
 msgid "Create a cart item"
 msgstr ""
 
-#: .\cart\views\item.py:99
+#: .\cart\views\item.py:91
 msgid ""
 "Create a new cart item. Requires authentication. For guest users, include X-"
-"Cart-Id and X-Session-Key headers to maintain cart session."
+"Cart-Id header to maintain cart session."
 msgstr ""
 
-#: .\cart\views\item.py:113
+#: .\cart\views\item.py:105
 msgid "Retrieve a cart item"
 msgstr ""
 
-#: .\cart\views\item.py:115
+#: .\cart\views\item.py:107
 msgid ""
 "Get detailed information about a specific cart item. For guest users, "
-"include X-Cart-Id and X-Session-Key headers to maintain cart session."
+"include X-Cart-Id header to maintain cart session."
 msgstr ""
 
-#: .\cart\views\item.py:128
+#: .\cart\views\item.py:120
 msgid "Update a cart item"
 msgstr ""
 
-#: .\cart\views\item.py:130
+#: .\cart\views\item.py:122
 msgid ""
 "Update cart item information. Requires authentication. For guest users, "
-"include X-Cart-Id and X-Session-Key headers to maintain cart session."
+"include X-Cart-Id header to maintain cart session."
 msgstr ""
 
-#: .\cart\views\item.py:145
+#: .\cart\views\item.py:137
 msgid "Partially update a cart item"
 msgstr ""
 
-#: .\cart\views\item.py:147
+#: .\cart\views\item.py:139
 msgid ""
 "Partially update cart item information. Requires authentication. For guest "
-"users, include X-Cart-Id and X-Session-Key headers to maintain cart session."
+"users, include X-Cart-Id header to maintain cart session."
 msgstr ""
 
-#: .\cart\views\item.py:162
+#: .\cart\views\item.py:154
 msgid "Delete a cart item"
 msgstr ""
 
-#: .\cart\views\item.py:164
+#: .\cart\views\item.py:156
 msgid ""
 "Delete a cart item. Requires authentication. For guest users, include X-Cart-"
-"Id and X-Session-Key headers to maintain cart session."
+"Id header to maintain cart session."
 msgstr ""
 
-#: .\cart\views\item.py:238
+#: .\cart\views\item.py:218
 msgid "You do not have permission to access this cart item."
 msgstr ""
 
-#: .\cart\views\item.py:244
+#: .\cart\views\item.py:224
 msgid "No CartItem matches the given query."
 msgstr ""
 
-#: .\cart\views\item.py:269
+#: .\cart\views\item.py:254
 msgid "You do not have permission to delete this cart item."
 msgstr ""
 
@@ -1717,20 +1693,20 @@ msgid "Message"
 msgstr ""
 
 #: .\contact\admin.py:122 .\notification\admin.py:175
-#: .\notification\admin.py:526 .\notification\admin.py:656
-#: .\notification\admin.py:855 .\product\admin.py:367 .\product\admin.py:1007
+#: .\notification\admin.py:532 .\notification\admin.py:662
+#: .\notification\admin.py:870 .\product\admin.py:373 .\product\admin.py:1017
 #: .\region\admin.py:382 .\tag\admin.py:166
 msgid "Analytics"
 msgstr ""
 
-#: .\contact\admin.py:129 .\contact\admin.py:479 .\notification\admin.py:182
+#: .\contact\admin.py:129 .\contact\admin.py:482 .\notification\admin.py:182
 msgid "Timing Information"
 msgstr ""
 
 #: .\contact\admin.py:136 .\country\admin.py:115 .\notification\admin.py:189
-#: .\notification\admin.py:663 .\order\admin.py:1130 .\pay_way\admin.py:222
-#: .\product\admin.py:374 .\product\admin.py:1018 .\product\admin.py:1227
-#: .\product\admin.py:1540 .\product\admin.py:1679 .\region\admin.py:389
+#: .\notification\admin.py:669 .\order\admin.py:1140 .\pay_way\admin.py:222
+#: .\product\admin.py:380 .\product\admin.py:1028 .\product\admin.py:1237
+#: .\product\admin.py:1550 .\product\admin.py:1689 .\region\admin.py:389
 #: .\tag\admin.py:177 .\tag\admin.py:636 .\user\admin.py:328
 #: .\user\admin.py:632 .\user\admin.py:747 .\vat\admin.py:137
 msgid "System Information"
@@ -1745,26 +1721,26 @@ msgstr ""
 msgid "Message Stats"
 msgstr ""
 
-#: .\contact\admin.py:289 .\notification\admin.py:488
-#: .\notification\admin.py:816
+#: .\contact\admin.py:289 .\notification\admin.py:491
+#: .\notification\admin.py:828
 msgid "Timing"
 msgstr ""
 
 #: .\contact\admin.py:345 .\notification\admin.py:274
-#: .\notification\admin.py:786 .\notification\models\notification.py:37
-#: .\order\admin.py:624
+#: .\notification\admin.py:795 .\notification\models\notification.py:37
+#: .\order\admin.py:631
 msgid "Priority"
 msgstr ""
 
-#: .\contact\admin.py:391
+#: .\contact\admin.py:394
 msgid "Contact Analytics"
 msgstr ""
 
-#: .\contact\admin.py:443
+#: .\contact\admin.py:446
 msgid "Message Analytics"
 msgstr ""
 
-#: .\contact\models.py:15 .\order\models\order.py:68
+#: .\contact\models.py:15 .\order\models\order.py:73
 msgid "Email"
 msgstr ""
 
@@ -1816,52 +1792,60 @@ msgstr ""
 msgid "Send a contact message to the site administrators."
 msgstr ""
 
-#: .\core\admin.py:138
+#: .\core\admin.py:139
 msgid "CSV export successful."
 msgstr ""
 
-#: .\core\admin.py:298
+#: .\core\admin.py:299
 msgid "No items selected for export."
 msgstr ""
 
-#: .\core\admin.py:313
+#: .\core\admin.py:314
 msgid "XML export successful."
 msgstr ""
 
-#: .\core\admin.py:319
+#: .\core\admin.py:320
 #, python-format
 msgid "An unexpected error occurred during XML export: %s"
 msgstr ""
 
-#: .\core\api\permissions.py:9
+#: .\core\api\permissions.py:9 .\core\api\permissions.py:40
 msgid "You do not have permission to access this object."
 msgstr ""
 
-#: .\core\api\views.py:39 .\core\utils\serializers.py:155
+#: .\core\api\schema.py:70
+msgid "Comma-separated values"
+msgstr ""
+
+#: .\core\api\serializers.py:60
+msgid "Serialized representation of the related content object"
+msgstr ""
+
+#: .\core\api\views.py:46 .\core\utils\serializers.py:143
 #, python-format
 msgid "Language code for translations (%s)"
 msgstr ""
 
-#: .\core\api\views.py:49 .\core\utils\serializers.py:169
-#: .\product\views\product.py:165
+#: .\core\api\views.py:56 .\core\utils\serializers.py:157
+#: .\product\views\product.py:149
 msgid "Pagination strategy type"
 msgstr ""
 
-#: .\core\api\views.py:58 .\core\utils\serializers.py:178
-#: .\product\views\product.py:173
+#: .\core\api\views.py:65 .\core\utils\serializers.py:166
+#: .\product\views\product.py:157
 msgid "Enable or disable pagination"
 msgstr ""
 
-#: .\core\api\views.py:67 .\core\utils\serializers.py:187
-#: .\product\views\product.py:181
+#: .\core\api\views.py:74 .\core\utils\serializers.py:175
+#: .\product\views\product.py:165
 msgid "Number of results to return per page"
 msgstr ""
 
-#: .\core\api\views.py:75
+#: .\core\api\views.py:82
 msgid "Cursor for pagination"
 msgstr ""
 
-#: .\core\api\views.py:260 .\core\api\views.py:261
+#: .\core\api\views.py:465 .\core\api\views.py:466
 msgid "Check the health status of database, Redis, and Celery"
 msgstr ""
 
@@ -1898,8 +1882,8 @@ msgid "Sixth Floor Plus"
 msgstr ""
 
 #: .\core\enum.py:17 .\core\templates\admin\clear_cache.html:10
-#: .\core\templates\admin\product\apply_discount.html:15 .\product\admin.py:811
-#: .\product\admin.py:886
+#: .\core\templates\admin\product\apply_discount.html:15 .\product\admin.py:821
+#: .\product\admin.py:896
 msgid "Home"
 msgstr ""
 
@@ -2005,18 +1989,18 @@ msgstr ""
 msgid "Filter items where private metadata contains the specified key"
 msgstr ""
 
-#: .\core\forms\image.py:71
+#: .\core\forms\image.py:76
 msgid ""
 "Upload a valid image. The file you uploaded was either not an image or a "
 "corrupted image."
 msgstr ""
 
-#: .\core\forms\image.py:115
+#: .\core\forms\image.py:120
 msgid ""
 "SVG files containing script elements are not allowed for security reasons."
 msgstr ""
 
-#: .\core\forms\image.py:124
+#: .\core\forms\image.py:129
 msgid ""
 "SVG files containing event handlers are not allowed for security reasons."
 msgstr ""
@@ -2042,7 +2026,7 @@ msgstr ""
 msgid "Is Published"
 msgstr ""
 
-#: .\core\tasks.py:427
+#: .\core\tasks.py:440
 msgid "We miss you!"
 msgstr ""
 
@@ -2067,8 +2051,8 @@ msgstr ""
 
 #: .\core\templates\admin\product\apply_discount.html:21
 #: .\core\templates\admin\product\apply_discount.html:28
-#: .\core\templates\admin\product\apply_discount.html:35 .\product\admin.py:801
-#: .\product\admin.py:816 .\product\admin.py:874 .\product\admin.py:891
+#: .\core\templates\admin\product\apply_discount.html:35 .\product\admin.py:811
+#: .\product\admin.py:826 .\product\admin.py:884 .\product\admin.py:901
 msgid "Apply Custom Discount"
 msgstr ""
 
@@ -2130,16 +2114,16 @@ msgstr ""
 msgid "Request Meta"
 msgstr ""
 
-#: .\core\urls.py:35
+#: .\core\urls.py:34
 msgid "admin/"
 msgstr ""
 
-#: .\core\utils\serializers.py:222
+#: .\core\utils\serializers.py:210
 #, python-format
 msgid "List %(name)s"
 msgstr ""
 
-#: .\core\utils\serializers.py:224
+#: .\core\utils\serializers.py:212
 #, python-format
 msgid ""
 "Retrieve a list of %(name)s with filtering and search capabilities. Supports "
@@ -2147,57 +2131,57 @@ msgid ""
 "limitOffset."
 msgstr ""
 
-#: .\core\utils\serializers.py:240
+#: .\core\utils\serializers.py:228
 #, python-format
 msgid "Create a %(name)s"
 msgstr ""
 
-#: .\core\utils\serializers.py:241
+#: .\core\utils\serializers.py:229
 #, python-format
 msgid "Create a new %(name)s. Requires authentication."
 msgstr ""
 
-#: .\core\utils\serializers.py:254
+#: .\core\utils\serializers.py:242
 #, python-format
 msgid "Retrieve a %(name)s"
 msgstr ""
 
-#: .\core\utils\serializers.py:255
+#: .\core\utils\serializers.py:243
 #, python-format
 msgid "Get detailed information about a specific %(name)s."
 msgstr ""
 
-#: .\core\utils\serializers.py:267
+#: .\core\utils\serializers.py:255
 #, python-format
 msgid "Update a %(name)s"
 msgstr ""
 
-#: .\core\utils\serializers.py:269
+#: .\core\utils\serializers.py:257
 #, python-format
 msgid "Update %(name)s information. Requires authentication."
 msgstr ""
 
-#: .\core\utils\serializers.py:283
+#: .\core\utils\serializers.py:271
 #, python-format
 msgid "Partially update a %(name)s"
 msgstr ""
 
-#: .\core\utils\serializers.py:285
+#: .\core\utils\serializers.py:273
 #, python-format
 msgid "Partially update %(name)s information. Requires authentication."
 msgstr ""
 
-#: .\core\utils\serializers.py:299
+#: .\core\utils\serializers.py:287
 #, python-format
 msgid "Delete a %(name)s"
 msgstr ""
 
-#: .\core\utils\serializers.py:300
+#: .\core\utils\serializers.py:288
 #, python-format
 msgid "Delete a %(name)s. Requires authentication."
 msgstr ""
 
-#: .\core\views.py:107
+#: .\core\views.py:95
 msgid "Invalid file path"
 msgstr ""
 
@@ -2255,8 +2239,8 @@ msgstr ""
 msgid "Completeness"
 msgstr ""
 
-#: .\country\admin.py:310 .\order\admin.py:598 .\product\admin.py:644
-#: .\product\admin.py:1127 .\product\admin.py:1360 .\product\admin.py:1486
+#: .\country\admin.py:310 .\order\admin.py:602 .\product\admin.py:651
+#: .\product\admin.py:1137 .\product\admin.py:1370 .\product\admin.py:1496
 #: .\region\admin.py:610 .\tag\admin.py:423 .\tag\admin.py:778
 #: .\tests\unit\region\test_region_admin.py:556 .\vat\admin.py:305
 msgid "Created"
@@ -2404,6 +2388,90 @@ msgstr ""
 msgid "ISO country code must be between 1 and 999."
 msgstr ""
 
+#: .\meili\management\commands\meilisearch_inspect_index.py:18
+msgid "Inspect Meilisearch index settings, statistics, and configuration"
+msgstr ""
+
+#: .\meili\management\commands\meilisearch_inspect_index.py:26
+msgid "Specific index to inspect (product or blog)"
+msgstr ""
+
+#: .\meili\management\commands\meilisearch_inspect_index.py:32
+msgid "Show all configured synonyms"
+msgstr ""
+
+#: .\meili\management\commands\meilisearch_inspect_index.py:37
+msgid "Show detailed index settings"
+msgstr ""
+
+#: .\meili\management\commands\meilisearch_inspect_index.py:55
+msgid "PRODUCT INDEX INSPECTION"
+msgstr ""
+
+#: .\meili\management\commands\meilisearch_inspect_index.py:63
+#: .\meili\management\commands\meilisearch_inspect_index.py:120
+msgid "Index Name"
+msgstr ""
+
+#: .\meili\management\commands\meilisearch_inspect_index.py:65
+#: .\meili\management\commands\meilisearch_inspect_index.py:122
+msgid "Documents"
+msgstr ""
+
+#: .\meili\management\commands\meilisearch_inspect_index.py:67
+#: .\meili\management\commands\meilisearch_inspect_index.py:124
+msgid "Indexing"
+msgstr ""
+
+#: .\meili\management\commands\meilisearch_inspect_index.py:71
+#: .\meili\management\commands\meilisearch_inspect_index.py:128
+msgid "Search Configuration"
+msgstr ""
+
+#: .\meili\management\commands\meilisearch_inspect_index.py:73
+#: .\meili\management\commands\meilisearch_inspect_index.py:130
+msgid "Searchable Fields"
+msgstr ""
+
+#: .\meili\management\commands\meilisearch_inspect_index.py:76
+#: .\meili\management\commands\meilisearch_inspect_index.py:133
+msgid "Filterable Fields"
+msgstr ""
+
+#: .\meili\management\commands\meilisearch_inspect_index.py:79
+#: .\meili\management\commands\meilisearch_inspect_index.py:136
+msgid "Sortable Fields"
+msgstr ""
+
+#: .\meili\management\commands\meilisearch_inspect_index.py:84
+#: .\meili\management\commands\meilisearch_inspect_index.py:141
+msgid "Synonyms"
+msgstr ""
+
+#: .\meili\management\commands\meilisearch_inspect_index.py:90
+#: .\meili\management\commands\meilisearch_inspect_index.py:147
+msgid "Detailed Settings"
+msgstr ""
+
+#: .\meili\management\commands\meilisearch_inspect_index.py:98
+#: .\meili\management\commands\meilisearch_inspect_index.py:155
+msgid "Index does not exist"
+msgstr ""
+
+#: .\meili\management\commands\meilisearch_inspect_index.py:103
+#: .\meili\management\commands\meilisearch_inspect_index.py:160
+msgid "Run"
+msgstr ""
+
+#: .\meili\management\commands\meilisearch_inspect_index.py:103
+#: .\meili\management\commands\meilisearch_inspect_index.py:160
+msgid "to create and populate the index."
+msgstr ""
+
+#: .\meili\management\commands\meilisearch_inspect_index.py:112
+msgid "BLOG POST INDEX INSPECTION"
+msgstr ""
+
 #: .\notification\admin.py:20
 msgid "Notification Status"
 msgstr ""
@@ -2476,20 +2544,20 @@ msgstr ""
 msgid "Scheduling"
 msgstr ""
 
-#: .\notification\admin.py:230 .\notification\admin.py:713
+#: .\notification\admin.py:230 .\notification\admin.py:719
 #: .\notification\models\notification.py:69
 msgid "Notification"
 msgstr ""
 
-#: .\notification\admin.py:568
+#: .\notification\admin.py:574
 msgid "Engagement Summary"
 msgstr ""
 
-#: .\notification\admin.py:601
+#: .\notification\admin.py:607
 msgid "Timing Summary"
 msgstr ""
 
-#: .\notification\admin.py:642
+#: .\notification\admin.py:648
 msgid "Relationship"
 msgstr ""
 
@@ -2513,16 +2581,16 @@ msgstr ""
 msgid "Danger"
 msgstr ""
 
-#: .\notification\enum.py:22 .\order\admin.py:1151 .\order\admin.py:1317
-#: .\order\models\order.py:131 .\pay_way\admin.py:374
+#: .\notification\enum.py:22 .\order\admin.py:1161 .\order\admin.py:1327
+#: .\order\models\order.py:136 .\pay_way\admin.py:374
 msgid "Order"
 msgstr ""
 
-#: .\notification\enum.py:23 .\order\admin.py:549
+#: .\notification\enum.py:23 .\order\admin.py:553
 msgid "Payment"
 msgstr ""
 
-#: .\notification\enum.py:24 .\order\admin.py:572
+#: .\notification\enum.py:24 .\order\admin.py:576
 msgid "Shipping"
 msgstr ""
 
@@ -2539,7 +2607,7 @@ msgstr ""
 msgid "Promotion"
 msgstr ""
 
-#: .\notification\enum.py:31 .\product\admin.py:1253
+#: .\notification\enum.py:31 .\product\admin.py:1263
 msgid "Review"
 msgstr ""
 
@@ -2715,11 +2783,11 @@ msgstr ""
 msgid "Notification Users"
 msgstr ""
 
-#: .\notification\serializers\notification.py:57
+#: .\notification\serializers\notification.py:69
 msgid "Expiry date must be in the future."
 msgstr ""
 
-#: .\notification\serializers\notification.py:68
+#: .\notification\serializers\notification.py:80
 msgid "Link must be a valid URL or relative path."
 msgstr ""
 
@@ -2736,77 +2804,75 @@ msgid "Number of unseen notifications"
 msgstr ""
 
 #: .\notification\serializers\user.py:107
-msgid "Information message about notifications"
-msgstr ""
-
-#: .\notification\serializers\user.py:113
 msgid "Whether the operation was successful"
 msgstr ""
 
-#: .\notification\views\notification.py:15
-#: .\notification\views\notification.py:16
+#: .\notification\views\notification.py:20
+#: .\notification\views\notification.py:21
 msgid "Returns the notifications for a list of ids."
 msgstr ""
 
 #: .\notification\views\notification.py:30
+msgid ""
+"Filter notifications by seen status. If false, returns only unseen "
+"notifications."
+msgstr ""
+
+#: .\notification\views\notification.py:48
 msgid "No notification ids provided."
 msgstr ""
 
-#: .\notification\views\notification.py:37
+#: .\notification\views\notification.py:71
 msgid "No notifications found for the provided ids."
 msgstr ""
 
-#: .\notification\views\user.py:59
+#: .\notification\views\user.py:64
 msgid "Get unseen notifications count"
 msgstr ""
 
-#: .\notification\views\user.py:61
+#: .\notification\views\user.py:66
 msgid "Get the count of unseen notifications for the authenticated user."
 msgstr ""
 
-#: .\notification\views\user.py:72
+#: .\notification\views\user.py:76
 msgid "Mark all notifications as seen"
 msgstr ""
 
-#: .\notification\views\user.py:74
+#: .\notification\views\user.py:78
 msgid "Mark all of the authenticated user's notifications as seen."
 msgstr ""
 
-#: .\notification\views\user.py:84
+#: .\notification\views\user.py:88
 msgid "Mark all notifications as unseen"
 msgstr ""
 
-#: .\notification\views\user.py:86
+#: .\notification\views\user.py:90
 msgid "Mark all of the authenticated user's notifications as unseen."
 msgstr ""
 
-#: .\notification\views\user.py:96
+#: .\notification\views\user.py:100
 msgid "Mark specific notifications as seen"
 msgstr ""
 
-#: .\notification\views\user.py:98
+#: .\notification\views\user.py:102
 msgid "Mark specific notifications as seen for the authenticated user."
 msgstr ""
 
-#: .\notification\views\user.py:110
+#: .\notification\views\user.py:114
 msgid "Mark specific notifications as unseen"
 msgstr ""
 
-#: .\notification\views\user.py:112
+#: .\notification\views\user.py:116
 msgid "Mark specific notifications as unseen for the authenticated user."
 msgstr ""
 
-#: .\notification\views\user.py:174 .\notification\views\user.py:192
-#: .\notification\views\user.py:205 .\notification\views\user.py:218
-#: .\notification\views\user.py:245
+#: .\notification\views\user.py:167 .\notification\views\user.py:192
+#: .\notification\views\user.py:211 .\notification\views\user.py:230
+#: .\notification\views\user.py:267
 msgid "User is not authenticated."
 msgstr ""
 
-#: .\notification\views\user.py:181
-msgid "No unseen notifications."
-msgstr ""
-
-#: .\notification\views\user.py:230 .\notification\views\user.py:257
+#: .\notification\views\user.py:246 .\notification\views\user.py:283
 msgid "No notification user ids provided."
 msgstr ""
 
@@ -2830,7 +2896,7 @@ msgstr ""
 msgid "Problematic (Canceled/Returned/Refunded)"
 msgstr ""
 
-#: .\order\admin.py:68 .\order\models\order.py:112
+#: .\order\admin.py:68 .\order\models\order.py:117
 msgid "Payment Status"
 msgstr ""
 
@@ -2866,7 +2932,7 @@ msgstr ""
 msgid "Needs Attention (Failed/Pending)"
 msgstr ""
 
-#: .\order\admin.py:117 .\order\admin.py:805 .\order\models\order.py:93
+#: .\order\admin.py:117 .\order\admin.py:812 .\order\models\order.py:98
 msgid "Document Type"
 msgstr ""
 
@@ -2906,11 +2972,11 @@ msgstr ""
 msgid "Urgent (24h+ Pending)"
 msgstr ""
 
-#: .\order\admin.py:271 .\order\admin.py:1244
+#: .\order\admin.py:271 .\order\admin.py:1254
 msgid "Refund Status"
 msgstr ""
 
-#: .\order\admin.py:317 .\order\admin.py:1408 .\order\admin.py:1522
+#: .\order\admin.py:317 .\order\admin.py:1418 .\order\admin.py:1532
 msgid "Changed By"
 msgstr ""
 
@@ -2930,105 +2996,117 @@ msgstr ""
 msgid "Payment Information"
 msgstr ""
 
-#: .\order\admin.py:441
+#: .\order\admin.py:438
+msgid ""
+"⚠️ Note: Ensure all money fields use the same currency (EUR preferred) to "
+"avoid calculation errors."
+msgstr ""
+
+#: .\order\admin.py:443
 msgid "Shipping & Tracking"
 msgstr ""
 
-#: .\order\admin.py:453 .\order\admin.py:1123 .\user\admin.py:621
+#: .\order\admin.py:452
+msgid ""
+"💡 Shipping price currency should match item currencies to avoid total "
+"calculation errors."
+msgstr ""
+
+#: .\order\admin.py:457 .\order\admin.py:1133 .\user\admin.py:621
 msgid "Additional Information"
 msgstr ""
 
-#: .\order\admin.py:500
+#: .\order\admin.py:504
 msgid "Customer"
 msgstr ""
 
-#: .\order\admin.py:532
+#: .\order\admin.py:536
 msgid "Order Summary"
 msgstr ""
 
-#: .\order\admin.py:832
+#: .\order\admin.py:839
 msgid "Currency"
 msgstr ""
 
-#: .\order\admin.py:852
+#: .\order\admin.py:859
 msgid "Customer Summary"
 msgstr ""
 
-#: .\order\admin.py:912
+#: .\order\admin.py:919
 msgid "Shipping Summary"
 msgstr ""
 
-#: .\order\admin.py:964
+#: .\order\admin.py:974
 msgid "Order Analytics"
 msgstr ""
 
-#: .\order\admin.py:967
+#: .\order\admin.py:977
 msgid "Mark selected orders as processing"
 msgstr ""
 
-#: .\order\admin.py:977
+#: .\order\admin.py:987
 #, python-format
 msgid "Order %(order_id)s marked as processing"
 msgstr ""
 
-#: .\order\admin.py:984
+#: .\order\admin.py:994
 msgid "Mark selected orders as shipped"
 msgstr ""
 
-#: .\order\admin.py:994
+#: .\order\admin.py:1004
 #, python-format
 msgid "Order %(order_id)s marked as shipped"
 msgstr ""
 
-#: .\order\admin.py:1001
+#: .\order\admin.py:1011
 msgid "Mark selected orders as delivered"
 msgstr ""
 
-#: .\order\admin.py:1011
+#: .\order\admin.py:1021
 #, python-format
 msgid "Order %(order_id)s marked as delivered"
 msgstr ""
 
-#: .\order\admin.py:1018
+#: .\order\admin.py:1028
 msgid "Mark selected orders as completed"
 msgstr ""
 
-#: .\order\admin.py:1028
+#: .\order\admin.py:1038
 #, python-format
 msgid "Order %(order_id)s marked as completed"
 msgstr ""
 
-#: .\order\admin.py:1035
+#: .\order\admin.py:1045
 msgid "Cancel selected orders and restore stock"
 msgstr ""
 
-#: .\order\admin.py:1045
+#: .\order\admin.py:1055
 #, python-format
 msgid "Order %(order_id)s marked as canceled"
 msgstr ""
 
-#: .\order\admin.py:1098
+#: .\order\admin.py:1108
 msgid "Order Item Information"
 msgstr ""
 
-#: .\order\admin.py:1105
+#: .\order\admin.py:1115
 msgid "Refund Information"
 msgstr ""
 
-#: .\order\admin.py:1116
+#: .\order\admin.py:1126
 msgid "Calculations"
 msgstr ""
 
-#: .\order\admin.py:1266
+#: .\order\admin.py:1276
 msgid "Item Analytics"
 msgstr ""
 
-#: .\order\admin.py:1383 .\order\admin.py:1498 .\order\models\history.py:46
+#: .\order\admin.py:1393 .\order\admin.py:1508 .\order\models\history.py:46
 #: .\order\models\history.py:251
 msgid "Change Type"
 msgstr ""
 
-#: .\order\admin.py:1459 .\order\models\item.py:39
+#: .\order\admin.py:1469 .\order\models\item.py:39
 msgid "Order Item"
 msgstr ""
 
@@ -3504,99 +3582,99 @@ msgstr ""
 msgid "Cannot refund more than the ordered quantity. "
 msgstr ""
 
-#: .\order\models\order.py:55 .\user\models\address.py:44
+#: .\order\models\order.py:60 .\user\models\address.py:44
 msgid "Floor"
 msgstr ""
 
-#: .\order\models\order.py:62 .\user\models\address.py:51
+#: .\order\models\order.py:67 .\user\models\address.py:51
 msgid "Location Type"
 msgstr ""
 
-#: .\order\models\order.py:69 .\user\models\account.py:46
+#: .\order\models\order.py:74 .\user\models\account.py:46
 #: .\user\models\address.py:21
 msgid "First Name"
 msgstr ""
 
-#: .\order\models\order.py:70 .\user\models\account.py:49
+#: .\order\models\order.py:75 .\user\models\account.py:49
 #: .\user\models\address.py:22
 msgid "Last Name"
 msgstr ""
 
-#: .\order\models\order.py:71 .\user\models\address.py:23
+#: .\order\models\order.py:76 .\user\models\address.py:23
 msgid "Street"
 msgstr ""
 
-#: .\order\models\order.py:72 .\user\models\address.py:24
+#: .\order\models\order.py:77 .\user\models\address.py:24
 msgid "Street Number"
 msgstr ""
 
-#: .\order\models\order.py:73 .\user\models\account.py:54
+#: .\order\models\order.py:78 .\user\models\account.py:54
 #: .\user\models\address.py:25
 msgid "City"
 msgstr ""
 
-#: .\order\models\order.py:74
+#: .\order\models\order.py:79
 msgid "Zipcode"
 msgstr ""
 
-#: .\order\models\order.py:75 .\user\models\account.py:61
+#: .\order\models\order.py:80 .\user\models\account.py:61
 msgid "Place"
 msgstr ""
 
-#: .\order\models\order.py:76 .\user\models\account.py:52
+#: .\order\models\order.py:81 .\user\models\account.py:52
 #: .\user\models\address.py:58
 msgid "Phone Number"
 msgstr ""
 
-#: .\order\models\order.py:78 .\user\models\address.py:60
+#: .\order\models\order.py:83 .\user\models\address.py:60
 msgid "Mobile Phone Number"
 msgstr ""
 
-#: .\order\models\order.py:81
+#: .\order\models\order.py:86
 msgid "Customer Notes"
 msgstr ""
 
-#: .\order\models\order.py:90
+#: .\order\models\order.py:95
 msgid "Shipping Price"
 msgstr ""
 
-#: .\order\models\order.py:99
+#: .\order\models\order.py:104
 msgid "Paid Amount"
 msgstr ""
 
-#: .\order\models\order.py:106
+#: .\order\models\order.py:111
 msgid "Status Updated At"
 msgstr ""
 
-#: .\order\models\order.py:109
+#: .\order\models\order.py:114
 msgid "Payment ID"
 msgstr ""
 
-#: .\order\models\order.py:119
+#: .\order\models\order.py:124
 msgid "Payment Method"
 msgstr ""
 
-#: .\order\models\order.py:122
+#: .\order\models\order.py:127
 msgid "Tracking Number"
 msgstr ""
 
-#: .\order\models\order.py:125
+#: .\order\models\order.py:130
 msgid "Shipping Carrier"
 msgstr ""
 
-#: .\order\models\order.py:132
+#: .\order\models\order.py:137
 msgid "Orders"
 msgstr ""
 
-#: .\order\models\order.py:212
+#: .\order\models\order.py:217
 msgid "Enter a valid email address."
 msgstr ""
 
-#: .\order\models\order.py:215
+#: .\order\models\order.py:220
 msgid "Zipcode is required."
 msgstr ""
 
-#: .\order\models\order.py:226
+#: .\order\models\order.py:231
 msgid "Street, street number, and city are required."
 msgstr ""
 
@@ -3675,62 +3753,110 @@ msgid ""
 "{available_quantity}"
 msgstr ""
 
-#: .\order\serializers\order.py:274
+#: .\order\serializers\order.py:138
+msgid "Order was created"
+msgstr ""
+
+#: .\order\serializers\order.py:290
 msgid "At least one item is required."
 msgstr ""
 
-#: .\order\serializers\order.py:280
+#: .\order\serializers\order.py:296
 msgid "Item quantity must be greater than zero."
 msgstr ""
 
-#: .\order\serializers\order.py:287
+#: .\order\serializers\order.py:303
 msgid "Email is required."
 msgstr ""
 
-#: .\order\serializers\order.py:292
+#: .\order\serializers\order.py:308
 msgid "Try using a different email address."
 msgstr ""
 
-#: .\order\serializers\order.py:311
+#: .\order\serializers\order.py:327
 #, python-brace-format
 msgid "Product with id '{product_name}' is not available."
 msgstr ""
 
-#: .\order\serializers\order.py:333
+#: .\order\serializers\order.py:349
 #, python-brace-format
 msgid "Product with id '{product_id}' does not exist."
 msgstr ""
 
-#: .\order\serializers\payment.py:7
-msgid "ID of the payment method to use"
+#: .\order\serializers\order.py:429
+msgid "User ID. Leave empty for guest orders."
 msgstr ""
 
-#: .\order\serializers\payment.py:12
+#: .\order\serializers\order.py:447
 msgid "Additional payment data required by the payment provider"
 msgstr ""
 
-#: .\order\serializers\payment.py:38
-msgid "Refund amount (optional, defaults to full refund)"
+#: .\order\serializers\order.py:453
+msgid "Payment intent ID from the payment provider"
 msgstr ""
 
-#: .\order\serializers\payment.py:43
-msgid "Currency code (required if amount is specified)"
+#: .\order\serializers\order.py:456
+msgid "Payment status"
 msgstr ""
 
-#: .\order\services.py:94
+#: .\order\serializers\order.py:458
+msgid "Payment amount"
+msgstr ""
+
+#: .\order\serializers\order.py:460
+msgid "Payment currency"
+msgstr ""
+
+#: .\order\serializers\order.py:462
+msgid "Payment provider name"
+msgstr ""
+
+#: .\order\serializers\order.py:467
+msgid "Stripe PaymentIntent client secret for frontend confirmation"
+msgstr ""
+
+#: .\order\serializers\order.py:475
+msgid "Whether the payment requires additional action (3D Secure, etc.)"
+msgstr ""
+
+#: .\order\serializers\order.py:482
+msgid "Next action required for payment completion"
+msgstr ""
+
+#: .\order\serializers\order.py:509
+msgid "Partial refund amount. Leave empty for full refund."
+msgstr ""
+
+#: .\order\serializers\order.py:516
+msgid "Currency code (e.g., USD, EUR). Required if amount is provided."
+msgstr ""
+
+#: .\order\serializers\order.py:523
+msgid "Reason for the refund"
+msgstr ""
+
+#: .\order\serializers\order.py:532
+msgid "Currency is required when amount is provided"
+msgstr ""
+
+#: .\order\serializers\order.py:537
+msgid "Refund amount must be greater than 0"
+msgstr ""
+
+#: .\order\services.py:90
 msgid "Product is required for order items"
 msgstr ""
 
-#: .\order\services.py:100
+#: .\order\services.py:96
 #, python-brace-format
 msgid "Invalid quantity {quantity} for product {product_id}"
 msgstr ""
 
-#: .\order\services.py:103
+#: .\order\services.py:99
 msgid "unknown"
 msgstr ""
 
-#: .\order\services.py:110
+#: .\order\services.py:106
 #, python-brace-format
 msgid ""
 "Product {product_name} does not have enough stock. Available: {available}, "
@@ -3746,23 +3872,48 @@ msgstr ""
 msgid "New status cannot be empty"
 msgstr ""
 
-#: .\order\services.py:194
+#: .\order\services.py:196
 #, python-brace-format
 msgid ""
 "Cannot transition from {old_status} to {new_status}. Allowed transitions: "
 "{allowed_transitions}"
 msgstr ""
 
-#: .\order\services.py:248
+#: .\order\services.py:261
 #, python-brace-format
 msgid ""
 "Order in status {status} cannot be canceled. Only orders in PENDING or "
 "PROCESSING status can be canceled."
 msgstr ""
 
-#: .\order\services.py:283
+#: .\order\services.py:361
 #, python-brace-format
 msgid "Failed to cancel order: {error}"
+msgstr ""
+
+#: .\order\services.py:374
+msgid "This order has no payment ID to refund."
+msgstr ""
+
+#: .\order\services.py:377
+msgid "This order has not been paid yet."
+msgstr ""
+
+#: .\order\services.py:380
+msgid "This order has already been refunded."
+msgstr ""
+
+#: .\order\services.py:383 .\order\services.py:448
+msgid "This order has no payment method configured."
+msgstr ""
+
+#: .\order\services.py:388
+#, python-brace-format
+msgid "Refund amount ({refund}) cannot exceed paid amount ({paid})."
+msgstr ""
+
+#: .\order\services.py:445
+msgid "This order has no payment ID."
 msgstr ""
 
 #: .\order\tasks.py:33
@@ -3788,213 +3939,185 @@ msgstr ""
 msgid "Process a refund for an order item."
 msgstr ""
 
-#: .\order\views\item.py:135
+#: .\order\views\item.py:122
 msgid "Order item not found."
 msgstr ""
 
-#: .\order\views\item.py:145 .\order\views\order.py:213
+#: .\order\views\item.py:132 .\order\views\order.py:315
+#: .\order\views\order.py:321
 msgid "You do not have permission to access this order."
 msgstr ""
 
-#: .\order\views\item.py:165
+#: .\order\views\item.py:152
 msgid "This order is not in a refundable state."
 msgstr ""
 
-#: .\order\views\item.py:170
+#: .\order\views\item.py:157
 msgid "This item has already been fully refunded."
 msgstr ""
 
-#: .\order\views\item.py:191
+#: .\order\views\item.py:179 .\order\views\order.py:765
 msgid "Refund processed successfully."
 msgstr ""
 
-#: .\order\views\item.py:210
+#: .\order\views\item.py:201
 msgid ""
 "A validation error occurred while processing the refund. Please check your "
 "input and try again."
 msgstr ""
 
-#: .\order\views\item.py:226
+#: .\order\views\item.py:217
 msgid "An error occurred while processing the refund. Please try again later."
 msgstr ""
 
-#: .\order\views\order.py:70
+#: .\order\views\order.py:93
 msgid "Retrieve an order by UUID"
 msgstr ""
 
-#: .\order\views\order.py:72
+#: .\order\views\order.py:95
 msgid "Get detailed information about a specific order using its UUID"
 msgstr ""
 
-#: .\order\views\order.py:84
+#: .\order\views\order.py:107
 msgid "Cancel an order"
 msgstr ""
 
-#: .\order\views\order.py:85
+#: .\order\views\order.py:108
 msgid "Cancel an existing order and restore product stock"
 msgstr ""
 
-#: .\order\views\order.py:96
+#: .\order\views\order.py:120
 msgid "List current user's orders"
 msgstr ""
 
-#: .\order\views\order.py:97
+#: .\order\views\order.py:121
 msgid "Returns a list of the authenticated user's orders"
 msgstr ""
 
-#: .\order\views\order.py:108
+#: .\order\views\order.py:132
 msgid "Add tracking information to an order"
 msgstr ""
 
-#: .\order\views\order.py:109
+#: .\order\views\order.py:133
 msgid "Add tracking information to an existing order"
 msgstr ""
 
-#: .\order\views\order.py:120
+#: .\order\views\order.py:145
 msgid "Update the status of an order"
 msgstr ""
 
-#: .\order\views\order.py:121
+#: .\order\views\order.py:146
 msgid "Update the status of an existing order"
 msgstr ""
 
-#: .\order\views\order.py:236
+#: .\order\views\order.py:158
+msgid "Create a payment intent for an order"
+msgstr ""
+
+#: .\order\views\order.py:160
+msgid "Create a payment intent for Stripe payments on an existing order"
+msgstr ""
+
+#: .\order\views\order.py:173
+msgid "Create a Stripe Checkout Session for an order"
+msgstr ""
+
+#: .\order\views\order.py:175
+msgid ""
+"Create a Stripe Checkout Session for hosted payment page. The customer will "
+"be redirected to Stripe's checkout page to complete payment."
+msgstr ""
+
+#: .\order\views\order.py:189
+msgid "Refund an order payment"
+msgstr ""
+
+#: .\order\views\order.py:191
+msgid ""
+"Process a full or partial refund for an order's payment. Only available for "
+"paid orders with valid payment providers."
+msgstr ""
+
+#: .\order\views\order.py:206
+msgid "Get payment status for an order"
+msgstr ""
+
+#: .\order\views\order.py:208
+msgid ""
+"Retrieve the current payment status from the payment provider. This fetches "
+"the latest status directly from Stripe/PayPal."
+msgstr ""
+
+#: .\order\views\order.py:308
+msgid "Guest orders can only be accessed via UUID."
+msgstr ""
+
+#: .\order\views\order.py:348
 #, python-brace-format
 msgid "Order with ID {order_id} not found"
 msgstr ""
 
-#: .\order\views\order.py:278 .\order\views\order.py:292
-#: .\order\views\order.py:336 .\order\views\order.py:426
-#: .\order\views\order.py:467 .\order\views\order.py:478
+#: .\order\views\order.py:407 .\order\views\order.py:416
+#: .\order\views\order.py:716
 msgid "An error occurred while processing your request."
 msgstr ""
 
-#: .\order\views\order.py:302
+#: .\order\views\order.py:429 .\order\views\order.py:486
+msgid "This order has already been paid."
+msgstr ""
+
+#: .\order\views\order.py:437 .\order\views\order.py:494
+msgid "This order is not configured for Stripe payments."
+msgstr ""
+
+#: .\order\views\order.py:467
+msgid "Failed to create payment intent."
+msgstr ""
+
+#: .\order\views\order.py:527
+msgid "Failed to create checkout session."
+msgstr ""
+
+#: .\order\views\order.py:551
 msgid "UUID parameter is required"
 msgstr ""
 
-#: .\order\views\order.py:308
+#: .\order\views\order.py:557
 #, python-brace-format
 msgid "Order with UUID {uuid} not found"
 msgstr ""
 
-#: .\order\views\order.py:322
+#: .\order\views\order.py:583
 msgid "You do not have permission to cancel this order"
 msgstr ""
 
-#: .\order\views\order.py:349 .\order\views\order.py:438
-#: .\order\views\order.py:490
+#: .\order\views\order.py:620 .\order\views\order.py:681
+#: .\order\views\order.py:723
 msgid "An unexpected error occurred"
 msgstr ""
 
-#: .\order\views\order.py:357
+#: .\order\views\order.py:629
 msgid "Authentication is required to view your orders"
 msgstr ""
 
-#: .\order\views\order.py:377
+#: .\order\views\order.py:652
 msgid "Only staff can add tracking information"
 msgstr ""
 
-#: .\order\views\order.py:384
-msgid "Tracking number is required"
-msgstr ""
-
-#: .\order\views\order.py:389
-msgid "Shipping carrier is required"
-msgstr ""
-
-#: .\order\views\order.py:447
+#: .\order\views\order.py:691
 msgid "Only staff can update order status"
 msgstr ""
 
-#: .\order\views\order.py:451
-msgid "Status is required"
+#: .\order\views\order.py:758
+msgid "Failed to process refund."
 msgstr ""
 
-#: .\order\views\payment.py:37
-msgid "Process payment for an order"
-msgstr ""
-
-#: .\order\views\payment.py:39
-msgid ""
-"Initiates payment processing for the specified order using the provided "
-"payment method."
-msgstr ""
-
-#: .\order\views\payment.py:52
-msgid "Check payment status"
-msgstr ""
-
-#: .\order\views\payment.py:54
-msgid "Retrieves the current payment status for the specified order."
-msgstr ""
-
-#: .\order\views\payment.py:66
-msgid "Refund payment"
-msgstr ""
-
-#: .\order\views\payment.py:68
-msgid "Initiates a refund for the specified order. Requires admin permissions."
-msgstr ""
-
-#: .\order\views\payment.py:140
-msgid "You do not have permission to process payment for this order."
-msgstr ""
-
-#: .\order\views\payment.py:148
-msgid "This order has already been paid."
-msgstr ""
-
-#: .\order\views\payment.py:155
-msgid "Payment method is required."
-msgstr ""
-
-#: .\order\views\payment.py:163
-msgid "Invalid payment method."
-msgstr ""
-
-#: .\order\views\payment.py:196
-msgid "Payment processing failed."
-msgstr ""
-
-#: .\order\views\payment.py:204
-msgid "Payment processing initiated."
-msgstr ""
-
-#: .\order\views\payment.py:227
-msgid "An error occurred while processing the payment."
-msgstr ""
-
-#: .\order\views\payment.py:243
-msgid "You do not have permission to check payment status for this order."
-msgstr ""
-
-#: .\order\views\payment.py:251 .\order\views\payment.py:305
-msgid "This order has no payment method selected."
-msgstr ""
-
-#: .\order\views\payment.py:257
-msgid "This order has no associated payment."
-msgstr ""
-
-#: .\order\views\payment.py:285
-msgid "An error occurred while checking payment status."
-msgstr ""
-
-#: .\order\views\payment.py:299
-msgid "This order has not been paid."
-msgstr ""
-
-#: .\order\views\payment.py:336
-msgid "Payment refund failed."
-msgstr ""
-
-#: .\order\views\payment.py:344
-msgid "Payment refund initiated."
-msgstr ""
-
-#: .\order\views\payment.py:359
+#: .\order\views\order.py:787
 msgid "An error occurred while processing the refund."
+msgstr ""
+
+#: .\order\views\order.py:826
+msgid "An error occurred while fetching payment status."
 msgstr ""
 
 #: .\pay_way\admin.py:22
@@ -4372,188 +4495,188 @@ msgstr ""
 msgid "New Arrivals (Last 30 days)"
 msgstr ""
 
-#: .\product\admin.py:171
+#: .\product\admin.py:173
 msgid "Likes count"
 msgstr ""
 
-#: .\product\admin.py:195
+#: .\product\admin.py:199
 msgid "Review Rating"
 msgstr ""
 
-#: .\product\admin.py:238 .\product\admin.py:942 .\product\admin.py:1558
-#: .\product\admin.py:1697
+#: .\product\admin.py:244 .\product\admin.py:952 .\product\admin.py:1568
+#: .\product\admin.py:1707
 msgid "Preview"
 msgstr ""
 
-#: .\product\admin.py:309
+#: .\product\admin.py:315
 msgid "Product Information"
 msgstr ""
 
-#: .\product\admin.py:334
+#: .\product\admin.py:340
 msgid "Inventory"
 msgstr ""
 
-#: .\product\admin.py:344
+#: .\product\admin.py:350
 msgid "SEO & Marketing"
 msgstr ""
 
-#: .\product\admin.py:356
+#: .\product\admin.py:362
 msgid "Performance Metrics"
 msgstr ""
 
-#: .\product\admin.py:533 .\product\models\product.py:77
+#: .\product\admin.py:540 .\product\models\product.py:77
 msgid "Stock"
 msgstr ""
 
-#: .\product\admin.py:552
+#: .\product\admin.py:559
 msgid "Performance"
 msgstr ""
 
-#: .\product\admin.py:673
+#: .\product\admin.py:680
 msgid "Pricing Summary"
 msgstr ""
 
-#: .\product\admin.py:706
+#: .\product\admin.py:713
 msgid "Performance Summary"
 msgstr ""
 
-#: .\product\admin.py:741
+#: .\product\admin.py:751
 msgid "Product Analytics"
 msgstr ""
 
-#: .\product\admin.py:744
+#: .\product\admin.py:754
 msgid "Activate selected products"
 msgstr ""
 
-#: .\product\admin.py:753
+#: .\product\admin.py:763
 #, python-format
 msgid "%(count)d product was successfully activated."
 msgstr ""
 
-#: .\product\admin.py:754
+#: .\product\admin.py:764
 #, python-format
 msgid "%(count)d products were successfully activated."
 msgstr ""
 
-#: .\product\admin.py:762
+#: .\product\admin.py:772
 msgid "Deactivate selected products"
 msgstr ""
 
-#: .\product\admin.py:771
+#: .\product\admin.py:781
 #, python-format
 msgid "%(count)d product was successfully deactivated."
 msgstr ""
 
-#: .\product\admin.py:772
+#: .\product\admin.py:782
 #, python-format
 msgid "%(count)d products were successfully deactivated."
 msgstr ""
 
-#: .\product\admin.py:780
+#: .\product\admin.py:790
 msgid "Apply custom discount to selected products"
 msgstr ""
 
-#: .\product\admin.py:829
+#: .\product\admin.py:839
 msgid "No products selected. Please try again."
 msgstr ""
 
-#: .\product\admin.py:853
+#: .\product\admin.py:863
 #, python-format
 msgid "Applied %(discount)s%% discount to %(count)d product."
 msgstr ""
 
-#: .\product\admin.py:856
+#: .\product\admin.py:866
 #, python-format
 msgid "Applied %(discount)s%% discount to %(count)d products."
 msgstr ""
 
-#: .\product\admin.py:904
+#: .\product\admin.py:914
 msgid "Clear discount from selected products"
 msgstr ""
 
-#: .\product\admin.py:913
+#: .\product\admin.py:923
 #, python-format
 msgid "%(count)d product's discount was cleared."
 msgstr ""
 
-#: .\product\admin.py:914
+#: .\product\admin.py:924
 #, python-format
 msgid "%(count)d products' discounts were cleared."
 msgstr ""
 
-#: .\product\admin.py:1086
+#: .\product\admin.py:1096
 msgid "Product Stats"
 msgstr ""
 
-#: .\product\admin.py:1153
+#: .\product\admin.py:1163
 msgid "Category Analytics"
 msgstr ""
 
-#: .\product\admin.py:1162
+#: .\product\admin.py:1172
 msgid "Direct Products"
 msgstr ""
 
-#: .\product\admin.py:1171
+#: .\product\admin.py:1181
 msgid "Total Products"
 msgstr ""
 
-#: .\product\admin.py:1213
+#: .\product\admin.py:1223
 msgid "Review Information"
 msgstr ""
 
-#: .\product\admin.py:1311
+#: .\product\admin.py:1321
 msgid "Rating"
 msgstr ""
 
-#: .\product\admin.py:1363
+#: .\product\admin.py:1373
 msgid "Approve selected reviews"
 msgstr ""
 
-#: .\product\admin.py:1372
+#: .\product\admin.py:1382
 #, python-format
 msgid "%(count)d review was approved."
 msgstr ""
 
-#: .\product\admin.py:1373
+#: .\product\admin.py:1383
 #, python-format
 msgid "%(count)d reviews were approved."
 msgstr ""
 
-#: .\product\admin.py:1381
+#: .\product\admin.py:1391
 msgid "Reject selected reviews"
 msgstr ""
 
-#: .\product\admin.py:1390
+#: .\product\admin.py:1400
 #, python-format
 msgid "%(count)d review was rejected."
 msgstr ""
 
-#: .\product\admin.py:1391
+#: .\product\admin.py:1401
 #, python-format
 msgid "%(count)d reviews were rejected."
 msgstr ""
 
-#: .\product\admin.py:1403
+#: .\product\admin.py:1413
 #, python-format
 msgid "%(count)d comment was successfully marked as published."
 msgstr ""
 
-#: .\product\admin.py:1404
+#: .\product\admin.py:1414
 #, python-format
 msgid "%(count)d comments were successfully marked as published."
 msgstr ""
 
-#: .\product\admin.py:1416
+#: .\product\admin.py:1426
 #, python-format
 msgid "%(count)d comment was successfully marked as unpublished."
 msgstr ""
 
-#: .\product\admin.py:1418
+#: .\product\admin.py:1428
 #, python-format
 msgid "%(count)d comments were successfully marked as unpublished."
 msgstr ""
 
-#: .\product\admin.py:1519 .\product\admin.py:1658
+#: .\product\admin.py:1529 .\product\admin.py:1668
 msgid "Image Information"
 msgstr ""
 
@@ -4918,108 +5041,108 @@ msgstr ""
 msgid "You have already reviewed this product."
 msgstr ""
 
-#: .\product\views\category_image.py:103
+#: .\product\views\category_image.py:91
 msgid "Bulk update category images"
 msgstr ""
 
-#: .\product\views\category_image.py:105
+#: .\product\views\category_image.py:93
 msgid ""
 "Update multiple category images at once. Can update active status and sort "
 "order."
 msgstr ""
 
-#: .\product\views\category_image.py:149
+#: .\product\views\category_image.py:142
 msgid "Get images by category"
 msgstr ""
 
-#: .\product\views\category_image.py:150
+#: .\product\views\category_image.py:143
 msgid "Retrieve all images for a specific category."
 msgstr ""
 
-#: .\product\views\category_image.py:183
+#: .\product\views\category_image.py:180
 msgid "Get images by type"
 msgstr ""
 
-#: .\product\views\category_image.py:185
+#: .\product\views\category_image.py:182
 msgid "Retrieve all images of a specific type (main, banner, icon, etc.)."
 msgstr ""
 
-#: .\product\views\favourite.py:96
+#: .\product\views\favourite.py:101
 msgid "Get favourite product details"
 msgstr ""
 
-#: .\product\views\favourite.py:98
+#: .\product\views\favourite.py:103
 msgid "Get detailed information about the product in this favourite entry."
 msgstr ""
 
-#: .\product\views\favourite.py:120
+#: .\product\views\favourite.py:126
 msgid "Get favourites by product IDs"
 msgstr ""
 
-#: .\product\views\favourite.py:122
+#: .\product\views\favourite.py:128
 msgid ""
 "Get favourite entries for the specified product IDs. Requires authentication."
 msgstr ""
 
-#: .\product\views\product.py:130
+#: .\product\views\product.py:112
 msgid "Increment product view count"
 msgstr ""
 
-#: .\product\views\product.py:131
+#: .\product\views\product.py:113
 msgid "Increment the view count for a product."
 msgstr ""
 
-#: .\product\views\product.py:153
+#: .\product\views\product.py:137
 msgid "Get product reviews"
 msgstr ""
 
-#: .\product\views\product.py:154
+#: .\product\views\product.py:138
 msgid "Get all reviews for a product with pagination support."
 msgstr ""
 
-#: .\product\views\product.py:224
+#: .\product\views\product.py:210
 msgid "Get product images"
 msgstr ""
 
-#: .\product\views\product.py:225
+#: .\product\views\product.py:211
 msgid "Get all images for a product."
 msgstr ""
 
-#: .\product\views\product.py:236
+#: .\product\views\product.py:222
 msgid "Language code for translations (el, en, de)"
 msgstr ""
 
-#: .\product\views\product.py:266
+#: .\product\views\product.py:254
 msgid "Get product tags"
 msgstr ""
 
-#: .\product\views\product.py:267
+#: .\product\views\product.py:255
 msgid "Get all tags associated with a product."
 msgstr ""
 
-#: .\product\views\review.py:121
+#: .\product\views\review.py:110
 msgid "Get user's review for a product"
 msgstr ""
 
-#: .\product\views\review.py:123
+#: .\product\views\review.py:112
 msgid ""
 "Get the current user's review for a specific product. Requires "
 "authentication."
 msgstr ""
 
-#: .\product\views\review.py:137
+#: .\product\views\review.py:126
 msgid "User is not authenticated"
 msgstr ""
 
-#: .\product\views\review.py:154
+#: .\product\views\review.py:144
 msgid "Review does not exist"
 msgstr ""
 
-#: .\product\views\review.py:160
+#: .\product\views\review.py:150
 msgid "Get reviewed product details"
 msgstr ""
 
-#: .\product\views\review.py:162
+#: .\product\views\review.py:152
 msgid "Get detailed information about the product this review is for."
 msgstr ""
 
@@ -5130,24 +5253,48 @@ msgstr ""
 msgid "Get all regions for a specific country using its alpha-2 code."
 msgstr ""
 
-#: .\search\views.py:24
+#: .\search\views.py:25
 msgid "Search blog posts"
 msgstr ""
 
-#: .\search\views.py:26
+#: .\search\views.py:27
 msgid ""
 "Search blog posts using MeiliSearch. Provides full-text search with "
-"highlighting, ranking, and faceting capabilities."
+"highlighting, ranking, and faceting capabilities. Results can be filtered by "
+"language."
 msgstr ""
 
-#: .\search\views.py:98
+#: .\search\views.py:40 .\search\views.py:133
+msgid "Search query string"
+msgstr ""
+
+#: .\search\views.py:48 .\search\views.py:141
+msgid ""
+"Language code to filter results (e.g., 'en', 'el', 'de'). If not provided, "
+"searches all languages."
+msgstr ""
+
+#: .\search\views.py:56 .\search\views.py:149
+msgid "Maximum number of results to return"
+msgstr ""
+
+#: .\search\views.py:64 .\search\views.py:157
+msgid "Number of results to skip"
+msgstr ""
+
+#: .\search\views.py:74 .\search\views.py:167
+msgid "A search query is required."
+msgstr ""
+
+#: .\search\views.py:118
 msgid "Search products"
 msgstr ""
 
-#: .\search\views.py:100
+#: .\search\views.py:120
 msgid ""
 "Search products using MeiliSearch. Provides full-text search with "
-"highlighting, ranking, and faceting capabilities."
+"highlighting, ranking, and faceting capabilities. Results can be filtered by "
+"language."
 msgstr ""
 
 #: .\seo\models.py:7
@@ -5162,19 +5309,19 @@ msgstr ""
 msgid "Seo Keywords"
 msgstr ""
 
-#: .\settings.py:202
+#: .\settings.py:196
 msgid "Greek"
 msgstr ""
 
-#: .\settings.py:203
+#: .\settings.py:197
 msgid "English"
 msgstr ""
 
-#: .\settings.py:204
+#: .\settings.py:198
 msgid "German"
 msgstr ""
 
-#: .\settings.py:1125
+#: .\settings.py:1077
 msgid "Cache"
 msgstr ""
 
@@ -5987,11 +6134,19 @@ msgstr ""
 msgid "User Subscriptions"
 msgstr ""
 
-#: .\user\serializers\account.py:10
+#: .\user\serializers\account.py:76
+msgid "A user with this email already exists."
+msgstr ""
+
+#: .\user\serializers\account.py:85
+msgid "A user with this username already exists."
+msgstr ""
+
+#: .\user\serializers\account.py:224
 msgid "New username"
 msgstr ""
 
-#: .\user\serializers\account.py:16
+#: .\user\serializers\account.py:230
 msgid "Success message for username update"
 msgstr ""
 
@@ -6039,7 +6194,7 @@ msgstr ""
 msgid "Action to perform on the topics"
 msgstr ""
 
-#: .\user\serializers\subscription.py:242 .\user\views\subscription.py:352
+#: .\user\serializers\subscription.py:242 .\user\views\subscription.py:341
 msgid "Invalid or inactive topic IDs: {}"
 msgstr ""
 
@@ -6054,215 +6209,195 @@ msgid ""
 "@/./+/-/_/# characters."
 msgstr ""
 
-#: .\user\views\account.py:83
+#: .\user\views\account.py:93
 msgid "Get user's favourite products"
 msgstr ""
 
-#: .\user\views\account.py:84
+#: .\user\views\account.py:94
 msgid "Get all favourite products for a specific user."
 msgstr ""
 
-#: .\user\views\account.py:95
+#: .\user\views\account.py:105
 msgid "Get user's orders"
 msgstr ""
 
-#: .\user\views\account.py:96
+#: .\user\views\account.py:106
 msgid "Get all orders for a specific user."
 msgstr ""
 
-#: .\user\views\account.py:107
+#: .\user\views\account.py:117
 msgid "Get user's product reviews"
 msgstr ""
 
-#: .\user\views\account.py:108
+#: .\user\views\account.py:118
 msgid "Get all product reviews written by a specific user."
 msgstr ""
 
-#: .\user\views\account.py:119
+#: .\user\views\account.py:129
 msgid "Get user's addresses"
 msgstr ""
 
-#: .\user\views\account.py:120
+#: .\user\views\account.py:130
 msgid "Get all addresses for a specific user."
 msgstr ""
 
-#: .\user\views\account.py:131
+#: .\user\views\account.py:141
 msgid "Get user's blog comments"
 msgstr ""
 
-#: .\user\views\account.py:132
+#: .\user\views\account.py:142
 msgid "Get all blog post comments written by a specific user."
 msgstr ""
 
-#: .\user\views\account.py:143
+#: .\user\views\account.py:153
 msgid "Get user's liked blog posts"
 msgstr ""
 
-#: .\user\views\account.py:144
+#: .\user\views\account.py:154
 msgid "Get all blog posts liked by a specific user."
 msgstr ""
 
-#: .\user\views\account.py:155
+#: .\user\views\account.py:165
 msgid "Get user's notifications"
 msgstr ""
 
-#: .\user\views\account.py:156
+#: .\user\views\account.py:166
 msgid "Get all notifications for a specific user."
 msgstr ""
 
-#: .\user\views\account.py:167
+#: .\user\views\account.py:177
 msgid "Get user's subscriptions"
 msgstr ""
 
-#: .\user\views\account.py:168
+#: .\user\views\account.py:178
 msgid "Get all subscriptions for a specific user."
 msgstr ""
 
-#: .\user\views\account.py:179
+#: .\user\views\account.py:189
 msgid "Change username"
 msgstr ""
 
-#: .\user\views\account.py:180
+#: .\user\views\account.py:190
 msgid "Change the username for a specific user."
 msgstr ""
 
-#: .\user\views\account.py:193
+#: .\user\views\account.py:203
 msgid "Get user's subscription summary"
 msgstr ""
 
-#: .\user\views\account.py:194
+#: .\user\views\account.py:204
 msgid "Get a summary of subscriptions for a specific user."
 msgstr ""
 
-#: .\user\views\account.py:381
+#: .\user\views\account.py:398
 msgid "Topic ID is required."
 msgstr ""
 
-#: .\user\views\account.py:391
+#: .\user\views\account.py:408
 msgid "Topic not found or not active."
 msgstr ""
 
-#: .\user\views\account.py:411
+#: .\user\views\account.py:428
 msgid "User is already subscribed to this topic."
 msgstr ""
 
-#: .\user\views\account.py:432
+#: .\user\views\account.py:453
 msgid "Username already exists."
 msgstr ""
 
-#: .\user\views\account.py:440
+#: .\user\views\account.py:460
 msgid "Username updated successfully."
 msgstr ""
 
-#: .\user\views\address.py:62
+#: .\user\views\address.py:60
 msgid "Set address as main"
 msgstr ""
 
-#: .\user\views\address.py:63
+#: .\user\views\address.py:61
 msgid "Set this address as the user's main address."
 msgstr ""
 
-#: .\user\views\address.py:74
+#: .\user\views\address.py:72
 msgid "Get main address"
 msgstr ""
 
-#: .\user\views\address.py:75
+#: .\user\views\address.py:73
 msgid "Retrieve the user's main address."
 msgstr ""
 
-#: .\user\views\address.py:85
-msgid "Validate address"
-msgstr ""
-
-#: .\user\views\address.py:86
-msgid "Validate an address without saving it."
-msgstr ""
-
-#: .\user\views\address.py:97
-msgid "Bulk delete addresses"
-msgstr ""
-
-#: .\user\views\address.py:98
-msgid "Delete multiple addresses by their IDs."
-msgstr ""
-
-#: .\user\views\address.py:176
+#: .\user\views\address.py:136
 msgid "No main address found."
 msgstr ""
 
-#: .\user\views\address.py:186
-msgid "Address validation successful."
-msgstr ""
-
-#: .\user\views\subscription.py:96
+#: .\user\views\subscription.py:87
 msgid "Get my subscriptions"
 msgstr ""
 
-#: .\user\views\subscription.py:98
+#: .\user\views\subscription.py:89
 msgid "Get the current user's subscribed and available subscription topics."
 msgstr ""
 
-#: .\user\views\subscription.py:152
+#: .\user\views\subscription.py:144
 msgid "Subscribe to a topic"
 msgstr ""
 
-#: .\user\views\subscription.py:154
+#: .\user\views\subscription.py:146
 msgid "Subscribe the current user to a specific subscription topic."
 msgstr ""
 
-#: .\user\views\subscription.py:177
+#: .\user\views\subscription.py:169
 msgid "Already subscribed to this topic."
 msgstr ""
 
-#: .\user\views\subscription.py:182
+#: .\user\views\subscription.py:174
 msgid "Subscription pending confirmation."
 msgstr ""
 
-#: .\user\views\subscription.py:219
+#: .\user\views\subscription.py:216
 msgid "Unsubscribe from a topic"
 msgstr ""
 
-#: .\user\views\subscription.py:221
+#: .\user\views\subscription.py:218
 msgid "Unsubscribe the current user from a specific subscription topic."
 msgstr ""
 
-#: .\user\views\subscription.py:244
+#: .\user\views\subscription.py:241
 msgid "Successfully unsubscribed."
 msgstr ""
 
-#: .\user\views\subscription.py:249
+#: .\user\views\subscription.py:246
 msgid "You are not subscribed to this topic."
 msgstr ""
 
-#: .\user\views\subscription.py:324
+#: .\user\views\subscription.py:312
 msgid "Bulk update user subscriptions"
 msgstr ""
 
-#: .\user\views\subscription.py:325
+#: .\user\views\subscription.py:313
 msgid "Subscribe or unsubscribe from multiple topics at once."
 msgstr ""
 
-#: .\user\views\subscription.py:411
+#: .\user\views\subscription.py:400
 msgid "Confirm a user subscription"
 msgstr ""
 
-#: .\user\views\subscription.py:413
+#: .\user\views\subscription.py:402
 msgid "Confirm a pending subscription using the confirmation token."
 msgstr ""
 
-#: .\user\views\subscription.py:435
+#: .\user\views\subscription.py:424
 msgid "Subscription is not pending confirmation."
 msgstr ""
 
-#: .\user\views\subscription.py:441
+#: .\user\views\subscription.py:430
 msgid "Invalid confirmation token."
 msgstr ""
 
-#: .\user\views\subscription.py:468
+#: .\user\views\subscription.py:461
 msgid "Unsubscribe via email link"
 msgstr ""
 
-#: .\user\views\subscription.py:470
+#: .\user\views\subscription.py:463
 msgid "Unsubscribe from a subscription topic using an email unsubscribe link."
 msgstr ""
 

@@ -113,12 +113,12 @@ class TestCartAdmin:
         assert "font-medium" in result
 
     def test_cart_owner_display_guest(self, cart_admin):
-        cart = CartFactory(user=None, session_key="guest123")
+        cart = CartFactory(user=None)
 
         result = cart_admin.cart_owner_display(cart)
 
         assert "Guest" in result
-        assert "guest123" in result
+        assert f"Cart #{cart.id}" in result
 
     def test_cart_type_badge_authenticated(self, cart_admin):
         user = UserAccountFactory()
@@ -130,7 +130,7 @@ class TestCartAdmin:
         assert "bg-green-50" in result
 
     def test_cart_type_badge_guest(self, cart_admin):
-        cart = CartFactory(user=None, session_key="guest123")
+        cart = CartFactory(user=None)
 
         result = cart_admin.cart_type_badge(cart)
 

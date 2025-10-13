@@ -16,9 +16,10 @@ from cart.models import Cart
 from core.tasks import (
     MonitoredTask,
     backup_database_task,
+    cleanup_abandoned_carts,
     cleanup_old_backups,
+    cleanup_old_guest_carts,
     clear_all_cache_task,
-    clear_carts_for_none_users_task,
     clear_duplicate_history_task,
     clear_expired_notifications_task,
     clear_expired_sessions_task,
@@ -261,53 +262,101 @@ class TestClearExpiredNotificationsTask(TestCase):
 
 
 @pytest.mark.django_db
-class TestClearCartsForNoneUsersTask(TestCase):
+class TestCleanupAbandonedCartsTask(TestCase):
     def setUp(self):
         self.user = UserAccountFactory()
-        self.user_cart = Cart.objects.create(
-            user=self.user, session_key="user_session"
+        self.user_cart = Cart.objects.create(user=self.user)
+
+        self.old_empty_cart = Cart.objects.create(user=None)
+        Cart.objects.filter(id=self.old_empty_cart.id).update(
+            last_activity=timezone.now() - timedelta(days=10)
         )
-        self.null_cart1 = Cart.objects.create(
-            user=None, session_key="null_session1"
+        self.old_empty_cart.refresh_from_db()
+
+        self.recent_empty_cart = Cart.objects.create(user=None)
+        Cart.objects.filter(id=self.recent_empty_cart.id).update(
+            last_activity=timezone.now() - timedelta(days=3)
         )
-        self.null_cart2 = Cart.objects.create(
-            user=None, session_key="null_session2"
+        self.recent_empty_cart.refresh_from_db()
+
+        self.old_cart_with_items = Cart.objects.create(user=None)
+        Cart.objects.filter(id=self.old_cart_with_items.id).update(
+            last_activity=timezone.now() - timedelta(days=10)
+        )
+        self.old_cart_with_items.refresh_from_db()
+
+    def test_cleanup_abandoned_carts_removes_old_empty_carts(self):
+        from cart.factories import CartItemFactory
+
+        CartItemFactory(cart=self.old_cart_with_items)
+
+        result = cleanup_abandoned_carts()
+
+        self.assertEqual(result, 1)
+
+        self.assertFalse(
+            Cart.objects.filter(id=self.old_empty_cart.id).exists()
         )
 
-    @patch("core.tasks.logger")
-    def test_clear_null_user_carts(self, mock_logger):
-        result = clear_carts_for_none_users_task()
-
-        self.assertEqual(result["status"], "success")
-        self.assertEqual(result["carts_deleted"], 2)
-
-        self.assertFalse(Cart.objects.filter(user=None).exists())
-        self.assertTrue(Cart.objects.filter(user=self.user).exists())
-
-        mock_logger.info.assert_called()
-
-    @patch("core.tasks.logger")
-    def test_clear_null_user_carts_no_carts(self, mock_logger):
-        Cart.objects.filter(user=None).delete()
-
-        result = clear_carts_for_none_users_task()
-
-        self.assertEqual(result["status"], "success")
-        self.assertEqual(result["carts_deleted"], 0)
-
-    @patch("core.tasks.transaction.atomic")
-    @patch("core.tasks.logger")
-    def test_clear_null_user_carts_database_error(
-        self, mock_logger, mock_atomic
-    ):
-        mock_atomic.side_effect = Exception("Database error")
-
-        with self.assertRaises(Exception):
-            clear_carts_for_none_users_task()
-
-        mock_logger.exception.assert_called_with(
-            "Error clearing null user carts"
+        self.assertTrue(
+            Cart.objects.filter(id=self.recent_empty_cart.id).exists()
         )
+
+        self.assertTrue(Cart.objects.filter(id=self.user_cart.id).exists())
+
+        self.assertTrue(
+            Cart.objects.filter(id=self.old_cart_with_items.id).exists()
+        )
+
+    def test_cleanup_abandoned_carts_no_carts_to_delete(self):
+        Cart.objects.filter(
+            user=None,
+            items__isnull=True,
+            last_activity__lt=timezone.now() - timedelta(days=7),
+        ).delete()
+
+        result = cleanup_abandoned_carts()
+
+        self.assertEqual(result, 0)
+
+
+@pytest.mark.django_db
+class TestCleanupOldGuestCartsTask(TestCase):
+    def setUp(self):
+        self.user = UserAccountFactory()
+        self.user_cart = Cart.objects.create(user=self.user)
+
+        self.very_old_cart = Cart.objects.create(user=None)
+        Cart.objects.filter(id=self.very_old_cart.id).update(
+            last_activity=timezone.now() - timedelta(days=35)
+        )
+        self.very_old_cart.refresh_from_db()
+
+        self.recent_cart = Cart.objects.create(user=None)
+        Cart.objects.filter(id=self.recent_cart.id).update(
+            last_activity=timezone.now() - timedelta(days=15)
+        )
+        self.recent_cart.refresh_from_db()
+
+    def test_cleanup_old_guest_carts_removes_old_carts(self):
+        result = cleanup_old_guest_carts()
+
+        self.assertEqual(result, 1)
+
+        self.assertFalse(Cart.objects.filter(id=self.very_old_cart.id).exists())
+
+        self.assertTrue(Cart.objects.filter(id=self.recent_cart.id).exists())
+
+        self.assertTrue(Cart.objects.filter(id=self.user_cart.id).exists())
+
+    def test_cleanup_old_guest_carts_no_carts_to_delete(self):
+        Cart.objects.filter(
+            user=None, last_activity__lt=timezone.now() - timedelta(days=30)
+        ).delete()
+
+        result = cleanup_old_guest_carts()
+
+        self.assertEqual(result, 0)
 
 
 @pytest.mark.django_db
@@ -925,17 +974,21 @@ class TestValidateTaskConfiguration(TestCase):
 class TestTaskIntegration(TestCase):
     def setUp(self):
         self.user = UserAccountFactory()
-        self.cart = Cart.objects.create(user=None, session_key="test_session")
+        self.cart = Cart.objects.create(user=None)
 
     @patch("core.tasks.management.call_command")
     def test_multiple_cleanup_tasks_workflow(self, mock_call_command):
         session_result = clear_expired_sessions_task()
         cache_result = clear_all_cache_task()
-        cart_result = clear_carts_for_none_users_task()
+
+        Cart.objects.filter(id=self.cart.id).update(
+            last_activity=timezone.now() - timedelta(days=10)
+        )
+        cart_result = cleanup_abandoned_carts()
 
         self.assertEqual(session_result["status"], "success")
         self.assertEqual(cache_result["status"], "success")
-        self.assertEqual(cart_result["status"], "success")
+        self.assertEqual(cart_result, 1)
 
         self.assertFalse(Cart.objects.filter(user=None).exists())
 

@@ -37,13 +37,6 @@ GUEST_CART_HEADERS = [
         description="Cart ID for guest users. Used to identify and maintain guest cart sessions.",
         required=False,
     ),
-    OpenApiParameter(
-        name="X-Session-Key",
-        type=OpenApiTypes.STR,
-        location=OpenApiParameter.HEADER,
-        description="Session key for guest users. Used to validate cart ownership for anonymous sessions.",
-        required=False,
-    ),
 ]
 
 req_serializers: RequestSerializersConfig = {
@@ -76,7 +69,7 @@ cart_schema_config.update(
             operation_id="listCart",
             summary=_("Get cart"),
             description=_(
-                "Get a cart. For guest users, include X-Cart-Id and X-Session-Key headers to maintain cart session."
+                "Get a cart. For guest users, include X-Cart-Id header to maintain cart session."
             ),
             tags=["Cart"],
             parameters=GUEST_CART_HEADERS,
@@ -89,7 +82,7 @@ cart_schema_config.update(
             operation_id="retrieveCart",
             summary=_("Get cart"),
             description=_(
-                "Get a cart. For guest users, include X-Cart-Id and X-Session-Key headers to maintain cart session."
+                "Get a cart. For guest users, include X-Cart-Id header to maintain cart session."
             ),
             tags=["Cart"],
             parameters=GUEST_CART_HEADERS,
@@ -102,7 +95,7 @@ cart_schema_config.update(
             operation_id="updateCart",
             summary=_("Update cart"),
             description=_(
-                "Update a cart. For guest users, include X-Cart-Id and X-Session-Key headers to maintain cart session."
+                "Update a cart. For guest users, include X-Cart-Id header to maintain cart session."
             ),
             tags=["Cart"],
             parameters=GUEST_CART_HEADERS,
@@ -116,7 +109,7 @@ cart_schema_config.update(
             operation_id="partialUpdateCart",
             summary=_("Update cart"),
             description=_(
-                "Update a cart. For guest users, include X-Cart-Id and X-Session-Key headers to maintain cart session."
+                "Update a cart. For guest users, include X-Cart-Id header to maintain cart session."
             ),
             tags=["Cart"],
             parameters=GUEST_CART_HEADERS,
@@ -130,7 +123,7 @@ cart_schema_config.update(
             operation_id="destroyCart",
             summary=_("Delete cart"),
             description=_(
-                "Delete a cart. For guest users, include X-Cart-Id and X-Session-Key headers to maintain cart session."
+                "Delete a cart. For guest users, include X-Cart-Id header to maintain cart session."
             ),
             tags=["Cart"],
             parameters=GUEST_CART_HEADERS,

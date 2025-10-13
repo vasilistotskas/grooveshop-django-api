@@ -19,11 +19,6 @@ class CartItemFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         field_name="cart__uuid",
         help_text=_("Filter by cart UUID"),
     )
-    cart__session_key = filters.CharFilter(
-        field_name="cart__session_key",
-        lookup_expr="exact",
-        help_text=_("Filter by cart session key"),
-    )
     cart__user = filters.NumberFilter(
         field_name="cart__user__id",
         lookup_expr="exact",
@@ -153,7 +148,6 @@ class CartItemFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
             "quantity": ["exact", "gte", "lte"],
             "cart": ["exact"],
             "cart__user": ["exact"],
-            "cart__session_key": ["exact", "icontains"],
             "product": ["exact"],
             "product__active": ["exact"],
         }

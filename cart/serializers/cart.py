@@ -12,7 +12,7 @@ from product.serializers.product import ProductSerializer
 class CartWriteSerializer(serializers.ModelSerializer[Cart]):
     class Meta:
         model = Cart
-        fields = ("user", "session_key")
+        fields = ("user",)
 
 
 class CartSerializer(serializers.ModelSerializer[Cart]):
@@ -30,7 +30,6 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
         fields = (
             "id",
             "user",
-            "session_key",
             "uuid",
             "items",
             "total_price",

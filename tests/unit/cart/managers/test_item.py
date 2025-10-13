@@ -35,7 +35,7 @@ def cart(user):
 
 @pytest.fixture
 def guest_cart():
-    return CartFactory(user=None, session_key="guest123")
+    return CartFactory(user=None)
 
 
 @pytest.fixture
@@ -109,7 +109,7 @@ class TestCartItemQuerySet:
 
     def test_by_product_popularity(self, cart, product):
         _ = CartItemFactory(cart=cart, product=product, quantity=5)
-        cart2 = CartFactory(user=None, session_key="guest456")
+        cart2 = CartFactory(user=None)
         _ = CartItemFactory(cart=cart2, product=product, quantity=3)
 
         other_product = ProductFactory()
@@ -235,7 +235,7 @@ class TestCartItemQuerySet:
 
         active_item = CartItemFactory(cart=cart, product=product)
 
-        abandoned_cart = CartFactory(user=None, session_key="guest_abandoned")
+        abandoned_cart = CartFactory(user=None)
         abandoned_item = CartItemFactory(
             cart=abandoned_cart, product=ProductFactory()
         )
@@ -267,7 +267,7 @@ class TestCartItemQuerySet:
 
         abandoned_item = CartItemFactory(cart=cart, product=product)
 
-        active_cart = CartFactory(user=None, session_key="guest_active")
+        active_cart = CartFactory(user=None)
         active_item = CartItemFactory(
             cart=active_cart, product=ProductFactory()
         )

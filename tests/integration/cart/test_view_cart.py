@@ -26,12 +26,10 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         self.client.force_authenticate(user=self.user)
         self.detail_url = reverse("cart-detail")
 
-    def _add_cart_headers(self, cart_id=None, session_key=None):
+    def _add_cart_headers(self, cart_id=None):
         headers = {}
         if cart_id:
             headers["HTTP_X_CART_ID"] = str(cart_id)
-        if session_key:
-            headers["HTTP_X_SESSION_KEY"] = session_key
         return headers
 
     def test_cart_only_supports_detail_operations(self):
@@ -45,7 +43,6 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         expected_fields = {
             "id",
             "user",
-            "session_key",
             "last_activity",
             "created_at",
             "updated_at",
@@ -76,7 +73,6 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         expected_fields = {
             "id",
             "user",
-            "session_key",
             "last_activity",
             "created_at",
             "updated_at",
@@ -107,7 +103,6 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         expected_fields = {
             "id",
             "user",
-            "session_key",
             "last_activity",
             "created_at",
             "updated_at",
@@ -147,7 +142,6 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         expected_fields = {
             "id",
             "user",
-            "session_key",
             "last_activity",
             "created_at",
             "updated_at",
@@ -195,7 +189,6 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         expected_detail_fields = {
             "id",
             "user",
-            "session_key",
             "last_activity",
             "created_at",
             "updated_at",
@@ -221,7 +214,6 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         expected_detail_fields = {
             "id",
             "user",
-            "session_key",
             "last_activity",
             "created_at",
             "updated_at",
@@ -250,9 +242,7 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         self.client.force_authenticate(user=None)
 
         anonymous_cart = CartFactory(user=None, num_cart_items=0)
-        headers = self._add_cart_headers(
-            cart_id=anonymous_cart.id, session_key=anonymous_cart.session_key
-        )
+        headers = self._add_cart_headers(cart_id=anonymous_cart.id)
 
         response = self.client.get(self.detail_url, **headers)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -266,15 +256,12 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIsNotNone(response.data["id"])
         self.assertIsNone(response.data["user"])
-        self.assertIsNotNone(response.data["session_key"])
 
     def test_update_cart_as_anonymous_user(self):
         self.client.force_authenticate(user=None)
 
         anonymous_cart = CartFactory(user=None, num_cart_items=0)
-        headers = self._add_cart_headers(
-            cart_id=anonymous_cart.id, session_key=anonymous_cart.session_key
-        )
+        headers = self._add_cart_headers(cart_id=anonymous_cart.id)
 
         update_data = {}
         response = self.client.patch(
@@ -287,31 +274,26 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         self.client.force_authenticate(user=None)
 
         anonymous_cart = CartFactory(user=None, num_cart_items=0)
-        headers = self._add_cart_headers(
-            cart_id=anonymous_cart.id, session_key=anonymous_cart.session_key
-        )
+        headers = self._add_cart_headers(cart_id=anonymous_cart.id)
 
         response = self.client.delete(self.detail_url, **headers)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(Cart.objects.filter(pk=anonymous_cart.pk).exists())
 
-    def test_wrong_session_key_creates_new_cart(self):
+    def test_wrong_cart_id_creates_new_cart(self):
         self.client.force_authenticate(user=None)
 
         anonymous_cart = CartFactory(user=None, num_cart_items=0)
-        headers = self._add_cart_headers(
-            cart_id=anonymous_cart.id, session_key="wrong-session-key"
-        )
+        headers = self._add_cart_headers(cart_id=99999)
 
         response = self.client.get(self.detail_url, **headers)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertNotEqual(response.data["id"], anonymous_cart.pk)
+        self.assertNotEqual(response.data["id"], 99999)
 
     def test_authenticated_user_with_guest_cart_headers_merges(self):
         guest_cart = CartFactory(user=None, num_cart_items=0)
-        headers = self._add_cart_headers(
-            cart_id=guest_cart.id, session_key=guest_cart.session_key
-        )
+        headers = self._add_cart_headers(cart_id=guest_cart.id)
 
         response = self.client.get(self.detail_url, **headers)
         self.assertEqual(response.status_code, status.HTTP_200_OK)

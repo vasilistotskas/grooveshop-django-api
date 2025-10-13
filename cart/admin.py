@@ -34,7 +34,7 @@ class CartTypeFilter(DropdownFilter):
         if self.value() == "authenticated":
             return queryset.filter(user__isnull=False)
         elif self.value() == "guest":
-            return queryset.filter(user__isnull=True, session_key__isnull=False)
+            return queryset.filter(user__isnull=True)
         elif self.value() == "abandoned":
             cutoff = timezone.now() - timedelta(hours=24)
             return queryset.filter(last_activity__lt=cutoff)
@@ -206,7 +206,6 @@ class CartAdmin(ModelAdmin):
     )
     search_fields = (
         "id",
-        "session_key",
         "user__email",
         "user__username",
         "user__first_name",
@@ -216,7 +215,6 @@ class CartAdmin(ModelAdmin):
     list_select_related = ["user"]
     readonly_fields = [
         "id",
-        "session_key",
         "created_at",
         "updated_at",
         "last_activity",
@@ -228,7 +226,7 @@ class CartAdmin(ModelAdmin):
         (
             _("Cart Owner"),
             {
-                "fields": ("user", "session_key"),
+                "fields": ("user",),
                 "classes": ("wide",),
             },
         ),
@@ -265,18 +263,12 @@ class CartAdmin(ModelAdmin):
                 f"</div>"
             )
             return mark_safe(html)
-        elif obj.session_key:
-            safe_key = conditional_escape(obj.session_key[:12])
-            html = (
-                f'<div class="text-sm">'
-                f'<div class="font-medium text-base-700 dark:text-base-300">Guest User</div>'
-                f'<div class="text-base-500 dark:text-base-400 font-mono">{safe_key}...</div>'
-                f"</div>"
-            )
-            return mark_safe(html)
         else:
             return mark_safe(
-                '<span class="text-base-400 dark:text-base-500 italic">Anonymous</span>'
+                '<div class="text-sm">'
+                '<div class="font-medium text-base-700 dark:text-base-300">Guest User</div>'
+                f'<div class="text-base-500 dark:text-base-400">Cart #{obj.id}</div>'
+                "</div>"
             )
 
     cart_owner_display.short_description = _("Cart Owner")
@@ -289,19 +281,13 @@ class CartAdmin(ModelAdmin):
                 "👤 User"
                 "</span>"
             )
-        elif obj.session_key:
+        else:
             return mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
                 "🛒 Guest"
                 "</span>"
             )
-        return mark_safe(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-            'bg-gray-50 dark:bg-gray-900 text-base-700 dark:text-base-300 rounded-full">'
-            "❓ Unknown"
-            "</span>"
-        )
 
     cart_type_badge.short_description = _("Type")
 
@@ -466,7 +452,6 @@ class CartItemAdmin(ModelAdmin):
         "cart__user__email",
         "cart__user__username",
         "product__translations__name",
-        "cart__session_key",
     )
     list_select_related = ["cart", "cart__user", "product"]
     readonly_fields = [

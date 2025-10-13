@@ -240,7 +240,6 @@ class CartItemViewSetTest(TestURLFixerMixin, APITestCase):
 
         headers = {
             "HTTP_X_CART_ID": str(guest_cart.id),
-            "HTTP_X_SESSION_KEY": guest_cart.session_key,
         }
 
         create_data = {
@@ -266,7 +265,6 @@ class CartItemViewSetTest(TestURLFixerMixin, APITestCase):
 
         headers = {
             "HTTP_X_CART_ID": str(guest_cart.id),
-            "HTTP_X_SESSION_KEY": guest_cart.session_key,
         }
 
         response = self.client.get(self.list_url, **headers)

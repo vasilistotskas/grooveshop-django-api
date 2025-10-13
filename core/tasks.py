@@ -12,7 +12,7 @@ from django.core import management
 from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
 from django.core.mail import send_mail
-from django.db import connections, models, transaction, close_old_connections
+from django.db import connections, transaction, close_old_connections
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -261,33 +261,50 @@ def clear_expired_notifications_task(days=365):
     retry_backoff=True,
 )
 @track_task_metrics
-def clear_carts_for_none_users_task():
-    try:
-        with transaction.atomic():
-            stats = Cart.objects.filter(user=None).aggregate(
-                total_carts=models.Count("id"),
-                total_items=models.Count("items"),
-            )
+def cleanup_abandoned_carts():
+    cutoff_date = timezone.now() - timedelta(days=7)
 
-            deleted_count, details = Cart.objects.filter(user=None).delete()
+    abandoned_carts = Cart.objects.filter(
+        user__isnull=True,
+        items__isnull=True,
+        last_activity__lt=cutoff_date,
+    ).distinct()
 
-            message = (
-                f"Cleared {stats['total_carts'] or 0} null carts and "
-                f"{stats['total_items'] or 0} related cart items"
-            )
-            logger.info(message, extra={"deleted_details": details})
+    count = abandoned_carts.count()
 
-            return {
-                "status": "success",
-                "message": message,
-                "carts_deleted": stats["total_carts"] or 0,
-                "items_deleted": stats["total_items"] or 0,
-                "details": details,
-            }
+    if count > 0:
+        abandoned_carts.delete()
+        logger.info(f"Cleaned up {count} abandoned empty guest carts")
+    else:
+        logger.info("No abandoned carts to clean up")
 
-    except Exception:
-        logger.exception("Error clearing null user carts")
-        raise
+    return count
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=3,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+)
+@track_task_metrics
+def cleanup_old_guest_carts():
+    cutoff_date = timezone.now() - timedelta(days=30)
+
+    old_carts = Cart.objects.filter(
+        user__isnull=True,
+        last_activity__lt=cutoff_date,
+    )
+
+    count = old_carts.count()
+
+    if count > 0:
+        old_carts.delete()
+        logger.info(f"Cleaned up {count} old guest carts (30+ days inactive)")
+    else:
+        logger.info("No old guest carts to clean up")
+
+    return count
 
 
 @celery_app.task(

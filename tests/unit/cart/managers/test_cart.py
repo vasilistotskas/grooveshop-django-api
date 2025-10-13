@@ -27,7 +27,7 @@ def user(country):
 
 @pytest.fixture
 def guest_cart():
-    return CartFactory(user=None, session_key="guest123")
+    return CartFactory(user=None)
 
 
 @pytest.fixture

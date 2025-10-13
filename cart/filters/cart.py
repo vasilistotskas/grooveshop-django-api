@@ -35,21 +35,6 @@ class CartFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         help_text=_("Filter by active users"),
     )
 
-    session_key = filters.CharFilter(
-        field_name="session_key",
-        lookup_expr="exact",
-        help_text=_("Filter by exact session key"),
-    )
-    session_key__startswith = filters.CharFilter(
-        field_name="session_key",
-        lookup_expr="istartswith",
-        help_text=_("Filter by session key prefix"),
-    )
-    has_session_key = filters.BooleanFilter(
-        method="filter_has_session_key",
-        help_text=_("Filter carts with/without session keys"),
-    )
-
     is_guest = filters.BooleanFilter(
         method="filter_is_guest",
         help_text=_("Filter guest carts (True) or user carts (False)"),
@@ -135,7 +120,6 @@ class CartFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
             "uuid": ["exact"],
             "id": ["exact", "in"],
             "user": ["exact", "isnull"],
-            "session_key": ["exact", "icontains", "istartswith"],
             "last_activity": ["exact", "gte", "lte", "date"],
         }
 
@@ -145,18 +129,6 @@ class CartFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
             return queryset.filter(
                 Q(user__first_name__icontains=value)
                 | Q(user__last_name__icontains=value)
-            )
-        return queryset
-
-    def filter_has_session_key(self, queryset, name, value):
-        """Filter carts based on session key presence."""
-        if value is True:
-            return queryset.exclude(
-                Q(session_key__isnull=True) | Q(session_key__exact="")
-            )
-        elif value is False:
-            return queryset.filter(
-                Q(session_key__isnull=True) | Q(session_key__exact="")
             )
         return queryset
 
@@ -173,13 +145,9 @@ class CartFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         if value == "user":
             return queryset.filter(user__isnull=False)
         elif value == "guest":
-            return queryset.filter(user__isnull=True).exclude(
-                Q(session_key__isnull=True) | Q(session_key__exact="")
-            )
+            return queryset.filter(user__isnull=True)
         elif value == "anonymous":
-            return queryset.filter(user__isnull=True).filter(
-                Q(session_key__isnull=True) | Q(session_key__exact="")
-            )
+            return queryset.filter(user__isnull=True)
         return queryset
 
     def filter_is_active(self, queryset, name, value):

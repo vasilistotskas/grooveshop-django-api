@@ -1,5 +1,3 @@
-import uuid
-
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory, TestCase
@@ -28,19 +26,14 @@ class CartServiceTest(TestCase):
         self.request = self._create_request_with_headers(
             user=self.user,
             cart_id=self.cart.id,
-            session_key=None,
         )
 
-    def _create_request_with_headers(
-        self, user=None, cart_id=None, session_key=None
-    ):
+    def _create_request_with_headers(self, user=None, cart_id=None):
         request = self.factory.get("/")
         request.user = user or AnonymousUser()
 
         if cart_id:
             request.META["HTTP_X_CART_ID"] = str(cart_id)
-        if session_key:
-            request.META["HTTP_X_SESSION_KEY"] = session_key
 
         request.session = {}
 
@@ -79,7 +72,6 @@ class CartServiceTest(TestCase):
         request = self._create_request_with_headers(
             user=self.user,
             cart_id=guest_cart.id,
-            session_key=guest_cart.session_key,
         )
 
         CartService(request=request)
@@ -165,50 +157,41 @@ class CartServiceTest(TestCase):
 class GuestCartServiceTest(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
-        self.session_key = str(uuid.uuid4())
         self.product = ProductFactory(num_images=0, num_reviews=0)
 
-    def _create_guest_request(self, cart_id=None, session_key=None):
+    def _create_guest_request(self, cart_id=None):
         request = self.factory.get("/")
         request.user = AnonymousUser()
 
         if cart_id:
             request.META["HTTP_X_CART_ID"] = str(cart_id)
-        if session_key:
-            request.META["HTTP_X_SESSION_KEY"] = session_key
 
         request.session = {}
         return request
 
     def test_get_or_create_cart_for_new_guest(self):
-        request = self._create_guest_request(session_key=self.session_key)
+        request = self._create_guest_request()
 
         cart_service = CartService(request=request)
         cart = cart_service.get_or_create_cart()
 
         self.assertIsNotNone(cart)
         self.assertIsNone(cart.user)
-        self.assertEqual(cart.session_key, self.session_key)
 
     def test_get_or_create_cart_for_guest_with_existing_cart(self):
-        guest_cart = CartFactory(user=None, session_key=self.session_key)
+        guest_cart = CartFactory(user=None)
 
-        request = self._create_guest_request(
-            cart_id=guest_cart.id, session_key=self.session_key
-        )
+        request = self._create_guest_request(cart_id=guest_cart.id)
 
         cart_service = CartService(request=request)
         cart = cart_service.get_or_create_cart()
 
         self.assertIsNotNone(cart)
         self.assertEqual(cart.id, guest_cart.id)
-        self.assertEqual(cart.session_key, self.session_key)
 
     def test_create_cart_item_for_guest(self):
-        guest_cart = CartFactory(user=None, session_key=self.session_key)
-        request = self._create_guest_request(
-            cart_id=guest_cart.id, session_key=self.session_key
-        )
+        guest_cart = CartFactory(user=None)
+        request = self._create_guest_request(cart_id=guest_cart.id)
 
         cart_service = CartService(request=request)
         cart_item = cart_service.create_cart_item(self.product, 3)
@@ -219,23 +202,22 @@ class GuestCartServiceTest(TestCase):
         self.assertEqual(cart_item.cart.id, guest_cart.id)
 
     def test_guest_cart_string_representation(self):
-        request = self._create_guest_request(session_key=self.session_key)
+        request = self._create_guest_request()
         cart_service = CartService(request=request)
 
         self.assertTrue(str(cart_service).startswith("Cart Anonymous"))
 
-    def test_guest_cart_with_mismatched_session_key(self):
-        existing_cart = CartFactory(user=None, session_key="different-key")
+    def test_guest_cart_with_specific_cart_id(self):
+        guest_cart = CartFactory(user=None)
+        cart_id = guest_cart.id
 
-        request = self._create_guest_request(
-            cart_id=existing_cart.id, session_key=self.session_key
-        )
+        request = self._create_guest_request(cart_id=cart_id)
 
         cart_service = CartService(request=request)
         cart = cart_service.get_or_create_cart()
 
-        self.assertNotEqual(cart.id, existing_cart.id)
-        self.assertEqual(cart.session_key, self.session_key)
+        self.assertEqual(cart.id, cart_id)
+        self.assertIsNone(cart.user)
 
     def test_guest_cart_no_headers_creates_new(self):
         request = self._create_guest_request()
@@ -244,43 +226,38 @@ class GuestCartServiceTest(TestCase):
         cart = cart_service.get_or_create_cart()
 
         self.assertIsNotNone(cart)
-        self.assertIsNotNone(cart.session_key)
         self.assertIsNone(cart.user)
 
     def test_guest_cart_transition_to_user(self):
-        guest_cart = CartFactory(user=None, session_key=self.session_key)
+        guest_cart = CartFactory(user=None)
         CartItemFactory(cart=guest_cart, product=self.product, quantity=2)
+        guest_cart_id = guest_cart.id
 
         user = UserAccountFactory(num_addresses=0)
 
-        guest_request = self._create_guest_request(
-            cart_id=guest_cart.id, session_key=self.session_key
-        )
+        guest_request = self._create_guest_request(cart_id=guest_cart.id)
         guest_service = CartService(request=guest_request)
         self.assertEqual(guest_service.cart.items.count(), 1)
 
         user_request = self._create_request_with_headers(
-            user=user, cart_id=guest_cart.id, session_key=self.session_key
+            user=user, cart_id=guest_cart.id
         )
 
         user_service = CartService(request=user_request)
 
+        self.assertIsNotNone(user_service.cart)
         self.assertEqual(user_service.cart.user, user)
         self.assertEqual(user_service.cart.items.count(), 1)
         self.assertEqual(user_service.cart.items.first().quantity, 2)
 
-        self.assertFalse(Cart.objects.filter(id=guest_cart.id).exists())
+        self.assertFalse(Cart.objects.filter(id=guest_cart_id).exists())
 
-    def _create_request_with_headers(
-        self, user, cart_id=None, session_key=None
-    ):
+    def _create_request_with_headers(self, user, cart_id=None):
         request = self.factory.get("/")
         request.user = user
 
         if cart_id:
             request.META["HTTP_X_CART_ID"] = str(cart_id)
-        if session_key:
-            request.META["HTTP_X_SESSION_KEY"] = session_key
 
         request.session = {}
         return request

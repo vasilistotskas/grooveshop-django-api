@@ -536,9 +536,13 @@ def get_celery_beat_schedule():
             "task": "core.tasks.clear_all_cache_task",
             "schedule": SCHEDULE_PRESETS["monthly_first_4am"],
         },
-        "clear-carts-for-none-users": {
-            "task": "core.tasks.clear_carts_for_none_users_task",
-            "schedule": SCHEDULE_PRESETS["bimonthly_4am"],
+        "cleanup-abandoned-carts": {
+            "task": "core.tasks.cleanup_abandoned_carts",
+            "schedule": SCHEDULE_PRESETS["daily_4am"],
+        },
+        "cleanup-old-guest-carts": {
+            "task": "core.tasks.cleanup_old_guest_carts",
+            "schedule": SCHEDULE_PRESETS["daily_6am"],
         },
         "clear-expired-notifications": {
             "task": "core.tasks.clear_expired_notifications_task",
@@ -607,7 +611,6 @@ CORS_ALLOW_HEADERS = (
     *default_headers,
     "x-session-token",
     "x-cart-id",
-    "x-session-key",
     "location",
 )
 

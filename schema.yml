@@ -6439,8 +6439,8 @@ paths:
   /api/v1/cart:
     get:
       operationId: retrieveCart
-      description: Get a cart. For guest users, include X-Cart-Id and X-Session-Key
-        headers to maintain cart session.
+      description: Get a cart. For guest users, include X-Cart-Id header to maintain
+        cart session.
       summary: Get cart
       parameters:
       - in: header
@@ -6452,12 +6452,6 @@ paths:
           - type: integer
         description: Cart ID for guest users. Used to identify and maintain guest
           cart sessions.
-      - in: header
-        name: X-Session-Key
-        schema:
-          type: string
-        description: Session key for guest users. Used to validate cart ownership
-          for anonymous sessions.
       tags:
       - Cart
       security:
@@ -6479,8 +6473,8 @@ paths:
           description: ''
     put:
       operationId: updateCart
-      description: Update a cart. For guest users, include X-Cart-Id and X-Session-Key
-        headers to maintain cart session.
+      description: Update a cart. For guest users, include X-Cart-Id header to maintain
+        cart session.
       summary: Update cart
       parameters:
       - in: header
@@ -6492,12 +6486,6 @@ paths:
           - type: integer
         description: Cart ID for guest users. Used to identify and maintain guest
           cart sessions.
-      - in: header
-        name: X-Session-Key
-        schema:
-          type: string
-        description: Session key for guest users. Used to validate cart ownership
-          for anonymous sessions.
       tags:
       - Cart
       requestBody:
@@ -6530,8 +6518,8 @@ paths:
           description: ''
     patch:
       operationId: partialUpdateCart
-      description: Update a cart. For guest users, include X-Cart-Id and X-Session-Key
-        headers to maintain cart session.
+      description: Update a cart. For guest users, include X-Cart-Id header to maintain
+        cart session.
       summary: Update cart
       parameters:
       - in: header
@@ -6543,12 +6531,6 @@ paths:
           - type: integer
         description: Cart ID for guest users. Used to identify and maintain guest
           cart sessions.
-      - in: header
-        name: X-Session-Key
-        schema:
-          type: string
-        description: Session key for guest users. Used to validate cart ownership
-          for anonymous sessions.
       tags:
       - Cart
       requestBody:
@@ -6581,8 +6563,8 @@ paths:
           description: ''
     delete:
       operationId: destroyCart
-      description: Delete a cart. For guest users, include X-Cart-Id and X-Session-Key
-        headers to maintain cart session.
+      description: Delete a cart. For guest users, include X-Cart-Id header to maintain
+        cart session.
       summary: Delete cart
       parameters:
       - in: header
@@ -6594,12 +6576,6 @@ paths:
           - type: integer
         description: Cart ID for guest users. Used to identify and maintain guest
           cart sessions.
-      - in: header
-        name: X-Session-Key
-        schema:
-          type: string
-        description: Session key for guest users. Used to validate cart ownership
-          for anonymous sessions.
       tags:
       - Cart
       security:
@@ -6625,8 +6601,7 @@ paths:
     get:
       operationId: listCartItem
       description: Retrieve a list of cart items with filtering and search capabilities.
-        For guest users, include X-Cart-Id and X-Session-Key headers to maintain cart
-        session.
+        For guest users, include X-Cart-Id header to maintain cart session.
       summary: List cart items
       parameters:
       - in: header
@@ -6638,12 +6613,6 @@ paths:
           - type: integer
         description: Cart ID for guest users. Used to identify and maintain guest
           cart sessions.
-      - in: header
-        name: X-Session-Key
-        schema:
-          type: string
-        description: Session key for guest users. Used to validate cart ownership
-          for anonymous sessions.
       - in: query
         name: cart
         schema:
@@ -6664,15 +6633,6 @@ paths:
             - '0'
           - type: boolean
         description: Filter items in guest carts
-      - in: query
-        name: cart_SessionKey
-        schema:
-          type: string
-        description: Filter by cart session key
-      - in: query
-        name: cart_SessionKey_Icontains
-        schema:
-          type: string
       - in: query
         name: cart_User
         schema:
@@ -7078,7 +7038,7 @@ paths:
     post:
       operationId: createCartItem
       description: Create a new cart item. Requires authentication. For guest users,
-        include X-Cart-Id and X-Session-Key headers to maintain cart session.
+        include X-Cart-Id header to maintain cart session.
       summary: Create a cart item
       parameters:
       - in: header
@@ -7090,12 +7050,6 @@ paths:
           - type: integer
         description: Cart ID for guest users. Used to identify and maintain guest
           cart sessions.
-      - in: header
-        name: X-Session-Key
-        schema:
-          type: string
-        description: Session key for guest users. Used to validate cart ownership
-          for anonymous sessions.
       tags:
       - Cart Items
       requestBody:
@@ -7143,7 +7097,7 @@ paths:
     get:
       operationId: retrieveCartItem
       description: Get detailed information about a specific cart item. For guest
-        users, include X-Cart-Id and X-Session-Key headers to maintain cart session.
+        users, include X-Cart-Id header to maintain cart session.
       summary: Retrieve a cart item
       parameters:
       - in: header
@@ -7155,12 +7109,6 @@ paths:
           - type: integer
         description: Cart ID for guest users. Used to identify and maintain guest
           cart sessions.
-      - in: header
-        name: X-Session-Key
-        schema:
-          type: string
-        description: Session key for guest users. Used to validate cart ownership
-          for anonymous sessions.
       - in: path
         name: id
         schema:
@@ -7213,7 +7161,7 @@ paths:
     put:
       operationId: updateCartItem
       description: Update cart item information. Requires authentication. For guest
-        users, include X-Cart-Id and X-Session-Key headers to maintain cart session.
+        users, include X-Cart-Id header to maintain cart session.
       summary: Update a cart item
       parameters:
       - in: header
@@ -7225,12 +7173,6 @@ paths:
           - type: integer
         description: Cart ID for guest users. Used to identify and maintain guest
           cart sessions.
-      - in: header
-        name: X-Session-Key
-        schema:
-          type: string
-        description: Session key for guest users. Used to validate cart ownership
-          for anonymous sessions.
       - in: path
         name: id
         schema:
@@ -7290,8 +7232,7 @@ paths:
     patch:
       operationId: partialUpdateCartItem
       description: Partially update cart item information. Requires authentication.
-        For guest users, include X-Cart-Id and X-Session-Key headers to maintain cart
-        session.
+        For guest users, include X-Cart-Id header to maintain cart session.
       summary: Partially update a cart item
       parameters:
       - in: header
@@ -7303,12 +7244,6 @@ paths:
           - type: integer
         description: Cart ID for guest users. Used to identify and maintain guest
           cart sessions.
-      - in: header
-        name: X-Session-Key
-        schema:
-          type: string
-        description: Session key for guest users. Used to validate cart ownership
-          for anonymous sessions.
       - in: path
         name: id
         schema:
@@ -7378,7 +7313,7 @@ paths:
     delete:
       operationId: destroyCartItem
       description: Delete a cart item. Requires authentication. For guest users, include
-        X-Cart-Id and X-Session-Key headers to maintain cart session.
+        X-Cart-Id header to maintain cart session.
       summary: Delete a cart item
       parameters:
       - in: header
@@ -7390,12 +7325,6 @@ paths:
           - type: integer
         description: Cart ID for guest users. Used to identify and maintain guest
           cart sessions.
-      - in: header
-        name: X-Session-Key
-        schema:
-          type: string
-        description: Session key for guest users. Used to validate cart ownership
-          for anonymous sessions.
       - in: path
         name: id
         schema:
@@ -7434,8 +7363,8 @@ paths:
   /api/v1/cart/list:
     get:
       operationId: listCart
-      description: Get a cart. For guest users, include X-Cart-Id and X-Session-Key
-        headers to maintain cart session.
+      description: Get a cart. For guest users, include X-Cart-Id header to maintain
+        cart session.
       summary: Get cart
       parameters:
       - in: header
@@ -7447,12 +7376,6 @@ paths:
           - type: integer
         description: Cart ID for guest users. Used to identify and maintain guest
           cart sessions.
-      - in: header
-        name: X-Session-Key
-        schema:
-          type: string
-        description: Session key for guest users. Used to validate cart ownership
-          for anonymous sessions.
       - in: query
         name: cartType
         schema:
@@ -7531,18 +7454,6 @@ paths:
             - '0'
           - type: boolean
         description: Filter carts that have/don't have items
-      - in: query
-        name: hasSessionKey
-        schema:
-          oneOf:
-          - type: string
-            enum:
-            - 'true'
-            - 'false'
-            - '1'
-            - '0'
-          - type: boolean
-        description: Filter carts with/without session keys
       - in: query
         name: id
         schema:
@@ -7750,24 +7661,6 @@ paths:
         description: A search term.
         schema:
           type: string
-      - in: query
-        name: sessionKey
-        schema:
-          type: string
-        description: Filter by exact session key
-      - in: query
-        name: sessionKey_Icontains
-        schema:
-          type: string
-      - in: query
-        name: sessionKey_Istartswith
-        schema:
-          type: string
-      - in: query
-        name: sessionKey_Startswith
-        schema:
-          type: string
-        description: Filter by session key prefix
       - in: query
         name: updatedAfter
         schema:
@@ -22919,10 +22812,6 @@ components:
         user:
           type: integer
           nullable: true
-        sessionKey:
-          type: string
-          description: Session key for guest users
-          maxLength: 40
         uuid:
           type: string
           format: uuid
@@ -22999,10 +22888,6 @@ components:
         user:
           type: integer
           nullable: true
-        sessionKey:
-          type: string
-          description: Session key for guest users
-          maxLength: 40
         uuid:
           type: string
           format: uuid
@@ -23350,10 +23235,6 @@ components:
         user:
           type: integer
           nullable: true
-        sessionKey:
-          type: string
-          description: Session key for guest users
-          maxLength: 40
     CategoryEnum:
       enum:
       - MARKETING
@@ -25920,10 +25801,6 @@ components:
         user:
           type: integer
           nullable: true
-        sessionKey:
-          type: string
-          description: Session key for guest users
-          maxLength: 40
     PatchedCountryWriteRequest:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.

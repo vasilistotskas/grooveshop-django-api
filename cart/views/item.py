@@ -38,13 +38,6 @@ GUEST_CART_HEADERS = [
         description="Cart ID for guest users. Used to identify and maintain guest cart sessions.",
         required=False,
     ),
-    OpenApiParameter(
-        name="X-Session-Key",
-        type=OpenApiTypes.STR,
-        location=OpenApiParameter.HEADER,
-        description="Session key for guest users. Used to validate cart ownership for anonymous sessions.",
-        required=False,
-    ),
 ]
 
 req_serializers: RequestSerializersConfig = {
@@ -79,7 +72,7 @@ cart_item_schema_config.update(
             operation_id="listCartItem",
             summary=_("List cart items"),
             description=_(
-                "Retrieve a list of cart items with filtering and search capabilities. For guest users, include X-Cart-Id and X-Session-Key headers to maintain cart session."
+                "Retrieve a list of cart items with filtering and search capabilities. For guest users, include X-Cart-Id header to maintain cart session."
             ),
             tags=["Cart Items"],
             parameters=GUEST_CART_HEADERS,
@@ -95,7 +88,7 @@ cart_item_schema_config.update(
             operation_id="createCartItem",
             summary=_("Create a cart item"),
             description=_(
-                "Create a new cart item. Requires authentication. For guest users, include X-Cart-Id and X-Session-Key headers to maintain cart session."
+                "Create a new cart item. Requires authentication. For guest users, include X-Cart-Id header to maintain cart session."
             ),
             tags=["Cart Items"],
             parameters=GUEST_CART_HEADERS,
@@ -111,7 +104,7 @@ cart_item_schema_config.update(
             operation_id="retrieveCartItem",
             summary=_("Retrieve a cart item"),
             description=_(
-                "Get detailed information about a specific cart item. For guest users, include X-Cart-Id and X-Session-Key headers to maintain cart session."
+                "Get detailed information about a specific cart item. For guest users, include X-Cart-Id header to maintain cart session."
             ),
             tags=["Cart Items"],
             parameters=GUEST_CART_HEADERS,
@@ -126,7 +119,7 @@ cart_item_schema_config.update(
             operation_id="updateCartItem",
             summary=_("Update a cart item"),
             description=_(
-                "Update cart item information. Requires authentication. For guest users, include X-Cart-Id and X-Session-Key headers to maintain cart session."
+                "Update cart item information. Requires authentication. For guest users, include X-Cart-Id header to maintain cart session."
             ),
             tags=["Cart Items"],
             parameters=GUEST_CART_HEADERS,
@@ -143,7 +136,7 @@ cart_item_schema_config.update(
             operation_id="partialUpdateCartItem",
             summary=_("Partially update a cart item"),
             description=_(
-                "Partially update cart item information. Requires authentication. For guest users, include X-Cart-Id and X-Session-Key headers to maintain cart session."
+                "Partially update cart item information. Requires authentication. For guest users, include X-Cart-Id header to maintain cart session."
             ),
             tags=["Cart Items"],
             parameters=GUEST_CART_HEADERS,
@@ -160,7 +153,7 @@ cart_item_schema_config.update(
             operation_id="destroyCartItem",
             summary=_("Delete a cart item"),
             description=_(
-                "Delete a cart item. Requires authentication. For guest users, include X-Cart-Id and X-Session-Key headers to maintain cart session."
+                "Delete a cart item. Requires authentication. For guest users, include X-Cart-Id header to maintain cart session."
             ),
             tags=["Cart Items"],
             parameters=GUEST_CART_HEADERS,
@@ -194,7 +187,6 @@ class CartItemViewSet(BaseModelViewSet):
     search_fields = [
         "product__translations__name",
         "cart__user__email",
-        "cart__session_key",
     ]
     cart_service: CartService
 
@@ -238,7 +230,12 @@ class CartItemViewSet(BaseModelViewSet):
 
     def create(self, request, *args, **kwargs):
         if not self.cart_service.cart:
-            self.cart_service.get_or_create_cart()
+            self.cart_service.cart = self.cart_service.get_or_create_cart()
+            self.cart_service.cart_items = (
+                self.cart_service.cart.get_items()
+                if self.cart_service.cart
+                else []
+            )
 
         return super().create(request, *args, **kwargs)
 

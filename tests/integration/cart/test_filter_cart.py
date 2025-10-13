@@ -42,11 +42,11 @@ class CartFilterTest(APITestCase):
     def test_session_filters(self):
         url = reverse("cart-list")
 
-        response = self.client.get(url, {"session_key": "test-session"})
+        response = self.client.get(url, {"user__isnull": "true"})
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response.data["results"], list)
 
-        response = self.client.get(url, {"has_session": "true"})
+        response = self.client.get(url, {"user__isnull": "false"})
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response.data["results"], list)
 

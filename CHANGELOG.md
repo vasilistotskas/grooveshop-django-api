@@ -3,6 +3,14 @@
 
 
 
+## v1.43.1 (2025-10-13)
+
+### Bug fixes
+
+* fix: sync ([`bc4e6ff`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bc4e6ffa40f8c914c701eecbc1bd3c251e81c734))
+
+* fix: Dockerfile ([`a810f83`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a810f831984e51fc5513697d83c991a6bbaa2f19))
+
 ## v1.43.0 (2025-10-13)
 
 ### Features

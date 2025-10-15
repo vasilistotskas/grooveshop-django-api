@@ -14,8 +14,8 @@ classifiers = [
 ]
 dependencies = [
   "asgiref==3.10.0",
-  "boto3==1.40.47",
-  "charset_normalizer==3.4.3",
+  "boto3==1.40.52",
+  "charset_normalizer==3.4.4",
   "channels[daphne]==4.3.1",
   "channels-redis==4.3.0",
   "cryptography==46.0.2",
@@ -28,7 +28,7 @@ dependencies = [
   "django-cors-headers==4.9.0",
   "django-simple-history==3.10.1",
   "django-filter==25.2",
-  "django-unfold==0.67.0",
+  "django-unfold==0.68.0",
   "django-money==3.5.4",
   "django-mptt==0.18.0",
   "django-parler==2.3.0",
@@ -47,7 +47,7 @@ dependencies = [
   "importlib-resources==6.5.2",
   "measurement==3.2.2",
   "meilisearch==0.37.0",
-  "phonenumbers==9.0.15",
+  "phonenumbers==9.0.16",
   "pillow==11.3.0",
   "psycopg[binary,pool] == 3.2.10",
   "python-dotenv==1.1.1",
@@ -55,10 +55,10 @@ dependencies = [
   "urllib3==2.5.0",
   "uvicorn==0.37.0",
   "celery[redis] >=5.5.3,<6.0.0",
-  "disposable-email-domains==0.0.138",
+  "disposable-email-domains==0.0.139",
   "django-stubs-ext==5.2.7",
   "twisted[http2,tls]==25.5.0",
-  "dj-stripe==2.10.1",
+  "dj-stripe==2.10.2",
 ]
 
 [project.urls]
@@ -79,8 +79,8 @@ dev = [
     "types-setuptools==80.9.0.20250822",
     "pre-commit==4.3.0",
     "pip-upgrader==1.4.15",
-    "pydantic==2.12.0",
-    "pylint==3.3.9",
+    "pydantic==2.12.2",
+    "pylint==4.0.1",
     "pyjwt==2.10.1",
     "pytest==8.4.2",
     "pytest-asyncio==1.2.0",

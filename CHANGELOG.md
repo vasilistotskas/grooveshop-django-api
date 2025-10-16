@@ -3,6 +3,12 @@
 
 
 
+## v1.44.1 (2025-10-16)
+
+### Bug fixes
+
+* fix: remove `seo` app and move SeoModel in core, admin remove `format_html` and use `mark_safe` and bump versions ([`ccbfe54`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ccbfe54a792ed73e43ad290b7a7741e297423e2b))
+
 ## v1.44.0 (2025-10-15)
 
 ### Features

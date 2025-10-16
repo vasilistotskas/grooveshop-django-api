@@ -297,3 +297,7 @@ class UserAccountSubscriptionIntegrationTestCase(TestCase):
         self.assertTrue(prefs.get("topic-0"))
         self.assertFalse(prefs.get("topic-1"))
         self.assertIsNone(prefs.get("topic-2"))
+
+    def tearDown(self):
+        UserSubscription.objects.all().delete()
+        SubscriptionTopic.objects.all().delete()

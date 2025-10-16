@@ -14,11 +14,11 @@ classifiers = [
 ]
 dependencies = [
   "asgiref==3.10.0",
-  "boto3==1.40.52",
+  "boto3==1.40.53",
   "charset_normalizer==3.4.4",
   "channels[daphne]==4.3.1",
   "channels-redis==4.3.0",
-  "cryptography==46.0.2",
+  "cryptography==46.0.3",
   "django==5.2.7",
   "django-admin-thumbnails==0.2.9",
   "django-allauth==65.12.0",
@@ -48,17 +48,17 @@ dependencies = [
   "measurement==3.2.2",
   "meilisearch==0.37.0",
   "phonenumbers==9.0.16",
-  "pillow==11.3.0",
+  "pillow==12.0.0",
   "psycopg[binary,pool] == 3.2.10",
   "python-dotenv==1.1.1",
   "qrcode==8.2",
   "urllib3==2.5.0",
   "uvicorn==0.37.0",
   "celery[redis] >=5.5.3,<6.0.0",
-  "disposable-email-domains==0.0.139",
+  "disposable-email-domains==0.0.140",
   "django-stubs-ext==5.2.7",
   "twisted[http2,tls]==25.5.0",
-  "dj-stripe==2.10.2",
+  "dj-stripe==2.10.3",
 ]
 
 [project.urls]
@@ -69,7 +69,7 @@ repository = "https://github.com/vasilistotskas/grooveshop-django-api"
 # ─────────────────────────────────────────────────────────
 [dependency-groups]
 dev = [
-    "coverage[toml]==7.10.7",
+    "coverage[toml]==7.11.0",
     "djangorestframework-stubs==3.16.4",
     "django-debug-toolbar==6.0.0",
     "django-stubs==5.2.7",

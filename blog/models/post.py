@@ -13,7 +13,7 @@ from core.fields.image import ImageAndSvgField
 from core.models import PublishableModel, TimeStampMixinModel, UUIDModel
 from core.utils.generators import SlugifyConfig, unique_slugify
 from meili.models import IndexMixin
-from seo.models import SeoModel
+from core.models import SeoModel
 
 
 class BlogPost(

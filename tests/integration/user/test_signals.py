@@ -218,3 +218,7 @@ class SignalDisconnectionTest(TestCase):
 
         finally:
             post_save.connect(create_default_subscriptions, sender=User)
+
+    def tearDown(self):
+        UserSubscription.objects.all().delete()
+        SubscriptionTopic.objects.all().delete()

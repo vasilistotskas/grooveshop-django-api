@@ -92,7 +92,6 @@ LOCAL_APPS = [
     "order",
     "search",
     "blog",
-    "seo",
     "vat",
     "country",
     "region",

@@ -12,7 +12,7 @@ from core.utils.generators import SlugifyConfig, unique_slugify
 from product.enum.category import CategoryImageTypeEnum
 from product.managers.category import CategoryManager
 from product.models.product import Product
-from seo.models import SeoModel
+from core.models import SeoModel
 
 
 class ProductCategory(

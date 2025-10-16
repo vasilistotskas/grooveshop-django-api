@@ -423,3 +423,7 @@ class UserSubscriptionStatusSerializerTest(TestCase):
 
         self.assertTrue(serializer.fields["subscribed"].read_only)
         self.assertTrue(serializer.fields["available"].read_only)
+
+    def tearDown(self):
+        UserSubscription.objects.all().delete()
+        SubscriptionTopic.objects.all().delete()

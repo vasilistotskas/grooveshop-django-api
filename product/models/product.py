@@ -39,7 +39,7 @@ from product.managers.product import ProductManager
 from product.models.favourite import ProductFavourite
 from product.models.image import ProductImage
 from product.models.review import ProductReview
-from seo.models import SeoModel
+from core.models import SeoModel
 from tag.models.tagged_item import TaggedModel
 
 DISCOUNT_PERCENT_MIN = Decimal("0.0")

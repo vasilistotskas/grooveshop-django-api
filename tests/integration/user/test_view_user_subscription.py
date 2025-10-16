@@ -478,3 +478,7 @@ class UserSubscriptionViewSetTest(BaseSubscriptionAPITest):
         response = self.client.get(url, {"ordering": "created_at"})
         dates = [sub["created_at"] for sub in response.data["results"]]
         self.assertEqual(dates, sorted(dates))
+
+    def tearDown(self):
+        UserSubscription.objects.all().delete()
+        SubscriptionTopic.objects.all().delete()

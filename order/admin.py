@@ -3,7 +3,8 @@ from datetime import timedelta
 from django.contrib import admin
 from django.db.models import Count, Sum
 from django.utils import timezone
-from django.utils.html import format_html
+from django.utils.html import conditional_escape
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.contrib.filters.admin import (
@@ -225,47 +226,51 @@ class OrderItemInline(TabularInline):
                 obj.product.safe_translation_getter("name", any_language=True)
                 or "Unnamed Product"
             )
-            return format_html(
+            safe_name = conditional_escape(product_name)
+            safe_id = conditional_escape(str(obj.product.id))
+
+            html = (
                 '<div class="text-sm">'
-                '<div class="font-medium text-base-900 dark:text-base-100">{}</div>'
-                '<div class="text-base-500 dark:text-base-400">ID: {}</div>'
-                "</div>",
-                product_name,
-                obj.product.id,
+                f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
+                f'<div class="text-base-500 dark:text-base-400">ID: {safe_id}</div>'
+                "</div>"
             )
+            return mark_safe(html)
         return "-"
 
     product_display.short_description = _("Product")
 
     def price_display(self, obj):
-        return format_html(
-            '<div class="text-sm font-medium text-base-900 dark:text-base-100">{}</div>',
-            obj.price,
-        )
+        safe_price = conditional_escape(str(obj.price))
+        html = f'<div class="text-sm font-medium text-base-900 dark:text-base-100">{safe_price}</div>'
+        return mark_safe(html)
 
     price_display.short_description = _("Unit Price")
 
     def total_display(self, obj):
-        return format_html(
-            '<div class="text-sm font-bold text-base-900 dark:text-base-100">{}</div>',
-            obj.total_price,
-        )
+        safe_total = conditional_escape(str(obj.total_price))
+        html = f'<div class="text-sm font-bold text-base-900 dark:text-base-100">{safe_total}</div>'
+        return mark_safe(html)
 
     total_display.short_description = _("Total")
 
     def refund_status(self, obj):
         if obj.is_refunded:
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
+            html = (
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
                 "↩️ Refunded"
                 "</span>"
             )
+            return mark_safe(html)
         elif obj.refunded_quantity > 0:
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full">'
+            html = (
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full">'
                 "⚠️ Partial"
                 "</span>"
             )
+            return mark_safe(html)
         return ""
 
     refund_status.short_description = _("Refund Status")
@@ -295,22 +300,24 @@ class OrderHistoryInline(TabularInline):
             obj.safe_translation_getter("description", any_language=True)
             or "No description"
         )
-        return format_html(
-            '<div class="text-sm text-base-700 dark:text-base-300">{}</div>',
-            description[:100] + "..."
-            if len(description) > 100
-            else description,
+        desc_display = (
+            description[:100] + "..." if len(description) > 100 else description
         )
+        safe_desc = conditional_escape(desc_display)
+
+        html = f'<div class="text-sm text-base-700 dark:text-base-300">{safe_desc}</div>'
+        return mark_safe(html)
 
     description_display.short_description = _("Description")
 
     def user_display(self, obj):
         if obj.user:
-            return format_html(
-                '<div class="text-sm text-base-700 dark:text-base-300">{}</div>',
-                obj.user.full_name or obj.user.username,
+            safe_name = conditional_escape(
+                obj.user.full_name or obj.user.username
             )
-        return format_html(
+            html = f'<div class="text-sm text-base-700 dark:text-base-300">{safe_name}</div>'
+            return mark_safe(html)
+        return mark_safe(
             '<span class="text-base-400 dark:text-base-500">System</span>'
         )
 
@@ -490,16 +497,18 @@ class OrderAdmin(ModelAdmin):
 
     def customer_info(self, obj):
         full_name = f"{obj.first_name} {obj.last_name}"
-        return format_html(
+        safe_name = conditional_escape(full_name)
+        safe_email = conditional_escape(obj.email)
+        safe_phone = conditional_escape(obj.phone or "No phone")
+
+        html = (
             '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{}</div>'
-            '<div class="text-base-500 dark:text-base-400">{}</div>'
-            '<div class="text-base-500 dark:text-base-400">{}</div>'
-            "</div>",
-            full_name,
-            obj.email,
-            obj.phone or "No phone",
+            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
+            f'<div class="text-base-500 dark:text-base-400">{safe_email}</div>'
+            f'<div class="text-base-500 dark:text-base-400">{safe_phone}</div>'
+            "</div>"
         )
+        return mark_safe(html)
 
     customer_info.short_description = _("Customer")
 
@@ -509,69 +518,75 @@ class OrderAdmin(ModelAdmin):
 
         try:
             total_price = obj.total_price
-            price_display = str(total_price)
+            price_display = conditional_escape(str(total_price))
         except ValueError as e:
             items_total = obj.total_price_items
             shipping_total = obj.total_price_extra
-            price_display = format_html(
-                '<span class="text-red-600 dark:text-red-400" title="Currency mismatch: {}">'
-                "Items: {} + Ship: {}"
-                "</span>",
-                str(e),
-                items_total,
-                shipping_total,
+            safe_error = conditional_escape(str(e))
+            safe_items = conditional_escape(str(items_total))
+            safe_shipping = conditional_escape(str(shipping_total))
+
+            price_display = (
+                f'<span class="text-red-600 dark:text-red-400" title="Currency mismatch: {safe_error}">'
+                f"Items: {safe_items} + Ship: {safe_shipping}"
+                "</span>"
             )
 
-        return format_html(
+        safe_count = conditional_escape(str(item_count))
+        safe_qty = conditional_escape(str(total_qty or 0))
+
+        html = (
             '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{} items</div>'
-            '<div class="text-base-500 dark:text-base-400">Qty: {}</div>'
-            '<div class="font-bold text-base-900 dark:text-base-100">{}</div>'
-            "</div>",
-            item_count,
-            total_qty or 0,
-            price_display,
+            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_count} items</div>'
+            f'<div class="text-base-500 dark:text-base-400">Qty: {safe_qty}</div>'
+            f'<div class="font-bold text-base-900 dark:text-base-100">{price_display}</div>'
+            "</div>"
         )
+        return mark_safe(html)
 
     order_summary.short_description = _("Order Summary")
 
     def payment_info(self, obj):
         payment_badge = self.payment_status_badge(obj)
         paid_amount = obj.paid_amount or obj.total_price
+        safe_amount = conditional_escape(str(paid_amount))
+        safe_method = conditional_escape(obj.payment_method or "Not set")
 
-        return format_html(
+        html = (
             '<div class="text-sm">'
-            "<div>{}</div>"
-            '<div class="font-medium text-base-900 dark:text-base-100">{}</div>'
-            '<div class="text-base-500 dark:text-base-400">{}</div>'
-            "</div>",
-            payment_badge,
-            paid_amount,
-            obj.payment_method or "Not set",
+            f"<div>{payment_badge}</div>"
+            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_amount}</div>'
+            f'<div class="text-base-500 dark:text-base-400">{safe_method}</div>'
+            "</div>"
         )
+        return mark_safe(html)
 
     payment_info.short_description = _("Payment")
 
     def shipping_info(self, obj):
+        safe_city = conditional_escape(obj.city)
+
         if obj.tracking_number:
-            return format_html(
+            safe_tracking = conditional_escape(obj.tracking_number)
+            safe_carrier = conditional_escape(
+                obj.shipping_carrier or "Unknown carrier"
+            )
+
+            html = (
                 '<div class="text-sm">'
-                '<div class="font-medium text-blue-600 dark:text-blue-400">{}</div>'
-                '<div class="text-base-500 dark:text-base-400">{}</div>'
-                '<div class="text-base-500 dark:text-base-400">{}</div>'
-                "</div>",
-                obj.tracking_number,
-                obj.shipping_carrier or "Unknown carrier",
-                obj.city,
+                f'<div class="font-medium text-blue-600 dark:text-blue-400">{safe_tracking}</div>'
+                f'<div class="text-base-500 dark:text-base-400">{safe_carrier}</div>'
+                f'<div class="text-base-500 dark:text-base-400">{safe_city}</div>'
+                "</div>"
             )
         else:
-            return format_html(
+            html = (
                 '<div class="text-sm">'
                 '<div class="text-base-500 dark:text-base-400">No tracking</div>'
-                '<div class="text-base-500 dark:text-base-400">{}</div>'
-                "</div>",
-                obj.city,
+                f'<div class="text-base-500 dark:text-base-400">{safe_city}</div>'
+                "</div>"
             )
+        return mark_safe(html)
 
     shipping_info.short_description = _("Shipping")
 
@@ -589,15 +604,18 @@ class OrderAdmin(ModelAdmin):
             time_ago = f"{diff.days}d ago"
             color = "text-base-600 dark:text-base-400"
 
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{}</div>'
-            '<div class="{}">{}</div>'
-            "</div>",
-            obj.created_at.strftime("%Y-%m-%d %H:%M"),
-            color,
-            time_ago,
+        safe_date = conditional_escape(
+            obj.created_at.strftime("%Y-%m-%d %H:%M")
         )
+        safe_time = conditional_escape(time_ago)
+
+        html = (
+            '<div class="text-sm">'
+            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_date}</div>'
+            f'<div class="{color}">{safe_time}</div>'
+            "</div>"
+        )
+        return mark_safe(html)
 
     created_display.short_description = _("Created")
 
@@ -609,23 +627,29 @@ class OrderAdmin(ModelAdmin):
         age = now - obj.created_at
 
         if obj.status == OrderStatus.PENDING and age > timedelta(hours=24):
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
+            html = (
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
                 "🚨 Urgent"
                 "</span>"
             )
+            return mark_safe(html)
         elif obj.status == OrderStatus.PROCESSING and age > timedelta(days=3):
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full">'
+            html = (
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full">'
                 "⚠️ Delayed"
                 "</span>"
             )
+            return mark_safe(html)
         elif obj.status == OrderStatus.SHIPPED and age > timedelta(days=7):
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-full">'
+            html = (
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-full">'
                 "📦 Follow up"
                 "</span>"
             )
+            return mark_safe(html)
         return ""
 
     urgency_indicator.short_description = _("Priority")
@@ -683,16 +707,16 @@ class OrderAdmin(ModelAdmin):
             },
         )
 
-        return format_html(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium {} {} rounded-full gap-1">'
-            "<span>{}</span>"
-            "<span>{}</span>"
-            "</span>",
-            config["bg"],
-            config["text"],
-            config["icon"],
-            obj.get_status_display(),
+        safe_status = conditional_escape(obj.get_status_display())
+
+        html = (
+            f'<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
+            f'{config["bg"]} {config["text"]} rounded-full gap-1">'
+            f"<span>{config['icon']}</span>"
+            f"<span>{safe_status}</span>"
+            "</span>"
         )
+        return mark_safe(html)
 
     status_badge.short_description = _("Status")
 
@@ -744,16 +768,16 @@ class OrderAdmin(ModelAdmin):
             },
         )
 
-        return format_html(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium {} {} rounded-full gap-1">'
-            "<span>{}</span>"
-            "<span>{}</span>"
-            "</span>",
-            config["bg"],
-            config["text"],
-            config["icon"],
-            obj.get_payment_status_display(),
+        safe_payment = conditional_escape(obj.get_payment_status_display())
+
+        html = (
+            f'<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
+            f'{config["bg"]} {config["text"]} rounded-full gap-1">'
+            f"<span>{config['icon']}</span>"
+            f"<span>{safe_payment}</span>"
+            "</span>"
         )
+        return mark_safe(html)
 
     def document_type_badge(self, obj):
         document_config = {
@@ -798,16 +822,16 @@ class OrderAdmin(ModelAdmin):
             },
         )
 
-        return format_html(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium {} {} rounded-full gap-1">'
-            "<span>{}</span>"
-            "<span>{}</span>"
-            "</span>",
-            config["bg"],
-            config["text"],
-            config["icon"],
-            obj.get_document_type_display(),
+        safe_doc = conditional_escape(obj.get_document_type_display())
+
+        html = (
+            f'<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
+            f'{config["bg"]} {config["text"]} rounded-full gap-1">'
+            f"<span>{config['icon']}</span>"
+            f"<span>{safe_doc}</span>"
+            "</span>"
         )
+        return mark_safe(html)
 
     document_type_badge.short_description = _("Document Type")
 
@@ -817,44 +841,50 @@ class OrderAdmin(ModelAdmin):
             shipping_currency = obj.shipping_price.currency
 
             if items_currency == shipping_currency:
-                return format_html(
-                    '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
-                    "✅ {}"
-                    "</span>",
-                    items_currency,
+                safe_currency = conditional_escape(str(items_currency))
+                html = (
+                    '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                    'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
+                    f"✅ {safe_currency}"
+                    "</span>"
                 )
             else:
-                return format_html(
-                    '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
+                html = (
+                    '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                    'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
                     "⚠️ Mixed"
                     "</span>"
                 )
         except ValueError:
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
+            html = (
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
                 "❌ Mismatch"
                 "</span>"
             )
+        return mark_safe(html)
 
     currency_status.short_description = _("Currency")
 
     def customer_summary(self, obj):
-        return format_html(
+        safe_name = conditional_escape(obj.customer_full_name)
+        safe_email = conditional_escape(obj.email)
+        safe_phone = conditional_escape(obj.phone or "Not provided")
+        safe_mobile = conditional_escape(obj.mobile_phone or "Not provided")
+        account_status = "Registered User" if obj.user else "Guest"
+
+        html = (
             '<div class="text-sm">'
             '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Full Name:</strong></div><div>{}</div>"
-            "<div><strong>Email:</strong></div><div>{}</div>"
-            "<div><strong>Phone:</strong></div><div>{}</div>"
-            "<div><strong>Mobile:</strong></div><div>{}</div>"
-            "<div><strong>Account:</strong></div><div>{}</div>"
+            f"<div><strong>Full Name:</strong></div><div>{safe_name}</div>"
+            f"<div><strong>Email:</strong></div><div>{safe_email}</div>"
+            f"<div><strong>Phone:</strong></div><div>{safe_phone}</div>"
+            f"<div><strong>Mobile:</strong></div><div>{safe_mobile}</div>"
+            f"<div><strong>Account:</strong></div><div>{account_status}</div>"
             "</div>"
-            "</div>",
-            obj.customer_full_name,
-            obj.email,
-            obj.phone or "Not provided",
-            obj.mobile_phone or "Not provided",
-            "Registered User" if obj.user else "Guest",
+            "</div>"
         )
+        return mark_safe(html)
 
     customer_summary.short_description = _("Customer Summary")
 
@@ -862,59 +892,69 @@ class OrderAdmin(ModelAdmin):
         shipping = obj.shipping_price
         items_total = obj.total_price_items
 
+        safe_shipping = conditional_escape(str(shipping))
+        safe_items = conditional_escape(str(items_total))
+
         try:
             total = obj.total_price
-            total_display = str(total)
+            total_display = conditional_escape(str(total))
             currency_warning = ""
         except ValueError as e:
-            total_display = format_html(
-                '<span class="text-red-600 dark:text-red-400">Currency Mismatch</span>'
-            )
-            currency_warning = format_html(
-                '<div><strong>Currency Issue:</strong></div><div class="text-red-600 dark:text-red-400 text-xs">{}</div>',
-                str(e),
+            total_display = '<span class="text-red-600 dark:text-red-400">Currency Mismatch</span>'
+            safe_error = conditional_escape(str(e))
+            currency_warning = (
+                "<div><strong>Currency Issue:</strong></div>"
+                f'<div class="text-red-600 dark:text-red-400 text-xs">{safe_error}</div>'
             )
 
-        return format_html(
+        safe_paid = conditional_escape(str(obj.paid_amount or "Not paid"))
+        safe_payment_status = conditional_escape(
+            obj.get_payment_status_display()
+        )
+        safe_payment_method = conditional_escape(
+            obj.payment_method or "Not specified"
+        )
+        safe_doc_type = conditional_escape(obj.get_document_type_display())
+
+        html = (
             '<div class="text-sm">'
             '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Items Total:</strong></div><div>{}</div>"
-            "<div><strong>Shipping:</strong></div><div>{}</div>"
-            '<div><strong>Grand Total:</strong></div><div class="font-bold">{}</div>'
-            "<div><strong>Paid Amount:</strong></div><div>{}</div>"
-            "<div><strong>Payment Status:</strong></div><div>{}</div>"
-            "<div><strong>Payment Method:</strong></div><div>{}</div>"
-            "<div><strong>Document Type:</strong></div><div>{}</div>"
-            "{}"
+            f"<div><strong>Items Total:</strong></div><div>{safe_items}</div>"
+            f"<div><strong>Shipping:</strong></div><div>{safe_shipping}</div>"
+            f'<div><strong>Grand Total:</strong></div><div class="font-bold">{total_display}</div>'
+            f"<div><strong>Paid Amount:</strong></div><div>{safe_paid}</div>"
+            f"<div><strong>Payment Status:</strong></div><div>{safe_payment_status}</div>"
+            f"<div><strong>Payment Method:</strong></div><div>{safe_payment_method}</div>"
+            f"<div><strong>Document Type:</strong></div><div>{safe_doc_type}</div>"
+            f"{currency_warning}"
             "</div>"
-            "</div>",
-            items_total,
-            shipping,
-            total_display,
-            obj.paid_amount or "Not paid",
-            obj.get_payment_status_display(),
-            obj.payment_method or "Not specified",
-            obj.get_document_type_display(),
-            currency_warning,
+            "</div>"
         )
+        return mark_safe(html)
 
     financial_summary.short_description = _("Financial Summary")
 
     def shipping_summary(self, obj):
-        return format_html(
+        safe_address = conditional_escape(obj.full_address)
+        safe_tracking = conditional_escape(
+            obj.tracking_number or "Not assigned"
+        )
+        safe_carrier = conditional_escape(
+            obj.shipping_carrier or "Not assigned"
+        )
+        safe_price = conditional_escape(str(obj.shipping_price))
+
+        html = (
             '<div class="text-sm">'
             '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Full Address:</strong></div><div>{}</div>"
-            "<div><strong>Tracking:</strong></div><div>{}</div>"
-            "<div><strong>Carrier:</strong></div><div>{}</div>"
-            "<div><strong>Shipping Cost:</strong></div><div>{}</div>"
+            f"<div><strong>Full Address:</strong></div><div>{safe_address}</div>"
+            f"<div><strong>Tracking:</strong></div><div>{safe_tracking}</div>"
+            f"<div><strong>Carrier:</strong></div><div>{safe_carrier}</div>"
+            f"<div><strong>Shipping Cost:</strong></div><div>{safe_price}</div>"
             "</div>"
-            "</div>",
-            obj.full_address,
-            obj.tracking_number or "Not assigned",
-            obj.shipping_carrier or "Not assigned",
-            obj.shipping_price,
+            "</div>"
         )
+        return mark_safe(html)
 
     shipping_summary.short_description = _("Shipping Summary")
 
@@ -946,30 +986,35 @@ class OrderAdmin(ModelAdmin):
         except ValueError:
             currency_status = "Mismatch Error"
 
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Order Age:</strong></div><div>{}d {}h</div>"
-            "<div><strong>Status Age:</strong></div><div>{}</div>"
-            "<div><strong>Items Count:</strong></div><div>{}</div>"
-            "<div><strong>Can Cancel:</strong></div><div>{}</div>"
-            "<div><strong>Is Paid:</strong></div><div>{}</div>"
-            '<div><strong>Currency Status:</strong></div><div class="{}">{}</div>'
-            '<div><strong>Available Docs:</strong></div><div class="text-xs">{}</div>'
-            "</div>"
-            "</div>",
-            age.days,
-            age.seconds // 3600,
-            processing_time or "N/A",
-            getattr(obj, "item_count", 0),
-            "Yes" if obj.can_be_canceled else "No",
-            "Yes" if obj.is_paid else "No",
+        safe_days = conditional_escape(str(age.days))
+        safe_hours = conditional_escape(str(age.seconds // 3600))
+        safe_processing = conditional_escape(processing_time or "N/A")
+        safe_count = conditional_escape(str(getattr(obj, "item_count", 0)))
+        can_cancel = "Yes" if obj.can_be_canceled else "No"
+        is_paid = "Yes" if obj.is_paid else "No"
+        safe_currency = conditional_escape(currency_status)
+        safe_docs = conditional_escape(doc_types)
+
+        currency_class = (
             "text-red-600 dark:text-red-400"
             if "Mismatch" in currency_status or "Mixed" in currency_status
-            else "",
-            currency_status,
-            doc_types,
+            else ""
         )
+
+        html = (
+            '<div class="text-sm">'
+            '<div class="grid grid-cols-2 gap-2">'
+            f"<div><strong>Order Age:</strong></div><div>{safe_days}d {safe_hours}h</div>"
+            f"<div><strong>Status Age:</strong></div><div>{safe_processing}</div>"
+            f"<div><strong>Items Count:</strong></div><div>{safe_count}</div>"
+            f"<div><strong>Can Cancel:</strong></div><div>{can_cancel}</div>"
+            f"<div><strong>Is Paid:</strong></div><div>{is_paid}</div>"
+            f'<div><strong>Currency Status:</strong></div><div class="{currency_class}">{safe_currency}</div>'
+            f'<div><strong>Available Docs:</strong></div><div class="text-xs">{safe_docs}</div>'
+            "</div>"
+            "</div>"
+        )
+        return mark_safe(html)
 
     order_analytics.short_description = _("Order Analytics")
 
@@ -1146,17 +1191,19 @@ class OrderItemAdmin(ModelAdmin):
     )
 
     def order_link(self, obj):
-        url = f"/admin/order/order/{obj.order.id}/change/"
-        status_badge = self.order_status_mini(obj.order)
-        return format_html(
-            '<div class="text-sm">'
-            '<a href="{}" class="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">Order #{}</a>'
-            "<div>{}</div>"
-            "</div>",
-            url,
-            obj.order.id,
-            status_badge,
+        safe_url = conditional_escape(
+            f"/admin/order/order/{obj.order.id}/change/"
         )
+        safe_id = conditional_escape(str(obj.order.id))
+        status_badge = self.order_status_mini(obj.order)
+
+        html = (
+            '<div class="text-sm">'
+            f'<a href="{safe_url}" class="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">Order #{safe_id}</a>'
+            f"<div>{status_badge}</div>"
+            "</div>"
+        )
+        return mark_safe(html)
 
     order_link.short_description = _("Order")
 
@@ -1174,104 +1221,121 @@ class OrderItemAdmin(ModelAdmin):
         color = status_colors.get(
             order.status, "text-base-600 dark:text-base-400"
         )
-        return format_html(
-            '<span class="{}">{}</span>', color, order.get_status_display()
-        )
+        safe_status = conditional_escape(order.get_status_display())
+
+        html = f'<span class="{color}">{safe_status}</span>'
+        return mark_safe(html)
 
     def product_display(self, obj):
         product_name = (
             obj.product.safe_translation_getter("name", any_language=True)
             or "Unnamed Product"
         )
-        return format_html(
+        safe_name = conditional_escape(product_name)
+        safe_id = conditional_escape(str(obj.product.id))
+
+        html = (
             '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{}</div>'
-            '<div class="text-base-500 dark:text-base-400">ID: {}</div>'
-            "</div>",
-            product_name,
-            obj.product.id,
+            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
+            f'<div class="text-base-500 dark:text-base-400">ID: {safe_id}</div>'
+            "</div>"
         )
+        return mark_safe(html)
 
     product_display.short_description = _("Product")
 
     def quantity_display(self, obj):
         if obj.refunded_quantity > 0:
-            return format_html(
+            safe_qty = conditional_escape(str(obj.quantity))
+            safe_refunded = conditional_escape(str(obj.refunded_quantity))
+            safe_net = conditional_escape(str(obj.net_quantity))
+
+            html = (
                 '<div class="text-sm">'
-                '<div class="font-medium text-base-900 dark:text-base-100">Total: {}</div>'
-                '<div class="text-red-600 dark:text-red-400">Refunded: {}</div>'
-                '<div class="text-green-600 dark:text-green-400">Net: {}</div>'
-                "</div>",
-                obj.quantity,
-                obj.refunded_quantity,
-                obj.net_quantity,
+                f'<div class="font-medium text-base-900 dark:text-base-100">Total: {safe_qty}</div>'
+                f'<div class="text-red-600 dark:text-red-400">Refunded: {safe_refunded}</div>'
+                f'<div class="text-green-600 dark:text-green-400">Net: {safe_net}</div>'
+                "</div>"
             )
         else:
-            return format_html(
-                '<span class="inline-flex items-center px-3 py-1 text-sm font-medium bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
-                "x{}"
-                "</span>",
-                obj.quantity,
+            safe_qty = conditional_escape(str(obj.quantity))
+            html = (
+                f'<span class="inline-flex items-center px-3 py-1 text-sm font-medium '
+                f'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
+                f"x{safe_qty}"
+                "</span>"
             )
+        return mark_safe(html)
 
     quantity_display.short_description = _("Quantity")
 
     def pricing_info(self, obj):
-        return format_html(
+        safe_price = conditional_escape(str(obj.price))
+        safe_total = conditional_escape(str(obj.total_price))
+        safe_net = conditional_escape(str(obj.net_price))
+
+        html = (
             '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{} each</div>'
-            '<div class="font-bold text-base-900 dark:text-base-100">Total: {}</div>'
-            '<div class="text-green-600 dark:text-green-400">Net: {}</div>'
-            "</div>",
-            obj.price,
-            obj.total_price,
-            obj.net_price,
+            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_price} each</div>'
+            f'<div class="font-bold text-base-900 dark:text-base-100">Total: {safe_total}</div>'
+            f'<div class="text-green-600 dark:text-green-400">Net: {safe_net}</div>'
+            "</div>"
         )
+        return mark_safe(html)
 
     pricing_info.short_description = _("Pricing")
 
     def refund_status_display(self, obj):
         if obj.is_refunded:
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
+            html = (
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
                 "↩️ Fully Refunded"
                 "</span>"
             )
         elif obj.refunded_quantity > 0:
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full">'
-                "⚠️ Partial ({}/{})"
-                "</span>",
-                obj.refunded_quantity,
-                obj.quantity,
+            safe_refunded = conditional_escape(str(obj.refunded_quantity))
+            safe_qty = conditional_escape(str(obj.quantity))
+            html = (
+                f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                f'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full">'
+                f"⚠️ Partial ({safe_refunded}/{safe_qty})"
+                "</span>"
             )
-        return format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
-            "✅ Active"
-            "</span>"
-        )
+        else:
+            html = (
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
+                "✅ Active"
+                "</span>"
+            )
+        return mark_safe(html)
 
     refund_status_display.short_description = _("Refund Status")
 
     def item_analytics(self, obj):
-        return format_html(
+        safe_original = conditional_escape(
+            str(obj.original_quantity or obj.quantity)
+        )
+        safe_current = conditional_escape(str(obj.quantity))
+        safe_refunded = conditional_escape(str(obj.refunded_quantity))
+        safe_net_qty = conditional_escape(str(obj.net_quantity))
+        safe_refunded_amt = conditional_escape(str(obj.refunded_amount))
+        safe_net_price = conditional_escape(str(obj.net_price))
+
+        html = (
             '<div class="text-sm">'
             '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Original Qty:</strong></div><div>{}</div>"
-            "<div><strong>Current Qty:</strong></div><div>{}</div>"
-            "<div><strong>Refunded Qty:</strong></div><div>{}</div>"
-            "<div><strong>Net Qty:</strong></div><div>{}</div>"
-            "<div><strong>Refunded Amount:</strong></div><div>{}</div>"
-            "<div><strong>Net Amount:</strong></div><div>{}</div>"
+            f"<div><strong>Original Qty:</strong></div><div>{safe_original}</div>"
+            f"<div><strong>Current Qty:</strong></div><div>{safe_current}</div>"
+            f"<div><strong>Refunded Qty:</strong></div><div>{safe_refunded}</div>"
+            f"<div><strong>Net Qty:</strong></div><div>{safe_net_qty}</div>"
+            f"<div><strong>Refunded Amount:</strong></div><div>{safe_refunded_amt}</div>"
+            f"<div><strong>Net Amount:</strong></div><div>{safe_net_price}</div>"
             "</div>"
-            "</div>",
-            obj.original_quantity or obj.quantity,
-            obj.quantity,
-            obj.refunded_quantity,
-            obj.net_quantity,
-            obj.refunded_amount,
-            obj.net_price,
+            "</div>"
         )
+        return mark_safe(html)
 
     item_analytics.short_description = _("Item Analytics")
 
@@ -1317,12 +1381,16 @@ class OrderHistoryAdmin(ModelAdmin):
     list_select_related = ["order", "user"]
 
     def order_link(self, obj):
-        url = f"/admin/order/order/{obj.order.id}/change/"
-        return format_html(
-            '<a href="{}" class="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">Order #{}</a>',
-            url,
-            obj.order.id,
+        safe_url = conditional_escape(
+            f"/admin/order/order/{obj.order.id}/change/"
         )
+        safe_id = conditional_escape(str(obj.order.id))
+
+        html = (
+            f'<a href="{safe_url}" class="font-medium text-blue-600 dark:text-blue-400 '
+            f'hover:text-blue-800 dark:hover:text-blue-300">Order #{safe_id}</a>'
+        )
+        return mark_safe(html)
 
     order_link.short_description = _("Order")
 
@@ -1379,16 +1447,16 @@ class OrderHistoryAdmin(ModelAdmin):
             },
         )
 
-        return format_html(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium {} {} rounded-full gap-1">'
-            "<span>{}</span>"
-            "<span>{}</span>"
-            "</span>",
-            config["bg"],
-            config["text"],
-            config["icon"],
-            obj.get_change_type_display(),
+        safe_type = conditional_escape(obj.get_change_type_display())
+
+        html = (
+            f'<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
+            f'{config["bg"]} {config["text"]} rounded-full gap-1">'
+            f"<span>{config['icon']}</span>"
+            f"<span>{safe_type}</span>"
+            "</span>"
         )
+        return mark_safe(html)
 
     change_type_badge.short_description = _("Change Type")
 
@@ -1397,21 +1465,29 @@ class OrderHistoryAdmin(ModelAdmin):
             obj.safe_translation_getter("description", any_language=True)
             or "No description"
         )
-        return format_html(
-            '<div class="text-sm text-base-700 dark:text-base-300" title="{}">{}</div>',
-            description,
-            description[:80] + "..." if len(description) > 80 else description,
+        desc_display = (
+            description[:80] + "..." if len(description) > 80 else description
         )
+        safe_desc = conditional_escape(description)
+        safe_display = conditional_escape(desc_display)
+
+        html = (
+            f'<div class="text-sm text-base-700 dark:text-base-300" title="{safe_desc}">'
+            f"{safe_display}"
+            "</div>"
+        )
+        return mark_safe(html)
 
     description_display.short_description = _("Description")
 
     def user_display(self, obj):
         if obj.user:
-            return format_html(
-                '<div class="text-sm text-base-700 dark:text-base-300">{}</div>',
-                obj.user.full_name or obj.user.username,
+            safe_name = conditional_escape(
+                obj.user.full_name or obj.user.username
             )
-        return format_html(
+            html = f'<div class="text-sm text-base-700 dark:text-base-300">{safe_name}</div>'
+            return mark_safe(html)
+        return mark_safe(
             '<span class="text-base-400 dark:text-base-500 italic">System</span>'
         )
 
@@ -1455,16 +1531,19 @@ class OrderItemHistoryAdmin(ModelAdmin):
     list_select_related = ["order_item", "order_item__order", "user"]
 
     def order_item_link(self, obj):
-        url = f"/admin/order/orderitem/{obj.order_item.id}/change/"
-        return format_html(
-            '<div class="text-sm">'
-            '<a href="{}" class="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">Item #{}</a>'
-            '<div class="text-base-500 dark:text-base-400">Order #{}</div>'
-            "</div>",
-            url,
-            obj.order_item.id,
-            obj.order_item.order.id,
+        safe_url = conditional_escape(
+            f"/admin/order/orderitem/{obj.order_item.id}/change/"
         )
+        safe_item_id = conditional_escape(str(obj.order_item.id))
+        safe_order_id = conditional_escape(str(obj.order_item.order.id))
+
+        html = (
+            '<div class="text-sm">'
+            f'<a href="{safe_url}" class="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">Item #{safe_item_id}</a>'
+            f'<div class="text-base-500 dark:text-base-400">Order #{safe_order_id}</div>'
+            "</div>"
+        )
+        return mark_safe(html)
 
     order_item_link.short_description = _("Order Item")
 
@@ -1493,17 +1572,16 @@ class OrderItemHistoryAdmin(ModelAdmin):
         }
 
         config = type_config.get(obj.change_type, type_config["OTHER"])
+        safe_type = conditional_escape(obj.get_change_type_display())
 
-        return format_html(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium {} {} rounded-full gap-1">'
-            "<span>{}</span>"
-            "<span>{}</span>"
-            "</span>",
-            config["bg"],
-            config["text"],
-            config["icon"],
-            obj.get_change_type_display(),
+        html = (
+            f'<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
+            f'{config["bg"]} {config["text"]} rounded-full gap-1">'
+            f"<span>{config['icon']}</span>"
+            f"<span>{safe_type}</span>"
+            "</span>"
         )
+        return mark_safe(html)
 
     change_type_badge.short_description = _("Change Type")
 
@@ -1512,20 +1590,24 @@ class OrderItemHistoryAdmin(ModelAdmin):
             obj.safe_translation_getter("description", any_language=True)
             or "No description"
         )
-        return format_html(
-            '<div class="text-sm text-base-700 dark:text-base-300">{}</div>',
-            description[:60] + "..." if len(description) > 60 else description,
+        desc_display = (
+            description[:60] + "..." if len(description) > 60 else description
         )
+        safe_desc = conditional_escape(desc_display)
+
+        html = f'<div class="text-sm text-base-700 dark:text-base-300">{safe_desc}</div>'
+        return mark_safe(html)
 
     description_display.short_description = _("Description")
 
     def user_display(self, obj):
         if obj.user:
-            return format_html(
-                '<div class="text-sm text-base-700 dark:text-base-300">{}</div>',
-                obj.user.full_name or obj.user.username,
+            safe_name = conditional_escape(
+                obj.user.full_name or obj.user.username
             )
-        return format_html(
+            html = f'<div class="text-sm text-base-700 dark:text-base-300">{safe_name}</div>'
+            return mark_safe(html)
+        return mark_safe(
             '<span class="text-base-400 dark:text-base-500 italic">System</span>'
         )
 

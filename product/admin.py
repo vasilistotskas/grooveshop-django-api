@@ -7,7 +7,7 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse_lazy
 from django.utils import timezone
-from django.utils.html import format_html
+from django.utils.html import conditional_escape
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext
@@ -233,11 +233,13 @@ class ProductImageInline(TabularInline):
 
     def image_preview(self, obj):
         if obj.image:
-            return format_html(
-                '<img src="{}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb;" />',
-                obj.image.url,
+            safe_url = conditional_escape(obj.image.url)
+            html = (
+                f'<img src="{safe_url}" '
+                'style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb;" />'
             )
-        return format_html(
+            return mark_safe(html)
+        return mark_safe(
             '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-400 dark:text-base-500 text-xs">No Image</div>'
         )
 
@@ -418,29 +420,28 @@ class ProductAdmin(
         )
         main_image = obj.images.filter(is_main=True).first()
 
-        image_html = ""
+        safe_name = conditional_escape(name)
+        safe_sku = conditional_escape(obj.sku[:8])
+
         if main_image and main_image.image:
-            image_html = format_html(
-                '<img src="{}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb; margin-right: 12px;" />',
-                main_image.image.url,
+            safe_url = conditional_escape(main_image.image.url)
+            image_html = (
+                f'<img src="{safe_url}" '
+                'style="width: 50px; height: 50px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb; margin-right: 12px;" />'
             )
         else:
-            image_html = format_html(
-                '<div style="width: 50px; height: 50px; background: #f3f4f6; border-radius: 8px; border: 1px solid #e5e7eb; margin-right: 12px; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 20px;">📦</div>'
-            )
+            image_html = '<div style="width: 50px; height: 50px; background: #f3f4f6; border-radius: 8px; border: 1px solid #e5e7eb; margin-right: 12px; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 20px;">📦</div>'
 
-        return format_html(
+        html = (
             '<div style="display: flex; align-items: center;">'
-            "{}"
+            f"{image_html}"
             '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{}</div>'
-            '<div class="text-base-500 dark:text-base-400">#{}</div>'
+            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
+            f'<div class="text-base-500 dark:text-base-400">#{safe_sku}</div>'
             "</div>"
-            "</div>",
-            image_html,
-            name,
-            obj.sku[:8],
+            "</div>"
         )
+        return mark_safe(html)
 
     product_info.short_description = _("Product")
 
@@ -458,15 +459,19 @@ class ProductAdmin(
                 ]
             )
 
-            return format_html(
-                '<div class="text-sm">'
-                '<div class="font-medium text-base-900 dark:text-base-100">{}</div>'
-                '<div class="text-xs text-base-500 dark:text-base-400">{}</div>'
-                "</div>",
-                category_name,
-                category_path if category_path else "Root",
+            safe_name = conditional_escape(category_name)
+            safe_path = conditional_escape(
+                category_path if category_path else "Root"
             )
-        return format_html(
+
+            html = (
+                '<div class="text-sm">'
+                f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
+                f'<div class="text-xs text-base-500 dark:text-base-400">{safe_path}</div>'
+                "</div>"
+            )
+            return mark_safe(html)
+        return mark_safe(
             '<span class="text-base-400 dark:text-base-500">No Category</span>'
         )
 
@@ -477,6 +482,10 @@ class ProductAdmin(
         final_price = obj.final_price
         discount = obj.discount_percent
 
+        safe_price = conditional_escape(str(price))
+        safe_final = conditional_escape(str(final_price))
+        safe_discount = conditional_escape(str(discount))
+
         price_class = (
             "text-base-500 dark:text-base-400 line-through"
             if discount > 0
@@ -484,58 +493,57 @@ class ProductAdmin(
         )
 
         if discount > 0:
-            return format_html(
+            html = (
                 '<div class="text-sm">'
-                '<div class="{}">{}</div>'
-                '<div class="font-bold text-green-600 dark:text-green-400">{}</div>'
-                '<div class="text-xs text-red-600 dark:text-red-400">-{}%</div>'
-                "</div>",
-                price_class,
-                price,
-                final_price,
-                discount,
+                f'<div class="{price_class}">{safe_price}</div>'
+                f'<div class="font-bold text-green-600 dark:text-green-400">{safe_final}</div>'
+                f'<div class="text-xs text-red-600 dark:text-red-400">-{safe_discount}%</div>'
+                "</div>"
             )
         else:
-            return format_html(
-                '<div class="text-sm"><div class="{}">{}</div></div>',
-                price_class,
-                price,
+            html = (
+                '<div class="text-sm">'
+                f'<div class="{price_class}">{safe_price}</div>'
+                "</div>"
             )
+        return mark_safe(html)
 
     pricing_info.short_description = _("Pricing")
 
     def stock_info(self, obj):
         stock = obj.stock
+        safe_stock = conditional_escape(str(stock))
 
         if stock == 0:
-            stock_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
+            stock_badge = (
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
                 "❌ Out of Stock"
                 "</span>"
             )
         elif stock <= 5:
-            stock_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full">'
-                "⚠️ Critical ({})"
-                "</span>",
-                stock,
+            stock_badge = (
+                f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                f'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full">'
+                f"⚠️ Critical ({safe_stock})"
+                "</span>"
             )
         elif stock <= 10:
-            stock_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-full">'
-                "🔶 Low ({})"
-                "</span>",
-                stock,
+            stock_badge = (
+                f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                f'bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-full">'
+                f"🔶 Low ({safe_stock})"
+                "</span>"
             )
         else:
-            stock_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
-                "✅ In Stock ({})"
-                "</span>",
-                stock,
+            stock_badge = (
+                f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                f'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
+                f"✅ In Stock ({safe_stock})"
+                "</span>"
             )
 
-        return stock_badge
+        return mark_safe(stock_badge)
 
     stock_info.short_description = _("Stock")
 
@@ -545,16 +553,18 @@ class ProductAdmin(
         rating = obj.review_average
         rating_formatted = "{:.1f}".format(float(rating))
 
-        return format_html(
+        safe_views = conditional_escape(str(views))
+        safe_likes = conditional_escape(str(likes))
+        safe_rating = conditional_escape(rating_formatted)
+
+        html = (
             '<div class="text-sm">'
-            '<div class="text-base-600 dark:text-base-400">👁️ {}</div>'
-            '<div class="text-base-600 dark:text-base-400">❤️ {}</div>'
-            '<div class="text-base-600 dark:text-base-400">⭐ {}/10</div>'
-            "</div>",
-            views,
-            likes,
-            rating_formatted,
+            f'<div class="text-base-600 dark:text-base-400">👁️ {safe_views}</div>'
+            f'<div class="text-base-600 dark:text-base-400">❤️ {safe_likes}</div>'
+            f'<div class="text-base-600 dark:text-base-400">⭐ {safe_rating}/10</div>'
+            "</div>"
         )
+        return mark_safe(html)
 
     performance_metrics.short_description = _("Performance")
 
@@ -581,26 +591,29 @@ class ProductAdmin(
                 "</span>"
             )
         elif obj.stock <= 10:
+            safe_stock = conditional_escape(str(obj.stock))
             badges.append(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-full border border-yellow-200 dark:border-yellow-700" title="Low stock - only {} units remaining">'
+                f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-full border border-yellow-200 dark:border-yellow-700" title="Low stock - only {safe_stock} units remaining">'
                 "⚠️ Low Stock"
-                "</span>".format(obj.stock)
+                "</span>"
             )
 
         if obj.discount_percent > 0:
+            safe_discount = conditional_escape(str(obj.discount_percent))
             badges.append(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full border border-orange-200 dark:border-orange-700" title="Product has {}% discount applied">'
-                "🏷️ {}% OFF"
-                "</span>".format(obj.discount_percent, obj.discount_percent)
+                f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full border border-orange-200 dark:border-orange-700" title="Product has {safe_discount}% discount applied">'
+                f"🏷️ {safe_discount}% OFF"
+                "</span>"
             )
 
         thirty_days_ago = timezone.now() - timedelta(days=30)
         if obj.created_at >= thirty_days_ago:
             days_old = (timezone.now() - obj.created_at).days
+            safe_days = conditional_escape(str(days_old))
             badges.append(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full border border-blue-200 dark:border-blue-700" title="Product added {} days ago">'
+                f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full border border-blue-200 dark:border-blue-700" title="Product added {safe_days} days ago">'
                 "🆕 New"
-                "</span>".format(days_old)
+                "</span>"
             )
 
         if hasattr(obj, "is_featured") and obj.is_featured:
@@ -612,10 +625,11 @@ class ProductAdmin(
 
         views = obj.view_count
         if views > 100:
+            safe_views = conditional_escape(str(views))
             badges.append(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded-full border border-indigo-200 dark:border-indigo-700" title="Product has {} views - performing well">'
+                f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded-full border border-indigo-200 dark:border-indigo-700" title="Product has {safe_views} views - performing well">'
                 "🔥 Popular"
-                "</span>".format(views)
+                "</span>"
             )
 
         return mark_safe(
@@ -638,15 +652,16 @@ class ProductAdmin(
             time_ago = obj.created_at.strftime("%Y-%m-%d")
             color = "text-base-600 dark:text-base-400"
 
-        return format_html(
+        safe_date = conditional_escape(obj.created_at.strftime("%Y-%m-%d"))
+        safe_time = conditional_escape(time_ago)
+
+        html = (
             '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{}</div>'
-            '<div class="{}">{}</div>'
-            "</div>",
-            obj.created_at.strftime("%Y-%m-%d"),
-            color,
-            time_ago,
+            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_date}</div>'
+            f'<div class="{color}">{safe_time}</div>'
+            "</div>"
         )
+        return mark_safe(html)
 
     created_display.short_description = _("Created")
 
@@ -658,24 +673,26 @@ class ProductAdmin(
         vat_value = obj.vat_value
         vat_percent = obj.vat_percent
 
-        return format_html(
+        safe_price = conditional_escape(str(price))
+        safe_discount = conditional_escape(str(discount))
+        safe_discount_val = conditional_escape(str(discount_value))
+        safe_vat_percent = conditional_escape(str(vat_percent))
+        safe_vat_value = conditional_escape(str(vat_value))
+        safe_final = conditional_escape(str(final_price))
+
+        html = (
             '<div class="text-sm">'
             '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Base Price:</strong></div><div>{}</div>"
-            "<div><strong>Discount %:</strong></div><div>{}%</div>"
-            "<div><strong>Discount Value:</strong></div><div>{}</div>"
-            "<div><strong>VAT %:</strong></div><div>{}%</div>"
-            "<div><strong>VAT Value:</strong></div><div>{}</div>"
-            '<div><strong>Final Price:</strong></div><div class="font-bold">{}</div>'
+            f"<div><strong>Base Price:</strong></div><div>{safe_price}</div>"
+            f"<div><strong>Discount %:</strong></div><div>{safe_discount}%</div>"
+            f"<div><strong>Discount Value:</strong></div><div>{safe_discount_val}</div>"
+            f"<div><strong>VAT %:</strong></div><div>{safe_vat_percent}%</div>"
+            f"<div><strong>VAT Value:</strong></div><div>{safe_vat_value}</div>"
+            f'<div><strong>Final Price:</strong></div><div class="font-bold">{safe_final}</div>'
             "</div>"
-            "</div>",
-            price,
-            discount,
-            discount_value,
-            vat_percent,
-            vat_value,
-            final_price,
+            "</div>"
         )
+        return mark_safe(html)
 
     pricing_summary.short_description = _("Pricing Summary")
 
@@ -691,24 +708,26 @@ class ProductAdmin(
             ((likes + favorites_count) / max(views, 1)) * 100
         )
 
-        return format_html(
+        safe_views = conditional_escape(str(views))
+        safe_likes = conditional_escape(str(likes))
+        safe_favorites = conditional_escape(str(favorites_count))
+        safe_reviews = conditional_escape(str(review_count))
+        safe_rating = conditional_escape(rating_formatted)
+        safe_engagement = conditional_escape(engagement_formatted)
+
+        html = (
             '<div class="text-sm">'
             '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Total Views:</strong></div><div>{}</div>"
-            "<div><strong>Likes:</strong></div><div>{}</div>"
-            "<div><strong>Favorites:</strong></div><div>{}</div>"
-            "<div><strong>Reviews:</strong></div><div>{}</div>"
-            "<div><strong>Avg Rating:</strong></div><div>{}/10</div>"
-            "<div><strong>Engagement:</strong></div><div>{}%%</div>"
+            f"<div><strong>Total Views:</strong></div><div>{safe_views}</div>"
+            f"<div><strong>Likes:</strong></div><div>{safe_likes}</div>"
+            f"<div><strong>Favorites:</strong></div><div>{safe_favorites}</div>"
+            f"<div><strong>Reviews:</strong></div><div>{safe_reviews}</div>"
+            f"<div><strong>Avg Rating:</strong></div><div>{safe_rating}/10</div>"
+            f"<div><strong>Engagement:</strong></div><div>{safe_engagement}%</div>"
             "</div>"
-            "</div>",
-            views,
-            likes,
-            favorites_count,
-            review_count,
-            rating_formatted,
-            engagement_formatted,
+            "</div>"
         )
+        return mark_safe(html)
 
     performance_summary.short_description = _("Performance Summary")
 
@@ -725,28 +744,34 @@ class ProductAdmin(
         engagement_rate = (likes / max(views, 1)) * 100
         engagement_formatted = "{:.1f}".format(engagement_rate)
 
-        return format_html(
+        safe_age = conditional_escape(str(age.days))
+        safe_updated = conditional_escape(str(last_updated.days))
+        safe_stock_value = conditional_escape(
+            str(obj.final_price.amount * obj.stock)
+        )
+        safe_engagement = conditional_escape(engagement_formatted)
+        has_images = "Yes" if obj.images.exists() else "No"
+        has_reviews = "Yes" if obj.reviews.exists() else "No"
+        in_category = "Yes" if obj.category else "No"
+        safe_changed_by = conditional_escape(
+            obj.changed_by.email if obj.changed_by else "System"
+        )
+
+        html = (
             '<div class="text-sm">'
             '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Product Age:</strong></div><div>{}d</div>"
-            "<div><strong>Last Updated:</strong></div><div>{}d ago</div>"
-            "<div><strong>Stock Value:</strong></div><div>{}</div>"
-            "<div><strong>Engagement Rate:</strong></div><div>{}%%</div>"
-            "<div><strong>Has Images:</strong></div><div>{}</div>"
-            "<div><strong>Has Reviews:</strong></div><div>{}</div>"
-            "<div><strong>In Category:</strong></div><div>{}</div>"
-            "<div><strong>Changed By:</strong></div><div>{}</div>"
+            f"<div><strong>Product Age:</strong></div><div>{safe_age}d</div>"
+            f"<div><strong>Last Updated:</strong></div><div>{safe_updated}d ago</div>"
+            f"<div><strong>Stock Value:</strong></div><div>{safe_stock_value}</div>"
+            f"<div><strong>Engagement Rate:</strong></div><div>{safe_engagement}%</div>"
+            f"<div><strong>Has Images:</strong></div><div>{has_images}</div>"
+            f"<div><strong>Has Reviews:</strong></div><div>{has_reviews}</div>"
+            f"<div><strong>In Category:</strong></div><div>{in_category}</div>"
+            f"<div><strong>Changed By:</strong></div><div>{safe_changed_by}</div>"
             "</div>"
-            "</div>",
-            age.days,
-            last_updated.days,
-            obj.final_price.amount * obj.stock,
-            engagement_formatted,
-            "Yes" if obj.images.exists() else "No",
-            "Yes" if obj.reviews.exists() else "No",
-            "Yes" if obj.category else "No",
-            obj.changed_by.email if obj.changed_by else "System",
+            "</div>"
         )
+        return mark_safe(html)
 
     product_analytics.short_description = _("Product Analytics")
 
@@ -941,11 +966,13 @@ class ProductCategoryImageInline(TabularInline):
 
     def image_preview(self, obj):
         if obj.image:
-            return format_html(
-                '<img src="{}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb;" />',
-                obj.image.url,
+            safe_url = conditional_escape(obj.image.url)
+            html = (
+                f'<img src="{safe_url}" '
+                'style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb;" />'
             )
-        return format_html(
+            return mark_safe(html)
+        return mark_safe(
             '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-400 dark:text-base-500 text-xs">No Image</div>'
         )
 
@@ -1064,16 +1091,18 @@ class ProductCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
             ]
         )
 
-        return format_html(
+        safe_name = conditional_escape(name)
+        safe_level = conditional_escape(str(level))
+        safe_path = conditional_escape(path if path else "Root Category")
+
+        html = (
             '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{}</div>'
-            '<div class="text-base-500 dark:text-base-400">Level: {}</div>'
-            '<div class="text-xs text-base-400 dark:text-base-500">{}</div>'
-            "</div>",
-            name,
-            level,
-            path if path else "Root Category",
+            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
+            f'<div class="text-base-500 dark:text-base-400">Level: {safe_level}</div>'
+            f'<div class="text-xs text-base-400 dark:text-base-500">{safe_path}</div>'
+            "</div>"
         )
+        return mark_safe(html)
 
     category_info.short_description = _("Category")
 
@@ -1082,57 +1111,62 @@ class ProductCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
         total_count = getattr(instance, "products_cumulative_count", 0)
         children_count = instance.get_children().count()
 
-        return format_html(
+        safe_direct = conditional_escape(str(direct_count))
+        safe_total = conditional_escape(str(total_count))
+        safe_children = conditional_escape(str(children_count))
+
+        html = (
             '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">Direct: {}</div>'
-            '<div class="text-base-600 dark:text-base-400">Total: {}</div>'
-            '<div class="text-base-500 dark:text-base-500">Subcategories: {}</div>'
-            "</div>",
-            direct_count,
-            total_count,
-            children_count,
+            f'<div class="font-medium text-base-900 dark:text-base-100">Direct: {safe_direct}</div>'
+            f'<div class="text-base-600 dark:text-base-400">Total: {safe_total}</div>'
+            f'<div class="text-base-500 dark:text-base-500">Subcategories: {safe_children}</div>'
+            "</div>"
         )
+        return mark_safe(html)
 
     category_stats.short_description = _("Product Stats")
 
     def category_status(self, instance):
         if instance.active:
-            status_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
+            status_badge = (
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
                 "✅ Active"
                 "</span>"
             )
         else:
-            status_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
+            status_badge = (
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
                 "❌ Inactive"
                 "</span>"
             )
 
-        return status_badge
+        return mark_safe(status_badge)
 
     category_status.short_description = _("Status")
 
     def image_preview(self, instance):
         main_image = instance.main_image
         if main_image and main_image.image:
-            return format_html(
-                '<img src="{}" style="width: 40px; height: 40px; object-fit: cover; border-radius: 6px; border: 1px solid #e5e7eb;" />',
-                main_image.image.url,
+            safe_url = conditional_escape(main_image.image.url)
+            html = (
+                f'<img src="{safe_url}" '
+                'style="width: 40px; height: 40px; object-fit: cover; border-radius: 6px; border: 1px solid #e5e7eb;" />'
             )
-        return format_html(
+            return mark_safe(html)
+        return mark_safe(
             '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-400 dark:text-base-500 text-xs">'
-            "📁"
+            "🖼"
             "</div>"
         )
 
     image_preview.short_description = _("Image")
 
     def created_display(self, instance):
-        return format_html(
-            '<div class="text-sm text-base-600 dark:text-base-400">{}</div>',
-            instance.created_at.strftime("%Y-%m-%d"),
-        )
+        safe_date = conditional_escape(instance.created_at.strftime("%Y-%m-%d"))
+        html = f'<div class="text-sm text-base-600 dark:text-base-400">{safe_date}</div>'
+        return mark_safe(html)
 
     created_display.short_description = _("Created")
 
@@ -1141,42 +1175,56 @@ class ProductCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
         descendants_count = instance.get_descendants().count()
         siblings_count = instance.get_siblings().count()
 
-        return format_html(
+        safe_level = conditional_escape(str(instance.level))
+        safe_ancestors = conditional_escape(str(ancestors_count))
+        safe_descendants = conditional_escape(str(descendants_count))
+        safe_siblings = conditional_escape(str(siblings_count))
+        safe_direct = conditional_escape(
+            str(getattr(instance, "products_count", 0))
+        )
+        safe_total = conditional_escape(
+            str(getattr(instance, "products_cumulative_count", 0))
+        )
+
+        html = (
             '<div class="text-sm">'
             '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Level:</strong></div><div>{}</div>"
-            "<div><strong>Ancestors:</strong></div><div>{}</div>"
-            "<div><strong>Descendants:</strong></div><div>{}</div>"
-            "<div><strong>Siblings:</strong></div><div>{}</div>"
-            "<div><strong>Direct Products:</strong></div><div>{}</div>"
-            "<div><strong>Total Products:</strong></div><div>{}</div>"
+            f"<div><strong>Level:</strong></div><div>{safe_level}</div>"
+            f"<div><strong>Ancestors:</strong></div><div>{safe_ancestors}</div>"
+            f"<div><strong>Descendants:</strong></div><div>{safe_descendants}</div>"
+            f"<div><strong>Siblings:</strong></div><div>{safe_siblings}</div>"
+            f"<div><strong>Direct Products:</strong></div><div>{safe_direct}</div>"
+            f"<div><strong>Total Products:</strong></div><div>{safe_total}</div>"
             "</div>"
-            "</div>",
-            instance.level,
-            ancestors_count,
-            descendants_count,
-            siblings_count,
-            getattr(instance, "products_count", 0),
-            getattr(instance, "products_cumulative_count", 0),
+            "</div>"
         )
+        return mark_safe(html)
 
     category_analytics.short_description = _("Category Analytics")
 
     def products_count_display(self, instance):
         count = getattr(instance, "products_count", 0)
-        return format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-semibold bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">{}</span>',
-            count,
+        safe_count = conditional_escape(str(count))
+        html = (
+            f'<span class="inline-flex items-center px-2 py-1 text-xs font-semibold '
+            f'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
+            f"{safe_count}"
+            "</span>"
         )
+        return mark_safe(html)
 
     products_count_display.short_description = _("Direct Products")
 
     def recursive_products_display(self, instance):
         count = getattr(instance, "products_cumulative_count", 0)
-        return format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-full">{}</span>',
-            count,
+        safe_count = conditional_escape(str(count))
+        html = (
+            f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+            f'bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-full">'
+            f"{safe_count}"
+            "</span>"
         )
+        return mark_safe(html)
 
     recursive_products_display.short_description = _("Total Products")
 
@@ -1251,14 +1299,16 @@ class ProductReviewAdmin(ModelAdmin, TranslatableAdmin):
             comment[:100] + "..." if len(comment) > 100 else comment
         )
 
-        return format_html(
+        safe_id = conditional_escape(str(obj.id))
+        safe_comment = conditional_escape(comment_preview)
+
+        html = (
             '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">Review #{}</div>'
-            '<div class="text-base-600 dark:text-base-400">{}</div>'
-            "</div>",
-            obj.id,
-            comment_preview,
+            f'<div class="font-medium text-base-900 dark:text-base-100">Review #{safe_id}</div>'
+            f'<div class="text-base-600 dark:text-base-400">{safe_comment}</div>'
+            "</div>"
         )
+        return mark_safe(html)
 
     review_info.short_description = _("Review")
 
@@ -1267,32 +1317,38 @@ class ProductReviewAdmin(ModelAdmin, TranslatableAdmin):
             name = obj.product.safe_translation_getter(
                 "name", any_language=True
             ) or str(obj.product.id)
-            url = f"/admin/product/product/{obj.product.id}/change/"
-            return format_html(
-                '<div class="text-sm">'
-                '<a href="{}" class="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">{}</a>'
-                '<div class="text-base-500 dark:text-base-400">#{}</div>'
-                "</div>",
-                url,
-                name,
-                obj.product.id,
+            safe_url = conditional_escape(
+                f"/admin/product/product/{obj.product.id}/change/"
             )
+            safe_name = conditional_escape(name)
+            safe_id = conditional_escape(str(obj.product.id))
+
+            html = (
+                '<div class="text-sm">'
+                f'<a href="{safe_url}" class="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">{safe_name}</a>'
+                f'<div class="text-base-500 dark:text-base-400">#{safe_id}</div>'
+                "</div>"
+            )
+            return mark_safe(html)
         return "-"
 
     product_link.short_description = _("Product")
 
     def user_link(self, obj):
         if obj.user:
-            url = f"/admin/user/useraccount/{obj.user.id}/change/"
-            return format_html(
-                '<div class="text-sm">'
-                '<a href="{}" class="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">{}</a>'
-                '<div class="text-base-500 dark:text-base-400">ID: {}</div>'
-                "</div>",
-                url,
-                obj.user.email,
-                obj.user.id,
+            safe_url = conditional_escape(
+                f"/admin/user/useraccount/{obj.user.id}/change/"
             )
+            safe_email = conditional_escape(obj.user.email)
+            safe_id = conditional_escape(str(obj.user.id))
+
+            html = (
+                '<div class="text-sm">'
+                f'<a href="{safe_url}" class="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">{safe_email}</a>'
+                f'<div class="text-base-500 dark:text-base-400">ID: {safe_id}</div>'
+                "</div>"
+            )
+            return mark_safe(html)
         return "-"
 
     user_link.short_description = _("User")
@@ -1308,15 +1364,16 @@ class ProductReviewAdmin(ModelAdmin, TranslatableAdmin):
         else:
             color = "text-red-600 dark:text-red-400"
 
-        return format_html(
+        safe_rate = conditional_escape(str(rate))
+        safe_stars = conditional_escape(stars[:5])
+
+        html = (
             '<div class="text-sm">'
-            '<div class="font-medium {}">{}/10</div>'
-            '<div class="text-xs">{}</div>'
-            "</div>",
-            color,
-            rate,
-            stars[:5],
+            f'<div class="font-medium {color}">{safe_rate}/10</div>'
+            f'<div class="text-xs">{safe_stars}</div>'
+            "</div>"
         )
+        return mark_safe(html)
 
     rating_display.short_description = _("Rating")
 
@@ -1348,24 +1405,25 @@ class ProductReviewAdmin(ModelAdmin, TranslatableAdmin):
             },
         )
 
-        return format_html(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium {} {} rounded-full gap-1">'
-            "<span>{}</span>"
-            "<span>{}</span>"
-            "</span>",
-            config["bg"],
-            config["text"],
-            config["icon"],
-            obj.get_status_display(),
+        safe_status = conditional_escape(obj.get_status_display())
+
+        html = (
+            f'<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
+            f'{config["bg"]} {config["text"]} rounded-full gap-1">'
+            f"<span>{config['icon']}</span>"
+            f"<span>{safe_status}</span>"
+            "</span>"
         )
+        return mark_safe(html)
 
     status_badge.short_description = _("Status")
 
     def created_display(self, obj):
-        return format_html(
-            '<div class="text-sm text-base-600 dark:text-base-400">{}</div>',
-            obj.created_at.strftime("%Y-%m-%d %H:%M"),
+        safe_date = conditional_escape(
+            obj.created_at.strftime("%Y-%m-%d %H:%M")
         )
+        html = f'<div class="text-sm text-base-600 dark:text-base-400">{safe_date}</div>'
+        return mark_safe(html)
 
     created_display.short_description = _("Created")
 
@@ -1460,14 +1518,16 @@ class ProductFavouriteAdmin(ModelAdmin):
     readonly_fields = ("created_at", "updated_at", "uuid")
 
     def user_display(self, obj):
-        return format_html(
+        safe_email = conditional_escape(obj.user.email)
+        safe_id = conditional_escape(str(obj.user.id))
+
+        html = (
             '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{}</div>'
-            '<div class="text-base-500 dark:text-base-400">ID: {}</div>'
-            "</div>",
-            obj.user.email,
-            obj.user.id,
+            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_email}</div>'
+            f'<div class="text-base-500 dark:text-base-400">ID: {safe_id}</div>'
+            "</div>"
         )
+        return mark_safe(html)
 
     user_display.short_description = _("User")
 
@@ -1476,22 +1536,25 @@ class ProductFavouriteAdmin(ModelAdmin):
             obj.product.safe_translation_getter("name", any_language=True)
             or "Unnamed Product"
         )
-        return format_html(
+        safe_name = conditional_escape(name)
+        safe_sku = conditional_escape(obj.product.sku[:8])
+
+        html = (
             '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{}</div>'
-            '<div class="text-base-500 dark:text-base-400">#{}</div>'
-            "</div>",
-            name,
-            obj.product.sku[:8],
+            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
+            f'<div class="text-base-500 dark:text-base-400">#{safe_sku}</div>'
+            "</div>"
         )
+        return mark_safe(html)
 
     product_display.short_description = _("Product")
 
     def created_display(self, obj):
-        return format_html(
-            '<div class="text-sm text-base-600 dark:text-base-400">{}</div>',
-            obj.created_at.strftime("%Y-%m-%d %H:%M"),
+        safe_date = conditional_escape(
+            obj.created_at.strftime("%Y-%m-%d %H:%M")
         )
+        html = f'<div class="text-sm text-base-600 dark:text-base-400">{safe_date}</div>'
+        return mark_safe(html)
 
     created_display.short_description = _("Created")
 
@@ -1557,11 +1620,13 @@ class ProductCategoryImageAdmin(ModelAdmin, TranslatableAdmin):
 
     def image_preview(self, obj):
         if obj.image:
-            return format_html(
-                '<img src="{}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb;" />',
-                obj.image.url,
+            safe_url = conditional_escape(obj.image.url)
+            html = (
+                f'<img src="{safe_url}" '
+                'style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb;" />'
             )
-        return format_html(
+            return mark_safe(html)
+        return mark_safe(
             '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-400 dark:text-base-500 text-xs">No Image</div>'
         )
 
@@ -1572,10 +1637,9 @@ class ProductCategoryImageAdmin(ModelAdmin, TranslatableAdmin):
             obj.category.safe_translation_getter("name", any_language=True)
             or "Unnamed Category"
         )
-        return format_html(
-            '<div class="text-sm font-medium text-base-900 dark:text-base-100">{}</div>',
-            name,
-        )
+        safe_name = conditional_escape(name)
+        html = f'<div class="text-sm font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
+        return mark_safe(html)
 
     category_name.short_description = _("Category")
 
@@ -1589,7 +1653,7 @@ class ProductCategoryImageAdmin(ModelAdmin, TranslatableAdmin):
             "BANNER": {
                 "bg": "bg-purple-50 dark:bg-purple-900",
                 "text": "text-purple-700 dark:text-purple-200",
-                "icon": "🏞️",
+                "icon": "🖼️",
             },
             "ICON": {
                 "bg": "bg-green-50 dark:bg-green-900",
@@ -1607,32 +1671,35 @@ class ProductCategoryImageAdmin(ModelAdmin, TranslatableAdmin):
             },
         )
 
-        return format_html(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium {} {} rounded-full gap-1">'
-            "<span>{}</span>"
-            "<span>{}</span>"
-            "</span>",
-            config["bg"],
-            config["text"],
-            config["icon"],
-            obj.get_image_type_display(),
+        safe_type = conditional_escape(obj.get_image_type_display())
+
+        html = (
+            f'<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
+            f'{config["bg"]} {config["text"]} rounded-full gap-1">'
+            f"<span>{config['icon']}</span>"
+            f"<span>{safe_type}</span>"
+            "</span>"
         )
+        return mark_safe(html)
 
     image_type_badge.short_description = _("Type")
 
     def status_badge(self, obj):
         if obj.active:
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
+            html = (
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
                 "✅ Active"
                 "</span>"
             )
         else:
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
+            html = (
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
                 "❌ Inactive"
                 "</span>"
             )
+        return mark_safe(html)
 
     status_badge.short_description = _("Status")
 
@@ -1696,11 +1763,13 @@ class ProductImageAdmin(ModelAdmin, TranslatableAdmin):
 
     def image_preview(self, obj):
         if obj.image:
-            return format_html(
-                '<img src="{}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb;" />',
-                obj.image.url,
+            safe_url = conditional_escape(obj.image.url)
+            html = (
+                f'<img src="{safe_url}" '
+                'style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb;" />'
             )
-        return format_html(
+            return mark_safe(html)
+        return mark_safe(
             '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-400 dark:text-base-500 text-xs">No Image</div>'
         )
 
@@ -1711,29 +1780,34 @@ class ProductImageAdmin(ModelAdmin, TranslatableAdmin):
             obj.product.safe_translation_getter("name", any_language=True)
             or "Unnamed Product"
         )
-        return format_html(
+        safe_name = conditional_escape(name)
+        safe_sku = conditional_escape(obj.product.sku[:8])
+
+        html = (
             '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{}</div>'
-            '<div class="text-base-500 dark:text-base-400">#{}</div>'
-            "</div>",
-            name,
-            obj.product.sku[:8],
+            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
+            f'<div class="text-base-500 dark:text-base-400">#{safe_sku}</div>'
+            "</div>"
         )
+        return mark_safe(html)
 
     product_name.short_description = _("Product")
 
     def main_badge(self, obj):
         if obj.is_main:
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded-full">'
+            html = (
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded-full">'
                 "⭐ Main"
                 "</span>"
             )
         else:
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-gray-50 dark:bg-gray-900 text-base-700 dark:text-base-700 rounded-full">'
+            html = (
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-gray-50 dark:bg-gray-900 text-base-700 dark:text-base-700 rounded-full">'
                 "📷 Gallery"
                 "</span>"
             )
+        return mark_safe(html)
 
     main_badge.short_description = _("Type")

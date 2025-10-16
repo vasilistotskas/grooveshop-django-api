@@ -2,7 +2,8 @@ from django.contrib import admin
 from django.db import models
 from django.db.models import Count, Q
 from django.utils import timezone
-from django.utils.html import format_html
+from django.utils.html import conditional_escape
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from mptt.admin import DraggableMPTTAdmin
 from parler.admin import TranslatableAdmin
@@ -248,14 +249,16 @@ class BlogAuthorAdmin(ModelAdmin, TranslatableAdmin):
     )
 
     def user_display(self, obj):
-        return format_html(
+        safe_name = conditional_escape(obj.user.full_name or obj.user.username)
+        safe_email = conditional_escape(obj.user.email)
+
+        html = (
             '<div class="flex items-center gap-2">'
-            '<strong class="text-base-900 dark:text-base-100">{}</strong>'
-            '<span class="text-base-500 dark:text-base-400">({}</span>'
-            "</div>",
-            obj.user.full_name or obj.user.username,
-            obj.user.email,
+            f'<strong class="text-base-900 dark:text-base-100">{safe_name}</strong>'
+            f'<span class="text-base-500 dark:text-base-400">({safe_email}</span>'
+            "</div>"
         )
+        return mark_safe(html)
 
     user_display.short_description = _("User")
 
@@ -269,33 +272,43 @@ class BlogAuthorAdmin(ModelAdmin, TranslatableAdmin):
 
     def posts_count(self, obj):
         count = obj.blog_posts.count()
-        return format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">{}</span>',
-            count,
+        safe_count = conditional_escape(str(count))
+
+        html = (
+            f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+            f'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
+            f"{safe_count}"
+            "</span>"
         )
+        return mark_safe(html)
 
     posts_count.short_description = _("Posts")
 
     def total_likes_display(self, obj):
         total = obj.total_likes_received
-        return format_html(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1">'
+        safe_total = conditional_escape(str(total))
+
+        html = (
+            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
+            'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1">'
             "<span>❤️</span>"
-            "<span>{}</span>"
-            "</span>",
-            total,
+            f"<span>{safe_total}</span>"
+            "</span>"
         )
+        return mark_safe(html)
 
     total_likes_display.short_description = _("Total Likes")
 
     def website_link(self, obj):
         if obj.website:
-            return format_html(
-                '<a href="{}" target="_blank" class="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">'
+            safe_url = conditional_escape(obj.website)
+            html = (
+                f'<a href="{safe_url}" target="_blank" '
+                'class="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">'
                 "<span>🔗</span><span>Website</span>"
-                "</a>",
-                obj.website,
+                "</a>"
             )
+            return mark_safe(html)
         return "-"
 
     website_link.short_description = _("Website")
@@ -346,35 +359,45 @@ class BlogTagAdmin(ModelAdmin, TranslatableAdmin):
             obj.safe_translation_getter("name", any_language=True)
             or "Unnamed Tag"
         )
-        return format_html(
-            '<strong class="text-base-900 dark:text-base-100">{}</strong>', name
-        )
+        safe_name = conditional_escape(name)
+
+        html = f'<strong class="text-base-900 dark:text-base-100">{safe_name}</strong>'
+        return mark_safe(html)
 
     name_display.short_description = _("Name")
 
     def active_badge(self, obj):
         if obj.active:
-            return format_html(
-                '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1">'
+            html = (
+                '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
+                'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1">'
                 "<span>✓</span>"
                 "<span>Active</span>"
                 "</span>"
             )
-        return format_html(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1">'
-            "<span>✗</span>"
-            "<span>Inactive</span>"
-            "</span>"
-        )
+        else:
+            html = (
+                '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
+                'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1">'
+                "<span>✗</span>"
+                "<span>Inactive</span>"
+                "</span>"
+            )
+        return mark_safe(html)
 
     active_badge.short_description = _("Status")
 
     def posts_count_badge(self, obj):
         count = obj.blog_posts.count()
-        return format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">{}</span>',
-            count,
+        safe_count = conditional_escape(str(count))
+
+        html = (
+            f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+            f'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
+            f"{safe_count}"
+            "</span>"
         )
+        return mark_safe(html)
 
     posts_count_badge.short_description = _("Posts")
 
@@ -460,11 +483,13 @@ class BlogCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
 
     def category_image(self, obj):
         if obj.image:
-            return format_html(
-                '<img src="{}" style="max-height: 40px; max-width: 80px; border-radius: 4px;" />',
-                obj.image.url,
+            safe_url = conditional_escape(obj.image.url)
+            html = (
+                f'<img src="{safe_url}" '
+                'style="max-height: 40px; max-width: 80px; border-radius: 4px;" />'
             )
-        return format_html(
+            return mark_safe(html)
+        return mark_safe(
             '<span class="text-base-400 dark:text-base-500">No image</span>'
         )
 
@@ -472,19 +497,29 @@ class BlogCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
 
     def posts_count_display(self, instance):
         count = getattr(instance, "posts_count", 0)
-        return format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-semibold bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">{}</span>',
-            count,
+        safe_count = conditional_escape(str(count))
+
+        html = (
+            f'<span class="inline-flex items-center px-2 py-1 text-xs font-semibold '
+            f'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
+            f"{safe_count}"
+            "</span>"
         )
+        return mark_safe(html)
 
     posts_count_display.short_description = _("Direct Posts")
 
     def recursive_posts_display(self, instance):
         count = getattr(instance, "posts_cumulative_count", 0)
-        return format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-full">{}</span>',
-            count,
+        safe_count = conditional_escape(str(count))
+
+        html = (
+            f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+            f'bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-full">'
+            f"{safe_count}"
+            "</span>"
         )
+        return mark_safe(html)
 
     recursive_posts_display.short_description = _("Total Posts (Tree)")
 
@@ -608,7 +643,12 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         (
             _("SEO"),
             {
-                "fields": ("seo_score",),
+                "fields": (
+                    "seo_title",
+                    "seo_description",
+                    "seo_keywords",
+                    "seo_score",
+                ),
                 "classes": ("collapse",),
             },
         ),
@@ -637,10 +677,10 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
             obj.safe_translation_getter("title", any_language=True)
             or "Untitled"
         )
-        return format_html(
-            '<strong class="text-base-900 dark:text-base-100">{}</strong>',
-            title[:50],
-        )
+        safe_title = conditional_escape(title[:50])
+
+        html = f'<strong class="text-base-900 dark:text-base-100">{safe_title}</strong>'
+        return mark_safe(html)
 
     title_display.short_description = _("Title")
 
@@ -650,11 +690,16 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
                 obj.category.safe_translation_getter("name", any_language=True)
                 or "Unnamed"
             )
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded-full">{}</span>',
-                category_name,
+            safe_name = conditional_escape(category_name)
+
+            html = (
+                f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                f'bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded-full">'
+                f"{safe_name}"
+                "</span>"
             )
-        return format_html(
+            return mark_safe(html)
+        return mark_safe(
             '<span class="text-base-400 dark:text-base-500">No category</span>'
         )
 
@@ -663,11 +708,11 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
     def author_display(self, obj):
         if obj.author:
             author_name = obj.author.user.full_name or obj.author.user.username
-            return format_html(
-                '<span class="font-medium text-base-700 dark:text-base-300">{}</span>',
-                author_name,
-            )
-        return format_html(
+            safe_name = conditional_escape(author_name)
+
+            html = f'<span class="font-medium text-base-700 dark:text-base-300">{safe_name}</span>'
+            return mark_safe(html)
+        return mark_safe(
             '<span class="text-base-400 dark:text-base-500">No author</span>'
         )
 
@@ -675,12 +720,14 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
 
     def featured_badge(self, obj):
         if obj.featured:
-            return format_html(
-                '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-full gap-1">'
+            html = (
+                '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
+                'bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-full gap-1">'
                 "<span>⭐</span>"
                 "<span>Featured</span>"
                 "</span>"
             )
+            return mark_safe(html)
         return ""
 
     featured_badge.short_description = _("Featured")
@@ -688,25 +735,30 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
     def publish_status_badge(self, obj):
         if obj.is_published and obj.published_at:
             if obj.published_at <= timezone.now():
-                return format_html(
-                    '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1">'
+                html = (
+                    '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
+                    'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1">'
                     "<span>✓</span>"
                     "<span>Published</span>"
                     "</span>"
                 )
             else:
-                return format_html(
-                    '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full gap-1">'
+                html = (
+                    '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
+                    'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full gap-1">'
                     "<span>📅</span>"
                     "<span>Scheduled</span>"
                     "</span>"
                 )
-        return format_html(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full gap-1">'
-            "<span>📝</span>"
-            "<span>Draft</span>"
-            "</span>"
-        )
+        else:
+            html = (
+                '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
+                'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full gap-1">'
+                "<span>📝</span>"
+                "<span>Draft</span>"
+                "</span>"
+            )
+        return mark_safe(html)
 
     publish_status_badge.short_description = _("Status")
 
@@ -715,22 +767,24 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         comments = obj.comments_count
         views = obj.view_count
 
-        return format_html(
+        safe_likes = conditional_escape(str(likes))
+        safe_comments = conditional_escape(str(comments))
+        safe_views = conditional_escape(str(views))
+
+        html = (
             '<div class="text-sm text-base-700 dark:text-base-300 flex items-center gap-3">'
             '<span class="flex items-center gap-1 text-red-600 dark:text-red-400">'
-            "<span>❤️</span><span>{}</span>"
+            f"<span>❤️</span><span>{safe_likes}</span>"
             "</span>"
             '<span class="flex items-center gap-1 text-blue-600 dark:text-blue-400">'
-            "<span>💬</span><span>{}</span>"
+            f"<span>💬</span><span>{safe_comments}</span>"
             "</span>"
             '<span class="flex items-center gap-1 text-green-600 dark:text-green-400">'
-            "<span>👀</span><span>{}</span>"
+            f"<span>👀</span><span>{safe_views}</span>"
             "</span>"
-            "</div>",
-            likes,
-            comments,
-            views,
+            "</div>"
         )
+        return mark_safe(html)
 
     engagement_metrics.short_description = _("Engagement")
 
@@ -760,22 +814,27 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
             bg_class = "bg-red-50 dark:bg-red-900"
             text_class = "text-red-700 dark:text-red-300"
 
-        return format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium {} {} rounded-full">{}%</span>',
-            bg_class,
-            text_class,
-            score,
+        safe_score = conditional_escape(str(score))
+
+        html = (
+            f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+            f'{bg_class} {text_class} rounded-full">'
+            f"{safe_score}%"
+            "</span>"
         )
+        return mark_safe(html)
 
     seo_score.short_description = _("SEO Score")
 
     def image_preview(self, obj):
         if obj.image:
-            return format_html(
-                '<img src="{}" style="max-height: 100px; max-width: 80px; border-radius: 4px; object-fit: cover;" />',
-                obj.image.url,
+            safe_url = conditional_escape(obj.image.url)
+            html = (
+                f'<img src="{safe_url}" '
+                'style="max-height: 100px; max-width: 80px; border-radius: 4px; object-fit: cover;" />'
             )
-        return format_html(
+            return mark_safe(html)
+        return mark_safe(
             '<span class="text-base-400 dark:text-base-500">No image</span>'
         )
 
@@ -962,15 +1021,17 @@ class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
             email = obj.user.email
 
             display_name = full_name if full_name else username
-            return format_html(
+            safe_name = conditional_escape(display_name)
+            safe_email = conditional_escape(email)
+
+            html = (
                 '<div class="text-sm">'
-                '<div class="font-medium text-base-900 dark:text-base-100">{}</div>'
-                '<div class="text-base-500 dark:text-base-400">{}</div>'
-                "</div>",
-                display_name,
-                email,
+                f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
+                f'<div class="text-base-500 dark:text-base-400">{safe_email}</div>'
+                "</div>"
             )
-        return format_html(
+            return mark_safe(html)
+        return mark_safe(
             '<span class="text-base-400 dark:text-base-500 italic">Anonymous</span>'
         )
 
@@ -982,13 +1043,20 @@ class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
                 obj.post.safe_translation_getter("title", any_language=True)
                 or f"Post {obj.post.id}"
             )
-            url = f"/admin/blog/blogpost/{obj.post.id}/change/"
-            return format_html(
-                '<a href="{}" class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium">{}</a>',
-                url,
-                title[:30] + "..." if len(title) > 30 else title,
+            title_display = title[:30] + "..." if len(title) > 30 else title
+            safe_title = conditional_escape(title_display)
+            safe_url = conditional_escape(
+                f"/admin/blog/blogpost/{obj.post.id}/change/"
             )
-        return format_html(
+
+            html = (
+                f'<a href="{safe_url}" '
+                'class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium">'
+                f"{safe_title}"
+                "</a>"
+            )
+            return mark_safe(html)
+        return mark_safe(
             '<span class="text-base-400 dark:text-base-500">No post</span>'
         )
 
@@ -996,18 +1064,22 @@ class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
 
     def approval_badge(self, obj):
         if obj.approved:
-            return format_html(
-                '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1">'
+            html = (
+                '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
+                'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1">'
                 "<span>✓</span>"
                 "<span>Approved</span>"
                 "</span>"
             )
-        return format_html(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1">'
-            "<span>⏳</span>"
-            "<span>Pending</span>"
-            "</span>"
-        )
+        else:
+            html = (
+                '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
+                'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1">'
+                "<span>⏳</span>"
+                "<span>Pending</span>"
+                "</span>"
+            )
+        return mark_safe(html)
 
     approval_badge.short_description = _("Status")
 
@@ -1015,18 +1087,20 @@ class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
         likes = obj.likes_count
         replies = obj.replies_count
 
-        return format_html(
+        safe_likes = conditional_escape(str(likes))
+        safe_replies = conditional_escape(str(replies))
+
+        html = (
             '<div class="text-sm text-base-700 dark:text-base-300 flex items-center gap-3">'
             '<span class="flex items-center gap-1 text-red-600 dark:text-red-400">'
-            "<span>❤️</span><span>{}</span>"
+            f"<span>❤️</span><span>{safe_likes}</span>"
             "</span>"
             '<span class="flex items-center gap-1 text-blue-600 dark:text-blue-400">'
-            "<span>💬</span><span>{}</span>"
+            f"<span>💬</span><span>{safe_replies}</span>"
             "</span>"
-            "</div>",
-            likes,
-            replies,
+            "</div>"
         )
+        return mark_safe(html)
 
     engagement_display.short_description = _("Engagement")
 

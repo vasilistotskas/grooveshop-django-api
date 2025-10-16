@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-10-13 21:18+0300\n"
+"POT-Creation-Date: 2025-10-16 10:49+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -32,84 +32,84 @@ msgstr ""
 msgid "Deleted %(deleted_keys)s keys for %(class_name)s"
 msgstr ""
 
-#: .\blog\admin.py:29
+#: .\blog\admin.py:30
 msgid "Likes"
 msgstr ""
 
-#: .\blog\admin.py:57
+#: .\blog\admin.py:58
 msgid "Comments"
 msgstr ""
 
-#: .\blog\admin.py:87 .\tag\admin.py:111 .\tag\admin.py:786
+#: .\blog\admin.py:88 .\tag\admin.py:111 .\tag\admin.py:786
 #: .\tag\models\tag.py:27
 msgid "Tags"
 msgstr ""
 
-#: .\blog\admin.py:117 .\blog\admin.py:277 .\blog\admin.py:379
+#: .\blog\admin.py:118 .\blog\admin.py:285 .\blog\admin.py:402
 msgid "Posts"
 msgstr ""
 
-#: .\blog\admin.py:150
+#: .\blog\admin.py:151
 msgid "Publish Status"
 msgstr ""
 
-#: .\blog\admin.py:155
+#: .\blog\admin.py:156
 msgid "Published"
 msgstr ""
 
-#: .\blog\admin.py:156
+#: .\blog\admin.py:157
 msgid "Draft"
 msgstr ""
 
-#: .\blog\admin.py:157
+#: .\blog\admin.py:158
 msgid "Scheduled"
 msgstr ""
 
-#: .\blog\admin.py:198
+#: .\blog\admin.py:199
 msgid "Content Preview"
 msgstr ""
 
-#: .\blog\admin.py:228 .\pay_way\admin.py:181
+#: .\blog\admin.py:229 .\pay_way\admin.py:181
 msgid "Basic Information"
 msgstr ""
 
-#: .\blog\admin.py:235
+#: .\blog\admin.py:236
 msgid "Biography"
 msgstr ""
 
-#: .\blog\admin.py:242 .\blog\admin.py:438
+#: .\blog\admin.py:243 .\blog\admin.py:461
 msgid "Statistics"
 msgstr ""
 
-#: .\blog\admin.py:260 .\blog\admin.py:977 .\notification\admin.py:698
-#: .\product\admin.py:1298 .\product\admin.py:1472 .\user\admin.py:925
+#: .\blog\admin.py:263 .\blog\admin.py:1038 .\notification\admin.py:700
+#: .\product\admin.py:1354 .\product\admin.py:1532 .\user\admin.py:925
 #: .\user\models\subscription.py:102
 msgid "User"
 msgstr ""
 
-#: .\blog\admin.py:268 .\blog\models\author.py:18 .\user\models\account.py:91
+#: .\blog\admin.py:271 .\blog\models\author.py:18 .\user\models\account.py:91
 msgid "Bio"
 msgstr ""
 
-#: .\blog\admin.py:289
+#: .\blog\admin.py:300
 msgid "Total Likes"
 msgstr ""
 
-#: .\blog\admin.py:301 .\blog\models\author.py:16 .\user\models\account.py:88
+#: .\blog\admin.py:314 .\blog\models\author.py:16 .\user\models\account.py:88
 msgid "Website"
 msgstr ""
 
-#: .\blog\admin.py:329 .\tag\admin.py:161
+#: .\blog\admin.py:342 .\tag\admin.py:161
 msgid "Tag Information"
 msgstr ""
 
-#: .\blog\admin.py:336 .\blog\admin.py:431 .\blog\admin.py:583
-#: .\product\admin.py:1543 .\product\admin.py:1682 .\region\admin.py:378
+#: .\blog\admin.py:349 .\blog\admin.py:454 .\blog\admin.py:618
+#: .\product\admin.py:1606 .\product\admin.py:1749 .\region\admin.py:378
 #: .\tag\admin.py:164
 msgid "Organization"
 msgstr ""
 
-#: .\blog\admin.py:353 .\blog\models\category.py:34 .\blog\models\tag.py:16
+#: .\blog\admin.py:367 .\blog\models\category.py:34 .\blog\models\tag.py:16
 #: .\contact\models.py:14 .\country\models.py:48 .\pay_way\admin.py:239
 #: .\pay_way\models.py:67 .\product\models\category.py:37
 #: .\product\models\product.py:293 .\region\models.py:19
@@ -117,184 +117,184 @@ msgstr ""
 msgid "Name"
 msgstr ""
 
-#: .\blog\admin.py:370 .\blog\admin.py:711 .\blog\admin.py:1012
-#: .\notification\admin.py:412 .\notification\admin.py:655
-#: .\notification\admin.py:766 .\order\admin.py:697 .\order\models\order.py:89
-#: .\pay_way\admin.py:274 .\product\admin.py:625 .\product\admin.py:1114
-#: .\product\admin.py:1362 .\product\admin.py:1637
+#: .\blog\admin.py:388 .\blog\admin.py:763 .\blog\admin.py:1084
+#: .\notification\admin.py:411 .\notification\admin.py:655
+#: .\notification\admin.py:772 .\order\admin.py:721 .\order\models\order.py:89
+#: .\pay_way\admin.py:274 .\product\admin.py:639 .\product\admin.py:1147
+#: .\product\admin.py:1419 .\product\admin.py:1704
 #: .\product\models\review.py:29 .\tag\admin.py:278 .\user\admin.py:444
 #: .\user\admin.py:807 .\user\admin.py:962 .\user\models\subscription.py:111
 msgid "Status"
 msgstr ""
 
-#: .\blog\admin.py:410 .\product\admin.py:996
+#: .\blog\admin.py:433 .\product\admin.py:1023
 msgid "Category Information"
 msgstr ""
 
-#: .\blog\admin.py:417
+#: .\blog\admin.py:440
 msgid "URL"
 msgstr ""
 
-#: .\blog\admin.py:424 .\blog\admin.py:576
+#: .\blog\admin.py:447 .\blog\admin.py:611
 msgid "Media"
 msgstr ""
 
-#: .\blog\admin.py:471 .\blog\models\category.py:24 .\blog\models\post.py:29
-#: .\product\admin.py:1129 .\product\models\category_image.py:26
+#: .\blog\admin.py:496 .\blog\models\category.py:24 .\blog\models\post.py:29
+#: .\product\admin.py:1164 .\product\models\category_image.py:26
 #: .\product\models\image.py:25 .\user\models\account.py:79
 msgid "Image"
 msgstr ""
 
-#: .\blog\admin.py:480
+#: .\blog\admin.py:510
 msgid "Direct Posts"
 msgstr ""
 
-#: .\blog\admin.py:489
+#: .\blog\admin.py:524
 msgid "Total Posts (Tree)"
 msgstr ""
 
-#: .\blog\admin.py:569 .\blog\models\comment.py:44 .\pay_way\admin.py:189
-#: .\product\admin.py:1003 .\product\admin.py:1230 .\product\admin.py:1536
-#: .\product\admin.py:1675
+#: .\blog\admin.py:604 .\blog\models\comment.py:44 .\pay_way\admin.py:189
+#: .\product\admin.py:1030 .\product\admin.py:1278 .\product\admin.py:1599
+#: .\product\admin.py:1742
 msgid "Content"
 msgstr ""
 
-#: .\blog\admin.py:590
+#: .\blog\admin.py:625
 msgid "Publishing"
 msgstr ""
 
-#: .\blog\admin.py:602 .\blog\admin.py:735 .\blog\admin.py:941
-#: .\blog\admin.py:1031 .\notification\admin.py:448 .\user\admin.py:482
+#: .\blog\admin.py:637 .\blog\admin.py:789 .\blog\admin.py:1000
+#: .\blog\admin.py:1105 .\notification\admin.py:446 .\user\admin.py:482
 msgid "Engagement"
 msgstr ""
 
-#: .\blog\admin.py:609 .\product\admin.py:1010
+#: .\blog\admin.py:644 .\product\admin.py:1037
 msgid "SEO"
 msgstr ""
 
-#: .\blog\admin.py:616 .\cart\admin.py:481 .\notification\enum.py:30
+#: .\blog\admin.py:656 .\cart\admin.py:481 .\notification\enum.py:30
 msgid "System"
 msgstr ""
 
-#: .\blog\admin.py:645 .\blog\models\post.py:114
+#: .\blog\admin.py:685 .\blog\models\post.py:114
 #: .\notification\models\notification.py:55
 #: .\product\models\category_image.py:36 .\product\models\image.py:28
 #: .\user\models\address.py:20
 msgid "Title"
 msgstr ""
 
-#: .\blog\admin.py:661 .\notification\admin.py:363
-#: .\notification\models\notification.py:31 .\product\admin.py:473
-#: .\product\admin.py:1078 .\product\admin.py:1580 .\user\admin.py:798
+#: .\blog\admin.py:706 .\notification\admin.py:362
+#: .\notification\models\notification.py:31 .\product\admin.py:478
+#: .\product\admin.py:1107 .\product\admin.py:1644 .\user\admin.py:798
 #: .\user\models\subscription.py:30 .\vat\admin.py:235
 msgid "Category"
 msgstr ""
 
-#: .\blog\admin.py:674
+#: .\blog\admin.py:719
 msgid "Author"
 msgstr ""
 
-#: .\blog\admin.py:686 .\blog\models\post.py:49
+#: .\blog\admin.py:733 .\blog\models\post.py:49
 msgid "Featured"
 msgstr ""
 
-#: .\blog\admin.py:770
+#: .\blog\admin.py:827
 msgid "SEO Score"
 msgstr ""
 
-#: .\blog\admin.py:790
+#: .\blog\admin.py:849
 msgid "Mark selected posts as featured"
 msgstr ""
 
-#: .\blog\admin.py:798
+#: .\blog\admin.py:857
 #, python-format
 msgid "%(count)d posts were successfully marked as featured."
 msgstr ""
 
-#: .\blog\admin.py:803
+#: .\blog\admin.py:862
 msgid "Remove featured mark from selected posts"
 msgstr ""
 
-#: .\blog\admin.py:811
+#: .\blog\admin.py:870
 #, python-format
 msgid "%(count)d posts were successfully unmarked as featured."
 msgstr ""
 
-#: .\blog\admin.py:816
+#: .\blog\admin.py:875
 msgid "Publish selected posts"
 msgstr ""
 
-#: .\blog\admin.py:826
+#: .\blog\admin.py:885
 #, python-format
 msgid "%(count)d posts were successfully published."
 msgstr ""
 
-#: .\blog\admin.py:831
+#: .\blog\admin.py:890
 msgid "Unpublish selected posts"
 msgstr ""
 
-#: .\blog\admin.py:839
+#: .\blog\admin.py:898
 #, python-format
 msgid "%(count)d posts were successfully unpublished."
 msgstr ""
 
-#: .\blog\admin.py:844
+#: .\blog\admin.py:903
 msgid "Increment view count by 100"
 msgstr ""
 
-#: .\blog\admin.py:855
+#: .\blog\admin.py:914
 #, python-format
 msgid "View count increased by 100 for %(count)d posts."
 msgstr ""
 
-#: .\blog\admin.py:860
+#: .\blog\admin.py:919
 msgid "Reset view count to zero"
 msgstr ""
 
-#: .\blog\admin.py:868
+#: .\blog\admin.py:927
 #, python-format
 msgid "View count reset to zero for %(count)d posts."
 msgstr ""
 
-#: .\blog\admin.py:920
+#: .\blog\admin.py:979
 msgid "Comment Content"
 msgstr ""
 
-#: .\blog\admin.py:927
+#: .\blog\admin.py:986
 msgid "Relations"
 msgstr ""
 
-#: .\blog\admin.py:934
+#: .\blog\admin.py:993
 msgid "Moderation"
 msgstr ""
 
-#: .\blog\admin.py:995
+#: .\blog\admin.py:1063
 msgid "Post"
 msgstr ""
 
-#: .\blog\admin.py:1034
+#: .\blog\admin.py:1108
 msgid "Approve selected comments"
 msgstr ""
 
-#: .\blog\admin.py:1042
+#: .\blog\admin.py:1116
 #, python-format
 msgid "%(count)d comments were successfully approved."
 msgstr ""
 
-#: .\blog\admin.py:1047
+#: .\blog\admin.py:1121
 msgid "Unapprove selected comments"
 msgstr ""
 
-#: .\blog\admin.py:1055
+#: .\blog\admin.py:1129
 #, python-format
 msgid "%(count)d comments were successfully unapproved."
 msgstr ""
 
-#: .\blog\admin.py:1060
+#: .\blog\admin.py:1134
 msgid "Mark as spam and delete"
 msgstr ""
 
-#: .\blog\admin.py:1069
+#: .\blog\admin.py:1143
 #, python-format
 msgid "%(count)d comments were marked as spam and deleted."
 msgstr ""
@@ -712,8 +712,8 @@ msgstr ""
 msgid "Slug"
 msgstr ""
 
-#: .\blog\models\category.py:35 .\order\admin.py:305 .\order\admin.py:1406
-#: .\order\admin.py:1520 .\order\models\history.py:25
+#: .\blog\models\category.py:35 .\order\admin.py:311 .\order\admin.py:1481
+#: .\order\admin.py:1601 .\order\models\history.py:25
 #: .\order\models\history.py:230 .\pay_way\models.py:73
 #: .\product\models\category.py:38 .\product\models\product.py:294
 #: .\user\models\subscription.py:64
@@ -770,7 +770,7 @@ msgstr ""
 
 #: .\blog\models\tag.py:13
 #: .\core\templates\admin\product\apply_discount.html:131
-#: .\notification\admin.py:25 .\pay_way\models.py:17
+#: .\notification\admin.py:26 .\pay_way\models.py:17
 #: .\product\models\category.py:28 .\product\models\category_image.py:33
 #: .\product\models\product.py:76 .\tag\admin.py:430 .\tag\models\tag.py:13
 #: .\user\models\account.py:81 .\user\models\subscription.py:37
@@ -1158,7 +1158,7 @@ msgstr ""
 msgid "Active (Last 24h)"
 msgstr ""
 
-#: .\cart\admin.py:75 .\notification\admin.py:28
+#: .\cart\admin.py:75 .\notification\admin.py:29
 msgid "Recent (Last 7 days)"
 msgstr ""
 
@@ -1167,18 +1167,18 @@ msgid "Old (7+ days)"
 msgstr ""
 
 #: .\cart\admin.py:129 .\cart\admin.py:528 .\notification\enum.py:26
-#: .\order\admin.py:238 .\order\admin.py:1195 .\product\admin.py:445
-#: .\product\admin.py:1282 .\product\admin.py:1488 .\product\admin.py:1723
+#: .\order\admin.py:241 .\order\admin.py:1245 .\product\admin.py:446
+#: .\product\admin.py:1335 .\product\admin.py:1550 .\product\admin.py:1794
 #: .\product\models\product.py:110
 msgid "Product"
 msgstr ""
 
-#: .\cart\admin.py:152 .\order\admin.py:246
+#: .\cart\admin.py:152 .\order\admin.py:248
 msgid "Unit Price"
 msgstr ""
 
 #: .\cart\admin.py:165 .\cart\admin.py:365
-#: .\core\templates\admin\product\apply_discount.html:139 .\order\admin.py:254
+#: .\core\templates\admin\product\apply_discount.html:139 .\order\admin.py:255
 msgid "Total"
 msgstr ""
 
@@ -1198,8 +1198,8 @@ msgstr ""
 msgid "Summary"
 msgstr ""
 
-#: .\cart\admin.py:292 .\pay_way\admin.py:298 .\product\admin.py:1621
-#: .\product\admin.py:1739
+#: .\cart\admin.py:292 .\pay_way\admin.py:298 .\product\admin.py:1685
+#: .\product\admin.py:1813
 msgid "Type"
 msgstr ""
 
@@ -1211,7 +1211,7 @@ msgstr ""
 msgid "Cart Summary"
 msgstr ""
 
-#: .\cart\admin.py:425 .\order\admin.py:901
+#: .\cart\admin.py:425 .\order\admin.py:935
 msgid "Financial Summary"
 msgstr ""
 
@@ -1231,8 +1231,8 @@ msgstr ""
 msgid "Qty"
 msgstr ""
 
-#: .\cart\admin.py:571 .\order\admin.py:1231 .\pay_way\admin.py:204
-#: .\product\admin.py:328 .\product\admin.py:505
+#: .\cart\admin.py:571 .\order\admin.py:1286 .\pay_way\admin.py:204
+#: .\product\admin.py:330 .\product\admin.py:511
 msgid "Pricing"
 msgstr ""
 
@@ -1466,7 +1466,7 @@ msgstr ""
 msgid "Carts"
 msgstr ""
 
-#: .\cart\models\item.py:21 .\order\admin.py:1217 .\order\models\item.py:28
+#: .\cart\models\item.py:21 .\order\admin.py:1270 .\order\models\item.py:28
 msgid "Quantity"
 msgstr ""
 
@@ -1666,15 +1666,15 @@ msgstr ""
 msgid "Contact Period"
 msgstr ""
 
-#: .\contact\admin.py:52 .\order\admin.py:180
+#: .\contact\admin.py:52 .\order\admin.py:181
 msgid "Today"
 msgstr ""
 
-#: .\contact\admin.py:53 .\order\admin.py:181
+#: .\contact\admin.py:53 .\order\admin.py:182
 msgid "This Week"
 msgstr ""
 
-#: .\contact\admin.py:54 .\order\admin.py:182
+#: .\contact\admin.py:54 .\order\admin.py:183
 msgid "This Month"
 msgstr ""
 
@@ -1691,21 +1691,21 @@ msgstr ""
 msgid "Message"
 msgstr ""
 
-#: .\contact\admin.py:122 .\notification\admin.py:175
-#: .\notification\admin.py:532 .\notification\admin.py:662
-#: .\notification\admin.py:870 .\product\admin.py:373 .\product\admin.py:1017
+#: .\contact\admin.py:122 .\notification\admin.py:176
+#: .\notification\admin.py:526 .\notification\admin.py:662
+#: .\notification\admin.py:886 .\product\admin.py:375 .\product\admin.py:1044
 #: .\region\admin.py:382 .\tag\admin.py:166
 msgid "Analytics"
 msgstr ""
 
-#: .\contact\admin.py:129 .\contact\admin.py:482 .\notification\admin.py:182
+#: .\contact\admin.py:129 .\contact\admin.py:482 .\notification\admin.py:183
 msgid "Timing Information"
 msgstr ""
 
-#: .\contact\admin.py:136 .\country\admin.py:115 .\notification\admin.py:189
-#: .\notification\admin.py:669 .\order\admin.py:1140 .\pay_way\admin.py:222
-#: .\product\admin.py:380 .\product\admin.py:1028 .\product\admin.py:1237
-#: .\product\admin.py:1550 .\product\admin.py:1689 .\region\admin.py:389
+#: .\contact\admin.py:136 .\country\admin.py:115 .\notification\admin.py:190
+#: .\notification\admin.py:669 .\order\admin.py:1185 .\pay_way\admin.py:222
+#: .\product\admin.py:382 .\product\admin.py:1055 .\product\admin.py:1285
+#: .\product\admin.py:1613 .\product\admin.py:1756 .\region\admin.py:389
 #: .\tag\admin.py:177 .\tag\admin.py:636 .\user\admin.py:328
 #: .\user\admin.py:632 .\user\admin.py:747 .\vat\admin.py:137
 msgid "System Information"
@@ -1720,14 +1720,14 @@ msgstr ""
 msgid "Message Stats"
 msgstr ""
 
-#: .\contact\admin.py:289 .\notification\admin.py:491
-#: .\notification\admin.py:828
+#: .\contact\admin.py:289 .\notification\admin.py:481
+#: .\notification\admin.py:838
 msgid "Timing"
 msgstr ""
 
 #: .\contact\admin.py:345 .\notification\admin.py:274
-#: .\notification\admin.py:795 .\notification\models\notification.py:37
-#: .\order\admin.py:631
+#: .\notification\admin.py:804 .\notification\models\notification.py:37
+#: .\order\admin.py:655
 msgid "Priority"
 msgstr ""
 
@@ -1881,8 +1881,8 @@ msgid "Sixth Floor Plus"
 msgstr ""
 
 #: .\core\enum.py:17 .\core\templates\admin\clear_cache.html:10
-#: .\core\templates\admin\product\apply_discount.html:15 .\product\admin.py:821
-#: .\product\admin.py:896
+#: .\core\templates\admin\product\apply_discount.html:15 .\product\admin.py:846
+#: .\product\admin.py:921
 msgid "Home"
 msgstr ""
 
@@ -2004,24 +2004,36 @@ msgid ""
 "SVG files containing event handlers are not allowed for security reasons."
 msgstr ""
 
-#: .\core\models.py:14 .\region\admin.py:549 .\tag\admin.py:408
+#: .\core\models.py:15
+msgid "Seo Title"
+msgstr ""
+
+#: .\core\models.py:18
+msgid "Seo Description"
+msgstr ""
+
+#: .\core\models.py:21
+msgid "Seo Keywords"
+msgstr ""
+
+#: .\core\models.py:29 .\region\admin.py:549 .\tag\admin.py:408
 #: .\tests\unit\region\test_region_admin.py:550
 msgid "Sort Order"
 msgstr ""
 
-#: .\core\models.py:71
+#: .\core\models.py:86
 msgid "Created At"
 msgstr ""
 
-#: .\core\models.py:72
+#: .\core\models.py:87
 msgid "Updated At"
 msgstr ""
 
-#: .\core\models.py:109
+#: .\core\models.py:124
 msgid "Published At"
 msgstr ""
 
-#: .\core\models.py:111
+#: .\core\models.py:126
 msgid "Is Published"
 msgstr ""
 
@@ -2050,8 +2062,8 @@ msgstr ""
 
 #: .\core\templates\admin\product\apply_discount.html:21
 #: .\core\templates\admin\product\apply_discount.html:28
-#: .\core\templates\admin\product\apply_discount.html:35 .\product\admin.py:811
-#: .\product\admin.py:826 .\product\admin.py:884 .\product\admin.py:901
+#: .\core\templates\admin\product\apply_discount.html:35 .\product\admin.py:836
+#: .\product\admin.py:851 .\product\admin.py:909 .\product\admin.py:926
 msgid "Apply Custom Discount"
 msgstr ""
 
@@ -2237,8 +2249,8 @@ msgstr ""
 msgid "Completeness"
 msgstr ""
 
-#: .\country\admin.py:310 .\order\admin.py:602 .\product\admin.py:651
-#: .\product\admin.py:1137 .\product\admin.py:1370 .\product\admin.py:1496
+#: .\country\admin.py:310 .\order\admin.py:620 .\product\admin.py:666
+#: .\product\admin.py:1171 .\product\admin.py:1428 .\product\admin.py:1559
 #: .\region\admin.py:610 .\tag\admin.py:423 .\tag\admin.py:778
 #: .\tests\unit\region\test_region_admin.py:556 .\vat\admin.py:305
 msgid "Created"
@@ -2470,84 +2482,84 @@ msgstr ""
 msgid "BLOG POST INDEX INSPECTION"
 msgstr ""
 
-#: .\notification\admin.py:20
+#: .\notification\admin.py:21
 msgid "Notification Status"
 msgstr ""
 
-#: .\notification\admin.py:26
+#: .\notification\admin.py:27
 msgid "Expired"
 msgstr ""
 
-#: .\notification\admin.py:27 .\notification\enum.py:42
+#: .\notification\admin.py:28 .\notification\enum.py:42
 msgid "Urgent Priority"
 msgstr ""
 
-#: .\notification\admin.py:29
+#: .\notification\admin.py:30
 msgid "Has Link"
 msgstr ""
 
-#: .\notification\admin.py:30 .\user\models\subscription.py:16
+#: .\notification\admin.py:31 .\user\models\subscription.py:16
 msgid "System Notifications"
 msgstr ""
 
-#: .\notification\admin.py:31
+#: .\notification\admin.py:32
 msgid "Order Related"
 msgstr ""
 
-#: .\notification\admin.py:32
+#: .\notification\admin.py:33
 msgid "Payment Related"
 msgstr ""
 
-#: .\notification\admin.py:33
+#: .\notification\admin.py:34
 msgid "Security Related"
 msgstr ""
 
-#: .\notification\admin.py:34
+#: .\notification\admin.py:35
 msgid "Promotions"
 msgstr ""
 
-#: .\notification\admin.py:73 .\user\admin.py:78
+#: .\notification\admin.py:74 .\user\admin.py:78
 msgid "User Status"
 msgstr ""
 
-#: .\notification\admin.py:78 .\notification\models\user.py:27
+#: .\notification\admin.py:79 .\notification\models\user.py:27
 msgid "Seen"
 msgstr ""
 
-#: .\notification\admin.py:79
+#: .\notification\admin.py:80
 msgid "Unseen"
 msgstr ""
 
-#: .\notification\admin.py:80
+#: .\notification\admin.py:81
 msgid "Seen Today"
 msgstr ""
 
-#: .\notification\admin.py:81
+#: .\notification\admin.py:82
 msgid "Urgent & Unseen"
 msgstr ""
 
-#: .\notification\admin.py:82
+#: .\notification\admin.py:83
 msgid "Expired Notifications"
 msgstr ""
 
-#: .\notification\admin.py:154
+#: .\notification\admin.py:155
 msgid "Notification Content"
 msgstr ""
 
-#: .\notification\admin.py:161
+#: .\notification\admin.py:162
 msgid "Classification"
 msgstr ""
 
-#: .\notification\admin.py:168
+#: .\notification\admin.py:169
 msgid "Scheduling"
 msgstr ""
 
-#: .\notification\admin.py:230 .\notification\admin.py:719
+#: .\notification\admin.py:231 .\notification\admin.py:723
 #: .\notification\models\notification.py:69
 msgid "Notification"
 msgstr ""
 
-#: .\notification\admin.py:574
+#: .\notification\admin.py:568
 msgid "Engagement Summary"
 msgstr ""
 
@@ -2579,16 +2591,16 @@ msgstr ""
 msgid "Danger"
 msgstr ""
 
-#: .\notification\enum.py:22 .\order\admin.py:1161 .\order\admin.py:1327
+#: .\notification\enum.py:22 .\order\admin.py:1208 .\order\admin.py:1395
 #: .\order\models\order.py:136 .\pay_way\admin.py:374
 msgid "Order"
 msgstr ""
 
-#: .\notification\enum.py:23 .\order\admin.py:553
+#: .\notification\enum.py:23 .\order\admin.py:564
 msgid "Payment"
 msgstr ""
 
-#: .\notification\enum.py:24 .\order\admin.py:576
+#: .\notification\enum.py:24 .\order\admin.py:591
 msgid "Shipping"
 msgstr ""
 
@@ -2604,7 +2616,7 @@ msgstr ""
 msgid "Promotion"
 msgstr ""
 
-#: .\notification\enum.py:31 .\product\admin.py:1263
+#: .\notification\enum.py:31 .\product\admin.py:1313
 msgid "Review"
 msgstr ""
 
@@ -2873,237 +2885,237 @@ msgstr ""
 msgid "No notification user ids provided."
 msgstr ""
 
-#: .\order\admin.py:28
+#: .\order\admin.py:29
 msgid "Status Group"
 msgstr ""
 
-#: .\order\admin.py:33
+#: .\order\admin.py:34
 msgid "Active Orders (Pending/Processing)"
 msgstr ""
 
-#: .\order\admin.py:34
+#: .\order\admin.py:35
 msgid "In Fulfillment (Shipped/Delivered)"
 msgstr ""
 
-#: .\order\admin.py:35
+#: .\order\admin.py:36
 msgid "Completed Orders"
 msgstr ""
 
-#: .\order\admin.py:36
+#: .\order\admin.py:37
 msgid "Problematic (Canceled/Returned/Refunded)"
 msgstr ""
 
-#: .\order\admin.py:68 .\order\models\order.py:117
+#: .\order\admin.py:69 .\order\models\order.py:117
 msgid "Payment Status"
 msgstr ""
 
-#: .\order\admin.py:73 .\order\enum\status.py:10 .\order\enum\status.py:36
+#: .\order\admin.py:74 .\order\enum\status.py:10 .\order\enum\status.py:36
 msgid "Completed"
 msgstr ""
 
-#: .\order\admin.py:74 .\order\enum\status.py:6 .\order\enum\status.py:34
+#: .\order\admin.py:75 .\order\enum\status.py:6 .\order\enum\status.py:34
 msgid "Pending"
 msgstr ""
 
-#: .\order\admin.py:75 .\order\enum\status.py:7 .\order\enum\status.py:35
+#: .\order\admin.py:76 .\order\enum\status.py:7 .\order\enum\status.py:35
 msgid "Processing"
 msgstr ""
 
-#: .\order\admin.py:76 .\order\enum\status.py:37
+#: .\order\admin.py:77 .\order\enum\status.py:37
 msgid "Failed"
 msgstr ""
 
-#: .\order\admin.py:77 .\order\enum\status.py:13 .\order\enum\status.py:38
+#: .\order\admin.py:78 .\order\enum\status.py:13 .\order\enum\status.py:38
 msgid "Refunded"
 msgstr ""
 
-#: .\order\admin.py:78 .\order\enum\status.py:39
+#: .\order\admin.py:79 .\order\enum\status.py:39
 msgid "Partially Refunded"
 msgstr ""
 
-#: .\order\admin.py:79 .\order\enum\status.py:11 .\order\enum\status.py:40
+#: .\order\admin.py:80 .\order\enum\status.py:11 .\order\enum\status.py:40
 msgid "Canceled"
 msgstr ""
 
-#: .\order\admin.py:80
+#: .\order\admin.py:81
 msgid "Needs Attention (Failed/Pending)"
 msgstr ""
 
-#: .\order\admin.py:117 .\order\admin.py:812 .\order\models\order.py:98
+#: .\order\admin.py:118 .\order\admin.py:836 .\order\models\order.py:98
 msgid "Document Type"
 msgstr ""
 
-#: .\order\admin.py:122 .\order\enum\document_type.py:6
+#: .\order\admin.py:123 .\order\enum\document_type.py:6
 msgid "Receipt"
 msgstr ""
 
-#: .\order\admin.py:123 .\order\enum\document_type.py:7
+#: .\order\admin.py:124 .\order\enum\document_type.py:7
 msgid "Invoice"
 msgstr ""
 
-#: .\order\admin.py:124 .\order\enum\document_type.py:9
+#: .\order\admin.py:125 .\order\enum\document_type.py:9
 msgid "Proforma Invoice"
 msgstr ""
 
-#: .\order\admin.py:125 .\order\enum\document_type.py:10
+#: .\order\admin.py:126 .\order\enum\document_type.py:10
 msgid "Shipping Label"
 msgstr ""
 
-#: .\order\admin.py:126 .\order\enum\document_type.py:11
+#: .\order\admin.py:127 .\order\enum\document_type.py:11
 msgid "Return Label"
 msgstr ""
 
-#: .\order\admin.py:127 .\order\enum\document_type.py:12
+#: .\order\admin.py:128 .\order\enum\document_type.py:12
 msgid "Credit Note"
 msgstr ""
 
-#: .\order\admin.py:161
+#: .\order\admin.py:162
 msgid "Order Value"
 msgstr ""
 
-#: .\order\admin.py:175
+#: .\order\admin.py:176
 msgid "Recent Orders"
 msgstr ""
 
-#: .\order\admin.py:183
+#: .\order\admin.py:184
 msgid "Urgent (24h+ Pending)"
 msgstr ""
 
-#: .\order\admin.py:271 .\order\admin.py:1254
+#: .\order\admin.py:276 .\order\admin.py:1314
 msgid "Refund Status"
 msgstr ""
 
-#: .\order\admin.py:317 .\order\admin.py:1418 .\order\admin.py:1532
+#: .\order\admin.py:324 .\order\admin.py:1494 .\order\admin.py:1614
 msgid "Changed By"
 msgstr ""
 
-#: .\order\admin.py:379
+#: .\order\admin.py:386
 msgid "Order Information"
 msgstr ""
 
-#: .\order\admin.py:393
+#: .\order\admin.py:400
 msgid "Customer Information"
 msgstr ""
 
-#: .\order\admin.py:408
+#: .\order\admin.py:415
 msgid "Shipping Address"
 msgstr ""
 
-#: .\order\admin.py:426
+#: .\order\admin.py:433
 msgid "Payment Information"
 msgstr ""
 
-#: .\order\admin.py:438
+#: .\order\admin.py:445
 msgid ""
 "⚠️ Note: Ensure all money fields use the same currency (EUR preferred) to "
 "avoid calculation errors."
 msgstr ""
 
-#: .\order\admin.py:443
+#: .\order\admin.py:450
 msgid "Shipping & Tracking"
 msgstr ""
 
-#: .\order\admin.py:452
+#: .\order\admin.py:459
 msgid ""
 "💡 Shipping price currency should match item currencies to avoid total "
 "calculation errors."
 msgstr ""
 
-#: .\order\admin.py:457 .\order\admin.py:1133 .\user\admin.py:621
+#: .\order\admin.py:464 .\order\admin.py:1178 .\user\admin.py:621
 msgid "Additional Information"
 msgstr ""
 
-#: .\order\admin.py:504
+#: .\order\admin.py:513
 msgid "Customer"
 msgstr ""
 
-#: .\order\admin.py:536
+#: .\order\admin.py:547
 msgid "Order Summary"
 msgstr ""
 
-#: .\order\admin.py:839
+#: .\order\admin.py:867
 msgid "Currency"
 msgstr ""
 
-#: .\order\admin.py:859
+#: .\order\admin.py:889
 msgid "Customer Summary"
 msgstr ""
 
-#: .\order\admin.py:919
+#: .\order\admin.py:959
 msgid "Shipping Summary"
 msgstr ""
 
-#: .\order\admin.py:974
+#: .\order\admin.py:1019
 msgid "Order Analytics"
 msgstr ""
 
-#: .\order\admin.py:977
+#: .\order\admin.py:1022
 msgid "Mark selected orders as processing"
 msgstr ""
 
-#: .\order\admin.py:987
+#: .\order\admin.py:1032
 #, python-format
 msgid "Order %(order_id)s marked as processing"
 msgstr ""
 
-#: .\order\admin.py:994
+#: .\order\admin.py:1039
 msgid "Mark selected orders as shipped"
 msgstr ""
 
-#: .\order\admin.py:1004
+#: .\order\admin.py:1049
 #, python-format
 msgid "Order %(order_id)s marked as shipped"
 msgstr ""
 
-#: .\order\admin.py:1011
+#: .\order\admin.py:1056
 msgid "Mark selected orders as delivered"
 msgstr ""
 
-#: .\order\admin.py:1021
+#: .\order\admin.py:1066
 #, python-format
 msgid "Order %(order_id)s marked as delivered"
 msgstr ""
 
-#: .\order\admin.py:1028
+#: .\order\admin.py:1073
 msgid "Mark selected orders as completed"
 msgstr ""
 
-#: .\order\admin.py:1038
+#: .\order\admin.py:1083
 #, python-format
 msgid "Order %(order_id)s marked as completed"
 msgstr ""
 
-#: .\order\admin.py:1045
+#: .\order\admin.py:1090
 msgid "Cancel selected orders and restore stock"
 msgstr ""
 
-#: .\order\admin.py:1055
+#: .\order\admin.py:1100
 #, python-format
 msgid "Order %(order_id)s marked as canceled"
 msgstr ""
 
-#: .\order\admin.py:1108
+#: .\order\admin.py:1153
 msgid "Order Item Information"
 msgstr ""
 
-#: .\order\admin.py:1115
+#: .\order\admin.py:1160
 msgid "Refund Information"
 msgstr ""
 
-#: .\order\admin.py:1126
+#: .\order\admin.py:1171
 msgid "Calculations"
 msgstr ""
 
-#: .\order\admin.py:1276
+#: .\order\admin.py:1340
 msgid "Item Analytics"
 msgstr ""
 
-#: .\order\admin.py:1393 .\order\admin.py:1508 .\order\models\history.py:46
+#: .\order\admin.py:1461 .\order\admin.py:1586 .\order\models\history.py:46
 #: .\order\models\history.py:251
 msgid "Change Type"
 msgstr ""
 
-#: .\order\admin.py:1469 .\order\models\item.py:39
+#: .\order\admin.py:1548 .\order\models\item.py:39
 msgid "Order Item"
 msgstr ""
 
@@ -4500,180 +4512,180 @@ msgstr ""
 msgid "Review Rating"
 msgstr ""
 
-#: .\product\admin.py:244 .\product\admin.py:952 .\product\admin.py:1568
-#: .\product\admin.py:1707
+#: .\product\admin.py:246 .\product\admin.py:979 .\product\admin.py:1633
+#: .\product\admin.py:1776
 msgid "Preview"
 msgstr ""
 
-#: .\product\admin.py:315
+#: .\product\admin.py:317
 msgid "Product Information"
 msgstr ""
 
-#: .\product\admin.py:340
+#: .\product\admin.py:342
 msgid "Inventory"
 msgstr ""
 
-#: .\product\admin.py:350
+#: .\product\admin.py:352
 msgid "SEO & Marketing"
 msgstr ""
 
-#: .\product\admin.py:362
+#: .\product\admin.py:364
 msgid "Performance Metrics"
 msgstr ""
 
-#: .\product\admin.py:540 .\product\models\product.py:77
+#: .\product\admin.py:548 .\product\models\product.py:77
 msgid "Stock"
 msgstr ""
 
-#: .\product\admin.py:559
+#: .\product\admin.py:569
 msgid "Performance"
 msgstr ""
 
-#: .\product\admin.py:680
+#: .\product\admin.py:697
 msgid "Pricing Summary"
 msgstr ""
 
-#: .\product\admin.py:713
+#: .\product\admin.py:732
 msgid "Performance Summary"
 msgstr ""
 
-#: .\product\admin.py:751
+#: .\product\admin.py:776
 msgid "Product Analytics"
 msgstr ""
 
-#: .\product\admin.py:754
+#: .\product\admin.py:779
 msgid "Activate selected products"
 msgstr ""
 
-#: .\product\admin.py:763
+#: .\product\admin.py:788
 #, python-format
 msgid "%(count)d product was successfully activated."
 msgstr ""
 
-#: .\product\admin.py:764
+#: .\product\admin.py:789
 #, python-format
 msgid "%(count)d products were successfully activated."
 msgstr ""
 
-#: .\product\admin.py:772
+#: .\product\admin.py:797
 msgid "Deactivate selected products"
 msgstr ""
 
-#: .\product\admin.py:781
+#: .\product\admin.py:806
 #, python-format
 msgid "%(count)d product was successfully deactivated."
 msgstr ""
 
-#: .\product\admin.py:782
+#: .\product\admin.py:807
 #, python-format
 msgid "%(count)d products were successfully deactivated."
 msgstr ""
 
-#: .\product\admin.py:790
+#: .\product\admin.py:815
 msgid "Apply custom discount to selected products"
 msgstr ""
 
-#: .\product\admin.py:839
+#: .\product\admin.py:864
 msgid "No products selected. Please try again."
 msgstr ""
 
-#: .\product\admin.py:863
+#: .\product\admin.py:888
 #, python-format
 msgid "Applied %(discount)s%% discount to %(count)d product."
 msgstr ""
 
-#: .\product\admin.py:866
+#: .\product\admin.py:891
 #, python-format
 msgid "Applied %(discount)s%% discount to %(count)d products."
 msgstr ""
 
-#: .\product\admin.py:914
+#: .\product\admin.py:939
 msgid "Clear discount from selected products"
 msgstr ""
 
-#: .\product\admin.py:923
+#: .\product\admin.py:948
 #, python-format
 msgid "%(count)d product's discount was cleared."
 msgstr ""
 
-#: .\product\admin.py:924
+#: .\product\admin.py:949
 #, python-format
 msgid "%(count)d products' discounts were cleared."
 msgstr ""
 
-#: .\product\admin.py:1096
+#: .\product\admin.py:1127
 msgid "Product Stats"
 msgstr ""
 
-#: .\product\admin.py:1163
+#: .\product\admin.py:1203
 msgid "Category Analytics"
 msgstr ""
 
-#: .\product\admin.py:1172
+#: .\product\admin.py:1216
 msgid "Direct Products"
 msgstr ""
 
-#: .\product\admin.py:1181
+#: .\product\admin.py:1229
 msgid "Total Products"
 msgstr ""
 
-#: .\product\admin.py:1223
+#: .\product\admin.py:1271
 msgid "Review Information"
 msgstr ""
 
-#: .\product\admin.py:1321
+#: .\product\admin.py:1378
 msgid "Rating"
 msgstr ""
 
-#: .\product\admin.py:1373
+#: .\product\admin.py:1431
 msgid "Approve selected reviews"
 msgstr ""
 
-#: .\product\admin.py:1382
+#: .\product\admin.py:1440
 #, python-format
 msgid "%(count)d review was approved."
 msgstr ""
 
-#: .\product\admin.py:1383
+#: .\product\admin.py:1441
 #, python-format
 msgid "%(count)d reviews were approved."
 msgstr ""
 
-#: .\product\admin.py:1391
+#: .\product\admin.py:1449
 msgid "Reject selected reviews"
 msgstr ""
 
-#: .\product\admin.py:1400
+#: .\product\admin.py:1458
 #, python-format
 msgid "%(count)d review was rejected."
 msgstr ""
 
-#: .\product\admin.py:1401
+#: .\product\admin.py:1459
 #, python-format
 msgid "%(count)d reviews were rejected."
 msgstr ""
 
-#: .\product\admin.py:1413
+#: .\product\admin.py:1471
 #, python-format
 msgid "%(count)d comment was successfully marked as published."
 msgstr ""
 
-#: .\product\admin.py:1414
+#: .\product\admin.py:1472
 #, python-format
 msgid "%(count)d comments were successfully marked as published."
 msgstr ""
 
-#: .\product\admin.py:1426
+#: .\product\admin.py:1484
 #, python-format
 msgid "%(count)d comment was successfully marked as unpublished."
 msgstr ""
 
-#: .\product\admin.py:1428
+#: .\product\admin.py:1486
 #, python-format
 msgid "%(count)d comments were successfully marked as unpublished."
 msgstr ""
 
-#: .\product\admin.py:1529 .\product\admin.py:1668
+#: .\product\admin.py:1592 .\product\admin.py:1735
 msgid "Image Information"
 msgstr ""
 
@@ -5294,31 +5306,19 @@ msgid ""
 "language."
 msgstr ""
 
-#: .\seo\models.py:7
-msgid "Seo Title"
-msgstr ""
-
-#: .\seo\models.py:10
-msgid "Seo Description"
-msgstr ""
-
-#: .\seo\models.py:13
-msgid "Seo Keywords"
-msgstr ""
-
-#: .\settings.py:196
+#: .\settings.py:195
 msgid "Greek"
 msgstr ""
 
-#: .\settings.py:197
+#: .\settings.py:196
 msgid "English"
 msgstr ""
 
-#: .\settings.py:198
+#: .\settings.py:197
 msgid "German"
 msgstr ""
 
-#: .\settings.py:1077
+#: .\settings.py:1076
 msgid "Cache"
 msgstr ""
 

@@ -5,7 +5,8 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db.models import Avg
 from django.test import TestCase
-from django.utils.html import format_html
+from django.utils.html import conditional_escape
+from django.utils.safestring import mark_safe
 from djmoney.money import Money
 
 from product.enum.review import ReviewStatus
@@ -157,19 +158,23 @@ class ProductModelTestCase(TestCase):
 
     def test_colored_stock_property(self):
         self.product.stock = 5
+        safe_stock = conditional_escape(str(self.product.stock))
+        expected_html = mark_safe(
+            f'<span style="color: #1bff00;">{safe_stock}</span>'
+        )
         self.assertEqual(
             self.product.colored_stock,
-            format_html(
-                '<span style="color: #1bff00;">{}</span>', self.product.stock
-            ),
+            expected_html,
         )
 
         self.product.stock = 0
+        safe_stock = conditional_escape(str(self.product.stock))
+        expected_html = mark_safe(
+            f'<span style="color: #ff0000;">{safe_stock}</span>'
+        )
         self.assertEqual(
             self.product.colored_stock,
-            format_html(
-                '<span style="color: #ff0000;">{}</span>', self.product.stock
-            ),
+            expected_html,
         )
 
 

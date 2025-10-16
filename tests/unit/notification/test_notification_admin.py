@@ -316,7 +316,7 @@ class NotificationAdminTestCase(TestCase):
             ("SYSTEM", "⚙️"),
             ("ORDER", "📦"),
             ("PAYMENT", "💳"),
-            ("SECURITY", "🔐"),
+            ("SECURITY", "🔒"),
             ("PROMOTION", "🎉"),
         ]
 

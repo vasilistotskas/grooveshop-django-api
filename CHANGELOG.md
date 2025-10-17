@@ -3,6 +3,12 @@
 
 
 
+## v1.45.0 (2025-10-17)
+
+### Features
+
+* feat: Bump Versions redis ci version to 8 ([`5819d6c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5819d6c9015d22ef40b604ddfa7f1aaa59b43a7a))
+
 ## v1.44.1 (2025-10-16)
 
 ### Bug fixes

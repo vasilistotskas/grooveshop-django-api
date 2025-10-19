@@ -179,3 +179,39 @@ class MeasurementSerializerField(serializers.Field):
             self.fail("invalid_value", invalid_value=value)
 
         return self.measurement(**{unit: value})
+
+
+@extend_schema_field(
+    {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "example": "CHECKOUT_SHIPPING_PRICE"},
+            "value": {"type": "string", "example": "3.00"},
+            "type": {"type": "string", "example": "string"},
+        },
+        "example": {
+            "name": "CHECKOUT_SHIPPING_PRICE",
+            "value": "3.00",
+            "type": "string",
+        },
+    }
+)
+class SettingSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    value = serializers.CharField()
+    type = serializers.CharField()
+
+
+@extend_schema_field(
+    {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "value": {"type": "string"},
+        },
+        "example": {"name": "CHECKOUT_SHIPPING_PRICE", "value": "3.00"},
+    }
+)
+class SettingDetailSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    value = serializers.CharField()

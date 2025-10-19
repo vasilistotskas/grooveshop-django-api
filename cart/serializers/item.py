@@ -176,16 +176,6 @@ class CartItemWriteSerializer(serializers.ModelSerializer[CartItem]):
 
         if existing_item:
             new_quantity = existing_item.quantity + quantity
-            if product.stock < new_quantity:
-                raise serializers.ValidationError(
-                    _(
-                        "Not enough stock to add {quantity} more. Current in cart: {existing_item_quantity}, Available: {product_stock}"
-                    ).format(
-                        quantity=quantity,
-                        existing_item_quantity=existing_item.quantity,
-                        product_stock=product.stock,
-                    )
-                )
             existing_item.quantity = new_quantity
             existing_item.save()
             return existing_item
@@ -252,16 +242,6 @@ class CartItemCreateSerializer(serializers.ModelSerializer[CartItem]):
 
         if existing_item:
             new_quantity = existing_item.quantity + quantity
-            if product.stock < new_quantity:
-                raise serializers.ValidationError(
-                    _(
-                        "Not enough stock to add {quantity} more. Current in cart: {existing_item_quantity}, Available: {product_stock}"
-                    ).format(
-                        quantity=quantity,
-                        existing_item_quantity=existing_item.quantity,
-                        product_stock=product.stock,
-                    )
-                )
             existing_item.quantity = new_quantity
             existing_item.save()
             return existing_item

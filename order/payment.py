@@ -1,7 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
 from typing import Any
-
+from django.utils.translation import gettext_lazy as _
 import stripe
 from django.conf import settings
 from djmoney.money import Money
@@ -64,6 +64,8 @@ class StripePaymentProvider(PaymentProvider):
     def create_checkout_session(
         self, amount: Money, order_id: str, **kwargs
     ) -> tuple[bool, dict[str, Any]]:
+        from extra_settings.models import Setting
+
         try:
             logger.info(
                 "Creating Stripe Checkout Session",
@@ -72,6 +74,13 @@ class StripePaymentProvider(PaymentProvider):
                     "currency": str(amount.currency),
                     "order_id": order_id,
                 },
+            )
+
+            base_shipping_cost = Setting.get(
+                "CHECKOUT_SHIPPING_PRICE", default=3.00
+            )
+            free_shipping_threshold = Setting.get(
+                "FREE_SHIPPING_THRESHOLD", default=50.00
             )
 
             stripe_amount = int(amount.amount * 100)
@@ -112,6 +121,24 @@ class StripePaymentProvider(PaymentProvider):
                     }
                 },
             }
+
+            if amount.amount < free_shipping_threshold:
+                checkout_session_data["shipping_options"] = [
+                    {
+                        "shipping_rate_data": {
+                            "type": "fixed_amount",
+                            "fixed_amount": {
+                                "amount": int(float(base_shipping_cost) * 100),
+                                "currency": currency_code,
+                            },
+                            "display_name": _("Standard shipping"),
+                            "delivery_estimate": {
+                                "minimum": {"unit": "business_day", "value": 5},
+                                "maximum": {"unit": "business_day", "value": 7},
+                            },
+                        },
+                    },
+                ]
 
             customer_id = kwargs.get("customer_id")
             if customer_id:

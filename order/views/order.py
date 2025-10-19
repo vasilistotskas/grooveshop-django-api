@@ -517,8 +517,11 @@ class OrderViewSet(BaseModelViewSet):
 
         provider = get_payment_provider(order.pay_way.provider_code)
 
+        # Pass only items total (without shipping) so Stripe can add shipping separately
         success, checkout_response = provider.create_checkout_session(
-            amount=order.total_price, order_id=str(order.id), **checkout_params
+            amount=order.total_price_items,
+            order_id=str(order.id),
+            **checkout_params,
         )
 
         if not success:

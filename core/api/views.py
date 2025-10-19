@@ -24,7 +24,12 @@ from rest_framework.metadata import SimpleMetadata
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from django.db import transaction
-from core.api.serializers import HealthCheckResponseSerializer
+from core.api.serializers import (
+    ErrorResponseSerializer,
+    HealthCheckResponseSerializer,
+    SettingDetailSerializer,
+    SettingSerializer,
+)
 from core.pagination.cursor import CursorPaginator
 from core.pagination.limit_offset import LimitOffsetPaginator
 from core.pagination.page_number import PageNumberPaginator
@@ -535,3 +540,120 @@ def redirect_to_frontend(request, *args, **kwargs):
     response.headers["X-Encrypted-Token"] = encrypted_token
 
     return response
+
+
+@extend_schema(
+    summary=_("List all available settings"),
+    description=_("Retrieve all settings with their names, values, and types"),
+    tags=["Settings"],
+    responses={
+        200: SettingSerializer(many=True),
+        500: ErrorResponseSerializer,
+    },
+)
+@api_view(["GET"])
+def list_settings(request):
+    """List all available settings with their values."""
+    try:
+        from extra_settings.models import Setting
+
+        settings_list = []
+        all_settings = Setting.objects.all()
+
+        for setting in all_settings:
+            settings_list.append(
+                {
+                    "name": setting.name,
+                    "value": str(setting.value),
+                    "type": setting.value_type,
+                }
+            )
+
+        from core.api.serializers import SettingSerializer
+
+        serializer = SettingSerializer(settings_list, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Error listing settings: {e}", exc_info=True)
+
+        error_data = {
+            "detail": _("Failed to retrieve settings"),
+            "error": str(e),
+        }
+        return Response(
+            error_data,
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@extend_schema(
+    summary=_("Get setting by key"),
+    description=_("Retrieve a specific setting value by its key name"),
+    tags=["Settings"],
+    parameters=[
+        OpenApiParameter(
+            name="key",
+            description=_("Setting key name (e.g., CHECKOUT_SHIPPING_PRICE)"),
+            required=True,
+            type=str,
+            location=OpenApiParameter.QUERY,
+        ),
+    ],
+    responses={
+        200: SettingDetailSerializer,
+        404: ErrorResponseSerializer,
+        500: ErrorResponseSerializer,
+    },
+)
+@api_view(["GET"])
+def get_setting_by_key(request):
+    """Get a specific setting by its key name."""
+    try:
+        from extra_settings.models import Setting
+
+        key = request.query_params.get("key")
+
+        if not key:
+            error_data = {
+                "detail": _("Setting key is required"),
+                "error": "missing_key",
+            }
+            return Response(
+                error_data,
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            setting_value = Setting.get(key)
+            from core.api.serializers import SettingDetailSerializer
+
+            serializer = SettingDetailSerializer(
+                {
+                    "name": key,
+                    "value": str(setting_value),
+                }
+            )
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except Setting.DoesNotExist:
+            error_data = {
+                "detail": _(f"Setting '{key}' not found"),
+                "error": "not_found",
+            }
+            return Response(
+                error_data,
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+    except Exception as e:
+        logger.error(f"Error retrieving setting: {e}", exc_info=True)
+
+        error_data = {
+            "detail": _("Failed to retrieve setting"),
+            "error": str(e),
+        }
+        return Response(
+            error_data,
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )

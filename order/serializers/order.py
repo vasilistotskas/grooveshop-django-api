@@ -271,7 +271,7 @@ class OrderDetailSerializer(OrderSerializer):
 class OrderWriteSerializer(serializers.ModelSerializer[Order]):
     items = OrderItemCreateSerializer(many=True)
     paid_amount = MoneyField(max_digits=11, decimal_places=2, required=False)
-    shipping_price = MoneyField(max_digits=11, decimal_places=2)
+    shipping_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     total_price_items = MoneyField(
         max_digits=11, decimal_places=2, read_only=True
     )
@@ -354,7 +354,33 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
         return data
 
     def create(self, validated_data):
+        from django.conf import settings
+        from djmoney.money import Money
+        from extra_settings.models import Setting
+
         items_data = validated_data.pop("items")
+
+        items_total = Money(0, settings.DEFAULT_CURRENCY)
+        for item_data in items_data:
+            product = item_data.get("product")
+            quantity = item_data.get("quantity", 1)
+            items_total += product.final_price * quantity
+
+        base_shipping_cost = Setting.get(
+            "CHECKOUT_SHIPPING_PRICE", default=3.00
+        )
+        free_shipping_threshold = Setting.get(
+            "FREE_SHIPPING_THRESHOLD", default=50.00
+        )
+
+        if items_total.amount >= float(free_shipping_threshold):
+            shipping_price = Money(0, items_total.currency)
+        else:
+            shipping_price = Money(
+                float(base_shipping_cost), items_total.currency
+            )
+
+        validated_data["shipping_price"] = shipping_price
 
         order = Order.objects.create(**validated_data)
 
@@ -421,6 +447,11 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
             "payment_method",
             "tracking_number",
             "shipping_carrier",
+        )
+        read_only_fields = (
+            "shipping_price",
+            "total_price_items",
+            "total_price_extra",
         )
         extra_kwargs = {
             "user": {

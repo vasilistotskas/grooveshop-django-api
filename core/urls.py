@@ -11,7 +11,12 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
 )
 
-from core.api.views import health_check, redirect_to_frontend
+from core.api.views import (
+    get_setting_by_key,
+    health_check,
+    list_settings,
+    redirect_to_frontend,
+)
 from core.views import (
     HomeView,
     ManageTOTPSvgView,
@@ -60,6 +65,8 @@ urlpatterns += i18n_patterns(
     path("api/v1/", include("notification.urls")),
     path("api/v1/", include("contact.urls")),
     path("api/v1/health", health_check, name="api-health"),
+    path("api/v1/settings", list_settings, name="api-settings-list"),
+    path("api/v1/settings/get", get_setting_by_key, name="api-settings-get"),
     path("api/v1/schema", SpectacularAPIView.as_view(), name="schema"),
     path(
         "api/v1/schema/swagger-ui",

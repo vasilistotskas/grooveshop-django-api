@@ -3,6 +3,14 @@
 
 
 
+## v1.46.0 (2025-10-19)
+
+### Features
+
+* feat: Add settings API endpoints and dynamic shipping logic
+
+Introduces API endpoints to list and retrieve settings via /api/v1/settings and /api/v1/settings/get. Shipping price and free shipping threshold are now configurable via settings and used dynamically in order creation and Stripe payment integration. Also updates serializers and schema to reflect these changes, and makes shipping_price read-only in order creation. ([`cf49628`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cf49628c01e9ff4823d0c034e54ed9425b8f2bf5))
+
 ## v1.45.0 (2025-10-17)
 
 ### Features

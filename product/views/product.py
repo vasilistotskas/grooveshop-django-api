@@ -63,7 +63,6 @@ schema_config = create_schema_view_config(
 
 
 @extend_schema_view(**schema_config)
-@cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class ProductViewSet(BaseModelViewSet):
     queryset = Product.objects.all()
     request_serializers = req_serializers

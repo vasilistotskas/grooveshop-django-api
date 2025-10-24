@@ -43,7 +43,21 @@ def get_or_create_region():
 
 class UserAddressFactory(factory.django.DjangoModelFactory):
     user = factory.LazyFunction(get_or_create_user)
-    title = factory.Faker("word")
+    title = factory.Faker(
+        "random_element",
+        elements=[
+            "Home",
+            "Work",
+            "Office",
+            "Billing Address",
+            "Shipping Address",
+            "Primary",
+            "Secondary",
+            "Parents' House",
+            "Vacation Home",
+            "Business",
+        ],
+    )
     first_name = factory.Faker("first_name")
     last_name = factory.Faker("last_name")
     street = factory.Faker("street_name")
@@ -60,8 +74,22 @@ class UserAddressFactory(factory.django.DjangoModelFactory):
     )
     phone = factory.Faker("phone_number")
     mobile_phone = factory.Faker("phone_number")
-    notes = factory.Faker("sentence")
-    is_main = factory.Faker("boolean")
+    notes = factory.Faker(
+        "random_element",
+        elements=[
+            "Please ring the doorbell",
+            "Leave at front door",
+            "Call upon arrival",
+            "Use back entrance",
+            "Apartment 2B",
+            "Second floor",
+            "Please deliver during business hours",
+            "Contact before delivery",
+            "Ring twice",
+            "",
+        ],
+    )
+    is_main = factory.Faker("pybool", truth_probability=30)
 
     class Meta:
         model = UserAddress

@@ -15,8 +15,40 @@ available_languages = [
 
 class ProductCategoryTranslationFactory(factory.django.DjangoModelFactory):
     language_code = factory.Iterator(available_languages)
-    name = factory.Faker("word")
-    description = factory.Faker("paragraph")
+    name = factory.Faker(
+        "random_element",
+        elements=[
+            "Electronics",
+            "Clothing",
+            "Home & Garden",
+            "Books",
+            "Sports & Outdoors",
+            "Toys & Games",
+            "Beauty & Personal Care",
+            "Health & Wellness",
+            "Food & Beverages",
+            "Office Supplies",
+            "Pet Supplies",
+            "Automotive",
+            "Tools & Hardware",
+            "Jewelry",
+            "Arts & Crafts",
+            "Baby & Kids",
+            "Music & Instruments",
+            "Movies & TV",
+            "Video Games",
+            "Kitchen & Dining",
+            "Furniture",
+            "Bedding & Bath",
+            "Shoes",
+            "Watches",
+            "Bags & Luggage",
+            "Party Supplies",
+            "Gifts",
+            "Seasonal",
+        ],
+    )
+    description = factory.Faker("text", max_nb_chars=300)
 
     class Meta:
         model = apps.get_model("product", "ProductCategoryTranslation")

@@ -26,7 +26,31 @@ def get_or_create_user():
 
 class BlogAuthorTranslationFactory(factory.django.DjangoModelFactory):
     language_code = factory.Iterator(available_languages)
-    bio = factory.Faker("paragraph")
+    bio = factory.Faker(
+        "random_element",
+        elements=[
+            "Passionate writer and storyteller with a love for exploring new ideas and perspectives.",
+            "Tech enthusiast and software developer sharing insights on the latest innovations.",
+            "Travel blogger documenting adventures around the world and cultural experiences.",
+            "Food lover and chef sharing delicious recipes and culinary tips.",
+            "Health and wellness coach helping people live their best lives.",
+            "Fashion expert and style consultant with years of industry experience.",
+            "Business strategist and entrepreneur sharing lessons from the startup world.",
+            "Entertainment journalist covering the latest news in film, TV, and music.",
+            "Sports analyst and former athlete with in-depth knowledge of the game.",
+            "Educator and academic researcher passionate about learning and development.",
+            "Finance professional providing practical advice on money management and investing.",
+            "Creative DIY enthusiast sharing craft ideas and home improvement projects.",
+            "Parenting blogger offering tips and support for modern families.",
+            "Fitness trainer dedicated to helping others achieve their health goals.",
+            "Beauty expert and makeup artist sharing the latest trends and tutorials.",
+            "Interior designer with a passion for creating beautiful, functional spaces.",
+            "Professional photographer capturing moments and teaching the art of photography.",
+            "Marketing specialist helping brands connect with their audiences.",
+            "Science communicator making complex topics accessible and engaging.",
+            "Environmental activist working towards a more sustainable future.",
+        ],
+    )
     master = factory.SubFactory("blog.factories.author.BlogAuthorFactory")
 
     class Meta:

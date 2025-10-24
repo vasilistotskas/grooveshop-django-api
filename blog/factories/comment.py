@@ -36,7 +36,36 @@ def get_or_create_post():
 
 class BlogCommentTranslationFactory(factory.django.DjangoModelFactory):
     language_code = factory.Iterator(available_languages)
-    content = factory.Faker("paragraph")
+    content = factory.Faker(
+        "random_element",
+        elements=[
+            "Great article! Very informative and well-written.",
+            "Thanks for sharing this insightful post!",
+            "I completely agree with your points here.",
+            "This is exactly what I was looking for. Thank you!",
+            "Interesting perspective. I hadn't thought about it that way.",
+            "Could you elaborate more on this topic?",
+            "Excellent work! Looking forward to more content like this.",
+            "Very helpful tips. I'll definitely try these out.",
+            "This post really resonated with me. Thank you!",
+            "I have a different opinion on this matter...",
+            "Well researched and thoughtfully presented.",
+            "This is super useful! Bookmarking for later.",
+            "Love your writing style! Keep it up!",
+            "Can't wait to see what you write about next.",
+            "This changed my perspective completely.",
+            "I learned so much from reading this. Thanks!",
+            "Great insights! Very practical advice.",
+            "I'm sharing this with all my friends!",
+            "This article came at the perfect time for me.",
+            "Your content always delivers value. Thank you!",
+            "I disagree with some points, but overall well done.",
+            "More people need to read this. Amazing post!",
+            "This is exactly the kind of content I enjoy.",
+            "Thought-provoking and well-articulated.",
+            "Thank you for addressing this important topic.",
+        ],
+    )
     master = factory.SubFactory("blog.factories.comment.BlogCommentFactory")
 
     class Meta:
@@ -46,7 +75,7 @@ class BlogCommentTranslationFactory(factory.django.DjangoModelFactory):
 
 @factory.django.mute_signals(signals.m2m_changed)
 class BlogCommentFactory(factory.django.DjangoModelFactory):
-    approved = factory.Faker("boolean")
+    approved = factory.Faker("pybool", truth_probability=75)
     user = factory.LazyFunction(get_or_create_user)
     post = factory.LazyFunction(get_or_create_post)
     parent = None

@@ -48,7 +48,31 @@ def get_or_create_product():
 
 class ProductReviewTranslationFactory(factory.django.DjangoModelFactory):
     language_code = factory.Iterator(available_languages)
-    comment = factory.Faker("paragraph")
+    comment = factory.Faker(
+        "random_element",
+        elements=[
+            "Great product! Highly recommend it.",
+            "Excellent quality and fast delivery.",
+            "Good value for money.",
+            "Not bad, but could be better.",
+            "Decent product overall.",
+            "Amazing! Exceeded my expectations.",
+            "Poor quality, wouldn't buy again.",
+            "The product works as described.",
+            "Very satisfied with this purchase.",
+            "It's okay for the price.",
+            "Outstanding! Best purchase I've made.",
+            "Disappointing. Expected more.",
+            "Fantastic! Will definitely order again.",
+            "Average product, nothing special.",
+            "Wonderful! Love it!",
+            "Not worth the money.",
+            "Perfect! Exactly what I needed.",
+            "Works well, happy with it.",
+            "Could be improved but still good.",
+            "Terrible experience, do not recommend.",
+        ],
+    )
     master = factory.SubFactory("product.factories.review.ProductReviewFactory")
 
     class Meta:

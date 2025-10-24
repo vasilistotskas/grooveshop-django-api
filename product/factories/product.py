@@ -44,8 +44,63 @@ def get_or_create_vat():
 
 class ProductTranslationFactory(factory.django.DjangoModelFactory):
     language_code = factory.Iterator(available_languages)
-    name = factory.Faker("word")
-    description = factory.Faker("paragraph")
+    name = factory.Faker(
+        "random_element",
+        elements=[
+            "Wireless Bluetooth Headphones",
+            "Stainless Steel Water Bottle",
+            "Organic Cotton T-Shirt",
+            "Yoga Mat with Carrying Strap",
+            "LED Desk Lamp",
+            "Ceramic Coffee Mug Set",
+            "Portable Phone Charger",
+            "Running Shoes",
+            "Leather Wallet",
+            "Smart Watch",
+            "Kitchen Knife Set",
+            "Backpack with Laptop Compartment",
+            "Sunglasses",
+            "Bamboo Cutting Board",
+            "Wireless Mouse",
+            "Essential Oil Diffuser",
+            "Stainless Steel Cookware Set",
+            "Memory Foam Pillow",
+            "Resistance Bands",
+            "Plant-Based Protein Powder",
+            "Wireless Earbuds",
+            "Throw Blanket",
+            "Canvas Tote Bag",
+            "Electric Kettle",
+            "Face Moisturizer",
+            "Hand Soap Set",
+            "Scented Candles",
+            "Journal Notebook",
+            "Insulated Lunch Box",
+            "Sports Bottle",
+            "Compression Socks",
+            "Gaming Keyboard",
+            "USB-C Cable",
+            "Phone Case",
+            "Desk Organizer",
+            "Adjustable Dumbbell Set",
+            "Air Purifier",
+            "Night Light",
+            "Reusable Shopping Bags",
+            "Wireless Charging Pad",
+            "Fitness Tracker",
+            "Wool Socks",
+            "Reversible Belt",
+            "Tablet Stand",
+            "Portable Speaker",
+            "Bath Towel Set",
+            "Non-Stick Frying Pan",
+            "Reading Glasses",
+            "Hand Cream",
+            "Multivitamin Supplements",
+            "Electric Toothbrush",
+        ],
+    )
+    description = factory.Faker("text", max_nb_chars=500)
     master = factory.SubFactory("product.factories.product.ProductFactory")
 
     class Meta:
@@ -60,20 +115,30 @@ class ProductFactory(CustomDjangoModelFactory):
         ("slug", lambda: fake.slug()),
     ]
 
-    sku = factory.Faker("uuid4")
+    sku = factory.Faker("ean", length=13)
     category = factory.LazyFunction(get_or_create_category)
     price = factory.Faker(
-        "pydecimal", left_digits=4, right_digits=2, positive=True
+        "pydecimal",
+        left_digits=3,
+        right_digits=2,
+        positive=True,
+        min_value=5,
+        max_value=999,
     )
-    active = factory.Faker("boolean")
-    stock = factory.Faker("random_int", min=5, max=100)
+    active = factory.Faker("pybool", truth_probability=85)
+    stock = factory.Faker("random_int", min=0, max=250)
     discount_percent = factory.Faker(
-        "pydecimal", left_digits=2, right_digits=2, positive=True, max_value=100
+        "random_element", elements=[0, 0, 0, 5, 10, 15, 20, 25, 30, 50]
     )
     vat = factory.LazyFunction(get_or_create_vat)
-    view_count = factory.Faker("random_int", min=0, max=1000)
+    view_count = factory.Faker("random_int", min=0, max=5000)
     weight = factory.Faker(
-        "pydecimal", left_digits=3, right_digits=2, positive=True
+        "pydecimal",
+        left_digits=2,
+        right_digits=2,
+        positive=True,
+        min_value=0.1,
+        max_value=99,
     )
 
     class Meta:

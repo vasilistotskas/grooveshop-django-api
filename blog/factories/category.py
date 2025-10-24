@@ -21,8 +21,41 @@ def generate_unique_blog_category_filename():
 
 class BlogCategoryTranslationFactory(factory.django.DjangoModelFactory):
     language_code = factory.Iterator(available_languages)
-    name = factory.Faker("word")
-    description = factory.Faker("paragraph")
+    name = factory.Faker(
+        "random_element",
+        elements=[
+            "Technology",
+            "Lifestyle",
+            "Travel",
+            "Food & Recipes",
+            "Health & Wellness",
+            "Fashion",
+            "Business",
+            "Entertainment",
+            "Sports",
+            "Education",
+            "Finance",
+            "DIY & Crafts",
+            "Parenting",
+            "Fitness",
+            "Beauty",
+            "Home Decor",
+            "Photography",
+            "Marketing",
+            "Science",
+            "Politics",
+            "Environment",
+            "Gaming",
+            "Music",
+            "Art & Design",
+            "Career Development",
+            "Personal Finance",
+            "Book Reviews",
+            "Movie Reviews",
+            "Product Reviews",
+        ],
+    )
+    description = factory.Faker("text", max_nb_chars=200)
     master = factory.SubFactory("blog.factories.category.BlogCategoryFactory")
 
     class Meta:

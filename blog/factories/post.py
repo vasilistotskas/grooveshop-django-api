@@ -49,9 +49,43 @@ def get_or_create_author():
 
 class BlogPostTranslationFactory(factory.django.DjangoModelFactory):
     language_code = factory.Iterator(available_languages)
-    title = factory.Faker("sentence", nb_words=6)
-    subtitle = factory.Faker("sentence", nb_words=12)
-    body = factory.Faker("paragraph", nb_sentences=5)
+    title = factory.Faker(
+        "random_element",
+        elements=[
+            "10 Tips for Improving Your Productivity",
+            "The Ultimate Guide to Healthy Eating",
+            "How to Start Your Own Business in 2025",
+            "Best Travel Destinations for Summer",
+            "Understanding Digital Marketing Strategies",
+            "The Future of Artificial Intelligence",
+            "Simple Ways to Save Money Every Month",
+            "Top 10 Fitness Exercises for Beginners",
+            "Home Organization Hacks That Actually Work",
+            "The Art of Effective Communication",
+            "Building a Successful Career in Tech",
+            "Sustainable Living: Easy Steps to Get Started",
+            "Mastering Time Management Skills",
+            "The Benefits of Meditation and Mindfulness",
+            "How to Create Engaging Content",
+            "Fashion Trends to Watch This Season",
+            "Essential Photography Tips for Beginners",
+            "The Complete Guide to Remote Work",
+            "Healthy Breakfast Ideas for Busy Mornings",
+            "Understanding Cryptocurrency and Blockchain",
+            "DIY Home Improvement Projects",
+            "The Psychology of Success",
+            "Best Practices for Social Media Marketing",
+            "Cooking Techniques Every Chef Should Know",
+            "How to Build Strong Relationships",
+            "The Science of Sleep and Rest",
+            "Financial Planning for Your Future",
+            "Creative Writing Tips and Techniques",
+            "The Impact of Climate Change",
+            "Modern Interior Design Ideas",
+        ],
+    )
+    subtitle = factory.Faker("text", max_nb_chars=150)
+    body = factory.Faker("text", max_nb_chars=2000)
     master = factory.SubFactory("blog.factories.post.BlogPostFactory")
 
     class Meta:
@@ -74,9 +108,9 @@ class BlogPostFactory(CustomDjangoModelFactory):
     )
     category = factory.LazyFunction(get_or_create_category)
     author = factory.LazyFunction(get_or_create_author)
-    is_published = factory.Faker("boolean")
-    featured = factory.Faker("boolean")
-    view_count = factory.Faker("random_int", min=0, max=1000)
+    is_published = factory.Faker("pybool", truth_probability=80)
+    featured = factory.Faker("pybool", truth_probability=20)
+    view_count = factory.Faker("random_int", min=0, max=10000)
 
     class Meta:
         model = BlogPost

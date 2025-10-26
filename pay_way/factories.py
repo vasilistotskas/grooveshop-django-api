@@ -17,18 +17,38 @@ available_languages = [
 
 class PayWayTranslationFactory(factory.django.DjangoModelFactory):
     language_code = factory.Iterator(available_languages)
-    name = factory.Iterator([choice[0] for choice in PayWayEnum.choices])
-    description = factory.LazyFunction(lambda: fake.paragraph())
-    instructions = factory.LazyFunction(
-        lambda: fake.paragraph(nb_sentences=3)
-        if random.choice([True, False])
-        else ""
+    name = factory.Iterator([choice.value for choice in PayWayEnum])
+    description = factory.Faker(
+        "random_element",
+        elements=[
+            "Fast and secure payment processing for all major credit and debit cards.",
+            "Pay safely with your PayPal account or credit card through PayPal.",
+            "Secure payment processing powered by Stripe. All major cards accepted.",
+            "Transfer funds directly from your bank account. Processing takes 1-3 business days.",
+            "Pay with cash when your order is delivered to your doorstep.",
+            "Quick and easy payment using Apple Pay on your iPhone or iPad.",
+            "Pay securely with Google Pay using your Android device or browser.",
+            "International wire transfers accepted. Contact us for bank details.",
+        ],
+    )
+    instructions = factory.Faker(
+        "random_element",
+        elements=[
+            "Enter your card details at checkout. Your payment will be processed securely.",
+            "Click the PayPal button and log in to your account to complete the payment.",
+            "Use your bank account number and routing number to set up the transfer.",
+            "Have cash ready when the delivery driver arrives. Credit cards not accepted for COD.",
+            "Select Apple Pay at checkout and authenticate with Face ID or Touch ID.",
+            "Tap Google Pay at checkout and confirm with your saved payment method.",
+            "Contact our billing department for wire transfer instructions.",
+            "",
+        ],
     )
     master = factory.SubFactory("pay_way.factories.PayWayFactory")
 
     class Meta:
         model = apps.get_model("pay_way", "PayWayTranslation")
-        django_get_or_create = ("language_code", "master")
+        django_get_or_create = ("language_code", "master", "name")
 
 
 def generate_stripe_config():

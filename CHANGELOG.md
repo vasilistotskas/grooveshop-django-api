@@ -3,6 +3,26 @@
 
 
 
+## v1.47.0 (2025-10-28)
+
+### Bug fixes
+
+* fix: tests ([`0a9df8a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0a9df8a584411ffee8ff09ac77d7d06cea1f56cd))
+
+### Chores
+
+* chore: Bump Versions ([`f894188`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f8941882b3626f07a41ed9499bc8f17e86e35c71))
+
+### Features
+
+* feat: Improve PayWayTranslationFactory and update dependencies
+
+Refactored PayWayTranslationFactory to use more realistic Faker-generated data for description and instructions, and updated the name field to use PayWayEnum values. Updated pyproject.toml dependencies and Python version requirement, including boto3, django-tinymce, meilisearch, phonenumbers, psycopg, python-dotenv, disposable-email-domains, djangorestframework-stubs, Faker, ruff, rpds-py, and psutil. ([`f96c0ff`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f96c0ffae318544ba6def4f7bd14e88ee03c0266))
+
+* feat: Enhance factory data realism and update UV version
+
+Updated the UV version to 0.9.5 in CI and Dockerfiles. Improved all factory classes to use more realistic and varied fake data for translations, comments, notifications, products, categories, tags, addresses, and VAT rates, enhancing test coverage and data diversity. Adjusted probability and value ranges for boolean and numeric fields to better reflect real-world scenarios. ([`c6c2372`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c6c2372c4ca2066d05ebb373d59bf8ef40dd0538))
+
 ## v1.46.0 (2025-10-19)
 
 ### Features

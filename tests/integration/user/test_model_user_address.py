@@ -58,12 +58,10 @@ class UserAddressModelTestCase(TestCase):
 
     def test_get_main_address(self):
         non_main_address_1 = UserAddressFactory(
-            user=self.user,
-            is_main=False,
+            user=self.user, is_main=False, title="Work"
         )
         non_main_address_2 = UserAddressFactory(
-            user=self.user,
-            is_main=False,
+            user=self.user, is_main=False, title="Other"
         )
         address = UserAddress.get_main_address(self.user)
 
@@ -74,9 +72,11 @@ class UserAddressModelTestCase(TestCase):
     def test_get_user_address_count(self):
         UserAddressFactory(
             user=self.user,
+            title="Test Address 1",
         )
         UserAddressFactory(
             user=self.user,
+            title="Test Address 2",
         )
         count = UserAddress.get_user_address_count(self.user)
 

@@ -493,13 +493,18 @@ class TestUserAddressAdmin:
     def test_main_address_badge(self):
         admin = UserAddressAdmin(UserAddress, AdminSite())
 
-        main_address = UserAddressFactory(is_main=True)
+        main_address = UserAddressFactory(
+            is_main=True, title="Main Test Address"
+        )
         result = admin.main_address_badge(main_address)
-        assert "Main" in result or "Primary" in result
+        assert "Main" in result
 
-        regular_address = UserAddressFactory(is_main=False)
+        regular_address = UserAddressFactory(
+            is_main=False, title="Regular Test Address"
+        )
         result = admin.main_address_badge(regular_address)
-        assert "Main" not in result or "Secondary" in result
+
+        assert result == ""
 
     def test_contact_numbers(self):
         admin = UserAddressAdmin(UserAddress, AdminSite())

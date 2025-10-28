@@ -95,7 +95,7 @@ class ResetManager:
         """Reset all seeded data with dependency-aware deletion order"""
         self.stdout.write(
             self.style.WARNING(
-                "⚠️  This will delete ALL data. Are you sure? (yes/no): "
+                "WARNING: This will delete ALL data. Are you sure? (yes/no): "
             )
         )
 
@@ -203,7 +203,7 @@ class FactoryDiscovery:
 
     def discover_factories(self, options: SeedingOptions) -> list[type[F]]:
         """Discover all factories matching the given options"""
-        self.stdout.write(self.style.NOTICE("🔍 Discovering factories..."))
+        self.stdout.write(self.style.NOTICE("[*] Discovering factories..."))
 
         all_factories = []
         discovery_stats = defaultdict(int)
@@ -222,11 +222,11 @@ class FactoryDiscovery:
 
             if filtered_factories:
                 self.stdout.write(
-                    f"  📦 {app_config.name:<15}: {len(filtered_factories):>3} factories"
+                    f"  [+] {app_config.name:<15}: {len(filtered_factories):>3} factories"
                 )
 
         self.stdout.write(
-            f"\n✅ Discovered {len(all_factories)} factories across {len(discovery_stats)} apps\n"
+            f"\n[OK] Discovered {len(all_factories)} factories across {len(discovery_stats)} apps\n"
         )
 
         return all_factories
@@ -699,7 +699,7 @@ class Command(BaseCommand):
     def _print_header(self) -> None:
         """Print command header"""
         self.stdout.write(
-            self.style.SUCCESS("🚀 Enhanced Grooveshop Seeding System v2.0")
+            self.style.SUCCESS("Enhanced Grooveshop Seeding System v2.0")
         )
         self.stdout.write(
             self.style.NOTICE("=====================================\n")
@@ -736,7 +736,7 @@ class Command(BaseCommand):
 
     def _show_dependency_report(self, ordered_factories: list[type[F]]) -> None:
         """Show dependency analysis report"""
-        self.stdout.write(self.style.NOTICE("📊 Dependency Analysis Report"))
+        self.stdout.write(self.style.NOTICE("[*] Dependency Analysis Report"))
         self.stdout.write("=" * 50)
 
         report = self.orchestrator.get_dependency_report()
@@ -746,14 +746,16 @@ class Command(BaseCommand):
         """Handle data reset"""
         if options.reset:
             self.stdout.write(
-                self.style.WARNING("⚠️  Resetting all seeded data...")
+                self.style.WARNING("WARNING: Resetting all seeded data...")
             )
             self.reset_manager.reset_all_data()
 
         elif options.reset_apps:
             reset_apps = options.reset_apps.split(",")
             self.stdout.write(
-                self.style.WARNING(f"⚠️  Resetting data for apps: {reset_apps}")
+                self.style.WARNING(
+                    f"WARNING: Resetting data for apps: {reset_apps}"
+                )
             )
             self.reset_manager.reset_apps_data(reset_apps)
 
@@ -761,7 +763,7 @@ class Command(BaseCommand):
         self, ordered_factories: list[type[F]], options: SeedingOptions
     ) -> None:
         """Show execution plan for dry run with custom seeding info"""
-        self.stdout.write(self.style.NOTICE("📋 Execution Plan (Dry Run)"))
+        self.stdout.write(self.style.NOTICE("[*] Execution Plan (Dry Run)"))
         self.stdout.write("=" * 50)
 
         model_counts = self._parse_model_counts(options.model_counts)
@@ -776,25 +778,25 @@ class Command(BaseCommand):
             if self._uses_custom_seeding(factory_class):
                 custom_seeding_factories.append(factory_class)
                 self.stdout.write(
-                    f"{i:>3}. {factory_class.__name__:<30} → [CUSTOM SEEDING] {model_name}"
+                    f"{i:>3}. {factory_class.__name__:<30} -> [CUSTOM SEEDING] {model_name}"
                 )
 
                 if hasattr(factory_class, "get_seeding_description"):
                     self.stdout.write(
-                        f"     └─ {factory_class.get_seeding_description()}"
+                        f"       {factory_class.get_seeding_description()}"
                     )
             else:
                 count = model_counts.get(model_name, default_count)
                 total_records += count
                 self.stdout.write(
-                    f"{i:>3}. {factory_class.__name__:<30} → {count:>4} {model_name} records"
+                    f"{i:>3}. {factory_class.__name__:<30} -> {count:>4} {model_name} records"
                 )
 
         self.stdout.write(
-            f"\n📈 Total standard records to create: {total_records}"
+            f"\n[*] Total standard records to create: {total_records}"
         )
         self.stdout.write(
-            f"📦 Factories with custom seeding: {len(custom_seeding_factories)}"
+            f"[*] Factories with custom seeding: {len(custom_seeding_factories)}"
         )
 
     def _execute_seeding(
@@ -804,7 +806,7 @@ class Command(BaseCommand):
         execution_context: dict[str, Any],
     ) -> None:
         """Execute the seeding process with support for custom seeding strategies"""
-        self.stdout.write(self.style.NOTICE("🌱 Starting seeding process..."))
+        self.stdout.write(self.style.NOTICE("[*] Starting seeding process..."))
 
         model_counts = self._parse_model_counts(options.model_counts)
         total_factories = len(ordered_factories)
@@ -829,7 +831,7 @@ class Command(BaseCommand):
 
                 self.stdout.write(
                     self.style.SUCCESS(
-                        f"  ✅ Created {result.created}/{result.requested} {result.model_name} records"
+                        f"  [OK] Created {result.created}/{result.requested} {result.model_name} records"
                     )
                 )
 
@@ -876,7 +878,7 @@ class Command(BaseCommand):
 
         if hasattr(factory_class, "get_seeding_description"):
             description = factory_class.get_seeding_description()
-            self.stdout.write(f"  ℹ️  {description}")
+            self.stdout.write(f"  [i] {description}")
 
         custom_kwargs = {
             "verbose": options.debug,
@@ -899,7 +901,7 @@ class Command(BaseCommand):
 
                 if seeding_result.skipped_count > 0:
                     self.stdout.write(
-                        f"  ℹ️  Skipped {seeding_result.skipped_count} existing records"
+                        f"  [i] Skipped {seeding_result.skipped_count} existing records"
                     )
 
             else:
@@ -926,7 +928,7 @@ class Command(BaseCommand):
 
         except Exception as e:
             self.stdout.write(
-                self.style.ERROR(f"  ❌ Custom seeding failed: {str(e)}")
+                self.style.ERROR(f"  [ERROR] Custom seeding failed: {str(e)}")
             )
             raise
 
@@ -951,7 +953,7 @@ class Command(BaseCommand):
         self, factory: type[F], error: Exception, options: SeedingOptions
     ) -> None:
         """Handle errors during factory processing"""
-        error_msg = f"❌ Failed processing {factory.__name__}: {error}"
+        error_msg = f"[ERROR] Failed processing {factory.__name__}: {error}"
         self.stdout.write(self.style.ERROR(error_msg))
 
         if options.debug:
@@ -984,11 +986,11 @@ class Command(BaseCommand):
         session_duration = time.time() - self.session_start_time
 
         self.stdout.write(
-            self.style.SUCCESS("\n🎉 Seeding completed successfully!")
+            self.style.SUCCESS("\n[SUCCESS] Seeding completed successfully!")
         )
         self.stdout.write("=" * 50)
 
-        self.stdout.write("📊 Session Statistics:")
+        self.stdout.write("[*] Session Statistics:")
         self.stdout.write(f"  • Duration: {session_duration:.2f}s")
         self.stdout.write(f"  • Total Records Created: {self.total_created}")
         self.stdout.write(f"  • Total Errors: {self.total_errors}")
@@ -1000,7 +1002,7 @@ class Command(BaseCommand):
         )
 
         if self.factory_results:
-            self.stdout.write("\n📈 Factory Results:")
+            self.stdout.write("\n[*] Factory Results:")
             for factory_name, result in self.factory_results.items():
                 self.stdout.write(
                     f"  • {factory_name:<30}: {result.created:>4}/{result.requested:<4} "
@@ -1009,14 +1011,14 @@ class Command(BaseCommand):
 
                 if result.errors and options.debug:
                     for error in result.errors[:3]:
-                        self.stdout.write(f"    ❌ {error}")
+                        self.stdout.write(f"    [ERROR] {error}")
                     if len(result.errors) > 3:
                         self.stdout.write(
                             f"    ... and {len(result.errors) - 3} more errors"
                         )
 
         if options.performance_report and hasattr(self.profiler, "metrics"):
-            self.stdout.write("\n⚡ Performance Report:")
+            self.stdout.write("\n[*] Performance Report:")
             self.stdout.write(self.profiler.generate_report())
 
     def _calculate_success_rate(self) -> float:
@@ -1031,7 +1033,9 @@ class Command(BaseCommand):
     def _handle_fatal_error(self, error: Exception) -> None:
         """Handle fatal errors"""
         self.stdout.write(
-            self.style.ERROR(f"\n💥 Fatal error during seeding: {error}")
+            self.style.ERROR(
+                f"\n[FATAL ERROR] Fatal error during seeding: {error}"
+            )
         )
 
         logger.error(

@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory
+from django.utils.html import conditional_escape
 
 from product.admin import (
     ProductCategoryAdmin,
@@ -288,13 +289,18 @@ class TestProductCategoryImageInline:
 class TestCategoryAdmin:
     def test_category_info_display(self, category_admin):
         category = ProductCategoryFactory()
+        category.set_current_language("en")
+        category.name = "Bedding & Bath"
+        category.save()
 
         result = category_admin.category_info(category)
 
-        assert (
-            category.safe_translation_getter("name", any_language=True)
-            in result
+        category_name = category.safe_translation_getter(
+            "name", any_language=True
         )
+        escaped_name = conditional_escape(category_name)
+
+        assert escaped_name in result
         assert "Level:" in result
         assert "font-medium" in result
 
@@ -365,11 +371,13 @@ class TestProductAdmin:
         product = ProductFactory(category=category)
 
         result = product_admin.category_display(product)
-
-        assert (
-            category.safe_translation_getter("name", any_language=True)
-            in result
+        category_name = category.safe_translation_getter(
+            "name", any_language=True
         )
+
+        escaped_name = conditional_escape(category_name)
+
+        assert escaped_name in result
 
     def test_pricing_info_display(self, product_admin):
         product = ProductFactory(price=Decimal("99.99"), discount_percent=20)
@@ -626,10 +634,12 @@ class TestProductCategoryImageAdmin:
 
         result = category_image_admin.category_name(category_image)
 
-        assert (
-            category.safe_translation_getter("name", any_language=True)
-            in result
+        category_name = category.safe_translation_getter(
+            "name", any_language=True
         )
+        escaped_name = conditional_escape(category_name)
+
+        assert escaped_name in result
 
     def test_image_type_badge(self, category_image_admin):
         category_image = ProductCategoryImageFactory(image_type="hero")

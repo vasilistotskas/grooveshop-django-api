@@ -24,6 +24,9 @@ class SubscriptionTopicFactory(factory.django.DjangoModelFactory):
 
     @factory.post_generation
     def set_translations(obj, create, extracted, **kwargs):
+        if kwargs.get("set_translations") is False:
+            return
+
         if not create:
             return
 

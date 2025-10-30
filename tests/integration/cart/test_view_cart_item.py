@@ -97,7 +97,9 @@ class CartItemViewSetTest(TestURLFixerMixin, APITestCase):
         self.assertTrue(expected_fields.issubset(set(response.data.keys())))
 
     def test_create_uses_correct_serializer(self):
-        new_product = ProductFactory(active=True, num_images=0, num_reviews=0)
+        new_product = ProductFactory(
+            active=True, num_images=0, num_reviews=0, stock=10
+        )
         create_data = {
             "product": new_product.pk,
             "quantity": 3,
@@ -171,7 +173,9 @@ class CartItemViewSetTest(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.data["quantity"], self.cart_item.quantity)
 
     def test_create_cart_item(self):
-        new_product = ProductFactory(active=True, num_images=0, num_reviews=0)
+        new_product = ProductFactory(
+            active=True, num_images=0, num_reviews=0, stock=10
+        )
         create_data = {
             "product": new_product.pk,
             "quantity": 3,
@@ -236,7 +240,9 @@ class CartItemViewSetTest(TestURLFixerMixin, APITestCase):
         self.client.force_authenticate(user=None)
 
         guest_cart = CartFactory(user=None, num_cart_items=0)
-        product = ProductFactory(active=True, num_images=0, num_reviews=0)
+        product = ProductFactory(
+            active=True, num_images=0, num_reviews=0, stock=10
+        )
 
         headers = {
             "HTTP_X_CART_ID": str(guest_cart.id),

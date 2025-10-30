@@ -678,6 +678,15 @@ DATABASES = {
         "USER": getenv("DB_USER", "postgres"),
         "PASSWORD": getenv("DB_PASSWORD", "postgres"),
         "PORT": getenv("DB_PORT", "5432"),
+        "OPTIONS": {
+            "pool": {
+                "min_size": 2,
+                "max_size": 10,
+                "timeout": 30,
+                "max_lifetime": 3600,
+                "max_idle": 600,
+            },
+        },
     },
 }
 

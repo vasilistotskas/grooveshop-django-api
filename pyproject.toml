@@ -14,7 +14,7 @@ classifiers = [
 ]
 dependencies = [
   "asgiref==3.10.0",
-  "boto3==1.40.59",
+  "boto3==1.40.62",
   "charset_normalizer==3.4.4",
   "channels[daphne]==4.3.1",
   "channels-redis==4.3.0",
@@ -28,7 +28,7 @@ dependencies = [
   "django-cors-headers==4.9.0",
   "django-simple-history==3.10.1",
   "django-filter==25.2",
-  "django-unfold==0.68.0",
+  "django-unfold==0.69.0",
   "django-money==3.5.4",
   "django-mptt==0.18.0",
   "django-parler==2.3.0",
@@ -50,7 +50,7 @@ dependencies = [
   "phonenumbers==9.0.17",
   "pillow==12.0.0",
   "psycopg[binary,pool] == 3.2.12",
-  "python-dotenv==1.2.0",
+  "python-dotenv==1.2.1",
   "qrcode==8.2",
   "urllib3==2.5.0",
   "uvicorn==0.38.0",

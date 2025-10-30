@@ -3,6 +3,16 @@
 
 
 
+## v1.48.0 (2025-10-30)
+
+### Bug fixes
+
+* fix: tests ([`a071fbb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a071fbb7b013c5c442d62115084b367a3f95a8bd))
+
+### Features
+
+* feat: Bump Versions, pg pool enable ([`3929ef3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3929ef31a18e667989398a235f9bfd0c78a32c5b))
+
 ## v1.47.0 (2025-10-28)
 
 ### Bug fixes

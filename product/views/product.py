@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from django.conf import settings
 from django.db.models import Case, When, IntegerField, Q
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import (
@@ -20,7 +19,6 @@ from core.utils.serializers import (
     RequestSerializersConfig,
     ResponseSerializersConfig,
 )
-from core.utils.views import cache_methods
 from product.filters.product import ProductFilter
 from product.filters.review import ProductReviewFilter
 from product.models.product import Product

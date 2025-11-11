@@ -86,6 +86,8 @@ node_modules/
 *.tmp
 
 # AI
+.claude
 .cursor
+.cursorrules
 .windsurfrules
-memory-bank
+.kiro

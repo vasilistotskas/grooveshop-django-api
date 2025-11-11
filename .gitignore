@@ -128,8 +128,9 @@ node_modules
 NOTES.MD
 
 # AI
+.claude
 .cursor
+.cursorrules
 .windsurfrules
 .kiro
-memory-bank
 /docs/

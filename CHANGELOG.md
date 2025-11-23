@@ -3,6 +3,16 @@
 
 
 
+## v1.53.0 (2025-11-23)
+
+### Bug fixes
+
+* fix: ruff ([`ea4766c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ea4766cf76cf1fc65d220966fd047a98d91e9729))
+
+### Features
+
+* feat: sync meili task ([`bc2257c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bc2257c05557f5fdde55c27d96cb67b334d0d090))
+
 ## v1.52.0 (2025-11-23)
 
 ### Features

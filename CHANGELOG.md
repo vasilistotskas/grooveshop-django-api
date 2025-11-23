@@ -3,6 +3,12 @@
 
 
 
+## v1.52.0 (2025-11-23)
+
+### Features
+
+* feat: admin emails ([`a57b9b9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a57b9b922525ce700e9bd275f0310de03e449d7b))
+
 ## v1.51.0 (2025-11-23)
 
 ### Features

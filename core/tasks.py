@@ -878,18 +878,18 @@ def sync_meilisearch_indexes():
     """
     try:
         logger.info("Starting Meilisearch index synchronization")
-        
+
         # Call the management command
         management.call_command("meilisearch_sync_all_indexes")
-        
+
         logger.info("Meilisearch index synchronization completed successfully")
-        
+
         return {
             "status": "success",
             "result_message": "All Meilisearch indexes synchronized successfully",
             "timestamp": timezone.now().isoformat(),
         }
-        
+
     except management.CommandError as e:
         logger.error(f"Django command error in sync_meilisearch_indexes: {e}")
         return {

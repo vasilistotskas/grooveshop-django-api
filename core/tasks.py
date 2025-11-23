@@ -862,3 +862,45 @@ try:
     validate_task_configuration()
 except ImproperlyConfigured as e:
     logger.error(f"Task configuration error: {e}")
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=3,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+)
+@track_task_metrics
+def sync_meilisearch_indexes():
+    """
+    Sync all Meilisearch indexes by calling the management command.
+    Scheduled to run daily at 2 AM.
+    """
+    try:
+        logger.info("Starting Meilisearch index synchronization")
+        
+        # Call the management command
+        management.call_command("meilisearch_sync_all_indexes")
+        
+        logger.info("Meilisearch index synchronization completed successfully")
+        
+        return {
+            "status": "success",
+            "result_message": "All Meilisearch indexes synchronized successfully",
+            "timestamp": timezone.now().isoformat(),
+        }
+        
+    except management.CommandError as e:
+        logger.error(f"Django command error in sync_meilisearch_indexes: {e}")
+        return {
+            "status": "error",
+            "result_message": str(e),
+            "error_type": "CommandError",
+        }
+    except Exception as e:
+        logger.exception("Unexpected error in sync_meilisearch_indexes")
+        return {
+            "status": "error",
+            "result_message": str(e),
+            "error_type": type(e).__name__,
+        }

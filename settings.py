@@ -548,6 +548,10 @@ def get_celery_beat_schedule():
             "schedule": SCHEDULE_PRESETS["bimonthly_6am"],
             "kwargs": {"days": 365},
         },
+        "sync-meilisearch-indexes": {
+            "task": "core.tasks.sync_meilisearch_indexes",
+            "schedule": SCHEDULE_PRESETS["daily_2am"],
+        },
     }
 
     if path.exists("/.dockerenv") and not getenv("KUBERNETES_SERVICE_HOST"):

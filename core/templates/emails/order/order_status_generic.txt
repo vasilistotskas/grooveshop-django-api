@@ -1,0 +1,38 @@
+{% load i18n %}{% blocktrans with first_name=order.first_name last_name=order.last_name %}Dear {{ first_name }} {{ last_name }},{% endblocktrans %}
+
+{% blocktrans with order_id=order.id %}Your order #{{ order_id }} has been updated.{% endblocktrans %}
+
+{% trans "New Status" %}: {{ order.get_status_display }}
+
+{% trans "Order Details" %}:
+- {% trans "Order Date" %}: {{ order.created_at|date:"SHORT_DATETIME_FORMAT" }}
+- {% trans "Total Amount" %}: {{ order.total_price }}
+
+{% trans "This status means" %}:
+{% if order.status == "PENDING" %}
+{% trans "Your order has been received and is awaiting payment processing." %}
+{% elif order.status == "PROCESSING" %}
+{% trans "Your payment has been confirmed and we're preparing your order." %}
+{% elif order.status == "SHIPPED" %}
+{% trans "Your order has been shipped and is on its way to you." %}
+{% elif order.status == "DELIVERED" %}
+{% trans "Your order has been delivered to your shipping address." %}
+{% elif order.status == "COMPLETED" %}
+{% trans "Your order has been completed successfully. Thank you for shopping with us!" %}
+{% elif order.status == "CANCELED" %}
+{% trans "Your order has been canceled. If you didn't request this, please contact us." %}
+{% elif order.status == "RETURNED" %}
+{% trans "Your return has been received and is being processed." %}
+{% elif order.status == "REFUNDED" %}
+{% trans "Your refund has been processed and should appear in your account soon." %}
+{% else %}
+{% trans "Your order status has been updated." %}
+{% endif %}
+
+{% trans "If you have any questions about your order, please contact our customer service team." %}
+
+{% blocktrans with site_name=SITE_NAME %}Thank you for shopping with {{ site_name }}!{% endblocktrans %}
+
+{% trans "Best regards" %},
+{{ SITE_NAME }} {% trans "Team" %}
+{{ INFO_EMAIL }}

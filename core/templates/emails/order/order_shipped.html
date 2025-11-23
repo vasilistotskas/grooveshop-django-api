@@ -1,0 +1,31 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "Order Shipped" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<h1>{% trans "Your Order Has Shipped" %}</h1>
+<p>{% blocktrans with order_id=order.id %}Good news! Your order #{{ order_id }} has been shipped and is on its way to you.{% endblocktrans %}</p>
+
+<div class="email-card">
+    <h2>{% trans "Shipping Information" %}</h2>
+    <p><strong>{% trans "Carrier" %}:</strong> {{ carrier }}</p>
+    <p class="text-bold" style="font-size: 1.1em; margin: 15px 0;">
+        {% trans "Tracking Number" %}: {{ tracking_number }}
+    </p>
+
+    <h3>{% trans "Delivery Address" %}</h3>
+    <p>
+        {{ order.first_name }} {{ order.last_name }}<br>
+        {{ order.street }} {{ order.street_number }}<br>
+        {{ order.city }}, {{ order.zipcode }}<br>
+        {{ order.country }}
+    </p>
+</div>
+
+<p class="mt-3">{% trans "You can track your package using the tracking number above on the carrier's website." %}</p>
+
+<p>{% trans "If you have any questions about your shipment, please contact our customer service." %}</p>
+
+<p>{% trans "Thank you for shopping with us!" %}</p>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "Order Completed" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 32px 24px; text-align: center; border-radius: 8px; margin-bottom: 24px;">
+    <h2 style="color: white; font-size: 28px; margin: 0 0 12px 0;">{% trans "Thank You for Your Purchase!" %}</h2>
+    <p style="color: white; font-size: 16px; margin: 0;">{% blocktrans with order_id=order.id %}Your order #{{ order_id }} has been successfully completed.{% endblocktrans %}</p>
+</div>
+
+<h1>{% trans "Order Completed" %}</h1>
+<p>{% blocktrans with first_name=order.first_name last_name=order.last_name %}Dear {{ first_name }} {{ last_name }},{% endblocktrans %}</p>
+
+<p>{% trans "We're delighted to confirm that your order has been completed successfully!" %}</p>
+
+<div class="email-card">
+    <h2>{% trans "Order Details" %}</h2>
+    <p><strong>{% trans "Order Date" %}:</strong> {{ order.created_at|date:"SHORT_DATETIME_FORMAT" }}</p>
+    <p><strong>{% trans "Order Total" %}:</strong> {{ order.total_price }}</p>
+    <p>
+        <strong>{% trans "Status" %}:</strong>
+        <span style="display: inline-block; padding: 6px 12px; font-weight: bold; border-radius: 4px; background-color: #d1fae5; color: #065f46;">
+            {% trans "Completed" %}
+        </span>
+    </p>
+</div>
+
+<h3>{% trans "What's Next?" %}</h3>
+<p>{% trans "Your order has been delivered and completed. We hope you're enjoying your purchase!" %}</p>
+
+<p>{% trans "If you have any questions or concerns about your order, please don't hesitate to contact our customer service team." %}</p>
+
+<p>{% blocktrans with site_name=SITE_NAME %}Thank you for shopping with {{ site_name }}! We look forward to serving you again.{% endblocktrans %}</p>
+{% endblock %}

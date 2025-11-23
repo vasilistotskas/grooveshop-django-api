@@ -1,0 +1,34 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "Order Reminder" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<h1>{% trans "Complete Your Order" %}</h1>
+<p>{% blocktrans with first_name=order.first_name last_name=order.last_name %}Dear {{ first_name }} {{ last_name }},{% endblocktrans %}</p>
+
+<div class="email-card" style="border-color: #ffe58f; background-color: #fffbe6;">
+    <p><strong>{% blocktrans with order_id=order.id order_date=order.created_at|date:"SHORT_DATE_FORMAT" %}We noticed that your order #{{ order_id }} placed on {{ order_date }} is still in pending status.{% endblocktrans %}</strong></p>
+</div>
+
+<div class="email-card">
+    <h2>{% trans "Order Details" %}</h2>
+    <p><strong>{% trans "Order Date" %}:</strong> {{ order.created_at|date:"SHORT_DATETIME_FORMAT" }}</p>
+    <p><strong>{% trans "Order Total" %}:</strong> {{ order.total_price }}</p>
+    <p><strong>{% trans "Status" %}:</strong> {% trans "Pending" %}</p>
+</div>
+
+<p class="mt-3">{% trans "To complete your purchase, please finalize your payment. If you've already completed payment, please disregard this message as it may take some time for our system to update." %}</p>
+
+<p>{% trans "You can view your order status by logging into your account on our website." %}</p>
+
+<div class="text-center mt-2">
+    <a href="{{ SITE_URL }}/account/orders" class="email-button">
+        {% trans "Go to Your Account" %}
+    </a>
+</div>
+
+<p class="mt-3">{% trans "If you're experiencing any issues with your payment or have questions about your order, please don't hesitate to contact our customer service team." %}</p>
+
+<p>{% blocktrans with site_name=SITE_NAME %}Thank you for shopping with {{ site_name }}!{% endblocktrans %}</p>
+{% endblock %}

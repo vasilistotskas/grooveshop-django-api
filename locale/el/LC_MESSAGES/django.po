@@ -6507,3 +6507,116 @@ msgstr ""
 #~ "Παρακαλούμε επιβεβαιώστε ότι το <a href=\"mailto:"
 #~ "%(email)s\"><code>%(email)s</a> είναι μια διεύθυνση ηλεκτρονικού "
 #~ "ταχυδρομείου για τον χρήστη <code>%(user_display)s."
+
+# Email Template Translations
+#: core/templates/emails/base/email_base.html
+msgid "Questions?"
+msgstr "Ερωτήσεις;"
+
+#: core/templates/emails/base/email_base.html
+msgid "Contact us"
+msgstr "Επικοινωνήστε μαζί μας"
+
+#: core/templates/emails/base/email_base.html
+msgid "All rights reserved."
+msgstr "Όλα τα δικαιώματα διατηρούνται."
+
+#: core/templates/emails/base/email_base.html
+msgid "Visit our website"
+msgstr "Επισκεφτείτε την ιστοσελίδα μας"
+
+#: core/templates/emails/order/
+msgid "Order Confirmation"
+msgstr "Επιβεβαίωση Παραγγελίας"
+
+#: core/templates/emails/order/
+msgid "Thank you for your order!"
+msgstr "Ευχαριστούμε για την παραγγελία σας!"
+
+#: core/templates/emails/order/
+msgid "Order Details"
+msgstr "Λεπτομέρειες Παραγγελίας"
+
+#: core/templates/emails/order/
+msgid "Order"
+msgstr "Παραγγελία"
+
+#: core/templates/emails/order/
+msgid "Date"
+msgstr "Ημερομηνία"
+
+#: core/templates/emails/order/
+msgid "Status"
+msgstr "Κατάσταση"
+
+#: core/templates/emails/order/
+msgid "Shipping Address"
+msgstr "Διεύθυνση Αποστολής"
+
+#: core/templates/emails/order/
+msgid "Order Items"
+msgstr "Προϊόντα Παραγγελίας"
+
+#: core/templates/emails/order/
+msgid "Product"
+msgstr "Προϊόν"
+
+#: core/templates/emails/order/
+msgid "Quantity"
+msgstr "Ποσότητα"
+
+#: core/templates/emails/order/
+msgid "Price"
+msgstr "Τιμή"
+
+#: core/templates/emails/order/
+msgid "Total"
+msgstr "Σύνολο"
+
+#: core/templates/emails/order/
+msgid "Subtotal"
+msgstr "Υποσύνολο"
+
+#: core/templates/emails/order/
+msgid "Shipping"
+msgstr "Μεταφορικά"
+
+#: core/templates/emails/order/
+msgid "Order Shipped"
+msgstr "Η Παραγγελία Απεστάλη"
+
+#: core/templates/emails/order/
+msgid "Your order has been shipped!"
+msgstr "Η παραγγελία σας έχει αποσταλεί!"
+
+#: core/templates/emails/order/
+msgid "Tracking Number"
+msgstr "Αριθμός Παρακολούθησης"
+
+#: core/templates/emails/order/
+msgid "Carrier"
+msgstr "Μεταφορέας"
+
+#: core/templates/emails/order/
+msgid "Order Delivered"
+msgstr "Η Παραγγελία Παραδόθηκε"
+
+#: core/templates/emails/order/
+msgid "Your order has been delivered!"
+msgstr "Η παραγγελία σας έχει παραδοθεί!"
+
+#: core/templates/emails/order/
+msgid "Order Canceled"
+msgstr "Η Παραγγελία Ακυρώθηκε"
+
+#: core/templates/emails/order/
+msgid "Your order has been canceled."
+msgstr "Η παραγγελία σας έχει ακυρωθεί."
+
+#: core/templates/emails/order/
+msgid "If you have any questions, please contact our customer service."
+msgstr "Εάν έχετε οποιεσδήποτε ερωτήσεις, παρακαλούμε επικοινωνήστε με την εξυπηρέτηση πελατών μας."
+
+#: core/templates/emails/order/
+msgid "Thank you for shopping with us!"
+msgstr "Ευχαριστούμε που ψωνίσατε μαζί μας!"

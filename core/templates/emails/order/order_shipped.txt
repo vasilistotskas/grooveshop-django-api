@@ -1,0 +1,23 @@
+{% load i18n %}{% trans "YOUR ORDER HAS SHIPPED" %}
+
+{% blocktrans with order_id=order.id %}Good news! Your order #{{ order_id }} has been shipped and is on its way to you.{% endblocktrans %}
+
+{% trans "SHIPPING INFORMATION" %}
+{% trans "Carrier" %}: {{ carrier }}
+{% trans "Tracking Number" %}: {{ tracking_number }}
+
+{% trans "DELIVERY ADDRESS" %}
+{{ order.first_name }} {{ order.last_name }}
+{{ order.street }} {{ order.street_number }}
+{{ order.city }}, {{ order.zipcode }}
+{{ order.country }}
+
+{% trans "You can track your package using the tracking number above on the carrier's website." %}
+
+{% trans "If you have any questions about your shipment, please contact our customer service." %}
+
+{% trans "Thank you for shopping with us!" %}
+
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}

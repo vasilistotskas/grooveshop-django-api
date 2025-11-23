@@ -1,0 +1,36 @@
+SUBSCRIPTION CONFIRMED
+{{ SITE_NAME }}
+================================================================================
+
+Hi {{ user.first_name|default:user.username }},
+
+Your subscription has been successfully activated! We're excited to have you on board.
+
+SUBSCRIPTION DETAILS
+--------------------------------------------------------------------------------
+Plan:           {{ subscription.plan }}
+Status:         {{ subscription.status|title }}
+Billing Cycle:  {{ subscription.billing_cycle|title }}
+Amount:         {{ subscription.amount }}
+Start Date:     {{ subscription.start_date|date:"F d, Y" }}
+
+WHAT'S NEXT?
+--------------------------------------------------------------------------------
+- You now have full access to all {{ subscription.plan }} features
+- Your subscription will automatically renew {{ subscription.billing_cycle }}
+- You can manage your subscription anytime from your account settings
+- We'll send you a reminder before your next billing date
+
+MANAGE YOUR SUBSCRIPTION
+--------------------------------------------------------------------------------
+Visit: {{ app_base_url }}/account/subscription
+
+NEED HELP?
+--------------------------------------------------------------------------------
+Contact our support team at {{ INFO_EMAIL }}
+
+Thank you for choosing {{ SITE_NAME }}!
+We're here to help you get the most out of your subscription.
+
+================================================================================
+{{ SITE_NAME }} - {{ SITE_URL }}

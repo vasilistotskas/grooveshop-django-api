@@ -1,0 +1,116 @@
+{% extends "emails/base/email_base.html" %}
+
+{% block email_title %}Subscription Confirmed{% endblock %}
+
+{% block email_content %}
+<div style="background-color: #ffffff; padding: 40px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    <!-- Header -->
+    <div style="text-align: center; margin-bottom: 30px;">
+        <h1 style="color: #2c3e50; margin: 0 0 10px 0; font-size: 28px;">
+            🎉 Subscription Confirmed!
+        </h1>
+        <p style="color: #7f8c8d; font-size: 16px; margin: 0;">
+            Thank you for subscribing to {{ subscription.plan }}
+        </p>
+    </div>
+
+    <!-- Greeting -->
+    <div style="margin-bottom: 30px;">
+        <p style="color: #2c3e50; font-size: 16px; line-height: 1.6;">
+            Hi {{ user.first_name|default:user.username }},
+        </p>
+        <p style="color: #2c3e50; font-size: 16px; line-height: 1.6;">
+            Your subscription has been successfully activated! We're excited to have you on board.
+        </p>
+    </div>
+
+    <!-- Subscription Details -->
+    <div style="background-color: #f8f9fa; padding: 25px; border-radius: 6px; margin-bottom: 30px; border-left: 4px solid #3498db;">
+        <h2 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 20px;">
+            Subscription Details
+        </h2>
+        
+        <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+                <td style="padding: 10px 0; color: #7f8c8d; font-size: 14px; width: 40%;">
+                    <strong>Plan:</strong>
+                </td>
+                <td style="padding: 10px 0; color: #2c3e50; font-size: 14px;">
+                    {{ subscription.plan }}
+                </td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 0; color: #7f8c8d; font-size: 14px;">
+                    <strong>Status:</strong>
+                </td>
+                <td style="padding: 10px 0; color: #27ae60; font-size: 14px;">
+                    <span style="background-color: #d4edda; padding: 4px 12px; border-radius: 4px;">
+                        {{ subscription.status|title }}
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 0; color: #7f8c8d; font-size: 14px;">
+                    <strong>Billing Cycle:</strong>
+                </td>
+                <td style="padding: 10px 0; color: #2c3e50; font-size: 14px;">
+                    {{ subscription.billing_cycle|title }}
+                </td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 0; color: #7f8c8d; font-size: 14px;">
+                    <strong>Amount:</strong>
+                </td>
+                <td style="padding: 10px 0; color: #2c3e50; font-size: 14px; font-weight: bold;">
+                    {{ subscription.amount }}
+                </td>
+            </tr>
+            <tr>
+                <td style="padding: 10px 0; color: #7f8c8d; font-size: 14px;">
+                    <strong>Start Date:</strong>
+                </td>
+                <td style="padding: 10px 0; color: #2c3e50; font-size: 14px;">
+                    {{ subscription.start_date|date:"F d, Y" }}
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- What's Next -->
+    <div style="margin-bottom: 30px;">
+        <h2 style="color: #2c3e50; margin: 0 0 15px 0; font-size: 20px;">
+            What's Next?
+        </h2>
+        <ul style="color: #2c3e50; font-size: 15px; line-height: 1.8; padding-left: 20px;">
+            <li>You now have full access to all {{ subscription.plan }} features</li>
+            <li>Your subscription will automatically renew {{ subscription.billing_cycle }}</li>
+            <li>You can manage your subscription anytime from your account settings</li>
+            <li>We'll send you a reminder before your next billing date</li>
+        </ul>
+    </div>
+
+    <!-- CTA Button -->
+    <div style="text-align: center; margin: 30px 0;">
+        <a href="{{ app_base_url }}/account/subscription" 
+           style="display: inline-block; background-color: #3498db; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-size: 16px; font-weight: 600; transition: background-color 0.3s;">
+            Manage Subscription
+        </a>
+    </div>
+
+    <!-- Support -->
+    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 6px; margin-top: 30px;">
+        <p style="color: #7f8c8d; font-size: 14px; margin: 0; text-align: center;">
+            <strong>Need help?</strong> Contact our support team at 
+            <a href="mailto:{{ INFO_EMAIL }}" style="color: #3498db; text-decoration: none;">{{ INFO_EMAIL }}</a>
+        </p>
+    </div>
+
+    <!-- Footer Message -->
+    <div style="margin-top: 30px; text-align: center;">
+        <p style="color: #7f8c8d; font-size: 14px; line-height: 1.6;">
+            Thank you for choosing {{ SITE_NAME }}!<br>
+            We're here to help you get the most out of your subscription.
+        </p>
+    </div>
+</div>
+{% endblock %}

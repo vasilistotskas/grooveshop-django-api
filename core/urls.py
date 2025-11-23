@@ -36,6 +36,10 @@ urlpatterns = [
 
 urlpatterns += i18n_patterns(
     path("", HomeView.as_view(), name="home"),
+    path(
+        _("admin/email-templates/"),
+        include("core.email.urls", namespace="email_templates"),
+    ),
     path(_("admin/"), admin.site.urls),
     path("upload_image", upload_image, name="upload_image"),
     path("accounts/", include("allauth.urls")),

@@ -1,0 +1,19 @@
+YOUR ORDER HAS BEEN CANCELED
+
+Your order #33309 has been canceled as requested.
+
+ORDER DETAILS
+Date Ordered: 22/11/2025 11:16 μμ.
+Date Canceled: 23/11/2025 11:16 μμ.
+
+
+Refund: Your payment of €316.48 will be refunded to your original payment method within 3-5 business days.
+
+
+If you did not request this cancellation or have any questions, please contact our customer service immediately.
+
+We hope to see you again soon!
+
+Grooveshop
+info@vassilistotskas.com
+http://localhost:3000

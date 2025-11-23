@@ -1,0 +1,23 @@
+YOUR ORDER HAS SHIPPED
+
+Good news! Your order #75561 has been shipped and is on its way to you.
+
+SHIPPING INFORMATION
+Carrier: ELTA Courier
+Tracking Number: 1Z4048285226022088
+
+DELIVERY ADDRESS
+Νίκος Παπαδόπουλος
+Σταδίου 57
+Πάτρα, 26221
+Greece
+
+You can track your package using the tracking number above on the carrier's website.
+
+If you have any questions about your shipment, please contact our customer service.
+
+Thank you for shopping with us!
+
+Grooveshop
+info@vassilistotskas.com
+http://localhost:3000

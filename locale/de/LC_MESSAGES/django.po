@@ -6493,3 +6493,116 @@ msgstr ""
 #: .\vat\models.py:40
 msgid "Vats"
 msgstr ""
+
+# Email Template Translations
+#: core/templates/emails/base/email_base.html
+msgid "Questions?"
+msgstr "Fragen?"
+
+#: core/templates/emails/base/email_base.html
+msgid "Contact us"
+msgstr "Kontaktieren Sie uns"
+
+#: core/templates/emails/base/email_base.html
+msgid "All rights reserved."
+msgstr "Alle Rechte vorbehalten."
+
+#: core/templates/emails/base/email_base.html
+msgid "Visit our website"
+msgstr "Besuchen Sie unsere Website"
+
+#: core/templates/emails/order/
+msgid "Order Confirmation"
+msgstr "Bestellbestätigung"
+
+#: core/templates/emails/order/
+msgid "Thank you for your order!"
+msgstr "Vielen Dank für Ihre Bestellung!"
+
+#: core/templates/emails/order/
+msgid "Order Details"
+msgstr "Bestelldetails"
+
+#: core/templates/emails/order/
+msgid "Order"
+msgstr "Bestellung"
+
+#: core/templates/emails/order/
+msgid "Date"
+msgstr "Datum"
+
+#: core/templates/emails/order/
+msgid "Status"
+msgstr "Status"
+
+#: core/templates/emails/order/
+msgid "Shipping Address"
+msgstr "Lieferadresse"
+
+#: core/templates/emails/order/
+msgid "Order Items"
+msgstr "Bestellte Artikel"
+
+#: core/templates/emails/order/
+msgid "Product"
+msgstr "Produkt"
+
+#: core/templates/emails/order/
+msgid "Quantity"
+msgstr "Menge"
+
+#: core/templates/emails/order/
+msgid "Price"
+msgstr "Preis"
+
+#: core/templates/emails/order/
+msgid "Total"
+msgstr "Gesamt"
+
+#: core/templates/emails/order/
+msgid "Subtotal"
+msgstr "Zwischensumme"
+
+#: core/templates/emails/order/
+msgid "Shipping"
+msgstr "Versand"
+
+#: core/templates/emails/order/
+msgid "Order Shipped"
+msgstr "Bestellung Versendet"
+
+#: core/templates/emails/order/
+msgid "Your order has been shipped!"
+msgstr "Ihre Bestellung wurde versendet!"
+
+#: core/templates/emails/order/
+msgid "Tracking Number"
+msgstr "Sendungsnummer"
+
+#: core/templates/emails/order/
+msgid "Carrier"
+msgstr "Versanddienstleister"
+
+#: core/templates/emails/order/
+msgid "Order Delivered"
+msgstr "Bestellung Zugestellt"
+
+#: core/templates/emails/order/
+msgid "Your order has been delivered!"
+msgstr "Ihre Bestellung wurde zugestellt!"
+
+#: core/templates/emails/order/
+msgid "Order Canceled"
+msgstr "Bestellung Storniert"
+
+#: core/templates/emails/order/
+msgid "Your order has been canceled."
+msgstr "Ihre Bestellung wurde storniert."
+
+#: core/templates/emails/order/
+msgid "If you have any questions, please contact our customer service."
+msgstr "Wenn Sie Fragen haben, wenden Sie sich bitte an unseren Kundenservice."
+
+#: core/templates/emails/order/
+msgid "Thank you for shopping with us!"
+msgstr "Vielen Dank, dass Sie bei uns eingekauft haben!"

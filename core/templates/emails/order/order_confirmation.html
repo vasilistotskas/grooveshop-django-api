@@ -1,0 +1,55 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "Order Confirmation" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<h1>{% trans "Order Confirmation" %}</h1>
+<p>{% trans "Thank you for your order!" %}</p>
+
+<div class="email-card">
+    <h2>{% trans "Order" %} #{{ order.id }}</h2>
+    <p><strong>{% trans "Date" %}:</strong> {{ order.created_at|date:"SHORT_DATE_FORMAT" }}</p>
+    <p><strong>{% trans "Status" %}:</strong> {{ order.get_status_display }}</p>
+
+    <h3>{% trans "Shipping Address" %}</h3>
+    <p>
+        {{ order.first_name }} {{ order.last_name }}<br>
+        {{ order.street }} {{ order.street_number }}<br>
+        {{ order.city }}, {{ order.zipcode }}<br>
+        {{ order.country }}
+    </p>
+</div>
+
+<h3>{% trans "Order Items" %}</h3>
+<table class="email-table">
+    <thead>
+        <tr>
+            <th>{% trans "Product" %}</th>
+            <th>{% trans "Quantity" %}</th>
+            <th>{% trans "Price" %}</th>
+            <th>{% trans "Total" %}</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td>{{ item.product.name }}</td>
+            <td>{{ item.quantity }}</td>
+            <td>{{ item.price }}</td>
+            <td>{{ item.get_total_price }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<div class="text-right mt-3">
+    <p><strong>{% trans "Subtotal" %}:</strong> {{ order.total_price_items }}</p>
+    <p><strong>{% trans "Shipping" %}:</strong> {{ order.shipping_price }}</p>
+    <p class="text-bold"><strong>{% trans "Total" %}:</strong> {{ order.total_price }}</p>
+</div>
+
+<p class="mt-3">{% trans "If you have any questions about your order, please contact our customer service." %}</p>
+
+<p>{% trans "Thank you for shopping with us!" %}</p>
+{% endblock %}

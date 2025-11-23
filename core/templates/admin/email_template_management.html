@@ -1,0 +1,866 @@
+{% extends "admin/base.html" %}
+{% load i18n %}
+{% load static %}
+{% load unfold %}
+
+{% block title %}{% trans "Email Template Management" %} - {{ block.super }}{% endblock %}
+
+{% block breadcrumbs %}
+{% if not is_popup %}
+<div class="px-4">
+    <div class="container mb-6 mx-auto -my-3 lg:mb-12">
+        <ul class="flex flex-wrap">
+            {% url 'admin:index' as link %}
+            {% trans 'Home' as name %}
+            {% include 'unfold/helpers/breadcrumb_item.html' with link=link name=name %}
+
+            {% trans 'Email Template Management' as name %}
+            {% include 'unfold/helpers/breadcrumb_item.html' with name=name %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    /* Light mode variables (default) */
+    :root {
+        --page-bg: #f3f4f6;
+        --card-bg: #ffffff;
+        --card-secondary-bg: #f9fafb;
+        --input-bg: #ffffff;
+        --hover-bg: #f3f4f6;
+        --active-bg: #dbeafe;
+        --border-color: #e5e7eb;
+        --border-hover: #d1d5db;
+        --border-radius: 0.5rem;
+        --text-primary: #111827;
+        --text-secondary: #6b7280;
+        --primary: #3b82f6;
+        --primary-hover: #2563eb;
+        --success-bg: #dcfce7;
+        --success-text: #166534;
+        --warning-bg: #fef3c7;
+        --warning-text: #92400e;
+        --error-bg: #fee2e2;
+        --error-border: #fecaca;
+        --error-text: #dc2626;
+    }
+
+    /* Dark mode variables */
+    .dark {
+        --page-bg: #0f172a;
+        --card-bg: #1e293b;
+        --card-secondary-bg: #0f172a;
+        --input-bg: #1e293b;
+        --hover-bg: #334155;
+        --active-bg: #1e40af;
+        --border-color: #334155;
+        --border-hover: #475569;
+        --text-primary: #f1f5f9;
+        --text-secondary: #94a3b8;
+    }
+
+    /* Apply theme-aware background */
+    body {
+        background-color: var(--page-bg) !important;
+    }
+
+    /* Fix header title visibility in both modes */
+    #header-inner h1,
+    #header-inner h1 span {
+        color: var(--text-primary) !important;
+        opacity: 1 !important;
+    }
+
+    /* Fix header background */
+    .bg-white.border-b {
+        background-color: var(--card-bg) !important;
+    }
+
+    /* Fix dropdown menus - ensure proper background and visibility */
+    nav[x-show] {
+        background-color: var(--card-bg) !important;
+        border-color: var(--border-color) !important;
+    }
+
+    nav[x-show] a,
+    nav[x-show] span,
+    nav[x-show] button {
+        color: var(--text-primary) !important;
+    }
+
+    nav[x-show] a:hover,
+    nav[x-show] button:hover {
+        background-color: var(--hover-bg) !important;
+    }
+
+    .template-grid {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        gap: 1.5rem;
+        margin-top: 1.5rem;
+    }
+
+    .template-list {
+        background: var(--card-bg) !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: var(--border-radius) !important;
+        padding: 1.5rem !important;
+    }
+
+    .template-list-header {
+        margin-bottom: 1rem !important;
+    }
+
+    .search-container {
+        margin-bottom: 1.5rem !important;
+    }
+
+    .search-input-wrapper {
+        position: relative !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    .search-icon {
+        position: absolute !important;
+        left: 0.75rem !important;
+        width: 1.25rem !important;
+        height: 1.25rem !important;
+        color: var(--text-secondary) !important;
+        pointer-events: none !important;
+    }
+
+    .search-input {
+        width: 100% !important;
+        padding: 0.625rem 2.5rem 0.625rem 2.5rem !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: var(--border-radius) !important;
+        font-size: 0.875rem !important;
+        background: var(--input-bg) !important;
+        color: var(--text-primary) !important;
+        transition: border-color 0.2s !important;
+    }
+
+    .search-input:focus {
+        outline: none !important;
+        border-color: var(--primary) !important;
+    }
+
+    .search-input::placeholder {
+        color: var(--text-secondary) !important;
+    }
+
+    .clear-search {
+        position: absolute !important;
+        right: 0.5rem !important;
+        background: none !important;
+        border: none !important;
+        cursor: pointer !important;
+        padding: 0.25rem !important;
+        color: var(--text-secondary) !important;
+        border-radius: var(--border-radius) !important;
+        transition: all 0.2s !important;
+    }
+
+    .clear-search:hover {
+        background-color: var(--hover-bg) !important;
+        color: var(--text-primary) !important;
+    }
+
+    .clear-search svg {
+        width: 1rem !important;
+        height: 1rem !important;
+    }
+
+    .search-results {
+        margin-top: 0.5rem !important;
+        font-size: 0.75rem !important;
+        color: var(--text-secondary) !important;
+    }
+
+    .template-category.hidden {
+        display: none !important;
+    }
+
+    .template-item.hidden {
+        display: none !important;
+    }
+
+    .template-item.highlight {
+        animation: highlight 0.5s ease !important;
+    }
+
+    @keyframes highlight {
+        0%, 100% {
+            background-color: transparent;
+        }
+        50% {
+            background-color: var(--active-bg);
+        }
+    }
+
+    .template-preview {
+        background: var(--card-bg) !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: var(--border-radius) !important;
+        padding: 1.5rem !important;
+        overflow: auto !important;
+    }
+
+    .template-category {
+        margin-bottom: 1.5rem;
+    }
+
+    .category-header {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        margin-bottom: 0.75rem !important;
+        padding-bottom: 0.5rem !important;
+        border-bottom: 2px solid var(--border-color) !important;
+    }
+
+    .category-title {
+        font-size: 1.1rem !important;
+        font-weight: 600 !important;
+        color: var(--text-primary) !important;
+        margin: 0 !important;
+    }
+
+    .category-toggle {
+        background: none !important;
+        border: none !important;
+        cursor: pointer !important;
+        padding: 0.25rem 0.5rem !important;
+        color: var(--text-secondary) !important;
+        transition: all 0.2s !important;
+        border-radius: var(--border-radius) !important;
+    }
+
+    .category-toggle:hover {
+        background-color: var(--hover-bg) !important;
+        color: var(--text-primary) !important;
+    }
+
+    .category-toggle svg {
+        width: 1.25rem !important;
+        height: 1.25rem !important;
+        transition: transform 0.2s !important;
+    }
+
+    .category-toggle.collapsed svg {
+        transform: rotate(-90deg) !important;
+    }
+
+    .template-item-list.collapsed {
+        display: none !important;
+    }
+
+    .template-item {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        padding: 0.75rem !important;
+        margin-bottom: 0.5rem !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: var(--border-radius) !important;
+        cursor: pointer !important;
+        transition: all 0.2s !important;
+        background-color: transparent !important;
+    }
+
+    .template-item-list {
+      display: flex !important;
+      flex-direction: column !important;
+      max-height: 400px !important;
+      overflow-y: auto !important;
+    }
+
+    .template-item:hover {
+        background-color: var(--hover-bg) !important;
+        border-color: var(--border-hover) !important;
+    }
+
+    .template-item.active {
+        background-color: var(--active-bg) !important;
+        border-color: var(--primary) !important;
+    }
+
+    .template-info h4 {
+        margin: 0;
+        font-size: 0.95rem;
+        font-weight: 500;
+        color: var(--text-primary);
+    }
+
+    .template-info p {
+        margin: 0.25rem 0 0 0;
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+    }
+
+    .template-status {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .status-badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: var(--border-radius);
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .status-used {
+        background-color: var(--success-bg);
+        color: var(--success-text);
+    }
+
+    .status-unused {
+        background-color: var(--warning-bg);
+        color: var(--warning-text);
+    }
+
+    .preview-controls {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+    }
+
+    .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .control-group label {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--text-primary);
+    }
+
+    .control-group select,
+    .control-group input {
+        padding: 0.5rem !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: var(--border-radius) !important;
+        font-size: 0.875rem !important;
+        background: var(--input-bg) !important;
+        color: var(--text-primary) !important;
+    }
+
+    .preview-button {
+        background-color: var(--primary) !important;
+        color: white !important;
+        border: none !important;
+        padding: 0.5rem 1rem !important;
+        border-radius: var(--border-radius) !important;
+        cursor: pointer !important;
+        font-size: 0.875rem !important;
+        font-weight: 500 !important;
+        transition: background-color 0.2s !important;
+    }
+
+    .preview-button:hover {
+        background-color: var(--primary-hover) !important;
+    }
+
+    .preview-button:disabled {
+        opacity: 0.5 !important;
+        cursor: not-allowed !important;
+    }
+
+    .preview-content {
+        border: 1px solid var(--border-color) !important;
+        border-radius: var(--border-radius) !important;
+        min-height: 400px !important;
+        background: var(--card-secondary-bg) !important;
+        height: 100% !important;
+    }
+
+    .preview-iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        border-radius: var(--border-radius);
+    }
+
+    .preview-text {
+        padding: 1rem;
+        font-family: monospace;
+        font-size: 0.875rem;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        background: var(--card-bg);
+        border-radius: var(--border-radius);
+        color: var(--text-primary);
+    }
+
+    .loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 200px;
+        color: var(--text-secondary);
+    }
+
+    .error {
+        padding: 1rem;
+        background-color: var(--error-bg);
+        border: 1px solid var(--error-border);
+        border-radius: var(--border-radius);
+        color: var(--error-text);
+    }
+
+    .format-tabs {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .format-tab {
+        padding: 0.5rem 1rem !important;
+        border: 1px solid var(--border-color) !important;
+        background: var(--card-bg) !important;
+        cursor: pointer !important;
+        border-radius: var(--border-radius) !important;
+        font-size: 0.875rem !important;
+        color: var(--text-primary) !important;
+    }
+
+    .format-tab.active {
+        background-color: var(--primary) !important;
+        color: white !important;
+        border-color: var(--primary) !important;
+    }
+
+    /* Fix text visibility */
+    .template-list h2,
+    .template-preview h2 {
+        color: var(--text-primary) !important;
+    }
+
+    .text-xs.text-gray-500 {
+        color: var(--text-secondary) !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="px-6 py-4">
+    <div class="mb-6 flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold" style="color: var(--text-primary);">{% trans "Email Template Management" %}</h1>
+            <p class="mt-2" style="color: var(--text-secondary);">{% trans "Preview and test email templates with sample or real order data" %}</p>
+        </div>
+        <a href="{% url 'admin:index' %}" class="inline-flex items-center px-4 py-2 text-white rounded-lg transition-colors" style="background-color: var(--primary);">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+            {% trans "Back to Admin" %}
+        </a>
+    </div>
+
+    <div class="template-grid">
+        <!-- Template List -->
+        <div class="template-list">
+            <div class="template-list-header">
+                <h2 class="text-lg font-semibold mb-4">{% trans "Available Templates" %}</h2>
+                
+                <!-- Search Input -->
+                <div class="search-container">
+                    <div class="search-input-wrapper">
+                        <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        <input 
+                            type="text" 
+                            id="template-search" 
+                            class="search-input" 
+                            placeholder="{% trans 'Search templates...' %}"
+                            autocomplete="off"
+                        />
+                        <button id="clear-search" class="clear-search" style="display: none;" title="{% trans 'Clear search' %}">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div id="search-results" class="search-results"></div>
+                </div>
+            </div>
+
+            {% for category, category_templates in templates_by_category.items %}
+            <div class="template-category">
+                <div class="category-header">
+                    <div class="category-title">{{ category }}</div>
+                    <button class="category-toggle" data-category="{{ category }}" title="{% trans 'Collapse/Expand' %}">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="template-item-list" data-category="{{ category }}">
+                  {% for template in category_templates %}
+                  <div class="template-item" data-template="{{ template.name }}">
+                      <div class="template-info">
+                          <h4>{{ template.name|title }}</h4>
+                          <p>{{ template.description }}</p>
+                      </div>
+                      <div class="template-status">
+                          {% if template.is_used %}
+                              <span class="status-badge status-used">{% trans "Active" %}</span>
+                          {% else %}
+                              <span class="status-badge status-unused">{% trans "Unused" %}</span>
+                          {% endif %}
+
+                          {% if template.has_html %}
+                              <span class="text-xs text-gray-500">HTML</span>
+                          {% endif %}
+                          {% if template.has_text %}
+                              <span class="text-xs text-gray-500">TXT</span>
+                          {% endif %}
+                      </div>
+                  </div>
+                  {% endfor %}
+                </div>
+
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Template Preview -->
+        <div class="template-preview">
+            <h2 class="text-lg font-semibold mb-4">{% trans "Template Preview" %}</h2>
+
+            <div class="preview-controls">
+                <div class="control-group">
+                    <label>{% trans "Language" %}</label>
+                    <select id="language-select">
+                        {% for lang in available_languages %}
+                        <option value="{{ lang.code }}" {% if lang.code == 'el' %}selected{% endif %}>
+                            {{ lang.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="control-group" id="data-source-group">
+                    <label>{% trans "Data Source" %}</label>
+                    <select id="data-source-select">
+                        <option value="sample">{% trans "Sample Data" %}</option>
+                        <option value="real" id="real-order-option">{% trans "Real Order" %}</option>
+                    </select>
+                </div>
+
+                <div class="control-group" id="order-select-group" style="display: none;">
+                    <label>{% trans "Order" %}</label>
+                    <select id="order-select">
+                        <option value="">{% trans "Select Order" %}</option>
+                        {% for order in recent_orders %}
+                        <option value="{{ order.id }}">
+                            #{{ order.id }} - {{ order.first_name }} {{ order.last_name }} (€{{ order.paid_amount }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>&nbsp;</label>
+                    <button class="preview-button" id="preview-btn" disabled>
+                        {% trans "Generate Preview" %}
+                    </button>
+                </div>
+            </div>
+
+            <div class="format-tabs">
+                <div class="format-tab active" data-format="html">HTML</div>
+                <div class="format-tab" data-format="text">{% trans "Text" %}</div>
+            </div>
+
+            <div class="preview-content" id="preview-content">
+                <div class="loading">
+                    {% trans "Select a template to preview" %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Template management JavaScript
+(function() {
+    let selectedTemplate = null;
+    let currentFormat = 'html';
+
+    // DOM elements
+    const templateItems = document.querySelectorAll('.template-item');
+    const previewBtn = document.getElementById('preview-btn');
+    const previewContent = document.getElementById('preview-content');
+    const languageSelect = document.getElementById('language-select');
+    const dataSourceSelect = document.getElementById('data-source-select');
+    const orderSelectGroup = document.getElementById('order-select-group');
+    const orderSelect = document.getElementById('order-select');
+    const formatTabs = document.querySelectorAll('.format-tab');
+
+    // Order-related template prefixes
+    const orderTemplates = ['order_'];
+    
+    // Check if template is order-related
+    function isOrderTemplate(templateName) {
+        return orderTemplates.some(prefix => templateName.startsWith(prefix));
+    }
+
+    // Category collapse/expand functionality
+    const categoryToggles = document.querySelectorAll('.category-toggle');
+    categoryToggles.forEach(toggle => {
+        toggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            const category = this.dataset.category;
+            const itemList = document.querySelector(`.template-item-list[data-category="${category}"]`);
+            
+            // Toggle collapsed state
+            this.classList.toggle('collapsed');
+            itemList.classList.toggle('collapsed');
+        });
+    });
+
+    // Search functionality
+    const searchInput = document.getElementById('template-search');
+    const clearSearchBtn = document.getElementById('clear-search');
+    const searchResults = document.getElementById('search-results');
+    const templateCategories = document.querySelectorAll('.template-category');
+
+    searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase().trim();
+        
+        // Show/hide clear button
+        clearSearchBtn.style.display = searchTerm ? 'block' : 'none';
+
+        if (!searchTerm) {
+            // Reset: show all templates and categories
+            templateItems.forEach(item => item.classList.remove('hidden', 'highlight'));
+            templateCategories.forEach(category => category.classList.remove('hidden'));
+            searchResults.textContent = '';
+            return;
+        }
+
+        let visibleCount = 0;
+        let matchedCategories = new Set();
+
+        // Filter templates
+        templateItems.forEach(item => {
+            const templateName = item.dataset.template.toLowerCase();
+            const templateDesc = item.querySelector('.template-info p').textContent.toLowerCase();
+            const matches = templateName.includes(searchTerm) || templateDesc.includes(searchTerm);
+
+            if (matches) {
+                item.classList.remove('hidden');
+                item.classList.add('highlight');
+                visibleCount++;
+                
+                // Track which category this template belongs to
+                const categoryElement = item.closest('.template-category');
+                if (categoryElement) {
+                    matchedCategories.add(categoryElement);
+                }
+                
+                // Auto-expand collapsed categories with matches
+                const itemList = item.closest('.template-item-list');
+                if (itemList && itemList.classList.contains('collapsed')) {
+                    const category = itemList.dataset.category;
+                    const toggle = document.querySelector(`.category-toggle[data-category="${category}"]`);
+                    if (toggle) {
+                        toggle.classList.remove('collapsed');
+                        itemList.classList.remove('collapsed');
+                    }
+                }
+            } else {
+                item.classList.add('hidden');
+                item.classList.remove('highlight');
+            }
+        });
+
+        // Show/hide categories based on whether they have visible templates
+        templateCategories.forEach(category => {
+            if (matchedCategories.has(category)) {
+                category.classList.remove('hidden');
+            } else {
+                category.classList.add('hidden');
+            }
+        });
+
+        // Update search results
+        if (visibleCount === 0) {
+            searchResults.textContent = '{% trans "No templates found" %}';
+            searchResults.style.color = 'var(--error-text)';
+        } else if (visibleCount === 1) {
+            searchResults.textContent = '{% trans "1 template found" %}';
+            searchResults.style.color = 'var(--text-secondary)';
+        } else {
+            searchResults.textContent = `${visibleCount} {% trans "templates found" %}`;
+            searchResults.style.color = 'var(--text-secondary)';
+        }
+
+        // Remove highlight animation after it completes
+        setTimeout(() => {
+            templateItems.forEach(item => item.classList.remove('highlight'));
+        }, 500);
+    });
+
+    // Clear search button
+    clearSearchBtn.addEventListener('click', function() {
+        searchInput.value = '';
+        searchInput.dispatchEvent(new Event('input'));
+        searchInput.focus();
+    });
+
+    // Keyboard shortcut: Ctrl/Cmd + K to focus search
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            searchInput.focus();
+            searchInput.select();
+        }
+    });
+
+    // Template selection
+    templateItems.forEach(item => {
+        item.addEventListener('click', function() {
+            // Remove active class from all items
+            templateItems.forEach(i => i.classList.remove('active'));
+
+            // Add active class to clicked item
+            this.classList.add('active');
+
+            // Set selected template
+            selectedTemplate = this.dataset.template;
+            previewBtn.disabled = false;
+
+            // Show/hide real order option based on template type
+            const realOrderOption = document.getElementById('real-order-option');
+            if (isOrderTemplate(selectedTemplate)) {
+                realOrderOption.style.display = 'block';
+                realOrderOption.disabled = false;
+            } else {
+                realOrderOption.style.display = 'none';
+                realOrderOption.disabled = true;
+                // Reset to sample data if real order was selected
+                if (dataSourceSelect.value === 'real') {
+                    dataSourceSelect.value = 'sample';
+                    orderSelectGroup.style.display = 'none';
+                }
+            }
+        });
+    });
+
+    // Data source change
+    dataSourceSelect.addEventListener('change', function() {
+        if (this.value === 'real') {
+            orderSelectGroup.style.display = 'flex';
+        } else {
+            orderSelectGroup.style.display = 'none';
+        }
+    });
+
+    // Format tabs
+    formatTabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            formatTabs.forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            currentFormat = this.dataset.format;
+
+            // Re-generate preview if template is selected
+            if (selectedTemplate) {
+                generatePreview();
+            }
+        });
+    });
+
+    // Preview button
+    previewBtn.addEventListener('click', generatePreview);
+
+    function generatePreview() {
+        if (!selectedTemplate) return;
+
+        previewContent.innerHTML = '<div class="loading">{% trans "Generating preview..." %}</div>';
+
+        const data = {
+            template_name: selectedTemplate,
+            language: languageSelect.value,
+            format_type: currentFormat
+        };
+
+        if (dataSourceSelect.value === 'real' && orderSelect.value) {
+            data.order_id = orderSelect.value;
+        }
+
+        fetch('/admin/email-templates/preview/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                displayPreview(result);
+            } else {
+                displayError(result.error);
+            }
+        })
+        .catch(error => {
+            displayError('Network error: ' + error.message);
+        });
+    }
+
+    function displayPreview(result) {
+        if (result.format_type === 'html') {
+            // Create iframe for HTML content
+            const iframe = document.createElement('iframe');
+            iframe.className = 'preview-iframe';
+            iframe.srcdoc = result.rendered_content;
+            previewContent.innerHTML = '';
+            previewContent.appendChild(iframe);
+        } else {
+            // Display text content
+            previewContent.innerHTML = `<div class="preview-text">${escapeHtml(result.rendered_content)}</div>`;
+        }
+    }
+
+    function displayError(error) {
+        previewContent.innerHTML = `<div class="error">{% trans "Error" %}: ${escapeHtml(error)}</div>`;
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+})();
+</script>
+{% endblock %}

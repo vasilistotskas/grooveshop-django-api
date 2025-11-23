@@ -34,10 +34,10 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
             order_id=order.id
         )
         text_content = render_to_string(
-            "emails/order_confirmation.txt", context
+            "emails/order/order_confirmation.txt", context
         )
         html_content = render_to_string(
-            "emails/order_confirmation.html", context
+            "emails/order/order_confirmation.html", context
         )
 
         msg = EmailMultiAlternatives(
@@ -109,7 +109,7 @@ def send_order_status_update_email(
             "site_url": getattr(settings, "SITE_URL", "https://example.com"),
         }
 
-        template_base = f"emails/order_{status.lower()}"
+        template_base = f"emails/order/order_{status.lower()}"
 
         subject = _("Order #{order_id} Status Update - {status}").format(
             order_id=order.id, status=OrderStatus(status).label
@@ -124,10 +124,10 @@ def send_order_status_update_email(
                 extra={"order_id": order_id, "status": status},
             )
             text_content = render_to_string(
-                "emails/order_status_generic.txt", context
+                "emails/order/order_status_generic.txt", context
             )
             html_content = render_to_string(
-                "emails/order_status_generic.html", context
+                "emails/order/order_status_generic.html", context
             )
 
         msg = EmailMultiAlternatives(
@@ -206,8 +206,12 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
         subject = _("Your Order #{order_id} Has Shipped").format(
             order_id=order.id
         )
-        text_content = render_to_string("emails/order_shipped.txt", context)
-        html_content = render_to_string("emails/order_shipped.html", context)
+        text_content = render_to_string(
+            "emails/order/order_shipped.txt", context
+        )
+        html_content = render_to_string(
+            "emails/order/order_shipped.html", context
+        )
 
         msg = EmailMultiAlternatives(
             subject,
@@ -314,10 +318,10 @@ def check_pending_orders() -> int:
                 order_id=order.id
             )
             text_content = render_to_string(
-                "emails/order_pending_reminder.txt", context
+                "emails/order/order_pending_reminder.txt", context
             )
             html_content = render_to_string(
-                "emails/order_pending_reminder.html", context
+                "emails/order/order_pending_reminder.html", context
             )
 
             msg = EmailMultiAlternatives(

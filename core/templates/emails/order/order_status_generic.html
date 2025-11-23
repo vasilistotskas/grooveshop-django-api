@@ -1,0 +1,50 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "Order Status Update" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<h1>{% trans "Order Status Update" %}</h1>
+<p>{% blocktrans with first_name=order.first_name last_name=order.last_name %}Dear {{ first_name }} {{ last_name }},{% endblocktrans %}</p>
+
+<p>{% blocktrans with order_id=order.id %}Your order #{{ order_id }} has been updated.{% endblocktrans %}</p>
+
+<div class="email-card">
+    <h2>{% trans "Order Details" %}</h2>
+    <p><strong>{% trans "Order Date" %}:</strong> {{ order.created_at|date:"SHORT_DATETIME_FORMAT" }}</p>
+    <p><strong>{% trans "Order Total" %}:</strong> {{ order.total_price }}</p>
+    <p>
+        <strong>{% trans "New Status" %}:</strong>
+        <span style="display: inline-block; padding: 6px 12px; font-weight: bold; border-radius: 4px; background-color: #eee;">
+            {{ order.get_status_display }}
+        </span>
+    </p>
+
+    <h3>{% trans "What This Means" %}</h3>
+    <p>
+        {% if order.status == "PENDING" %}
+            {% trans "Your order has been received and is awaiting payment processing." %}
+        {% elif order.status == "PROCESSING" %}
+            {% trans "Your payment has been confirmed and we're preparing your order." %}
+        {% elif order.status == "SHIPPED" %}
+            {% trans "Your order has been shipped and is on its way to you." %}
+        {% elif order.status == "DELIVERED" %}
+            {% trans "Your order has been delivered to your shipping address." %}
+        {% elif order.status == "COMPLETED" %}
+            {% trans "Your order has been completed successfully. Thank you for shopping with us!" %}
+        {% elif order.status == "CANCELED" %}
+            {% trans "Your order has been canceled. If you didn't request this, please contact us." %}
+        {% elif order.status == "RETURNED" %}
+            {% trans "Your return has been received and is being processed." %}
+        {% elif order.status == "REFUNDED" %}
+            {% trans "Your refund has been processed and should appear in your account soon." %}
+        {% else %}
+            {% trans "Your order status has been updated." %}
+        {% endif %}
+    </p>
+</div>
+
+<p class="mt-3">{% trans "If you have any questions about your order, please contact our customer service team." %}</p>
+
+<p>{% blocktrans with site_name=SITE_NAME %}Thank you for shopping with {{ site_name }}!{% endblocktrans %}</p>
+{% endblock %}

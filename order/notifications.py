@@ -39,10 +39,10 @@ class EmailNotifier(NotifierInterface):
             "items": order.items.all(),
         }
         html_message = render_to_string(
-            "emails/order_confirmation.html", context
+            "emails/order/order_confirmation.html", context
         )
         text_message = render_to_string(
-            "emails/order_confirmation.txt", context
+            "emails/order/order_confirmation.txt", context
         )
 
         try:
@@ -70,8 +70,12 @@ class EmailNotifier(NotifierInterface):
             "tracking_number": tracking_number,
             "carrier": carrier,
         }
-        html_message = render_to_string("emails/order_shipped.html", context)
-        text_message = render_to_string("emails/order_shipped.txt", context)
+        html_message = render_to_string(
+            "emails/order/order_shipped.html", context
+        )
+        text_message = render_to_string(
+            "emails/order/order_shipped.txt", context
+        )
 
         try:
             send_mail(
@@ -94,8 +98,12 @@ class EmailNotifier(NotifierInterface):
         context = {
             "order": order,
         }
-        html_message = render_to_string("emails/order_delivered.html", context)
-        text_message = render_to_string("emails/order_delivered.txt", context)
+        html_message = render_to_string(
+            "emails/order/order_delivered.html", context
+        )
+        text_message = render_to_string(
+            "emails/order/order_delivered.txt", context
+        )
 
         try:
             send_mail(
@@ -118,8 +126,12 @@ class EmailNotifier(NotifierInterface):
         context = {
             "order": order,
         }
-        html_message = render_to_string("emails/order_canceled.html", context)
-        text_message = render_to_string("emails/order_canceled.txt", context)
+        html_message = render_to_string(
+            "emails/order/order_canceled.html", context
+        )
+        text_message = render_to_string(
+            "emails/order/order_canceled.txt", context
+        )
 
         try:
             send_mail(

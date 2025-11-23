@@ -1,0 +1,20 @@
+{% load i18n %}{% blocktrans with first_name=order.first_name last_name=order.last_name %}Dear {{ first_name }} {{ last_name }},{% endblocktrans %}
+
+{% blocktrans with order_id=order.id order_date=order.created_at|date:"SHORT_DATE_FORMAT" %}We noticed that your order #{{ order_id }} placed on {{ order_date }} is still in pending status.{% endblocktrans %}
+
+{% trans "Order Details" %}:
+- {% trans "Total Amount" %}: {{ order.total_price }}
+- {% trans "Status" %}: {% trans "Pending" %}
+
+{% trans "To complete your purchase, please finalize your payment. If you've already completed payment, please disregard this message as it may take some time for our system to update." %}
+
+{% trans "You can view your order status by logging into your account on our website." %}
+{{ SITE_URL }}/account/orders
+
+{% trans "If you're experiencing any issues with your payment or have questions about your order, please don't hesitate to contact our customer service team." %}
+
+{% blocktrans with site_name=SITE_NAME %}Thank you for shopping with {{ site_name }}!{% endblocktrans %}
+
+{% trans "Best regards" %},
+{{ SITE_NAME }} {% trans "Team" %}
+{{ INFO_EMAIL }}

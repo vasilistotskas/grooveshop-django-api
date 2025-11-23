@@ -1,0 +1,30 @@
+{% load i18n %}{% trans "ORDER CONFIRMATION" %}
+
+{% trans "Thank you for your order!" %}
+
+{% trans "Order" %} #{{ order.id }}
+{% trans "Date" %}: {{ order.created_at|date:"SHORT_DATE_FORMAT" }}
+{% trans "Status" %}: {{ order.get_status_display }}
+
+{% trans "SHIPPING ADDRESS" %}
+{{ order.first_name }} {{ order.last_name }}
+{{ order.street }} {{ order.street_number }}
+{{ order.city }}, {{ order.zipcode }}
+{{ order.country }}
+
+{% trans "ORDER ITEMS" %}
+{% for item in items %}
+{{ item.product.name }} - {{ item.quantity }} x {{ item.price }} = {{ item.get_total_price }}
+{% endfor %}
+
+{% trans "Subtotal" %}: {{ order.total_price_items }}
+{% trans "Shipping" %}: {{ order.shipping_price }}
+{% trans "Total" %}: {{ order.total_price }}
+
+{% trans "If you have any questions about your order, please contact our customer service." %}
+
+{% trans "Thank you for shopping with us!" %}
+
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}

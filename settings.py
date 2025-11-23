@@ -1085,6 +1085,11 @@ UNFOLD = {
             "title": _("Cache"),
             "link": reverse_lazy("admin:clear-cache"),
         },
+        {
+            "icon": "email",
+            "title": _("Email Templates"),
+            "link": reverse_lazy("email_templates:management"),
+        },
     ],
 }
 

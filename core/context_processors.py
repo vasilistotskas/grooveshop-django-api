@@ -1,5 +1,6 @@
 import os
 
+from django.conf import settings
 from django.http import HttpRequest
 
 
@@ -30,5 +31,8 @@ def metadata(request: HttpRequest):
         "SITE_DESCRIPTION": site_description,
         "SITE_KEYWORDS": site_keywords,
         "SITE_AUTHOR": site_author,
+        "SITE_URL": settings.NUXT_BASE_URL,
+        "INFO_EMAIL": settings.INFO_EMAIL,
+        "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         "REQUEST_DETAILS": request_details,
     }

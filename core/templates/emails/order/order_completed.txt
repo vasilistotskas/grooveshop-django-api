@@ -1,0 +1,30 @@
+{% load i18n %}
+========================================
+{% trans "THANK YOU FOR YOUR PURCHASE!" %}
+========================================
+
+{% blocktrans with order_id=order.id %}Your order #{{ order_id }} has been successfully completed.{% endblocktrans %}
+
+{% trans "Order Completed" %}
+
+{% blocktrans with first_name=order.first_name last_name=order.last_name %}Dear {{ first_name }} {{ last_name }},{% endblocktrans %}
+
+{% trans "We're delighted to confirm that your order has been completed successfully!" %}
+
+{% trans "Order Details" %}
+----------------------------------------
+{% trans "Order Date" %}: {{ order.created_at|date:"SHORT_DATETIME_FORMAT" }}
+{% trans "Order Total" %}: {{ order.total_price }}
+{% trans "Status" %}: {% trans "Completed" %}
+
+{% trans "What's Next?" %}
+----------------------------------------
+{% trans "Your order has been delivered and completed. We hope you're enjoying your purchase!" %}
+
+{% trans "If you have any questions or concerns about your order, please don't hesitate to contact our customer service team." %}
+
+{% blocktrans with site_name=SITE_NAME %}Thank you for shopping with {{ site_name }}! We look forward to serving you again.{% endblocktrans %}
+
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}

@@ -446,7 +446,7 @@ def send_inactive_user_notifications():
             }
 
             message = render_to_string(
-                "emails/inactive_user_email_template.html", context
+                "emails/user/inactive_user_email_template.html", context
             )
 
             send_mail(

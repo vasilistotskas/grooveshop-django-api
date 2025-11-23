@@ -35,11 +35,13 @@ class SubscriptionTopicFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         field_name="translations__name",
         lookup_expr="icontains",
         help_text=_("Filter by name (partial match)"),
+        distinct=True,
     )
     description = filters.CharFilter(
         field_name="translations__description",
         lookup_expr="icontains",
         help_text=_("Filter by description (partial match)"),
+        distinct=True,
     )
 
     # Custom filter methods

@@ -417,16 +417,30 @@ if SYSTEM_ENV == "ci":
 
 
 # Broker & Results
-CELERY_BROKER_URL = getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
+CELERY_BROKER_URL = getenv(
+    "CELERY_BROKER_URL", "amqp://guest:guest@rabbitmq:5672//"
+)
 CELERY_RESULT_BACKEND = getenv("CELERY_RESULT_BACKEND", "django-db")
 CELERY_CACHE_BACKEND = getenv("CELERY_CACHE_BACKEND", "django-cache")
 
 # Task execution
-CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TRACK_STARTED = (
+    False  # Disable to reduce DB load and avoid connection issues
+)
 CELERY_TASK_ACKS_LATE = True
 CELERY_TASK_REJECT_ON_WORKER_LOST = True
 CELERY_TASK_SOFT_TIME_LIMIT = 1500
 CELERY_TASK_TIME_LIMIT = 1800
+CELERY_TASK_STORE_ERRORS_EVEN_IF_IGNORED = True
+
+# Default retry policy for all tasks
+CELERY_TASK_AUTORETRY_FOR = (
+    Exception,  # Retry on any exception
+)
+CELERY_TASK_RETRY_BACKOFF = True  # Exponential backoff
+CELERY_TASK_RETRY_BACKOFF_MAX = 600  # Max 10 minutes between retries
+CELERY_TASK_RETRY_JITTER = True  # Add randomness to prevent thundering herd
+CELERY_TASK_MAX_RETRIES = 5  # Retry up to 5 times
 
 # Timezone (use UTC)
 CELERY_ENABLE_UTC = False
@@ -446,23 +460,27 @@ CELERY_BROKER_CONNECTION_TIMEOUT = 30
 CELERY_BROKER_CONNECTION_RETRY = True
 CELERY_BROKER_CONNECTION_MAX_RETRIES = 100
 
+# Worker settings
+CELERY_WORKER_SEND_TASK_EVENTS = True
+CELERY_TASK_SEND_SENT_EVENT = True
+CELERY_WORKER_MAX_TASKS_PER_CHILD = (
+    50  # Restart worker after 50 tasks to prevent memory leaks
+)
+CELERY_WORKER_MAX_MEMORY_PER_CHILD = 250000  # 250MB limit per worker
+CELERY_WORKER_DISABLE_RATE_LIMITS = False
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1  # Fetch one task at a time
+
 CELERY_RESULT_BACKEND_ALWAYS_RETRY = True
-CELERY_RESULT_BACKEND_MAX_RETRIES = 10
+CELERY_RESULT_BACKEND_MAX_RETRIES = 3
 CELERY_RESULT_EXTENDED = True
 CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {"retry_policy": {"timeout": 5.0}}
-CELERY_TASK_RESULT_EXPIRES = 86400
+CELERY_TASK_RESULT_EXPIRES = 3600  # Results expire after 1 hour
+CELERY_RESULT_PERSISTENT = False  # Don't persist to disk for better performance
 
 # Serialization
 CELERY_ACCEPT_CONTENT = ["application/json"]
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TASK_SERIALIZER = "json"
-
-# Worker settings
-CELERY_WORKER_SEND_TASK_EVENTS = True
-CELERY_TASK_SEND_SENT_EVENT = True
-CELERY_WORKER_PREFETCH_MULTIPLIER = 2
-CELERY_WORKER_MAX_TASKS_PER_CHILD = 1000
-CELERY_WORKER_MAX_MEMORY_PER_CHILD = 200000
 
 # Beat scheduler
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
@@ -493,6 +511,7 @@ SCHEDULE_PRESETS = {
     "bimonthly_6am": crontab(hour="6", minute="0", day_of_month="1,15"),
     # Frequent schedules
     "every_minute": crontab(minute="*"),
+    "every_5_minute": crontab(minute="*/5"),
     "every_30_min": crontab(minute="*/30"),
     "every_hour": crontab(minute="0"),
 }
@@ -502,55 +521,79 @@ def get_celery_beat_schedule():
     base_schedule = {
         "monitor-system-health": {
             "task": "core.tasks.monitor_system_health",
-            "schedule": SCHEDULE_PRESETS["every_30_min"],
+            "schedule": SCHEDULE_PRESETS["daily_5am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_minute"],
         },
         "scheduled-database-backup": {
             "task": "core.tasks.scheduled_database_backup",
-            "schedule": SCHEDULE_PRESETS["daily_3am"],
+            "schedule": SCHEDULE_PRESETS["daily_3am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_minute"],
         },
         "cleanup-old-backups": {
             "task": "core.tasks.cleanup_old_backups",
-            "schedule": SCHEDULE_PRESETS["weekly_sunday_5am"],
+            "schedule": SCHEDULE_PRESETS["weekly_sunday_5am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_minute"],
             "kwargs": {"days": 30, "backup_dir": "backups"},
         },
         "clear-duplicate-history": {
             "task": "core.tasks.clear_duplicate_history_task",
-            "schedule": SCHEDULE_PRESETS["daily_5am"],
+            "schedule": SCHEDULE_PRESETS["daily_5am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_minute"],
             "kwargs": {"excluded_fields": [], "minutes": None},
         },
         "clear-old-history": {
             "task": "core.tasks.clear_old_history_task",
-            "schedule": SCHEDULE_PRESETS["weekly_sunday_3am"],
+            "schedule": SCHEDULE_PRESETS["weekly_sunday_3am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_minute"],
             "kwargs": {"days": 365},
         },
         "clear-expired-sessions": {
             "task": "core.tasks.clear_expired_sessions_task",
-            "schedule": SCHEDULE_PRESETS["weekly_monday_4am"],
+            "schedule": SCHEDULE_PRESETS["weekly_monday_4am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_minute"],
         },
         "send-inactive-user-notifications": {
             "task": "core.tasks.send_inactive_user_notifications",
-            "schedule": SCHEDULE_PRESETS["monthly_first_6am"],
+            "schedule": SCHEDULE_PRESETS["monthly_first_6am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_minute"],
         },
         "clear-all-cache": {
             "task": "core.tasks.clear_all_cache_task",
-            "schedule": SCHEDULE_PRESETS["monthly_first_4am"],
+            "schedule": SCHEDULE_PRESETS["monthly_first_4am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_minute"],
         },
         "cleanup-abandoned-carts": {
             "task": "core.tasks.cleanup_abandoned_carts",
-            "schedule": SCHEDULE_PRESETS["daily_4am"],
+            "schedule": SCHEDULE_PRESETS["daily_4am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_minute"],
         },
         "cleanup-old-guest-carts": {
             "task": "core.tasks.cleanup_old_guest_carts",
-            "schedule": SCHEDULE_PRESETS["daily_6am"],
+            "schedule": SCHEDULE_PRESETS["daily_6am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_minute"],
         },
         "clear-expired-notifications": {
             "task": "core.tasks.clear_expired_notifications_task",
-            "schedule": SCHEDULE_PRESETS["bimonthly_6am"],
+            "schedule": SCHEDULE_PRESETS["bimonthly_6am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_minute"],
             "kwargs": {"days": 365},
         },
         "sync-meilisearch-indexes": {
             "task": "core.tasks.sync_meilisearch_indexes",
-            "schedule": SCHEDULE_PRESETS["daily_2am"],
+            "schedule": SCHEDULE_PRESETS["daily_2am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_minute"],
         },
     }
 
@@ -559,7 +602,9 @@ def get_celery_beat_schedule():
             {
                 "clear-development-logs": {
                     "task": "core.tasks.clear_development_log_files_task",
-                    "schedule": SCHEDULE_PRESETS["daily_4am"],
+                    "schedule": SCHEDULE_PRESETS["daily_4am"]
+                    if not DEBUG
+                    else SCHEDULE_PRESETS["every_minute"],
                     "kwargs": {"days": 7},
                 },
             }
@@ -674,7 +719,9 @@ INDEX_MAXIMUM_EXPR_COUNT = 8000
 DATABASES = {
     "default": {
         "ATOMIC_REQUESTS": False,
-        "CONN_HEALTH_CHECKS": SYSTEM_ENV == "production",
+        "AUTOCOMMIT": True,
+        "CONN_HEALTH_CHECKS": True,
+        "CONN_MAX_AGE": 0,
         "TIME_ZONE": getenv("TIME_ZONE", "Europe/Athens"),
         "ENGINE": "django.db.backends.postgresql",
         "HOST": getenv("DB_HOST", "db"),
@@ -683,13 +730,8 @@ DATABASES = {
         "PASSWORD": getenv("DB_PASSWORD", "postgres"),
         "PORT": getenv("DB_PORT", "5432"),
         "OPTIONS": {
-            "pool": {
-                "min_size": 2,
-                "max_size": 10,
-                "timeout": 30,
-                "max_lifetime": 3600,
-                "max_idle": 600,
-            },
+            "connect_timeout": 5,
+            "options": "-c statement_timeout=30000 -c idle_in_transaction_session_timeout=10000",
         },
     },
 }

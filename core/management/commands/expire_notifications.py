@@ -17,6 +17,8 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        from django.db import transaction
+
         notification = importlib.import_module(
             "notification.models.notification"
         ).Notification
@@ -35,15 +37,14 @@ class Command(BaseCommand):
             ).exclude(expiry_date__isnull=True)
             message = "expired notifications"
 
-        count = expired_notifications.count()
+        with transaction.atomic():
+            if not expired_notifications.exists():
+                self.stdout.write(
+                    self.style.WARNING(f"No {message} found to delete")
+                )
+                return
 
-        if count == 0:
-            self.stdout.write(
-                self.style.WARNING(f"No {message} found to delete")
-            )
-            return
-
-        deleted_count, deleted_details = expired_notifications.delete()
+            deleted_count, deleted_details = expired_notifications.delete()
 
         self.stdout.write(
             self.style.SUCCESS(

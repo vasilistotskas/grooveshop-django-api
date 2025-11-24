@@ -28,7 +28,6 @@ from core.tasks import (
     monitor_system_health,
     scheduled_database_backup,
     send_inactive_user_notifications,
-    track_task_metrics,
     validate_task_configuration,
 )
 from user.factories.account import UserAccountFactory
@@ -60,45 +59,6 @@ class TestMonitoredTask(TestCase):
         mock_logger.error.assert_called_once_with(
             "Task test_task failed. Task ID: 12345, Error: Test error"
         )
-
-
-class TestTrackTaskMetrics(TestCase):
-    @patch("core.tasks.logger")
-    @patch("time.time")
-    def test_successful_task_tracking(self, mock_time, mock_logger):
-        mock_time.side_effect = [1000.0, 1001.5]
-
-        @track_task_metrics
-        def dummy_task():
-            return "success"
-
-        result = dummy_task()
-
-        self.assertEqual(result, "success")
-        mock_logger.info.assert_called_once()
-        call_args = mock_logger.info.call_args
-        self.assertIn("Task dummy_task completed successfully", call_args[0][0])
-        self.assertEqual(call_args[1]["extra"]["duration"], 1.5)
-        self.assertEqual(call_args[1]["extra"]["status"], "success")
-
-    @patch("core.tasks.logger")
-    @patch("time.time")
-    def test_failed_task_tracking(self, mock_time, mock_logger):
-        mock_time.side_effect = [1000.0, 1001.5]
-
-        @track_task_metrics
-        def failing_task():
-            raise ValueError("Test error")
-
-        with self.assertRaises(ValueError):
-            failing_task()
-
-        mock_logger.error.assert_called_once()
-        call_args = mock_logger.error.call_args
-        self.assertIn("Task failing_task failed", call_args[0][0])
-        self.assertEqual(call_args[1]["extra"]["duration"], 1.5)
-        self.assertEqual(call_args[1]["extra"]["status"], "failure")
-        self.assertEqual(call_args[1]["extra"]["error"], "Test error")
 
 
 @pytest.mark.django_db

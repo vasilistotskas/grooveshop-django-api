@@ -840,38 +840,22 @@ def sync_meilisearch_indexes():
     Sync all Meilisearch indexes by calling the management command.
     Scheduled to run daily at 2 AM.
     """
+    logger.info("Starting Meilisearch index synchronization")
+    
     try:
-        logger.info("Starting Meilisearch index synchronization")
-
-        try:
-            management.call_command("meilisearch_sync_all_indexes")
-            logger.info(
-                "Meilisearch index synchronization completed successfully"
-            )
-            return {
-                "status": "success",
-                "result_message": "All Meilisearch indexes synchronized successfully",
-                "timestamp": timezone.now().isoformat(),
-            }
-        except SystemExit as e:
-            logger.error(f"Meilisearch sync command exited with code: {e.code}")
-            return {
-                "status": "error",
-                "result_message": f"Command exited with code {e.code}",
-                "error_type": "SystemExit",
-            }
-
+        management.call_command("meilisearch_sync_all_indexes")
+        logger.info("Meilisearch index synchronization completed successfully")
+        return {
+            "status": "success",
+            "result_message": "All Meilisearch indexes synchronized successfully",
+            "timestamp": timezone.now().isoformat(),
+        }
+    except SystemExit as e:
+        logger.error(f"Meilisearch sync command exited with code: {e.code}")
+        raise Exception(f"Command exited with code {e.code}")
     except management.CommandError as e:
         logger.error(f"Django command error in sync_meilisearch_indexes: {e}")
-        return {
-            "status": "error",
-            "result_message": str(e),
-            "error_type": "CommandError",
-        }
+        raise
     except Exception as e:
         logger.exception("Unexpected error in sync_meilisearch_indexes")
-        return {
-            "status": "error",
-            "result_message": str(e),
-            "error_type": type(e).__name__,
-        }
+        raise

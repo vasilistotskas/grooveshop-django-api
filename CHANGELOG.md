@@ -3,6 +3,16 @@
 
 
 
+## v1.55.0 (2025-11-24)
+
+### Bug fixes
+
+* fix: meili task ([`c701fb6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c701fb63df45f0e26a5b84213c36958e87a1003c))
+
+### Features
+
+* feat: subscription confirmation, task fixes ([`a79529c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a79529ca7f75fdf1eb1447d9dce05da57b6346da))
+
 ## v1.54.0 (2025-11-24)
 
 ### Bug fixes

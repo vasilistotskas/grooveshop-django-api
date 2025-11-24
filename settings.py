@@ -523,77 +523,77 @@ def get_celery_beat_schedule():
             "task": "core.tasks.monitor_system_health",
             "schedule": SCHEDULE_PRESETS["daily_5am"]
             if not DEBUG
-            else SCHEDULE_PRESETS["every_minute"],
+            else SCHEDULE_PRESETS["every_hour"],
         },
         "scheduled-database-backup": {
             "task": "core.tasks.scheduled_database_backup",
             "schedule": SCHEDULE_PRESETS["daily_3am"]
             if not DEBUG
-            else SCHEDULE_PRESETS["every_minute"],
+            else SCHEDULE_PRESETS["every_hour"],
         },
         "cleanup-old-backups": {
             "task": "core.tasks.cleanup_old_backups",
             "schedule": SCHEDULE_PRESETS["weekly_sunday_5am"]
             if not DEBUG
-            else SCHEDULE_PRESETS["every_minute"],
+            else SCHEDULE_PRESETS["every_hour"],
             "kwargs": {"days": 30, "backup_dir": "backups"},
         },
         "clear-duplicate-history": {
             "task": "core.tasks.clear_duplicate_history_task",
             "schedule": SCHEDULE_PRESETS["daily_5am"]
             if not DEBUG
-            else SCHEDULE_PRESETS["every_minute"],
+            else SCHEDULE_PRESETS["every_hour"],
             "kwargs": {"excluded_fields": [], "minutes": None},
         },
         "clear-old-history": {
             "task": "core.tasks.clear_old_history_task",
             "schedule": SCHEDULE_PRESETS["weekly_sunday_3am"]
             if not DEBUG
-            else SCHEDULE_PRESETS["every_minute"],
+            else SCHEDULE_PRESETS["every_hour"],
             "kwargs": {"days": 365},
         },
         "clear-expired-sessions": {
             "task": "core.tasks.clear_expired_sessions_task",
             "schedule": SCHEDULE_PRESETS["weekly_monday_4am"]
             if not DEBUG
-            else SCHEDULE_PRESETS["every_minute"],
+            else SCHEDULE_PRESETS["every_hour"],
         },
         "send-inactive-user-notifications": {
             "task": "core.tasks.send_inactive_user_notifications",
             "schedule": SCHEDULE_PRESETS["monthly_first_6am"]
             if not DEBUG
-            else SCHEDULE_PRESETS["every_minute"],
+            else SCHEDULE_PRESETS["every_hour"],
         },
         "clear-all-cache": {
             "task": "core.tasks.clear_all_cache_task",
             "schedule": SCHEDULE_PRESETS["monthly_first_4am"]
             if not DEBUG
-            else SCHEDULE_PRESETS["every_minute"],
+            else SCHEDULE_PRESETS["monthly_first_4am"],
         },
         "cleanup-abandoned-carts": {
             "task": "core.tasks.cleanup_abandoned_carts",
             "schedule": SCHEDULE_PRESETS["daily_4am"]
             if not DEBUG
-            else SCHEDULE_PRESETS["every_minute"],
+            else SCHEDULE_PRESETS["every_hour"],
         },
         "cleanup-old-guest-carts": {
             "task": "core.tasks.cleanup_old_guest_carts",
             "schedule": SCHEDULE_PRESETS["daily_6am"]
             if not DEBUG
-            else SCHEDULE_PRESETS["every_minute"],
+            else SCHEDULE_PRESETS["every_hour"],
         },
         "clear-expired-notifications": {
             "task": "core.tasks.clear_expired_notifications_task",
             "schedule": SCHEDULE_PRESETS["bimonthly_6am"]
             if not DEBUG
-            else SCHEDULE_PRESETS["every_minute"],
+            else SCHEDULE_PRESETS["every_hour"],
             "kwargs": {"days": 365},
         },
         "sync-meilisearch-indexes": {
             "task": "core.tasks.sync_meilisearch_indexes",
             "schedule": SCHEDULE_PRESETS["daily_2am"]
             if not DEBUG
-            else SCHEDULE_PRESETS["every_minute"],
+            else SCHEDULE_PRESETS["every_hour"],
         },
     }
 
@@ -604,7 +604,7 @@ def get_celery_beat_schedule():
                     "task": "core.tasks.clear_development_log_files_task",
                     "schedule": SCHEDULE_PRESETS["daily_4am"]
                     if not DEBUG
-                    else SCHEDULE_PRESETS["every_minute"],
+                    else SCHEDULE_PRESETS["every_hour"],
                     "kwargs": {"days": 7},
                 },
             }
@@ -715,6 +715,7 @@ CONN_HEALTH_CHECKS = False
 ATOMIC_REQUESTS = False
 CONN_MAX_AGE = 600
 INDEX_MAXIMUM_EXPR_COUNT = 8000
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
 
 DATABASES = {
     "default": {

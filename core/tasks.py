@@ -10,7 +10,7 @@ from django.core import management
 from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
 from django.core.mail import send_mail
-from django.db import connections, transaction, close_old_connections
+from django.db import connections, transaction
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -48,8 +48,6 @@ class MonitoredTask(Task):
 )
 def clear_expired_sessions_task():
     try:
-        close_old_connections()
-
         logger.info("Starting expired sessions cleanup")
 
         with transaction.atomic():
@@ -66,8 +64,6 @@ def clear_expired_sessions_task():
     except Exception:
         logger.exception("Unexpected error in clear_expired_sessions")
         raise
-    finally:
-        close_old_connections()
 
 
 @celery_app.task(
@@ -78,8 +74,6 @@ def clear_expired_sessions_task():
 )
 def clear_all_cache_task():
     try:
-        close_old_connections()
-
         logger.info("Starting cache cleanup")
         management.call_command("clear_cache", verbosity=0)
 
@@ -94,8 +88,6 @@ def clear_all_cache_task():
     except Exception:
         logger.exception("Unexpected error in clear_cache")
         raise
-    finally:
-        close_old_connections()
 
 
 @celery_app.task(
@@ -122,8 +114,6 @@ def clear_duplicate_history_task(excluded_fields=None, minutes=None):
         }
 
     try:
-        close_old_connections()
-
         logger.info(
             "Starting duplicate history cleanup",
             extra={"excluded_fields": excluded_fields, "minutes": minutes},
@@ -164,7 +154,6 @@ def clear_duplicate_history_task(excluded_fields=None, minutes=None):
     finally:
         # Release lock
         cache.delete(lock_id)
-        close_old_connections()
 
 
 @celery_app.task(
@@ -175,8 +164,6 @@ def clear_duplicate_history_task(excluded_fields=None, minutes=None):
 )
 def clear_old_history_task(days=365):
     try:
-        close_old_connections()
-
         logger.info(
             f"Starting old history cleanup for entries older than {days} days"
         )
@@ -207,8 +194,6 @@ def clear_old_history_task(days=365):
     except Exception:
         logger.exception("Unexpected error in clear_old_history")
         raise
-    finally:
-        close_old_connections()
 
 
 @celery_app.task(
@@ -219,8 +204,6 @@ def clear_old_history_task(days=365):
 )
 def clear_expired_notifications_task(days=365):
     try:
-        close_old_connections()
-
         logger.info("Starting expired notifications cleanup")
 
         command_args = ["expire_notifications"]
@@ -245,8 +228,6 @@ def clear_expired_notifications_task(days=365):
     except Exception:
         logger.exception("Unexpected error in clear_expired_notifications")
         raise
-    finally:
-        close_old_connections()
 
 
 @celery_app.task(
@@ -256,26 +237,21 @@ def clear_expired_notifications_task(days=365):
     retry_backoff=True,
 )
 def cleanup_abandoned_carts():
-    try:
-        close_old_connections()
+    cutoff_date = timezone.now() - timedelta(days=7)
 
-        cutoff_date = timezone.now() - timedelta(days=7)
+    with transaction.atomic():
+        count, _ = Cart.objects.filter(
+            user__isnull=True,
+            items__isnull=True,
+            last_activity__lt=cutoff_date,
+        ).delete()
 
-        with transaction.atomic():
-            count, _ = Cart.objects.filter(
-                user__isnull=True,
-                items__isnull=True,
-                last_activity__lt=cutoff_date,
-            ).delete()
+    if count > 0:
+        logger.info(f"Cleaned up {count} abandoned empty guest carts")
+    else:
+        logger.info("No abandoned carts to clean up")
 
-        if count > 0:
-            logger.info(f"Cleaned up {count} abandoned empty guest carts")
-        else:
-            logger.info("No abandoned carts to clean up")
-
-        return count
-    finally:
-        close_old_connections()
+    return count
 
 
 @celery_app.task(
@@ -285,26 +261,19 @@ def cleanup_abandoned_carts():
     retry_backoff=True,
 )
 def cleanup_old_guest_carts():
-    try:
-        close_old_connections()
+    cutoff_date = timezone.now() - timedelta(days=30)
 
-        cutoff_date = timezone.now() - timedelta(days=30)
+    count, _ = Cart.objects.filter(
+        user__isnull=True,
+        last_activity__lt=cutoff_date,
+    ).delete()
 
-        count, _ = Cart.objects.filter(
-            user__isnull=True,
-            last_activity__lt=cutoff_date,
-        ).delete()
+    if count > 0:
+        logger.info(f"Cleaned up {count} old guest carts (30+ days inactive)")
+    else:
+        logger.info("No old guest carts to clean up")
 
-        if count > 0:
-            logger.info(
-                f"Cleaned up {count} old guest carts (30+ days inactive)"
-            )
-        else:
-            logger.info("No old guest carts to clean up")
-
-        return count
-    finally:
-        close_old_connections()
+    return count
 
 
 @celery_app.task(
@@ -416,93 +385,88 @@ def clear_development_log_files_task(days=7):
     retry_backoff=True,
 )
 def send_inactive_user_notifications():
-    try:
-        close_old_connections()
+    cutoff_date = timezone.now() - timedelta(days=60)
 
-        cutoff_date = timezone.now() - timedelta(days=60)
+    inactive_users = list(
+        User.objects.filter(
+            last_login__lt=cutoff_date,
+            is_active=True,
+            email__isnull=False,
+            email__gt="",
+        ).values_list("id", "email", "first_name", "username")[
+            :1000
+        ]  # Limit to prevent memory issues
+    )
 
-        inactive_users = list(
-            User.objects.filter(
-                last_login__lt=cutoff_date,
-                is_active=True,
-                email__isnull=False,
-                email__gt="",
-            ).values_list("id", "email", "first_name", "username")[
-                :1000
-            ]  # Limit to prevent memory issues
-        )
+    total_users = len(inactive_users)
+    success_count = 0
+    failed_emails = []
 
-        total_users = len(inactive_users)
-        success_count = 0
-        failed_emails = []
+    logger.info(f"Starting to send emails to {total_users} inactive users")
 
-        logger.info(f"Starting to send emails to {total_users} inactive users")
+    for user_id, email, first_name, username in inactive_users:
+        try:
+            mail_subject = _("We miss you!")
 
-        for user_id, email, first_name, username in inactive_users:
-            try:
-                mail_subject = _("We miss you!")
+            context = {
+                "user_id": user_id,
+                "first_name": first_name or username,
+                "app_base_url": settings.NUXT_BASE_URL,
+            }
 
-                context = {
+            message = render_to_string(
+                "emails/user/inactive_user_email_template.html", context
+            )
+
+            send_mail(
+                subject=mail_subject,
+                message=message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[email],
+                fail_silently=False,
+                html_message=message,
+            )
+
+            success_count += 1
+
+            if success_count % 100 == 0:
+                logger.info(f"Sent {success_count} emails so far...")
+
+        except Exception as e:
+            logger.error(
+                f"Failed to send email to user {user_id}",
+                extra={"user_id": user_id, "error": str(e)},
+            )
+            failed_emails.append(
+                {
                     "user_id": user_id,
-                    "first_name": first_name or username,
-                    "app_base_url": settings.NUXT_BASE_URL,
+                    "email": email[:3] + "***",
+                    "error": str(e),
                 }
+            )
 
-                message = render_to_string(
-                    "emails/user/inactive_user_email_template.html", context
-                )
+            if len(failed_emails) > 50:
+                logger.error("Too many email failures, stopping task")
+                break
 
-                send_mail(
-                    subject=mail_subject,
-                    message=message,
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[email],
-                    fail_silently=False,
-                    html_message=message,
-                )
-
-                success_count += 1
-
-                if success_count % 100 == 0:
-                    logger.info(f"Sent {success_count} emails so far...")
-
-            except Exception as e:
-                logger.error(
-                    f"Failed to send email to user {user_id}",
-                    extra={"user_id": user_id, "error": str(e)},
-                )
-                failed_emails.append(
-                    {
-                        "user_id": user_id,
-                        "email": email[:3] + "***",
-                        "error": str(e),
-                    }
-                )
-
-                if len(failed_emails) > 50:
-                    logger.error("Too many email failures, stopping task")
-                    break
-
-        message = f"Sent {success_count} re-engagement emails to inactive users"
-        logger.info(
-            message,
-            extra={
-                "total_users": total_users,
-                "emails_sent": success_count,
-                "failed_count": len(failed_emails),
-            },
-        )
-
-        return {
-            "status": "completed",
-            "message": message,
+    message = f"Sent {success_count} re-engagement emails to inactive users"
+    logger.info(
+        message,
+        extra={
             "total_users": total_users,
             "emails_sent": success_count,
-            "failed": len(failed_emails),
-            "failed_details": failed_emails[:10],
-        }
-    finally:
-        close_old_connections()
+            "failed_count": len(failed_emails),
+        },
+    )
+
+    return {
+        "status": "completed",
+        "message": message,
+        "total_users": total_users,
+        "emails_sent": success_count,
+        "failed": len(failed_emails),
+        "failed_details": failed_emails[:10],
+    }
 
 
 @celery_app.task(
@@ -513,8 +477,6 @@ def send_inactive_user_notifications():
     retry_jitter=True,
 )
 def monitor_system_health():
-    close_old_connections()
-
     health_checks = {"database": False, "cache": False, "storage": False}
     errors = []
 
@@ -707,8 +669,6 @@ def backup_database_task(
 )
 def scheduled_database_backup():
     try:
-        close_old_connections()
-
         timestamp = timezone.now().strftime("%Y%m%d_%H%M%S")
         filename = f"scheduled_backup_{timestamp}"
 
@@ -762,8 +722,6 @@ def scheduled_database_backup():
             )
 
         raise
-    finally:
-        close_old_connections()
 
 
 @celery_app.task(
@@ -774,8 +732,6 @@ def scheduled_database_backup():
 )
 def cleanup_old_backups(days=30, backup_dir="backups"):
     try:
-        close_old_connections()
-
         backup_path = Path(settings.BASE_DIR) / backup_dir
 
         if not backup_path.exists():
@@ -844,8 +800,6 @@ def cleanup_old_backups(days=30, backup_dir="backups"):
     except Exception:
         logger.exception("Error during backup cleanup")
         raise
-    finally:
-        close_old_connections()
 
 
 def validate_task_configuration():
@@ -887,8 +841,6 @@ def sync_meilisearch_indexes():
     Scheduled to run daily at 2 AM.
     """
     try:
-        close_old_connections()
-
         logger.info("Starting Meilisearch index synchronization")
 
         try:
@@ -923,5 +875,3 @@ def sync_meilisearch_indexes():
             "result_message": str(e),
             "error_type": type(e).__name__,
         }
-    finally:
-        close_old_connections()

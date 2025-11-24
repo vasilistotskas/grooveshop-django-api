@@ -9,7 +9,7 @@ import pytest
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management import CommandError
-from django.test import TestCase, override_settings
+from django.test import override_settings
 from django.utils import timezone
 
 from cart.models import Cart
@@ -34,16 +34,13 @@ from user.factories.account import UserAccountFactory
 
 
 @pytest.mark.django_db
-class TestMonitoredTask(TestCase):
-    def setUp(self):
-        self.task = MonitoredTask()
-        self.task.name = "test_task"
-
+class TestMonitoredTask:
     @patch("core.tasks.logger")
     def test_on_success_logs_completion(self, mock_logger):
-        self.task.on_success(
-            retval="success", task_id="12345", args=(), kwargs={}
-        )
+        task = MonitoredTask()
+        task.name = "test_task"
+
+        task.on_success(retval="success", task_id="12345", args=(), kwargs={})
 
         mock_logger.info.assert_called_once_with(
             "Task test_task completed successfully. Task ID: 12345"
@@ -51,8 +48,11 @@ class TestMonitoredTask(TestCase):
 
     @patch("core.tasks.logger")
     def test_on_failure_logs_error(self, mock_logger):
+        task = MonitoredTask()
+        task.name = "test_task"
+
         exception = Exception("Test error")
-        self.task.on_failure(
+        task.on_failure(
             exc=exception, task_id="12345", args=(), kwargs={}, einfo=None
         )
 
@@ -62,15 +62,15 @@ class TestMonitoredTask(TestCase):
 
 
 @pytest.mark.django_db
-class TestClearExpiredSessionsTask(TestCase):
+class TestClearExpiredSessionsTask:
     @patch("core.tasks.management.call_command")
     @patch("core.tasks.logger")
     def test_successful_session_cleanup(self, mock_logger, mock_call_command):
         result = clear_expired_sessions_task()
 
         mock_call_command.assert_called_once_with("clearsessions", verbosity=0)
-        self.assertEqual(result["status"], "success")
-        self.assertEqual(result["message"], "All expired sessions deleted")
+        assert result["status"] == "success"
+        assert result["message"] == "All expired sessions deleted"
         mock_logger.info.assert_any_call("Starting expired sessions cleanup")
 
     @patch("core.tasks.management.call_command")
@@ -80,9 +80,9 @@ class TestClearExpiredSessionsTask(TestCase):
 
         result = clear_expired_sessions_task()
 
-        self.assertEqual(result["status"], "error")
-        self.assertEqual(result["error_type"], "CommandError")
-        self.assertIn("Command failed", result["message"])
+        assert result["status"] == "error"
+        assert result["error_type"] == "CommandError"
+        assert "Command failed" in result["message"]
         mock_logger.error.assert_called()
 
     @patch("core.tasks.management.call_command")
@@ -90,7 +90,7 @@ class TestClearExpiredSessionsTask(TestCase):
     def test_unexpected_error_handling(self, mock_logger, mock_call_command):
         mock_call_command.side_effect = RuntimeError("Unexpected error")
 
-        with self.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             clear_expired_sessions_task()
 
         mock_logger.exception.assert_called_with(
@@ -99,15 +99,15 @@ class TestClearExpiredSessionsTask(TestCase):
 
 
 @pytest.mark.django_db
-class TestClearAllCacheTask(TestCase):
+class TestClearAllCacheTask:
     @patch("core.tasks.management.call_command")
     @patch("core.tasks.logger")
     def test_successful_cache_cleanup(self, mock_logger, mock_call_command):
         result = clear_all_cache_task()
 
         mock_call_command.assert_called_once_with("clear_cache", verbosity=0)
-        self.assertEqual(result["status"], "success")
-        self.assertEqual(result["message"], "All cache deleted")
+        assert result["status"] == "success"
+        assert result["message"] == "All cache deleted"
 
     @patch("core.tasks.management.call_command")
     def test_cache_cleanup_command_error(self, mock_call_command):
@@ -115,12 +115,12 @@ class TestClearAllCacheTask(TestCase):
 
         result = clear_all_cache_task()
 
-        self.assertEqual(result["status"], "error")
-        self.assertEqual(result["error_type"], "CommandError")
+        assert result["status"] == "error"
+        assert result["error_type"] == "CommandError"
 
 
 @pytest.mark.django_db
-class TestClearDuplicateHistoryTask(TestCase):
+class TestClearDuplicateHistoryTask:
     @patch("core.tasks.management.call_command")
     @patch("core.tasks.logger")
     def test_duplicate_history_cleanup_with_defaults(
@@ -131,8 +131,8 @@ class TestClearDuplicateHistoryTask(TestCase):
         mock_call_command.assert_called_once_with(
             "clean_duplicate_history", "--auto"
         )
-        self.assertEqual(result["status"], "success")
-        self.assertIn("Duplicate history entries cleaned", result["message"])
+        assert result["status"] == "success"
+        assert "Duplicate history entries cleaned" in result["message"]
 
     @patch("core.tasks.management.call_command")
     def test_duplicate_history_cleanup_with_parameters(self, mock_call_command):
@@ -152,11 +152,9 @@ class TestClearDuplicateHistoryTask(TestCase):
             "field2",
             "--auto",
         )
-        self.assertEqual(result["status"], "success")
-        self.assertEqual(
-            result["parameters"]["excluded_fields"], excluded_fields
-        )
-        self.assertEqual(result["parameters"]["minutes"], minutes)
+        assert result["status"] == "success"
+        assert result["parameters"]["excluded_fields"] == excluded_fields
+        assert result["parameters"]["minutes"] == minutes
 
     @patch("core.tasks.management.call_command")
     def test_duplicate_history_cleanup_command_error(self, mock_call_command):
@@ -164,12 +162,12 @@ class TestClearDuplicateHistoryTask(TestCase):
 
         result = clear_duplicate_history_task()
 
-        self.assertEqual(result["status"], "error")
-        self.assertEqual(result["error_type"], "CommandError")
+        assert result["status"] == "error"
+        assert result["error_type"] == "CommandError"
 
 
 @pytest.mark.django_db
-class TestClearOldHistoryTask(TestCase):
+class TestClearOldHistoryTask:
     @patch("core.tasks.management.call_command")
     @patch("core.tasks.logger")
     def test_old_history_cleanup_with_default_days(
@@ -180,10 +178,10 @@ class TestClearOldHistoryTask(TestCase):
         mock_call_command.assert_called_once_with(
             "clean_old_history", "--days", "365", "--auto"
         )
-        self.assertEqual(result["status"], "success")
-        self.assertIn(
-            "Old history entries cleaned (older than 365 days)",
-            result["message"],
+        assert result["status"] == "success"
+        assert (
+            "Old history entries cleaned (older than 365 days)"
+            in result["message"]
         )
 
     @patch("core.tasks.management.call_command")
@@ -193,11 +191,11 @@ class TestClearOldHistoryTask(TestCase):
         mock_call_command.assert_called_once_with(
             "clean_old_history", "--days", "30", "--auto"
         )
-        self.assertEqual(result["status"], "success")
+        assert result["status"] == "success"
 
 
 @pytest.mark.django_db
-class TestClearExpiredNotificationsTask(TestCase):
+class TestClearExpiredNotificationsTask:
     @patch("core.tasks.management.call_command")
     @patch("core.tasks.logger")
     def test_expired_notifications_cleanup(
@@ -208,8 +206,8 @@ class TestClearExpiredNotificationsTask(TestCase):
         mock_call_command.assert_called_once_with(
             "expire_notifications", "--days", "30"
         )
-        self.assertEqual(result["status"], "success")
-        self.assertEqual(result["message"], "Expired notifications deleted")
+        assert result["status"] == "success"
+        assert result["message"] == "Expired notifications deleted"
 
     @patch("core.tasks.management.call_command")
     def test_expired_notifications_with_default_days(self, mock_call_command):
@@ -218,57 +216,50 @@ class TestClearExpiredNotificationsTask(TestCase):
         mock_call_command.assert_called_once_with(
             "expire_notifications", "--days", "365"
         )
-        self.assertEqual(result["status"], "success")
+        assert result["status"] == "success"
 
 
-@pytest.mark.django_db
-class TestCleanupAbandonedCartsTask(TestCase):
-    def setUp(self):
-        self.user = UserAccountFactory()
-        self.user_cart = Cart.objects.create(user=self.user)
-
-        self.old_empty_cart = Cart.objects.create(user=None)
-        Cart.objects.filter(id=self.old_empty_cart.id).update(
-            last_activity=timezone.now() - timedelta(days=10)
-        )
-        self.old_empty_cart.refresh_from_db()
-
-        self.recent_empty_cart = Cart.objects.create(user=None)
-        Cart.objects.filter(id=self.recent_empty_cart.id).update(
-            last_activity=timezone.now() - timedelta(days=3)
-        )
-        self.recent_empty_cart.refresh_from_db()
-
-        self.old_cart_with_items = Cart.objects.create(user=None)
-        Cart.objects.filter(id=self.old_cart_with_items.id).update(
-            last_activity=timezone.now() - timedelta(days=10)
-        )
-        self.old_cart_with_items.refresh_from_db()
-
-    def test_cleanup_abandoned_carts_removes_old_empty_carts(self):
+@pytest.mark.django_db(transaction=True)
+class TestCleanupAbandonedCartsTask:
+    def test_cleanup_abandoned_carts_removes_old_empty_carts(self, db):
         from cart.factories import CartItemFactory
 
-        CartItemFactory(cart=self.old_cart_with_items)
+        user = UserAccountFactory()
+        user_cart = Cart.objects.create(user=user)
+
+        old_empty_cart = Cart.objects.create(user=None)
+        Cart.objects.filter(id=old_empty_cart.id).update(
+            last_activity=timezone.now() - timedelta(days=10)
+        )
+        old_empty_cart.refresh_from_db()
+
+        recent_empty_cart = Cart.objects.create(user=None)
+        Cart.objects.filter(id=recent_empty_cart.id).update(
+            last_activity=timezone.now() - timedelta(days=3)
+        )
+        recent_empty_cart.refresh_from_db()
+
+        old_cart_with_items = Cart.objects.create(user=None)
+        Cart.objects.filter(id=old_cart_with_items.id).update(
+            last_activity=timezone.now() - timedelta(days=10)
+        )
+        old_cart_with_items.refresh_from_db()
+
+        CartItemFactory(cart=old_cart_with_items)
 
         result = cleanup_abandoned_carts()
 
-        self.assertEqual(result, 1)
+        assert result == 1
 
-        self.assertFalse(
-            Cart.objects.filter(id=self.old_empty_cart.id).exists()
-        )
+        assert not Cart.objects.filter(id=old_empty_cart.id).exists()
 
-        self.assertTrue(
-            Cart.objects.filter(id=self.recent_empty_cart.id).exists()
-        )
+        assert Cart.objects.filter(id=recent_empty_cart.id).exists()
 
-        self.assertTrue(Cart.objects.filter(id=self.user_cart.id).exists())
+        assert Cart.objects.filter(id=user_cart.id).exists()
 
-        self.assertTrue(
-            Cart.objects.filter(id=self.old_cart_with_items.id).exists()
-        )
+        assert Cart.objects.filter(id=old_cart_with_items.id).exists()
 
-    def test_cleanup_abandoned_carts_no_carts_to_delete(self):
+    def test_cleanup_abandoned_carts_no_carts_to_delete(self, db):
         Cart.objects.filter(
             user=None,
             items__isnull=True,
@@ -277,56 +268,55 @@ class TestCleanupAbandonedCartsTask(TestCase):
 
         result = cleanup_abandoned_carts()
 
-        self.assertEqual(result, 0)
+        assert result == 0
 
 
-@pytest.mark.django_db
-class TestCleanupOldGuestCartsTask(TestCase):
-    def setUp(self):
-        self.user = UserAccountFactory()
-        self.user_cart = Cart.objects.create(user=self.user)
+@pytest.mark.django_db(transaction=True)
+class TestCleanupOldGuestCartsTask:
+    def test_cleanup_old_guest_carts_removes_old_carts(self, db):
+        user = UserAccountFactory()
+        user_cart = Cart.objects.create(user=user)
 
-        self.very_old_cart = Cart.objects.create(user=None)
-        Cart.objects.filter(id=self.very_old_cart.id).update(
+        very_old_cart = Cart.objects.create(user=None)
+        Cart.objects.filter(id=very_old_cart.id).update(
             last_activity=timezone.now() - timedelta(days=35)
         )
-        self.very_old_cart.refresh_from_db()
+        very_old_cart.refresh_from_db()
 
-        self.recent_cart = Cart.objects.create(user=None)
-        Cart.objects.filter(id=self.recent_cart.id).update(
+        recent_cart = Cart.objects.create(user=None)
+        Cart.objects.filter(id=recent_cart.id).update(
             last_activity=timezone.now() - timedelta(days=15)
         )
-        self.recent_cart.refresh_from_db()
+        recent_cart.refresh_from_db()
 
-    def test_cleanup_old_guest_carts_removes_old_carts(self):
         result = cleanup_old_guest_carts()
 
-        self.assertEqual(result, 1)
+        assert result == 1
 
-        self.assertFalse(Cart.objects.filter(id=self.very_old_cart.id).exists())
+        assert not Cart.objects.filter(id=very_old_cart.id).exists()
 
-        self.assertTrue(Cart.objects.filter(id=self.recent_cart.id).exists())
+        assert Cart.objects.filter(id=recent_cart.id).exists()
 
-        self.assertTrue(Cart.objects.filter(id=self.user_cart.id).exists())
+        assert Cart.objects.filter(id=user_cart.id).exists()
 
-    def test_cleanup_old_guest_carts_no_carts_to_delete(self):
+    def test_cleanup_old_guest_carts_no_carts_to_delete(self, db):
         Cart.objects.filter(
             user=None, last_activity__lt=timezone.now() - timedelta(days=30)
         ).delete()
 
         result = cleanup_old_guest_carts()
 
-        self.assertEqual(result, 0)
+        assert result == 0
 
 
 @pytest.mark.django_db
-class TestClearLogFilesTask(TestCase):
-    def setUp(self):
+class TestClearLogFilesTask:
+    @pytest.fixture(autouse=True)
+    def setup_teardown(self):
         self.temp_dir = tempfile.mkdtemp()
         self.logs_path = os.path.join(self.temp_dir, "logs")
         os.makedirs(self.logs_path)
-
-    def tearDown(self):
+        yield
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     @override_settings(BASE_DIR=Path(__file__).parent)
@@ -391,8 +381,8 @@ class TestClearLogFilesTask(TestCase):
 
         result = clear_development_log_files_task(days=30)
 
-        self.assertEqual(result["status"], "success")
-        self.assertIn("deleted_count", result)
+        assert result["status"] == "success"
+        assert "deleted_count" in result
         mock_getmtime.assert_called()
 
     @override_settings(BASE_DIR=Path(__file__).parent)
@@ -419,8 +409,8 @@ class TestClearLogFilesTask(TestCase):
 
         result = clear_development_log_files_task()
 
-        self.assertEqual(result["status"], "skipped")
-        self.assertEqual(result["reason"], "logs directory not found")
+        assert result["status"] == "skipped"
+        assert result["reason"] == "logs directory not found"
         mock_logger.warning.assert_called()
 
     @patch("core.tasks.os.getenv")
@@ -434,8 +424,8 @@ class TestClearLogFilesTask(TestCase):
 
         result = clear_development_log_files_task()
 
-        self.assertEqual(result["status"], "skipped")
-        self.assertEqual(result["reason"], "kubernetes environment detected")
+        assert result["status"] == "skipped"
+        assert result["reason"] == "kubernetes environment detected"
 
     @patch("core.tasks.os.getenv")
     @patch("core.tasks.os.path.exists")
@@ -455,8 +445,8 @@ class TestClearLogFilesTask(TestCase):
 
         result = clear_development_log_files_task()
 
-        self.assertEqual(result["status"], "skipped")
-        self.assertEqual(result["reason"], "not in docker environment")
+        assert result["status"] == "skipped"
+        assert result["reason"] == "not in docker environment"
 
     @override_settings(BASE_DIR=Path(__file__).parent)
     @patch("core.tasks.os.getenv")
@@ -482,37 +472,14 @@ class TestClearLogFilesTask(TestCase):
         mock_join.return_value = self.logs_path
         mock_listdir.side_effect = OSError("Permission denied")
 
-        with self.assertRaises(OSError):
+        with pytest.raises(OSError):
             clear_development_log_files_task()
 
         mock_logger.exception.assert_called()
 
 
-@pytest.mark.django_db
-class TestSendInactiveUserNotificationsTask(TestCase):
-    def setUp(self):
-        self.active_user = UserAccountFactory(
-            last_login=timezone.now() - timedelta(days=30),
-            is_active=True,
-            email="active@example.com",
-        )
-        self.inactive_user = UserAccountFactory(
-            last_login=timezone.now() - timedelta(days=70),
-            is_active=True,
-            email="inactive@example.com",
-            first_name="John",
-        )
-        self.very_old_user = UserAccountFactory(
-            last_login=timezone.now() - timedelta(days=100),
-            is_active=True,
-            email="old@example.com",
-        )
-        self.inactive_no_email = UserAccountFactory(
-            last_login=timezone.now() - timedelta(days=70),
-            is_active=True,
-            email="",
-        )
-
+@pytest.mark.django_db(transaction=True)
+class TestSendInactiveUserNotificationsTask:
     @patch("core.tasks.send_mail")
     @patch("core.tasks.render_to_string")
     @patch("core.tasks.logger")
@@ -521,29 +488,63 @@ class TestSendInactiveUserNotificationsTask(TestCase):
         DEFAULT_FROM_EMAIL="noreply@example.com",
     )
     def test_send_inactive_user_notifications_success(
-        self, mock_logger, mock_render, mock_send_mail
+        self, mock_logger, mock_render, mock_send_mail, db
     ):
+        UserAccountFactory(
+            last_login=timezone.now() - timedelta(days=30),
+            is_active=True,
+            email="active@example.com",
+        )
+        UserAccountFactory(
+            last_login=timezone.now() - timedelta(days=70),
+            is_active=True,
+            email="inactive@example.com",
+            first_name="John",
+        )
+        UserAccountFactory(
+            last_login=timezone.now() - timedelta(days=100),
+            is_active=True,
+            email="old@example.com",
+        )
+        UserAccountFactory(
+            last_login=timezone.now() - timedelta(days=70),
+            is_active=True,
+            email="",
+        )
+
         mock_render.return_value = "<html>Test email</html>"
 
         result = send_inactive_user_notifications()
 
-        self.assertEqual(result["status"], "completed")
-        self.assertEqual(result["total_users"], 2)
-        self.assertEqual(result["emails_sent"], 2)
-        self.assertEqual(result["failed"], 0)
+        assert result["status"] == "completed"
+        assert result["total_users"] == 2
+        assert result["emails_sent"] == 2
+        assert result["failed"] == 0
 
-        self.assertEqual(mock_send_mail.call_count, 2)
+        assert mock_send_mail.call_count == 2
 
         call_args = mock_send_mail.call_args_list[0][1]
-        self.assertIn("We miss you!", call_args["subject"])
-        self.assertEqual(call_args["from_email"], "noreply@example.com")
+        assert "We miss you!" in call_args["subject"]
+        assert call_args["from_email"] == "noreply@example.com"
 
     @patch("core.tasks.send_mail")
     @patch("core.tasks.render_to_string")
     @patch("core.tasks.logger")
     def test_send_inactive_user_notifications_with_failures(
-        self, mock_logger, mock_render, mock_send_mail
+        self, mock_logger, mock_render, mock_send_mail, db
     ):
+        UserAccountFactory(
+            last_login=timezone.now() - timedelta(days=70),
+            is_active=True,
+            email="inactive@example.com",
+            first_name="John",
+        )
+        UserAccountFactory(
+            last_login=timezone.now() - timedelta(days=100),
+            is_active=True,
+            email="old@example.com",
+        )
+
         mock_render.return_value = "<html>Test email</html>"
         mock_send_mail.side_effect = [
             Exception("SMTP error"),
@@ -552,17 +553,17 @@ class TestSendInactiveUserNotificationsTask(TestCase):
 
         result = send_inactive_user_notifications()
 
-        self.assertEqual(result["status"], "completed")
-        self.assertEqual(result["total_users"], 2)
-        self.assertEqual(result["emails_sent"], 1)
-        self.assertEqual(result["failed"], 1)
-        self.assertEqual(len(result["failed_details"]), 1)
+        assert result["status"] == "completed"
+        assert result["total_users"] == 2
+        assert result["emails_sent"] == 1
+        assert result["failed"] == 1
+        assert len(result["failed_details"]) == 1
 
     @patch("core.tasks.send_mail")
     @patch("core.tasks.render_to_string")
     @patch("core.tasks.logger")
     def test_send_inactive_user_notifications_too_many_failures(
-        self, mock_logger, mock_render, mock_send_mail
+        self, mock_logger, mock_render, mock_send_mail, db
     ):
         mock_render.return_value = "<html>Test email</html>"
         mock_send_mail.side_effect = Exception("SMTP error")
@@ -576,15 +577,15 @@ class TestSendInactiveUserNotificationsTask(TestCase):
 
         result = send_inactive_user_notifications()
 
-        self.assertEqual(result["emails_sent"], 0)
-        self.assertEqual(len(result["failed_details"]), 10)
+        assert result["emails_sent"] == 0
+        assert len(result["failed_details"]) == 10
         mock_logger.error.assert_any_call(
             "Too many email failures, stopping task"
         )
 
 
 @pytest.mark.django_db
-class TestMonitorSystemHealthTask(TestCase):
+class TestMonitorSystemHealthTask:
     @patch("core.tasks.connections")
     @patch("core.tasks.cache")
     @patch("core.tasks.open", new_callable=mock_open)
@@ -602,11 +603,11 @@ class TestMonitorSystemHealthTask(TestCase):
 
         result = monitor_system_health()
 
-        self.assertEqual(result["status"], "healthy")
-        self.assertTrue(result["checks"]["database"])
-        self.assertTrue(result["checks"]["cache"])
-        self.assertTrue(result["checks"]["storage"])
-        self.assertEqual(len(result["errors"]), 0)
+        assert result["status"] == "healthy"
+        assert result["checks"]["database"] is True
+        assert result["checks"]["cache"] is True
+        assert result["checks"]["storage"] is True
+        assert len(result["errors"]) == 0
 
     @patch("core.tasks.connections")
     @patch("core.tasks.cache")
@@ -633,17 +634,14 @@ class TestMonitorSystemHealthTask(TestCase):
         mock_cache.set.return_value = None
         mock_cache.get.return_value = "ok"
 
-        with self.assertRaises(
-            Exception,
-            msg="Critical system health check failed",
+        with pytest.raises(
+            Exception, match="Critical system health check failed"
         ):
             monitor_system_health()
 
         mock_send_mail.assert_called_once()
         call_args = mock_send_mail.call_args[1]
-        self.assertIn(
-            "CRITICAL: System Health Check Failed", call_args["subject"]
-        )
+        assert "CRITICAL: System Health Check Failed" in call_args["subject"]
 
     @patch("core.tasks.connections")
     @patch("core.tasks.cache")
@@ -661,11 +659,11 @@ class TestMonitorSystemHealthTask(TestCase):
 
         result = monitor_system_health()
 
-        self.assertEqual(result["status"], "degraded")
-        self.assertTrue(result["checks"]["database"])
-        self.assertFalse(result["checks"]["cache"])
-        self.assertTrue(result["checks"]["storage"])
-        self.assertGreater(len(result["errors"]), 0)
+        assert result["status"] == "degraded"
+        assert result["checks"]["database"] is True
+        assert result["checks"]["cache"] is False
+        assert result["checks"]["storage"] is True
+        assert len(result["errors"]) > 0
 
     @patch("core.tasks.connections")
     @patch("core.tasks.cache")
@@ -686,14 +684,14 @@ class TestMonitorSystemHealthTask(TestCase):
         with patch("core.tasks.open", mock_open_obj):
             result = monitor_system_health()
 
-        self.assertEqual(result["status"], "degraded")
-        self.assertTrue(result["checks"]["database"])
-        self.assertTrue(result["checks"]["cache"])
-        self.assertFalse(result["checks"]["storage"])
+        assert result["status"] == "degraded"
+        assert result["checks"]["database"] is True
+        assert result["checks"]["cache"] is True
+        assert result["checks"]["storage"] is False
 
 
 @pytest.mark.django_db
-class TestBackupDatabaseTask(TestCase):
+class TestBackupDatabaseTask:
     @patch("core.tasks.management.call_command")
     @patch("core.tasks.Path")
     @patch("core.tasks.logger")
@@ -718,10 +716,10 @@ class TestBackupDatabaseTask(TestCase):
             format_type="custom",
         )
 
-        self.assertEqual(result["status"], "success")
-        self.assertEqual(result["file_size"], 1024000)
-        self.assertIn(
-            "Database backup completed successfully", result["result_message"]
+        assert result["status"] == "success"
+        assert result["file_size"] == 1024000
+        assert (
+            "Database backup completed successfully" in result["result_message"]
         )
 
         mock_call_command.assert_called_once_with(
@@ -744,9 +742,9 @@ class TestBackupDatabaseTask(TestCase):
 
         result = backup_database_task()
 
-        self.assertEqual(result["status"], "error")
-        self.assertEqual(result["error_type"], "CommandError")
-        self.assertIn("Backup failed", result["result_message"])
+        assert result["status"] == "error"
+        assert result["error_type"] == "CommandError"
+        assert "Backup failed" in result["result_message"]
 
     @patch("core.tasks.management.call_command")
     @patch("core.tasks.Path")
@@ -761,13 +759,13 @@ class TestBackupDatabaseTask(TestCase):
 
         result = backup_database_task()
 
-        self.assertEqual(result["status"], "success")
-        self.assertEqual(result["file_size"], 0)
-        self.assertIsNone(result["backup_file"])
+        assert result["status"] == "success"
+        assert result["file_size"] == 0
+        assert result["backup_file"] is None
 
 
 @pytest.mark.django_db
-class TestScheduledDatabaseBackupTask(TestCase):
+class TestScheduledDatabaseBackupTask:
     @patch("core.tasks.backup_database_task")
     @patch("core.tasks.cleanup_old_backups")
     @patch("core.tasks.logger")
@@ -783,7 +781,7 @@ class TestScheduledDatabaseBackupTask(TestCase):
 
         result = scheduled_database_backup()
 
-        self.assertEqual(result["status"], "success")
+        assert result["status"] == "success"
         mock_backup.apply.assert_called_once()
         mock_cleanup.delay.assert_called_once_with(
             days=7, backup_dir="backups/scheduled"
@@ -802,14 +800,12 @@ class TestScheduledDatabaseBackupTask(TestCase):
         mock_result.result = {"status": "error", "message": "Backup failed"}
         mock_backup.apply.return_value = mock_result
 
-        with self.assertRaises(Exception):
+        with pytest.raises(Exception):
             scheduled_database_backup()
 
         mock_send_mail.assert_called_once()
         call_args = mock_send_mail.call_args[1]
-        self.assertIn(
-            "ALERT: Scheduled Database Backup Failed", call_args["subject"]
-        )
+        assert "ALERT: Scheduled Database Backup Failed" in call_args["subject"]
 
     @patch("core.tasks.backup_database_task")
     @patch("core.tasks.send_mail")
@@ -823,7 +819,7 @@ class TestScheduledDatabaseBackupTask(TestCase):
 
         mock_send_mail.side_effect = Exception("Email error")
 
-        with self.assertRaises(Exception):
+        with pytest.raises(Exception):
             scheduled_database_backup()
 
         mock_logger.error.assert_any_call(
@@ -832,7 +828,7 @@ class TestScheduledDatabaseBackupTask(TestCase):
 
 
 @pytest.mark.django_db
-class TestCleanupOldBackupsTask(TestCase):
+class TestCleanupOldBackupsTask:
     @patch("core.tasks.Path")
     @patch("core.tasks.logger")
     @override_settings(BASE_DIR="/test/base")
@@ -860,9 +856,9 @@ class TestCleanupOldBackupsTask(TestCase):
 
         result = cleanup_old_backups(days=30, backup_dir="backups")
 
-        self.assertEqual(result["status"], "success")
-        self.assertEqual(result["deleted_count"], 1)
-        self.assertEqual(result["total_size_freed"], 1024)
+        assert result["status"] == "success"
+        assert result["deleted_count"] == 1
+        assert result["total_size_freed"] == 1024
         old_file.unlink.assert_called_once()
         recent_file.unlink.assert_not_called()
 
@@ -876,8 +872,8 @@ class TestCleanupOldBackupsTask(TestCase):
 
         result = cleanup_old_backups()
 
-        self.assertEqual(result["status"], "skipped")
-        self.assertEqual(result["reason"], "backup directory not found")
+        assert result["status"] == "skipped"
+        assert result["reason"] == "backup directory not found"
         mock_logger.warning.assert_called()
 
     @patch("core.tasks.Path")
@@ -897,12 +893,13 @@ class TestCleanupOldBackupsTask(TestCase):
 
         result = cleanup_old_backups()
 
-        self.assertEqual(result["status"], "success")
-        self.assertEqual(result["deleted_count"], 0)
+        assert result["status"] == "success"
+        assert result["deleted_count"] == 0
         mock_logger.error.assert_called()
 
 
-class TestValidateTaskConfiguration(TestCase):
+@pytest.mark.django_db
+class TestValidateTaskConfiguration:
     @override_settings(
         DEFAULT_FROM_EMAIL="test@example.com",
         ADMIN_EMAIL="admin@example.com",
@@ -924,35 +921,33 @@ class TestValidateTaskConfiguration(TestCase):
         if hasattr(settings, "ADMIN_EMAIL"):
             del settings.ADMIN_EMAIL
 
-        with self.assertRaises(ImproperlyConfigured) as cm:
+        with pytest.raises(
+            ImproperlyConfigured, match="Missing required settings"
+        ):
             validate_task_configuration()
 
-        self.assertIn("Missing required settings", str(cm.exception))
 
-
-@pytest.mark.django_db
-class TestTaskIntegration(TestCase):
-    def setUp(self):
-        self.user = UserAccountFactory()
-        self.cart = Cart.objects.create(user=None)
-
+@pytest.mark.django_db(transaction=True)
+class TestTaskIntegration:
     @patch("core.tasks.management.call_command")
-    def test_multiple_cleanup_tasks_workflow(self, mock_call_command):
+    def test_multiple_cleanup_tasks_workflow(self, mock_call_command, db):
+        cart = Cart.objects.create(user=None)
+
         session_result = clear_expired_sessions_task()
         cache_result = clear_all_cache_task()
 
-        Cart.objects.filter(id=self.cart.id).update(
+        Cart.objects.filter(id=cart.id).update(
             last_activity=timezone.now() - timedelta(days=10)
         )
         cart_result = cleanup_abandoned_carts()
 
-        self.assertEqual(session_result["status"], "success")
-        self.assertEqual(cache_result["status"], "success")
-        self.assertEqual(cart_result, 1)
+        assert session_result["status"] == "success"
+        assert cache_result["status"] == "success"
+        assert cart_result == 1
 
-        self.assertFalse(Cart.objects.filter(user=None).exists())
+        assert not Cart.objects.filter(user=None).exists()
 
         expected_calls = ["clearsessions", "clear_cache"]
         actual_calls = [call[0][0] for call in mock_call_command.call_args_list]
         for expected_call in expected_calls:
-            self.assertIn(expected_call, actual_calls)
+            assert expected_call in actual_calls

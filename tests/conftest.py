@@ -8,6 +8,7 @@ settings.PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.MD5PasswordHasher",
 ]
 
+settings.DISABLE_CACHE = True
 settings.MEILI_OFFLINE = True
 
 settings.DATABASES["default"]["ATOMIC_REQUESTS"] = False
@@ -45,7 +46,12 @@ def debug_query_count():
 
 @pytest.fixture(autouse=True)
 def _django_clear_cache():
-    cache.clear()
+    try:
+        cache.clear()
+    except Exception as e:
+        # Ignore cache errors in tests (e.g., Redis not available)
+        print(f"Failed to clear cache: {e}")
+        pass
 
 
 @pytest.fixture

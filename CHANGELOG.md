@@ -3,6 +3,12 @@
 
 
 
+## v1.53.1 (2025-11-24)
+
+### Bug fixes
+
+* fix: remove useless stuff ([`5bd58a5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5bd58a55aa60b54a4409fff1635f63ba5de6a7ac))
+
 ## v1.53.0 (2025-11-23)
 
 ### Bug fixes

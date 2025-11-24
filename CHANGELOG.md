@@ -3,6 +3,16 @@
 
 
 
+## v1.54.0 (2025-11-24)
+
+### Bug fixes
+
+* fix: tasks ([`6088b14`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6088b14b90d3df2892090af559a9d606d437831c))
+
+### Features
+
+* feat: celery improvements ([`1b7441b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1b7441b0138bd69c001c565cbc1aa1ef20796bc2))
+
 ## v1.53.1 (2025-11-24)
 
 ### Bug fixes

@@ -46,20 +46,23 @@ def send_subscription_confirmation(
         context = {
             "user": subscription.user,
             "topic": subscription.topic,
+            "subscription": subscription,
             "confirmation_url": confirmation_url.format(
                 token=subscription.confirmation_token
             ),
-            "site_name": getattr(settings, "SITE_NAME", "Our Site"),
-            "support_email": getattr(
-                settings, "SUPPORT_EMAIL", "support@example.com"
+            "SITE_NAME": getattr(settings, "SITE_NAME", "Website"),
+            "SITE_URL": getattr(settings, "SITE_URL", ""),
+            "INFO_EMAIL": getattr(
+                settings, "INFO_EMAIL", settings.DEFAULT_FROM_EMAIL
             ),
+            "STATIC_BASE_URL": getattr(settings, "STATIC_BASE_URL", ""),
+            "LANGUAGE_CODE": getattr(settings, "LANGUAGE_CODE", "el"),
         }
 
         subject = _("Confirm your subscription to {topic}").format(
             topic=subscription.topic.name
         )
 
-        # @TODO: create email template
         html_message = render_to_string(
             "emails/subscription/confirmation.html", context
         )

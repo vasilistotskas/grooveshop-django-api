@@ -1,36 +1,37 @@
-SUBSCRIPTION CONFIRMED
+{% load i18n %}{% trans "SUBSCRIPTION CONFIRMED" %}
 {{ SITE_NAME }}
 ================================================================================
 
-Hi {{ user.first_name|default:user.username }},
+{% blocktrans with first_name=user.first_name|default:user.username %}Hi {{ first_name }},{% endblocktrans %}
 
-Your subscription has been successfully activated! We're excited to have you on board.
+{% blocktrans with topic_name=topic.name %}Your subscription to {{ topic_name }} has been successfully confirmed! We're excited to have you on board.{% endblocktrans %}
 
-SUBSCRIPTION DETAILS
+{% trans "SUBSCRIPTION DETAILS" %}
 --------------------------------------------------------------------------------
-Plan:           {{ subscription.plan }}
-Status:         {{ subscription.status|title }}
-Billing Cycle:  {{ subscription.billing_cycle|title }}
-Amount:         {{ subscription.amount }}
-Start Date:     {{ subscription.start_date|date:"F d, Y" }}
+{% trans "Topic" %}:           {{ topic.name }}
+{% trans "Category" %}:        {{ topic.get_category_display }}
+{% trans "Status" %}:          {% trans "Active" %}
+{% trans "Subscribed On" %}:   {{ subscription.subscribed_at|date:"SHORT_DATE_FORMAT" }}
 
-WHAT'S NEXT?
+{% if topic.description %}
+{% trans "WHAT YOU'LL RECEIVE" %}
 --------------------------------------------------------------------------------
-- You now have full access to all {{ subscription.plan }} features
-- Your subscription will automatically renew {{ subscription.billing_cycle }}
-- You can manage your subscription anytime from your account settings
-- We'll send you a reminder before your next billing date
+{{ topic.description }}
+{% endif %}
 
-MANAGE YOUR SUBSCRIPTION
+{% trans "WHAT'S NEXT?" %}
 --------------------------------------------------------------------------------
-Visit: {{ app_base_url }}/account/subscription
+{% trans "You'll start receiving updates based on your subscription preferences. You can manage your subscriptions anytime from your account settings." %}
 
-NEED HELP?
+{% trans "MANAGE YOUR SUBSCRIPTIONS" %}
 --------------------------------------------------------------------------------
-Contact our support team at {{ INFO_EMAIL }}
+{% trans "Visit" %}: {{ SITE_URL }}/account/subscriptions
 
-Thank you for choosing {{ SITE_NAME }}!
-We're here to help you get the most out of your subscription.
+{% trans "UNSUBSCRIBE" %}
+--------------------------------------------------------------------------------
+{% trans "If you didn't request this subscription or want to unsubscribe, you can do so at any time from your account settings." %}
+
+{% blocktrans with site_name=SITE_NAME %}Thank you for staying connected with {{ site_name }}!{% endblocktrans %}
 
 ================================================================================
 {{ SITE_NAME }} - {{ SITE_URL }}

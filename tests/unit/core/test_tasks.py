@@ -249,7 +249,8 @@ class TestCleanupAbandonedCartsTask:
 
         result = cleanup_abandoned_carts()
 
-        assert result == 1
+        assert result["status"] == "success"
+        assert result["deleted_count"] == 1
 
         assert not Cart.objects.filter(id=old_empty_cart.id).exists()
 
@@ -268,7 +269,8 @@ class TestCleanupAbandonedCartsTask:
 
         result = cleanup_abandoned_carts()
 
-        assert result == 0
+        assert result["status"] == "success"
+        assert result["deleted_count"] == 0
 
 
 @pytest.mark.django_db(transaction=True)
@@ -291,7 +293,8 @@ class TestCleanupOldGuestCartsTask:
 
         result = cleanup_old_guest_carts()
 
-        assert result == 1
+        assert result["status"] == "success"
+        assert result["deleted_count"] == 1
 
         assert not Cart.objects.filter(id=very_old_cart.id).exists()
 
@@ -306,7 +309,8 @@ class TestCleanupOldGuestCartsTask:
 
         result = cleanup_old_guest_carts()
 
-        assert result == 0
+        assert result["status"] == "success"
+        assert result["deleted_count"] == 0
 
 
 @pytest.mark.django_db
@@ -852,7 +856,12 @@ class TestCleanupOldBackupsTask:
         ).timestamp()
 
         mock_backup_dir.iterdir.return_value = [old_file, recent_file]
-        mock_path.return_value.__truediv__.return_value = mock_backup_dir
+
+        # Mock Path() to handle is_absolute() and division operator
+        mock_path_instance = Mock()
+        mock_path_instance.is_absolute.return_value = False
+        mock_path_instance.__truediv__ = Mock(return_value=mock_backup_dir)
+        mock_path.return_value = mock_path_instance
 
         result = cleanup_old_backups(days=30, backup_dir="backups")
 
@@ -868,7 +877,12 @@ class TestCleanupOldBackupsTask:
     def test_cleanup_old_backups_no_directory(self, mock_logger, mock_path):
         mock_backup_dir = Mock()
         mock_backup_dir.exists.return_value = False
-        mock_path.return_value.__truediv__.return_value = mock_backup_dir
+
+        # Mock Path() to handle is_absolute() and division operator
+        mock_path_instance = Mock()
+        mock_path_instance.is_absolute.return_value = False
+        mock_path_instance.__truediv__ = Mock(return_value=mock_backup_dir)
+        mock_path.return_value = mock_path_instance
 
         result = cleanup_old_backups()
 
@@ -889,7 +903,12 @@ class TestCleanupOldBackupsTask:
         error_file.stat.side_effect = OSError("Permission denied")
 
         mock_backup_dir.iterdir.return_value = [error_file]
-        mock_path.return_value.__truediv__.return_value = mock_backup_dir
+
+        # Mock Path() to handle is_absolute() and division operator
+        mock_path_instance = Mock()
+        mock_path_instance.is_absolute.return_value = False
+        mock_path_instance.__truediv__ = Mock(return_value=mock_backup_dir)
+        mock_path.return_value = mock_path_instance
 
         result = cleanup_old_backups()
 
@@ -943,7 +962,8 @@ class TestTaskIntegration:
 
         assert session_result["status"] == "success"
         assert cache_result["status"] == "success"
-        assert cart_result == 1
+        assert cart_result["status"] == "success"
+        assert cart_result["deleted_count"] == 1
 
         assert not Cart.objects.filter(user=None).exists()
 

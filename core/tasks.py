@@ -237,21 +237,33 @@ def clear_expired_notifications_task(days=365):
     retry_backoff=True,
 )
 def cleanup_abandoned_carts():
-    cutoff_date = timezone.now() - timedelta(days=7)
+    try:
+        cutoff_date = timezone.now() - timedelta(days=7)
 
-    with transaction.atomic():
-        count, _ = Cart.objects.filter(
-            user__isnull=True,
-            items__isnull=True,
-            last_activity__lt=cutoff_date,
-        ).delete()
+        with transaction.atomic():
+            count, _ = Cart.objects.filter(
+                user__isnull=True,
+                items__isnull=True,
+                last_activity__lt=cutoff_date,
+            ).delete()
 
-    if count > 0:
-        logger.info(f"Cleaned up {count} abandoned empty guest carts")
-    else:
-        logger.info("No abandoned carts to clean up")
+        message = (
+            f"Cleaned up {count} abandoned empty guest carts"
+            if count > 0
+            else "No abandoned carts to clean up"
+        )
+        logger.info(message)
 
-    return count
+        return {
+            "status": "success",
+            "message": message,
+            "deleted_count": count,
+            "cutoff_date": cutoff_date.isoformat(),
+            "timestamp": timezone.now().isoformat(),
+        }
+    except Exception:
+        logger.exception("Error cleaning up abandoned carts")
+        raise
 
 
 @celery_app.task(
@@ -261,19 +273,31 @@ def cleanup_abandoned_carts():
     retry_backoff=True,
 )
 def cleanup_old_guest_carts():
-    cutoff_date = timezone.now() - timedelta(days=30)
+    try:
+        cutoff_date = timezone.now() - timedelta(days=30)
 
-    count, _ = Cart.objects.filter(
-        user__isnull=True,
-        last_activity__lt=cutoff_date,
-    ).delete()
+        count, _ = Cart.objects.filter(
+            user__isnull=True,
+            last_activity__lt=cutoff_date,
+        ).delete()
 
-    if count > 0:
-        logger.info(f"Cleaned up {count} old guest carts (30+ days inactive)")
-    else:
-        logger.info("No old guest carts to clean up")
+        message = (
+            f"Cleaned up {count} old guest carts (30+ days inactive)"
+            if count > 0
+            else "No old guest carts to clean up"
+        )
+        logger.info(message)
 
-    return count
+        return {
+            "status": "success",
+            "message": message,
+            "deleted_count": count,
+            "cutoff_date": cutoff_date.isoformat(),
+            "timestamp": timezone.now().isoformat(),
+        }
+    except Exception:
+        logger.exception("Error cleaning up old guest carts")
+        raise
 
 
 @celery_app.task(
@@ -510,14 +534,13 @@ def monitor_system_health():
         test_file_path = os.path.join(settings.MEDIA_ROOT, ".health_check")
         with open(test_file_path, "w") as f:
             f.write("ok")
-
         os.remove(test_file_path)
         health_checks["storage"] = True
         logger.debug("Storage health check passed")
 
     except Exception as e:
         error_msg = f"Storage health check failed: {e}"
-        logger.error(error_msg)
+        logger.warning(error_msg)
         errors.append(error_msg)
 
     all_passed = all(health_checks.values())
@@ -696,7 +719,17 @@ def scheduled_database_backup():
                 extra=safe_logging_extra,
             )
 
-            cleanup_old_backups.delay(days=7, backup_dir="backups/scheduled")
+            # Extract the actual backup directory from the result
+            backup_file = result.result.get("backup_file")
+            if backup_file:
+                logger.info(f"Backup file: {backup_file}")
+                actual_backup_dir = str(Path(backup_file).parent)
+                cleanup_old_backups.delay(days=7, backup_dir=actual_backup_dir)
+            else:
+                # Fallback to relative path
+                cleanup_old_backups.delay(
+                    days=7, backup_dir="backups/scheduled"
+                )
 
             return result.result
         else:
@@ -732,7 +765,11 @@ def scheduled_database_backup():
 )
 def cleanup_old_backups(days=30, backup_dir="backups"):
     try:
-        backup_path = Path(settings.BASE_DIR) / backup_dir
+        # Handle both relative and absolute paths
+        if Path(backup_dir).is_absolute():
+            backup_path = Path(backup_dir)
+        else:
+            backup_path = Path(settings.BASE_DIR) / backup_dir
 
         if not backup_path.exists():
             logger.warning(f"Backup directory does not exist: {backup_path}")
@@ -841,7 +878,7 @@ def sync_meilisearch_indexes():
     Scheduled to run daily at 2 AM.
     """
     logger.info("Starting Meilisearch index synchronization")
-    
+
     try:
         management.call_command("meilisearch_sync_all_indexes")
         logger.info("Meilisearch index synchronization completed successfully")
@@ -856,6 +893,6 @@ def sync_meilisearch_indexes():
     except management.CommandError as e:
         logger.error(f"Django command error in sync_meilisearch_indexes: {e}")
         raise
-    except Exception as e:
+    except Exception:
         logger.exception("Unexpected error in sync_meilisearch_indexes")
         raise

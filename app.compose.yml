@@ -85,7 +85,8 @@ services:
       uv --no-cache run celery
       --app core
       worker
-      --max-memory-per-child=200000
+      --max-tasks-per-child=50
+      --max-memory-per-child=250000
       --queues celery
       --pool=prefork
       --loglevel=debug

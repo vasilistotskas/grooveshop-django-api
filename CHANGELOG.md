@@ -3,6 +3,12 @@
 
 
 
+## v1.56.2 (2025-11-25)
+
+### Bug fixes
+
+* fix: tailwind ([`62088c3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/62088c3d1a2d19c6f05e0009d9b6b5e8b9a12177))
+
 ## v1.56.1 (2025-11-25)
 
 ### Bug fixes

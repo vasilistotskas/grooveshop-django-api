@@ -1,34 +1,96 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Weekly Newsletter</title>
-</head>
-<body>
-    <h1>Hello {{ user.first_name|default:user.username }}!</h1>
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
 
-    <h2>This Week's Highlights</h2>
-    <p>From {{ week_start|date:"M d" }} to {{ week_end|date:"M d, Y" }}</p>
+{% block email_title %}{% trans "Weekly Newsletter" %} - {{ SITE_NAME }}{% endblock %}
 
-    {% if featured_articles %}
-    <h3>Featured Articles</h3>
-    <ul>
-    {% for article in featured_articles %}
-        <li>
-            <a href="{{ article.url }}">{{ article.title }}</a>
-            <p>{{ article.summary }}</p>
-        </li>
-    {% endfor %}
-    </ul>
-    {% endif %}
-
-    <hr>
-
-    <p style="font-size: 12px; color: #666;">
-        You're receiving this because you're subscribed to our weekly newsletter.
-        <br>
-        <a href="{{ unsubscribe_url }}">Unsubscribe</a> |
-        <a href="{{ preferences_url }}">Manage Preferences</a>
+{% block email_content %}
+<div style="background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%); padding: 32px 24px; text-align: center; border-radius: 8px; margin-bottom: 24px;">
+    <h2 style="color: white; font-size: 28px; margin: 0 0 12px 0;">{% trans "This Week's Highlights" %}</h2>
+    <p style="color: white; font-size: 16px; margin: 0;">
+        {% blocktrans with start=week_start|date:"SHORT_DATE_FORMAT" end=week_end|date:"SHORT_DATE_FORMAT" %}From {{ start }} to {{ end }}{% endblocktrans %}
     </p>
-</body>
-</html>
+</div>
+
+<h1>{% blocktrans with name=user.first_name|default:user.username %}Hello {{ name }}!{% endblocktrans %}</h1>
+
+<p>{% blocktrans with site_name=SITE_NAME %}Welcome to your weekly newsletter from {{ site_name }}. Here's what's been happening:{% endblocktrans %}</p>
+
+{% if featured_products %}
+<div class="email-card">
+    <h3>{% trans "Featured Products" %}</h3>
+    <table class="email-table">
+        <thead>
+            <tr>
+                <th>{% trans "Product" %}</th>
+                <th>{% trans "Price" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for product in featured_products %}
+            <tr>
+                <td>
+                    <a href="{{ SITE_URL }}/product/{{ product.slug }}" style="color: #2563eb; text-decoration: none;">
+                        {{ product.name }}
+                    </a>
+                </td>
+                <td>{{ product.price }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+{% if featured_articles %}
+<div class="email-card">
+    <h3>{% trans "Featured Articles" %}</h3>
+    {% for article in featured_articles %}
+    <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #e5e7eb;">
+        <h4 style="margin: 0 0 8px 0;">
+            <a href="{{ article.url }}" style="color: #2563eb; text-decoration: none;">{{ article.title }}</a>
+        </h4>
+        <p style="margin: 0; font-size: 14px;">{{ article.summary }}</p>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if promotions %}
+<div class="email-card" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-color: #f59e0b;">
+    <h3 style="color: #92400e;">{% trans "Special Offers" %}</h3>
+    {% for promo in promotions %}
+    <div style="margin-bottom: 12px;">
+        <strong style="color: #92400e;">{{ promo.title }}</strong>
+        <p style="margin: 4px 0 0 0; font-size: 14px; color: #78350f;">{{ promo.description }}</p>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="text-center mt-3 mb-3">
+    <a href="{{ SITE_URL }}" class="email-button">{% trans "Shop Now" %}</a>
+</div>
+
+<p>{% blocktrans with site_name=SITE_NAME %}Thank you for being part of the {{ site_name }} community!{% endblocktrans %}</p>
+{% endblock %}
+
+{% block email_footer %}
+<p class="text-bold">{{ SITE_NAME }}</p>
+<p>
+    {% trans "Questions?" %}
+    <a href="mailto:{{ INFO_EMAIL }}">{% trans "Contact us" %}</a>
+</p>
+<p class="text-muted">
+    &copy; {% now "Y" %} {{ SITE_NAME }}. {% trans "All rights reserved." %}
+</p>
+<div class="social-links">
+    <a href="{{ SITE_URL }}">{% trans "Visit our website" %}</a>
+</div>
+<p class="text-muted mt-2" style="font-size: 12px;">
+    {% trans "You're receiving this because you're subscribed to our newsletter." %}
+</p>
+<p class="text-muted" style="font-size: 12px;">
+    <a href="{{ unsubscribe_url|default:SITE_URL }}">{% trans "Unsubscribe" %}</a> |
+    <a href="{{ preferences_url|default:SITE_URL }}">{% trans "Manage Preferences" %}</a>
+</p>
+{% endblock %}

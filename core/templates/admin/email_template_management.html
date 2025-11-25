@@ -100,8 +100,11 @@
     .template-grid {
         display: grid;
         grid-template-columns: 1fr 2fr;
-        gap: 1.5rem;
+        gap: 0.5rem;
         margin-top: 1.5rem;
+        @media (max-width: 768px) {
+          grid-template-columns: 1fr;
+        }
     }
 
     .template-list {
@@ -109,6 +112,9 @@
         border: 1px solid var(--border-color) !important;
         border-radius: var(--border-radius) !important;
         padding: 1.5rem !important;
+        @media (max-width: 768px) {
+          padding: 0.5rem !important;
+        }
     }
 
     .template-list-header {
@@ -207,7 +213,6 @@
         background: var(--card-bg) !important;
         border: 1px solid var(--border-color) !important;
         border-radius: var(--border-radius) !important;
-        padding: 1.5rem !important;
         overflow: auto !important;
     }
 
@@ -453,8 +458,8 @@
 {% endblock %}
 
 {% block content %}
-<div class="px-6 py-4">
-    <div class="mb-6 flex items-center justify-between">
+<div id="email-template-management">
+    <div class="mb-6 flex flex-col items-center justify-between md:flex-row">
         <div>
             <h1 class="text-2xl font-bold" style="color: var(--text-primary);">{% trans "Email Template Management" %}</h1>
             <p class="mt-2" style="color: var(--text-secondary);">{% trans "Preview and test email templates with sample or real order data" %}</p>
@@ -472,17 +477,17 @@
         <div class="template-list">
             <div class="template-list-header">
                 <h2 class="text-lg font-semibold mb-4">{% trans "Available Templates" %}</h2>
-                
+
                 <!-- Search Input -->
                 <div class="search-container">
                     <div class="search-input-wrapper">
                         <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                         </svg>
-                        <input 
-                            type="text" 
-                            id="template-search" 
-                            class="search-input" 
+                        <input
+                            type="text"
+                            id="template-search"
+                            class="search-input"
                             placeholder="{% trans 'Search templates...' %}"
                             autocomplete="off"
                         />
@@ -538,9 +543,9 @@
 
         <!-- Template Preview -->
         <div class="template-preview">
-            <h2 class="text-lg font-semibold mb-4">{% trans "Template Preview" %}</h2>
+            <h2 class="text-lg font-semibold mb-4 px-2 md:px-4 pt-2">{% trans "Template Preview" %}</h2>
 
-            <div class="preview-controls">
+            <div class="preview-controls px-2 md:px-4">
                 <div class="control-group">
                     <label>{% trans "Language" %}</label>
                     <select id="language-select">
@@ -580,7 +585,7 @@
                 </div>
             </div>
 
-            <div class="format-tabs">
+            <div class="format-tabs px-2 md:px-4">
                 <div class="format-tab active" data-format="html">HTML</div>
                 <div class="format-tab" data-format="text">{% trans "Text" %}</div>
             </div>
@@ -612,7 +617,7 @@
 
     // Order-related template prefixes
     const orderTemplates = ['order_'];
-    
+
     // Check if template is order-related
     function isOrderTemplate(templateName) {
         return orderTemplates.some(prefix => templateName.startsWith(prefix));
@@ -625,7 +630,7 @@
             e.preventDefault();
             const category = this.dataset.category;
             const itemList = document.querySelector(`.template-item-list[data-category="${category}"]`);
-            
+
             // Toggle collapsed state
             this.classList.toggle('collapsed');
             itemList.classList.toggle('collapsed');
@@ -640,7 +645,7 @@
 
     searchInput.addEventListener('input', function() {
         const searchTerm = this.value.toLowerCase().trim();
-        
+
         // Show/hide clear button
         clearSearchBtn.style.display = searchTerm ? 'block' : 'none';
 
@@ -665,13 +670,13 @@
                 item.classList.remove('hidden');
                 item.classList.add('highlight');
                 visibleCount++;
-                
+
                 // Track which category this template belongs to
                 const categoryElement = item.closest('.template-category');
                 if (categoryElement) {
                     matchedCategories.add(categoryElement);
                 }
-                
+
                 // Auto-expand collapsed categories with matches
                 const itemList = item.closest('.template-item-list');
                 if (itemList && itemList.classList.contains('collapsed')) {

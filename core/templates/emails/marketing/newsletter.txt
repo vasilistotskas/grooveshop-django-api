@@ -1,0 +1,45 @@
+{% load i18n %}{% blocktrans with site_name=SITE_NAME %}WEEKLY NEWSLETTER - {{ site_name }}{% endblocktrans %}
+
+{% blocktrans with start=week_start|date:"SHORT_DATE_FORMAT" end=week_end|date:"SHORT_DATE_FORMAT" %}This Week's Highlights: {{ start }} to {{ end }}{% endblocktrans %}
+
+{% blocktrans with name=user.first_name|default:user.username %}Hello {{ name }}!{% endblocktrans %}
+
+{% blocktrans with site_name=SITE_NAME %}Welcome to your weekly newsletter from {{ site_name }}. Here's what's been happening:{% endblocktrans %}
+
+{% if featured_products %}
+{% trans "FEATURED PRODUCTS" %}
+{% for product in featured_products %}
+- {{ product.name }} - {{ product.price }}
+  {{ SITE_URL }}/product/{{ product.slug }}
+{% endfor %}
+{% endif %}
+
+{% if featured_articles %}
+{% trans "FEATURED ARTICLES" %}
+{% for article in featured_articles %}
+- {{ article.title }}
+  {{ article.summary }}
+  {{ article.url }}
+{% endfor %}
+{% endif %}
+
+{% if promotions %}
+{% trans "SPECIAL OFFERS" %}
+{% for promo in promotions %}
+- {{ promo.title }}
+  {{ promo.description }}
+{% endfor %}
+{% endif %}
+
+{% trans "Shop Now" %}: {{ SITE_URL }}
+
+{% blocktrans with site_name=SITE_NAME %}Thank you for being part of the {{ site_name }} community!{% endblocktrans %}
+
+---
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}
+
+{% trans "You're receiving this because you're subscribed to our newsletter." %}
+{% trans "Unsubscribe" %}: {{ unsubscribe_url|default:SITE_URL }}
+{% trans "Manage Preferences" %}: {{ preferences_url|default:SITE_URL }}

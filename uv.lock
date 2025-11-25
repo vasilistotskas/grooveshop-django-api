@@ -95,30 +95,30 @@ wheels = [
 
 [[package]]
 name = "boto3"
-version = "1.41.2"
+version = "1.41.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "botocore" },
     { name = "jmespath" },
     { name = "s3transfer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/fa/81/2600e83ddd7cb1dac43d28fd39774434afcda0d85d730402192b1a9266a3/boto3-1.41.2.tar.gz", hash = "sha256:7054fbc61cadab383f40ea6d725013ba6c8f569641dddb14c0055e790280ad6c", size = 111593, upload-time = "2025-11-21T20:32:08.622Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/90/30/1f1bfb34a97709b5d004d5c16ccac81a73ea6c5ce86ce75eaff0a75aee3f/boto3-1.41.3.tar.gz", hash = "sha256:8a89f3900a356879022c1600f72cbb3d8b85708f094d2d08a461bd193d0b07ca", size = 111614, upload-time = "2025-11-24T20:22:33.007Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/48/41/1ed7fdc3f124c1cf2df78e605588fa78a182410b832f5b71944a69436171/boto3-1.41.2-py3-none-any.whl", hash = "sha256:edcde82fdae4201aa690e3683f8e5b1a846cf1bbf79d03db4fa8a2f6f46dba9c", size = 139343, upload-time = "2025-11-21T20:32:07.147Z" },
+    { url = "https://files.pythonhosted.org/packages/37/d3/56e8c147e369fdc1b5526584f87151ca1742949bf5e6ab7500d926107624/boto3-1.41.3-py3-none-any.whl", hash = "sha256:10a3f5a72e071c362f5aa8443bd949edc31b7494c48a315ccdab14b1c387a1fd", size = 139345, upload-time = "2025-11-24T20:22:30.601Z" },
 ]
 
 [[package]]
 name = "botocore"
-version = "1.41.2"
+version = "1.41.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jmespath" },
     { name = "python-dateutil" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c5/0b/6eb5dc752b240dd0b76d7e3257ae25b70683896d1789e7bfb78fba7c7c99/botocore-1.41.2.tar.gz", hash = "sha256:49a3e8f4c1a1759a687941fef8b36efd7bafcf63c1ef74aa75d6497eb4887c9c", size = 14660558, upload-time = "2025-11-21T20:31:58.785Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/8c/e9/d6207e08f35280cb8755b316f0e0a0cd2e8405d1b849e847c26fb4e3e3a6/botocore-1.41.3.tar.gz", hash = "sha256:1c6ad338f445c9bf02e231bfa302239d60520ec6dd88ded3206b34dca100103c", size = 14658770, upload-time = "2025-11-24T20:22:21.929Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/77/4d/516ee2157c0686fbe48ca8b94dffc17a0c35040d4626761d74b1a43215c8/botocore-1.41.2-py3-none-any.whl", hash = "sha256:154052dfaa7292212f01c8fab822c76cd10a15a7e164e4c45e4634eb40214b90", size = 14324839, upload-time = "2025-11-21T20:31:56.236Z" },
+    { url = "https://files.pythonhosted.org/packages/9f/18/a0597e4491d3a725768162c48a4dd1e1a57323fdb40fca04a34e9a68ef93/botocore-1.41.3-py3-none-any.whl", hash = "sha256:fe2379b30cc726e9e44bf47c3834fe208b85f7eaa57b934ab05f305ca9d05a8b", size = 14328009, upload-time = "2025-11-24T20:22:17.618Z" },
 ]
 
 [[package]]
@@ -717,14 +717,14 @@ wheels = [
 
 [[package]]
 name = "django-phonenumber-field"
-version = "8.3.0"
+version = "8.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cf/65/93e52cdc84803e62be6b2b953ed7b5c7ce21d5ff75e149433c6aaba22c00/django_phonenumber_field-8.3.0.tar.gz", hash = "sha256:193b3acc3b83ff4aad95dd9530a6d01e1c7c1cecbdfa8a56159789bbb85ab0e2", size = 45239, upload-time = "2025-10-06T14:57:01.447Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/87/bf/8aa60c9834773b955dff1ddea842e361e8daaf6b0945d5bfc29fc66d53ab/django_phonenumber_field-8.4.0.tar.gz", hash = "sha256:2b83e843dac35eec6a69880a166487235b737a71a1e38c9a52e5ad67d6996083", size = 45512, upload-time = "2025-11-24T15:09:51.904Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f1/55/fd4a0976805a05402ca04f3938f5d999f3803471a1eef8b65a9e259e5914/django_phonenumber_field-8.3.0-py3-none-any.whl", hash = "sha256:afaf8b16693c8d64646acf7693f5a9c4a809e7f1f9b66a84dabbe04a2d6c1513", size = 69530, upload-time = "2025-10-06T14:57:00.259Z" },
+    { url = "https://files.pythonhosted.org/packages/8b/a3/f6b85a9246e22cf719752ad83f5e95aa9ba12419b2f9eff70f20d30e55df/django_phonenumber_field-8.4.0-py3-none-any.whl", hash = "sha256:7a1cb3a6456edb54d879f11ffa0acb227ded08c93b587035d0f28093f0e46511", size = 69528, upload-time = "2025-11-24T15:09:45.479Z" },
 ]
 
 [[package]]
@@ -832,14 +832,14 @@ wheels = [
 
 [[package]]
 name = "django-unfold"
-version = "0.71.0"
+version = "0.72.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ec/5b/406eae1a429b15ba04f4dfaaf53aa64fb03bcfdc6bdd0753a41027aa3daa/django_unfold-0.71.0.tar.gz", hash = "sha256:995a296f1c15f172b0d8458ff12beb420ea7e9a666fa865a60ec03f70aaf4066", size = 1101347, upload-time = "2025-11-11T16:24:03.289Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/55/e6/045b68207d8b4b395623d39d803e6566ea2c110e56665e3ff6bda07de6aa/django_unfold-0.72.0.tar.gz", hash = "sha256:43a0e8a4383037a24b73666c9f721faef12bd500c4628b4fc39d0dafd2e9c0a2", size = 1102339, upload-time = "2025-11-24T09:03:47.347Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/16/94/ad8ba84410655e0207ffcc7c6cba0875e9f79f914e3f2e2de883f706f7c9/django_unfold-0.71.0-py3-none-any.whl", hash = "sha256:76d4019aa9052ebe2e040d868be895d8581018fdf7debca943084aa0e79c2e31", size = 1213722, upload-time = "2025-11-11T16:24:01.985Z" },
+    { url = "https://files.pythonhosted.org/packages/2d/dd/6cdb80d5d377f2bdf3b39b639025bb8655b96fac08aa3673ae1e4b3e3384/django_unfold-0.72.0-py3-none-any.whl", hash = "sha256:61448ad42ff7a33c7ad66d14071b24224bb476038a14a1bbe719a774db496e34", size = 1215396, upload-time = "2025-11-24T09:03:45.568Z" },
 ]
 
 [[package]]
@@ -1004,7 +1004,7 @@ wheels = [
 
 [[package]]
 name = "grooveshop-django-api"
-version = "1.54.0"
+version = "1.55.0"
 source = { virtual = "." }
 dependencies = [
     { name = "asgiref" },
@@ -1087,7 +1087,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "asgiref", specifier = "==3.11.0" },
-    { name = "boto3", specifier = "==1.41.2" },
+    { name = "boto3", specifier = "==1.41.3" },
     { name = "celery", extras = ["redis"], specifier = ">=5.5.3,<6.0.0" },
     { name = "channels", extras = ["daphne"], specifier = "==4.3.2" },
     { name = "channels-redis", specifier = "==4.3.0" },
@@ -1107,14 +1107,14 @@ requires-dist = [
     { name = "django-mptt", specifier = "==0.18.0" },
     { name = "django-parler", specifier = "==2.3.0" },
     { name = "django-parler-rest", specifier = "==2.2.0" },
-    { name = "django-phonenumber-field", specifier = "==8.3.0" },
+    { name = "django-phonenumber-field", specifier = "==8.4.0" },
     { name = "django-rest-knox", specifier = "==5.0.2" },
     { name = "django-rosetta", specifier = "==0.10.2" },
     { name = "django-simple-history", specifier = "==3.10.1" },
     { name = "django-storages", specifier = "==1.14.6" },
     { name = "django-stubs-ext", specifier = "==5.2.7" },
     { name = "django-tinymce", specifier = "==5.0.0" },
-    { name = "django-unfold", specifier = "==0.71.0" },
+    { name = "django-unfold", specifier = "==0.72.0" },
     { name = "djangorestframework", specifier = "==3.16.1" },
     { name = "djangorestframework-camel-case", specifier = "==1.4.2" },
     { name = "drf-spectacular", specifier = "==0.29.0" },

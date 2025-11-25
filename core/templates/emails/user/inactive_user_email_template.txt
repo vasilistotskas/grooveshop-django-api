@@ -1,0 +1,35 @@
+{% load i18n %}{% blocktrans with site_name=SITE_NAME %}WE MISS YOU! - {{ site_name }}{% endblocktrans %}
+
+{% blocktrans with name=user.first_name|default:user.username %}Hi {{ name }},{% endblocktrans %}
+
+{% trans "We noticed you haven't visited us in a while, and we wanted to reach out because we miss having you around!" %}
+
+{% blocktrans with site_name=SITE_NAME %}A lot has happened since your last visit, and we'd love to have you back to explore all the exciting updates and features we've been working on at {{ site_name }}.{% endblocktrans %}
+
+{% trans "Welcome Back" %}: {{ SITE_URL }}
+
+{% trans "HERE'S WHAT YOU MIGHT HAVE MISSED:" %}
+{% if highlights %}{% for highlight in highlights %}
+✓ {{ highlight }}
+{% endfor %}{% else %}
+✓ {% trans "New and improved user interface" %}
+✓ {% trans "Enhanced performance and faster loading times" %}
+✓ {% trans "Exciting new features based on user feedback" %}
+✓ {% trans "Better mobile experience" %}
+✓ {% trans "Your data and preferences are still safely stored" %}
+{% endif %}
+
+{% trans "Your account is still active and all your data is exactly where you left it. We've been keeping everything safe and ready for your return!" %}
+
+{% trans "If you have any questions or need help getting back into your account, please contact our support team - we're always happy to help." %}
+
+{% trans "Looking forward to seeing you again!" %}
+{% blocktrans with site_name=SITE_NAME %}The {{ site_name }} Team{% endblocktrans %}
+
+---
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}
+
+{% trans "Don't want to receive these emails?" %}
+{% trans "Unsubscribe" %}: {{ SITE_URL }}/unsubscribe?email={{ user.email }}

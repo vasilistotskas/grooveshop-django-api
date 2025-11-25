@@ -1,219 +1,83 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>We Miss You!</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f8f9fa;
-            line-height: 1.6;
-        }
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
 
-        .email-container {
-            max-width: 600px;
-            margin: 0 auto;
-            background-color: #ffffff;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
+{% block email_title %}{% trans "We Miss You!" %} - {{ SITE_NAME }}{% endblock %}
 
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 40px 30px;
-            text-align: center;
-            color: white;
-        }
+{% block email_content %}
+<div style="background: linear-gradient(135deg, #003dff 0%, rgba(0, 61, 255, 0.15) 100%); padding: 32px 24px; text-align: center; border-radius: 8px; margin-bottom: 24px;">
+    <h2 style="color: white; font-size: 28px; margin: 0 0 12px 0;">{% trans "We Miss You!" %} 👋</h2>
+    <p style="color: white; font-size: 16px; margin: 0;">{% trans "Come back and see what's new" %}</p>
+</div>
 
-        .header h1 {
-            margin: 0;
-            font-size: 28px;
-            font-weight: 600;
-        }
+<h1>{% blocktrans with name=user.first_name|default:user.username %}Hi {{ name }},{% endblocktrans %}</h1>
 
-        .header p {
-            margin: 10px 0 0 0;
-            font-size: 16px;
-            opacity: 0.9;
-        }
+<p>{% trans "We noticed you haven't visited us in a while, and we wanted to reach out because we miss having you around!" %}</p>
 
-        .content {
-            padding: 40px 30px;
-        }
+<p>{% blocktrans with site_name=SITE_NAME %}A lot has happened since your last visit, and we'd love to have you back to explore all the exciting updates and features we've been working on at {{ site_name }}.{% endblocktrans %}</p>
 
-        .greeting {
-            font-size: 18px;
-            color: #333;
-            margin-bottom: 20px;
-        }
+<div class="text-center mt-3 mb-3">
+    <a href="{{ SITE_URL }}" class="email-button">{% trans "Welcome Back - Let's Go!" %}</a>
+</div>
 
-        .message {
-            font-size: 16px;
-            color: #555;
-            margin-bottom: 30px;
-        }
+<div class="email-card">
+    <h3>{% trans "Here's what you might have missed:" %}</h3>
+    <ul style="list-style: none; padding: 0; margin: 16px 0 0 0;">
+        {% if highlights %}
+            {% for highlight in highlights %}
+            <li style="padding: 8px 0; padding-left: 25px; position: relative;">
+                <span style="position: absolute; left: 0; color: #667eea; font-weight: bold;">✓</span>
+                {{ highlight }}
+            </li>
+            {% endfor %}
+        {% else %}
+            <li style="padding: 8px 0; padding-left: 25px; position: relative;">
+                <span style="position: absolute; left: 0; color: #667eea; font-weight: bold;">✓</span>
+                {% trans "New and improved user interface" %}
+            </li>
+            <li style="padding: 8px 0; padding-left: 25px; position: relative;">
+                <span style="position: absolute; left: 0; color: #667eea; font-weight: bold;">✓</span>
+                {% trans "Enhanced performance and faster loading times" %}
+            </li>
+            <li style="padding: 8px 0; padding-left: 25px; position: relative;">
+                <span style="position: absolute; left: 0; color: #667eea; font-weight: bold;">✓</span>
+                {% trans "Exciting new features based on user feedback" %}
+            </li>
+            <li style="padding: 8px 0; padding-left: 25px; position: relative;">
+                <span style="position: absolute; left: 0; color: #667eea; font-weight: bold;">✓</span>
+                {% trans "Better mobile experience" %}
+            </li>
+            <li style="padding: 8px 0; padding-left: 25px; position: relative;">
+                <span style="position: absolute; left: 0; color: #667eea; font-weight: bold;">✓</span>
+                {% trans "Your data and preferences are still safely stored" %}
+            </li>
+        {% endif %}
+    </ul>
+</div>
 
-        .cta-button {
-            display: inline-block;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            text-decoration: none;
-            padding: 15px 30px;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
-            text-align: center;
-            margin: 20px 0;
-            transition: transform 0.2s ease;
-        }
+<p>{% trans "Your account is still active and all your data is exactly where you left it. We've been keeping everything safe and ready for your return!" %}</p>
 
-        .cta-button:hover {
-            transform: translateY(-2px);
-        }
+<p>{% trans "If you have any questions or need help getting back into your account, please contact our support team - we're always happy to help." %}</p>
 
-        .features {
-            background-color: #f8f9fa;
-            padding: 30px;
-            margin: 30px 0;
-            border-radius: 8px;
-            border-left: 4px solid #667eea;
-        }
+<p class="mt-3">
+    <strong>{% trans "Looking forward to seeing you again!" %}</strong><br>
+    {% blocktrans with site_name=SITE_NAME %}The {{ site_name }} Team{% endblocktrans %}
+</p>
+{% endblock %}
 
-        .features h3 {
-            color: #333;
-            margin-top: 0;
-            font-size: 18px;
-        }
-
-        .features ul {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-
-        .features li {
-            padding: 8px 0;
-            color: #555;
-            position: relative;
-            padding-left: 25px;
-        }
-
-        .features li:before {
-            content: "✓";
-            position: absolute;
-            left: 0;
-            color: #667eea;
-            font-weight: bold;
-        }
-
-        .footer {
-            background-color: #f8f9fa;
-            padding: 30px;
-            text-align: center;
-            border-top: 1px solid #e9ecef;
-        }
-
-        .footer p {
-            margin: 5px 0;
-            color: #666;
-            font-size: 14px;
-        }
-
-        .footer a {
-            color: #667eea;
-            text-decoration: none;
-        }
-
-        .unsubscribe {
-            margin-top: 20px;
-            font-size: 12px;
-            color: #999;
-        }
-
-        .unsubscribe a {
-            color: #999;
-        }
-
-        @media only screen and (max-width: 600px) {
-            .email-container {
-                width: 100% !important;
-            }
-
-            .header, .content, .footer {
-                padding: 20px !important;
-            }
-
-            .header h1 {
-                font-size: 24px !important;
-            }
-
-            .cta-button {
-                display: block !important;
-                width: 100% !important;
-                box-sizing: border-box;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="email-container">
-        <!-- Header -->
-        <div class="header">
-            <h1>We Miss You! 👋</h1>
-            <p>Come back and see what's new</p>
-        </div>
-
-        <!-- Main Content -->
-        <div class="content">
-            <div class="greeting">
-                Hi {{ user.first_name|default:user.username }},
-            </div>
-
-            <div class="message">
-                <p>We noticed you haven't visited us in a while, and we wanted to reach out because we miss having you around! 😊</p>
-
-                <p>A lot has happened since your last visit, and we'd love to have you back to explore all the exciting updates and features we've been working on just for users like you.</p>
-            </div>
-
-            <div style="text-align: center;">
-                <a href="{{ app_base_url }}" class="cta-button">Welcome Back - Let's Go!</a>
-            </div>
-
-            <!-- Features/What's New Section -->
-            <div class="features">
-                <h3>Here's what you might have missed:</h3>
-                <ul>
-                    <li>New and improved user interface</li>
-                    <li>Enhanced performance and faster loading times</li>
-                    <li>Exciting new features based on user feedback</li>
-                    <li>Better mobile experience</li>
-                    <li>Your data and preferences are still safely stored</li>
-                </ul>
-            </div>
-
-            <div class="message">
-                <p>Your account is still active and all your data is exactly where you left it. We've been keeping everything safe and ready for your return!</p>
-
-                <p>If you have any questions or need help getting back into your account, just reply to this email - our support team is always happy to help.</p>
-
-                <p style="margin-top: 30px;">
-                    <strong>Looking forward to seeing you again!</strong><br>
-                    The Team
-                </p>
-            </div>
-        </div>
-
-        <!-- Footer -->
-        <div class="footer">
-            <p><strong>Questions?</strong> <a href="mailto:support@yourapp.com">Contact our support team</a></p>
-            <p>© 2025 Your App Name. All rights reserved.</p>
-
-            <div class="unsubscribe">
-                <p>Don't want to receive these emails? <a href="{{ app_base_url }}/unsubscribe?email={{ user.email }}">Unsubscribe here</a></p>
-            </div>
-        </div>
-    </div>
-</body>
-</html>
+{% block email_footer %}
+<p class="text-bold">{{ SITE_NAME }}</p>
+<p>
+    {% trans "Questions?" %}
+    <a href="mailto:{{ INFO_EMAIL }}">{% trans "Contact us" %}</a>
+</p>
+<p class="text-muted">
+    &copy; {% now "Y" %} {{ SITE_NAME }}. {% trans "All rights reserved." %}
+</p>
+<div class="social-links">
+    <a href="{{ SITE_URL }}">{% trans "Visit our website" %}</a>
+</div>
+<p class="text-muted mt-2" style="font-size: 12px;">
+    {% trans "Don't want to receive these emails?" %}
+    <a href="{{ SITE_URL }}/unsubscribe?email={{ user.email }}">{% trans "Unsubscribe here" %}</a>
+</p>
+{% endblock %}

@@ -1,1 +1,0 @@
-Template not found: emails//inactive_user_email_template.txt. Please check that the template file exists.

@@ -1,1 +1,0 @@
-Template not found: emails//newsletter.txt. Please check that the template file exists.

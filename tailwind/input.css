@@ -1,9 +1,9 @@
 @import 'tailwindcss';
 
 /* Configure content sources for Tailwind to scan */
-@source "../../core/templates/**/*.html";
-@source "../../**/templates/**/*.html";
-@source "../../**/*.py";
+@source "../core/templates/**/*.html";
+@source "../**/templates/**/*.html";
+@source "../**/*.py";
 
 /* Configure dark mode to use class strategy (for Unfold compatibility) */
 @variant dark (.dark &);

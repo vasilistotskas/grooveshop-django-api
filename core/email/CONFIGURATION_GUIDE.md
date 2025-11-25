@@ -80,7 +80,7 @@ If your template needs a new type of context, add a generator method to `preview
 def _get_sample_password_reset_context(self) -> dict:
     """Generate sample password reset data."""
     from datetime import datetime, timedelta
-    
+
     return {
         "user": {
             "id": 12345,

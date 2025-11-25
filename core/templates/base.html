@@ -81,21 +81,21 @@
       document.addEventListener('DOMContentLoaded', function () {
         const themeToggleText = document.querySelector('#theme-toggle-text');
         const darkModeToggle = document.querySelector('#dark-mode-toggle');
-        
+
         // Get current theme from localStorage or default to light
         let currentTheme = localStorage.getItem('theme') || 'light';
 
         function updateTheme(theme) {
           // Update button text
           themeToggleText.textContent = theme === 'dark' ? '🌚' : '🌞';
-          
+
           // Update HTML class for Tailwind dark mode
           if (theme === 'dark') {
             document.documentElement.classList.add('dark');
           } else {
             document.documentElement.classList.remove('dark');
           }
-          
+
           // Store in localStorage
           localStorage.setItem('theme', theme);
         }

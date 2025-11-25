@@ -1,10 +1,10 @@
 {
- "scripts": {
-  "build": "npx @tailwindcss/cli -i ./static/src/input.css -o ./static/css/styles.css --minify",
-  "dev": "npx @tailwindcss/cli -i ./static/src/input.css -o ./static/css/styles.css --watch"
- },
- "devDependencies": {
-  "tailwindcss": "^4.1.12",
-  "@tailwindcss/cli": "^4.1.12"
- }
+  "scripts": {
+    "build": "npx @tailwindcss/cli -i ./tailwind/input.css -o ./static/css/styles.css --minify",
+    "dev": "npx @tailwindcss/cli -i ./tailwind/input.css -o ./static/css/styles.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^4.1.12",
+    "@tailwindcss/cli": "^4.1.12"
+  }
 }

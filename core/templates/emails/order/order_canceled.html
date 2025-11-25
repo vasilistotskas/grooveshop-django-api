@@ -14,7 +14,7 @@
 
     {% if order.paid_amount %}
     <p class="mt-2">
-        <strong>{% trans "Refund" %}:</strong> 
+        <strong>{% trans "Refund" %}:</strong>
         {% blocktrans with amount=order.paid_amount %}Your payment of {{ amount }} will be refunded to your original payment method within 3-5 business days.{% endblocktrans %}
     </p>
     {% endif %}

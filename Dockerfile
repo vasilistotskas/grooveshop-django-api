@@ -8,6 +8,15 @@ ARG APP_PATH=/home/app
 
 FROM $UV_IMAGE AS uv
 
+# Build Tailwind CSS
+FROM node:25-alpine AS tailwind-builder
+ARG APP_PATH
+WORKDIR ${APP_PATH}
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
 FROM python:${PYTHON_VERSION}-alpine${ALPINE_VERSION} AS builder
 ARG UV_IMAGE
 ARG APP_PATH
@@ -23,6 +32,8 @@ RUN mkdir -p ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles && \
     uv sync --frozen --no-install-project --no-editable
 
 COPY . .
+# Copy pre-built Tailwind CSS from tailwind-builder stage
+COPY --from=tailwind-builder ${APP_PATH}/static/css/styles.css ./static/css/styles.css
 RUN uv sync --frozen --no-editable
 ENTRYPOINT []
 

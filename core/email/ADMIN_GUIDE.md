@@ -41,7 +41,7 @@ The left panel shows all available email templates organized by category:
 - Each category can be independently collapsed
 
 Each template shows:
-- **Status Badge**: 
+- **Status Badge**:
   - 🟢 Active = Currently in use
   - ⚪ Unused = Available but not actively used
 - **Format Icons**: HTML and/or TXT versions available

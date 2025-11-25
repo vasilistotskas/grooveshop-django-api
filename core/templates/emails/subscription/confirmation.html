@@ -16,7 +16,7 @@
     <p><strong>{% trans "Category" %}:</strong> {{ topic.get_category_display }}</p>
     <p><strong>{% trans "Status" %}:</strong> <span style="color: #10b981; font-weight: 600;">{% trans "Active" %}</span></p>
     <p><strong>{% trans "Subscribed On" %}:</strong> {{ subscription.subscribed_at|date:"SHORT_DATE_FORMAT" }}</p>
-    
+
     {% if topic.description %}
     <h3>{% trans "What You'll Receive" %}</h3>
     <p>{{ topic.description }}</p>

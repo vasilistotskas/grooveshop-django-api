@@ -1126,6 +1126,9 @@ UNFOLD = {
         },
     },
     "SHOW_LANGUAGES": True,
+    "STYLES": [
+        lambda request: static("css/styles.css"),
+    ],
     "SITE_DROPDOWN": [
         {
             "icon": "cached",

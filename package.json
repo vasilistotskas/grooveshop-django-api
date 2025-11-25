@@ -1,9 +1,10 @@
 {
  "scripts": {
-  "build": "npx tailwindcss -i ./static/css/input.css -o ./static/css/styles.css --minify",
-  "dev": "npx tailwindcss -i ./static/css/input.css -o ./static/css/styles.css --watch"
+  "build": "npx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/styles.css --minify",
+  "dev": "npx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/styles.css --watch"
  },
  "devDependencies": {
-  "tailwindcss": "^3.4.17"
+  "tailwindcss": "^4.1.12",
+  "@tailwindcss/cli": "^4.1.12"
  }
 }

@@ -1,3 +1,48 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+/* Configure content sources for Tailwind to scan */
+@source "../../core/templates/**/*.html";
+@source "../../**/templates/**/*.html";
+@source "../../**/*.py";
+
+/* Configure dark mode to use class strategy (for Unfold compatibility) */
+@variant dark (.dark &);
+
+/* Unfold color theme integration */
+@theme {
+  /* Base color palette (neutral grays) - using rgb() for proper color values */
+  --color-base-50: rgb(250 250 250);
+  --color-base-100: rgb(244 244 245);
+  --color-base-200: rgb(228 228 231);
+  --color-base-300: rgb(212 212 216);
+  --color-base-400: rgb(161 161 170);
+  --color-base-500: rgb(113 113 122);
+  --color-base-600: rgb(82 82 91);
+  --color-base-700: rgb(63 63 70);
+  --color-base-800: rgb(39 39 42);
+  --color-base-900: rgb(24 24 27);
+  --color-base-950: rgb(9 9 11);
+
+  /* Primary brand colors */
+  --color-primary-50: rgb(239 246 255);
+  --color-primary-100: rgb(219 234 254);
+  --color-primary-200: rgb(191 219 254);
+  --color-primary-300: rgb(147 197 253);
+  --color-primary-400: rgb(96 165 250);
+  --color-primary-500: rgb(59 130 246);
+  --color-primary-600: rgb(37 99 235);
+  --color-primary-700: rgb(29 78 216);
+  --color-primary-800: rgb(30 64 175);
+  --color-primary-900: rgb(30 58 138);
+  --color-primary-950: rgb(23 37 84);
+
+  /* Font colors for light/dark modes */
+  --color-font-subtle-light: rgb(113 113 122);
+  --color-font-subtle-dark: rgb(161 161 170);
+  --color-font-default-light: rgb(39 39 42);
+  --color-font-default-dark: rgb(244 244 245);
+  --color-font-important-light: rgb(24 24 27);
+  --color-font-important-dark: rgb(250 250 250);
+}
+
+/* Custom styles for Unfold admin */

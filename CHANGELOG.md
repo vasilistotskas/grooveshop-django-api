@@ -3,6 +3,16 @@
 
 
 
+## v1.55.1 (2025-11-25)
+
+### Bug fixes
+
+* fix: email templates ([`448f308`](https://github.com/vasilistotskas/grooveshop-django-api/commit/448f308ac3e85134ce069c75a21140d808520c76))
+
+### Chores
+
+* chore: remove useless files ([`52d96f8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/52d96f88a3508c9b85d880b7739d81d56c12b291))
+
 ## v1.55.0 (2025-11-24)
 
 ### Bug fixes

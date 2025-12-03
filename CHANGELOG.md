@@ -3,6 +3,12 @@
 
 
 
+## v1.57.0 (2025-12-03)
+
+### Features
+
+* feat: Bump Versions, remove useless files ([`7c9b1a4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7c9b1a4db1015880c2340a8654b4ddbf2a1a4a66))
+
 ## v1.56.2 (2025-11-25)
 
 ### Bug fixes

@@ -30,7 +30,10 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-          cache-dependency-glob: "uv.lock"
+          cache-dependency-glob: |
+            **/*requirements*.txt
+            **/pyproject.toml
+            **/uv.lock
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -101,7 +104,10 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-          cache-dependency-glob: "uv.lock"
+          cache-dependency-glob: |
+            **/*requirements*.txt
+            **/pyproject.toml
+            **/uv.lock
 
       - name: Install psycopg prerequisites
         run: sudo apt-get install libpq-dev
@@ -173,7 +179,10 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-          cache-dependency-glob: "uv.lock"
+          cache-dependency-glob: |
+            **/*requirements*.txt
+            **/pyproject.toml
+            **/uv.lock
 
       - name: Clear dist_build directory
         run: rm -rf dist_build/

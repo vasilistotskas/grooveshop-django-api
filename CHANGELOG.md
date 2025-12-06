@@ -3,6 +3,16 @@
 
 
 
+## v1.59.0 (2025-12-06)
+
+### Bug fixes
+
+* fix: lint ([`dd3dd06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dd3dd06aacd2ee4826dd313c9785dfc4fe9a9c55))
+
+### Features
+
+* feat: optimize ([`0c7ab0e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0c7ab0e11b599279995309ebb45934802e1b4795))
+
 ## v1.58.0 (2025-12-05)
 
 ### Features

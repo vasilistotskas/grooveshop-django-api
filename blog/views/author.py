@@ -53,7 +53,9 @@ res_serializers: ResponseSerializersConfig = {
         response_serializers=res_serializers,
     )
 )
-@cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve", "posts"])
+@cache_methods(
+    settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve", "posts"]
+)
 class BlogAuthorViewSet(BaseModelViewSet):
     queryset = BlogAuthor.objects.none()
     response_serializers = res_serializers

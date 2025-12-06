@@ -91,11 +91,20 @@ class ProductViewSet(BaseModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        queryset = queryset.annotate(
-            availability_priority=Case(
-                When(Q(active=True) & Q(stock__gt=0), then=1),
-                default=0,
-                output_field=IntegerField(),
+        # Optimize with select_related for foreign keys
+        queryset = queryset.select_related("category", "vat")
+        # Prefetch translations for better performance
+        queryset = queryset.prefetch_related("translations")
+        # Add annotations to avoid N+1 queries
+        queryset = (
+            queryset.with_likes_count_annotation()
+            .with_review_average_annotation()
+            .annotate(
+                availability_priority=Case(
+                    When(Q(active=True) & Q(stock__gt=0), then=1),
+                    default=0,
+                    output_field=IntegerField(),
+                )
             )
         )
         return queryset

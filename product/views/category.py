@@ -62,3 +62,8 @@ class ProductCategoryViewSet(BaseModelViewSet):
     ]
     ordering = ["tree_id", "lft"]
     search_fields = ["translations__name", "translations__description", "slug"]
+
+    def get_queryset(self):
+        """Optimize queryset with prefetch_related for translations."""
+        queryset = super().get_queryset()
+        return queryset.prefetch_related("translations")

@@ -50,7 +50,12 @@ class Cart(TimeStampMixinModel, UUIDModel):
         self.save()
 
     def get_items(self):
-        return self.items.prefetch_related("product").all()
+        """Get cart items with optimized prefetching to avoid N+1 queries."""
+        return self.items.select_related(
+            "product__category", "product__vat"
+        ).prefetch_related(
+            "product__translations"
+        ).all()
 
     @property
     def total_price(self) -> Money:

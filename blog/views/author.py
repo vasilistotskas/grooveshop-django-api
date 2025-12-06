@@ -53,7 +53,7 @@ res_serializers: ResponseSerializersConfig = {
         response_serializers=res_serializers,
     )
 )
-@cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
+@cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve", "posts"])
 class BlogAuthorViewSet(BaseModelViewSet):
     queryset = BlogAuthor.objects.none()
     response_serializers = res_serializers
@@ -69,9 +69,13 @@ class BlogAuthorViewSet(BaseModelViewSet):
             from rest_framework.generics import get_object_or_404
 
             author = get_object_or_404(BlogAuthor, id=self.kwargs["pk"])
-            return author.blog_posts.all()
+            return author.blog_posts.select_related(
+                "category", "author__user"
+            ).prefetch_related("translations", "tags__translations", "likes")
 
-        return BlogAuthor.objects.all()
+        return BlogAuthor.objects.select_related("user").prefetch_related(
+            "translations"
+        )
 
     ordering_fields = [
         "id",

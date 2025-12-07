@@ -3,6 +3,12 @@
 
 
 
+## v1.59.1 (2025-12-07)
+
+### Bug fixes
+
+* fix: performance ([`6067022`](https://github.com/vasilistotskas/grooveshop-django-api/commit/60670226246b4ab65fbb5226bab109c181cfae84))
+
 ## v1.59.0 (2025-12-06)
 
 ### Bug fixes

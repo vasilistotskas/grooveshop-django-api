@@ -712,7 +712,7 @@ CURRENCY_CHOICES = [("EUR", "EUR €"), ("USD", "USD $")]
 
 CONN_HEALTH_CHECKS = False
 ATOMIC_REQUESTS = False
-CONN_MAX_AGE = 60
+CONN_MAX_AGE = 0
 INDEX_MAXIMUM_EXPR_COUNT = 8000
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
 
@@ -721,7 +721,7 @@ DATABASES = {
         "ATOMIC_REQUESTS": False,
         "AUTOCOMMIT": True,
         "CONN_HEALTH_CHECKS": True,
-        "CONN_MAX_AGE": 60,
+        "CONN_MAX_AGE": 0,
         "TIME_ZONE": getenv("TIME_ZONE", "Europe/Athens"),
         "ENGINE": "django.db.backends.postgresql",
         "HOST": getenv("DB_HOST", "db"),

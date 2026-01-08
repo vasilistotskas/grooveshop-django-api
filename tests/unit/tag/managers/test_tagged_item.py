@@ -22,11 +22,10 @@ class TestTaggedItemManager(TestCase):
         )
 
     def test_get_queryset_includes_optimizations(self):
-        queryset = TaggedItem.objects.get_queryset()
+        """Test that for_list() includes optimizations."""
+        queryset = TaggedItem.objects.for_list()
 
-        self.assertIn("tag", queryset.query.select_related)
-        self.assertIn("content_type", queryset.query.select_related)
-
+        # Check prefetch_related lookups
         self.assertIn("tag__translations", queryset._prefetch_related_lookups)
 
     def test_active_tags_method(self):

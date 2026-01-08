@@ -48,7 +48,7 @@ res_serializers: ResponseSerializersConfig = {
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class BlogTagViewSet(BaseModelViewSet):
-    queryset = BlogTag.objects.prefetch_related("translations")
+    queryset = BlogTag.objects.all()
     response_serializers = res_serializers
     request_serializers = req_serializers
     filterset_class = BlogTagFilter
@@ -62,3 +62,8 @@ class BlogTagViewSet(BaseModelViewSet):
     ]
     ordering = ["sort_order", "-created_at"]
     search_fields = ["translations__name"]
+
+    def get_queryset(self):
+        if self.action == "list":
+            return BlogTag.objects.for_list()
+        return BlogTag.objects.for_detail()

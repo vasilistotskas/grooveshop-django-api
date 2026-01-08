@@ -339,3 +339,27 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         self.tracking_number = tracking_number
         self.shipping_carrier = shipping_carrier
         self.save(update_fields=["tracking_number", "shipping_carrier"])
+
+    @property
+    def items_count(self) -> int:
+        """
+        Return the number of items in the order.
+
+        Uses annotated value if available (from optimized queryset),
+        otherwise queries the database.
+        """
+        if hasattr(self, "_items_count"):
+            return self._items_count or 0
+        return self.items.count()
+
+    @property
+    def total_quantity(self) -> int:
+        """
+        Return the total quantity of all items in the order.
+
+        Uses annotated value if available (from optimized queryset),
+        otherwise queries the database.
+        """
+        if hasattr(self, "_total_quantity"):
+            return self._total_quantity or 0
+        return self.items.aggregate(total=Sum("quantity"))["total"] or 0

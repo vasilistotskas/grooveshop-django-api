@@ -107,9 +107,9 @@ class UserAddressViewSet(BaseModelViewSet):
     ]
 
     def get_queryset(self):
-        return UserAddress.objects.filter(
-            user=self.request.user
-        ).select_related("country", "region")
+        if self.action == "list":
+            return UserAddress.objects.for_list().filter(user=self.request.user)
+        return UserAddress.objects.for_detail().filter(user=self.request.user)
 
     @action(detail=True, methods=["POST"])
     def set_main(self, request, pk=None):

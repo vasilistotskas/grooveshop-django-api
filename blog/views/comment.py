@@ -92,14 +92,10 @@ class BlogCommentViewSet(BaseModelViewSet):
     ]
 
     def get_queryset(self):
-        queryset = BlogComment.objects.select_related(
-            "user", "post", "parent", "post__category", "post__author"
-        ).prefetch_related(
-            "likes",
-            "translations",
-            "children",
-            "post__translations",
-        )
+        if self.action == "list":
+            queryset = BlogComment.objects.for_list()
+        else:
+            queryset = BlogComment.objects.for_detail()
 
         if not self.request.user.is_staff:
             queryset = queryset.filter(approved=True)

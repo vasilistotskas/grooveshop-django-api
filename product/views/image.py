@@ -66,11 +66,6 @@ class ProductImageViewSet(BaseModelViewSet):
     ordering = ["-is_main", "sort_order", "-created_at"]
 
     def get_queryset(self):
-        queryset = ProductImage.objects.all()
-
         if self.action == "list":
-            return queryset.optimized_for_list().ordered_by_position()
-        elif self.action in ["retrieve", "update", "partial_update", "destroy"]:
-            return queryset.with_product_data()
-
-        return queryset
+            return ProductImage.objects.for_list()
+        return ProductImage.objects.for_detail()

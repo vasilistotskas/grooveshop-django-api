@@ -89,10 +89,16 @@ class BlogPost(
 
     @property
     def likes_count(self) -> int:
+        # Use annotated value if available (from queryset), otherwise query
+        if hasattr(self, "_likes_count"):
+            return self._likes_count
         return self.likes.count()
 
     @property
     def comments_count(self) -> int:
+        # Use annotated value if available (from queryset), otherwise query
+        if hasattr(self, "_comments_count"):
+            return self._comments_count
         return self.comments.filter(approved=True).count()
 
     @property
@@ -101,6 +107,9 @@ class BlogPost(
 
     @property
     def tags_count(self) -> int:
+        # Use annotated value if available (from queryset), otherwise query
+        if hasattr(self, "_tags_count"):
+            return self._tags_count
         return self.tags.filter(active=True).count()
 
 

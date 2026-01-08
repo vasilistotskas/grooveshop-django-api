@@ -53,6 +53,14 @@ class NotificationQuerySet(TranslatableQuerySet):
     def with_user_data(self):
         return self.prefetch_related("user__user")
 
+    def for_list(self):
+        """Optimized queryset for list views."""
+        return self.with_translations()
+
+    def for_detail(self):
+        """Optimized queryset for detail views."""
+        return self.with_translations().with_user_data()
+
     def system_notifications(self):
         return self.filter(category=NotificationCategoryEnum.SYSTEM)
 
@@ -119,6 +127,14 @@ class NotificationManager(TranslatableManager):
 
     def with_user_data(self):
         return self.get_queryset().with_user_data()
+
+    def for_list(self):
+        """Return optimized queryset for list views."""
+        return self.get_queryset().for_list()
+
+    def for_detail(self):
+        """Return optimized queryset for detail views."""
+        return self.get_queryset().for_detail()
 
     def system_notifications(self):
         return self.get_queryset().system_notifications()
@@ -215,6 +231,14 @@ class NotificationUserQuerySet(models.QuerySet):
             "notification__translations"
         )
 
+    def for_list(self):
+        """Alias for optimized_for_list() for consistency."""
+        return self.optimized_for_list()
+
+    def for_detail(self):
+        """Optimized queryset for detail views."""
+        return self.optimized_for_list()
+
     def active_notifications(self):
         return self.filter(
             Q(notification__expiry_date__isnull=True)
@@ -295,6 +319,14 @@ class NotificationUserManager(models.Manager):
 
     def optimized_for_list(self):
         return self.get_queryset().optimized_for_list()
+
+    def for_list(self):
+        """Return optimized queryset for list views."""
+        return self.get_queryset().for_list()
+
+    def for_detail(self):
+        """Return optimized queryset for detail views."""
+        return self.get_queryset().for_detail()
 
     def active_notifications(self):
         return self.get_queryset().active_notifications()

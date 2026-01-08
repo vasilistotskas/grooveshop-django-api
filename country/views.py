@@ -69,3 +69,14 @@ class CountryViewSet(BaseModelViewSet):
         "phone_code",
         "translations__name",
     ]
+
+    def get_queryset(self):
+        """
+        Return optimized queryset based on action.
+
+        Uses Country.objects.for_list() for list views and
+        Country.objects.for_detail() for detail views.
+        """
+        if self.action == "list":
+            return Country.objects.for_list()
+        return Country.objects.for_detail()

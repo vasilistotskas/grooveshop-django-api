@@ -221,10 +221,26 @@ class Product(
 
     @property
     def likes_count(self) -> int:
+        """
+        Return the number of likes/favourites for this product.
+
+        Uses annotated value if available (from optimized queryset),
+        otherwise queries the database.
+        """
+        if hasattr(self, "_likes_count"):
+            return self._likes_count or 0
         return ProductFavourite.objects.filter(product=self).count()
 
     @property
     def review_average(self) -> float:
+        """
+        Return the average review rating for this product.
+
+        Uses annotated value if available (from optimized queryset),
+        otherwise queries the database.
+        """
+        if hasattr(self, "_review_average"):
+            return float(self._review_average or 0.0)
         average = ProductReview.objects.filter(product=self).aggregate(
             avg=Avg("rate")
         )["avg"]
@@ -232,6 +248,14 @@ class Product(
 
     @property
     def review_count(self) -> int:
+        """
+        Return the number of reviews for this product.
+
+        Uses annotated value if available (from optimized queryset),
+        otherwise queries the database.
+        """
+        if hasattr(self, "_reviews_count"):
+            return self._reviews_count or 0
         return ProductReview.objects.filter(product=self).count()
 
     @property

@@ -14,7 +14,8 @@ class TestTagManager(TestCase):
         self.inactive_tag = TagFactory(active=False)
 
     def test_get_queryset_includes_translations(self):
-        queryset = Tag.objects.get_queryset()
+        """Test that for_list() includes translations prefetch."""
+        queryset = Tag.objects.for_list()
 
         self.assertIn("translations", queryset._prefetch_related_lookups)
 

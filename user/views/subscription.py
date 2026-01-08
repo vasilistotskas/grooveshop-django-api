@@ -83,7 +83,11 @@ class SubscriptionTopicViewSet(BaseModelViewSet):
     search_fields = ["translations__name", "translations__description", "slug"]
 
     def get_queryset(self):
-        return super().get_queryset().distinct()
+        return (
+            SubscriptionTopic.objects.for_list()
+            .filter(is_active=True)
+            .distinct()
+        )
 
     @extend_schema(
         operation_id="getMySubscriptionTopics",
@@ -303,9 +307,9 @@ class UserSubscriptionViewSet(BaseModelViewSet):
     ]
 
     def get_queryset(self):
-        return UserSubscription.objects.filter(
+        return UserSubscription.objects.for_list().filter(
             user=self.request.user
-        ).select_related("topic")
+        )
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)

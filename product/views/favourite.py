@@ -57,9 +57,7 @@ schema_config = create_schema_view_config(
 
 @extend_schema_view(**schema_config)
 class ProductFavouriteViewSet(BaseModelViewSet):
-    queryset = ProductFavourite.objects.select_related(
-        "user", "product"
-    ).prefetch_related("product__translations")
+    queryset = ProductFavourite.objects.all()
     filterset_class = ProductFavouriteFilter
     ordering_fields = [
         "id",
@@ -75,6 +73,11 @@ class ProductFavouriteViewSet(BaseModelViewSet):
     ]
     response_serializers = res_serializers
     request_serializers = req_serializers
+
+    def get_queryset(self):
+        if self.action == "list":
+            return ProductFavourite.objects.for_list()
+        return ProductFavourite.objects.for_detail()
 
     def create(self, request, *args, **kwargs):
         req_serializer = self.get_request_serializer()

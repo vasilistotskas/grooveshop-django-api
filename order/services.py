@@ -47,19 +47,13 @@ class OrderCancellationError(OrderServiceError):
 class OrderService:
     @classmethod
     def get_order_by_id(cls, order_id: int) -> Order:
-        return (
-            Order.objects.select_related("user", "pay_way", "country", "region")
-            .prefetch_related("items")
-            .get(id=order_id)
-        )
+        """Get order by ID with optimized queryset."""
+        return Order.objects.for_detail().get(id=order_id)
 
     @classmethod
     def get_order_by_uuid(cls, uuid: str) -> Order:
-        return (
-            Order.objects.select_related("user", "pay_way", "country", "region")
-            .prefetch_related("items")
-            .get(uuid=uuid)
-        )
+        """Get order by UUID with optimized queryset."""
+        return Order.objects.for_detail().get(uuid=uuid)
 
     @classmethod
     @transaction.atomic
@@ -240,10 +234,10 @@ class OrderService:
 
     @classmethod
     def get_user_orders(cls, user_id: int) -> QuerySet:
+        """Get all orders for a user with optimized queryset."""
         return (
-            Order.objects.filter(user_id=user_id)
-            .select_related("pay_way", "country", "region")
-            .prefetch_related("items", "items__product")
+            Order.objects.for_list()
+            .filter(user_id=user_id)
             .order_by("-created_at")
         )
 
@@ -512,7 +506,7 @@ class OrderService:
     @transaction.atomic
     def handle_payment_succeeded(cls, payment_intent_id: str) -> Order | None:
         try:
-            order = Order.objects.get(payment_id=payment_intent_id)
+            order = Order.objects.for_detail().get(payment_id=payment_intent_id)
         except Order.DoesNotExist:
             logger.error(
                 "Order not found for payment_intent: %s", payment_intent_id
@@ -533,7 +527,7 @@ class OrderService:
     @transaction.atomic
     def handle_payment_failed(cls, payment_intent_id: str) -> Order | None:
         try:
-            order = Order.objects.get(payment_id=payment_intent_id)
+            order = Order.objects.for_detail().get(payment_id=payment_intent_id)
         except Order.DoesNotExist:
             logger.error(
                 "Order not found for payment_intent: %s", payment_intent_id

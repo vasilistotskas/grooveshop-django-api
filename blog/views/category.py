@@ -194,18 +194,11 @@ class BlogCategoryViewSet(BaseModelViewSet):
 
     def get_queryset(self):
         if self.request and self.request.query_params.get("tree") == "true":
-            return BlogCategory.objects.select_related(
-                "parent"
-            ).prefetch_related(
-                "translations",
-                "children",
-                "blog_posts",
-            )
+            return BlogCategory.objects.for_tree()
 
-        return BlogCategory.objects.select_related("parent").prefetch_related(
-            "translations",
-            "blog_posts",
-        )
+        if self.action == "list":
+            return BlogCategory.objects.for_list()
+        return BlogCategory.objects.for_detail()
 
     def list(self, request, *args, **kwargs):
         if request.query_params.get("tree") == "true":

@@ -254,6 +254,19 @@ class OrderViewSet(BaseModelViewSet):
         "payment_id",
     ]
 
+    def get_queryset(self):
+        """
+        Return optimized queryset based on action.
+
+        Uses Order.objects.for_list() for list views and
+        Order.objects.for_detail() for detail views to avoid N+1 queries.
+        """
+        if self.action == "list":
+            return Order.objects.for_list()
+        elif self.action == "my_orders":
+            return Order.objects.for_list()
+        return Order.objects.for_detail()
+
     def get_permissions(self):
         owner_or_admin_actions = {
             "list",

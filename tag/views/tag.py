@@ -62,3 +62,14 @@ class TagViewSet(BaseModelViewSet):
     ]
     ordering = ["sort_order", "-created_at"]
     search_fields = ["translations__label"]
+
+    def get_queryset(self):
+        """
+        Return optimized queryset based on action.
+
+        Uses Tag.objects.for_list() for list views and
+        Tag.objects.for_detail() for detail views.
+        """
+        if self.action == "list":
+            return Tag.objects.for_list()
+        return Tag.objects.for_detail()

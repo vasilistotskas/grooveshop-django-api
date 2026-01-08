@@ -73,9 +73,9 @@ class CartService:
 
     def _initialize_cart(self):
         if self.request.user.is_authenticated and self.cart_id:
-            guest_cart = Cart.objects.filter(
-                id=self.cart_id, user__isnull=True
-            ).first()
+            guest_cart = (
+                Cart.objects.guest_carts().filter(id=self.cart_id).first()
+            )
             if guest_cart:
                 self.cart = self.get_or_create_cart()
             else:
@@ -91,12 +91,12 @@ class CartService:
         user = self.request.user
 
         if user.is_authenticated:
-            cart = Cart.objects.filter(user=user).first()
+            cart = Cart.objects.for_user(user).for_detail().first()
 
             if cart and self.cart_id:
-                guest_cart = Cart.objects.filter(
-                    id=self.cart_id, user__isnull=True
-                ).first()
+                guest_cart = (
+                    Cart.objects.guest_carts().filter(id=self.cart_id).first()
+                )
 
                 if guest_cart:
                     self.merge_carts(guest_cart, cart)
@@ -104,9 +104,12 @@ class CartService:
             return cart
         else:
             if self.cart_id:
-                return Cart.objects.filter(
-                    id=self.cart_id, user__isnull=True
-                ).first()
+                return (
+                    Cart.objects.guest_carts()
+                    .for_detail()
+                    .filter(id=self.cart_id)
+                    .first()
+                )
 
             return None
 
@@ -117,9 +120,9 @@ class CartService:
             cart, created = Cart.objects.get_or_create(user=user)
 
             if self.cart_id:
-                guest_cart = Cart.objects.filter(
-                    id=self.cart_id, user__isnull=True
-                ).first()
+                guest_cart = (
+                    Cart.objects.guest_carts().filter(id=self.cart_id).first()
+                )
 
                 if guest_cart:
                     self.merge_carts(guest_cart, cart)
@@ -127,9 +130,9 @@ class CartService:
             return cart
         else:
             if self.cart_id:
-                cart = Cart.objects.filter(
-                    id=self.cart_id, user__isnull=True
-                ).first()
+                cart = (
+                    Cart.objects.guest_carts().filter(id=self.cart_id).first()
+                )
                 if cart:
                     return cart
 
@@ -145,10 +148,12 @@ class CartService:
         if target_cart.id == source_cart.id:
             return
 
-        for item in source_cart.items.all():
-            existing_item = CartItem.objects.filter(
-                cart=target_cart, product=item.product
-            ).first()
+        for item in source_cart.items.for_list():
+            existing_item = (
+                CartItem.objects.for_cart(target_cart)
+                .filter(product=item.product)
+                .first()
+            )
 
             if existing_item:
                 existing_item.quantity += item.quantity
@@ -169,7 +174,7 @@ class CartService:
             self.cart_items = []
 
     def get_cart_by_id(self, cart_id: int):
-        return Cart.objects.filter(id=cart_id).first()
+        return Cart.objects.for_detail().filter(id=cart_id).first()
 
     def get_cart_item(self, product_id: int | None):
         if self.cart:
@@ -180,9 +185,9 @@ class CartService:
         if not self.cart:
             raise CartNotSetException("Cart is not set.")
 
-        existing_item = CartItem.objects.filter(
-            cart=self.cart, product=product
-        ).first()
+        existing_item = (
+            CartItem.objects.for_cart(self.cart).filter(product=product).first()
+        )
 
         if existing_item:
             existing_item.quantity += quantity

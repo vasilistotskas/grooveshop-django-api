@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.db import models
@@ -6,8 +9,50 @@ from django.utils import timezone
 from djmoney.money import Money
 from extra_settings.models import Setting
 
+if TYPE_CHECKING:
+    from typing import Self
+
 
 class CartItemQuerySet(models.QuerySet):
+    """
+    Optimized QuerySet for CartItem model.
+
+    Provides chainable methods for common operations and
+    standardized `for_list()` and `for_detail()` methods.
+    """
+
+    def with_product(self) -> Self:
+        """Select related product."""
+        return self.select_related("product")
+
+    def with_product_translations(self) -> Self:
+        """Prefetch product translations."""
+        return self.prefetch_related("product__translations")
+
+    def with_product_images(self) -> Self:
+        """Prefetch product images."""
+        return self.prefetch_related("product__images__translations")
+
+    def with_cart(self) -> Self:
+        """Select related cart."""
+        return self.select_related("cart")
+
+    def for_list(self) -> Self:
+        """
+        Optimized queryset for list views.
+
+        Includes product with translations and cart.
+        """
+        return self.with_product().with_product_translations().with_cart()
+
+    def for_detail(self) -> Self:
+        """
+        Optimized queryset for detail views.
+
+        Includes everything from for_list() plus product images.
+        """
+        return self.for_list().with_product_images()
+
     def for_cart(self, cart):
         return self.filter(cart=cart)
 
@@ -20,7 +65,8 @@ class CartItemQuerySet(models.QuerySet):
         return self.none()
 
     def with_product_data(self):
-        return self.select_related("product", "cart")
+        """Legacy method - use for_list() instead."""
+        return self.for_list()
 
     def total_quantity(self):
         return self.aggregate(total=models.Sum("quantity"))["total"] or 0
@@ -78,8 +124,26 @@ class CartItemQuerySet(models.QuerySet):
 
 
 class CartItemManager(models.Manager):
+    """
+    Manager for CartItem model with optimized queryset methods.
+
+    Usage in ViewSet:
+        def get_queryset(self):
+            if self.action == "list":
+                return CartItem.objects.for_list()
+            return CartItem.objects.for_detail()
+    """
+
     def get_queryset(self) -> CartItemQuerySet:
         return CartItemQuerySet(self.model, using=self._db)
+
+    def for_list(self) -> CartItemQuerySet:
+        """Return optimized queryset for list views."""
+        return self.get_queryset().for_list()
+
+    def for_detail(self) -> CartItemQuerySet:
+        """Return optimized queryset for detail views."""
+        return self.get_queryset().for_detail()
 
     def for_cart(self, cart):
         return self.get_queryset().for_cart(cart)
@@ -91,7 +155,8 @@ class CartItemManager(models.Manager):
         return self.get_queryset().for_user(user)
 
     def with_product_data(self):
-        return self.get_queryset().with_product_data()
+        """Legacy method - use for_list() instead."""
+        return self.get_queryset().for_list()
 
     def total_quantity(self):
         return self.get_queryset().total_quantity()

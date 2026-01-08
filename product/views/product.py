@@ -90,21 +90,26 @@ class ProductViewSet(BaseModelViewSet):
         return ProductFilter
 
     def get_queryset(self):
-        queryset = super().get_queryset()
-        # Optimize with select_related for foreign keys
-        queryset = queryset.select_related("category", "vat")
-        # Prefetch translations for better performance
-        queryset = queryset.prefetch_related("translations")
-        # Add annotations to avoid N+1 queries
-        queryset = (
-            queryset.with_likes_count_annotation()
-            .with_review_average_annotation()
-            .annotate(
-                availability_priority=Case(
-                    When(Q(active=True) & Q(stock__gt=0), then=1),
-                    default=0,
-                    output_field=IntegerField(),
-                )
+        """
+        Return optimized queryset based on action.
+
+        Uses Product.objects.for_list() for list views and
+        Product.objects.for_detail() for detail views to avoid N+1 queries.
+        """
+        if self.action == "list":
+            queryset = Product.objects.for_list()
+        elif self.action in ["reviews", "images", "tags"]:
+            # For action endpoints, we just need the product itself
+            queryset = Product.objects.for_detail()
+        else:
+            queryset = Product.objects.for_detail()
+
+        # Add availability priority annotation for ordering
+        queryset = queryset.annotate(
+            availability_priority=Case(
+                When(Q(active=True) & Q(stock__gt=0), then=1),
+                default=0,
+                output_field=IntegerField(),
             )
         )
         return queryset
@@ -282,7 +287,13 @@ class ProductViewSet(BaseModelViewSet):
     )
     def tags(self, request, pk=None):
         product = get_object_or_404(Product, pk=pk)
-        tags = [tagged_item.tag for tagged_item in product.tags.all()]
+        # Prefetch tags with translations to avoid N+1 queries
+        tags = [
+            tagged_item.tag
+            for tagged_item in product.tags.select_related(
+                "tag"
+            ).prefetch_related("tag__translations")
+        ]
 
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(

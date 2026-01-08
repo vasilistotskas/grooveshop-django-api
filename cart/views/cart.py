@@ -175,14 +175,21 @@ class CartViewSet(BaseModelViewSet):
         return super().get_permissions()
 
     def get_queryset(self):
+        """
+        Return optimized queryset based on user permissions.
+
+        Uses Cart.objects.for_detail() for optimized queries.
+        """
         user = self.request.user
 
         if user.is_staff:
-            return Cart.objects.all()
+            return Cart.objects.for_list()
         elif user.is_authenticated:
-            return Cart.objects.filter(user=user)
+            return Cart.objects.for_detail().filter(user=user)
         elif self.cart_service.cart:
-            return Cart.objects.filter(id=self.cart_service.cart.id)
+            return Cart.objects.for_detail().filter(
+                id=self.cart_service.cart.id
+            )
 
         return Cart.objects.none()
 

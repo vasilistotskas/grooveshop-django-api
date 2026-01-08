@@ -77,12 +77,23 @@ class RegionViewSet(BaseModelViewSet):
     response_serializers = res_serializers
     request_serializers = req_serializers
 
+    def get_queryset(self):
+        """
+        Return optimized queryset based on action.
+
+        Uses Region.objects.for_list() for list views and
+        Region.objects.for_detail() for detail views.
+        """
+        if self.action == "list":
+            return Region.objects.for_list()
+        return Region.objects.for_detail()
+
     @action(
         detail=True,
         methods=["GET"],
     )
     def get_regions_by_country_alpha_2(self, request, pk=None, *args, **kwargs):
-        regions = Region.objects.filter(country__alpha_2=pk)
+        regions = Region.objects.for_list().filter(country__alpha_2=pk)
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(regions, many=True)
         return Response(response_serializer.data, status=status.HTTP_200_OK)

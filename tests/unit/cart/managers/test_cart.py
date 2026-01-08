@@ -131,8 +131,8 @@ class TestCartQuerySet:
         carts_with_totals = Cart.objects.with_totals()
         cart = carts_with_totals.get(id=user_cart.id)
 
-        assert cart.total_quantity == 5
-        assert cart.unique_items_count == 2
+        assert cart._total_quantity == 5
+        assert cart._items_count == 2
 
     def test_expired_carts_default_30_days(self, user_cart):
         Cart.objects.filter(id=user_cart.id).update(
@@ -234,7 +234,7 @@ class TestCartManager:
 
         carts_with_totals = Cart.objects.with_totals()
         cart = carts_with_totals.get(id=user_cart.id)
-        assert hasattr(cart, "total_quantity")
+        assert hasattr(cart, "_total_quantity")
 
     def test_manager_delegates_to_queryset_expired(self, user_cart):
         Cart.objects.filter(id=user_cart.id).update(

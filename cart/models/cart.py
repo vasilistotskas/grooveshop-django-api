@@ -51,6 +51,10 @@ class Cart(TimeStampMixinModel, UUIDModel):
 
     def get_items(self):
         """Get cart items with optimized prefetching to avoid N+1 queries."""
+        # If items are already prefetched, use them directly
+        if "items" in getattr(self, "_prefetched_objects_cache", {}):
+            return self.items.all()
+        # Otherwise, fetch with optimized prefetching
         return (
             self.items.select_related("product__category", "product__vat")
             .prefetch_related("product__translations")
@@ -59,25 +63,63 @@ class Cart(TimeStampMixinModel, UUIDModel):
 
     @property
     def total_price(self) -> Money:
-        total = sum(item.total_price.amount for item in self.get_items())
+        # Use prefetched items if available
+        items = (
+            self.items.all()
+            if "items" in getattr(self, "_prefetched_objects_cache", {})
+            else self.get_items()
+        )
+        total = sum(item.total_price.amount for item in items)
         return Money(total, settings.DEFAULT_CURRENCY)
 
     @property
     def total_discount_value(self) -> Money:
-        total = sum(
-            item.total_discount_value.amount for item in self.get_items()
+        # Use prefetched items if available
+        items = (
+            self.items.all()
+            if "items" in getattr(self, "_prefetched_objects_cache", {})
+            else self.get_items()
         )
+        total = sum(item.total_discount_value.amount for item in items)
         return Money(total, settings.DEFAULT_CURRENCY)
 
     @property
     def total_vat_value(self) -> Money:
-        total = sum(item.vat_value.amount for item in self.get_items())
+        # Use prefetched items if available
+        items = (
+            self.items.all()
+            if "items" in getattr(self, "_prefetched_objects_cache", {})
+            else self.get_items()
+        )
+        total = sum(item.vat_value.amount for item in items)
         return Money(total, settings.DEFAULT_CURRENCY)
 
     @property
     def total_items(self) -> int | Literal[0]:
-        return sum(item.quantity for item in self.get_items())
+        """
+        Return the total quantity of all items in the cart.
+
+        Uses annotated value if available (from optimized queryset),
+        otherwise calculates from items.
+        """
+        if hasattr(self, "_total_quantity"):
+            return self._total_quantity or 0
+        # Use prefetched items if available
+        items = (
+            self.items.all()
+            if "items" in getattr(self, "_prefetched_objects_cache", {})
+            else self.get_items()
+        )
+        return sum(item.quantity for item in items)
 
     @property
     def total_items_unique(self) -> int:
+        """
+        Return the number of unique items in the cart.
+
+        Uses annotated value if available (from optimized queryset),
+        otherwise queries the database.
+        """
+        if hasattr(self, "_items_count"):
+            return self._items_count or 0
         return self.items.count()

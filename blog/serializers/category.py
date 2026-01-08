@@ -22,9 +22,23 @@ class BlogCategorySerializer(
     has_children = serializers.SerializerMethodField()
 
     def get_post_count(self, obj: BlogCategory) -> int:
+        """
+        Return post count from annotation if available, otherwise query.
+
+        Uses _post_count annotation from BlogCategoryManager.for_list().
+        """
+        if hasattr(obj, "_post_count"):
+            return obj._post_count
         return obj.blog_posts.filter(is_published=True).count()
 
     def get_has_children(self, obj: BlogCategory) -> bool:
+        """
+        Return has_children from annotation if available, otherwise query.
+
+        Uses _has_children annotation from BlogCategoryManager.for_list().
+        """
+        if hasattr(obj, "_has_children"):
+            return obj._has_children
         return obj.get_children().exists()
 
     class Meta:

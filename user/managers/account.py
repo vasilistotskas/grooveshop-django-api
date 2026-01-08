@@ -10,7 +10,36 @@ if TYPE_CHECKING:
     from user.models import UserAccount
 
 
+class UserAccountQuerySet:
+    """
+    QuerySet-like methods for UserAccount model.
+
+    Note: This is not a true QuerySet because UserAccount uses BaseUserManager.
+    These methods are mixed into the manager.
+    """
+
+    pass
+
+
 class UserAccountManager(BaseUserManager["UserAccount"]):
+    """
+    Manager for UserAccount model with optimized queryset methods.
+
+    Usage in ViewSet:
+        def get_queryset(self):
+            if self.action == "list":
+                return UserAccount.objects.for_list()
+            return UserAccount.objects.for_detail()
+    """
+
+    def for_list(self):
+        """Return optimized queryset for list views."""
+        return self.get_queryset()
+
+    def for_detail(self):
+        """Return optimized queryset for detail views."""
+        return self.get_queryset()
+
     def active(self):
         return self.filter(is_active=True)
 

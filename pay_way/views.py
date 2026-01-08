@@ -70,3 +70,8 @@ class PayWayViewSet(BaseModelViewSet):
         "translations__description",
         "translations__instructions",
     ]
+
+    def get_queryset(self):
+        if self.action == "list":
+            return PayWay.objects.for_list()
+        return PayWay.objects.for_detail()

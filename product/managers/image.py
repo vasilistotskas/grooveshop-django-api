@@ -1,12 +1,52 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from django.db import models
 from django.db.models import Count, Q
 from django.utils import timezone
 from parler.managers import TranslatableManager, TranslatableQuerySet
 
+if TYPE_CHECKING:
+    from typing import Self
+
 
 class EnhancedImageQuerySet(TranslatableQuerySet):
+    """
+    Optimized QuerySet for ProductImage model.
+
+    Provides chainable methods for common operations and
+    standardized `for_list()` and `for_detail()` methods.
+    """
+
+    def with_translations(self) -> Self:
+        """Prefetch translations for better performance."""
+        return self.prefetch_related("translations")
+
+    def with_product(self) -> Self:
+        """Select related product."""
+        return self.select_related("product")
+
+    def with_product_translations(self) -> Self:
+        """Prefetch product translations."""
+        return self.prefetch_related("product__translations")
+
+    def for_list(self) -> Self:
+        """
+        Optimized queryset for list views.
+
+        Includes product and translations.
+        """
+        return self.with_translations().with_product().ordered_by_position()
+
+    def for_detail(self) -> Self:
+        """
+        Optimized queryset for detail views.
+
+        Includes everything from for_list() plus product translations.
+        """
+        return self.for_list().with_product_translations()
+
     def main_images(self):
         return self.filter(is_main=True)
 
@@ -39,12 +79,12 @@ class EnhancedImageQuerySet(TranslatableQuerySet):
         return self.order_by("sort_order", "created_at")
 
     def optimized_for_list(self):
-        return self.select_related("product").prefetch_related("translations")
+        """Legacy method - use for_list() instead."""
+        return self.for_list()
 
     def with_product_data(self):
-        return self.select_related("product").prefetch_related(
-            "product__translations", "translations"
-        )
+        """Legacy method - use for_detail() instead."""
+        return self.for_detail()
 
     def get_products_needing_images(self, max_images=5):
         from product.models.product import Product  # noqa: PLC0415
@@ -95,8 +135,26 @@ class EnhancedImageQuerySet(TranslatableQuerySet):
 
 
 class EnhancedImageManager(TranslatableManager):
+    """
+    Manager for ProductImage model with optimized queryset methods.
+
+    Usage in ViewSet:
+        def get_queryset(self):
+            if self.action == "list":
+                return ProductImage.objects.for_list()
+            return ProductImage.objects.for_detail()
+    """
+
     def get_queryset(self) -> EnhancedImageQuerySet:
         return EnhancedImageQuerySet(self.model, using=self._db)
+
+    def for_list(self) -> EnhancedImageQuerySet:
+        """Return optimized queryset for list views."""
+        return self.get_queryset().for_list()
+
+    def for_detail(self) -> EnhancedImageQuerySet:
+        """Return optimized queryset for detail views."""
+        return self.get_queryset().for_detail()
 
     def main_image(self, product):
         return self.get_queryset().main_images().for_product(product).first()
@@ -123,10 +181,12 @@ class EnhancedImageManager(TranslatableManager):
         return self.get_queryset().recent(days)
 
     def optimized_for_list(self):
-        return self.get_queryset().optimized_for_list()
+        """Legacy method - use for_list() instead."""
+        return self.get_queryset().for_list()
 
     def with_product_data(self):
-        return self.get_queryset().with_product_data()
+        """Legacy method - use for_detail() instead."""
+        return self.get_queryset().for_detail()
 
     def get_products_needing_images(self, max_images=5):
         return self.get_queryset().get_products_needing_images(max_images)

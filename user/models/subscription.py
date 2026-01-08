@@ -6,6 +6,10 @@ from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel, TranslatedFields
 
 from core.models import TimeStampMixinModel, UUIDModel
+from user.managers.subscription import (
+    SubscriptionTopicManager,
+    UserSubscriptionManager,
+)
 
 
 class SubscriptionTopic(TranslatableModel, TimeStampMixinModel, UUIDModel):
@@ -69,6 +73,8 @@ class SubscriptionTopic(TranslatableModel, TimeStampMixinModel, UUIDModel):
         ),
     )
 
+    objects: SubscriptionTopicManager = SubscriptionTopicManager()
+
     class Meta(TypedModelMeta):
         verbose_name = _("Subscription Topic")
         verbose_name_plural = _("Subscription Topics")
@@ -129,6 +135,8 @@ class UserSubscription(TimeStampMixinModel, UUIDModel):
         blank=True,
         help_text=_("Additional subscription preferences or data"),
     )
+
+    objects: UserSubscriptionManager = UserSubscriptionManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("User Subscription")

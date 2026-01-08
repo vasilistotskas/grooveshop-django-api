@@ -1,14 +1,57 @@
-from typing import cast
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, cast
 
 from django.db import models
-from django.db.models import ExpressionWrapper, F, QuerySet, Sum
+from django.db.models import Count, ExpressionWrapper, F, Sum
 from djmoney.models.fields import MoneyField
 
 from order.enum.status import OrderStatus
 
+if TYPE_CHECKING:
+    from typing import Self
+
 
 class OrderQuerySet(models.QuerySet):
-    def with_total_amounts(self) -> QuerySet:
+    """
+    Optimized QuerySet for Order model.
+
+    Provides chainable methods for common operations and
+    standardized `for_list()` and `for_detail()` methods.
+    """
+
+    def exclude_deleted(self) -> Self:
+        """Exclude soft-deleted orders."""
+        return self.exclude(is_deleted=True)
+
+    def with_user(self) -> Self:
+        """Select related user for order."""
+        return self.select_related("user")
+
+    def with_payment_info(self) -> Self:
+        """Select related payment and location info."""
+        return self.select_related("pay_way", "country", "region")
+
+    def with_items(self) -> Self:
+        """Prefetch order items with product data."""
+        return self.prefetch_related(
+            "items__product__translations",
+            "items__product__images__translations",
+        )
+
+    def with_items_basic(self) -> Self:
+        """Prefetch order items without deep product data (for list views)."""
+        return self.prefetch_related("items", "items__product__translations")
+
+    def with_counts(self) -> Self:
+        """Annotate with item counts for efficient property access."""
+        return self.annotate(
+            _items_count=Count("items", distinct=True),
+            _total_quantity=Sum("items__quantity"),
+        )
+
+    def with_total_amounts(self) -> Self:
+        """Annotate with calculated total amounts."""
         return self.annotate(
             items_total=Sum(
                 ExpressionWrapper(
@@ -18,64 +61,109 @@ class OrderQuerySet(models.QuerySet):
             )
         )
 
-    def pending(self) -> QuerySet:
+    def for_list(self) -> Self:
+        """
+        Optimized queryset for list views.
+
+        Includes user, payment info, and counts but not full item details.
+        """
+        return (
+            self.exclude_deleted()
+            .with_user()
+            .with_payment_info()
+            .with_items_basic()
+            .with_counts()
+        )
+
+    def for_detail(self) -> Self:
+        """
+        Optimized queryset for detail views.
+
+        Includes everything from for_list() plus full item details.
+        """
+        return (
+            self.exclude_deleted()
+            .with_user()
+            .with_payment_info()
+            .with_items()
+            .with_counts()
+        )
+
+    # Status filter methods
+    def pending(self) -> Self:
         return self.filter(status=OrderStatus.PENDING)
 
-    def processing(self) -> QuerySet:
+    def processing(self) -> Self:
         return self.filter(status=OrderStatus.PROCESSING)
 
-    def shipped(self) -> QuerySet:
+    def shipped(self) -> Self:
         return self.filter(status=OrderStatus.SHIPPED)
 
-    def delivered(self) -> QuerySet:
+    def delivered(self) -> Self:
         return self.filter(status=OrderStatus.DELIVERED)
 
-    def completed(self) -> QuerySet:
+    def completed(self) -> Self:
         return self.filter(status=OrderStatus.COMPLETED)
 
-    def canceled(self) -> QuerySet:
+    def canceled(self) -> Self:
         return self.filter(status=OrderStatus.CANCELED)
 
-    def returned(self) -> QuerySet:
+    def returned(self) -> Self:
         return self.filter(status=OrderStatus.RETURNED)
 
-    def refunded(self) -> QuerySet:
+    def refunded(self) -> Self:
         return self.filter(status=OrderStatus.REFUNDED)
 
 
 class OrderManager(models.Manager):
+    """
+    Manager for Order model with optimized queryset methods.
+
+    Usage in ViewSet:
+        def get_queryset(self):
+            if self.action == "list":
+                return Order.objects.for_list()
+            return Order.objects.for_detail()
+    """
+
     def get_queryset(self) -> OrderQuerySet:
+        """Return base queryset excluding deleted orders."""
         return cast(
             "OrderQuerySet",
-            OrderQuerySet(self.model, using=self._db)
-            .select_related("user", "pay_way", "country", "region")
-            .prefetch_related("items", "items__product")
-            .exclude(is_deleted=True),
+            OrderQuerySet(self.model, using=self._db).exclude_deleted(),
         )
 
-    def with_total_amounts(self) -> QuerySet:
+    def for_list(self) -> OrderQuerySet:
+        """Return optimized queryset for list views."""
+        return OrderQuerySet(self.model, using=self._db).for_list()
+
+    def for_detail(self) -> OrderQuerySet:
+        """Return optimized queryset for detail views."""
+        return OrderQuerySet(self.model, using=self._db).for_detail()
+
+    def with_total_amounts(self) -> OrderQuerySet:
         return self.get_queryset().with_total_amounts()
 
-    def pending(self) -> QuerySet:
+    def pending(self) -> OrderQuerySet:
         return self.get_queryset().pending()
 
-    def processing(self) -> QuerySet:
+    def processing(self) -> OrderQuerySet:
         return self.get_queryset().processing()
 
-    def shipped(self) -> QuerySet:
+    def shipped(self) -> OrderQuerySet:
         return self.get_queryset().shipped()
 
-    def delivered(self) -> QuerySet:
+    def delivered(self) -> OrderQuerySet:
         return self.get_queryset().delivered()
 
-    def completed(self) -> QuerySet:
+    def completed(self) -> OrderQuerySet:
         return self.get_queryset().completed()
 
-    def canceled(self) -> QuerySet:
+    def canceled(self) -> OrderQuerySet:
         return self.get_queryset().canceled()
 
-    def returned(self) -> QuerySet:
+    def returned(self) -> OrderQuerySet:
         return self.get_queryset().returned()
 
-    def refunded(self) -> QuerySet:
+    def refunded(self) -> OrderQuerySet:
         return self.get_queryset().refunded()

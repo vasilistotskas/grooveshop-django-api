@@ -106,16 +106,15 @@ class BlogPostViewSet(BaseModelViewSet):
     ]
 
     def get_queryset(self):
-        queryset = BlogPost.objects.select_related(
-            "author__user", "category", "author"
-        ).prefetch_related(
-            "tags__translations",
-            "likes",
-            "comments",
-            "translations",
-            "category__translations",
-        )
-        return queryset
+        """
+        Return optimized queryset based on action.
+
+        Uses BlogPost.objects.for_list() for list views and
+        BlogPost.objects.for_detail() for detail views to avoid N+1 queries.
+        """
+        if self.action == "list":
+            return BlogPost.objects.for_list()
+        return BlogPost.objects.for_detail()
 
     def get_filterset_class(self):
         if self.action == "comments":

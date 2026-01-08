@@ -78,7 +78,10 @@ class ProductReviewViewSet(BaseModelViewSet):
     request_serializers = req_serializers
 
     def get_queryset(self):
-        queryset = ProductReview.objects.with_product_details()
+        if self.action == "list":
+            queryset = ProductReview.objects.for_list()
+        else:
+            queryset = ProductReview.objects.for_detail()
 
         if self.request.user.is_superuser:
             return queryset

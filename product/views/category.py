@@ -64,6 +64,12 @@ class ProductCategoryViewSet(BaseModelViewSet):
     search_fields = ["translations__name", "translations__description", "slug"]
 
     def get_queryset(self):
-        """Optimize queryset with prefetch_related for translations."""
-        queryset = super().get_queryset()
-        return queryset.prefetch_related("translations")
+        """
+        Return optimized queryset based on action.
+
+        Uses ProductCategory.objects.for_list() for list views and
+        ProductCategory.objects.for_detail() for detail views.
+        """
+        if self.action == "list":
+            return ProductCategory.objects.for_list()
+        return ProductCategory.objects.for_detail()

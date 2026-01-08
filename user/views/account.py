@@ -239,37 +239,43 @@ class UserAccountViewSet(BaseModelViewSet):
     def get_queryset(self):
         match self.action:
             case "favourite_products":
-                queryset = get_object_or_404(
-                    User, id=self.kwargs["pk"]
-                ).favourite_products.all()
+                from product.models.favourite import ProductFavourite
+
+                user = get_object_or_404(User, id=self.kwargs["pk"])
+                queryset = ProductFavourite.objects.for_list().filter(user=user)
             case "orders":
-                queryset = get_object_or_404(
-                    User, id=self.kwargs["pk"]
-                ).orders.all()
+                from order.models.order import Order
+
+                user = get_object_or_404(User, id=self.kwargs["pk"])
+                queryset = Order.objects.for_list().filter(user=user)
             case "product_reviews":
-                queryset = get_object_or_404(
-                    User, id=self.kwargs["pk"]
-                ).product_reviews.all()
+                from product.models.review import ProductReview
+
+                user = get_object_or_404(User, id=self.kwargs["pk"])
+                queryset = ProductReview.objects.for_list().filter(user=user)
             case "addresses":
-                queryset = get_object_or_404(
-                    User, id=self.kwargs["pk"]
-                ).addresses.all()
+                from user.models.address import UserAddress
+
+                user = get_object_or_404(User, id=self.kwargs["pk"])
+                queryset = UserAddress.objects.for_list().filter(user=user)
             case "blog_post_comments":
-                queryset = get_object_or_404(
-                    User, id=self.kwargs["pk"]
-                ).blog_comments.all()
+                from blog.models.comment import BlogComment
+
+                user = get_object_or_404(User, id=self.kwargs["pk"])
+                queryset = BlogComment.objects.for_list().filter(user=user)
             case "liked_blog_posts":
-                queryset = get_object_or_404(
-                    User, id=self.kwargs["pk"]
-                ).liked_blog_posts.all()
+                from blog.models.post import BlogPost
+
+                user = get_object_or_404(User, id=self.kwargs["pk"])
+                queryset = BlogPost.objects.for_list().filter(likes=user)
             case "notifications":
-                queryset = get_object_or_404(
-                    User, id=self.kwargs["pk"]
-                ).notification.all()
+                from notification.models import NotificationUser
+
+                user = get_object_or_404(User, id=self.kwargs["pk"])
+                queryset = NotificationUser.objects.for_list().filter(user=user)
             case "subscriptions":
-                queryset = get_object_or_404(
-                    User, id=self.kwargs["pk"]
-                ).subscriptions.select_related("topic")
+                user = get_object_or_404(User, id=self.kwargs["pk"])
+                queryset = user.subscriptions.select_related("topic")
             case _:
                 queryset = (
                     User.objects.all()

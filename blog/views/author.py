@@ -75,9 +75,9 @@ class BlogAuthorViewSet(BaseModelViewSet):
                 "category", "author__user"
             ).prefetch_related("translations", "tags__translations", "likes")
 
-        return BlogAuthor.objects.select_related("user").prefetch_related(
-            "translations"
-        )
+        if self.action == "list":
+            return BlogAuthor.objects.for_list()
+        return BlogAuthor.objects.for_detail()
 
     ordering_fields = [
         "id",

@@ -3,6 +3,16 @@
 
 
 
+## v1.64.0 (2026-01-08)
+
+### Bug fixes
+
+* fix: cart service ([`c6ecb84`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c6ecb84ae24c713760f4eeb7d9829325245b33ab))
+
+### Features
+
+* feat: perf improve ([`dbcfb45`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dbcfb4537add16eebd53872f6e0289113786766c))
+
 ## v1.63.0 (2026-01-08)
 
 ### Bug fixes

@@ -3,6 +3,16 @@
 
 
 
+## v1.63.0 (2026-01-08)
+
+### Bug fixes
+
+* fix: tests ([`b59abb7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b59abb78c21ac2900f9b9d64f26df5c43d630a6f))
+
+### Features
+
+* feat: Bump Versions ([`e3d838f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e3d838f93ed87de82c0caf7cb0c7f1516cbbd71e))
+
 ## v1.62.0 (2025-12-18)
 
 ### Features

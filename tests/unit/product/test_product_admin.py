@@ -337,12 +337,14 @@ class TestCategoryAdmin:
         assert len(result) >= 0
 
     def test_created_display(self, category_admin):
+        from django.utils import timezone
+
         category = ProductCategoryFactory()
 
         result = category_admin.created_display(category)
 
         assert len(result) > 10
-        assert "2025" in result or "2024" in result
+        assert str(timezone.now().year) in result
 
     def test_category_analytics(self, category_admin):
         category = ProductCategoryFactory()
@@ -421,12 +423,14 @@ class TestProductAdmin:
         assert "Inactive" in result
 
     def test_created_display(self, product_admin):
+        from django.utils import timezone
+
         product = ProductFactory()
 
         result = product_admin.created_display(product)
 
         assert len(result) > 10
-        assert "2025" in result or "2024" in result
+        assert str(timezone.now().year) in result
 
     def test_pricing_summary(self, product_admin):
         product = ProductFactory(price=Decimal("100.00"), discount_percent=10)
@@ -551,12 +555,14 @@ class TestReviewAdmin:
         assert "New" in result
 
     def test_created_display(self, review_admin):
+        from django.utils import timezone
+
         review = ProductReviewFactory()
 
         result = review_admin.created_display(review)
 
         assert len(result) > 10
-        assert "2025" in result or "2024" in result
+        assert str(timezone.now().year) in result
 
     @patch.object(ProductReviewAdmin, "message_user")
     def test_approve_reviews_action(
@@ -610,12 +616,14 @@ class TestFavouriteAdmin:
         )
 
     def test_created_display(self, favourite_admin):
+        from django.utils import timezone
+
         favourite = ProductFavouriteFactory()
 
         result = favourite_admin.created_display(favourite)
 
         assert len(result) > 10
-        assert "2025" in result or "2024" in result
+        assert str(timezone.now().year) in result
 
 
 @pytest.mark.django_db

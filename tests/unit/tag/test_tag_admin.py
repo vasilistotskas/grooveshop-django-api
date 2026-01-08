@@ -215,12 +215,14 @@ class TestTagAdmin:
         assert "#100" in result
 
     def test_created_display(self, tag_admin):
+        from django.utils import timezone
+
         tag = TagFactory()
 
         result = tag_admin.created_display(tag)
 
         assert len(result) > 10
-        assert "2025" in result or "2024" in result
+        assert str(timezone.now().year) in result
 
     def test_tag_analytics(self, tag_admin):
         tag = TagFactory()
@@ -355,6 +357,8 @@ class TestTaggedItemAdmin:
         assert "bg-green-50" in result
 
     def test_created_display(self, tagged_item_admin):
+        from django.utils import timezone
+
         tag = TagFactory()
         product = ProductFactory()
         tagged_item = TaggedProductFactory(tag=tag, content_object=product)
@@ -362,7 +366,7 @@ class TestTaggedItemAdmin:
         result = tagged_item_admin.created_display(tagged_item)
 
         assert len(result) > 10
-        assert "2025" in result or "2024" in result
+        assert str(timezone.now().year) in result
 
 
 @pytest.mark.django_db

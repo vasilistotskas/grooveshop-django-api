@@ -91,7 +91,7 @@ class CartService:
         user = self.request.user
 
         if user.is_authenticated:
-            cart = Cart.objects.for_user(user).for_detail().first()
+            cart = Cart.objects.filter(user=user).first()
 
             if cart and self.cart_id:
                 guest_cart = (
@@ -105,10 +105,7 @@ class CartService:
         else:
             if self.cart_id:
                 return (
-                    Cart.objects.guest_carts()
-                    .for_detail()
-                    .filter(id=self.cart_id)
-                    .first()
+                    Cart.objects.guest_carts().filter(id=self.cart_id).first()
                 )
 
             return None
@@ -148,12 +145,10 @@ class CartService:
         if target_cart.id == source_cart.id:
             return
 
-        for item in source_cart.items.for_list():
-            existing_item = (
-                CartItem.objects.for_cart(target_cart)
-                .filter(product=item.product)
-                .first()
-            )
+        for item in source_cart.items.all():
+            existing_item = CartItem.objects.filter(
+                cart=target_cart, product=item.product
+            ).first()
 
             if existing_item:
                 existing_item.quantity += item.quantity
@@ -185,9 +180,9 @@ class CartService:
         if not self.cart:
             raise CartNotSetException("Cart is not set.")
 
-        existing_item = (
-            CartItem.objects.for_cart(self.cart).filter(product=product).first()
-        )
+        existing_item = CartItem.objects.filter(
+            cart=self.cart, product=product
+        ).first()
 
         if existing_item:
             existing_item.quantity += quantity

@@ -32,6 +32,7 @@ class PayWaySerializer(
             "free_threshold",
             "icon",
             "sort_order",
+            "main_image_path",
             "created_at",
             "updated_at",
             "uuid",
@@ -42,6 +43,7 @@ class PayWaySerializer(
         )
         read_only_fields = (
             "id",
+            "main_image_path",
             "created_at",
             "updated_at",
             "uuid",

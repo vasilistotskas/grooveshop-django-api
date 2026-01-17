@@ -8432,7 +8432,7 @@ paths:
           description: No response body
   /api/v1/health:
     get:
-      operationId: api_v1_health_retrieve
+      operationId: health_retrieve
       description: Check the health status of database, Redis, and Celery
       summary: Check the health status of database, Redis, and Celery
       tags:
@@ -16947,7 +16947,7 @@ paths:
           description: ''
   /api/v1/search/blog/post:
     get:
-      operationId: api_v1_search_blog_post_retrieve
+      operationId: search_blog_post_retrieve
       description: Search blog posts using MeiliSearch. Provides full-text search
         with highlighting, ranking, and faceting capabilities. Results can be filtered
         by language.
@@ -17002,7 +17002,7 @@ paths:
           description: ''
   /api/v1/search/product:
     get:
-      operationId: api_v1_search_product_retrieve
+      operationId: search_product_retrieve
       description: Search products using MeiliSearch. Provides full-text search with
         highlighting, ranking, and faceting capabilities. Results can be filtered
         by language.
@@ -17057,7 +17057,7 @@ paths:
           description: ''
   /api/v1/settings:
     get:
-      operationId: api_v1_settings_list
+      operationId: settings_list
       description: Retrieve all settings with their names, values, and types
       summary: List all available settings
       tags:
@@ -17083,7 +17083,7 @@ paths:
           description: ''
   /api/v1/settings/get:
     get:
-      operationId: api_v1_settings_get_retrieve
+      operationId: settings_get_retrieve
       description: Retrieve a specific setting value by its key name
       summary: Get setting by key
       parameters:
@@ -21735,9 +21735,17 @@ components:
           nullable: true
         postCount:
           type: integer
+          description: |-
+            Return post count from annotation if available, otherwise query.
+
+            Uses _post_count annotation from BlogCategoryManager.for_list().
           readOnly: true
         hasChildren:
           type: boolean
+          description: |-
+            Return has_children from annotation if available, otherwise query.
+
+            Uses _has_children annotation from BlogCategoryManager.for_list().
           readOnly: true
         mainImagePath:
           type: string
@@ -21808,9 +21816,17 @@ components:
           nullable: true
         postCount:
           type: integer
+          description: |-
+            Return post count from annotation if available, otherwise query.
+
+            Uses _post_count annotation from BlogCategoryManager.for_list().
           readOnly: true
         hasChildren:
           type: boolean
+          description: |-
+            Return has_children from annotation if available, otherwise query.
+
+            Uses _has_children annotation from BlogCategoryManager.for_list().
           readOnly: true
         mainImagePath:
           type: string
@@ -22914,9 +22930,19 @@ components:
           - enum:
             - 0
             type: integer
+          description: |-
+            Return the total quantity of all items in the cart.
+
+            Uses annotated value if available (from optimized queryset),
+            otherwise calculates from items.
           readOnly: true
         totalItemsUnique:
           type: integer
+          description: |-
+            Return the number of unique items in the cart.
+
+            Uses annotated value if available (from optimized queryset),
+            otherwise queries the database.
           readOnly: true
         createdAt:
           type: string
@@ -22990,9 +23016,19 @@ components:
           - enum:
             - 0
             type: integer
+          description: |-
+            Return the total quantity of all items in the cart.
+
+            Uses annotated value if available (from optimized queryset),
+            otherwise calculates from items.
           readOnly: true
         totalItemsUnique:
           type: integer
+          description: |-
+            Return the number of unique items in the cart.
+
+            Uses annotated value if available (from optimized queryset),
+            otherwise queries the database.
           readOnly: true
         createdAt:
           type: string
@@ -26691,6 +26727,9 @@ components:
           type: integer
           readOnly: true
           nullable: true
+        mainImagePath:
+          type: string
+          readOnly: true
         createdAt:
           type: string
           format: date-time
@@ -26724,6 +26763,7 @@ components:
       - freeThreshold
       - iconFilename
       - id
+      - mainImagePath
       - sortOrder
       - translations
       - updatedAt
@@ -26789,6 +26829,9 @@ components:
           type: integer
           readOnly: true
           nullable: true
+        mainImagePath:
+          type: string
+          readOnly: true
         createdAt:
           type: string
           format: date-time
@@ -26826,6 +26869,7 @@ components:
       - freeThreshold
       - iconFilename
       - id
+      - mainImagePath
       - sortOrder
       - translations
       - updatedAt
@@ -27053,12 +27097,27 @@ components:
         reviewAverage:
           type: number
           format: double
+          description: |-
+            Return the average review rating for this product.
+
+            Uses annotated value if available (from optimized queryset),
+            otherwise queries the database.
           readOnly: true
         reviewCount:
           type: integer
+          description: |-
+            Return the number of reviews for this product.
+
+            Uses annotated value if available (from optimized queryset),
+            otherwise queries the database.
           readOnly: true
         likesCount:
           type: integer
+          description: |-
+            Return the number of likes/favourites for this product.
+
+            Uses annotated value if available (from optimized queryset),
+            otherwise queries the database.
           readOnly: true
       required:
       - category
@@ -27636,12 +27695,27 @@ components:
         reviewAverage:
           type: number
           format: double
+          description: |-
+            Return the average review rating for this product.
+
+            Uses annotated value if available (from optimized queryset),
+            otherwise queries the database.
           readOnly: true
         reviewCount:
           type: integer
+          description: |-
+            Return the number of reviews for this product.
+
+            Uses annotated value if available (from optimized queryset),
+            otherwise queries the database.
           readOnly: true
         likesCount:
           type: integer
+          description: |-
+            Return the number of likes/favourites for this product.
+
+            Uses annotated value if available (from optimized queryset),
+            otherwise queries the database.
           readOnly: true
       required:
       - category
@@ -27878,12 +27952,27 @@ components:
         reviewAverage:
           type: number
           format: double
+          description: |-
+            Return the average review rating for this product.
+
+            Uses annotated value if available (from optimized queryset),
+            otherwise queries the database.
           readOnly: true
         reviewCount:
           type: integer
+          description: |-
+            Return the number of reviews for this product.
+
+            Uses annotated value if available (from optimized queryset),
+            otherwise queries the database.
           readOnly: true
         likesCount:
           type: integer
+          description: |-
+            Return the number of likes/favourites for this product.
+
+            Uses annotated value if available (from optimized queryset),
+            otherwise queries the database.
           readOnly: true
       required:
       - category

@@ -1,5 +1,6 @@
 import os
 
+from core.fields.image import ImageAndSvgField
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -30,9 +31,7 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
             "Order amount above which this payment method becomes free"
         ),
     )
-    icon = models.ImageField(
-        _("Icon"), upload_to="uploads/pay_way/", blank=True, null=True
-    )
+    icon = ImageAndSvgField(_("Icon"), upload_to="uploads/pay_way/", blank=True, null=True)
     provider_code = models.CharField(
         _("Provider Code"),
         max_length=50,
@@ -104,6 +103,12 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
 
     def get_ordering_queryset(self):
         return PayWay.objects.all()
+
+    @property
+    def main_image_path(self) -> str:
+        if self.icon and hasattr(self.icon, "name"):
+            return f"media/uploads/pay_way/{os.path.basename(self.icon.name)}"
+        return ""
 
     @property
     def icon_filename(self) -> str:

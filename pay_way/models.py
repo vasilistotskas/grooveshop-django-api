@@ -31,7 +31,9 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
             "Order amount above which this payment method becomes free"
         ),
     )
-    icon = ImageAndSvgField(_("Icon"), upload_to="uploads/pay_way/", blank=True, null=True)
+    icon = ImageAndSvgField(
+        _("Icon"), upload_to="uploads/pay_way/", blank=True, null=True
+    )
     provider_code = models.CharField(
         _("Provider Code"),
         max_length=50,

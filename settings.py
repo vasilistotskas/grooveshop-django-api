@@ -151,6 +151,7 @@ MIDDLEWARE = [
     "allauth.usersessions.middleware.UserSessionsMiddleware",
     "djangorestframework_camel_case.middleware.CamelCaseMiddleWare",
     "simple_history.middleware.HistoryRequestMiddleware",
+    "core.middleware.asgi_compat.ASGICompatMiddleware",  # ASGI compatibility for Rosetta
 ]
 
 ROOT_URLCONF = "core.urls"
@@ -1089,6 +1090,12 @@ ROSETTA_MESSAGES_PER_PAGE = 25
 ROSETTA_ENABLE_TRANSLATION_SUGGESTIONS = True
 ROSETTA_SHOW_AT_ADMIN_PANEL = True
 ROSETTA_REQUIRES_AUTH = True
+ROSETTA_WSGI_AUTO_RELOAD = True
+ROSETTA_UWSGI_AUTO_RELOAD = True
+ROSETTA_AUTO_COMPILE = True
+ROSETTA_POFILE_WRAP_WIDTH = 0
+ROSETTA_CACHE_NAME = "default"
+ROSETTA_STORAGE_CLASS = "core.rosetta_storage.CacheClearingRosettaStorage"
 
 UNFOLD = {
     "SITE_TITLE": getenv("UNFOLD_SITE_TITLE", "GrooveShop Title"),

@@ -3,6 +3,16 @@
 
 
 
+## v1.65.0 (2026-01-17)
+
+### Bug fixes
+
+* fix: ruff ([`75d0676`](https://github.com/vasilistotskas/grooveshop-django-api/commit/75d0676c24877f1d30cf6d12b14be76bfd996ea0))
+
+### Features
+
+* feat: pay way image, bump versions ([`64d3c1c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/64d3c1c2fcb62b197a5d200bf1d371db1fc7581d))
+
 ## v1.64.0 (2026-01-08)
 
 ### Bug fixes

@@ -37,10 +37,18 @@ class EmailTemplatePreviewService:
         self.sample_generator = SampleOrderDataGenerator()
 
     def generate_preview(
-        self, template_name: str, order_id: Optional[int] = None
+        self,
+        template_name: str,
+        order_id: Optional[int] = None,
+        language: str = "el",
     ) -> EmailPreview:
         """Generate preview for a template."""
+        from django.utils import translation
+
         try:
+            # Activate the selected language for template rendering
+            translation.activate(language)
+
             # Determine category from configuration
             category = self._extract_category(template_name)
 
@@ -90,6 +98,9 @@ class EmailTemplatePreviewService:
                 is_sample_data=True,
                 error=str(e),
             )
+        finally:
+            # Deactivate translation to restore default language
+            translation.deactivate()
 
     def _get_context_data_for_category(
         self, template_name: str, order_id: Optional[int] = None

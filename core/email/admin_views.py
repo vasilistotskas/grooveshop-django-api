@@ -112,7 +112,7 @@ def preview_template_ajax(request: HttpRequest) -> JsonResponse:
         # Generate preview
         preview_service = EmailTemplatePreviewService()
         preview = preview_service.generate_preview(
-            template_name=template_name, order_id=order_id
+            template_name=template_name, order_id=order_id, language=language
         )
 
         # Build result

@@ -3,12 +3,11 @@
 # This file is distributed under the same license as the PACKAGE package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
 #
-#, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-10-16 10:49+0300\n"
+"POT-Creation-Date: 2026-01-17 20:13+0200\n"
 "PO-Revision-Date: 2023-07-12 12:32+0300\n"
 "Last-Translator:   <bill@bill.gr>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -84,7 +83,7 @@ msgstr ""
 
 #: .\blog\admin.py:263 .\blog\admin.py:1038 .\notification\admin.py:700
 #: .\product\admin.py:1354 .\product\admin.py:1532 .\user\admin.py:925
-#: .\user\models\subscription.py:102
+#: .\user\models\subscription.py:108
 msgid "User"
 msgstr ""
 
@@ -112,21 +111,29 @@ msgstr ""
 
 #: .\blog\admin.py:367 .\blog\models\category.py:34 .\blog\models\tag.py:16
 #: .\contact\models.py:14 .\country\models.py:48 .\pay_way\admin.py:239
-#: .\pay_way\models.py:67 .\product\models\category.py:37
-#: .\product\models\product.py:293 .\region\models.py:19
-#: .\user\models\subscription.py:59
+#: .\pay_way\models.py:68 .\product\models\category.py:37
+#: .\product\models\product.py:317 .\region\models.py:19
+#: .\user\models\subscription.py:63
 msgid "Name"
 msgstr ""
 
 #: .\blog\admin.py:388 .\blog\admin.py:763 .\blog\admin.py:1084
+#: .\core\templates\emails\order\order_completed.html:22
+#: .\core\templates\emails\order\order_completed.txt:18
+#: .\core\templates\emails\order\order_confirmation.html:13
+#: .\core\templates\emails\order\order_confirmation.txt:7
+#: .\core\templates\emails\order\order_pending_reminder.html:18
+#: .\core\templates\emails\order\order_pending_reminder.txt:7
+#: .\core\templates\emails\subscription\confirmation.html:17
+#: .\core\templates\emails\subscription\confirmation.txt:13
 #: .\notification\admin.py:411 .\notification\admin.py:655
 #: .\notification\admin.py:772 .\order\admin.py:721 .\order\models\order.py:89
 #: .\pay_way\admin.py:274 .\product\admin.py:639 .\product\admin.py:1147
 #: .\product\admin.py:1419 .\product\admin.py:1704
 #: .\product\models\review.py:29 .\tag\admin.py:278 .\user\admin.py:444
-#: .\user\admin.py:807 .\user\admin.py:962 .\user\models\subscription.py:111
+#: .\user\admin.py:807 .\user\admin.py:962 .\user\models\subscription.py:117
 msgid "Status"
-msgstr ""
+msgstr "Κατάσταση"
 
 #: .\blog\admin.py:433 .\product\admin.py:1023
 msgid "Category Information"
@@ -177,17 +184,19 @@ msgstr ""
 msgid "System"
 msgstr ""
 
-#: .\blog\admin.py:685 .\blog\models\post.py:114
+#: .\blog\admin.py:685 .\blog\models\post.py:123
 #: .\notification\models\notification.py:55
 #: .\product\models\category_image.py:36 .\product\models\image.py:28
 #: .\user\models\address.py:20
 msgid "Title"
 msgstr ""
 
-#: .\blog\admin.py:706 .\notification\admin.py:362
-#: .\notification\models\notification.py:31 .\product\admin.py:478
-#: .\product\admin.py:1107 .\product\admin.py:1644 .\user\admin.py:798
-#: .\user\models\subscription.py:30 .\vat\admin.py:235
+#: .\blog\admin.py:706
+#: .\core\templates\emails\subscription\confirmation.html:16
+#: .\core\templates\emails\subscription\confirmation.txt:12
+#: .\notification\admin.py:362 .\notification\models\notification.py:31
+#: .\product\admin.py:478 .\product\admin.py:1107 .\product\admin.py:1644
+#: .\user\admin.py:798 .\user\models\subscription.py:34 .\vat\admin.py:235
 msgid "Category"
 msgstr ""
 
@@ -709,15 +718,15 @@ msgstr ""
 
 #: .\blog\models\category.py:22 .\blog\models\post.py:27
 #: .\product\models\category.py:27 .\product\models\product.py:69
-#: .\user\models\subscription.py:22
+#: .\user\models\subscription.py:26
 msgid "Slug"
 msgstr ""
 
 #: .\blog\models\category.py:35 .\order\admin.py:311 .\order\admin.py:1481
 #: .\order\admin.py:1601 .\order\models\history.py:25
-#: .\order\models\history.py:230 .\pay_way\models.py:73
-#: .\product\models\category.py:38 .\product\models\product.py:294
-#: .\user\models\subscription.py:64
+#: .\order\models\history.py:230 .\pay_way\models.py:74
+#: .\product\models\category.py:38 .\product\models\product.py:318
+#: .\user\models\subscription.py:68
 msgid "Description"
 msgstr ""
 
@@ -753,29 +762,32 @@ msgstr ""
 msgid "Blog Posts"
 msgstr ""
 
-#: .\blog\models\post.py:116
+#: .\blog\models\post.py:125
 msgid "Subtitle"
 msgstr ""
 
-#: .\blog\models\post.py:118
+#: .\blog\models\post.py:127
 msgid "Body"
 msgstr ""
 
-#: .\blog\models\post.py:124
+#: .\blog\models\post.py:133
 msgid "Blog Post Translation"
 msgstr ""
 
-#: .\blog\models\post.py:125
+#: .\blog\models\post.py:134
 msgid "Blog Post Translations"
 msgstr ""
 
 #: .\blog\models\tag.py:13
+#: .\core\templates\admin\email_template_management.html:524
 #: .\core\templates\admin\product\apply_discount.html:131
-#: .\notification\admin.py:26 .\pay_way\models.py:17
+#: .\core\templates\emails\subscription\confirmation.html:17
+#: .\core\templates\emails\subscription\confirmation.txt:13
+#: .\notification\admin.py:26 .\pay_way\models.py:18
 #: .\product\models\category.py:28 .\product\models\category_image.py:33
 #: .\product\models\product.py:76 .\tag\admin.py:430 .\tag\models\tag.py:13
-#: .\user\models\account.py:81 .\user\models\subscription.py:37
-#: .\user\models\subscription.py:93
+#: .\user\models\account.py:81 .\user\models\subscription.py:41
+#: .\user\models\subscription.py:99
 msgid "Active"
 msgstr ""
 
@@ -804,54 +816,54 @@ msgstr ""
 msgid "Website must start with http:// or https://"
 msgstr ""
 
-#: .\blog\serializers\category.py:140
+#: .\blog\serializers\category.py:154
 msgid "Category cannot be its own parent."
 msgstr ""
 
-#: .\blog\serializers\category.py:144
+#: .\blog\serializers\category.py:158
 msgid "Category cannot have a descendant as parent."
 msgstr ""
 
-#: .\blog\serializers\category.py:150 .\blog\serializers\post.py:177
+#: .\blog\serializers\category.py:164 .\blog\serializers\post.py:177
 #: .\product\serializers\product.py:129
 msgid "Slug is required."
 msgstr ""
 
-#: .\blog\serializers\category.py:158 .\blog\serializers\post.py:185
+#: .\blog\serializers\category.py:172 .\blog\serializers\post.py:185
 #: .\product\serializers\product.py:137
 msgid "A post with this slug already exists."
 msgstr ""
 
-#: .\blog\serializers\category.py:175
+#: .\blog\serializers\category.py:189
 msgid "Category ID"
 msgstr ""
 
-#: .\blog\serializers\category.py:176
+#: .\blog\serializers\category.py:190
 msgid "New sort order value"
 msgstr ""
 
-#: .\blog\serializers\category.py:182
+#: .\blog\serializers\category.py:196
 msgid "List of categories with new sort orders"
 msgstr ""
 
-#: .\blog\serializers\category.py:191
+#: .\blog\serializers\category.py:205
 msgid "At least one category is required."
 msgstr ""
 
-#: .\blog\serializers\category.py:197
+#: .\blog\serializers\category.py:211
 msgid "Duplicate category IDs are not allowed."
 msgstr ""
 
-#: .\blog\serializers\category.py:208
+#: .\blog\serializers\category.py:222
 #, python-format
 msgid "Categories with IDs %(missing_ids)s do not exist."
 msgstr ""
 
-#: .\blog\serializers\category.py:216
+#: .\blog\serializers\category.py:230
 msgid "Number of categories updated"
 msgstr ""
 
-#: .\blog\serializers\category.py:218
+#: .\blog\serializers\category.py:232
 msgid "Success message"
 msgstr ""
 
@@ -939,11 +951,11 @@ msgstr ""
 msgid "Sort order cannot be negative."
 msgstr ""
 
-#: .\blog\views\author.py:98
+#: .\blog\views\author.py:104
 msgid "Get author's blog posts"
 msgstr ""
 
-#: .\blog\views\author.py:100
+#: .\blog\views\author.py:106
 msgid "Retrieve all blog posts written by this author with proper pagination."
 msgstr ""
 
@@ -1008,126 +1020,126 @@ msgstr ""
 msgid "Batch reorder categories by updating their sort_order values."
 msgstr ""
 
-#: .\blog\views\category.py:320
+#: .\blog\views\category.py:313
 msgid "Categories reordered successfully."
 msgstr ""
 
-#: .\blog\views\comment.py:125
+#: .\blog\views\comment.py:121
 msgid "Get comment replies"
 msgstr ""
 
-#: .\blog\views\comment.py:127
+#: .\blog\views\comment.py:123
 msgid "Get all replies (children) of this comment in threaded structure."
 msgstr ""
 
-#: .\blog\views\comment.py:153
+#: .\blog\views\comment.py:149
 msgid "Get comment thread"
 msgstr ""
 
-#: .\blog\views\comment.py:155
+#: .\blog\views\comment.py:151
 msgid ""
 "Get the complete thread (all ancestors and descendants) of this comment."
 msgstr ""
 
-#: .\blog\views\comment.py:193
+#: .\blog\views\comment.py:189
 msgid "Toggle comment like"
 msgstr ""
 
-#: .\blog\views\comment.py:194
+#: .\blog\views\comment.py:190
 msgid "Like or unlike a comment. Toggles the like status."
 msgstr ""
 
-#: .\blog\views\comment.py:228
+#: .\blog\views\comment.py:224
 msgid "Get comment's blog post"
 msgstr ""
 
-#: .\blog\views\comment.py:229
+#: .\blog\views\comment.py:225
 msgid "Get the blog post that this comment belongs to."
 msgstr ""
 
-#: .\blog\views\comment.py:253
+#: .\blog\views\comment.py:249
 msgid "Check bulk like status"
 msgstr ""
 
-#: .\blog\views\comment.py:255
+#: .\blog\views\comment.py:251
 msgid "Check which comments from a list are liked by the current user."
 msgstr ""
 
-#: .\blog\views\comment.py:288
+#: .\blog\views\comment.py:284
 msgid "Get current user's comments"
 msgstr ""
 
-#: .\blog\views\comment.py:290
+#: .\blog\views\comment.py:286
 msgid "Get all comments made by the currently authenticated user."
 msgstr ""
 
-#: .\blog\views\post.py:151
+#: .\blog\views\post.py:150
 msgid "Toggle post like"
 msgstr ""
 
-#: .\blog\views\post.py:152
+#: .\blog\views\post.py:151
 msgid "Like or unlike a blog post. Toggles the like status."
 msgstr ""
 
-#: .\blog\views\post.py:165
+#: .\blog\views\post.py:164
 msgid "Authentication credentials were not provided."
 msgstr ""
 
-#: .\blog\views\post.py:186
+#: .\blog\views\post.py:185
 msgid "Increment post view count"
 msgstr ""
 
-#: .\blog\views\post.py:187
+#: .\blog\views\post.py:186
 msgid "Increment the view count for a blog post."
 msgstr ""
 
-#: .\blog\views\post.py:208
+#: .\blog\views\post.py:207
 msgid "Get related posts"
 msgstr ""
 
-#: .\blog\views\post.py:209
+#: .\blog\views\post.py:208
 msgid "Get related posts for a blog post."
 msgstr ""
 
-#: .\blog\views\post.py:242
+#: .\blog\views\post.py:241
 msgid "Get liked posts"
 msgstr ""
 
-#: .\blog\views\post.py:243
+#: .\blog\views\post.py:242
 msgid "Get all posts that the authenticated user has liked."
 msgstr ""
 
-#: .\blog\views\post.py:275
+#: .\blog\views\post.py:274
 msgid "Get post comments"
 msgstr ""
 
-#: .\blog\views\post.py:276
+#: .\blog\views\post.py:275
 msgid "Get all comments for a blog post."
 msgstr ""
 
-#: .\blog\views\post.py:332
+#: .\blog\views\post.py:331
 msgid "Get trending posts"
 msgstr ""
 
-#: .\blog\views\post.py:334
+#: .\blog\views\post.py:333
 msgid ""
 "Get trending blog posts based on recent engagement metrics. Combines views, "
 "likes, and comments from recent time period."
 msgstr ""
 
-#: .\blog\views\post.py:379
+#: .\blog\views\post.py:378
 msgid "Get popular posts"
 msgstr ""
 
-#: .\blog\views\post.py:381
+#: .\blog\views\post.py:380
 msgid "Get most popular blog posts based on all-time engagement metrics."
 msgstr ""
 
-#: .\blog\views\post.py:403
+#: .\blog\views\post.py:402
 msgid "Get featured posts"
 msgstr ""
 
-#: .\blog\views\post.py:405
+#: .\blog\views\post.py:404
 msgid "Get posts marked as featured, ordered by publication date."
 msgstr ""
 
@@ -1167,21 +1179,26 @@ msgstr ""
 msgid "Old (7+ days)"
 msgstr ""
 
-#: .\cart\admin.py:129 .\cart\admin.py:528 .\notification\enum.py:26
-#: .\order\admin.py:241 .\order\admin.py:1245 .\product\admin.py:446
-#: .\product\admin.py:1335 .\product\admin.py:1550 .\product\admin.py:1794
-#: .\product\models\product.py:110
+#: .\cart\admin.py:129 .\cart\admin.py:528
+#: .\core\templates\emails\marketing\newsletter.html:24
+#: .\core\templates\emails\order\order_confirmation.html:28
+#: .\notification\enum.py:26 .\order\admin.py:241 .\order\admin.py:1245
+#: .\product\admin.py:446 .\product\admin.py:1335 .\product\admin.py:1550
+#: .\product\admin.py:1794 .\product\models\product.py:110
 msgid "Product"
-msgstr ""
+msgstr "Προϊόν"
 
 #: .\cart\admin.py:152 .\order\admin.py:248
 msgid "Unit Price"
 msgstr ""
 
 #: .\cart\admin.py:165 .\cart\admin.py:365
-#: .\core\templates\admin\product\apply_discount.html:139 .\order\admin.py:255
+#: .\core\templates\admin\product\apply_discount.html:139
+#: .\core\templates\emails\order\order_confirmation.html:31
+#: .\core\templates\emails\order\order_confirmation.html:49
+#: .\core\templates\emails\order\order_confirmation.txt:22 .\order\admin.py:255
 msgid "Total"
-msgstr ""
+msgstr "Σύνολο"
 
 #: .\cart\admin.py:179 .\cart\admin.py:585
 msgid "Discount"
@@ -1467,9 +1484,11 @@ msgstr ""
 msgid "Carts"
 msgstr ""
 
-#: .\cart\models\item.py:21 .\order\admin.py:1270 .\order\models\item.py:28
+#: .\cart\models\item.py:21
+#: .\core\templates\emails\order\order_confirmation.html:29
+#: .\order\admin.py:1270 .\order\models\item.py:28
 msgid "Quantity"
-msgstr ""
+msgstr "Ποσότητα"
 
 #: .\cart\models\item.py:27
 msgid "Cart Items"
@@ -1487,38 +1506,31 @@ msgstr ""
 msgid "Related products that might interest the customer"
 msgstr ""
 
-#: .\cart\serializers\item.py:126 .\cart\serializers\item.py:207
-#: .\cart\serializers\item.py:282
+#: .\cart\serializers\item.py:126 .\cart\serializers\item.py:197
+#: .\cart\serializers\item.py:262
 msgid "Quantity must be greater than zero."
 msgstr ""
 
-#: .\cart\serializers\item.py:129 .\cart\serializers\item.py:210
-#: .\cart\serializers\item.py:285
+#: .\cart\serializers\item.py:129 .\cart\serializers\item.py:200
+#: .\cart\serializers\item.py:265
 msgid "Quantity cannot exceed 999."
 msgstr ""
 
-#: .\cart\serializers\item.py:143 .\cart\serializers\item.py:220
+#: .\cart\serializers\item.py:143 .\cart\serializers\item.py:210
 #, python-brace-format
 msgid "Product '{product_name}' is not available."
 msgstr ""
 
-#: .\cart\serializers\item.py:153 .\cart\serializers\item.py:230
-#: .\cart\serializers\item.py:297 .\order\serializers\order.py:338
+#: .\cart\serializers\item.py:153 .\cart\serializers\item.py:220
+#: .\cart\serializers\item.py:277 .\order\serializers\order.py:338
 #, python-brace-format
 msgid ""
 "Not enough stock for '{product_name}'. Available: {product_stock}, "
 "Requested: {quantity}"
 msgstr ""
 
-#: .\cart\serializers\item.py:171 .\cart\serializers\item.py:247
+#: .\cart\serializers\item.py:171 .\cart\serializers\item.py:237
 msgid "Cart is not provided."
-msgstr ""
-
-#: .\cart\serializers\item.py:182 .\cart\serializers\item.py:258
-#, python-brace-format
-msgid ""
-"Not enough stock to add {quantity} more. Current in cart: "
-"{existing_item_quantity}, Available: {product_stock}"
 msgstr ""
 
 #: .\cart\views\cart.py:61
@@ -1821,32 +1833,64 @@ msgstr ""
 msgid "Serialized representation of the related content object"
 msgstr ""
 
-#: .\core\api\views.py:46 .\core\utils\serializers.py:143
+#: .\core\api\views.py:51 .\core\utils\serializers.py:143
 #, python-format
 msgid "Language code for translations (%s)"
 msgstr ""
 
-#: .\core\api\views.py:56 .\core\utils\serializers.py:157
-#: .\product\views\product.py:149
+#: .\core\api\views.py:61 .\core\utils\serializers.py:157
+#: .\product\views\product.py:160
 msgid "Pagination strategy type"
 msgstr ""
 
-#: .\core\api\views.py:65 .\core\utils\serializers.py:166
-#: .\product\views\product.py:157
+#: .\core\api\views.py:70 .\core\utils\serializers.py:166
+#: .\product\views\product.py:168
 msgid "Enable or disable pagination"
 msgstr ""
 
-#: .\core\api\views.py:74 .\core\utils\serializers.py:175
-#: .\product\views\product.py:165
+#: .\core\api\views.py:79 .\core\utils\serializers.py:175
+#: .\product\views\product.py:176
 msgid "Number of results to return per page"
 msgstr ""
 
-#: .\core\api\views.py:82
+#: .\core\api\views.py:87
 msgid "Cursor for pagination"
 msgstr ""
 
-#: .\core\api\views.py:465 .\core\api\views.py:466
+#: .\core\api\views.py:470 .\core\api\views.py:471
 msgid "Check the health status of database, Redis, and Celery"
+msgstr ""
+
+#: .\core\api\views.py:546
+msgid "List all available settings"
+msgstr ""
+
+#: .\core\api\views.py:547
+msgid "Retrieve all settings with their names, values, and types"
+msgstr ""
+
+#: .\core\api\views.py:581
+msgid "Failed to retrieve settings"
+msgstr ""
+
+#: .\core\api\views.py:591
+msgid "Get setting by key"
+msgstr ""
+
+#: .\core\api\views.py:592
+msgid "Retrieve a specific setting value by its key name"
+msgstr ""
+
+#: .\core\api\views.py:597
+msgid "Setting key name (e.g., CHECKOUT_SHIPPING_PRICE)"
+msgstr ""
+
+#: .\core\api\views.py:619
+msgid "Setting key is required"
+msgstr ""
+
+#: .\core\api\views.py:653
+msgid "Failed to retrieve setting"
 msgstr ""
 
 #: .\core\enum.py:6
@@ -1882,6 +1926,7 @@ msgid "Sixth Floor Plus"
 msgstr ""
 
 #: .\core\enum.py:17 .\core\templates\admin\clear_cache.html:10
+#: .\core\templates\admin\email_template_management.html:14
 #: .\core\templates\admin\product\apply_discount.html:15 .\product\admin.py:846
 #: .\product\admin.py:921
 msgid "Home"
@@ -1891,7 +1936,7 @@ msgstr ""
 msgid "Office"
 msgstr ""
 
-#: .\core\enum.py:19 .\user\models\subscription.py:19
+#: .\core\enum.py:19 .\user\models\subscription.py:23
 msgid "Other"
 msgstr ""
 
@@ -2038,7 +2083,7 @@ msgstr ""
 msgid "Is Published"
 msgstr ""
 
-#: .\core\tasks.py:440
+#: .\core\tasks.py:433
 msgid "We miss you!"
 msgstr ""
 
@@ -2059,6 +2104,105 @@ msgstr ""
 #: .\core\templates\admin\clear_cache.html:45
 #: .\core\templates\admin\clear_cache.html:50
 msgid "Clear Entire Site Cache"
+msgstr ""
+
+#: .\core\templates\admin\email_template_management.html:6
+#: .\core\templates\admin\email_template_management.html:17
+#: .\core\templates\admin\email_template_management.html:464
+msgid "Email Template Management"
+msgstr ""
+
+#: .\core\templates\admin\email_template_management.html:465
+msgid "Preview and test email templates with sample or real order data"
+msgstr ""
+
+#: .\core\templates\admin\email_template_management.html:471
+msgid "Back to Admin"
+msgstr ""
+
+#: .\core\templates\admin\email_template_management.html:479
+msgid "Available Templates"
+msgstr ""
+
+#: .\core\templates\admin\email_template_management.html:491
+msgid "Search templates..."
+msgstr ""
+
+#: .\core\templates\admin\email_template_management.html:494
+msgid "Clear search"
+msgstr ""
+
+#: .\core\templates\admin\email_template_management.html:508
+msgid "Collapse/Expand"
+msgstr ""
+
+#: .\core\templates\admin\email_template_management.html:526
+msgid "Unused"
+msgstr ""
+
+#: .\core\templates\admin\email_template_management.html:546
+msgid "Template Preview"
+msgstr ""
+
+#: .\core\templates\admin\email_template_management.html:550
+msgid "Language"
+msgstr ""
+
+#: .\core\templates\admin\email_template_management.html:561
+msgid "Data Source"
+msgstr ""
+
+#: .\core\templates\admin\email_template_management.html:563
+msgid "Sample Data"
+msgstr ""
+
+#: .\core\templates\admin\email_template_management.html:564
+msgid "Real Order"
+msgstr "Παραγγελία"
+
+#: .\core\templates\admin\email_template_management.html:569
+#: .\core\templates\emails\order\order_confirmation.html:11
+#: .\core\templates\emails\order\order_confirmation.txt:5
+#: .\notification\enum.py:22 .\order\admin.py:1208 .\order\admin.py:1395
+#: .\order\models\order.py:136 .\pay_way\admin.py:374
+msgid "Order"
+msgstr "Παραγγελία"
+
+#: .\core\templates\admin\email_template_management.html:571
+msgid "Select Order"
+msgstr ""
+
+#: .\core\templates\admin\email_template_management.html:583
+msgid "Generate Preview"
+msgstr ""
+
+#: .\core\templates\admin\email_template_management.html:590
+msgid "Text"
+msgstr ""
+
+#: .\core\templates\admin\email_template_management.html:595
+msgid "Select a template to preview"
+msgstr ""
+
+#: .\core\templates\admin\email_template_management.html:707
+msgid "No templates found"
+msgstr ""
+
+#: .\core\templates\admin\email_template_management.html:710
+msgid "1 template found"
+msgstr ""
+
+#: .\core\templates\admin\email_template_management.html:713
+msgid "templates found"
+msgstr ""
+
+#: .\core\templates\admin\email_template_management.html:798
+msgid "Generating preview..."
+msgstr ""
+
+#: .\core\templates\admin\email_template_management.html:846
+#: .\notification\enum.py:6
+msgid "Error"
 msgstr ""
 
 #: .\core\templates\admin\product\apply_discount.html:21
@@ -2086,7 +2230,6 @@ msgid "Selection Summary"
 msgstr ""
 
 #: .\core\templates\admin\product\apply_discount.html:135 .\tag\admin.py:430
-#, fuzzy
 msgid "Inactive"
 msgstr "Λογαριασμός Ανενεργός"
 
@@ -2103,7 +2246,817 @@ msgid "© 2024"
 msgstr ""
 
 #: .\core\templates\base.html:78
+#: .\core\templates\emails\base\email_base.html:357
+#: .\core\templates\emails\marketing\newsletter.html:84
+#: .\core\templates\emails\user\inactive_user_email_template.html:74
 msgid "All rights reserved."
+msgstr "Όλα τα δικαιώματα διατηρούνται."
+
+# Email Template Translations
+#: .\core\templates\emails\base\email_base.html:351
+#: .\core\templates\emails\marketing\newsletter.html:80
+#: .\core\templates\emails\user\inactive_user_email_template.html:70
+msgid "Questions?"
+msgstr "Ερωτήσεις;"
+
+#: .\core\templates\emails\base\email_base.html:353
+#: .\core\templates\emails\marketing\newsletter.html:81
+#: .\core\templates\emails\user\inactive_user_email_template.html:71
+msgid "Contact us"
+msgstr "Επικοινωνήστε μαζί μας"
+
+#: .\core\templates\emails\base\email_base.html:360
+#: .\core\templates\emails\marketing\newsletter.html:87
+#: .\core\templates\emails\user\inactive_user_email_template.html:77
+msgid "Visit our website"
+msgstr "Επισκεφτείτε την ιστοσελίδα μας"
+
+#: .\core\templates\emails\marketing\newsletter.html:4
+msgid "Weekly Newsletter"
+msgstr ""
+
+#: .\core\templates\emails\marketing\newsletter.html:8
+msgid "This Week's Highlights"
+msgstr ""
+
+#: .\core\templates\emails\marketing\newsletter.html:10
+#, python-format
+msgid "From %(start)s to %(end)s"
+msgstr ""
+
+#: .\core\templates\emails\marketing\newsletter.html:14
+#: .\core\templates\emails\marketing\newsletter.txt:5
+#, python-format
+msgid "Hello %(name)s!"
+msgstr ""
+
+#: .\core\templates\emails\marketing\newsletter.html:16
+#: .\core\templates\emails\marketing\newsletter.txt:7
+#, python-format
+msgid ""
+"Welcome to your weekly newsletter from %(site_name)s. Here's what's been "
+"happening:"
+msgstr ""
+
+#: .\core\templates\emails\marketing\newsletter.html:20
+msgid "Featured Products"
+msgstr ""
+
+#: .\core\templates\emails\marketing\newsletter.html:25
+#: .\core\templates\emails\order\order_confirmation.html:30
+#: .\order\models\item.py:27 .\product\models\product.py:71
+msgid "Price"
+msgstr "Τιμή"
+
+#: .\core\templates\emails\marketing\newsletter.html:46
+msgid "Featured Articles"
+msgstr ""
+
+#: .\core\templates\emails\marketing\newsletter.html:60
+msgid "Special Offers"
+msgstr ""
+
+#: .\core\templates\emails\marketing\newsletter.html:71
+#: .\core\templates\emails\marketing\newsletter.txt:34
+msgid "Shop Now"
+msgstr ""
+
+#: .\core\templates\emails\marketing\newsletter.html:74
+#: .\core\templates\emails\marketing\newsletter.txt:36
+#, python-format
+msgid "Thank you for being part of the %(site_name)s community!"
+msgstr ""
+
+#: .\core\templates\emails\marketing\newsletter.html:90
+#: .\core\templates\emails\marketing\newsletter.txt:43
+msgid "You're receiving this because you're subscribed to our newsletter."
+msgstr ""
+
+#: .\core\templates\emails\marketing\newsletter.html:93
+#: .\core\templates\emails\marketing\newsletter.txt:44
+#: .\core\templates\emails\user\inactive_user_email_template.txt:35
+msgid "Unsubscribe"
+msgstr ""
+
+#: .\core\templates\emails\marketing\newsletter.html:94
+#: .\core\templates\emails\marketing\newsletter.txt:45
+msgid "Manage Preferences"
+msgstr ""
+
+#: .\core\templates\emails\marketing\newsletter.txt:1
+#, python-format
+msgid "WEEKLY NEWSLETTER - %(site_name)s"
+msgstr ""
+
+#: .\core\templates\emails\marketing\newsletter.txt:3
+#, python-format
+msgid "This Week's Highlights: %(start)s to %(end)s"
+msgstr ""
+
+#: .\core\templates\emails\marketing\newsletter.txt:10
+msgid "FEATURED PRODUCTS"
+msgstr ""
+
+#: .\core\templates\emails\marketing\newsletter.txt:18
+msgid "FEATURED ARTICLES"
+msgstr ""
+
+#: .\core\templates\emails\marketing\newsletter.txt:27
+msgid "SPECIAL OFFERS"
+msgstr ""
+
+#: .\core\templates\emails\order\order_canceled.html:4
+msgid "Order Canceled"
+msgstr "Η Παραγγελία Ακυρώθηκε"
+
+#: .\core\templates\emails\order\order_canceled.html:7
+msgid "Your Order Has Been Canceled"
+msgstr "Η παραγγελία σας έχει ακυρωθεί."
+
+#: .\core\templates\emails\order\order_canceled.html:8
+#: .\core\templates\emails\order\order_canceled.txt:3
+#, python-format
+msgid "Your order #%(order_id)s has been canceled as requested."
+msgstr "Η παραγγελία σας #%(order_id)s έχει ακυρωθεί όπως ζητήθηκε."
+
+#: .\core\templates\emails\order\order_canceled.html:11
+#: .\core\templates\emails\order\order_completed.html:18
+#: .\core\templates\emails\order\order_completed.txt:14
+#: .\core\templates\emails\order\order_pending_reminder.html:15
+#: .\core\templates\emails\order\order_pending_reminder.txt:5
+#: .\core\templates\emails\order\order_status_generic.html:13
+#: .\core\templates\emails\order\order_status_generic.txt:7
+msgid "Order Details"
+msgstr "Λεπτομέρειες Παραγγελίας"
+
+#: .\core\templates\emails\order\order_canceled.html:12
+#: .\core\templates\emails\order\order_canceled.txt:6
+msgid "Date Ordered"
+msgstr ""
+
+#: .\core\templates\emails\order\order_canceled.html:13
+#: .\core\templates\emails\order\order_canceled.txt:7
+msgid "Date Canceled"
+msgstr "Η Παραγγελία Ακυρώθηκε"
+
+#: .\core\templates\emails\order\order_canceled.html:17
+#: .\core\templates\emails\order\order_canceled.txt:10
+msgid "Refund"
+msgstr ""
+
+#: .\core\templates\emails\order\order_canceled.html:18
+#: .\core\templates\emails\order\order_canceled.txt:10
+#, python-format
+msgid ""
+"Your payment of %(amount)s will be refunded to your original payment method "
+"within 3-5 business days."
+msgstr ""
+
+#: .\core\templates\emails\order\order_canceled.html:23
+#: .\core\templates\emails\order\order_canceled.txt:13
+msgid ""
+"If you did not request this cancellation or have any questions, please "
+"contact our customer service immediately."
+msgstr ""
+"Εάν έχετε οποιεσδήποτε ερωτήσεις, παρακαλούμε επικοινωνήστε με την "
+"εξυπηρέτηση πελατών μας."
+
+#: .\core\templates\emails\order\order_canceled.html:25
+#: .\core\templates\emails\order\order_canceled.txt:15
+msgid "We hope to see you again soon!"
+msgstr ""
+
+#: .\core\templates\emails\order\order_canceled.txt:1
+msgid "YOUR ORDER HAS BEEN CANCELED"
+msgstr ""
+
+#: .\core\templates\emails\order\order_canceled.txt:5
+msgid "ORDER DETAILS"
+msgstr ""
+
+#: .\core\templates\emails\order\order_completed.html:4
+#: .\core\templates\emails\order\order_completed.html:12
+#: .\core\templates\emails\order\order_completed.txt:8
+msgid "Order Completed"
+msgstr "Η Παραγγελία Ακυρώθηκε"
+
+#: .\core\templates\emails\order\order_completed.html:8
+msgid "Thank You for Your Purchase!"
+msgstr "Ευχαριστούμε για την Αγορά σας!"
+
+#: .\core\templates\emails\order\order_completed.html:9
+#: .\core\templates\emails\order\order_completed.txt:6
+#, python-format
+msgid "Your order #%(order_id)s has been successfully completed."
+msgstr "Η παραγγελία σας #%(order_id)s ολοκληρώθηκε επιτυχώς."
+
+#: .\core\templates\emails\order\order_completed.html:13
+#: .\core\templates\emails\order\order_completed.txt:10
+#: .\core\templates\emails\order\order_pending_reminder.html:8
+#: .\core\templates\emails\order\order_pending_reminder.txt:1
+#: .\core\templates\emails\order\order_status_generic.html:8
+#: .\core\templates\emails\order\order_status_generic.txt:1
+#, python-format
+msgid "Dear %(first_name)s %(last_name)s,"
+msgstr ""
+
+#: .\core\templates\emails\order\order_completed.html:15
+#: .\core\templates\emails\order\order_completed.txt:12
+msgid ""
+"We're delighted to confirm that your order has been completed successfully!"
+msgstr ""
+
+#: .\core\templates\emails\order\order_completed.html:19
+#: .\core\templates\emails\order\order_completed.txt:16
+#: .\core\templates\emails\order\order_pending_reminder.html:16
+#: .\core\templates\emails\order\order_status_generic.html:14
+#: .\core\templates\emails\order\order_status_generic.txt:8
+msgid "Order Date"
+msgstr "Προϊόντα Παραγγελίας"
+
+#: .\core\templates\emails\order\order_completed.html:20
+#: .\core\templates\emails\order\order_completed.txt:17
+#: .\core\templates\emails\order\order_pending_reminder.html:17
+#: .\core\templates\emails\order\order_status_generic.html:15
+msgid "Order Total"
+msgstr "Λεπτομέρειες Παραγγελίας"
+
+#: .\core\templates\emails\order\order_completed.html:24
+#: .\core\templates\emails\order\order_completed.txt:18 .\order\admin.py:74
+#: .\order\enum\status.py:10 .\order\enum\status.py:36
+msgid "Completed"
+msgstr ""
+
+#: .\core\templates\emails\order\order_completed.html:29
+#: .\core\templates\emails\order\order_completed.txt:20
+#: .\core\templates\emails\subscription\confirmation.html:26
+msgid "What's Next?"
+msgstr ""
+
+#: .\core\templates\emails\order\order_completed.html:30
+#: .\core\templates\emails\order\order_completed.txt:22
+msgid ""
+"Your order has been delivered and completed. We hope you're enjoying your "
+"purchase!"
+msgstr ""
+
+#: .\core\templates\emails\order\order_completed.html:32
+#: .\core\templates\emails\order\order_completed.txt:24
+msgid ""
+"If you have any questions or concerns about your order, please don't "
+"hesitate to contact our customer service team."
+msgstr ""
+"Εάν έχετε οποιεσδήποτε ερωτήσεις, παρακαλούμε επικοινωνήστε με την "
+"εξυπηρέτηση πελατών μας."
+
+#: .\core\templates\emails\order\order_completed.html:34
+#: .\core\templates\emails\order\order_completed.txt:26
+#, python-format
+msgid ""
+"Thank you for shopping with %(site_name)s! We look forward to serving you "
+"again."
+msgstr ""
+
+#: .\core\templates\emails\order\order_completed.txt:3
+msgid "THANK YOU FOR YOUR PURCHASE!"
+msgstr "ΕΥΧΑΡΙΣΤΟΥΜΕ ΓΙΑ ΤΗΝ ΑΓΟΡΑ ΣΑΣ!"
+
+#: .\core\templates\emails\order\order_confirmation.html:4
+#: .\core\templates\emails\order\order_confirmation.html:7
+msgid "Order Confirmation"
+msgstr "Επιβεβαίωση Παραγγελίας"
+
+#: .\core\templates\emails\order\order_confirmation.html:8
+#: .\core\templates\emails\order\order_confirmation.txt:3
+msgid "Thank you for your order!"
+msgstr "Ευχαριστούμε για την παραγγελία σας!"
+
+#: .\core\templates\emails\order\order_confirmation.html:12
+#: .\core\templates\emails\order\order_confirmation.txt:6
+#: .\core\templates\emails\order\order_delivered.html:12
+#: .\core\templates\emails\order\order_delivered.txt:6
+msgid "Date"
+msgstr "Ημερομηνία"
+
+#: .\core\templates\emails\order\order_confirmation.html:15
+#: .\order\admin.py:415
+msgid "Shipping Address"
+msgstr "Διεύθυνση Αποστολής"
+
+#: .\core\templates\emails\order\order_confirmation.html:24
+#: .\order\models\item.py:40
+msgid "Order Items"
+msgstr "Προϊόντα Παραγγελίας"
+
+#: .\core\templates\emails\order\order_confirmation.html:47
+#: .\core\templates\emails\order\order_confirmation.txt:20
+msgid "Subtotal"
+msgstr "Υποσύνολο"
+
+#: .\core\templates\emails\order\order_confirmation.html:48
+#: .\core\templates\emails\order\order_confirmation.txt:21
+#: .\notification\enum.py:24 .\order\admin.py:591
+msgid "Shipping"
+msgstr "Μεταφορικά"
+
+#: .\core\templates\emails\order\order_confirmation.html:52
+#: .\core\templates\emails\order\order_confirmation.txt:24
+msgid ""
+"If you have any questions about your order, please contact our customer "
+"service."
+msgstr ""
+"Εάν έχετε οποιεσδήποτε ερωτήσεις, παρακαλούμε επικοινωνήστε με την "
+"εξυπηρέτηση πελατών μας."
+
+#: .\core\templates\emails\order\order_confirmation.html:54
+#: .\core\templates\emails\order\order_confirmation.txt:26
+#: .\core\templates\emails\order\order_delivered.html:33
+#: .\core\templates\emails\order\order_delivered.txt:20
+#: .\core\templates\emails\order\order_shipped.html:30
+#: .\core\templates\emails\order\order_shipped.txt:19
+msgid "Thank you for shopping with us!"
+msgstr "Ευχαριστούμε που ψωνίσατε μαζί μας!"
+
+#: .\core\templates\emails\order\order_confirmation.txt:1
+msgid "ORDER CONFIRMATION"
+msgstr ""
+
+#: .\core\templates\emails\order\order_confirmation.txt:9
+msgid "SHIPPING ADDRESS"
+msgstr ""
+
+#: .\core\templates\emails\order\order_confirmation.txt:15
+msgid "ORDER ITEMS"
+msgstr ""
+
+#: .\core\templates\emails\order\order_delivered.html:4
+msgid "Order Delivered"
+msgstr "Η Παραγγελία Παραδόθηκε"
+
+#: .\core\templates\emails\order\order_delivered.html:7
+msgid "Your Order Has Been Delivered"
+msgstr "Η παραγγελία σας έχει παραδοθεί!"
+
+#: .\core\templates\emails\order\order_delivered.html:8
+#: .\core\templates\emails\order\order_delivered.txt:3
+#, python-format
+msgid "Great news! Your order #%(order_id)s has been delivered."
+msgstr "Υπέροχα νέα! Η παραγγελία σας #%(order_id)s έχει παραδοθεί."
+
+#: .\core\templates\emails\order\order_delivered.html:11
+msgid "Delivery Information"
+msgstr "Επιβεβαίωση Παραγγελίας"
+
+#: .\core\templates\emails\order\order_delivered.html:14
+#: .\core\templates\emails\order\order_shipped.html:17
+msgid "Delivery Address"
+msgstr ""
+
+#: .\core\templates\emails\order\order_delivered.html:23
+#: .\core\templates\emails\order\order_delivered.txt:14
+msgid ""
+"We hope you are satisfied with your purchase. If you have any issues with "
+"your order, please contact our customer service."
+msgstr ""
+"Εάν έχετε οποιεσδήποτε ερωτήσεις, παρακαλούμε επικοινωνήστε με την "
+"εξυπηρέτηση πελατών μας."
+
+#: .\core\templates\emails\order\order_delivered.html:25
+#: .\core\templates\emails\order\order_delivered.txt:16
+msgid "We'd love to hear your feedback! How was your shopping experience?"
+msgstr ""
+
+#: .\core\templates\emails\order\order_delivered.html:29
+msgid "Rate Your Experience"
+msgstr ""
+
+#: .\core\templates\emails\order\order_delivered.txt:1
+msgid "YOUR ORDER HAS BEEN DELIVERED"
+msgstr ""
+
+#: .\core\templates\emails\order\order_delivered.txt:5
+msgid "DELIVERY INFORMATION"
+msgstr ""
+
+#: .\core\templates\emails\order\order_delivered.txt:8
+#: .\core\templates\emails\order\order_shipped.txt:9
+msgid "DELIVERY ADDRESS"
+msgstr ""
+
+#: .\core\templates\emails\order\order_delivered.txt:17
+msgid "Visit our website to rate your experience."
+msgstr ""
+
+#: .\core\templates\emails\order\order_pending_reminder.html:4
+msgid "Order Reminder"
+msgstr "Η Παραγγελία Παραδόθηκε"
+
+#: .\core\templates\emails\order\order_pending_reminder.html:7
+msgid "Complete Your Order"
+msgstr ""
+
+#: .\core\templates\emails\order\order_pending_reminder.html:11
+#: .\core\templates\emails\order\order_pending_reminder.txt:3
+#, python-format
+msgid ""
+"We noticed that your order #%(order_id)s placed on %(order_date)s is still "
+"in pending status."
+msgstr ""
+
+#: .\core\templates\emails\order\order_pending_reminder.html:18
+#: .\core\templates\emails\order\order_pending_reminder.txt:7
+#: .\order\admin.py:75 .\order\enum\status.py:6 .\order\enum\status.py:34
+msgid "Pending"
+msgstr ""
+
+#: .\core\templates\emails\order\order_pending_reminder.html:21
+#: .\core\templates\emails\order\order_pending_reminder.txt:9
+msgid ""
+"To complete your purchase, please finalize your payment. If you've already "
+"completed payment, please disregard this message as it may take some time "
+"for our system to update."
+msgstr ""
+
+#: .\core\templates\emails\order\order_pending_reminder.html:23
+#: .\core\templates\emails\order\order_pending_reminder.txt:11
+msgid ""
+"You can view your order status by logging into your account on our website."
+msgstr ""
+
+#: .\core\templates\emails\order\order_pending_reminder.html:27
+msgid "Go to Your Account"
+msgstr ""
+
+#: .\core\templates\emails\order\order_pending_reminder.html:31
+#: .\core\templates\emails\order\order_pending_reminder.txt:14
+msgid ""
+"If you're experiencing any issues with your payment or have questions about "
+"your order, please don't hesitate to contact our customer service team."
+msgstr ""
+
+#: .\core\templates\emails\order\order_pending_reminder.html:33
+#: .\core\templates\emails\order\order_pending_reminder.txt:16
+#: .\core\templates\emails\order\order_status_generic.html:49
+#: .\core\templates\emails\order\order_status_generic.txt:34
+#, python-format
+msgid "Thank you for shopping with %(site_name)s!"
+msgstr "Ευχαριστούμε που ψωνίσατε με %(site_name)s!"
+
+#: .\core\templates\emails\order\order_pending_reminder.txt:6
+#: .\core\templates\emails\order\order_status_generic.txt:9
+msgid "Total Amount"
+msgstr ""
+
+#: .\core\templates\emails\order\order_pending_reminder.txt:18
+#: .\core\templates\emails\order\order_status_generic.txt:36
+msgid "Best regards"
+msgstr ""
+
+#: .\core\templates\emails\order\order_pending_reminder.txt:19
+#: .\core\templates\emails\order\order_status_generic.txt:37
+msgid "Team"
+msgstr ""
+
+#: .\core\templates\emails\order\order_shipped.html:4
+msgid "Order Shipped"
+msgstr "Η Παραγγελία Απεστάλη"
+
+#: .\core\templates\emails\order\order_shipped.html:7
+msgid "Your Order Has Shipped"
+msgstr "Η παραγγελία σας έχει αποσταλεί!"
+
+#: .\core\templates\emails\order\order_shipped.html:8
+#: .\core\templates\emails\order\order_shipped.txt:3
+#, python-format
+msgid ""
+"Good news! Your order #%(order_id)s has been shipped and is on its way to "
+"you."
+msgstr ""
+
+#: .\core\templates\emails\order\order_shipped.html:11
+msgid "Shipping Information"
+msgstr ""
+
+#: .\core\templates\emails\order\order_shipped.html:12
+#: .\core\templates\emails\order\order_shipped.txt:6
+msgid "Carrier"
+msgstr "Μεταφορέας"
+
+#: .\core\templates\emails\order\order_shipped.html:14
+#: .\core\templates\emails\order\order_shipped.txt:7
+#: .\order\models\order.py:127
+msgid "Tracking Number"
+msgstr "Αριθμός Παρακολούθησης"
+
+#: .\core\templates\emails\order\order_shipped.html:26
+#: .\core\templates\emails\order\order_shipped.txt:15
+msgid ""
+"You can track your package using the tracking number above on the carrier's "
+"website."
+msgstr ""
+"Μπορείτε να παρακολουθήσετε το δέμα σας χρησιμοποιώντας τον παραπάνω αριθμό "
+"παρακολούθησης στην ιστοσελίδα του μεταφορέα."
+
+#: .\core\templates\emails\order\order_shipped.html:28
+#: .\core\templates\emails\order\order_shipped.txt:17
+msgid ""
+"If you have any questions about your shipment, please contact our customer "
+"service."
+msgstr ""
+"Εάν έχετε οποιεσδήποτε ερωτήσεις, παρακαλούμε επικοινωνήστε με την "
+"εξυπηρέτηση πελατών μας."
+
+#: .\core\templates\emails\order\order_shipped.txt:1
+msgid "YOUR ORDER HAS SHIPPED"
+msgstr "Η ΠΑΡΑΓΓΕΛΙΑ ΣΑΣ ΕΧΕΙ ΑΠΟΣΤΑΛΕΙ"
+
+#: .\core\templates\emails\order\order_shipped.txt:5
+msgid "SHIPPING INFORMATION"
+msgstr "ΠΛΗΡΟΦΟΡΙΕΣ ΑΠΟΣΤΟΛΗΣ"
+
+#: .\core\templates\emails\order\order_status_generic.html:4
+#: .\core\templates\emails\order\order_status_generic.html:7
+msgid "Order Status Update"
+msgstr ""
+
+#: .\core\templates\emails\order\order_status_generic.html:10
+#: .\core\templates\emails\order\order_status_generic.txt:3
+#, python-format
+msgid "Your order #%(order_id)s has been updated."
+msgstr "Η παραγγελία σας #%(order_id)s έχει ενημερωθεί."
+
+#: .\core\templates\emails\order\order_status_generic.html:17
+#: .\core\templates\emails\order\order_status_generic.txt:5
+msgid "New Status"
+msgstr "Κατάσταση"
+
+#: .\core\templates\emails\order\order_status_generic.html:23
+msgid "What This Means"
+msgstr ""
+
+#: .\core\templates\emails\order\order_status_generic.html:26
+#: .\core\templates\emails\order\order_status_generic.txt:13
+msgid "Your order has been received and is awaiting payment processing."
+msgstr ""
+
+#: .\core\templates\emails\order\order_status_generic.html:28
+#: .\core\templates\emails\order\order_status_generic.txt:15
+msgid "Your payment has been confirmed and we're preparing your order."
+msgstr ""
+
+#: .\core\templates\emails\order\order_status_generic.html:30
+#: .\core\templates\emails\order\order_status_generic.txt:17
+msgid "Your order has been shipped and is on its way to you."
+msgstr "Η παραγγελία σας έχει αποσταλεί!"
+
+#: .\core\templates\emails\order\order_status_generic.html:32
+#: .\core\templates\emails\order\order_status_generic.txt:19
+msgid "Your order has been delivered to your shipping address."
+msgstr "Η παραγγελία σας έχει παραδοθεί!"
+
+#: .\core\templates\emails\order\order_status_generic.html:34
+#: .\core\templates\emails\order\order_status_generic.txt:21
+msgid ""
+"Your order has been completed successfully. Thank you for shopping with us!"
+msgstr ""
+
+#: .\core\templates\emails\order\order_status_generic.html:36
+#: .\core\templates\emails\order\order_status_generic.txt:23
+msgid ""
+"Your order has been canceled. If you didn't request this, please contact us."
+msgstr ""
+
+#: .\core\templates\emails\order\order_status_generic.html:38
+#: .\core\templates\emails\order\order_status_generic.txt:25
+msgid "Your return has been received and is being processed."
+msgstr "Η παραγγελία σας έχει ακυρωθεί."
+
+#: .\core\templates\emails\order\order_status_generic.html:40
+#: .\core\templates\emails\order\order_status_generic.txt:27
+msgid "Your refund has been processed and should appear in your account soon."
+msgstr ""
+
+#: .\core\templates\emails\order\order_status_generic.html:42
+#: .\core\templates\emails\order\order_status_generic.txt:29
+msgid "Your order status has been updated."
+msgstr "Η παραγγελία σας έχει ακυρωθεί."
+
+#: .\core\templates\emails\order\order_status_generic.html:47
+#: .\core\templates\emails\order\order_status_generic.txt:32
+msgid ""
+"If you have any questions about your order, please contact our customer "
+"service team."
+msgstr ""
+"Εάν έχετε οποιεσδήποτε ερωτήσεις, παρακαλούμε επικοινωνήστε με την "
+"εξυπηρέτηση πελατών μας."
+
+#: .\core\templates\emails\order\order_status_generic.txt:11
+msgid "This status means"
+msgstr ""
+
+#: .\core\templates\emails\subscription\confirmation.html:4
+msgid "Subscription Confirmation"
+msgstr "Επιβεβαίωση Παραγγελίας"
+
+#: .\core\templates\emails\subscription\confirmation.html:7
+msgid "Subscription Confirmed!"
+msgstr ""
+
+#: .\core\templates\emails\subscription\confirmation.html:9
+#: .\core\templates\emails\subscription\confirmation.txt:5
+#, python-format
+msgid "Hi %(first_name)s,"
+msgstr ""
+
+#: .\core\templates\emails\subscription\confirmation.html:11
+#: .\core\templates\emails\subscription\confirmation.txt:7
+#, python-format
+msgid ""
+"Your subscription to %(topic_name)s has been successfully confirmed! We're "
+"excited to have you on board."
+msgstr ""
+
+#: .\core\templates\emails\subscription\confirmation.html:14
+#: .\user\admin.py:886
+msgid "Subscription Details"
+msgstr ""
+
+#: .\core\templates\emails\subscription\confirmation.html:15
+#: .\core\templates\emails\subscription\confirmation.txt:11 .\user\admin.py:782
+#: .\user\admin.py:937 .\user\models\subscription.py:114
+msgid "Topic"
+msgstr ""
+
+#: .\core\templates\emails\subscription\confirmation.html:18
+#: .\core\templates\emails\subscription\confirmation.txt:14
+msgid "Subscribed On"
+msgstr ""
+
+#: .\core\templates\emails\subscription\confirmation.html:21
+msgid "What You'll Receive"
+msgstr ""
+
+#: .\core\templates\emails\subscription\confirmation.html:27
+#: .\core\templates\emails\subscription\confirmation.txt:24
+msgid ""
+"You'll start receiving updates based on your subscription preferences. You "
+"can manage your subscriptions anytime from your account settings."
+msgstr ""
+
+#: .\core\templates\emails\subscription\confirmation.html:31
+msgid "Manage Subscriptions"
+msgstr ""
+
+#: .\core\templates\emails\subscription\confirmation.html:35
+#: .\core\templates\emails\subscription\confirmation.txt:32
+msgid ""
+"If you didn't request this subscription or want to unsubscribe, you can do "
+"so at any time from your account settings."
+msgstr ""
+
+#: .\core\templates\emails\subscription\confirmation.html:37
+#: .\core\templates\emails\subscription\confirmation.txt:34
+#, python-format
+msgid "Thank you for staying connected with %(site_name)s!"
+msgstr "Ευχαριστούμε που παραμένετε συνδεδεμένοι με %(site_name)s!"
+
+#: .\core\templates\emails\subscription\confirmation.txt:1
+msgid "SUBSCRIPTION CONFIRMED"
+msgstr ""
+
+#: .\core\templates\emails\subscription\confirmation.txt:9
+msgid "SUBSCRIPTION DETAILS"
+msgstr ""
+
+#: .\core\templates\emails\subscription\confirmation.txt:17
+msgid "WHAT YOU'LL RECEIVE"
+msgstr ""
+
+#: .\core\templates\emails\subscription\confirmation.txt:22
+msgid "WHAT'S NEXT?"
+msgstr ""
+
+#: .\core\templates\emails\subscription\confirmation.txt:26
+msgid "MANAGE YOUR SUBSCRIPTIONS"
+msgstr ""
+
+#: .\core\templates\emails\subscription\confirmation.txt:28
+msgid "Visit"
+msgstr ""
+
+#: .\core\templates\emails\subscription\confirmation.txt:30
+msgid "UNSUBSCRIBE"
+msgstr ""
+
+#: .\core\templates\emails\user\inactive_user_email_template.html:4
+#: .\core\templates\emails\user\inactive_user_email_template.html:8
+msgid "We Miss You!"
+msgstr ""
+
+#: .\core\templates\emails\user\inactive_user_email_template.html:9
+msgid "Come back and see what's new"
+msgstr ""
+
+#: .\core\templates\emails\user\inactive_user_email_template.html:12
+#: .\core\templates\emails\user\inactive_user_email_template.txt:3
+#, python-format
+msgid "Hi %(name)s,"
+msgstr ""
+
+#: .\core\templates\emails\user\inactive_user_email_template.html:14
+#: .\core\templates\emails\user\inactive_user_email_template.txt:5
+msgid ""
+"We noticed you haven't visited us in a while, and we wanted to reach out "
+"because we miss having you around!"
+msgstr ""
+
+#: .\core\templates\emails\user\inactive_user_email_template.html:16
+#: .\core\templates\emails\user\inactive_user_email_template.txt:7
+#, python-format
+msgid ""
+"A lot has happened since your last visit, and we'd love to have you back to "
+"explore all the exciting updates and features we've been working on at "
+"%(site_name)s."
+msgstr ""
+
+#: .\core\templates\emails\user\inactive_user_email_template.html:19
+msgid "Welcome Back - Let's Go!"
+msgstr ""
+
+#: .\core\templates\emails\user\inactive_user_email_template.html:23
+msgid "Here's what you might have missed:"
+msgstr ""
+
+#: .\core\templates\emails\user\inactive_user_email_template.html:35
+#: .\core\templates\emails\user\inactive_user_email_template.txt:15
+msgid "New and improved user interface"
+msgstr ""
+
+#: .\core\templates\emails\user\inactive_user_email_template.html:39
+#: .\core\templates\emails\user\inactive_user_email_template.txt:16
+msgid "Enhanced performance and faster loading times"
+msgstr ""
+
+#: .\core\templates\emails\user\inactive_user_email_template.html:43
+#: .\core\templates\emails\user\inactive_user_email_template.txt:17
+msgid "Exciting new features based on user feedback"
+msgstr ""
+
+#: .\core\templates\emails\user\inactive_user_email_template.html:47
+#: .\core\templates\emails\user\inactive_user_email_template.txt:18
+msgid "Better mobile experience"
+msgstr ""
+
+#: .\core\templates\emails\user\inactive_user_email_template.html:51
+#: .\core\templates\emails\user\inactive_user_email_template.txt:19
+msgid "Your data and preferences are still safely stored"
+msgstr ""
+
+#: .\core\templates\emails\user\inactive_user_email_template.html:57
+#: .\core\templates\emails\user\inactive_user_email_template.txt:22
+msgid ""
+"Your account is still active and all your data is exactly where you left it. "
+"We've been keeping everything safe and ready for your return!"
+msgstr ""
+
+#: .\core\templates\emails\user\inactive_user_email_template.html:59
+#: .\core\templates\emails\user\inactive_user_email_template.txt:24
+msgid ""
+"If you have any questions or need help getting back into your account, "
+"please contact our support team - we're always happy to help."
+msgstr ""
+
+#: .\core\templates\emails\user\inactive_user_email_template.html:62
+#: .\core\templates\emails\user\inactive_user_email_template.txt:26
+msgid "Looking forward to seeing you again!"
+msgstr ""
+
+#: .\core\templates\emails\user\inactive_user_email_template.html:63
+#: .\core\templates\emails\user\inactive_user_email_template.txt:27
+#, python-format
+msgid "The %(site_name)s Team"
+msgstr ""
+
+#: .\core\templates\emails\user\inactive_user_email_template.html:80
+#: .\core\templates\emails\user\inactive_user_email_template.txt:34
+msgid "Don't want to receive these emails?"
+msgstr ""
+
+#: .\core\templates\emails\user\inactive_user_email_template.html:81
+msgid "Unsubscribe here"
+msgstr ""
+
+#: .\core\templates\emails\user\inactive_user_email_template.txt:1
+#, python-format
+msgid "WE MISS YOU! - %(site_name)s"
+msgstr ""
+
+#: .\core\templates\emails\user\inactive_user_email_template.txt:9
+msgid "Welcome Back"
+msgstr ""
+
+#: .\core\templates\emails\user\inactive_user_email_template.txt:11
+msgid "HERE'S WHAT YOU MIGHT HAVE MISSED:"
 msgstr ""
 
 #: .\core\templates\home.html:7
@@ -2126,7 +3079,11 @@ msgstr ""
 msgid "Request Meta"
 msgstr ""
 
-#: .\core\urls.py:34
+#: .\core\urls.py:40
+msgid "admin/email-templates/"
+msgstr ""
+
+#: .\core\urls.py:43
 msgid "admin/"
 msgstr ""
 
@@ -2500,7 +3457,7 @@ msgstr ""
 msgid "Has Link"
 msgstr ""
 
-#: .\notification\admin.py:31 .\user\models\subscription.py:16
+#: .\notification\admin.py:31 .\user\models\subscription.py:20
 msgid "System Notifications"
 msgstr ""
 
@@ -2573,10 +3530,6 @@ msgstr ""
 msgid "Relationship"
 msgstr ""
 
-#: .\notification\enum.py:6
-msgid "Error"
-msgstr ""
-
 #: .\notification\enum.py:7
 msgid "Success"
 msgstr ""
@@ -2593,21 +3546,11 @@ msgstr ""
 msgid "Danger"
 msgstr ""
 
-#: .\notification\enum.py:22 .\order\admin.py:1208 .\order\admin.py:1395
-#: .\order\models\order.py:136 .\pay_way\admin.py:374
-msgid "Order"
-msgstr ""
-
 #: .\notification\enum.py:23 .\order\admin.py:564
 msgid "Payment"
 msgstr ""
 
-#: .\notification\enum.py:24 .\order\admin.py:591
-msgid "Shipping"
-msgstr ""
-
 #: .\notification\enum.py:27
-#, fuzzy
 msgid "Account"
 msgstr "Λογαριασμός Ανενεργός"
 
@@ -2631,7 +3574,7 @@ msgstr ""
 msgid "Support"
 msgstr ""
 
-#: .\notification\enum.py:34 .\user\models\subscription.py:17
+#: .\notification\enum.py:34 .\user\models\subscription.py:21
 msgid "Newsletter"
 msgstr ""
 
@@ -2912,14 +3855,6 @@ msgstr ""
 msgid "Payment Status"
 msgstr ""
 
-#: .\order\admin.py:74 .\order\enum\status.py:10 .\order\enum\status.py:36
-msgid "Completed"
-msgstr ""
-
-#: .\order\admin.py:75 .\order\enum\status.py:6 .\order\enum\status.py:34
-msgid "Pending"
-msgstr ""
-
 #: .\order\admin.py:76 .\order\enum\status.py:7 .\order\enum\status.py:35
 msgid "Processing"
 msgstr ""
@@ -2998,10 +3933,6 @@ msgstr ""
 
 #: .\order\admin.py:400
 msgid "Customer Information"
-msgstr ""
-
-#: .\order\admin.py:415
-msgid "Shipping Address"
 msgstr ""
 
 #: .\order\admin.py:433
@@ -3550,10 +4481,6 @@ msgstr ""
 msgid "Order Item History"
 msgstr ""
 
-#: .\order\models\item.py:27 .\product\models\product.py:71
-msgid "Price"
-msgstr ""
-
 #: .\order\models\item.py:30
 msgid "Original Quantity"
 msgstr ""
@@ -3568,10 +4495,6 @@ msgstr ""
 
 #: .\order\models\item.py:34 .\user\models\address.py:61
 msgid "Notes"
-msgstr ""
-
-#: .\order\models\item.py:40
-msgid "Order Items"
 msgstr ""
 
 #: .\order\models\item.py:59
@@ -3666,10 +4589,6 @@ msgstr ""
 msgid "Payment Method"
 msgstr ""
 
-#: .\order\models\order.py:127
-msgid "Tracking Number"
-msgstr ""
-
 #: .\order\models\order.py:130
 msgid "Shipping Carrier"
 msgstr ""
@@ -3700,42 +4619,46 @@ msgstr ""
 msgid "Your Order #{order_id} Has Shipped"
 msgstr ""
 
-#: .\order\notifications.py:91
+#: .\order\notifications.py:95
 #, python-brace-format
 msgid "Your Order #{order_id} Has Been Delivered"
 msgstr ""
 
-#: .\order\notifications.py:115
+#: .\order\notifications.py:123
 #, python-brace-format
 msgid "Your Order #{order_id} Has Been Canceled"
 msgstr ""
 
-#: .\order\notifications.py:145
+#: .\order\notifications.py:157
 #, python-brace-format
 msgid ""
 "Thank you for your order #{order_id}. Your order total is {total_price}. "
 "We'll notify you when your order ships."
 msgstr ""
 
-#: .\order\notifications.py:163
+#: .\order\notifications.py:175
 #, python-brace-format
 msgid ""
 "Your order #{order_id} has shipped! Track it with {carrier} using tracking "
 "number {tracking_number}."
 msgstr ""
 
-#: .\order\notifications.py:181
+#: .\order\notifications.py:193
 #, python-brace-format
 msgid ""
 "Your order #{order_id} has been delivered! Thank you for shopping with us."
 msgstr ""
 
-#: .\order\notifications.py:197
+#: .\order\notifications.py:209
 #, python-brace-format
 msgid ""
 "Your order #{order_id} has been canceled. Please contact customer service if "
 "you have any questions."
 msgstr ""
+
+#: .\order\payment.py:134
+msgid "Standard shipping"
+msgstr "Μεταφορικά"
 
 #: .\order\serializers\item.py:79 .\order\serializers\item.py:113
 msgid "Quantity must be a positive number."
@@ -3795,136 +4718,136 @@ msgstr ""
 msgid "Product with id '{product_id}' does not exist."
 msgstr ""
 
-#: .\order\serializers\order.py:429
+#: .\order\serializers\order.py:460
 msgid "User ID. Leave empty for guest orders."
 msgstr ""
 
-#: .\order\serializers\order.py:447
+#: .\order\serializers\order.py:478
 msgid "Additional payment data required by the payment provider"
 msgstr ""
 
-#: .\order\serializers\order.py:453
+#: .\order\serializers\order.py:484
 msgid "Payment intent ID from the payment provider"
 msgstr ""
 
-#: .\order\serializers\order.py:456
+#: .\order\serializers\order.py:487
 msgid "Payment status"
 msgstr ""
 
-#: .\order\serializers\order.py:458
+#: .\order\serializers\order.py:489
 msgid "Payment amount"
 msgstr ""
 
-#: .\order\serializers\order.py:460
+#: .\order\serializers\order.py:491
 msgid "Payment currency"
 msgstr ""
 
-#: .\order\serializers\order.py:462
+#: .\order\serializers\order.py:493
 msgid "Payment provider name"
 msgstr ""
 
-#: .\order\serializers\order.py:467
+#: .\order\serializers\order.py:498
 msgid "Stripe PaymentIntent client secret for frontend confirmation"
 msgstr ""
 
-#: .\order\serializers\order.py:475
+#: .\order\serializers\order.py:506
 msgid "Whether the payment requires additional action (3D Secure, etc.)"
 msgstr ""
 
-#: .\order\serializers\order.py:482
+#: .\order\serializers\order.py:513
 msgid "Next action required for payment completion"
 msgstr ""
 
-#: .\order\serializers\order.py:509
+#: .\order\serializers\order.py:540
 msgid "Partial refund amount. Leave empty for full refund."
 msgstr ""
 
-#: .\order\serializers\order.py:516
+#: .\order\serializers\order.py:547
 msgid "Currency code (e.g., USD, EUR). Required if amount is provided."
 msgstr ""
 
-#: .\order\serializers\order.py:523
+#: .\order\serializers\order.py:554
 msgid "Reason for the refund"
 msgstr ""
 
-#: .\order\serializers\order.py:532
+#: .\order\serializers\order.py:563
 msgid "Currency is required when amount is provided"
 msgstr ""
 
-#: .\order\serializers\order.py:537
+#: .\order\serializers\order.py:568
 msgid "Refund amount must be greater than 0"
 msgstr ""
 
-#: .\order\services.py:90
+#: .\order\services.py:84
 msgid "Product is required for order items"
 msgstr ""
 
-#: .\order\services.py:96
+#: .\order\services.py:90
 #, python-brace-format
 msgid "Invalid quantity {quantity} for product {product_id}"
 msgstr ""
 
-#: .\order\services.py:99
+#: .\order\services.py:93
 msgid "unknown"
 msgstr ""
 
-#: .\order\services.py:106
+#: .\order\services.py:100
 #, python-brace-format
 msgid ""
 "Product {product_name} does not have enough stock. Available: {available}, "
 "Requested: {requested}"
 msgstr ""
 
-#: .\order\services.py:153
+#: .\order\services.py:147
 #, python-brace-format
 msgid "Failed to create order: {error}"
 msgstr ""
 
-#: .\order\services.py:162
+#: .\order\services.py:156
 msgid "New status cannot be empty"
 msgstr ""
 
-#: .\order\services.py:196
+#: .\order\services.py:190
 #, python-brace-format
 msgid ""
 "Cannot transition from {old_status} to {new_status}. Allowed transitions: "
 "{allowed_transitions}"
 msgstr ""
 
-#: .\order\services.py:261
+#: .\order\services.py:255
 #, python-brace-format
 msgid ""
 "Order in status {status} cannot be canceled. Only orders in PENDING or "
 "PROCESSING status can be canceled."
 msgstr ""
 
-#: .\order\services.py:361
+#: .\order\services.py:355
 #, python-brace-format
 msgid "Failed to cancel order: {error}"
 msgstr ""
 
-#: .\order\services.py:374
+#: .\order\services.py:368
 msgid "This order has no payment ID to refund."
 msgstr ""
 
-#: .\order\services.py:377
+#: .\order\services.py:371
 msgid "This order has not been paid yet."
 msgstr ""
 
-#: .\order\services.py:380
+#: .\order\services.py:374
 msgid "This order has already been refunded."
 msgstr ""
 
-#: .\order\services.py:383 .\order\services.py:448
+#: .\order\services.py:377 .\order\services.py:442
 msgid "This order has no payment method configured."
 msgstr ""
 
-#: .\order\services.py:388
+#: .\order\services.py:382
 #, python-brace-format
 msgid "Refund amount ({refund}) cannot exceed paid amount ({paid})."
 msgstr ""
 
-#: .\order\services.py:445
+#: .\order\services.py:439
 msgid "This order has no payment ID."
 msgstr ""
 
@@ -3938,7 +4861,7 @@ msgstr ""
 msgid "Order #{order_id} Status Update - {status}"
 msgstr ""
 
-#: .\order\tasks.py:313
+#: .\order\tasks.py:317
 #, python-brace-format
 msgid "Reminder: Complete Your Order #{order_id}"
 msgstr ""
@@ -3955,8 +4878,8 @@ msgstr ""
 msgid "Order item not found."
 msgstr ""
 
-#: .\order\views\item.py:132 .\order\views\order.py:315
-#: .\order\views\order.py:321
+#: .\order\views\item.py:132 .\order\views\order.py:328
+#: .\order\views\order.py:334
 msgid "You do not have permission to access this order."
 msgstr ""
 
@@ -3968,7 +4891,7 @@ msgstr ""
 msgid "This item has already been fully refunded."
 msgstr ""
 
-#: .\order\views\item.py:179 .\order\views\order.py:765
+#: .\order\views\item.py:179 .\order\views\order.py:781
 msgid "Refund processed successfully."
 msgstr ""
 
@@ -4060,75 +4983,75 @@ msgid ""
 "the latest status directly from Stripe/PayPal."
 msgstr ""
 
-#: .\order\views\order.py:308
+#: .\order\views\order.py:321
 msgid "Guest orders can only be accessed via UUID."
 msgstr ""
 
-#: .\order\views\order.py:348
+#: .\order\views\order.py:361
 #, python-brace-format
 msgid "Order with ID {order_id} not found"
 msgstr ""
 
-#: .\order\views\order.py:407 .\order\views\order.py:416
-#: .\order\views\order.py:716
+#: .\order\views\order.py:420 .\order\views\order.py:429
+#: .\order\views\order.py:732
 msgid "An error occurred while processing your request."
 msgstr ""
 
-#: .\order\views\order.py:429 .\order\views\order.py:486
+#: .\order\views\order.py:442 .\order\views\order.py:499
 msgid "This order has already been paid."
 msgstr ""
 
-#: .\order\views\order.py:437 .\order\views\order.py:494
+#: .\order\views\order.py:450 .\order\views\order.py:507
 msgid "This order is not configured for Stripe payments."
 msgstr ""
 
-#: .\order\views\order.py:467
+#: .\order\views\order.py:480
 msgid "Failed to create payment intent."
 msgstr ""
 
-#: .\order\views\order.py:527
+#: .\order\views\order.py:543
 msgid "Failed to create checkout session."
 msgstr ""
 
-#: .\order\views\order.py:551
+#: .\order\views\order.py:567
 msgid "UUID parameter is required"
 msgstr ""
 
-#: .\order\views\order.py:557
+#: .\order\views\order.py:573
 #, python-brace-format
 msgid "Order with UUID {uuid} not found"
 msgstr ""
 
-#: .\order\views\order.py:583
+#: .\order\views\order.py:599
 msgid "You do not have permission to cancel this order"
 msgstr ""
 
-#: .\order\views\order.py:620 .\order\views\order.py:681
-#: .\order\views\order.py:723
+#: .\order\views\order.py:636 .\order\views\order.py:697
+#: .\order\views\order.py:739
 msgid "An unexpected error occurred"
 msgstr ""
 
-#: .\order\views\order.py:629
+#: .\order\views\order.py:645
 msgid "Authentication is required to view your orders"
 msgstr ""
 
-#: .\order\views\order.py:652
+#: .\order\views\order.py:668
 msgid "Only staff can add tracking information"
 msgstr ""
 
-#: .\order\views\order.py:691
+#: .\order\views\order.py:707
 msgid "Only staff can update order status"
 msgstr ""
 
-#: .\order\views\order.py:758
+#: .\order\views\order.py:774
 msgid "Failed to process refund."
 msgstr ""
 
-#: .\order\views\order.py:787
+#: .\order\views\order.py:803
 msgid "An error occurred while processing the refund."
 msgstr ""
 
-#: .\order\views\order.py:826
+#: .\order\views\order.py:842
 msgid "An error occurred while fetching payment status."
 msgstr ""
 
@@ -4188,11 +5111,11 @@ msgstr ""
 msgid "Provider"
 msgstr ""
 
-#: .\pay_way\admin.py:318 .\pay_way\models.py:19
+#: .\pay_way\admin.py:318 .\pay_way\models.py:20
 msgid "Cost"
 msgstr ""
 
-#: .\pay_way\admin.py:334 .\pay_way\models.py:25
+#: .\pay_way\admin.py:334 .\pay_way\models.py:26
 msgid "Free Threshold"
 msgstr ""
 
@@ -4200,7 +5123,7 @@ msgstr ""
 msgid "Configuration"
 msgstr ""
 
-#: .\pay_way\admin.py:388 .\pay_way\models.py:34
+#: .\pay_way\admin.py:388 .\pay_way\models.py:35
 msgid "Icon"
 msgstr ""
 
@@ -4325,7 +5248,7 @@ msgstr ""
 msgid "Filter by name (partial match)"
 msgstr ""
 
-#: .\pay_way\filters.py:71 .\user\filters\subscription.py:42
+#: .\pay_way\filters.py:71 .\user\filters\subscription.py:43
 msgid "Filter by description (partial match)"
 msgstr ""
 
@@ -4337,73 +5260,73 @@ msgstr ""
 msgid "Filter payment methods that have/don't have configuration"
 msgstr ""
 
-#: .\pay_way\models.py:30
+#: .\pay_way\models.py:31
 msgid "Order amount above which this payment method becomes free"
 msgstr ""
 
-#: .\pay_way\models.py:37
+#: .\pay_way\models.py:38
 msgid "Provider Code"
 msgstr ""
 
-#: .\pay_way\models.py:42
+#: .\pay_way\models.py:43
 msgid ""
 "Code used to identify the payment provider in the system (e.g., 'stripe', "
 "'paypal')"
 msgstr ""
 
-#: .\pay_way\models.py:46
+#: .\pay_way\models.py:47
 msgid "Is Online Payment"
 msgstr ""
 
-#: .\pay_way\models.py:48
+#: .\pay_way\models.py:49
 msgid "Whether this payment method is processed online"
 msgstr ""
 
-#: .\pay_way\models.py:51 .\user\models\subscription.py:51
+#: .\pay_way\models.py:52 .\user\models\subscription.py:55
 msgid "Requires Confirmation"
 msgstr ""
 
-#: .\pay_way\models.py:54
+#: .\pay_way\models.py:55
 msgid ""
 "Whether this payment method requires manual confirmation (e.g., bank "
 "transfer)"
 msgstr ""
 
-#: .\pay_way\models.py:58
+#: .\pay_way\models.py:59
 msgid "Provider Configuration"
 msgstr ""
 
-#: .\pay_way\models.py:62
+#: .\pay_way\models.py:63
 msgid "Provider-specific configuration (API keys, webhooks, etc.)"
 msgstr ""
 
-#: .\pay_way\models.py:75
+#: .\pay_way\models.py:76
 msgid "Payment Instructions"
 msgstr ""
 
-#: .\pay_way\models.py:79
+#: .\pay_way\models.py:80
 msgid ""
 "Instructions for the customer on how to complete payment (e.g., bank "
 "transfer details)"
 msgstr ""
 
-#: .\pay_way\models.py:87
+#: .\pay_way\models.py:88
 msgid "Pay Way"
 msgstr ""
 
-#: .\pay_way\models.py:88
+#: .\pay_way\models.py:89
 msgid "Pay Ways"
 msgstr ""
 
-#: .\pay_way\serializers.py:69
+#: .\pay_way\serializers.py:71
 msgid "Cost cannot be negative."
 msgstr ""
 
-#: .\pay_way\serializers.py:75
+#: .\pay_way\serializers.py:77
 msgid "Free order amount threshold cannot be negative."
 msgstr ""
 
-#: .\pay_way\serializers.py:82
+#: .\pay_way\serializers.py:84
 msgid "Online payment methods must have a provider code."
 msgstr ""
 
@@ -5005,11 +5928,11 @@ msgstr ""
 msgid "Stock cannot be negative."
 msgstr ""
 
-#: .\product\models\product.py:300
+#: .\product\models\product.py:324
 msgid "Product Translation"
 msgstr ""
 
-#: .\product\models\product.py:301
+#: .\product\models\product.py:325
 msgid "Product Translations"
 msgstr ""
 
@@ -5079,82 +6002,82 @@ msgstr ""
 msgid "Retrieve all images of a specific type (main, banner, icon, etc.)."
 msgstr ""
 
-#: .\product\views\favourite.py:101
+#: .\product\views\favourite.py:104
 msgid "Get favourite product details"
 msgstr ""
 
-#: .\product\views\favourite.py:103
+#: .\product\views\favourite.py:106
 msgid "Get detailed information about the product in this favourite entry."
 msgstr ""
 
-#: .\product\views\favourite.py:126
+#: .\product\views\favourite.py:129
 msgid "Get favourites by product IDs"
 msgstr ""
 
-#: .\product\views\favourite.py:128
+#: .\product\views\favourite.py:131
 msgid ""
 "Get favourite entries for the specified product IDs. Requires authentication."
 msgstr ""
 
-#: .\product\views\product.py:112
+#: .\product\views\product.py:123
 msgid "Increment product view count"
 msgstr ""
 
-#: .\product\views\product.py:113
+#: .\product\views\product.py:124
 msgid "Increment the view count for a product."
 msgstr ""
 
-#: .\product\views\product.py:137
+#: .\product\views\product.py:148
 msgid "Get product reviews"
 msgstr ""
 
-#: .\product\views\product.py:138
+#: .\product\views\product.py:149
 msgid "Get all reviews for a product with pagination support."
 msgstr ""
 
-#: .\product\views\product.py:210
+#: .\product\views\product.py:221
 msgid "Get product images"
 msgstr ""
 
-#: .\product\views\product.py:211
+#: .\product\views\product.py:222
 msgid "Get all images for a product."
 msgstr ""
 
-#: .\product\views\product.py:222
+#: .\product\views\product.py:233
 msgid "Language code for translations (el, en, de)"
 msgstr ""
 
-#: .\product\views\product.py:254
+#: .\product\views\product.py:265
 msgid "Get product tags"
 msgstr ""
 
-#: .\product\views\product.py:255
+#: .\product\views\product.py:266
 msgid "Get all tags associated with a product."
 msgstr ""
 
-#: .\product\views\review.py:110
+#: .\product\views\review.py:113
 msgid "Get user's review for a product"
 msgstr ""
 
-#: .\product\views\review.py:112
+#: .\product\views\review.py:115
 msgid ""
 "Get the current user's review for a specific product. Requires "
 "authentication."
 msgstr ""
 
-#: .\product\views\review.py:126
+#: .\product\views\review.py:129
 msgid "User is not authenticated"
 msgstr ""
 
-#: .\product\views\review.py:144
+#: .\product\views\review.py:147
 msgid "Review does not exist"
 msgstr ""
 
-#: .\product\views\review.py:150
+#: .\product\views\review.py:153
 msgid "Get reviewed product details"
 msgstr ""
 
-#: .\product\views\review.py:152
+#: .\product\views\review.py:155
 msgid "Get detailed information about the product this review is for."
 msgstr ""
 
@@ -5309,20 +6232,24 @@ msgid ""
 "language."
 msgstr ""
 
-#: .\settings.py:195
+#: .\settings.py:194
 msgid "Greek"
 msgstr ""
 
-#: .\settings.py:196
+#: .\settings.py:195
 msgid "English"
 msgstr ""
 
-#: .\settings.py:197
+#: .\settings.py:196
 msgid "German"
 msgstr ""
 
-#: .\settings.py:1076
+#: .\settings.py:1134
 msgid "Cache"
+msgstr ""
+
+#: .\settings.py:1139
+msgid "Email Templates"
 msgstr ""
 
 #: .\tag\admin.py:21
@@ -5671,7 +6598,6 @@ msgid "Topic Category"
 msgstr ""
 
 #: .\user\admin.py:259
-#, fuzzy
 msgid "Account Credentials"
 msgstr "Λογαριασμός Ανενεργός"
 
@@ -5755,16 +6681,8 @@ msgstr ""
 msgid "Settings"
 msgstr ""
 
-#: .\user\admin.py:782 .\user\admin.py:937 .\user\models\subscription.py:108
-msgid "Topic"
-msgstr ""
-
 #: .\user\admin.py:837
 msgid "Subscribers"
-msgstr ""
-
-#: .\user\admin.py:886
-msgid "Subscription Details"
 msgstr ""
 
 #: .\user\admin.py:890
@@ -5893,7 +6811,7 @@ msgstr ""
 msgid "Filter addresses that have notes"
 msgstr ""
 
-#: .\user\filters\subscription.py:12 .\user\filters\subscription.py:86
+#: .\user\filters\subscription.py:12 .\user\filters\subscription.py:88
 msgid "Filter by topic category"
 msgstr ""
 
@@ -5909,55 +6827,55 @@ msgstr ""
 msgid "Filter by exact slug"
 msgstr ""
 
-#: .\user\filters\subscription.py:48
+#: .\user\filters\subscription.py:50
 msgid "Filter topics that have subscribers"
 msgstr ""
 
-#: .\user\filters\subscription.py:76
+#: .\user\filters\subscription.py:78
 msgid "Filter by subscription topic"
 msgstr ""
 
-#: .\user\filters\subscription.py:80
+#: .\user\filters\subscription.py:82
 msgid "Filter by subscription status"
 msgstr ""
 
-#: .\user\filters\subscription.py:92
+#: .\user\filters\subscription.py:94
 msgid "Filter subscriptions created after this date"
 msgstr ""
 
-#: .\user\filters\subscription.py:97
+#: .\user\filters\subscription.py:99
 msgid "Filter subscriptions created before this date"
 msgstr ""
 
-#: .\user\filters\subscription.py:102
+#: .\user\filters\subscription.py:104
 msgid "Filter subscriptions unsubscribed after this date"
 msgstr ""
 
-#: .\user\filters\subscription.py:107
+#: .\user\filters\subscription.py:109
 msgid "Filter subscriptions unsubscribed before this date"
 msgstr ""
 
-#: .\user\filters\subscription.py:113
+#: .\user\filters\subscription.py:115
 msgid "Filter by topic slug (partial match)"
 msgstr ""
 
-#: .\user\filters\subscription.py:118
+#: .\user\filters\subscription.py:120
 msgid "Filter by exact topic slug"
 msgstr ""
 
-#: .\user\filters\subscription.py:124
+#: .\user\filters\subscription.py:126
 msgid "Filter by topic name (partial match)"
 msgstr ""
 
-#: .\user\filters\subscription.py:129
+#: .\user\filters\subscription.py:131
 msgid "Filter by topic description (partial match)"
 msgstr ""
 
-#: .\user\filters\subscription.py:135
+#: .\user\filters\subscription.py:137
 msgid "Filter by confirmation status"
 msgstr ""
 
-#: .\user\filters\subscription.py:139
+#: .\user\filters\subscription.py:141
 msgid "Filter subscriptions that have metadata"
 msgstr ""
 
@@ -6033,104 +6951,103 @@ msgstr ""
 msgid "There can only be one main address per user."
 msgstr ""
 
-#: .\user\models\subscription.py:13
+#: .\user\models\subscription.py:17
 msgid "Marketing Campaigns"
 msgstr ""
 
-#: .\user\models\subscription.py:14
+#: .\user\models\subscription.py:18
 msgid "Product Updates"
 msgstr ""
 
-#: .\user\models\subscription.py:15
-#, fuzzy
+#: .\user\models\subscription.py:19
 msgid "Account Updates"
 msgstr "Λογαριασμός Ανενεργός"
 
-#: .\user\models\subscription.py:18
+#: .\user\models\subscription.py:22
 msgid "Promotional"
 msgstr ""
 
-#: .\user\models\subscription.py:26
+#: .\user\models\subscription.py:30
 msgid "Unique identifier for the topic (e.g., 'weekly-newsletter')"
 msgstr ""
 
-#: .\user\models\subscription.py:34
+#: .\user\models\subscription.py:38
 msgid "Category of the subscription topic"
 msgstr ""
 
-#: .\user\models\subscription.py:40
+#: .\user\models\subscription.py:44
 msgid "Whether this topic is currently available for subscription"
 msgstr ""
 
-#: .\user\models\subscription.py:44
+#: .\user\models\subscription.py:48
 msgid "Default Subscription"
 msgstr ""
 
-#: .\user\models\subscription.py:47
+#: .\user\models\subscription.py:51
 msgid "Whether new users are automatically subscribed to this topic"
 msgstr ""
 
-#: .\user\models\subscription.py:54
+#: .\user\models\subscription.py:58
 msgid "Whether subscription to this topic requires email confirmation"
 msgstr ""
 
-#: .\user\models\subscription.py:61
+#: .\user\models\subscription.py:65
 msgid "Human-readable name for the topic"
 msgstr ""
 
-#: .\user\models\subscription.py:67
+#: .\user\models\subscription.py:71
 msgid "Detailed description of what this subscription includes"
 msgstr ""
 
-#: .\user\models\subscription.py:73
+#: .\user\models\subscription.py:79
 msgid "Subscription Topic"
 msgstr ""
 
-#: .\user\models\subscription.py:74
+#: .\user\models\subscription.py:80
 msgid "Subscription Topics"
 msgstr ""
 
-#: .\user\models\subscription.py:94
+#: .\user\models\subscription.py:100
 msgid "Pending Confirmation"
 msgstr ""
 
-#: .\user\models\subscription.py:95
+#: .\user\models\subscription.py:101
 msgid "Unsubscribed"
 msgstr ""
 
-#: .\user\models\subscription.py:96
+#: .\user\models\subscription.py:102
 msgid "Bounced"
 msgstr ""
 
-#: .\user\models\subscription.py:116
+#: .\user\models\subscription.py:122
 msgid "Subscribed At"
 msgstr ""
 
-#: .\user\models\subscription.py:118
+#: .\user\models\subscription.py:124
 msgid "Unsubscribed At"
 msgstr ""
 
-#: .\user\models\subscription.py:121
+#: .\user\models\subscription.py:127
 msgid "Confirmation Token"
 msgstr ""
 
-#: .\user\models\subscription.py:124
+#: .\user\models\subscription.py:130
 msgid "Token for email confirmation if required"
 msgstr ""
 
-#: .\user\models\subscription.py:127
+#: .\user\models\subscription.py:133
 msgid "Metadata"
 msgstr ""
 
-#: .\user\models\subscription.py:130
+#: .\user\models\subscription.py:136
 msgid "Additional subscription preferences or data"
 msgstr ""
 
-#: .\user\models\subscription.py:134
+#: .\user\models\subscription.py:142
 msgid "User Subscription"
 msgstr ""
 
-#: .\user\models\subscription.py:135
+#: .\user\models\subscription.py:143
 msgid "User Subscriptions"
 msgstr ""
 
@@ -6194,11 +7111,11 @@ msgstr ""
 msgid "Action to perform on the topics"
 msgstr ""
 
-#: .\user\serializers\subscription.py:242 .\user\views\subscription.py:341
+#: .\user\serializers\subscription.py:242 .\user\views\subscription.py:348
 msgid "Invalid or inactive topic IDs: {}"
 msgstr ""
 
-#: .\user\utils\subscription.py:58
+#: .\user\utils\subscription.py:62
 #, python-brace-format
 msgid "Confirm your subscription to {topic}"
 msgstr ""
@@ -6289,23 +7206,23 @@ msgstr ""
 msgid "Get a summary of subscriptions for a specific user."
 msgstr ""
 
-#: .\user\views\account.py:398
+#: .\user\views\account.py:404
 msgid "Topic ID is required."
 msgstr ""
 
-#: .\user\views\account.py:408
+#: .\user\views\account.py:414
 msgid "Topic not found or not active."
 msgstr ""
 
-#: .\user\views\account.py:428
+#: .\user\views\account.py:434
 msgid "User is already subscribed to this topic."
 msgstr ""
 
-#: .\user\views\account.py:453
+#: .\user\views\account.py:459
 msgid "Username already exists."
 msgstr ""
 
-#: .\user\views\account.py:460
+#: .\user\views\account.py:466
 msgid "Username updated successfully."
 msgstr ""
 
@@ -6329,75 +7246,75 @@ msgstr ""
 msgid "No main address found."
 msgstr ""
 
-#: .\user\views\subscription.py:87
+#: .\user\views\subscription.py:94
 msgid "Get my subscriptions"
 msgstr ""
 
-#: .\user\views\subscription.py:89
+#: .\user\views\subscription.py:96
 msgid "Get the current user's subscribed and available subscription topics."
 msgstr ""
 
-#: .\user\views\subscription.py:144
+#: .\user\views\subscription.py:151
 msgid "Subscribe to a topic"
 msgstr ""
 
-#: .\user\views\subscription.py:146
+#: .\user\views\subscription.py:153
 msgid "Subscribe the current user to a specific subscription topic."
 msgstr ""
 
-#: .\user\views\subscription.py:169
+#: .\user\views\subscription.py:176
 msgid "Already subscribed to this topic."
 msgstr ""
 
-#: .\user\views\subscription.py:174
+#: .\user\views\subscription.py:181
 msgid "Subscription pending confirmation."
 msgstr ""
 
-#: .\user\views\subscription.py:216
+#: .\user\views\subscription.py:223
 msgid "Unsubscribe from a topic"
 msgstr ""
 
-#: .\user\views\subscription.py:218
+#: .\user\views\subscription.py:225
 msgid "Unsubscribe the current user from a specific subscription topic."
 msgstr ""
 
-#: .\user\views\subscription.py:241
+#: .\user\views\subscription.py:248
 msgid "Successfully unsubscribed."
 msgstr ""
 
-#: .\user\views\subscription.py:246
+#: .\user\views\subscription.py:253
 msgid "You are not subscribed to this topic."
 msgstr ""
 
-#: .\user\views\subscription.py:312
+#: .\user\views\subscription.py:319
 msgid "Bulk update user subscriptions"
 msgstr ""
 
-#: .\user\views\subscription.py:313
+#: .\user\views\subscription.py:320
 msgid "Subscribe or unsubscribe from multiple topics at once."
 msgstr ""
 
-#: .\user\views\subscription.py:400
+#: .\user\views\subscription.py:407
 msgid "Confirm a user subscription"
 msgstr ""
 
-#: .\user\views\subscription.py:402
+#: .\user\views\subscription.py:409
 msgid "Confirm a pending subscription using the confirmation token."
 msgstr ""
 
-#: .\user\views\subscription.py:424
+#: .\user\views\subscription.py:431
 msgid "Subscription is not pending confirmation."
 msgstr ""
 
-#: .\user\views\subscription.py:430
+#: .\user\views\subscription.py:437
 msgid "Invalid confirmation token."
 msgstr ""
 
-#: .\user\views\subscription.py:461
+#: .\user\views\subscription.py:468
 msgid "Unsubscribe via email link"
 msgstr ""
 
-#: .\user\views\subscription.py:463
+#: .\user\views\subscription.py:470
 msgid "Unsubscribe from a subscription topic using an email unsubscribe link."
 msgstr ""
 
@@ -6498,125 +7415,3 @@ msgstr ""
 #: .\vat\models.py:40
 msgid "Vats"
 msgstr ""
-
-#, python-format
-#~ msgid ""
-#~ "Please confirm that <a href=\"mailto:%(email)s\">%(email)s</a> is an e-"
-#~ "mail address for user %(user_display)s."
-#~ msgstr ""
-#~ "Παρακαλούμε επιβεβαιώστε ότι το <a href=\"mailto:"
-#~ "%(email)s\"><code>%(email)s</a> είναι μια διεύθυνση ηλεκτρονικού "
-#~ "ταχυδρομείου για τον χρήστη <code>%(user_display)s."
-
-# Email Template Translations
-#: core/templates/emails/base/email_base.html
-msgid "Questions?"
-msgstr "Ερωτήσεις;"
-
-#: core/templates/emails/base/email_base.html
-msgid "Contact us"
-msgstr "Επικοινωνήστε μαζί μας"
-
-#: core/templates/emails/base/email_base.html
-msgid "All rights reserved."
-msgstr "Όλα τα δικαιώματα διατηρούνται."
-
-#: core/templates/emails/base/email_base.html
-msgid "Visit our website"
-msgstr "Επισκεφτείτε την ιστοσελίδα μας"
-
-#: core/templates/emails/order/
-msgid "Order Confirmation"
-msgstr "Επιβεβαίωση Παραγγελίας"
-
-#: core/templates/emails/order/
-msgid "Thank you for your order!"
-msgstr "Ευχαριστούμε για την παραγγελία σας!"
-
-#: core/templates/emails/order/
-msgid "Order Details"
-msgstr "Λεπτομέρειες Παραγγελίας"
-
-#: core/templates/emails/order/
-msgid "Order"
-msgstr "Παραγγελία"
-
-#: core/templates/emails/order/
-msgid "Date"
-msgstr "Ημερομηνία"
-
-#: core/templates/emails/order/
-msgid "Status"
-msgstr "Κατάσταση"
-
-#: core/templates/emails/order/
-msgid "Shipping Address"
-msgstr "Διεύθυνση Αποστολής"
-
-#: core/templates/emails/order/
-msgid "Order Items"
-msgstr "Προϊόντα Παραγγελίας"
-
-#: core/templates/emails/order/
-msgid "Product"
-msgstr "Προϊόν"
-
-#: core/templates/emails/order/
-msgid "Quantity"
-msgstr "Ποσότητα"
-
-#: core/templates/emails/order/
-msgid "Price"
-msgstr "Τιμή"
-
-#: core/templates/emails/order/
-msgid "Total"
-msgstr "Σύνολο"
-
-#: core/templates/emails/order/
-msgid "Subtotal"
-msgstr "Υποσύνολο"
-
-#: core/templates/emails/order/
-msgid "Shipping"
-msgstr "Μεταφορικά"
-
-#: core/templates/emails/order/
-msgid "Order Shipped"
-msgstr "Η Παραγγελία Απεστάλη"
-
-#: core/templates/emails/order/
-msgid "Your order has been shipped!"
-msgstr "Η παραγγελία σας έχει αποσταλεί!"
-
-#: core/templates/emails/order/
-msgid "Tracking Number"
-msgstr "Αριθμός Παρακολούθησης"
-
-#: core/templates/emails/order/
-msgid "Carrier"
-msgstr "Μεταφορέας"
-
-#: core/templates/emails/order/
-msgid "Order Delivered"
-msgstr "Η Παραγγελία Παραδόθηκε"
-
-#: core/templates/emails/order/
-msgid "Your order has been delivered!"
-msgstr "Η παραγγελία σας έχει παραδοθεί!"
-
-#: core/templates/emails/order/
-msgid "Order Canceled"
-msgstr "Η Παραγγελία Ακυρώθηκε"
-
-#: core/templates/emails/order/
-msgid "Your order has been canceled."
-msgstr "Η παραγγελία σας έχει ακυρωθεί."
-
-#: core/templates/emails/order/
-msgid "If you have any questions, please contact our customer service."
-msgstr "Εάν έχετε οποιεσδήποτε ερωτήσεις, παρακαλούμε επικοινωνήστε με την εξυπηρέτηση πελατών μας."
-
-#: core/templates/emails/order/
-msgid "Thank you for shopping with us!"
-msgstr "Ευχαριστούμε που ψωνίσατε μαζί μας!"

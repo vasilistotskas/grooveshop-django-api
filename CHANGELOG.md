@@ -3,6 +3,12 @@
 
 
 
+## v1.65.1 (2026-01-17)
+
+### Bug fixes
+
+* fix: email preview locales ([`4cac197`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4cac197fdf9933e2afb4dc2b16e4d547c115ea92))
+
 ## v1.65.0 (2026-01-17)
 
 ### Bug fixes

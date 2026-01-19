@@ -2242,7 +2242,7 @@ msgid "Apply Discount"
 msgstr ""
 
 #: .\core\templates\base.html:78
-msgid "© 2024"
+msgid "© 2026"
 msgstr ""
 
 #: .\core\templates\base.html:78
@@ -2392,17 +2392,17 @@ msgstr "Λεπτομέρειες Παραγγελίας"
 #: .\core\templates\emails\order\order_canceled.html:12
 #: .\core\templates\emails\order\order_canceled.txt:6
 msgid "Date Ordered"
-msgstr ""
+msgstr "Ημερομηνία Παραγγελίας"
 
 #: .\core\templates\emails\order\order_canceled.html:13
 #: .\core\templates\emails\order\order_canceled.txt:7
 msgid "Date Canceled"
-msgstr "Η Παραγγελία Ακυρώθηκε"
+msgstr "Ημερομηνία Ακύρωσης"
 
 #: .\core\templates\emails\order\order_canceled.html:17
 #: .\core\templates\emails\order\order_canceled.txt:10
 msgid "Refund"
-msgstr ""
+msgstr "Επιστροφή Χρημάτων"
 
 #: .\core\templates\emails\order\order_canceled.html:18
 #: .\core\templates\emails\order\order_canceled.txt:10
@@ -2411,6 +2411,8 @@ msgid ""
 "Your payment of %(amount)s will be refunded to your original payment method "
 "within 3-5 business days."
 msgstr ""
+"Η πληρωμή σας %(amount)s θα επιστραφεί στην αρχική σας μέθοδο πληρωμής εντός "
+"3-5 εργάσιμων ημερών."
 
 #: .\core\templates\emails\order\order_canceled.html:23
 #: .\core\templates\emails\order\order_canceled.txt:13
@@ -2418,27 +2420,27 @@ msgid ""
 "If you did not request this cancellation or have any questions, please "
 "contact our customer service immediately."
 msgstr ""
-"Εάν έχετε οποιεσδήποτε ερωτήσεις, παρακαλούμε επικοινωνήστε με την "
-"εξυπηρέτηση πελατών μας."
+"Εάν δεν ζητήσατε αυτή την ακύρωση ή έχετε οποιεσδήποτε ερωτήσεις, παρακαλούμε "
+"επικοινωνήστε άμεσα με την εξυπηρέτηση πελατών μας."
 
 #: .\core\templates\emails\order\order_canceled.html:25
 #: .\core\templates\emails\order\order_canceled.txt:15
 msgid "We hope to see you again soon!"
-msgstr ""
+msgstr "Ελπίζουμε να σας δούμε ξανά σύντομα!"
 
 #: .\core\templates\emails\order\order_canceled.txt:1
 msgid "YOUR ORDER HAS BEEN CANCELED"
-msgstr ""
+msgstr "Η ΠΑΡΑΓΓΕΛΙΑ ΣΑΣ ΑΚΥΡΩΘΗΚΕ"
 
 #: .\core\templates\emails\order\order_canceled.txt:5
 msgid "ORDER DETAILS"
-msgstr ""
+msgstr "ΛΕΠΤΟΜΕΡΕΙΕΣ ΠΑΡΑΓΓΕΛΙΑΣ"
 
 #: .\core\templates\emails\order\order_completed.html:4
 #: .\core\templates\emails\order\order_completed.html:12
 #: .\core\templates\emails\order\order_completed.txt:8
 msgid "Order Completed"
-msgstr "Η Παραγγελία Ακυρώθηκε"
+msgstr "Η Παραγγελία Ολοκληρώθηκε"
 
 #: .\core\templates\emails\order\order_completed.html:8
 msgid "Thank You for Your Purchase!"
@@ -2458,13 +2460,13 @@ msgstr "Η παραγγελία σας #%(order_id)s ολοκληρώθηκε ε
 #: .\core\templates\emails\order\order_status_generic.txt:1
 #, python-format
 msgid "Dear %(first_name)s %(last_name)s,"
-msgstr ""
+msgstr "Αγαπητέ/ή %(first_name)s %(last_name)s,"
 
 #: .\core\templates\emails\order\order_completed.html:15
 #: .\core\templates\emails\order\order_completed.txt:12
 msgid ""
 "We're delighted to confirm that your order has been completed successfully!"
-msgstr ""
+msgstr "Είμαστε στην ευχάριστη θέση να επιβεβαιώσουμε ότι η παραγγελία σας ολοκληρώθηκε επιτυχώς!"
 
 #: .\core\templates\emails\order\order_completed.html:19
 #: .\core\templates\emails\order\order_completed.txt:16
@@ -2472,26 +2474,31 @@ msgstr ""
 #: .\core\templates\emails\order\order_status_generic.html:14
 #: .\core\templates\emails\order\order_status_generic.txt:8
 msgid "Order Date"
-msgstr "Προϊόντα Παραγγελίας"
+msgstr "Ημερομηνία Παραγγελίας"
+
+#: .\core\templates\emails\order\order_status_generic.html:14
+#: .\core\templates\emails\order\order_status_generic.txt:6
+msgid "Order Number"
+msgstr "Αριθμός Παραγγελίας"
 
 #: .\core\templates\emails\order\order_completed.html:20
 #: .\core\templates\emails\order\order_completed.txt:17
 #: .\core\templates\emails\order\order_pending_reminder.html:17
 #: .\core\templates\emails\order\order_status_generic.html:15
 msgid "Order Total"
-msgstr "Λεπτομέρειες Παραγγελίας"
+msgstr "Σύνολο Παραγγελίας"
 
 #: .\core\templates\emails\order\order_completed.html:24
 #: .\core\templates\emails\order\order_completed.txt:18 .\order\admin.py:74
 #: .\order\enum\status.py:10 .\order\enum\status.py:36
 msgid "Completed"
-msgstr ""
+msgstr "Ολοκληρώθηκε"
 
 #: .\core\templates\emails\order\order_completed.html:29
 #: .\core\templates\emails\order\order_completed.txt:20
 #: .\core\templates\emails\subscription\confirmation.html:26
 msgid "What's Next?"
-msgstr ""
+msgstr "Τι Ακολουθεί;"
 
 #: .\core\templates\emails\order\order_completed.html:30
 #: .\core\templates\emails\order\order_completed.txt:22
@@ -2499,6 +2506,8 @@ msgid ""
 "Your order has been delivered and completed. We hope you're enjoying your "
 "purchase!"
 msgstr ""
+"Η παραγγελία σας παραδόθηκε και ολοκληρώθηκε. Ελπίζουμε να απολαμβάνετε την "
+"αγορά σας!"
 
 #: .\core\templates\emails\order\order_completed.html:32
 #: .\core\templates\emails\order\order_completed.txt:24
@@ -2516,6 +2525,8 @@ msgid ""
 "Thank you for shopping with %(site_name)s! We look forward to serving you "
 "again."
 msgstr ""
+"Ευχαριστούμε που ψωνίσατε με %(site_name)s! Ανυπομονούμε να σας "
+"εξυπηρετήσουμε ξανά."
 
 #: .\core\templates\emails\order\order_completed.txt:3
 msgid "THANK YOU FOR YOUR PURCHASE!"
@@ -2579,15 +2590,15 @@ msgstr "Ευχαριστούμε που ψωνίσατε μαζί μας!"
 
 #: .\core\templates\emails\order\order_confirmation.txt:1
 msgid "ORDER CONFIRMATION"
-msgstr ""
+msgstr "ΕΠΙΒΕΒΑΙΩΣΗ ΠΑΡΑΓΓΕΛΙΑΣ"
 
 #: .\core\templates\emails\order\order_confirmation.txt:9
 msgid "SHIPPING ADDRESS"
-msgstr ""
+msgstr "ΔΙΕΥΘΥΝΣΗ ΑΠΟΣΤΟΛΗΣ"
 
 #: .\core\templates\emails\order\order_confirmation.txt:15
 msgid "ORDER ITEMS"
-msgstr ""
+msgstr "ΠΡΟΪΟΝΤΑ ΠΑΡΑΓΓΕΛΙΑΣ"
 
 #: .\core\templates\emails\order\order_delivered.html:4
 msgid "Order Delivered"
@@ -2605,12 +2616,12 @@ msgstr "Υπέροχα νέα! Η παραγγελία σας #%(order_id)s έχ
 
 #: .\core\templates\emails\order\order_delivered.html:11
 msgid "Delivery Information"
-msgstr "Επιβεβαίωση Παραγγελίας"
+msgstr "Πληροφορίες Παράδοσης"
 
 #: .\core\templates\emails\order\order_delivered.html:14
 #: .\core\templates\emails\order\order_shipped.html:17
 msgid "Delivery Address"
-msgstr ""
+msgstr "Διεύθυνση Παράδοσης"
 
 #: .\core\templates\emails\order\order_delivered.html:23
 #: .\core\templates\emails\order\order_delivered.txt:14
@@ -2618,42 +2629,43 @@ msgid ""
 "We hope you are satisfied with your purchase. If you have any issues with "
 "your order, please contact our customer service."
 msgstr ""
-"Εάν έχετε οποιεσδήποτε ερωτήσεις, παρακαλούμε επικοινωνήστε με την "
-"εξυπηρέτηση πελατών μας."
+"Ελπίζουμε να είστε ικανοποιημένοι με την αγορά σας. Αν έχετε οποιοδήποτε "
+"πρόβλημα με την παραγγελία σας, παρακαλούμε επικοινωνήστε με την εξυπηρέτηση "
+"πελατών μας."
 
 #: .\core\templates\emails\order\order_delivered.html:25
 #: .\core\templates\emails\order\order_delivered.txt:16
 msgid "We'd love to hear your feedback! How was your shopping experience?"
-msgstr ""
+msgstr "Θα θέλαμε να ακούσουμε τη γνώμη σας! Πώς ήταν η εμπειρία αγορών σας;"
 
 #: .\core\templates\emails\order\order_delivered.html:29
 msgid "Rate Your Experience"
-msgstr ""
+msgstr "Αξιολογήστε την Εμπειρία σας"
 
 #: .\core\templates\emails\order\order_delivered.txt:1
 msgid "YOUR ORDER HAS BEEN DELIVERED"
-msgstr ""
+msgstr "Η ΠΑΡΑΓΓΕΛΙΑ ΣΑΣ ΠΑΡΑΔΟΘΗΚΕ"
 
 #: .\core\templates\emails\order\order_delivered.txt:5
 msgid "DELIVERY INFORMATION"
-msgstr ""
+msgstr "ΠΛΗΡΟΦΟΡΙΕΣ ΠΑΡΑΔΟΣΗΣ"
 
 #: .\core\templates\emails\order\order_delivered.txt:8
 #: .\core\templates\emails\order\order_shipped.txt:9
 msgid "DELIVERY ADDRESS"
-msgstr ""
+msgstr "ΔΙΕΥΘΥΝΣΗ ΠΑΡΑΔΟΣΗΣ"
 
 #: .\core\templates\emails\order\order_delivered.txt:17
 msgid "Visit our website to rate your experience."
-msgstr ""
+msgstr "Επισκεφθείτε την ιστοσελίδα μας για να αξιολογήσετε την εμπειρία σας."
 
 #: .\core\templates\emails\order\order_pending_reminder.html:4
 msgid "Order Reminder"
-msgstr "Η Παραγγελία Παραδόθηκε"
+msgstr "Υπενθύμιση Παραγγελίας"
 
 #: .\core\templates\emails\order\order_pending_reminder.html:7
 msgid "Complete Your Order"
-msgstr ""
+msgstr "Ολοκληρώστε την Παραγγελία σας"
 
 #: .\core\templates\emails\order\order_pending_reminder.html:11
 #: .\core\templates\emails\order\order_pending_reminder.txt:3
@@ -2662,12 +2674,14 @@ msgid ""
 "We noticed that your order #%(order_id)s placed on %(order_date)s is still "
 "in pending status."
 msgstr ""
+"Παρατηρήσαμε ότι η παραγγελία σας #%(order_id)s που τοποθετήθηκε στις "
+"%(order_date)s είναι ακόμα σε κατάσταση αναμονής."
 
 #: .\core\templates\emails\order\order_pending_reminder.html:18
 #: .\core\templates\emails\order\order_pending_reminder.txt:7
 #: .\order\admin.py:75 .\order\enum\status.py:6 .\order\enum\status.py:34
 msgid "Pending"
-msgstr ""
+msgstr "Εκκρεμεί"
 
 #: .\core\templates\emails\order\order_pending_reminder.html:21
 #: .\core\templates\emails\order\order_pending_reminder.txt:9
@@ -2676,16 +2690,21 @@ msgid ""
 "completed payment, please disregard this message as it may take some time "
 "for our system to update."
 msgstr ""
+"Για να ολοκληρώσετε την αγορά σας, παρακαλούμε ολοκληρώστε την πληρωμή σας. "
+"Αν έχετε ήδη ολοκληρώσει την πληρωμή, παρακαλούμε αγνοήστε αυτό το μήνυμα "
+"καθώς μπορεί να χρειαστεί λίγος χρόνος για την ενημέρωση του συστήματός μας."
 
 #: .\core\templates\emails\order\order_pending_reminder.html:23
 #: .\core\templates\emails\order\order_pending_reminder.txt:11
 msgid ""
 "You can view your order status by logging into your account on our website."
 msgstr ""
+"Μπορείτε να δείτε την κατάσταση της παραγγελίας σας συνδέοντας στον "
+"λογαριασμό σας στην ιστοσελίδα μας."
 
 #: .\core\templates\emails\order\order_pending_reminder.html:27
 msgid "Go to Your Account"
-msgstr ""
+msgstr "Μετάβαση στον Λογαριασμό σας"
 
 #: .\core\templates\emails\order\order_pending_reminder.html:31
 #: .\core\templates\emails\order\order_pending_reminder.txt:14
@@ -2693,6 +2712,9 @@ msgid ""
 "If you're experiencing any issues with your payment or have questions about "
 "your order, please don't hesitate to contact our customer service team."
 msgstr ""
+"Αν αντιμετωπίζετε προβλήματα με την πληρωμή σας ή έχετε ερωτήσεις σχετικά με "
+"την παραγγελία σας, μη διστάσετε να επικοινωνήσετε με την ομάδα εξυπηρέτησης "
+"πελατών μας."
 
 #: .\core\templates\emails\order\order_pending_reminder.html:33
 #: .\core\templates\emails\order\order_pending_reminder.txt:16
@@ -2705,17 +2727,17 @@ msgstr "Ευχαριστούμε που ψωνίσατε με %(site_name)s!"
 #: .\core\templates\emails\order\order_pending_reminder.txt:6
 #: .\core\templates\emails\order\order_status_generic.txt:9
 msgid "Total Amount"
-msgstr ""
+msgstr "Συνολικό Ποσό"
 
 #: .\core\templates\emails\order\order_pending_reminder.txt:18
 #: .\core\templates\emails\order\order_status_generic.txt:36
 msgid "Best regards"
-msgstr ""
+msgstr "Με εκτίμηση"
 
 #: .\core\templates\emails\order\order_pending_reminder.txt:19
 #: .\core\templates\emails\order\order_status_generic.txt:37
 msgid "Team"
-msgstr ""
+msgstr "Ομάδα"
 
 #: .\core\templates\emails\order\order_shipped.html:4
 msgid "Order Shipped"
@@ -2732,10 +2754,12 @@ msgid ""
 "Good news! Your order #%(order_id)s has been shipped and is on its way to "
 "you."
 msgstr ""
+"Καλά νέα! Η παραγγελία σας #%(order_id)s έχει αποσταλεί και είναι καθ' οδόν "
+"προς εσάς."
 
 #: .\core\templates\emails\order\order_shipped.html:11
 msgid "Shipping Information"
-msgstr ""
+msgstr "Πληροφορίες Αποστολής"
 
 #: .\core\templates\emails\order\order_shipped.html:12
 #: .\core\templates\emails\order\order_shipped.txt:6
@@ -2763,8 +2787,8 @@ msgid ""
 "If you have any questions about your shipment, please contact our customer "
 "service."
 msgstr ""
-"Εάν έχετε οποιεσδήποτε ερωτήσεις, παρακαλούμε επικοινωνήστε με την "
-"εξυπηρέτηση πελατών μας."
+"Εάν έχετε οποιεσδήποτε ερωτήσεις σχετικά με την αποστολή σας, παρακαλούμε "
+"επικοινωνήστε με την εξυπηρέτηση πελατών μας."
 
 #: .\core\templates\emails\order\order_shipped.txt:1
 msgid "YOUR ORDER HAS SHIPPED"
@@ -2777,7 +2801,7 @@ msgstr "ΠΛΗΡΟΦΟΡΙΕΣ ΑΠΟΣΤΟΛΗΣ"
 #: .\core\templates\emails\order\order_status_generic.html:4
 #: .\core\templates\emails\order\order_status_generic.html:7
 msgid "Order Status Update"
-msgstr ""
+msgstr "Ενημέρωση Κατάστασης Παραγγελίας"
 
 #: .\core\templates\emails\order\order_status_generic.html:10
 #: .\core\templates\emails\order\order_status_generic.txt:3
@@ -2788,58 +2812,61 @@ msgstr "Η παραγγελία σας #%(order_id)s έχει ενημερωθε
 #: .\core\templates\emails\order\order_status_generic.html:17
 #: .\core\templates\emails\order\order_status_generic.txt:5
 msgid "New Status"
-msgstr "Κατάσταση"
+msgstr "Νέα Κατάσταση"
 
 #: .\core\templates\emails\order\order_status_generic.html:23
 msgid "What This Means"
-msgstr ""
+msgstr "Τι Σημαίνει Αυτό"
 
 #: .\core\templates\emails\order\order_status_generic.html:26
 #: .\core\templates\emails\order\order_status_generic.txt:13
 msgid "Your order has been received and is awaiting payment processing."
-msgstr ""
+msgstr "Η παραγγελία σας έχει ληφθεί και αναμένει επεξεργασία πληρωμής."
 
 #: .\core\templates\emails\order\order_status_generic.html:28
 #: .\core\templates\emails\order\order_status_generic.txt:15
 msgid "Your payment has been confirmed and we're preparing your order."
-msgstr ""
+msgstr "Η πληρωμή σας έχει επιβεβαιωθεί και ετοιμάζουμε την παραγγελία σας."
 
 #: .\core\templates\emails\order\order_status_generic.html:30
 #: .\core\templates\emails\order\order_status_generic.txt:17
 msgid "Your order has been shipped and is on its way to you."
-msgstr "Η παραγγελία σας έχει αποσταλεί!"
+msgstr "Η παραγγελία σας έχει αποσταλεί και είναι καθ' οδόν προς εσάς."
 
 #: .\core\templates\emails\order\order_status_generic.html:32
 #: .\core\templates\emails\order\order_status_generic.txt:19
 msgid "Your order has been delivered to your shipping address."
-msgstr "Η παραγγελία σας έχει παραδοθεί!"
+msgstr "Η παραγγελία σας έχει παραδοθεί στη διεύθυνση αποστολής σας."
 
 #: .\core\templates\emails\order\order_status_generic.html:34
 #: .\core\templates\emails\order\order_status_generic.txt:21
 msgid ""
 "Your order has been completed successfully. Thank you for shopping with us!"
 msgstr ""
+"Η παραγγελία σας ολοκληρώθηκε επιτυχώς. Ευχαριστούμε που ψωνίσατε μαζί μας!"
 
 #: .\core\templates\emails\order\order_status_generic.html:36
 #: .\core\templates\emails\order\order_status_generic.txt:23
 msgid ""
 "Your order has been canceled. If you didn't request this, please contact us."
 msgstr ""
+"Η παραγγελία σας έχει ακυρωθεί. Αν δεν το ζητήσατε εσείς, παρακαλούμε "
+"επικοινωνήστε μαζί μας."
 
 #: .\core\templates\emails\order\order_status_generic.html:38
 #: .\core\templates\emails\order\order_status_generic.txt:25
 msgid "Your return has been received and is being processed."
-msgstr "Η παραγγελία σας έχει ακυρωθεί."
+msgstr "Η επιστροφή σας έχει ληφθεί και είναι υπό επεξεργασία."
 
 #: .\core\templates\emails\order\order_status_generic.html:40
 #: .\core\templates\emails\order\order_status_generic.txt:27
 msgid "Your refund has been processed and should appear in your account soon."
-msgstr ""
+msgstr "Η επιστροφή χρημάτων σας έχει επεξεργαστεί και θα εμφανιστεί σύντομα στον λογαριασμό σας."
 
 #: .\core\templates\emails\order\order_status_generic.html:42
 #: .\core\templates\emails\order\order_status_generic.txt:29
 msgid "Your order status has been updated."
-msgstr "Η παραγγελία σας έχει ακυρωθεί."
+msgstr "Η κατάσταση της παραγγελίας σας έχει ενημερωθεί."
 
 #: .\core\templates\emails\order\order_status_generic.html:47
 #: .\core\templates\emails\order\order_status_generic.txt:32
@@ -2852,11 +2879,11 @@ msgstr ""
 
 #: .\core\templates\emails\order\order_status_generic.txt:11
 msgid "This status means"
-msgstr ""
+msgstr "Αυτή η κατάσταση σημαίνει"
 
 #: .\core\templates\emails\subscription\confirmation.html:4
 msgid "Subscription Confirmation"
-msgstr "Επιβεβαίωση Παραγγελίας"
+msgstr "Επιβεβαίωση Εγγραφής"
 
 #: .\core\templates\emails\subscription\confirmation.html:7
 msgid "Subscription Confirmed!"
@@ -3857,7 +3884,7 @@ msgstr ""
 
 #: .\order\admin.py:76 .\order\enum\status.py:7 .\order\enum\status.py:35
 msgid "Processing"
-msgstr ""
+msgstr "Σε επεξεργασία"
 
 #: .\order\admin.py:77 .\order\enum\status.py:37
 msgid "Failed"
@@ -3865,7 +3892,7 @@ msgstr ""
 
 #: .\order\admin.py:78 .\order\enum\status.py:13 .\order\enum\status.py:38
 msgid "Refunded"
-msgstr ""
+msgstr "Επεστράφη"
 
 #: .\order\admin.py:79 .\order\enum\status.py:39
 msgid "Partially Refunded"
@@ -3873,7 +3900,7 @@ msgstr ""
 
 #: .\order\admin.py:80 .\order\enum\status.py:11 .\order\enum\status.py:40
 msgid "Canceled"
-msgstr ""
+msgstr "Ακυρώθηκε"
 
 #: .\order\admin.py:81
 msgid "Needs Attention (Failed/Pending)"
@@ -4055,15 +4082,15 @@ msgstr ""
 
 #: .\order\enum\status.py:8
 msgid "Shipped"
-msgstr ""
+msgstr "Απεστάλη"
 
 #: .\order\enum\status.py:9
 msgid "Delivered"
-msgstr ""
+msgstr "Παραδόθηκε"
 
 #: .\order\enum\status.py:12
 msgid "Returned"
-msgstr ""
+msgstr "Επιστράφηκε"
 
 #: .\order\filters.py:18
 msgid "Filter by country code"

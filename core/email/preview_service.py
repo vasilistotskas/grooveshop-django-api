@@ -112,7 +112,9 @@ class EmailTemplatePreviewService:
 
         # Map generator names to methods
         generator_map = {
-            "generate_order_context": lambda: self._get_context_data(order_id),
+            "generate_order_context": lambda: self._get_context_data(
+                order_id, template_name
+            ),
             "generate_subscription_context": lambda: (
                 self._get_sample_subscription_context(),
                 True,
@@ -136,9 +138,11 @@ class EmailTemplatePreviewService:
             return result, True
 
         # Fallback to order context
-        return self._get_context_data(order_id)
+        return self._get_context_data(order_id, template_name)
 
-    def _get_context_data(self, order_id: Optional[int]) -> tuple[dict, bool]:
+    def _get_context_data(
+        self, order_id: Optional[int], template_name: str = ""
+    ) -> tuple[dict, bool]:
         """Get context data for order templates."""
         if order_id:
             try:
@@ -148,7 +152,7 @@ class EmailTemplatePreviewService:
                     f"Order {order_id} not found, falling back to sample data",
                     extra={"order_id": order_id},
                 )
-        return self._get_sample_order_context(), True
+        return self._get_sample_order_context(template_name), True
 
     def _get_real_order_context(self, order_id: int) -> dict:
         """Load real order data for preview."""
@@ -212,11 +216,16 @@ class EmailTemplatePreviewService:
             "items": formatted_items,
             "tracking_number": order.tracking_number or "",
             "carrier": order.shipping_carrier or "",
+            "status": order.status,
+            "status_display": order.get_status_display(),
         }
 
-    def _get_sample_order_context(self) -> dict:
+    def _get_sample_order_context(self, template_name: str = "") -> dict:
         """Generate sample order data for preview."""
-        sample_data = self.sample_generator.generate_order()
+        # Determine status based on template name
+        status = self._get_status_from_template_name(template_name)
+
+        sample_data = self.sample_generator.generate_order(status=status)
 
         # Add get_status_display method result
         sample_data["order"]["get_status_display"] = (
@@ -226,6 +235,23 @@ class EmailTemplatePreviewService:
         )
 
         return sample_data
+
+    def _get_status_from_template_name(self, template_name: str) -> str:
+        """Extract order status from template name."""
+        status_map = {
+            "order_pending": "PENDING",
+            "order_pending_reminder": "PENDING",
+            "order_processing": "PROCESSING",
+            "order_shipped": "SHIPPED",
+            "order_delivered": "DELIVERED",
+            "order_completed": "COMPLETED",
+            "order_canceled": "CANCELED",
+            "order_returned": "RETURNED",
+            "order_refunded": "REFUNDED",
+            "order_confirmation": "PENDING",
+            "order_status_generic": "PROCESSING",
+        }
+        return status_map.get(template_name, "PENDING")
 
     def _render_template(self, template_path: str, context: dict) -> str:
         """Render template with context."""

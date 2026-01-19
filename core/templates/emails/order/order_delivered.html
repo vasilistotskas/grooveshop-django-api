@@ -10,6 +10,12 @@
 <div class="email-card">
     <h2>{% trans "Delivery Information" %}</h2>
     <p><strong>{% trans "Date" %}:</strong> {{ order.status_updated_at|date:"SHORT_DATETIME_FORMAT" }}</p>
+    <p>
+        <strong>{% trans "Status" %}:</strong>
+        <span style="display: inline-block; padding: 6px 12px; font-weight: bold; border-radius: 4px; background-color: #d1fae5; color: #065f46;">
+            {% trans "Delivered" %}
+        </span>
+    </p>
 
     <h3>{% trans "Delivery Address" %}</h3>
     <p>

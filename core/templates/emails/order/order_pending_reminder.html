@@ -15,7 +15,12 @@
     <h2>{% trans "Order Details" %}</h2>
     <p><strong>{% trans "Order Date" %}:</strong> {{ order.created_at|date:"SHORT_DATETIME_FORMAT" }}</p>
     <p><strong>{% trans "Order Total" %}:</strong> {{ order.total_price }}</p>
-    <p><strong>{% trans "Status" %}:</strong> {% trans "Pending" %}</p>
+    <p>
+        <strong>{% trans "Status" %}:</strong>
+        <span style="display: inline-block; padding: 6px 12px; font-weight: bold; border-radius: 4px; background-color: #fef3c7; color: #92400e;">
+            {% trans "Pending" %}
+        </span>
+    </p>
 </div>
 
 <p class="mt-3">{% trans "To complete your purchase, please finalize your payment. If you've already completed payment, please disregard this message as it may take some time for our system to update." %}</p>

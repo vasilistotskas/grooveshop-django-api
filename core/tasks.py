@@ -436,6 +436,16 @@ def send_inactive_user_notifications():
                 "user_id": user_id,
                 "first_name": first_name or username,
                 "app_base_url": settings.NUXT_BASE_URL,
+                "SITE_NAME": getattr(settings, "SITE_NAME", "Our Shop"),
+                "INFO_EMAIL": getattr(
+                    settings, "INFO_EMAIL", "support@example.com"
+                ),
+                "SITE_URL": getattr(
+                    settings, "SITE_URL", "https://example.com"
+                ),
+                "STATIC_BASE_URL": getattr(
+                    settings, "STATIC_BASE_URL", "https://example.com"
+                ),
             }
 
             message = render_to_string(

@@ -9,6 +9,12 @@
 
 <div class="email-card">
     <h2>{% trans "Shipping Information" %}</h2>
+    <p>
+        <strong>{% trans "Status" %}:</strong>
+        <span style="display: inline-block; padding: 6px 12px; font-weight: bold; border-radius: 4px; background-color: #e0e7ff; color: #3730a3;">
+            {% trans "Shipped" %}
+        </span>
+    </p>
     <p><strong>{% trans "Carrier" %}:</strong> {{ carrier }}</p>
     <p class="text-bold" style="font-size: 1.1em; margin: 15px 0;">
         {% trans "Tracking Number" %}: {{ tracking_number }}

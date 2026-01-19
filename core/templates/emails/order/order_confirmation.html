@@ -10,7 +10,12 @@
 <div class="email-card">
     <h2>{% trans "Order" %} #{{ order.id }}</h2>
     <p><strong>{% trans "Date" %}:</strong> {{ order.created_at|date:"SHORT_DATE_FORMAT" }}</p>
-    <p><strong>{% trans "Status" %}:</strong> {{ order.get_status_display }}</p>
+    <p>
+        <strong>{% trans "Status" %}:</strong>
+        <span style="display: inline-block; padding: 6px 12px; font-weight: bold; border-radius: 4px; background-color: #fef3c7; color: #92400e;">
+            {{ order.get_status_display }}
+        </span>
+    </p>
 
     <h3>{% trans "Shipping Address" %}</h3>
     <p>

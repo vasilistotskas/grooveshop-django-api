@@ -37,6 +37,14 @@ class EmailNotifier(NotifierInterface):
         context = {
             "order": order,
             "items": order.items.all(),
+            "SITE_NAME": getattr(settings, "SITE_NAME", "Our Shop"),
+            "INFO_EMAIL": getattr(
+                settings, "INFO_EMAIL", "support@example.com"
+            ),
+            "SITE_URL": getattr(settings, "SITE_URL", "https://example.com"),
+            "STATIC_BASE_URL": getattr(
+                settings, "STATIC_BASE_URL", "https://example.com"
+            ),
         }
         html_message = render_to_string(
             "emails/order/order_confirmation.html", context
@@ -69,6 +77,14 @@ class EmailNotifier(NotifierInterface):
             "order": order,
             "tracking_number": tracking_number,
             "carrier": carrier,
+            "SITE_NAME": getattr(settings, "SITE_NAME", "Our Shop"),
+            "INFO_EMAIL": getattr(
+                settings, "INFO_EMAIL", "support@example.com"
+            ),
+            "SITE_URL": getattr(settings, "SITE_URL", "https://example.com"),
+            "STATIC_BASE_URL": getattr(
+                settings, "STATIC_BASE_URL", "https://example.com"
+            ),
         }
         html_message = render_to_string(
             "emails/order/order_shipped.html", context
@@ -97,6 +113,14 @@ class EmailNotifier(NotifierInterface):
         )
         context = {
             "order": order,
+            "SITE_NAME": getattr(settings, "SITE_NAME", "Our Shop"),
+            "INFO_EMAIL": getattr(
+                settings, "INFO_EMAIL", "support@example.com"
+            ),
+            "SITE_URL": getattr(settings, "SITE_URL", "https://example.com"),
+            "STATIC_BASE_URL": getattr(
+                settings, "STATIC_BASE_URL", "https://example.com"
+            ),
         }
         html_message = render_to_string(
             "emails/order/order_delivered.html", context
@@ -125,6 +149,14 @@ class EmailNotifier(NotifierInterface):
         )
         context = {
             "order": order,
+            "SITE_NAME": getattr(settings, "SITE_NAME", "Our Shop"),
+            "INFO_EMAIL": getattr(
+                settings, "INFO_EMAIL", "support@example.com"
+            ),
+            "SITE_URL": getattr(settings, "SITE_URL", "https://example.com"),
+            "STATIC_BASE_URL": getattr(
+                settings, "STATIC_BASE_URL", "https://example.com"
+            ),
         }
         html_message = render_to_string(
             "emails/order/order_canceled.html", context

@@ -5,6 +5,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.utils import timezone
+from django.utils.translation import gettext as _
 
 
 class SampleOrderDataGenerator:
@@ -69,9 +70,9 @@ class SampleOrderDataGenerator:
 
     CARRIERS = ["DHL Express", "ACS Courier", "ELTA Courier", "Speedex"]
 
-    def generate_order(self) -> dict:
+    def generate_order(self, status: str = "PENDING") -> dict:
         """Generate complete sample order data."""
-        order_data = self._generate_order_object()
+        order_data = self._generate_order_object(status=status)
         items_data = self._generate_order_items()
 
         # Calculate totals
@@ -88,14 +89,20 @@ class SampleOrderDataGenerator:
         order_data["total_price"] = f"€{total_price:.2f}"
         order_data["paid_amount"] = f"€{total_price:.2f}"
 
+        # Add status and status_display at root level for templates
+        current_status = order_data.get("status", "PENDING")
+        status_display = self.get_status_display(current_status)
+
         return {
             "order": order_data,
             "items": items_data,
             "tracking_number": self._generate_tracking_number(),
             "carrier": random.choice(self.CARRIERS),
+            "status": current_status,
+            "status_display": status_display,
         }
 
-    def _generate_order_object(self) -> dict:
+    def _generate_order_object(self, status: str = "PENDING") -> dict:
         """Generate sample Order model data."""
         city_data = random.choice(self.GREEK_CITIES)
         created_at = timezone.now() - timedelta(days=random.randint(0, 7))
@@ -103,7 +110,7 @@ class SampleOrderDataGenerator:
         return {
             "id": random.randint(10000, 99999),
             "uuid": "550e8400-e29b-41d4-a716-446655440000",
-            "status": "PENDING",
+            "status": status,
             "first_name": random.choice(self.GREEK_FIRST_NAMES),
             "last_name": random.choice(self.GREEK_LAST_NAMES),
             "email": f"customer{random.randint(1, 999)}@example.com",
@@ -155,15 +162,15 @@ class SampleOrderDataGenerator:
         return f"{prefix}{numbers}"
 
     def get_status_display(self, status: str) -> str:
-        """Get display name for order status."""
+        """Get display name for order status using Django's translation."""
         status_display = {
-            "PENDING": "Pending",
-            "PROCESSING": "Processing",
-            "SHIPPED": "Shipped",
-            "DELIVERED": "Delivered",
-            "COMPLETED": "Completed",
-            "CANCELED": "Canceled",
-            "REFUNDED": "Refunded",
-            "RETURNED": "Returned",
+            "PENDING": _("Pending"),
+            "PROCESSING": _("Processing"),
+            "SHIPPED": _("Shipped"),
+            "DELIVERED": _("Delivered"),
+            "COMPLETED": _("Completed"),
+            "CANCELED": _("Canceled"),
+            "REFUNDED": _("Refunded"),
+            "RETURNED": _("Returned"),
         }
         return status_display.get(status, status)

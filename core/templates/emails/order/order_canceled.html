@@ -11,6 +11,12 @@
     <h2>{% trans "Order Details" %}</h2>
     <p><strong>{% trans "Date Ordered" %}:</strong> {{ order.created_at|date:"SHORT_DATETIME_FORMAT" }}</p>
     <p><strong>{% trans "Date Canceled" %}:</strong> {{ order.status_updated_at|date:"SHORT_DATETIME_FORMAT" }}</p>
+    <p>
+        <strong>{% trans "Status" %}:</strong>
+        <span style="display: inline-block; padding: 6px 12px; font-weight: bold; border-radius: 4px; background-color: #fee2e2; color: #991b1b;">
+            {% trans "Canceled" %}
+        </span>
+    </p>
 
     {% if order.paid_amount %}
     <p class="mt-2">

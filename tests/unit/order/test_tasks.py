@@ -37,6 +37,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
         SITE_URL="http://example.com",
+        STATIC_BASE_URL="http://example.com",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
     )
     def test_send_order_confirmation_email_success(
@@ -69,6 +70,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
         SITE_URL="http://example.com",
+        STATIC_BASE_URL="http://example.com",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
     )
     def test_send_order_status_update_email_success(
@@ -111,6 +113,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
         SITE_URL="http://example.com",
+        STATIC_BASE_URL="http://example.com",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
     )
     def test_send_order_status_update_email_template_fallback(
@@ -142,6 +145,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
         SITE_URL="http://example.com",
+        STATIC_BASE_URL="http://example.com",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
     )
     def test_send_shipping_notification_email_success(
@@ -222,6 +226,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
         SITE_URL="http://example.com",
+        STATIC_BASE_URL="http://example.com",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
     )
     def test_check_pending_orders_success(
@@ -335,6 +340,7 @@ class OrderTasksIntegrationTestCase(DjangoTestCase):
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
         SITE_URL="http://example.com",
+        STATIC_BASE_URL="http://example.com",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
     )
     def test_order_workflow_email_sequence(self, mock_render, mock_email):

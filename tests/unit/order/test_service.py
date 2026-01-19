@@ -105,13 +105,17 @@ class OrderServiceTestCase(TestCase):
                 str(context.exception),
             )
 
-    @patch("order.signals.order_status_changed.send")
-    def test_update_order_status_valid(self, mock_signal):
-        self.order.status = OrderStatus.PENDING
+    @patch("order.signals.handlers.order_status_changed.send")
+    @patch("order.signals.handlers.send_order_confirmation_email")
+    def test_update_order_status_valid(self, mock_email, mock_signal):
+        order = OrderService.create_order(
+            self.order_data, self.items_data, user=self.user
+        )
+        mock_signal.reset_mock()
 
-        OrderService.update_order_status(self.order, OrderStatus.PROCESSING)
+        OrderService.update_order_status(order, OrderStatus.PROCESSING)
 
-        self.assertEqual(self.order.status, OrderStatus.PROCESSING)
+        self.assertEqual(order.status, OrderStatus.PROCESSING)
 
         mock_signal.assert_called_once()
 

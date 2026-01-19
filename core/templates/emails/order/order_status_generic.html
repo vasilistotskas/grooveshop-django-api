@@ -11,38 +11,102 @@
 
 <div class="email-card">
     <h2>{% trans "Order Details" %}</h2>
+    <p><strong>{% trans "Order Number" %}:</strong> #{{ order.id }}</p>
     <p><strong>{% trans "Order Date" %}:</strong> {{ order.created_at|date:"SHORT_DATETIME_FORMAT" }}</p>
-    <p><strong>{% trans "Order Total" %}:</strong> {{ order.total_price }}</p>
     <p>
         <strong>{% trans "New Status" %}:</strong>
-        <span style="display: inline-block; padding: 6px 12px; font-weight: bold; border-radius: 4px; background-color: #eee;">
-            {{ order.get_status_display }}
+        {% if status == "PENDING" %}
+        <span style="display: inline-block; padding: 6px 12px; font-weight: bold; border-radius: 4px; background-color: #fef3c7; color: #92400e;">
+            {{ status_display }}
         </span>
+        {% elif status == "PROCESSING" %}
+        <span style="display: inline-block; padding: 6px 12px; font-weight: bold; border-radius: 4px; background-color: #dbeafe; color: #1e40af;">
+            {{ status_display }}
+        </span>
+        {% elif status == "SHIPPED" %}
+        <span style="display: inline-block; padding: 6px 12px; font-weight: bold; border-radius: 4px; background-color: #e0e7ff; color: #3730a3;">
+            {{ status_display }}
+        </span>
+        {% elif status == "DELIVERED" %}
+        <span style="display: inline-block; padding: 6px 12px; font-weight: bold; border-radius: 4px; background-color: #d1fae5; color: #065f46;">
+            {{ status_display }}
+        </span>
+        {% elif status == "COMPLETED" %}
+        <span style="display: inline-block; padding: 6px 12px; font-weight: bold; border-radius: 4px; background-color: #d1fae5; color: #065f46;">
+            {{ status_display }}
+        </span>
+        {% elif status == "CANCELED" %}
+        <span style="display: inline-block; padding: 6px 12px; font-weight: bold; border-radius: 4px; background-color: #fee2e2; color: #991b1b;">
+            {{ status_display }}
+        </span>
+        {% elif status == "RETURNED" %}
+        <span style="display: inline-block; padding: 6px 12px; font-weight: bold; border-radius: 4px; background-color: #fed7aa; color: #9a3412;">
+            {{ status_display }}
+        </span>
+        {% elif status == "REFUNDED" %}
+        <span style="display: inline-block; padding: 6px 12px; font-weight: bold; border-radius: 4px; background-color: #ccfbf1; color: #115e59;">
+            {{ status_display }}
+        </span>
+        {% else %}
+        <span style="display: inline-block; padding: 6px 12px; font-weight: bold; border-radius: 4px; background-color: #f3f4f6; color: #374151;">
+            {{ status_display }}
+        </span>
+        {% endif %}
     </p>
 
     <h3>{% trans "What This Means" %}</h3>
     <p>
-        {% if order.status == "PENDING" %}
+        {% if status == "PENDING" %}
             {% trans "Your order has been received and is awaiting payment processing." %}
-        {% elif order.status == "PROCESSING" %}
+        {% elif status == "PROCESSING" %}
             {% trans "Your payment has been confirmed and we're preparing your order." %}
-        {% elif order.status == "SHIPPED" %}
+        {% elif status == "SHIPPED" %}
             {% trans "Your order has been shipped and is on its way to you." %}
-        {% elif order.status == "DELIVERED" %}
+        {% elif status == "DELIVERED" %}
             {% trans "Your order has been delivered to your shipping address." %}
-        {% elif order.status == "COMPLETED" %}
+        {% elif status == "COMPLETED" %}
             {% trans "Your order has been completed successfully. Thank you for shopping with us!" %}
-        {% elif order.status == "CANCELED" %}
+        {% elif status == "CANCELED" %}
             {% trans "Your order has been canceled. If you didn't request this, please contact us." %}
-        {% elif order.status == "RETURNED" %}
+        {% elif status == "RETURNED" %}
             {% trans "Your return has been received and is being processed." %}
-        {% elif order.status == "REFUNDED" %}
+        {% elif status == "REFUNDED" %}
             {% trans "Your refund has been processed and should appear in your account soon." %}
         {% else %}
             {% trans "Your order status has been updated." %}
         {% endif %}
     </p>
 </div>
+
+{% if items %}
+<h3>{% trans "Order Items" %}</h3>
+<table class="email-table">
+    <thead>
+        <tr>
+            <th>{% trans "Product" %}</th>
+            <th>{% trans "Quantity" %}</th>
+            <th>{% trans "Price" %}</th>
+            <th>{% trans "Total" %}</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td>{{ item.product.name }}</td>
+            <td>{{ item.quantity }}</td>
+            <td>{{ item.price }}</td>
+            <td>{{ item.total_price }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<div class="text-right mt-2">
+    <p><strong>{% trans "Subtotal" %}:</strong> {{ order.total_price_items }}</p>
+    <p><strong>{% trans "Shipping" %}:</strong> {{ order.shipping_price }}</p>
+    <p class="text-bold"><strong>{% trans "Order Total" %}:</strong> {{ order.total_price }}</p>
+</div>
+{% endif %}
 
 <p class="mt-3">{% trans "If you have any questions about your order, please contact our customer service team." %}</p>
 

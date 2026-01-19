@@ -11,7 +11,7 @@ from djmoney.money import Money
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models.item import OrderItem
 from order.models.order import Order
-from order.signals import order_canceled, order_refunded, order_status_changed
+from order.signals import order_canceled, order_refunded
 
 logger = logging.getLogger(__name__)
 
@@ -209,12 +209,8 @@ class OrderService:
             order.status_updated_at = timezone.now()
             order.save(update_fields=["status", "status_updated_at"])
 
-            order_status_changed.send(
-                sender=cls,
-                order=order,
-                old_status=old_status,
-                new_status=new_status,
-            )
+            # Note: order_status_changed signal is sent automatically by
+            # handle_order_post_save when the status changes.
 
             logger.info(
                 "Order %s status updated from %s to %s",

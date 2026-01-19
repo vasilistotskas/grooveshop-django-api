@@ -23,11 +23,14 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
         context = {
             "order": order,
             "items": order.items.all(),
-            "site_name": getattr(settings, "SITE_NAME", "Our Shop"),
-            "info_email": getattr(
+            "SITE_NAME": getattr(settings, "SITE_NAME", "Our Shop"),
+            "INFO_EMAIL": getattr(
                 settings, "INFO_EMAIL", "support@example.com"
             ),
-            "site_url": getattr(settings, "SITE_URL", "https://example.com"),
+            "SITE_URL": getattr(settings, "SITE_URL", "https://example.com"),
+            "STATIC_BASE_URL": getattr(
+                settings, "STATIC_BASE_URL", "https://example.com"
+            ),
         }
 
         subject = _("Order Confirmation - #{order_id}").format(
@@ -101,12 +104,17 @@ def send_order_status_update_email(
 
         context = {
             "order": order,
+            "items": order.items.select_related("product").all(),
             "status": status,
-            "site_name": getattr(settings, "SITE_NAME", "Our Shop"),
-            "info_email": getattr(
+            "status_display": OrderStatus(status).label,
+            "SITE_NAME": getattr(settings, "SITE_NAME", "Our Shop"),
+            "INFO_EMAIL": getattr(
                 settings, "INFO_EMAIL", "support@example.com"
             ),
-            "site_url": getattr(settings, "SITE_URL", "https://example.com"),
+            "SITE_URL": getattr(settings, "SITE_URL", "https://example.com"),
+            "STATIC_BASE_URL": getattr(
+                settings, "STATIC_BASE_URL", "https://example.com"
+            ),
         }
 
         template_base = f"emails/order/order_{status.lower()}"
@@ -196,11 +204,14 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
             "order": order,
             "tracking_number": order.tracking_number,
             "carrier": order.shipping_carrier,
-            "site_name": getattr(settings, "SITE_NAME", "Our Shop"),
-            "info_email": getattr(
+            "SITE_NAME": getattr(settings, "SITE_NAME", "Our Shop"),
+            "INFO_EMAIL": getattr(
                 settings, "INFO_EMAIL", "support@example.com"
             ),
-            "site_url": getattr(settings, "SITE_URL", "https://example.com"),
+            "SITE_URL": getattr(settings, "SITE_URL", "https://example.com"),
+            "STATIC_BASE_URL": getattr(
+                settings, "STATIC_BASE_URL", "https://example.com"
+            ),
         }
 
         subject = _("Your Order #{order_id} Has Shipped").format(
@@ -309,9 +320,16 @@ def check_pending_orders() -> int:
         for order in pending_orders:
             context = {
                 "order": order,
-                "site_name": settings.SITE_NAME,
-                "info_email": settings.INFO_EMAIL,
-                "site_url": settings.SITE_URL,
+                "SITE_NAME": getattr(settings, "SITE_NAME", "Our Shop"),
+                "INFO_EMAIL": getattr(
+                    settings, "INFO_EMAIL", "support@example.com"
+                ),
+                "SITE_URL": getattr(
+                    settings, "SITE_URL", "https://example.com"
+                ),
+                "STATIC_BASE_URL": getattr(
+                    settings, "STATIC_BASE_URL", "https://example.com"
+                ),
             }
 
             subject = _("Reminder: Complete Your Order #{order_id}").format(

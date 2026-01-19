@@ -2,31 +2,41 @@
 
 {% blocktrans with order_id=order.id %}Your order #{{ order_id }} has been updated.{% endblocktrans %}
 
-{% trans "New Status" %}: {{ order.get_status_display }}
-
 {% trans "Order Details" %}:
+- {% trans "Order Number" %}: #{{ order.id }}
 - {% trans "Order Date" %}: {{ order.created_at|date:"SHORT_DATETIME_FORMAT" }}
-- {% trans "Total Amount" %}: {{ order.total_price }}
+- {% trans "New Status" %}: {{ status_display }}
 
 {% trans "This status means" %}:
-{% if order.status == "PENDING" %}
+{% if status == "PENDING" %}
 {% trans "Your order has been received and is awaiting payment processing." %}
-{% elif order.status == "PROCESSING" %}
+{% elif status == "PROCESSING" %}
 {% trans "Your payment has been confirmed and we're preparing your order." %}
-{% elif order.status == "SHIPPED" %}
+{% elif status == "SHIPPED" %}
 {% trans "Your order has been shipped and is on its way to you." %}
-{% elif order.status == "DELIVERED" %}
+{% elif status == "DELIVERED" %}
 {% trans "Your order has been delivered to your shipping address." %}
-{% elif order.status == "COMPLETED" %}
+{% elif status == "COMPLETED" %}
 {% trans "Your order has been completed successfully. Thank you for shopping with us!" %}
-{% elif order.status == "CANCELED" %}
+{% elif status == "CANCELED" %}
 {% trans "Your order has been canceled. If you didn't request this, please contact us." %}
-{% elif order.status == "RETURNED" %}
+{% elif status == "RETURNED" %}
 {% trans "Your return has been received and is being processed." %}
-{% elif order.status == "REFUNDED" %}
+{% elif status == "REFUNDED" %}
 {% trans "Your refund has been processed and should appear in your account soon." %}
 {% else %}
 {% trans "Your order status has been updated." %}
+{% endif %}
+
+{% if items %}
+{% trans "Order Items" %}:
+{% for item in items %}
+- {{ item.product.name }} x {{ item.quantity }} @ {{ item.price }} = {{ item.total_price }}
+{% endfor %}
+
+{% trans "Subtotal" %}: {{ order.total_price_items }}
+{% trans "Shipping" %}: {{ order.shipping_price }}
+{% trans "Order Total" %}: {{ order.total_price }}
 {% endif %}
 
 {% trans "If you have any questions about your order, please contact our customer service team." %}

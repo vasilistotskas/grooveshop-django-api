@@ -3,7 +3,6 @@ Management command to clear Django's translation cache.
 Useful after manually editing .po files or when translations aren't updating.
 """
 
-from django.core.cache import cache
 from django.core.management.base import BaseCommand
 from django.utils.translation import trans_real
 

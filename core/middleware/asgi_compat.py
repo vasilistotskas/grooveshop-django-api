@@ -26,7 +26,9 @@ class ASGICompatMiddleware:
                 "CONTENT_LENGTH": request.META.get("CONTENT_LENGTH", ""),
                 "SERVER_NAME": request.META.get("SERVER_NAME", "localhost"),
                 "SERVER_PORT": request.META.get("SERVER_PORT", "8000"),
-                "SERVER_PROTOCOL": request.META.get("SERVER_PROTOCOL", "HTTP/1.1"),
+                "SERVER_PROTOCOL": request.META.get(
+                    "SERVER_PROTOCOL", "HTTP/1.1"
+                ),
                 "wsgi.url_scheme": request.scheme,
             }
 

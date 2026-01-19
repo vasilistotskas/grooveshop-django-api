@@ -60,13 +60,19 @@ class StripeWebhookDebugMiddleware:
                 for part in stripe_signature.split(","):
                     if "=" in part:
                         key, value = part.split("=", 1)
-                        sig_parts[key] = value[:20] + "..."  # Truncate for logging
+                        sig_parts[key] = (
+                            value[:20] + "..."
+                        )  # Truncate for logging
 
             # Get webhook secret info (just existence and prefix, not full secret)
             webhook_secret = getattr(settings, "DJSTRIPE_WEBHOOK_SECRET", "")
-            secret_configured = bool(webhook_secret and webhook_secret != "whsec_...")
+            secret_configured = bool(
+                webhook_secret and webhook_secret != "whsec_..."
+            )
             secret_prefix = (
-                webhook_secret[:10] + "..." if len(webhook_secret) > 10 else "***"
+                webhook_secret[:10] + "..."
+                if len(webhook_secret) > 10
+                else "***"
             )
 
             # Log all the diagnostic info
@@ -79,7 +85,9 @@ class StripeWebhookDebugMiddleware:
                     "signature_present": bool(stripe_signature),
                     "signature_parts": sig_parts,
                     "secret_configured": secret_configured,
-                    "secret_prefix": secret_prefix if self.debug_enabled else "***",
+                    "secret_prefix": secret_prefix
+                    if self.debug_enabled
+                    else "***",
                     "content_type": request.content_type,
                     "remote_addr": request.META.get("REMOTE_ADDR"),
                     "x_forwarded_for": request.META.get("HTTP_X_FORWARDED_FOR"),
@@ -95,7 +103,9 @@ class StripeWebhookDebugMiddleware:
                         "full_signature": stripe_signature[:50] + "..."
                         if stripe_signature
                         else "MISSING",
-                        "body_preview": body[:100].decode("utf-8", errors="replace")
+                        "body_preview": body[:100].decode(
+                            "utf-8", errors="replace"
+                        )
                         if body
                         else "EMPTY",
                     },
@@ -117,9 +127,9 @@ class StripeWebhookDebugMiddleware:
                 extra={
                     "path": request.path,
                     "status_code": response.status_code,
-                    "response_preview": getattr(response, "content", b"")[:200].decode(
-                        "utf-8", errors="replace"
-                    ),
+                    "response_preview": getattr(response, "content", b"")[
+                        :200
+                    ].decode("utf-8", errors="replace"),
                 },
             )
         else:

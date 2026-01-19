@@ -2,7 +2,6 @@
 Custom Rosetta storage backend that clears translation cache on save.
 """
 
-from django.core.cache import cache
 from django.utils.translation import trans_real
 from rosetta.storage import CacheRosettaStorage
 

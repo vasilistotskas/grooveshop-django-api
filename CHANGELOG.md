@@ -3,6 +3,12 @@
 
 
 
+## v1.66.1 (2026-01-19)
+
+### Bug fixes
+
+* fix: email templates ([`1d5c365`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1d5c3659ad3d2a03eea0975c3c078c6011964c43))
+
 ## v1.66.0 (2026-01-19)
 
 ### Bug fixes

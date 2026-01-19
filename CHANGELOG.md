@@ -3,6 +3,18 @@
 
 
 
+## v1.66.0 (2026-01-19)
+
+### Bug fixes
+
+* fix: lint ([`a5c2e5f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a5c2e5f1039fe7ee4b04d8be38503bfcf782a55d))
+
+* fix: rosseta ([`5db1dab`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5db1dab71ec57071c7b355546684be4d2f7f754f))
+
+### Features
+
+* feat: stripe webhook debug ([`e37a7ba`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e37a7ba57aa38e6fa49e44c1c778c289dbf5cc4f))
+
 ## v1.65.1 (2026-01-17)
 
 ### Bug fixes

@@ -152,6 +152,7 @@ MIDDLEWARE = [
     "djangorestframework_camel_case.middleware.CamelCaseMiddleWare",
     "simple_history.middleware.HistoryRequestMiddleware",
     "core.middleware.asgi_compat.ASGICompatMiddleware",  # ASGI compatibility for Rosetta
+    "core.middleware.stripe_webhook.StripeWebhookDebugMiddleware",  # Stripe webhook debugging
 ]
 
 ROOT_URLCONF = "core.urls"
@@ -1444,6 +1445,7 @@ STRIPE_LIVE_MODE = not DEBUG
 DJSTRIPE_FOREIGN_KEY_TO_FIELD = "id"
 DJSTRIPE_WEBHOOK_VALIDATION = "verify_signature"
 DJSTRIPE_WEBHOOK_SECRET = getenv("DJSTRIPE_WEBHOOK_SECRET", "whsec_...")
+STRIPE_WEBHOOK_DEBUG = getenv("STRIPE_WEBHOOK_DEBUG", "false").lower() == "true"
 
 
 # SHIPPING SETTINGS

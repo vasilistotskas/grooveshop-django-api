@@ -74,6 +74,36 @@ def handle_order_created(
     send_order_confirmation_email.delay(order.id)
     OrderHistory.log_note(order=order, note="Order created")
 
+    # Clear the user's cart after successful order creation
+    from cart.models import Cart
+
+    if order.user:
+        # For authenticated users, clear their cart
+        try:
+            cart = Cart.objects.filter(user=order.user).first()
+            if cart:
+                cart.items.all().delete()
+                logger.info(
+                    "Cleared cart for user %s after order %s creation",
+                    order.user.id,
+                    order.id,
+                )
+        except Exception as e:
+            logger.error(
+                "Error clearing cart for user %s: %s",
+                order.user.id,
+                e,
+                exc_info=True,
+            )
+    else:
+        # For guest orders, try to get cart_id from request context if available
+        # Note: Guest cart clearing should be handled by the frontend after order creation
+        # since we don't have direct access to the cart_id in the signal handler
+        logger.debug(
+            "Guest order %s created - cart should be cleared by frontend",
+            order.id,
+        )
+
 
 @receiver(order_status_changed)
 def handle_order_status_changed(

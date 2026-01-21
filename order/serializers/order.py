@@ -393,6 +393,41 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
         order.paid_amount = order.calculate_order_total_amount()
         order.save(update_fields=["paid_amount"])
 
+        # Clear guest cart if cart_id is provided in context
+        request = self.context.get("request")
+        if request and not order.user:
+            # For guest orders, try to clear the cart using the X-Cart-Id header
+            from cart.models import Cart
+            import logging
+
+            logger = logging.getLogger(__name__)
+
+            cart_id = None
+            if hasattr(request, "META"):
+                cart_id = request.META.get("HTTP_X_CART_ID")
+            elif hasattr(request, "headers"):
+                cart_id = request.headers.get("X-Cart-Id")
+
+            if cart_id:
+                try:
+                    cart_id = int(cart_id)
+                    cart = Cart.objects.filter(
+                        id=cart_id, user__isnull=True
+                    ).first()
+                    if cart:
+                        cart.items.all().delete()
+                        logger.info(
+                            "Cleared guest cart %s after order %s creation",
+                            cart_id,
+                            order.id,
+                        )
+                except (ValueError, TypeError) as e:
+                    logger.warning("Invalid cart_id format: %s", e)
+                except Exception as e:
+                    logger.error(
+                        "Error clearing guest cart: %s", e, exc_info=True
+                    )
+
         order_created.send(sender=Order, order=order)
 
         return order

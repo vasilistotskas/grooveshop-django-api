@@ -3,6 +3,12 @@
 
 
 
+## v1.67.0 (2026-01-21)
+
+### Features
+
+* feat: bump versions, clean cart at order creation ([`dba07fc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dba07fc989e3e1cee42bbb209961ea62b0355398))
+
 ## v1.66.1 (2026-01-19)
 
 ### Bug fixes

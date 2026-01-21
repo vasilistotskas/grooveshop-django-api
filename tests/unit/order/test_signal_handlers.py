@@ -1,4 +1,4 @@
-from unittest import TestCase
+from django.test import TestCase
 from unittest.mock import MagicMock, Mock, patch
 
 from order.enum.status import OrderStatus
@@ -14,17 +14,27 @@ class OrderSignalHandlersTestCase(TestCase):
 
         self.sender = MagicMock()
 
-    @patch("order.signals.order_status_changed.send")
     @patch("order.signals.order_created.send")
+    @patch("django.db.transaction.on_commit")
     def test_handle_order_post_save_new_order(
-        self, mock_order_created, mock_signal
+        self, mock_on_commit, mock_order_created
     ):
+        """Test that order_created signal is deferred via transaction.on_commit"""
         handle_order_post_save(
             sender=self.sender, instance=self.order, created=True
         )
 
-        mock_signal.assert_not_called()
+        # Signal should NOT be called immediately
+        mock_order_created.assert_not_called()
 
+        # But on_commit should be called to schedule the signal
+        mock_on_commit.assert_called_once()
+
+        # Execute the deferred callback to verify it works
+        callback = mock_on_commit.call_args[0][0]
+        callback()
+
+        # Now the signal should be called
         mock_order_created.assert_called_once_with(
             sender=self.sender, order=self.order
         )

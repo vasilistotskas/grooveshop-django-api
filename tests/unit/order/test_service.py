@@ -60,8 +60,12 @@ class OrderServiceTestCase(TestCase):
         self.order.paid_amount = Money("0.00", settings.DEFAULT_CURRENCY)
         self.order.metadata = {}
 
+    @patch("django.db.transaction.on_commit")
     @patch("order.signals.order_created.send")
-    def test_create_order(self, mock_signal):
+    def test_create_order(self, mock_signal, mock_on_commit):
+        # Mock on_commit to execute callbacks immediately
+        mock_on_commit.side_effect = lambda func: func()
+
         result = OrderService.create_order(
             self.order_data, self.items_data, user=self.user
         )
@@ -73,6 +77,7 @@ class OrderServiceTestCase(TestCase):
 
         self.assertEqual(result.items.count(), 2)
 
+        # Signal is called via transaction.on_commit, which we mocked to execute immediately
         mock_signal.assert_called_once_with(sender=Order, order=result)
 
     def test_create_order_insufficient_stock(self):

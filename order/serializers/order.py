@@ -15,7 +15,6 @@ from order.serializers.item import (
     OrderItemCreateSerializer,
     OrderItemDetailSerializer,
 )
-from order.signals import order_created
 from pay_way.models import PayWay
 from product.models.product import Product
 from region.models import Region
@@ -360,6 +359,7 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
 
         items_data = validated_data.pop("items")
 
+        # Calculate items total and shipping
         items_total = Money(0, settings.DEFAULT_CURRENCY)
         for item_data in items_data:
             product = item_data.get("product")
@@ -382,26 +382,9 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
 
         validated_data["shipping_price"] = shipping_price
 
-        order = Order.objects.create(**validated_data)
-
-        for item_data in items_data:
-            product = item_data.get("product")
-            item_to_create = item_data.copy()
-            item_to_create["price"] = product.final_price
-            OrderItem.objects.create(order=order, **item_to_create)
-
-        order.paid_amount = order.calculate_order_total_amount()
-        order.save(update_fields=["paid_amount"])
-
-        # Clear guest cart if cart_id is provided in context
+        # Store cart_id in order metadata for guest cart clearing
         request = self.context.get("request")
-        if request and not order.user:
-            # For guest orders, try to clear the cart using the X-Cart-Id header
-            from cart.models import Cart
-            import logging
-
-            logger = logging.getLogger(__name__)
-
+        if request and not validated_data.get("user"):
             cart_id = None
             if hasattr(request, "META"):
                 cart_id = request.META.get("HTTP_X_CART_ID")
@@ -411,24 +394,58 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
             if cart_id:
                 try:
                     cart_id = int(cart_id)
-                    cart = Cart.objects.filter(
-                        id=cart_id, user__isnull=True
-                    ).first()
-                    if cart:
-                        cart.items.all().delete()
-                        logger.info(
-                            "Cleared guest cart %s after order %s creation",
-                            cart_id,
-                            order.id,
-                        )
-                except (ValueError, TypeError) as e:
-                    logger.warning("Invalid cart_id format: %s", e)
-                except Exception as e:
-                    logger.error(
-                        "Error clearing guest cart: %s", e, exc_info=True
-                    )
+                    if "metadata" not in validated_data:
+                        validated_data["metadata"] = {}
+                    validated_data["metadata"]["cart_id"] = cart_id
+                except (ValueError, TypeError):
+                    pass
 
-        order_created.send(sender=Order, order=order)
+        # Validate and lock stock BEFORE creating order
+        from product.models import Product
+
+        for item_data in items_data:
+            product = item_data.get("product")
+            quantity = item_data.get("quantity", 1)
+
+            # Lock product row for update to prevent race conditions
+            locked_product = Product.objects.select_for_update().get(
+                pk=product.pk
+            )
+
+            if locked_product.stock < quantity:
+                raise serializers.ValidationError(
+                    {
+                        "items": [
+                            f"Product '{locked_product.safe_translation_getter('name', any_language=True)}' "
+                            f"does not have enough stock. Available: {locked_product.stock}, "
+                            f"Requested: {quantity}"
+                        ]
+                    }
+                )
+
+            # Deduct stock immediately in transaction
+            locked_product.stock = max(0, locked_product.stock - quantity)
+            locked_product.save(update_fields=["stock"])
+
+        # Create order after stock is validated and deducted
+        order = Order.objects.create(**validated_data)
+
+        # Create order items (stock already deducted above)
+        for item_data in items_data:
+            product = item_data.get("product")
+            item_to_create = item_data.copy()
+            item_to_create["price"] = product.final_price
+
+            # Set flag BEFORE creating to prevent signal from deducting again
+            OrderItem._skip_stock_deduction = True
+            OrderItem.objects.create(order=order, **item_to_create)
+            OrderItem._skip_stock_deduction = False
+
+        order.paid_amount = order.calculate_order_total_amount()
+        order.save(update_fields=["paid_amount"])
+
+        # Mark order to send signal after transaction commits
+        order._send_created_signal = True
 
         return order
 

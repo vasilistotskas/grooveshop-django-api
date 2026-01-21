@@ -44,8 +44,16 @@ def handle_order_post_save(
 ) -> None:
     """Handle order post-save signal."""
     if created:
-        order_created.send(sender=sender, order=instance)
-        logger.debug("Sent order_created signal for new order %s", instance.id)
+        # Send signal after transaction commits to avoid race conditions
+        from django.db import transaction
+
+        def send_created_signal():
+            order_created.send(sender=sender, order=instance)
+            logger.debug(
+                "Sent order_created signal for new order %s", instance.id
+            )
+
+        transaction.on_commit(send_created_signal)
         return
 
     if (
@@ -74,35 +82,54 @@ def handle_order_created(
     send_order_confirmation_email.delay(order.id)
     OrderHistory.log_note(order=order, note="Order created")
 
-    # Clear the user's cart after successful order creation
+    # Clear cart after successful order creation (both user and guest)
     from cart.models import Cart
+    from django.db import transaction
 
-    if order.user:
-        # For authenticated users, clear their cart
+    def clear_cart():
+        """Clear cart after transaction commits."""
         try:
-            cart = Cart.objects.filter(user=order.user).first()
-            if cart:
-                cart.items.all().delete()
-                logger.info(
-                    "Cleared cart for user %s after order %s creation",
-                    order.user.id,
-                    order.id,
+            if order.user:
+                # For authenticated users, clear their cart
+                cart = Cart.objects.filter(user=order.user).first()
+                if cart:
+                    cart.delete()  # Delete entire cart, not just items
+                    logger.info(
+                        "Cleared cart for user %s after order %s creation",
+                        order.user.id,
+                        order.id,
+                    )
+            else:
+                # For guest orders, try to get cart_id from order metadata
+                cart_id = (
+                    order.metadata.get("cart_id") if order.metadata else None
                 )
+                if cart_id:
+                    cart = Cart.objects.filter(
+                        id=cart_id, user__isnull=True
+                    ).first()
+                    if cart:
+                        cart.delete()  # Delete entire cart
+                        logger.info(
+                            "Cleared guest cart %s after order %s creation",
+                            cart_id,
+                            order.id,
+                        )
+                else:
+                    logger.debug(
+                        "Guest order %s created - no cart_id in metadata",
+                        order.id,
+                    )
         except Exception as e:
             logger.error(
-                "Error clearing cart for user %s: %s",
-                order.user.id,
+                "Error clearing cart for order %s: %s",
+                order.id,
                 e,
                 exc_info=True,
             )
-    else:
-        # For guest orders, try to get cart_id from request context if available
-        # Note: Guest cart clearing should be handled by the frontend after order creation
-        # since we don't have direct access to the cart_id in the signal handler
-        logger.debug(
-            "Guest order %s created - cart should be cleared by frontend",
-            order.id,
-        )
+
+    # Clear cart after transaction commits
+    transaction.on_commit(clear_cart)
 
 
 @receiver(order_status_changed)
@@ -196,11 +223,18 @@ def handle_order_item_pre_save(
 def handle_order_item_post_save(
     sender: type[OrderItem], instance: OrderItem, created: bool, **kwargs: Any
 ) -> None:
-    """Handle order item changes and update stock."""
+    """Handle order item changes and log history."""
     if created:
-        product = instance.product
-        product.stock = max(0, product.stock - instance.quantity)
-        product.save(update_fields=["stock"])
+        # Stock already deducted in serializer, just log the action
+        if not getattr(instance, "_stock_already_deducted", False):
+            # Fallback: deduct stock if not already done (shouldn't happen)
+            logger.warning(
+                "Stock not deducted in transaction for order item %s, deducting now",
+                instance.id,
+            )
+            product = instance.product
+            product.stock = max(0, product.stock - instance.quantity)
+            product.save(update_fields=["stock"])
 
         try:
             order = instance.order
@@ -433,8 +467,28 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
     try:
         event: Event = kwargs.get("event")
         payment_intent_id = event.data["object"]["id"]
+        event_id = event.id
 
         logger.info("Stripe payment succeeded: %s", payment_intent_id)
+
+        # Check idempotency to prevent duplicate processing
+        order = Order.objects.filter(payment_id=payment_intent_id).first()
+        if order:
+            if order.metadata and order.metadata.get(
+                f"webhook_processed_{event_id}"
+            ):
+                logger.info(
+                    "Webhook %s already processed for order %s, skipping",
+                    event_id,
+                    order.id,
+                )
+                return
+
+            # Mark webhook as processed
+            if not order.metadata:
+                order.metadata = {}
+            order.metadata[f"webhook_processed_{event_id}"] = True
+            order.save(update_fields=["metadata"])
 
         order = OrderService.handle_payment_succeeded(payment_intent_id)
 
@@ -547,6 +601,7 @@ def handle_stripe_checkout_completed(sender, **kwargs):
         session_id = session_data["id"]
         payment_intent_id = session_data.get("payment_intent")
         payment_status = session_data.get("payment_status")
+        event_id = event.id
 
         logger.info("Checkout session completed: %s", session_id)
 
@@ -564,6 +619,22 @@ def handle_stripe_checkout_completed(sender, **kwargs):
             )
             return
 
+        # Check idempotency
+        if order.metadata and order.metadata.get(
+            f"webhook_processed_{event_id}"
+        ):
+            logger.info(
+                "Webhook %s already processed for order %s, skipping",
+                event_id,
+                order.id,
+            )
+            return
+
+        # Mark webhook as processed
+        if not order.metadata:
+            order.metadata = {}
+        order.metadata[f"webhook_processed_{event_id}"] = True
+
         if payment_status == "paid" and payment_intent_id:
             order.mark_as_paid(
                 payment_id=payment_intent_id, payment_method="stripe"
@@ -572,8 +643,6 @@ def handle_stripe_checkout_completed(sender, **kwargs):
             if order.status == OrderStatus.PENDING:
                 OrderService.update_order_status(order, OrderStatus.PROCESSING)
 
-            if not order.metadata:
-                order.metadata = {}
             order.metadata["stripe_checkout_session_id"] = session_id
             order.metadata["stripe_payment_intent_id"] = payment_intent_id
             order.save(update_fields=["metadata"])
@@ -596,7 +665,7 @@ def handle_stripe_checkout_completed(sender, **kwargs):
 
         elif payment_status == "unpaid":
             order.payment_status = PaymentStatus.PENDING
-            order.save(update_fields=["payment_status"])
+            order.save(update_fields=["payment_status", "metadata"])
 
             OrderHistory.log_note(
                 order=order,

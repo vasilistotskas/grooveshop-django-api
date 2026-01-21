@@ -3,6 +3,12 @@
 
 
 
+## v1.67.1 (2026-01-21)
+
+### Bug fixes
+
+* fix: order creation ([`45afb26`](https://github.com/vasilistotskas/grooveshop-django-api/commit/45afb26116c6388e255991ed36cdcdb43355ff02))
+
 ## v1.67.0 (2026-01-21)
 
 ### Features

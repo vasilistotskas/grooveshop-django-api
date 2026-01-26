@@ -3,6 +3,12 @@
 
 
 
+## v1.68.0 (2026-01-26)
+
+### Features
+
+* feat: stock manager and order improvements ([`7311fc9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7311fc9b35909e5a69246c371ec1a91b2dcd31da))
+
 ## v1.67.1 (2026-01-21)
 
 ### Bug fixes

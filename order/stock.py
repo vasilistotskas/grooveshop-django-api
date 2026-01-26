@@ -3,6 +3,7 @@ from typing import Optional
 
 from django.db import transaction
 from django.utils import timezone
+from extra_settings.models import Setting
 
 from order.exceptions import (
     InsufficientStockError,
@@ -29,8 +30,15 @@ class StockManager:
     race conditions and ensure atomicity.
     """
 
-    # Default reservation TTL in minutes
-    RESERVATION_TTL_MINUTES = 15
+    @classmethod
+    def get_reservation_ttl_minutes(cls) -> int:
+        """
+        Get the stock reservation TTL from django-extra-settings.
+
+        Returns:
+            int: Reservation TTL in minutes (default: 15)
+        """
+        return Setting.get("STOCK_RESERVATION_TTL_MINUTES", default=15)
 
     @classmethod
     @transaction.atomic
@@ -44,8 +52,8 @@ class StockManager:
         """
         Reserve stock for checkout process.
 
-        Creates a temporary stock reservation with a 15-minute TTL. Uses
-        SELECT FOR UPDATE to prevent race conditions when multiple customers
+        Creates a temporary stock reservation with a configurable TTL (default 15 minutes).
+        Uses SELECT FOR UPDATE to prevent race conditions when multiple customers
         attempt to reserve the same product simultaneously.
 
         The available stock is calculated as:
@@ -77,7 +85,7 @@ class StockManager:
             ...     user_id=456
             ... )
             >>> print(reservation.expires_at)
-            2024-01-15 10:30:00+00:00  # 15 minutes from now
+            2024-01-15 10:30:00+00:00  # TTL minutes from now (configurable)
         """
         # Validate quantity
         if quantity <= 0:
@@ -113,8 +121,9 @@ class StockManager:
                 requested=quantity,
             )
 
-        # Calculate expiration time (15 minutes from now)
-        expires_at = now + timedelta(minutes=cls.RESERVATION_TTL_MINUTES)
+        # Calculate expiration time using dynamic TTL from settings
+        ttl_minutes = cls.get_reservation_ttl_minutes()
+        expires_at = now + timedelta(minutes=ttl_minutes)
 
         # Create the reservation
         reservation = StockReservation.objects.create(
@@ -513,6 +522,7 @@ class StockManager:
         Where active reservations are those that are:
         - Not consumed (consumed=False) - reservation hasn't been converted to sale
         - Not expired (expires_at > now) - reservation is still within TTL
+          (configurable via STOCK_RESERVATION_TTL_MINUTES setting)
 
         This method does NOT use SELECT FOR UPDATE because it's a read-only
         operation and doesn't modify any data. It provides a point-in-time
@@ -583,7 +593,8 @@ class StockManager:
 
         This method is designed to be called by a Celery periodic task every
         5 minutes to clean up reservations that have exceeded their TTL
-        (Time To Live, default 15 minutes).
+        (Time To Live, configurable via STOCK_RESERVATION_TTL_MINUTES setting,
+        default 15 minutes).
 
         The method finds all reservations where:
         - expires_at < current_time (reservation has expired)

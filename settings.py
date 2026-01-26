@@ -796,6 +796,11 @@ EXTRA_SETTINGS_DEFAULTS = [
         "type": "string",
         "value": "https://example.com/confirm/{token}/",
     },
+    {
+        "name": "STOCK_RESERVATION_TTL_MINUTES",
+        "type": "int",
+        "value": 15,
+    },
 ]
 
 EMAIL_BACKEND = getenv(

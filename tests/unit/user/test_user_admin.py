@@ -508,9 +508,7 @@ class TestUserAddressAdmin:
 
     def test_contact_numbers(self):
         admin = UserAddressAdmin(UserAddress, AdminSite())
-        address = UserAddressFactory(
-            phone="+1234567890", mobile_phone="+9876543210"
-        )
+        address = UserAddressFactory(phone="+1234567890")
 
         result = admin.contact_numbers(address)
 

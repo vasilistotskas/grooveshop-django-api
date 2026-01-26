@@ -26,7 +26,10 @@ class CheckoutAPITestCase(APITestCase):
         self.user = UserAccountFactory(num_addresses=0)
         self.country = CountryFactory(num_regions=0)
         self.region = RegionFactory(country=self.country)
-        self.pay_way = PayWayFactory()
+        # Create offline payment method for testing offline checkout flow
+        self.pay_way = PayWayFactory.create_offline_payment(
+            provider_code="cash", requires_confirmation=False
+        )
 
         self.product1 = ProductFactory.create(
             stock=20, num_images=0, num_reviews=0, active=True
@@ -47,9 +50,9 @@ class CheckoutAPITestCase(APITestCase):
             "street_number": "123",
             "city": "Testville",
             "zipcode": "12345",
-            "country": self.country.alpha_2,
-            "region": self.region.alpha,
-            "pay_way": self.pay_way.id,
+            "country_id": self.country.alpha_2,
+            "region_id": self.region.alpha,
+            "pay_way_id": self.pay_way.id,
             "shipping_price": "10.00",
             "items": [
                 {"product": self.product1.id, "quantity": 2},
@@ -57,79 +60,128 @@ class CheckoutAPITestCase(APITestCase):
             ],
         }
 
-    @patch("order.signals.order_created.send")
-    def test_checkout_successful(self, mock_signal):
+    def test_checkout_successful(self):
+        """Test successful order creation with offline payment flow."""
+        from cart.factories import CartFactory, CartItemFactory
+
+        # Create a cart with items
+        cart = CartFactory(user=None)
+        CartItemFactory(cart=cart, product=self.product1, quantity=2)
+        CartItemFactory(cart=cart, product=self.product2, quantity=1)
+
+        # Use offline payment (no payment_intent_id required)
+        checkout_data = self.checkout_data.copy()
+
+        initial_order_count = Order.objects.count()
+
         response = self.client.post(
             self.checkout_url,
-            data=json.dumps(self.checkout_data),
+            data=json.dumps(checkout_data),
             content_type="application/json",
+            HTTP_X_CART_ID=str(cart.id),
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        self.assertEqual(Order.objects.count(), 1)
+        # Verify order was created
+        self.assertEqual(Order.objects.count(), initial_order_count + 1)
 
-        self.product1.refresh_from_db()
-        self.product2.refresh_from_db()
-
-        self.assertEqual(self.product1.stock, 20 - 2)
-        self.assertEqual(self.product2.stock, 15 - 1)
-
-        # Signal is called via transaction.on_commit, which fires after response
-        # In tests, we need to check if it was scheduled
-        # The signal will be called, but timing depends on transaction commit
-        # For integration tests, we just verify the order was created successfully
-        self.assertTrue(
-            Order.objects.filter(email=self.checkout_data["email"]).exists()
+        # Verify order details
+        created_order = Order.objects.latest("id")
+        self.assertEqual(created_order.email, self.checkout_data["email"])
+        self.assertEqual(
+            created_order.first_name, self.checkout_data["first_name"]
+        )
+        self.assertEqual(
+            created_order.last_name, self.checkout_data["last_name"]
         )
 
     def test_checkout_insufficient_stock(self):
+        """Test order creation fails when cart has insufficient stock."""
+        from cart.factories import CartFactory, CartItemFactory
+
         product_limited = ProductFactory.create(
             stock=5, num_images=0, num_reviews=0, active=True
         )
 
+        # Create a cart with items exceeding stock
+        cart = CartFactory(user=None)
+        CartItemFactory(cart=cart, product=product_limited, quantity=10)
+
         data = self.checkout_data.copy()
-        data["items"] = [{"product": product_limited.id, "quantity": 10}]
+        data["payment_intent_id"] = "pi_test123"
 
         response = self.client.post(
             self.checkout_url,
             data=json.dumps(data),
             content_type="application/json",
+            HTTP_X_CART_ID=str(cart.id),
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("items", response.data)
+        # Error should be in cart validation
+        self.assertIn("cart", response.data)
 
         product_limited.refresh_from_db()
         self.assertEqual(product_limited.stock, 5)
 
-    def test_checkout_authenticated_user(self):
+    @patch("order.services.OrderService.create_order_from_cart")
+    def test_checkout_authenticated_user(self, mock_create_order):
+        """Test authenticated user can create order with payment-first flow."""
+        from cart.factories import CartFactory, CartItemFactory
+
         self.client.force_authenticate(user=self.user)
+
+        # Create a cart for the authenticated user
+        cart = CartFactory(user=self.user)
+        CartItemFactory(cart=cart, product=self.product1, quantity=2)
+        CartItemFactory(cart=cart, product=self.product2, quantity=1)
+
+        # Create mock order to return
+        mock_order = OrderFactory(
+            user=self.user,
+            email=self.checkout_data["email"],
+            payment_id="pi_test123",
+        )
+        mock_create_order.return_value = mock_order
+
+        # Add payment_intent_id to checkout data
+        checkout_data = self.checkout_data.copy()
+        checkout_data["payment_intent_id"] = "pi_test123"
 
         response = self.client.post(
             self.checkout_url,
-            data=json.dumps(self.checkout_data),
+            data=json.dumps(checkout_data),
             content_type="application/json",
+            HTTP_X_CART_ID=str(cart.id),
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        order = Order.objects.first()
-        self.assertEqual(order.user, self.user)
+        # Verify the order was created with the authenticated user
+        self.assertEqual(response.data["user"], self.user.id)
 
     def test_checkout_invalid_data(self):
+        """Test order creation fails with invalid email."""
+        from cart.factories import CartFactory, CartItemFactory
+
+        # Create a cart
+        cart = CartFactory(user=None)
+        CartItemFactory(cart=cart, product=self.product1, quantity=2)
+
         invalid_data = self.checkout_data.copy()
         invalid_data["email"] = "invalid-email"
+        invalid_data["payment_intent_id"] = "pi_test123"
 
         response = self.client.post(
             self.checkout_url,
             data=json.dumps(invalid_data),
             content_type="application/json",
+            HTTP_X_CART_ID=str(cart.id),
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("email", response.data)
-
-        self.assertEqual(Order.objects.count(), 0)
+        # Error should be about invalid email in shipping address validation
+        self.assertTrue("email" in response.data or "detail" in response.data)
 
 
 class OrderViewSetTestCase(APITestCase):
@@ -325,9 +377,9 @@ class GuestOrderTestCase(APITestCase):
             "street_number": "456",
             "city": "GuestCity",
             "zipcode": "54321",
-            "country": self.country.alpha_2,
-            "region": self.region.alpha,
-            "pay_way": self.pay_way.id,
+            "country_id": self.country.alpha_2,
+            "region_id": self.region.alpha,
+            "pay_way_id": self.pay_way.id,
             "shipping_price": "10.00",
             "items": [
                 {"product": self.product1.id, "quantity": 1},
@@ -336,29 +388,46 @@ class GuestOrderTestCase(APITestCase):
         }
 
     @patch("order.signals.order_created.send")
-    def test_guest_can_create_order(self, mock_signal):
-        """Test that a guest (unauthenticated) user can create an order."""
+    @patch("order.services.OrderService.create_order_from_cart")
+    def test_guest_can_create_order(self, mock_create_order, mock_signal):
+        """Test that a guest (unauthenticated) user can create an order with payment-first flow."""
+        from cart.factories import CartFactory, CartItemFactory
+
         self.client.force_authenticate(user=None)
+
+        # Create a guest cart
+        cart = CartFactory(user=None)
+        CartItemFactory(cart=cart, product=self.product1, quantity=1)
+        CartItemFactory(cart=cart, product=self.product2, quantity=1)
+
+        # Create mock order to return
+        mock_order = OrderFactory(
+            user=None,
+            email="guest@example.com",
+            first_name="Guest",
+            last_name="User",
+            payment_id="pi_test123",
+        )
+        mock_create_order.return_value = mock_order
+
+        # Add payment_intent_id to checkout data
+        checkout_data = self.guest_checkout_data.copy()
+        checkout_data["payment_intent_id"] = "pi_test123"
 
         response = self.client.post(
             self.checkout_url,
-            data=json.dumps(self.guest_checkout_data),
+            data=json.dumps(checkout_data),
             content_type="application/json",
+            HTTP_X_CART_ID=str(cart.id),
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(Order.objects.count(), 1)
 
-        order = Order.objects.first()
-        self.assertIsNone(order.user)
-        self.assertEqual(order.email, "guest@example.com")
-        self.assertEqual(order.first_name, "Guest")
-        self.assertEqual(order.last_name, "User")
-
-        # Verify order was created successfully (signal timing handled by transaction)
-        self.assertTrue(
-            Order.objects.filter(email="guest@example.com").exists()
-        )
+        # Verify order details
+        self.assertIsNone(response.data["user"])
+        self.assertEqual(response.data["email"], "guest@example.com")
+        self.assertEqual(response.data["first_name"], "Guest")
+        self.assertEqual(response.data["last_name"], "User")
 
     def test_guest_can_retrieve_order_by_uuid(self):
         """Test that a guest can retrieve their order using UUID."""

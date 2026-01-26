@@ -2,7 +2,7 @@ import pytest
 from django.conf import settings
 from django.contrib.sites.models import Site
 from django.core.cache import cache
-from django.db import connection, reset_queries
+from django.db import connection, connections, reset_queries
 
 settings.PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.MD5PasswordHasher",
@@ -13,6 +13,7 @@ settings.MEILI_OFFLINE = True
 
 settings.DATABASES["default"]["ATOMIC_REQUESTS"] = False
 settings.DATABASES["default"]["AUTOCOMMIT"] = True
+settings.DATABASES["default"]["CONN_MAX_AGE"] = 0
 
 settings.CELERY_TASK_ALWAYS_EAGER = True
 settings.CELERY_TASK_EAGER_PROPAGATES = True
@@ -30,6 +31,18 @@ def reset_db_queries():
     reset_queries()
     yield
     reset_queries()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def close_db_connections_on_teardown(request):
+    """Close all database connections at the end of the test session to prevent teardown warnings."""
+    yield
+
+    def close_connections():
+        for conn in connections.all():
+            conn.close()
+
+    request.addfinalizer(close_connections)
 
 
 @pytest.fixture(autouse=True)

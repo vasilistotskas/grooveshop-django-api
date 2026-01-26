@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.openapi import OpenApiTypes
 from drf_spectacular.utils import (
@@ -8,6 +10,7 @@ from drf_spectacular.utils import (
     extend_schema_view,
 )
 from rest_framework import status
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAdminUser
 
 from rest_framework.response import Response
@@ -18,6 +21,9 @@ from cart.serializers.cart import (
     CartDetailSerializer,
     CartSerializer,
     CartWriteSerializer,
+    ReleaseReservationsRequestSerializer,
+    ReleaseReservationsResponseSerializer,
+    ReserveStockResponseSerializer,
 )
 from cart.services import CartService
 from core.api.serializers import ErrorResponseSerializer
@@ -28,6 +34,10 @@ from core.utils.serializers import (
     RequestSerializersConfig,
     ResponseSerializersConfig,
 )
+from order.exceptions import InsufficientStockError, StockReservationError
+from order.stock import StockManager
+
+logger = logging.getLogger(__name__)
 
 GUEST_CART_HEADERS = [
     OpenApiParameter(
@@ -42,6 +52,7 @@ GUEST_CART_HEADERS = [
 req_serializers: RequestSerializersConfig = {
     "update": CartWriteSerializer,
     "partial_update": CartWriteSerializer,
+    "release_reservations": ReleaseReservationsRequestSerializer,
 }
 
 res_serializers: ResponseSerializersConfig = {
@@ -49,6 +60,8 @@ res_serializers: ResponseSerializersConfig = {
     "retrieve": CartDetailSerializer,
     "update": CartDetailSerializer,
     "partial_update": CartDetailSerializer,
+    "reserve_stock": ReserveStockResponseSerializer,
+    "release_reservations": ReleaseReservationsResponseSerializer,
 }
 
 cart_schema_config = create_schema_view_config(
@@ -236,3 +249,366 @@ class CartViewSet(BaseModelViewSet):
             cart.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
         return Response(status=status.HTTP_404_NOT_FOUND)
+
+    @extend_schema(
+        operation_id="reserveCartStock",
+        summary=_("Reserve stock for cart items"),
+        description=_(
+            "Reserve stock for all items in the cart during checkout. "
+            "Creates temporary stock reservations with 15-minute TTL. "
+            "Returns list of reservation IDs to be used during order creation."
+        ),
+        tags=["Cart"],
+        parameters=GUEST_CART_HEADERS,
+        request=None,
+        responses={
+            200: ReserveStockResponseSerializer,
+            400: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    )
+    @action(detail=False, methods=["post"], url_path="reserve-stock")
+    def reserve_stock(self, request, *args, **kwargs):
+        """
+        Reserve stock for all cart items during checkout.
+
+        This endpoint is called when the customer begins the checkout process.
+        It creates temporary stock reservations (15-minute TTL) for all items
+        in the cart to prevent other customers from purchasing the same items
+        while this customer completes payment.
+
+        The reservation IDs returned should be stored by the frontend and used
+        during order creation to convert reservations to permanent stock decrements.
+        """
+        # Get the cart for the current user or guest
+        cart = self.cart_service.get_or_create_cart()
+        if not cart:
+            return Response(
+                {"detail": "Cart not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Get cart items with product information
+        cart_items = cart.get_items()
+
+        if not cart_items:
+            return Response(
+                {
+                    "detail": "Cart is empty. Cannot reserve stock for empty cart."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Reserve stock for each cart item
+        reservation_ids = []
+        failed_items = []
+
+        for item in cart_items:
+            try:
+                # Reserve stock using StockManager
+                # session_id is the cart's UUID for tracking
+                # user_id is None for guest users
+                reservation = StockManager.reserve_stock(
+                    product_id=item.product.id,
+                    quantity=item.quantity,
+                    session_id=str(cart.uuid),
+                    user_id=cart.user.id if cart.user else None,
+                )
+                reservation_ids.append(reservation.id)
+            except InsufficientStockError as e:
+                # Track which items failed to reserve
+                failed_items.append(
+                    {
+                        "product_id": e.product_id,
+                        "product_name": item.product.safe_translation_getter(
+                            "name", any_language=True
+                        ),
+                        "available": e.available,
+                        "requested": e.requested,
+                    }
+                )
+
+        # If any items failed to reserve, release all successful reservations
+        # and return error
+        if failed_items:
+            # Release all successfully created reservations
+            for reservation_id in reservation_ids:
+                try:
+                    StockManager.release_reservation(reservation_id)
+                except StockReservationError:
+                    # Log but don't fail if release fails
+                    pass
+
+            return Response(
+                {
+                    "detail": "Insufficient stock for one or more items",
+                    "failed_items": failed_items,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Return success with reservation IDs
+        return Response(
+            {
+                "reservation_ids": reservation_ids,
+                "message": f"Successfully reserved stock for {len(reservation_ids)} items",
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @extend_schema(
+        operation_id="releaseCartReservations",
+        summary=_("Release stock reservations"),
+        description=_(
+            "Release stock reservations when checkout is abandoned or payment fails. "
+            "This makes the reserved stock available for other customers."
+        ),
+        tags=["Cart"],
+        parameters=GUEST_CART_HEADERS,
+        request=ReleaseReservationsRequestSerializer,
+        responses={
+            200: ReleaseReservationsResponseSerializer,
+            400: ErrorResponseSerializer,
+        },
+    )
+    @action(detail=False, methods=["post"], url_path="release-reservations")
+    def release_reservations(self, request, *args, **kwargs):
+        """
+        Release stock reservations.
+
+        This endpoint is called when:
+        - Customer abandons checkout
+        - Payment fails
+        - Customer navigates away from checkout
+
+        It releases the temporary stock reservations, making the stock
+        available for other customers to purchase.
+        """
+        # Get reservation_ids from request data
+        reservation_ids = request.data.get("reservation_ids", [])
+
+        if not reservation_ids:
+            return Response(
+                {"detail": "reservation_ids is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not isinstance(reservation_ids, list):
+            return Response(
+                {"detail": "reservation_ids must be a list"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Release each reservation
+        released_count = 0
+        failed_releases = []
+
+        for reservation_id in reservation_ids:
+            try:
+                StockManager.release_reservation(reservation_id)
+                released_count += 1
+            except StockReservationError as e:
+                # Track failed releases but continue processing others
+                failed_releases.append(
+                    {
+                        "reservation_id": reservation_id,
+                        "error": str(e),
+                    }
+                )
+
+        # Return success even if some releases failed
+        # (they may have already been released or expired)
+        response_data = {
+            "message": f"Released {released_count} of {len(reservation_ids)} reservations",
+            "released_count": released_count,
+        }
+
+        if failed_releases:
+            response_data["failed_releases"] = failed_releases
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        operation_id="createCartPaymentIntent",
+        summary=_("Create payment intent from cart"),
+        description=_(
+            "Create a Stripe payment intent based on cart total before order creation. "
+            "This is required for online payment methods (Stripe) in the payment-first flow. "
+            "Returns client_secret for frontend payment confirmation and payment_intent_id "
+            "to be included in order creation request."
+        ),
+        tags=["Cart"],
+        parameters=GUEST_CART_HEADERS,
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "pay_way_id": {
+                        "type": "integer",
+                        "description": "Payment method ID (must be Stripe)",
+                    }
+                },
+                "required": ["pay_way_id"],
+            }
+        },
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "client_secret": {
+                        "type": "string",
+                        "description": "Stripe client secret for payment confirmation",
+                    },
+                    "payment_intent_id": {
+                        "type": "string",
+                        "description": "Payment intent ID to include in order creation",
+                    },
+                },
+            },
+            400: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+        },
+    )
+    @action(detail=False, methods=["post"], url_path="create-payment-intent")
+    def create_payment_intent(self, request, *args, **kwargs):
+        """
+        Create a Stripe payment intent from cart before order creation.
+
+        This endpoint is called during checkout for online payment methods (Stripe).
+        It creates a payment intent based on the cart total, which must be confirmed
+        before the order can be created.
+
+        Flow:
+        1. Get cart and validate it has items
+        2. Get payment method and validate it's Stripe
+        3. Calculate cart total (items + shipping + fees)
+        4. Create Stripe payment intent
+        5. Return client_secret and payment_intent_id
+
+        The payment_intent_id must be included in the order creation request.
+        """
+        from pay_way.models import PayWay
+        from pay_way.services import PayWayService
+
+        cart = self.cart_service.get_or_create_cart()
+        if not cart:
+            logger.error("Cart not found")
+            return Response(
+                {"detail": "Cart not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        if not cart.items.exists():
+            logger.error("Cart is empty")
+            return Response(
+                {
+                    "detail": "Cart is empty. Cannot create payment intent for empty cart."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Get and validate payment method
+        pay_way_id = request.data.get("pay_way_id")
+        if not pay_way_id:
+            logger.error("pay_way_id is missing from request")
+            return Response(
+                {"detail": "pay_way_id is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            pay_way = PayWay.objects.get(id=pay_way_id)
+            logger.info(
+                f"Payment method found: {pay_way.name} (provider: {pay_way.provider_code}, is_online: {pay_way.is_online_payment})"
+            )
+        except PayWay.DoesNotExist:
+            logger.error(f"Payment method with ID {pay_way_id} not found")
+            return Response(
+                {"detail": f"Payment method with ID {pay_way_id} not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Validate it's an online payment method (Stripe)
+        if not pay_way.is_online_payment or pay_way.provider_code != "stripe":
+            logger.error(
+                f"Invalid payment method: is_online={pay_way.is_online_payment}, provider={pay_way.provider_code}"
+            )
+            return Response(
+                {
+                    "detail": "This endpoint only supports Stripe payment methods"
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Calculate cart total (this will include shipping and fees when order is created)
+        # For now, use cart total as base amount
+        cart_total = cart.total_price
+
+        # Get Stripe payment provider
+        provider = PayWayService.get_provider_for_pay_way(pay_way)
+        if not provider:
+            logger.error("Stripe payment provider not available")
+            return Response(
+                {"detail": "Stripe payment provider not available"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        # Create payment intent
+        try:
+            success, payment_data = provider.process_payment(
+                amount=cart_total,
+                order_id=f"cart_{cart.uuid}",  # Temporary ID until order is created
+                metadata={
+                    "cart_id": str(cart.uuid),
+                    "cart_total": str(cart_total.amount),
+                    "currency": cart_total.currency,
+                },
+            )
+
+            logger.info(
+                f"Payment intent creation result: success={success}, payment_data={payment_data}"
+            )
+
+            if not success:
+                logger.error(
+                    f"Failed to create payment intent: {payment_data.get('error', 'Unknown error')}"
+                )
+                return Response(
+                    {
+                        "detail": "Failed to create payment intent",
+                        "error": payment_data.get("error", "Unknown error"),
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Extract and convert values to ensure JSON serialization
+            # CRITICAL: Convert Currency object to string code BEFORE building response dict
+            # The Currency object from django-money is not JSON serializable
+            currency_code = (
+                cart_total.currency.code
+                if hasattr(cart_total.currency, "code")
+                else str(cart_total.currency)
+            )
+
+            client_secret = str(payment_data.get("client_secret", ""))
+            payment_intent_id = str(payment_data.get("payment_id", ""))
+            amount = str(cart_total.amount)
+
+            # Return client_secret and payment_intent_id
+            response_data = {
+                "client_secret": client_secret,
+                "payment_intent_id": payment_intent_id,
+                "amount": amount,
+                "currency": currency_code,
+            }
+            return Response(
+                response_data,
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            logger.error(
+                f"Error creating payment intent from cart: {e}", exc_info=True
+            )
+            return Response(
+                {"detail": "An error occurred while creating payment intent"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

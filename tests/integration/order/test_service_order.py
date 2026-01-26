@@ -8,6 +8,11 @@ from django.test import TestCase
 from djmoney.money import Money
 
 from order.enum.status import OrderStatus, PaymentStatus
+from order.exceptions import (
+    InsufficientStockError,
+    InvalidStatusTransitionError,
+    PaymentError,
+)
 from order.factories.order import OrderFactory
 from order.models.order import Order
 from order.services import OrderService
@@ -96,7 +101,7 @@ class OrderServiceTestCase(TestCase):
         self.product.stock = 1
         self.product.save()
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(InsufficientStockError):
             OrderService.create_order(
                 order_data=self.order_data,
                 items_data=self.items_data,
@@ -132,7 +137,7 @@ class OrderServiceTestCase(TestCase):
             order.refresh_from_db()
             self.assertEqual(order.status, OrderStatus.PENDING.value)
 
-            with self.assertRaises(ValueError):
+            with self.assertRaises(InvalidStatusTransitionError):
                 OrderService.update_order_status(
                     order=order, new_status=OrderStatus.COMPLETED.value
                 )
@@ -187,6 +192,11 @@ class OrderServiceTestCase(TestCase):
 
         product = ProductFactory(stock=10)
         test_currency = order.shipping_price.currency
+
+        # Manually decrement stock first (simulating order creation)
+        product.stock = 7
+        product.save()
+
         order.items.create(
             product=product,
             price=Money(amount=Decimal("50.00"), currency=test_currency),
@@ -347,7 +357,7 @@ class OrderServiceTestCase(TestCase):
         order.payment_id = "test_payment_123"
         order.save(update_fields=["payment_status", "payment_id"])
 
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(PaymentError) as context:
             OrderService.refund_order(order=order)
 
         self.assertIn(

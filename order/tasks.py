@@ -417,3 +417,41 @@ def update_order_statuses_from_shipping() -> int:
             extra={"error": str(e)},
         )
         return 0
+
+
+@shared_task
+def cleanup_expired_stock_reservations() -> int:
+    """
+    Cleanup expired stock reservations.
+
+    This task should be run periodically (every 5 minutes) to release
+    expired stock reservations and make the stock available again for
+    other customers.
+
+    Expired reservations are those where:
+    - expires_at < current_time (past the 15-minute TTL)
+    - consumed = False (not yet converted to sale or released)
+
+    Returns:
+        int: Number of expired reservations that were cleaned up
+    """
+    try:
+        from order.stock import StockManager
+
+        count = StockManager.cleanup_expired_reservations()
+
+        if count > 0:
+            logger.info(
+                f"Cleaned up {count} expired stock reservations",
+                extra={"cleaned_count": count},
+            )
+
+        return count
+
+    except Exception as e:
+        logger.error(
+            f"Error cleaning up expired stock reservations: {e!s}",
+            extra={"error": str(e)},
+            exc_info=True,
+        )
+        return 0

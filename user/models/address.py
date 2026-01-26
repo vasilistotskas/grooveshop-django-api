@@ -54,10 +54,7 @@ class UserAddress(TimeStampMixinModel, UUIDModel):
         blank=True,
         default="",
     )
-    phone = PhoneNumberField(
-        _("Phone Number"), null=True, blank=True, default=None
-    )
-    mobile_phone = PhoneNumberField(_("Mobile Phone Number"))
+    phone = PhoneNumberField(_("Phone Number"))
     notes = models.CharField(_("Notes"), max_length=255, blank=True, default="")
     is_main = models.BooleanField(_("Is Main"), default=False)
 

@@ -225,16 +225,10 @@ def handle_order_item_post_save(
 ) -> None:
     """Handle order item changes and log history."""
     if created:
-        # Stock already deducted in serializer, just log the action
-        if not getattr(instance, "_stock_already_deducted", False):
-            # Fallback: deduct stock if not already done (shouldn't happen)
-            logger.warning(
-                "Stock not deducted in transaction for order item %s, deducting now",
-                instance.id,
-            )
-            product = instance.product
-            product.stock = max(0, product.stock - instance.quantity)
-            product.save(update_fields=["stock"])
+        # Stock is managed by StockManager (either via convert_reservation_to_sale
+        # or decrement_stock in OrderService.create_order_from_cart).
+        # We do NOT decrement stock here to avoid double-decrementing.
+        # This signal handler only logs the order history.
 
         try:
             order = instance.order

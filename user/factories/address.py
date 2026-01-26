@@ -73,7 +73,6 @@ class UserAddressFactory(factory.django.DjangoModelFactory):
         lambda: random.choice([s[0] for s in LocationChoicesEnum.choices])
     )
     phone = factory.Faker("phone_number")
-    mobile_phone = factory.Faker("phone_number")
     notes = factory.Faker(
         "random_element",
         elements=[

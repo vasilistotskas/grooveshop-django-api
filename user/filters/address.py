@@ -104,11 +104,6 @@ class UserAddressFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         lookup_expr="icontains",
         help_text=_("Filter by phone number (partial match)"),
     )
-    mobile_phone = filters.CharFilter(
-        field_name="mobile_phone",
-        lookup_expr="icontains",
-        help_text=_("Filter by mobile phone number (partial match)"),
-    )
 
     floor = filters.ChoiceFilter(
         field_name="floor",
@@ -136,7 +131,6 @@ class UserAddressFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
             "last_name": ["exact", "icontains"],
             "is_main": ["exact"],
             "phone": ["exact", "icontains"],
-            "mobile_phone": ["exact", "icontains"],
             "floor": ["exact"],
             "created_at": ["gte", "lte", "date"],
             "updated_at": ["gte", "lte", "date"],

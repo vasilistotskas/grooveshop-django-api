@@ -22,10 +22,13 @@ product_price_increased = django.dispatch.Signal()
 def post_create_historical_record_callback(
     sender, instance, history_instance, **kwargs
 ):
+    from order.models.stock_log import StockLog
+
     prev_record = getattr(history_instance, "prev_record", None)
     if prev_record is None:
         return
 
+    # Track price changes
     old_price = prev_record.price.amount
     new_price = instance.price.amount
 
@@ -42,6 +45,45 @@ def post_create_historical_record_callback(
             instance=instance,
             old_price=old_price,
             new_price=new_price,
+        )
+
+    # Track stock changes
+    old_stock = prev_record.stock
+    new_stock = instance.stock
+
+    if old_stock != new_stock:
+        # Detect if this is a programmatic stock operation from order/stock.py
+        # Programmatic operations use save(update_fields=['stock', 'updated_at'])
+        # Admin changes typically update multiple fields or use save() without update_fields
+        history_change_reason = getattr(
+            history_instance, "history_change_reason", None
+        )
+
+        # Skip if this is a programmatic stock operation
+        # These operations create their own detailed StockLog entries with order context
+        if history_change_reason and "StockManager" in history_change_reason:
+            return
+
+        quantity_delta = new_stock - old_stock
+        operation_type = (
+            StockLog.OPERATION_INCREMENT
+            if quantity_delta > 0
+            else StockLog.OPERATION_DECREMENT
+        )
+
+        # Get the user who made the change from history_instance
+        performed_by = getattr(history_instance, "history_user", None)
+
+        # Create stock log entry for manual admin changes
+        StockLog.objects.create(
+            product=instance,
+            operation_type=operation_type,
+            quantity_delta=quantity_delta,
+            stock_before=old_stock,
+            stock_after=new_stock,
+            reason="Manual stock adjustment via admin panel",
+            performed_by=performed_by,
+            order=None,
         )
 
 

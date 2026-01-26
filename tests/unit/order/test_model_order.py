@@ -26,6 +26,7 @@ class OrderModelTestCase(TestCase):
         self.order.document_type = OrderDocumentTypeEnum.RECEIPT
         self.order.shipping_price = Money("10.00", settings.DEFAULT_CURRENCY)
         self.order.paid_amount = Money("0.00", settings.DEFAULT_CURRENCY)
+        self.order.payment_method_fee = None  # No payment method fee
         self.order._original_status = OrderStatus.PENDING
 
         self.order.street = "Test Street"

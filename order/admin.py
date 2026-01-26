@@ -365,7 +365,6 @@ class OrderAdmin(ModelAdmin):
         "first_name",
         "last_name",
         "phone",
-        "mobile_phone",
         "city",
         "tracking_number",
         "payment_id",
@@ -405,7 +404,6 @@ class OrderAdmin(ModelAdmin):
                     "last_name",
                     "email",
                     "phone",
-                    "mobile_phone",
                     "customer_summary",
                 ),
                 "classes": ("wide",),
@@ -870,7 +868,6 @@ class OrderAdmin(ModelAdmin):
         safe_name = conditional_escape(obj.customer_full_name)
         safe_email = conditional_escape(obj.email)
         safe_phone = conditional_escape(obj.phone or "Not provided")
-        safe_mobile = conditional_escape(obj.mobile_phone or "Not provided")
         account_status = "Registered User" if obj.user else "Guest"
 
         html = (
@@ -879,7 +876,6 @@ class OrderAdmin(ModelAdmin):
             f"<div><strong>Full Name:</strong></div><div>{safe_name}</div>"
             f"<div><strong>Email:</strong></div><div>{safe_email}</div>"
             f"<div><strong>Phone:</strong></div><div>{safe_phone}</div>"
-            f"<div><strong>Mobile:</strong></div><div>{safe_mobile}</div>"
             f"<div><strong>Account:</strong></div><div>{account_status}</div>"
             "</div>"
             "</div>"

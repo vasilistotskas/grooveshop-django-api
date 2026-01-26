@@ -626,7 +626,7 @@ class UserAddressAdmin(ModelAdmin):
         ),
         (
             _("Contact Information"),
-            {"fields": ("phone", "mobile_phone"), "classes": ("wide",)},
+            {"fields": ("phone",), "classes": ("wide",)},
         ),
         (
             _("System Information"),
@@ -681,11 +681,6 @@ class UserAddressAdmin(ModelAdmin):
             esc_phone = conditional_escape(obj.phone)
             nums.append(
                 f'<span class="flex items-center gap-1"><span>📞</span><span>{esc_phone}</span></span>'
-            )
-        if obj.mobile_phone:
-            esc_mobile = conditional_escape(obj.mobile_phone)
-            nums.append(
-                f'<span class="flex items-center gap-1"><span>📱</span><span>{esc_mobile}</span></span>'
             )
         if nums:
             html = (

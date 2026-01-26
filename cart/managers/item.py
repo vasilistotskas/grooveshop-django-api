@@ -3,10 +3,8 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
-from django.conf import settings
 from django.db import models
 from django.utils import timezone
-from djmoney.money import Money
 from extra_settings.models import Setting
 
 if TYPE_CHECKING:
@@ -95,19 +93,15 @@ class CartItemQuerySet(models.QuerySet):
         return self.filter(quantity__range=[min_qty, max_qty])
 
     def by_price_range(self, min_price, max_price):
-        currency = getattr(
-            settings, "DEFAULT_CURRENCY", settings.DEFAULT_CURRENCY
-        )
+        """Filter items by product price range."""
         return self.filter(
-            product__price__gte=Money(min_price, currency),
-            product__price__lte=Money(max_price, currency),
+            product__price__gte=min_price,
+            product__price__lte=max_price,
         )
 
     def expensive_items(self, threshold=100):
-        currency = getattr(
-            settings, "DEFAULT_CURRENCY", settings.DEFAULT_CURRENCY
-        )
-        return self.filter(product__price__gte=Money(threshold, currency))
+        """Filter items with product price above threshold."""
+        return self.filter(product__price__gte=threshold)
 
     def in_active_carts(self):
         abandoned_threshold = Setting.get("CART_ABANDONED_HOURS", default=24)

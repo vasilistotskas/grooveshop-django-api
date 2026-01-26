@@ -27,6 +27,61 @@ from order.managers.order import OrderManager
 
 
 class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
+    """
+    Order model representing a customer purchase.
+
+    This model tracks all order information including customer details, shipping address,
+    payment information, and order status. It inherits from several mixins:
+    - SoftDeleteModel: Provides soft delete functionality
+    - TimeStampMixinModel: Adds created_at and updated_at timestamps
+    - UUIDModel: Adds a UUID field for guest order access
+    - MetaDataModel: Provides metadata and private_metadata JSON fields
+
+    Metadata JSON Structure:
+        The metadata field stores additional order information in JSON format:
+        {
+            "cart_snapshot": {
+                "items": [...],
+                "total": "...",
+                "created_at": "..."
+            },
+            "price_validation": {
+                "original_prices": {...},
+                "current_prices": {...},
+                "price_changes": {...}
+            },
+            "cancellation": {
+                "reason": "...",
+                "cancelled_by": "...",
+                "cancelled_at": "..."
+            },
+            "refunds": [
+                {
+                    "amount": "...",
+                    "reason": "...",
+                    "refunded_at": "...",
+                    "refund_id": "..."
+                }
+            ],
+            "stripe_checkout_session_id": "...",
+            "webhook_events": [
+                {
+                    "event_id": "...",
+                    "event_type": "...",
+                    "processed_at": "..."
+                }
+            ]
+        }
+
+    Stock Reservation Tracking:
+        The stock_reservation_ids field stores a list of StockReservation IDs that were
+        converted to this order. This provides an audit trail linking temporary stock
+        reservations during checkout to the final order, enabling:
+        - Tracking which reservations were consumed by this order
+        - Debugging stock discrepancies
+        - Audit compliance for inventory management
+    """
+
     id = models.BigAutoField(primary_key=True)
     user = models.ForeignKey(
         "user.UserAccount",
@@ -79,9 +134,6 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     zipcode = models.CharField(_("Zipcode"), max_length=255)
     place = models.CharField(_("Place"), max_length=255, blank=True, default="")
     phone = PhoneNumberField(_("Phone Number"))
-    mobile_phone = PhoneNumberField(
-        _("Mobile Phone Number"), null=True, blank=True, default=None
-    )
     customer_notes = models.TextField(
         _("Customer Notes"), blank=True, default=""
     )
@@ -93,6 +145,15 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     )
     shipping_price = MoneyField(
         _("Shipping Price"), max_digits=11, decimal_places=2, default=0
+    )
+    payment_method_fee = MoneyField(
+        _("Payment Method Fee"),
+        max_digits=11,
+        decimal_places=2,
+        default=0,
+        help_text=_(
+            "Fee charged by the payment method (e.g., Cash on Delivery fee)"
+        ),
     )
     document_type = models.CharField(
         _("Document Type"),
@@ -111,7 +172,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         _("Status Updated At"), auto_now=False, null=True, blank=True
     )
     payment_id = models.CharField(
-        _("Payment ID"), max_length=255, blank=True, default=""
+        _("Payment ID"), max_length=255, blank=True, null=True, default=""
     )
     payment_status = models.CharField(
         _("Payment Status"),
@@ -128,6 +189,15 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     )
     shipping_carrier = models.CharField(
         _("Shipping Carrier"), max_length=255, blank=True, default=""
+    )
+    stock_reservation_ids = models.JSONField(
+        _("Stock Reservation IDs"),
+        default=list,
+        blank=True,
+        help_text=_(
+            "List of stock reservation IDs that were converted to this order. "
+            "Provides audit trail linking reservations to final orders."
+        ),
     )
 
     objects: OrderManager = OrderManager()
@@ -257,7 +327,29 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
 
     @property
     def total_price_extra(self) -> Money:
-        return self.shipping_price
+        """
+        Calculate total extra costs (shipping + payment method fee).
+
+        Returns:
+            Money: Sum of shipping_price and payment_method_fee
+
+        Raises:
+            ValueError: If shipping and payment fee have different currencies
+        """
+        extras = self.shipping_price
+
+        if self.payment_method_fee and self.payment_method_fee.amount > 0:
+            if self.shipping_price.currency != self.payment_method_fee.currency:
+                raise ValueError(
+                    f"Shipping and payment fee have different currencies: "
+                    f"{self.shipping_price.currency} and {self.payment_method_fee.currency}"
+                )
+            extras = Money(
+                self.shipping_price.amount + self.payment_method_fee.amount,
+                self.shipping_price.currency,
+            )
+
+        return extras
 
     @property
     def full_address(self) -> str:

@@ -4,6 +4,7 @@ import logging
 import uuid
 
 from django.conf import settings
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
@@ -28,6 +29,12 @@ from core.utils.serializers import (
     create_schema_view_config,
 )
 from core.utils.views import cache_methods
+from order.exceptions import (
+    InsufficientStockError,
+    InvalidOrderDataError,
+    InvalidStatusTransitionError,
+    PaymentNotFoundError,
+)
 from order.filters import OrderFilter
 from order.models.order import Order
 from order.payment import get_payment_provider
@@ -38,6 +45,7 @@ from order.serializers.order import (
     CreateCheckoutSessionResponseSerializer,
     CreatePaymentIntentRequestSerializer,
     CreatePaymentIntentResponseSerializer,
+    OrderCreateFromCartSerializer,
     OrderDetailSerializer,
     OrderSerializer,
     OrderWriteSerializer,
@@ -46,13 +54,14 @@ from order.serializers.order import (
     RefundOrderResponseSerializer,
     UpdateStatusSerializer,
 )
-from order.services import OrderService, OrderServiceError
+from order.services import OrderService
+from pay_way.models import PayWay
 from pay_way.services import PayWayService
 
 logger = logging.getLogger(__name__)
 
 req_serializers: RequestSerializersConfig = {
-    "create": OrderWriteSerializer,
+    "create": OrderCreateFromCartSerializer,
     "update": OrderWriteSerializer,
     "partial_update": OrderWriteSerializer,
     "add_tracking": AddTrackingSerializer,
@@ -246,7 +255,6 @@ class OrderViewSet(BaseModelViewSet):
         "last_name",
         "email",
         "phone",
-        "mobile_phone",
         "city",
         "street",
         "zipcode",
@@ -365,72 +373,337 @@ class OrderViewSet(BaseModelViewSet):
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
-        request_serializer_class = self.get_request_serializer()
-        request_serializer = request_serializer_class(
-            data=request.data, context={"request": request}
-        )
-        request_serializer.is_valid(raise_exception=True)
+        """
+        Create an order with dual-flow support.
+
+        This endpoint supports two payment flows based on payment method type:
+
+        **Online Payments (is_online_payment=True):**
+        - Payment-first flow: Requires payment_intent_id
+        - Flow: Payment confirmed → Order created
+        - Examples: Stripe, PayPal
+
+        **Offline Payments (is_online_payment=False):**
+        - Order-first flow: No payment_intent_id required
+        - Flow: Order created → Payment pending
+        - Examples: Cash on Delivery, Bank Transfer
+
+        Required request data:
+        - cart_id: Cart ID or UUID to create order from
+        - pay_way_id: Payment method ID
+        - payment_intent_id: Required ONLY for online payments
+        - Shipping address fields (first_name, last_name, email, street, etc.)
+
+        Returns:
+            Response: Order details with 201 status on success
+
+        Raises:
+            ValidationError: If validation fails or required fields missing
+        """
 
         try:
-            user = request.user if request.user.is_authenticated else None
-            validated_data = request_serializer.validated_data.copy()
-
-            if user and "user" not in validated_data:
-                validated_data["user"] = user
-
-            order = request_serializer.create(validated_data)
-
-            if (
-                order.pay_way
-                and order.pay_way.provider_code == "stripe"
-                and request.data.get("process_payment", False)
-            ):
-                payment_data = request.data.get("payment_data", {})
-                success, payment_response = PayWayService.process_payment(
-                    pay_way=order.pay_way, order=order, **payment_data
+            # Step 1: Get payment method to determine flow
+            # Note: djangorestframework_camel_case converts payWay -> pay_way
+            pay_way_id = request.data.get("pay_way_id")
+            if not pay_way_id:
+                raise ValidationError(
+                    {"pay_way_id": [_("Payment method is required")]}
                 )
 
-                if not success:
-                    logger.warning(
-                        "Payment failed for order %s: %s",
-                        order.id,
-                        payment_response,
-                    )
+            try:
+                pay_way = PayWay.objects.get(id=pay_way_id)
+            except PayWay.DoesNotExist:
+                raise ValidationError(
+                    {
+                        "pay_way_id": [
+                            _(
+                                "Payment method with ID {pay_way_id} not found"
+                            ).format(pay_way_id=pay_way_id)
+                        ]
+                    }
+                )
 
-                response_data = OrderDetailSerializer(
-                    order, context={"request": request}
-                ).data
-                response_data["payment_info"] = payment_response
+            # Step 2: Route to appropriate flow based on payment type
+            if pay_way.is_online_payment:
+                # Online payment: Require payment_intent_id (payment-first)
+                return self._create_with_payment_intent(request, pay_way)
+            else:
+                # Offline payment: No payment_intent_id required (order-first)
+                return self._create_without_payment_intent(request, pay_way)
 
-                return Response(response_data, status=status.HTTP_201_CREATED)
-
-            response_serializer_class = self.get_response_serializer()
-            response_serializer = response_serializer_class(
-                order, context={"request": request}
+        except InsufficientStockError as e:
+            logger.warning(
+                "Insufficient stock for order creation: product_id=%s, available=%s, requested=%s",
+                e.product_id,
+                e.available,
+                e.requested,
             )
             return Response(
-                response_serializer.data, status=status.HTTP_201_CREATED
+                {
+                    "detail": _("Insufficient stock for product"),
+                    "error": {
+                        "type": "insufficient_stock",
+                        "product_id": e.product_id,
+                        "available": e.available,
+                        "requested": e.requested,
+                    },
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        except OrderServiceError as e:
-            logger.error("Error creating order: %s", e)
-            raise ValidationError(
+        except InvalidOrderDataError as e:
+            logger.warning("Invalid order data: %s", e)
+            error_response = {
+                "detail": str(e),
+                "error": {
+                    "type": "invalid_order_data",
+                },
+            }
+            if e.field_errors:
+                error_response["field_errors"] = e.field_errors
+            return Response(
+                error_response,
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        except PaymentNotFoundError as e:
+            logger.warning("Payment not found: %s", e)
+            return Response(
                 {
-                    "detail": _(
-                        "An error occurred while processing your request."
-                    )
-                }
-            ) from e
+                    "detail": str(e),
+                    "error": {
+                        "type": "payment_not_found",
+                        "payment_id": e.payment_id
+                        if hasattr(e, "payment_id")
+                        else None,
+                    },
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        except ValidationError as e:
+            logger.warning("Validation error: %s", e)
+            # DRF ValidationError has a detail attribute
+            # Return the error detail directly for proper field-level errors
+            error_detail = (
+                e.detail if hasattr(e, "detail") else {"detail": str(e)}
+            )
+            return Response(
+                error_detail,
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        except PermissionDenied as e:
+            logger.warning("Permission denied: %s", e)
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         except Exception as e:
-            logger.error("Error creating order: %s", e, exc_info=True)
+            logger.error(
+                "Unexpected error creating order: %s", e, exc_info=True
+            )
             return Response(
                 {
-                    "detail": _(
-                        "An error occurred while processing your request."
-                    )
+                    "detail": _("An unexpected error occurred"),
+                    "error": str(e),
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+    def _create_with_payment_intent(self, request, pay_way: PayWay) -> Response:
+        """
+        Create order with payment-first flow (online payments).
+
+        Requires payment_intent_id to be provided and confirmed.
+        """
+
+        # Step 1: Get cart from request (validate cart exists first)
+        cart, user = self._get_cart_and_user(request)
+
+        # Step 2: Validate payment_intent_id is provided
+        # Note: djangorestframework_camel_case converts paymentIntentId -> payment_intent_id
+        payment_intent_id = request.data.get("payment_intent_id")
+        if not payment_intent_id:
+            raise ValidationError(
+                {
+                    "payment_intent_id": [
+                        _(
+                            "Payment intent ID is required for online payment methods"
+                        )
+                    ]
+                }
+            )
+
+        # Step 3: Validate cart is ready for checkout
+        validation_result = OrderService.validate_cart_for_checkout(cart)
+        if not validation_result.get("valid", False):
+            errors = validation_result.get("errors", [])
+            raise ValidationError({"cart": errors})
+
+        # Step 4: Build and validate shipping address
+        shipping_address = self._build_shipping_address(request)
+        try:
+            OrderService.validate_shipping_address(shipping_address)
+        except DjangoValidationError as e:
+            # Convert Django ValidationError to DRF ValidationError
+            raise ValidationError(
+                e.message_dict
+                if hasattr(e, "message_dict")
+                else {"detail": str(e)}
+            )
+
+        # Step 5: Create order from cart with payment_intent_id
+        order = OrderService.create_order_from_cart(
+            cart=cart,
+            shipping_address=shipping_address,
+            payment_intent_id=payment_intent_id,
+            pay_way=pay_way,
+            user=user,
+        )
+
+        # Return order details
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(
+            order, context={"request": request}
+        )
+
+        logger.info(
+            "Order %s created successfully (online payment) for user %s with payment %s",
+            order.id,
+            user.id if user else "guest",
+            payment_intent_id,
+        )
+
+        return Response(
+            response_serializer.data, status=status.HTTP_201_CREATED
+        )
+
+    def _create_without_payment_intent(
+        self, request, pay_way: PayWay
+    ) -> Response:
+        """
+        Create order with order-first flow (offline payments).
+
+        No payment_intent_id required. Order created with PENDING status.
+        """
+
+        # Step 1: Get cart from request
+        cart, user = self._get_cart_and_user(request)
+
+        # Step 2: Validate cart is ready for checkout
+        validation_result = OrderService.validate_cart_for_checkout(cart)
+        if not validation_result.get("valid", False):
+            errors = validation_result.get("errors", [])
+            raise ValidationError({"cart": errors})
+
+        # Step 3: Build and validate shipping address
+        shipping_address = self._build_shipping_address(request)
+        try:
+            OrderService.validate_shipping_address(shipping_address)
+        except DjangoValidationError as e:
+            # Convert Django ValidationError to DRF ValidationError
+            raise ValidationError(
+                e.message_dict
+                if hasattr(e, "message_dict")
+                else {"detail": str(e)}
+            )
+
+        # Step 4: Create order from cart without payment_intent_id
+        order = OrderService.create_order_from_cart_offline(
+            cart=cart,
+            shipping_address=shipping_address,
+            pay_way=pay_way,
+            user=user,
+        )
+
+        # Return order details
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(
+            order, context={"request": request}
+        )
+
+        logger.info(
+            "Order %s created successfully (offline payment) for user %s",
+            order.id,
+            user.id if user else "guest",
+        )
+
+        return Response(
+            response_serializer.data, status=status.HTTP_201_CREATED
+        )
+
+    def _get_cart_and_user(self, request):
+        """
+        Helper method to get cart and user from request using CartService.
+
+        Cart is identified via X-Cart-Id header (standard approach).
+        Uses CartService pattern consistent with cart views.
+
+        Note: For order creation, we need an existing cart with items.
+        We use get_existing_cart() instead of get_or_create_cart() to ensure
+        the cart already exists and is not created on-the-fly.
+        """
+        from cart.services import CartService
+
+        # Use CartService to get cart from X-Cart-Id header
+        cart_service = CartService(request)
+        cart = cart_service.get_existing_cart()
+
+        if not cart:
+            raise ValidationError(
+                {
+                    "cart": [
+                        _(
+                            "Cart not found. Please add items to cart before checkout."
+                        )
+                    ]
+                }
+            )
+
+        # Verify cart has items
+        if not cart.items.exists():
+            raise ValidationError(
+                {
+                    "cart": [
+                        _("Cart is empty. Please add items before checkout.")
+                    ]
+                }
+            )
+
+        # Get user (None for guest orders)
+        user = request.user if request.user.is_authenticated else None
+
+        # Verify cart ownership for authenticated users
+        if user and cart.user and cart.user.id != user.id:
+            raise PermissionDenied(
+                _("You do not have permission to access this cart.")
+            )
+
+        return cart, user
+
+    def _build_shipping_address(self, request) -> dict:
+        """
+        Helper method to build shipping address from request data.
+
+        Note: djangorestframework_camel_case middleware automatically converts
+        camelCase request data to snake_case, so we only need to check snake_case keys.
+        """
+        phone = request.data.get("phone")
+        return {
+            "first_name": request.data.get("first_name"),
+            "last_name": request.data.get("last_name"),
+            "email": request.data.get("email"),
+            "street": request.data.get("street"),
+            "street_number": request.data.get("street_number"),
+            "city": request.data.get("city"),
+            "zipcode": request.data.get("zipcode"),
+            "country_id": request.data.get("country_id"),
+            "region_id": request.data.get("region_id"),
+            "phone": phone,
+            "customer_notes": request.data.get("customer_notes", ""),
+        }
 
     @action(detail=True, methods=["POST"])
     def create_payment_intent(self, request, *args, **kwargs):
@@ -724,6 +997,16 @@ class OrderViewSet(BaseModelViewSet):
             )
             return Response(response_serializer.data)
 
+        except InvalidStatusTransitionError as e:
+            logger.error("Invalid status transition: %s", e)
+            raise ValidationError(
+                {
+                    "detail": str(e),
+                    "current_status": e.current_status,
+                    "new_status": e.new_status,
+                    "allowed_transitions": e.allowed,
+                }
+            ) from e
         except ValueError as e:
             logger.error("Error updating order status: %s", e)
             raise ValidationError(

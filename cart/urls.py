@@ -23,6 +23,21 @@ urlpatterns = [
         name="cart-list",
     ),
     path(
+        "cart/reserve-stock",
+        CartViewSet.as_view({"post": "reserve_stock"}),
+        name="cart-reserve-stock",
+    ),
+    path(
+        "cart/release-reservations",
+        CartViewSet.as_view({"post": "release_reservations"}),
+        name="cart-release-reservations",
+    ),
+    path(
+        "cart/create-payment-intent",
+        CartViewSet.as_view({"post": "create_payment_intent"}),
+        name="cart-create-payment-intent",
+    ),
+    path(
         "cart/item",
         CartItemViewSet.as_view({"get": "list", "post": "create"}),
         name="cart-item-list",

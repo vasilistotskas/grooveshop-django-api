@@ -26,7 +26,6 @@ class UserAddressModelTestCase(TestCase):
             floor=FloorChoicesEnum.FIRST_FLOOR.value,
             location_type=LocationChoicesEnum.HOME.value,
             phone="123-456-7890",
-            mobile_phone="987-654-3210",
             notes="Sample notes",
             is_main=True,
         )

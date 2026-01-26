@@ -74,7 +74,6 @@ class OrderFilterTest(APITestCase):
             street="Broadway",
             street_number="123",
             phone="+1234567890",
-            mobile_phone="+1234567891",
             customer_notes="Please deliver after 5 PM",
             paid_amount=Money(0, "EUR"),
             shipping_price=Money(10, "EUR"),
@@ -102,7 +101,6 @@ class OrderFilterTest(APITestCase):
             street="Broadway",
             street_number="456",
             phone="+1234567890",
-            mobile_phone=None,
             customer_notes="",
             paid_amount=Money(50, "EUR"),
             shipping_price=Money(15, "EUR"),
@@ -130,7 +128,6 @@ class OrderFilterTest(APITestCase):
             street="Unter den Linden",
             street_number="1",
             phone="+49123456789",
-            mobile_phone="+49123456788",
             customer_notes="Ring the bell twice",
             paid_amount=Money(75, "EUR"),
             shipping_price=Money(20, "EUR"),
@@ -159,7 +156,6 @@ class OrderFilterTest(APITestCase):
             street="Marienplatz",
             street_number="8",
             phone="+49123456789",
-            mobile_phone="+49123456788",
             customer_notes="",
             paid_amount=Money(100, "EUR"),
             shipping_price=Money(5, "EUR"),
@@ -188,7 +184,6 @@ class OrderFilterTest(APITestCase):
             street="Sunset Blvd",
             street_number="999",
             phone="+1987654321",
-            mobile_phone=None,
             customer_notes="",
             paid_amount=Money(0, "EUR"),
             shipping_price=Money(12, "EUR"),
@@ -359,11 +354,12 @@ class OrderFilterTest(APITestCase):
         self.assertIn(self.shipped_order.id, result_ids)
         self.assertIn(self.completed_order.id, result_ids)
 
-        response = self.client.get(url, {"has_mobile_phone": "false"})
+        response = self.client.get(url, {"has_customer_notes": "false"})
         self.assertEqual(response.status_code, 200)
         result_ids = [r["id"] for r in response.data["results"]]
-        self.assertEqual(len(result_ids), 2)
+        self.assertEqual(len(result_ids), 3)
         self.assertIn(self.processing_order.id, result_ids)
+        self.assertIn(self.completed_order.id, result_ids)
         self.assertIn(self.canceled_order.id, result_ids)
 
         response = self.client.get(url, {"has_customer_notes": "true"})

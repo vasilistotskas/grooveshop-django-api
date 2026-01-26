@@ -1,4 +1,4 @@
-import asyncio
+import inspect
 from unittest.mock import AsyncMock, patch
 from asgiref.sync import sync_to_async
 from django.conf import settings
@@ -41,7 +41,7 @@ class TestNotifyCommentLiked(TestCase):
     ):
         def sync_to_async_side_effect(fn):
             async def wrapped_async(*args, **kwargs):
-                if asyncio.iscoroutinefunction(fn):
+                if inspect.iscoroutinefunction(fn):
                     return await fn(*args, **kwargs)
                 return fn(*args, **kwargs)
 

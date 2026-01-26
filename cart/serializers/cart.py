@@ -90,3 +90,41 @@ class CartDetailSerializer(CartSerializer):
             *CartSerializer.Meta.fields,
             "recommendations",
         )
+
+
+class ReleaseReservationsRequestSerializer(serializers.Serializer):
+    """Serializer for releasing stock reservations."""
+
+    reservation_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=True,
+        help_text=_("List of reservation IDs to release"),
+    )
+
+
+class ReleaseReservationsResponseSerializer(serializers.Serializer):
+    """Serializer for release reservations response."""
+
+    message = serializers.CharField(
+        help_text=_("Success message"),
+    )
+    released_count = serializers.IntegerField(
+        help_text=_("Number of reservations released"),
+    )
+    failed_releases = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        help_text=_("List of failed releases with error details"),
+    )
+
+
+class ReserveStockResponseSerializer(serializers.Serializer):
+    """Serializer for reserve stock response."""
+
+    reservation_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        help_text=_("List of created stock reservation IDs"),
+    )
+    message = serializers.CharField(
+        help_text=_("Success message"),
+    )

@@ -49,6 +49,53 @@ class StripePaymentProvider(PaymentProvider):
 
         self.webhook_secret = getattr(settings, "DJSTRIPE_WEBHOOK_SECRET", "")
 
+    def verify_webhook_signature(
+        self, payload: bytes, signature: str
+    ) -> dict[str, Any]:
+        """
+        Verify Stripe webhook signature.
+
+        Uses stripe.Webhook.construct_event with DJSTRIPE_WEBHOOK_SECRET to verify
+        that the webhook request actually came from Stripe and hasn't been tampered with.
+
+        Args:
+            payload: Raw webhook payload bytes from request.body
+            signature: Stripe signature from HTTP_STRIPE_SIGNATURE header
+
+        Returns:
+            Verified event dictionary from Stripe
+
+        Raises:
+            stripe.error.SignatureVerificationError: If signature is invalid
+            ValueError: If payload is invalid JSON
+
+        Example:
+            >>> provider = StripePaymentProvider()
+            >>> event = provider.verify_webhook_signature(
+            ...     payload=request.body,
+            ...     signature=request.META['HTTP_STRIPE_SIGNATURE']
+            ... )
+            >>> print(event['type'])
+            'payment_intent.succeeded'
+        """
+        if not self.webhook_secret:
+            logger.error("DJSTRIPE_WEBHOOK_SECRET not configured")
+            raise ValueError("Webhook secret not configured")
+
+        try:
+            event = stripe.Webhook.construct_event(
+                payload, signature, self.webhook_secret
+            )
+            return event
+        except ValueError as e:
+            # Invalid payload
+            logger.error(f"Invalid webhook payload: {e}")
+            raise
+        except stripe.StripeError as e:
+            # Invalid signature or other Stripe error
+            logger.error(f"Webhook signature verification failed: {e}")
+            raise
+
     def _map_stripe_status(self, stripe_status: str) -> PaymentStatus:
         status_mapping = {
             "requires_payment_method": PaymentStatus.PENDING,
@@ -184,12 +231,14 @@ class StripePaymentProvider(PaymentProvider):
             logger.error(
                 f"Stripe Checkout Session creation failed: {e}",
                 extra={"order_id": order_id, "error": str(e)},
+                exc_info=True,
             )
             return False, {"error": str(e), "stripe_error": True}
         except Exception as e:
             logger.error(
                 f"Checkout Session creation failed: {e}",
                 extra={"order_id": order_id, "error": str(e)},
+                exc_info=True,
             )
             return False, {"error": str(e)}
 
@@ -208,20 +257,62 @@ class StripePaymentProvider(PaymentProvider):
 
             stripe_amount = int(amount.amount * 100)
             currency_code = str(amount.currency).lower()
+
+            # Build comprehensive metadata for tracking
+            metadata = {
+                "order_id": order_id,
+                "source": "django_app",
+            }
+
+            # Add cart_item_ids if provided
+            cart_item_ids = kwargs.get("cart_item_ids")
+            if cart_item_ids is not None:
+                # Convert list to comma-separated string for Stripe metadata
+                if isinstance(cart_item_ids, list):
+                    metadata["cart_item_ids"] = ",".join(
+                        str(id) for id in cart_item_ids
+                    )
+                else:
+                    metadata["cart_item_ids"] = str(cart_item_ids)
+
+            # Add customer_email if provided
+            customer_email = kwargs.get("customer_email")
+            if customer_email:
+                metadata["customer_email"] = customer_email
+
             payment_intent_data = {
                 "amount": stripe_amount,
                 "currency": currency_code,
-                "metadata": {"order_id": order_id, "source": "django_app"},
+                "metadata": metadata,
                 "automatic_payment_methods": {
                     "enabled": True,
                 },
             }
 
+            # Add idempotency key using order_uuid if provided
+            order_uuid = kwargs.get("order_uuid")
+            idempotency_key = None
+            if order_uuid:
+                idempotency_key = f"order_{order_uuid}"
+                logger.info(
+                    "Using idempotency key for payment intent",
+                    extra={
+                        "idempotency_key": idempotency_key,
+                        "order_id": order_id,
+                    },
+                )
+
             customer_id = kwargs.get("customer_id")
             if customer_id:
                 payment_intent_data["customer"] = customer_id
 
-            stripe_pi = stripe.PaymentIntent.create(**payment_intent_data)
+            # Create payment intent with idempotency key if provided
+            if idempotency_key:
+                stripe_pi = stripe.PaymentIntent.create(
+                    **payment_intent_data, idempotency_key=idempotency_key
+                )
+            else:
+                stripe_pi = stripe.PaymentIntent.create(**payment_intent_data)
             print("Stripe PaymentIntent created successfully", stripe_pi)
 
             try:
@@ -260,12 +351,14 @@ class StripePaymentProvider(PaymentProvider):
             logger.error(
                 f"Stripe payment processing failed: {e}",
                 extra={"order_id": order_id, "error": str(e)},
+                exc_info=True,
             )
             return False, {"error": str(e), "stripe_error": True}
         except Exception as e:
             logger.error(
                 f"Payment processing failed: {e}",
                 extra={"order_id": order_id, "error": str(e)},
+                exc_info=True,
             )
             return False, {"error": str(e)}
 
@@ -310,12 +403,14 @@ class StripePaymentProvider(PaymentProvider):
             logger.error(
                 f"Stripe refund failed: {e}",
                 extra={"payment_id": payment_id, "error": str(e)},
+                exc_info=True,
             )
             return False, {"error": str(e), "stripe_error": True}
         except Exception as e:
             logger.error(
                 f"Refund failed: {e}",
                 extra={"payment_id": payment_id, "error": str(e)},
+                exc_info=True,
             )
             return False, {"error": str(e)}
 
@@ -353,12 +448,14 @@ class StripePaymentProvider(PaymentProvider):
             logger.error(
                 f"Failed to get Stripe payment status: {e}",
                 extra={"payment_id": payment_id, "error": str(e)},
+                exc_info=True,
             )
             return PaymentStatus.FAILED, {"error": str(e), "stripe_error": True}
         except Exception as e:
             logger.error(
                 f"Failed to get payment status: {e}",
                 extra={"payment_id": payment_id, "error": str(e)},
+                exc_info=True,
             )
             return PaymentStatus.FAILED, {"error": str(e)}
 
@@ -400,6 +497,7 @@ class PayPalPaymentProvider(PaymentProvider):
             logger.error(
                 f"PayPal payment processing failed: {e!s}",
                 extra={"order_id": order_id, "error": str(e)},
+                exc_info=True,
             )
             return False, {"error": str(e)}
 
@@ -428,6 +526,7 @@ class PayPalPaymentProvider(PaymentProvider):
             logger.error(
                 f"PayPal refund failed: {e!s}",
                 extra={"payment_id": payment_id, "error": str(e)},
+                exc_info=True,
             )
             return False, {"error": str(e)}
 
@@ -453,6 +552,7 @@ class PayPalPaymentProvider(PaymentProvider):
             logger.error(
                 f"Failed to get PayPal payment status: {e!s}",
                 extra={"payment_id": payment_id, "error": str(e)},
+                exc_info=True,
             )
             return PaymentStatus.FAILED, {"error": str(e)}
 

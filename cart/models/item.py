@@ -5,6 +5,7 @@ from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
+from djmoney.models.fields import MoneyField
 
 from cart.managers.item import CartItemManager
 from core.models import TimeStampMixinModel, UUIDModel
@@ -19,6 +20,17 @@ class CartItem(TimeStampMixinModel, UUIDModel):
         "product.Product", related_name="cart_items", on_delete=models.CASCADE
     )
     quantity = models.PositiveIntegerField(_("Quantity"), default=1)
+    price_at_add = MoneyField(
+        _("Price at Add"),
+        max_digits=10,
+        decimal_places=2,
+        default_currency=settings.DEFAULT_CURRENCY,
+        null=True,
+        blank=True,
+        help_text=_(
+            "Price of the product when added to cart (for price change validation)"
+        ),
+    )
 
     objects: CartItemManager = CartItemManager()
 
@@ -92,3 +104,10 @@ class CartItem(TimeStampMixinModel, UUIDModel):
     def update_quantity(self, quantity: int):
         self.quantity = quantity
         self.save()
+
+    def save(self, *args, **kwargs):
+        """Override save to set price_at_add for new items."""
+        # Set price_at_add when creating a new cart item
+        if self.pk is None and self.price_at_add is None:
+            self.price_at_add = self.product.final_price
+        super().save(*args, **kwargs)

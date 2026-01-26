@@ -3,6 +3,7 @@ from decimal import Decimal
 
 import admin_thumbnails
 from django.contrib import admin, messages
+from django.db.models import Q, Sum
 from django.http import HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse_lazy
@@ -221,6 +222,54 @@ class ReviewAverageFilter(RangeNumericListFilter):
         ]
 
 
+class StockReservationStatusFilter(DropdownFilter):
+    """Filter products by stock reservation status."""
+
+    title = _("Reservation Status")
+    parameter_name = "reservation_status"
+
+    def lookups(self, request, model_admin):
+        return [
+            ("has_reservations", _("Has Active Reservations")),
+            ("no_reservations", _("No Active Reservations")),
+            ("high_reservations", _("High Reservations (>50% stock)")),
+        ]
+
+    def queryset(self, request, queryset):
+        filter_value = self.value()
+        now = timezone.now()
+
+        if filter_value == "has_reservations":
+            # Products with active (non-expired, non-consumed) reservations
+            return queryset.filter(
+                stockreservation__expires_at__gt=now,
+                stockreservation__consumed=False,
+            ).distinct()
+        elif filter_value == "no_reservations":
+            # Products without any active reservations
+            return queryset.exclude(
+                stockreservation__expires_at__gt=now,
+                stockreservation__consumed=False,
+            )
+        elif filter_value == "high_reservations":
+            # Products where reserved quantity > 50% of stock
+            # Annotate with reserved quantity and filter
+            queryset = queryset.annotate(
+                reserved_qty=Sum(
+                    "stockreservation__quantity",
+                    filter=Q(
+                        stockreservation__expires_at__gt=now,
+                        stockreservation__consumed=False,
+                    ),
+                )
+            )
+            return queryset.filter(reserved_qty__gt=0).extra(
+                where=["reserved_qty > stock * 0.5"]
+            )
+
+        return queryset
+
+
 @admin_thumbnails.thumbnail("image")
 class ProductImageInline(TabularInline):
     model = ProductImage
@@ -244,6 +293,296 @@ class ProductImageInline(TabularInline):
         )
 
     image_preview.short_description = _("Preview")
+
+
+class StockReservationInline(TabularInline):
+    """Display active stock reservations for this product."""
+
+    from order.models.stock_reservation import StockReservation
+
+    model = StockReservation
+    extra = 0
+    can_delete = False
+
+    fields = (
+        "reservation_info",
+        "quantity",
+        "session_info",
+        "expires_display",
+        "status_badge",
+    )
+    readonly_fields = (
+        "reservation_info",
+        "quantity",
+        "session_info",
+        "expires_display",
+        "status_badge",
+    )
+
+    tab = True
+    verbose_name = _("Active Stock Reservation")
+    verbose_name_plural = _("Active Stock Reservations")
+
+    def get_queryset(self, request):
+        """Only show active (non-expired, non-consumed) reservations."""
+        qs = super().get_queryset(request)
+        now = timezone.now()
+        return (
+            qs.filter(expires_at__gt=now, consumed=False)
+            .select_related("reserved_by", "order")
+            .order_by("-created_at")
+        )
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def reservation_info(self, obj):
+        """Display reservation ID and creation time."""
+        created = obj.created_at.strftime("%Y-%m-%d %H:%M")
+        safe_id = conditional_escape(str(obj.id))
+        safe_created = conditional_escape(created)
+
+        html = (
+            '<div class="text-sm">'
+            f'<div class="font-medium text-base-900 dark:text-base-100">#{safe_id}</div>'
+            f'<div class="text-xs text-base-500 dark:text-base-400">{safe_created}</div>'
+            "</div>"
+        )
+        return mark_safe(html)
+
+    reservation_info.short_description = _("Reservation")
+
+    def session_info(self, obj):
+        """Display user or session information."""
+        if obj.reserved_by:
+            user_display = obj.reserved_by.email or obj.reserved_by.username
+            safe_user = conditional_escape(user_display)
+            html = (
+                '<div class="text-sm">'
+                f'<div class="font-medium text-base-900 dark:text-base-100">👤 {safe_user}</div>'
+                "</div>"
+            )
+        else:
+            session_short = (
+                obj.session_id[:8]
+                if len(obj.session_id) > 8
+                else obj.session_id
+            )
+            safe_session = conditional_escape(session_short)
+            html = (
+                '<div class="text-sm">'
+                f'<div class="text-base-600 dark:text-base-400">🔒 Guest: {safe_session}...</div>'
+                "</div>"
+            )
+        return mark_safe(html)
+
+    session_info.short_description = _("Reserved By")
+
+    def expires_display(self, obj):
+        """Display expiration time with countdown."""
+        now = timezone.now()
+        time_left = obj.expires_at - now
+        minutes_left = int(time_left.total_seconds() / 60)
+
+        safe_minutes = conditional_escape(str(minutes_left))
+
+        if minutes_left <= 2:
+            color_class = "text-red-600 dark:text-red-400"
+            icon = "🔴"
+        elif minutes_left <= 5:
+            color_class = "text-orange-600 dark:text-orange-400"
+            icon = "🟠"
+        else:
+            color_class = "text-green-600 dark:text-green-400"
+            icon = "🟢"
+
+        html = (
+            f'<div class="text-sm {color_class}">'
+            f"{icon} {safe_minutes} min left"
+            "</div>"
+        )
+        return mark_safe(html)
+
+    expires_display.short_description = _("Expires In")
+
+    def status_badge(self, obj):
+        """Display reservation status badge."""
+        if obj.order:
+            order_id = obj.order.id
+            safe_order_id = conditional_escape(str(order_id))
+            badge = (
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
+                f"📦 Order #{safe_order_id}"
+                "</span>"
+            )
+        else:
+            badge = (
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-full">'
+                "⏳ Pending Checkout"
+                "</span>"
+            )
+        return mark_safe(badge)
+
+    status_badge.short_description = _("Status")
+
+
+class StockLogInline(TabularInline):
+    """Display recent stock operation history for this product."""
+
+    from order.models.stock_log import StockLog
+
+    model = StockLog
+    extra = 0
+    can_delete = False
+    max_num = 20  # Limit to 20 records instead of slicing queryset
+
+    fields = (
+        "operation_display",
+        "quantity_change",
+        "stock_levels",
+        "order_link",
+        "performed_by_display",
+        "timestamp_display",
+    )
+    readonly_fields = (
+        "operation_display",
+        "quantity_change",
+        "stock_levels",
+        "order_link",
+        "performed_by_display",
+        "timestamp_display",
+    )
+
+    tab = True
+    verbose_name = _("Stock Activity Log")
+    verbose_name_plural = _("Stock Activity Logs (Recent 20)")
+
+    def get_queryset(self, request):
+        """Show last 20 stock operations, ordered by most recent."""
+        qs = super().get_queryset(request)
+        return qs.select_related("order", "performed_by").order_by(
+            "-created_at"
+        )
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def operation_display(self, obj):
+        """Display operation type with icon."""
+        operation_icons = {
+            "RESERVE": "🔒",
+            "RELEASE": "🔓",
+            "DECREMENT": "📉",
+            "INCREMENT": "📈",
+        }
+        icon = operation_icons.get(obj.operation_type, "📝")
+        safe_op = conditional_escape(obj.get_operation_type_display())
+
+        color_map = {
+            "RESERVE": "text-blue-600 dark:text-blue-400",
+            "RELEASE": "text-green-600 dark:text-green-400",
+            "DECREMENT": "text-red-600 dark:text-red-400",
+            "INCREMENT": "text-green-600 dark:text-green-400",
+        }
+        color_class = color_map.get(
+            obj.operation_type, "text-base-600 dark:text-base-400"
+        )
+
+        html = (
+            f'<div class="text-sm {color_class} font-medium">'
+            f"{icon} {safe_op}"
+            "</div>"
+        )
+        return mark_safe(html)
+
+    operation_display.short_description = _("Operation")
+
+    def quantity_change(self, obj):
+        """Display quantity delta with +/- indicator."""
+        delta = obj.quantity_delta
+        safe_delta = conditional_escape(str(abs(delta)))
+
+        if delta > 0:
+            html = (
+                '<span class="text-sm font-medium text-green-600 dark:text-green-400">'
+                f"+{safe_delta}"
+                "</span>"
+            )
+        elif delta < 0:
+            html = (
+                '<span class="text-sm font-medium text-red-600 dark:text-red-400">'
+                f"-{safe_delta}"
+                "</span>"
+            )
+        else:
+            html = '<span class="text-sm text-base-500 dark:text-base-400">0</span>'
+
+        return mark_safe(html)
+
+    quantity_change.short_description = _("Change")
+
+    def stock_levels(self, obj):
+        """Display before/after stock levels."""
+        safe_before = conditional_escape(str(obj.stock_before))
+        safe_after = conditional_escape(str(obj.stock_after))
+
+        html = (
+            '<div class="text-sm text-base-600 dark:text-base-400">'
+            f"{safe_before} → {safe_after}"
+            "</div>"
+        )
+        return mark_safe(html)
+
+    stock_levels.short_description = _("Stock Level")
+
+    def order_link(self, obj):
+        """Display linked order if any."""
+        if obj.order:
+            order_id = obj.order.id
+            safe_order_id = conditional_escape(str(order_id))
+            # Create admin URL for order
+            url = reverse_lazy("admin:order_order_change", args=[order_id])
+            safe_url = conditional_escape(str(url))
+
+            html = (
+                f'<a href="{safe_url}" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">'
+                f"Order #{safe_order_id}"
+                "</a>"
+            )
+            return mark_safe(html)
+
+        reason = obj.reason or "N/A"
+        safe_reason = conditional_escape(reason[:45])
+        return mark_safe(
+            f'<span class="text-sm text-base-500 dark:text-base-400">{safe_reason}</span>'
+        )
+
+    order_link.short_description = _("Related Order")
+
+    def performed_by_display(self, obj):
+        """Display who performed the operation."""
+        if obj.performed_by:
+            user_display = obj.performed_by.email or obj.performed_by.username
+            safe_user = conditional_escape(user_display[:20])
+            html = f'<span class="text-sm text-base-600 dark:text-base-400">{safe_user}</span>'
+        else:
+            html = '<span class="text-sm text-base-500 dark:text-base-400">System</span>'
+
+        return mark_safe(html)
+
+    performed_by_display.short_description = _("By")
+
+    def timestamp_display(self, obj):
+        """Display operation timestamp."""
+        timestamp = obj.created_at.strftime("%m/%d %H:%M")
+        safe_timestamp = conditional_escape(timestamp)
+
+        html = f'<span class="text-sm text-base-500 dark:text-base-400">{safe_timestamp}</span>'
+        return mark_safe(html)
+
+    timestamp_display.short_description = _("Time")
 
 
 @admin.register(Product)
@@ -274,6 +613,7 @@ class ProductAdmin(
     ]
     list_filter = [
         StockStatusFilter,
+        StockReservationStatusFilter,
         PriceRangeFilter,
         DiscountStatusFilter,
         PopularityFilter,
@@ -289,7 +629,12 @@ class ProductAdmin(
         LikesCountFilter,
         ReviewAverageFilter,
     ]
-    inlines = [ProductImageInline, TaggedItemInline]
+    inlines = [
+        ProductImageInline,
+        StockReservationInline,
+        StockLogInline,
+        TaggedItemInline,
+    ]
     readonly_fields = (
         "id",
         "uuid",
@@ -301,6 +646,7 @@ class ProductAdmin(
         "product_analytics",
         "pricing_summary",
         "performance_summary",
+        "stock_reservation_summary",
     )
     list_select_related = ["category", "vat", "changed_by"]
     list_per_page = 25
@@ -346,6 +692,16 @@ class ProductAdmin(
                     "weight",
                 ),
                 "classes": ("wide",),
+            },
+        ),
+        (
+            _("Stock Management & Audit"),
+            {
+                "fields": ("stock_reservation_summary",),
+                "classes": ("collapse",),
+                "description": _(
+                    "View active stock reservations and recent stock operations for this product."
+                ),
             },
         ),
         (
@@ -407,7 +763,13 @@ class ProductAdmin(
             .with_likes_count_annotation()
             .with_review_average_annotation()
             .select_related("category", "vat", "changed_by")
-            .prefetch_related("images", "reviews", "favourited_by")
+            .prefetch_related(
+                "images",
+                "reviews",
+                "favourited_by",
+                "stock_reservations",
+                "stock_logs",
+            )
         )
 
     def get_prepopulated_fields(self, request, obj=None):
@@ -511,8 +873,23 @@ class ProductAdmin(
     pricing_info.short_description = _("Pricing")
 
     def stock_info(self, obj):
+        from order.models.stock_reservation import StockReservation
+
         stock = obj.stock
         safe_stock = conditional_escape(str(stock))
+
+        # Calculate reserved stock from active reservations
+        now = timezone.now()
+        reserved_qty = (
+            StockReservation.objects.filter(
+                product=obj, expires_at__gt=now, consumed=False
+            ).aggregate(total=Sum("quantity"))["total"]
+            or 0
+        )
+
+        available_stock = stock - reserved_qty
+        safe_reserved = conditional_escape(str(reserved_qty))
+        safe_available = conditional_escape(str(available_stock))
 
         if stock == 0:
             stock_badge = (
@@ -543,7 +920,22 @@ class ProductAdmin(
                 "</span>"
             )
 
-        return mark_safe(stock_badge)
+        # Add reservation info if any
+        if reserved_qty > 0:
+            reservation_info = (
+                f'<div class="text-xs text-blue-600 dark:text-blue-400 mt-1">'
+                f"🔒 {safe_reserved} reserved"
+                "</div>"
+                f'<div class="text-xs text-green-600 dark:text-green-400">'
+                f"✓ {safe_available} available"
+                "</div>"
+            )
+        else:
+            reservation_info = ""
+
+        return mark_safe(
+            f'<div class="text-sm">{stock_badge}{reservation_info}</div>'
+        )
 
     stock_info.short_description = _("Stock")
 
@@ -730,6 +1122,96 @@ class ProductAdmin(
         return mark_safe(html)
 
     performance_summary.short_description = _("Performance Summary")
+
+    def stock_reservation_summary(self, obj):
+        """Display stock reservation statistics and recent activity."""
+        from order.models.stock_reservation import StockReservation
+        from order.models.stock_log import StockLog
+
+        now = timezone.now()
+
+        # Get active reservations count and total quantity
+        active_reservations = StockReservation.objects.filter(
+            product=obj, expires_at__gt=now, consumed=False
+        )
+
+        reservation_count = active_reservations.count()
+        reserved_qty = (
+            active_reservations.aggregate(total=Sum("quantity"))["total"] or 0
+        )
+        available_stock = obj.stock - reserved_qty
+
+        # Get recent stock operations count (last 7 days)
+        seven_days_ago = now - timedelta(days=7)
+        recent_operations = StockLog.objects.filter(
+            product=obj, created_at__gte=seven_days_ago
+        )
+
+        operations_count = recent_operations.count()
+        reserve_count = recent_operations.filter(
+            operation_type="RESERVE"
+        ).count()
+        release_count = recent_operations.filter(
+            operation_type="RELEASE"
+        ).count()
+        decrement_count = recent_operations.filter(
+            operation_type="DECREMENT"
+        ).count()
+        increment_count = recent_operations.filter(
+            operation_type="INCREMENT"
+        ).count()
+
+        # Calculate reservation percentage
+        reservation_pct = (
+            (reserved_qty / max(obj.stock, 1)) * 100 if obj.stock > 0 else 0
+        )
+
+        safe_stock = conditional_escape(str(obj.stock))
+        safe_reserved = conditional_escape(str(reserved_qty))
+        safe_available = conditional_escape(str(available_stock))
+        safe_res_count = conditional_escape(str(reservation_count))
+        safe_res_pct = conditional_escape(f"{reservation_pct:.1f}")
+        safe_ops_count = conditional_escape(str(operations_count))
+        safe_reserve = conditional_escape(str(reserve_count))
+        safe_release = conditional_escape(str(release_count))
+        safe_decrement = conditional_escape(str(decrement_count))
+        safe_increment = conditional_escape(str(increment_count))
+
+        # Color coding for reservation percentage
+        if reservation_pct > 50:
+            pct_color = "text-red-600 dark:text-red-400"
+        elif reservation_pct > 25:
+            pct_color = "text-orange-600 dark:text-orange-400"
+        else:
+            pct_color = "text-green-600 dark:text-green-400"
+
+        html = (
+            '<div class="text-sm">'
+            '<div class="mb-3">'
+            '<h4 class="font-semibold text-base-900 dark:text-base-100 mb-2">Current Stock Status</h4>'
+            '<div class="grid grid-cols-2 gap-2">'
+            f"<div><strong>Total Stock:</strong></div><div>{safe_stock}</div>"
+            f'<div><strong>Reserved:</strong></div><div class="text-blue-600 dark:text-blue-400">{safe_reserved}</div>'
+            f'<div><strong>Available:</strong></div><div class="text-green-600 dark:text-green-400">{safe_available}</div>'
+            f"<div><strong>Active Reservations:</strong></div><div>{safe_res_count}</div>"
+            f'<div><strong>Reserved %:</strong></div><div class="{pct_color} font-medium">{safe_res_pct}%</div>'
+            "</div>"
+            "</div>"
+            "<div>"
+            '<h4 class="font-semibold text-base-900 dark:text-base-100 mb-2">Recent Activity (7 days)</h4>'
+            '<div class="grid grid-cols-2 gap-2">'
+            f"<div><strong>Total Operations:</strong></div><div>{safe_ops_count}</div>"
+            f"<div><strong>🔒 Reserves:</strong></div><div>{safe_reserve}</div>"
+            f"<div><strong>🔓 Releases:</strong></div><div>{safe_release}</div>"
+            f"<div><strong>📉 Decrements:</strong></div><div>{safe_decrement}</div>"
+            f"<div><strong>📈 Increments:</strong></div><div>{safe_increment}</div>"
+            "</div>"
+            "</div>"
+            "</div>"
+        )
+        return mark_safe(html)
+
+    stock_reservation_summary.short_description = _("Stock Reservation Summary")
 
     def product_analytics(self, obj):
         if not obj.created_at:

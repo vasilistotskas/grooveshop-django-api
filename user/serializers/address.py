@@ -16,7 +16,6 @@ class UserAddressSerializer(serializers.ModelSerializer[UserAddress]):
     country = PrimaryKeyRelatedField(queryset=Country.objects.all())
     region = PrimaryKeyRelatedField(queryset=Region.objects.all())
     phone = PhoneNumberField()
-    mobile_phone = PhoneNumberField(required=False, allow_blank=True)
 
     class Meta:
         model = UserAddress
@@ -32,7 +31,6 @@ class UserAddressSerializer(serializers.ModelSerializer[UserAddress]):
             "floor",
             "location_type",
             "phone",
-            "mobile_phone",
             "notes",
             "is_main",
             "user",
@@ -63,14 +61,6 @@ class UserAddressWriteSerializer(serializers.ModelSerializer[UserAddress]):
         queryset=Region.objects.all(), required=False
     )
     phone = PhoneNumberField()
-    mobile_phone = PhoneNumberField(required=False, allow_blank=True)
-
-    def validate_phone(self, value: str) -> str:
-        if not value and not self.initial_data.get("mobile_phone"):
-            raise serializers.ValidationError(
-                _("Either phone or mobile phone is required")
-            )
-        return value
 
     def validate(self, data):
         if data.get("is_main"):
@@ -104,7 +94,6 @@ class UserAddressWriteSerializer(serializers.ModelSerializer[UserAddress]):
             "floor",
             "location_type",
             "phone",
-            "mobile_phone",
             "notes",
             "is_main",
             "user",

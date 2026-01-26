@@ -47,7 +47,6 @@ class UserAddressFilterTest(APITestCase):
             floor=FloorChoicesEnum.GROUND_FLOOR,
             location_type=LocationChoicesEnum.HOME,
             phone="+1234567890",
-            mobile_phone="+1987654321",
             notes="Primary residence",
             is_main=True,
         )
@@ -68,7 +67,6 @@ class UserAddressFilterTest(APITestCase):
             floor=FloorChoicesEnum.FIRST_FLOOR,
             location_type=LocationChoicesEnum.OFFICE,
             phone="+1555123456",
-            mobile_phone="+1987654321",
             notes="",
             is_main=False,
         )
@@ -89,7 +87,6 @@ class UserAddressFilterTest(APITestCase):
             floor=FloorChoicesEnum.SECOND_FLOOR,
             location_type=LocationChoicesEnum.OTHER,
             phone="+1416555789",
-            mobile_phone="+1416555987",
             notes="Summer vacation spot",
             is_main=False,
         )
@@ -110,7 +107,6 @@ class UserAddressFilterTest(APITestCase):
             floor=FloorChoicesEnum.THIRD_FLOOR,
             location_type=LocationChoicesEnum.HOME,
             phone="+302101234567",
-            mobile_phone="+306901234567",
             notes="Greek residence",
             is_main=True,
         )
@@ -334,12 +330,13 @@ class UserAddressFilterTest(APITestCase):
         self.assertEqual(len(result_ids), 1)
         self.assertIn(self.home_address.id, result_ids)
 
-        response = self.client.get(url, {"mobile_phone": "1987654321"})
+        # Search for "555" which appears in work_address phone number
+        response = self.client.get(url, {"phone": "555"})
         self.assertEqual(response.status_code, 200)
         result_ids = [r["id"] for r in response.data["results"]]
         self.assertEqual(len(result_ids), 2)
-        self.assertIn(self.home_address.id, result_ids)
         self.assertIn(self.work_address.id, result_ids)
+        self.assertIn(self.vacation_address.id, result_ids)
 
     def test_complex_filter_combinations(self):
         url = reverse("user-address-list")

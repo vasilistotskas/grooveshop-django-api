@@ -4,6 +4,7 @@ from order.views.item import OrderItemViewSet
 from order.views.order import OrderViewSet
 
 urlpatterns = [
+    # Order endpoints
     path(
         "order",
         OrderViewSet.as_view({"get": "list", "post": "create"}),

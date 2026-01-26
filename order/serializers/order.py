@@ -27,6 +27,9 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
     pay_way = PrimaryKeyRelatedField(queryset=PayWay.objects.all())
     paid_amount = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     shipping_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
+    payment_method_fee = MoneyField(
+        max_digits=11, decimal_places=2, read_only=True
+    )
     total_price_items = MoneyField(
         max_digits=11, decimal_places=2, read_only=True
     )
@@ -34,7 +37,6 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
         max_digits=11, decimal_places=2, read_only=True
     )
     phone = PhoneNumberField()
-    mobile_phone = PhoneNumberField(required=False, allow_blank=True)
     status_display = serializers.SerializerMethodField("get_status_display")
     can_be_canceled = serializers.BooleanField(read_only=True)
     is_paid = serializers.BooleanField(read_only=True)
@@ -64,11 +66,11 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "place",
             "city",
             "phone",
-            "mobile_phone",
             "customer_notes",
             "paid_amount",
             "items",
             "shipping_price",
+            "payment_method_fee",
             "document_type",
             "created_at",
             "updated_at",
@@ -87,6 +89,7 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "uuid",
             "paid_amount",
             "shipping_price",
+            "payment_method_fee",
             "total_price_items",
             "total_price_extra",
             "created_at",
@@ -109,7 +112,6 @@ class OrderDetailSerializer(OrderSerializer):
         help_text="Tracking and shipping details"
     )
     phone = PhoneNumberField(read_only=True)
-    mobile_phone = PhoneNumberField(read_only=True, allow_blank=True)
 
     @extend_schema_field(
         {
@@ -165,6 +167,7 @@ class OrderDetailSerializer(OrderSerializer):
             "properties": {
                 "items_subtotal": {"type": "number"},
                 "shipping_cost": {"type": "number"},
+                "payment_method_fee": {"type": "number"},
                 "extras_total": {"type": "number"},
                 "grand_total": {"type": "number"},
                 "currency": {"type": "string"},
@@ -178,15 +181,19 @@ class OrderDetailSerializer(OrderSerializer):
             obj.total_price_items.amount if obj.total_price_items else 0
         )
         shipping_total = obj.shipping_price.amount if obj.shipping_price else 0
+        payment_fee = (
+            obj.payment_method_fee.amount if obj.payment_method_fee else 0
+        )
         extras_total = (
             obj.total_price_extra.amount if obj.total_price_extra else 0
         )
 
-        grand_total = items_total + shipping_total
+        grand_total = items_total + shipping_total + payment_fee
 
         return {
             "items_subtotal": items_total,
             "shipping_cost": shipping_total,
+            "payment_method_fee": payment_fee,
             "extras_total": extras_total,
             "grand_total": grand_total,
             "currency": obj.total_price_items.currency.code
@@ -247,7 +254,6 @@ class OrderDetailSerializer(OrderSerializer):
             "pricing_breakdown",
             "tracking_details",
             "phone",
-            "mobile_phone",
             "document_type",
             "payment_id",
             "payment_status",
@@ -267,10 +273,97 @@ class OrderDetailSerializer(OrderSerializer):
         )
 
 
+class OrderCreateFromCartSerializer(serializers.Serializer):
+    """
+    Serializer for creating orders from cart (dual-flow payment architecture).
+
+    This serializer supports two payment flows:
+    1. Online payments (is_online_payment=True): Requires payment_intent_id
+    2. Offline payments (is_online_payment=False): No payment_intent_id required
+
+    The order is created from an existing cart identified via X-Cart-Id header.
+    Cart is NOT sent in request body - it's retrieved from the header using CartService.
+    """
+
+    # Payment method (required for all flows)
+    pay_way_id = serializers.IntegerField(
+        required=True, help_text=_("Payment method ID")
+    )
+
+    # Payment intent (required only for online payments)
+    payment_intent_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        help_text=_(
+            "Payment intent ID from payment provider (required for online payments)"
+        ),
+    )
+
+    # Shipping address fields (required for all flows)
+    first_name = serializers.CharField(
+        max_length=150, required=True, help_text=_("Customer first name")
+    )
+    last_name = serializers.CharField(
+        max_length=150, required=True, help_text=_("Customer last name")
+    )
+    email = serializers.EmailField(
+        required=True, help_text=_("Customer email address")
+    )
+    street = serializers.CharField(
+        max_length=255, required=True, help_text=_("Street name")
+    )
+    street_number = serializers.CharField(
+        max_length=50,
+        required=False,
+        allow_blank=True,
+        help_text=_("Street number"),
+    )
+    city = serializers.CharField(
+        max_length=100, required=True, help_text=_("City name")
+    )
+    zipcode = serializers.CharField(
+        max_length=20, required=True, help_text=_("Postal/ZIP code")
+    )
+    country_id = serializers.CharField(
+        required=True, help_text=_("Country alpha-2 code (e.g., 'GR', 'US')")
+    )
+    region_id = serializers.CharField(
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        help_text=_("Region alpha code"),
+    )
+    phone = PhoneNumberField(
+        required=True, help_text=_("Customer phone number")
+    )
+    customer_notes = serializers.CharField(
+        max_length=500,
+        required=False,
+        allow_blank=True,
+        help_text=_("Customer notes or special instructions"),
+    )
+
+    def validate_email(self, value: str) -> str:
+        """Validate email is not from disposable domain."""
+        if not value:
+            raise serializers.ValidationError(_("Email is required."))
+
+        email_domain = value.split("@")[-1]
+        if is_disposable_domain(email_domain):
+            raise serializers.ValidationError(
+                _("Try using a different email address.")
+            )
+        return value
+
+
 class OrderWriteSerializer(serializers.ModelSerializer[Order]):
     items = OrderItemCreateSerializer(many=True)
     paid_amount = MoneyField(max_digits=11, decimal_places=2, required=False)
     shipping_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
+    payment_method_fee = MoneyField(
+        max_digits=11, decimal_places=2, read_only=True
+    )
     total_price_items = MoneyField(
         max_digits=11, decimal_places=2, read_only=True
     )
@@ -278,7 +371,6 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
         max_digits=11, decimal_places=2, read_only=True
     )
     phone = PhoneNumberField()
-    mobile_phone = PhoneNumberField(required=False, allow_blank=True)
     payment_id = serializers.CharField(required=False)
     payment_status = serializers.CharField(required=False)
     payment_method = serializers.CharField(required=False)
@@ -486,11 +578,11 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
             "place",
             "city",
             "phone",
-            "mobile_phone",
             "paid_amount",
             "customer_notes",
             "items",
             "shipping_price",
+            "payment_method_fee",
             "total_price_items",
             "total_price_extra",
             "document_type",
@@ -502,6 +594,7 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
         )
         read_only_fields = (
             "shipping_price",
+            "payment_method_fee",
             "total_price_items",
             "total_price_extra",
         )

@@ -83,11 +83,6 @@ class OrderFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         lookup_expr="icontains",
         help_text=_("Filter by phone number"),
     )
-    mobile_phone = filters.CharFilter(
-        field_name="mobile_phone",
-        lookup_expr="icontains",
-        help_text=_("Filter by mobile phone number"),
-    )
 
     city = filters.CharFilter(
         field_name="city",
@@ -186,10 +181,6 @@ class OrderFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         method="filter_has_payment_id",
         help_text=_("Filter orders that have/don't have payment ID"),
     )
-    has_mobile_phone = filters.BooleanFilter(
-        method="filter_has_mobile_phone",
-        help_text=_("Filter orders that have/don't have mobile phone"),
-    )
     has_customer_notes = filters.BooleanFilter(
         method="filter_has_customer_notes",
         help_text=_("Filter orders that have/don't have customer notes"),
@@ -282,7 +273,6 @@ class OrderFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
             "last_name": ["exact", "icontains"],
             "email": ["exact", "icontains"],
             "phone": ["exact", "icontains"],
-            "mobile_phone": ["exact", "icontains"],
             "customer_notes": ["exact", "icontains"],
             "tracking_number": ["exact", "icontains"],
             "payment_id": ["exact", "icontains"],
@@ -316,13 +306,6 @@ class OrderFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
             return queryset.exclude(payment_id="")
         elif value is False:
             return queryset.filter(payment_id="")
-        return queryset
-
-    def filter_has_mobile_phone(self, queryset, name, value):
-        if value is True:
-            return queryset.filter(mobile_phone__isnull=False)
-        elif value is False:
-            return queryset.filter(mobile_phone__isnull=True)
         return queryset
 
     def filter_has_customer_notes(self, queryset, name, value):

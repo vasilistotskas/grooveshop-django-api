@@ -138,11 +138,6 @@ class OrderFactory(factory.django.DjangoModelFactory):
     phone = factory.LazyAttribute(
         lambda _: PhoneNumber.from_string(fake.phone_number(), region="US")
     )
-    mobile_phone = factory.LazyAttribute(
-        lambda _: PhoneNumber.from_string(fake.phone_number(), region="US")
-        if random.randint(1, 10) > 3
-        else None
-    )
     customer_notes = factory.LazyFunction(
         lambda: fake.paragraph(nb_sentences=2)
         if random.randint(1, 10) > 7
@@ -209,7 +204,6 @@ class OrderFactory(factory.django.DjangoModelFactory):
 
     class Meta:
         model = Order
-        django_get_or_create = ("user",)
         skip_postgeneration_save = True
 
     @factory.post_generation

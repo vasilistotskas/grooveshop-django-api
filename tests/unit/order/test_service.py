@@ -7,6 +7,11 @@ from django.conf import settings
 from djmoney.money import Money
 
 from order.enum.status import OrderStatus
+from order.exceptions import (
+    InsufficientStockError,
+    InvalidStatusTransitionError,
+    OrderCancellationError,
+)
 from order.models.order import Order
 from order.services import OrderService
 from product.factories.product import ProductFactory
@@ -83,32 +88,15 @@ class OrderServiceTestCase(TestCase):
     def test_create_order_insufficient_stock(self):
         self.product1.stock = 1
 
-        original_create_order = OrderService.create_order
-
-        def mock_create_order(order_data, items_data, user=None):
-            for item_data in items_data:
-                product = item_data.get("product")
-                quantity = item_data.get("quantity")
-
-                if product.stock < quantity:
-                    raise ValueError(
-                        f"Product {product.name} does not have enough stock."
-                    )
-
-            return original_create_order(order_data, items_data, user)
-
-        with patch.object(
-            OrderService, "create_order", side_effect=mock_create_order
-        ):
-            with self.assertRaises(ValueError) as context:
-                OrderService.create_order(
-                    self.order_data, self.items_data, user=self.user
-                )
-
-            self.assertIn(
-                f"Product {self.product1.name} does not have enough stock",
-                str(context.exception),
+        with self.assertRaises(InsufficientStockError) as context:
+            OrderService.create_order(
+                self.order_data, self.items_data, user=self.user
             )
+
+        exception = context.exception
+        self.assertEqual(exception.product_id, self.product1.id)
+        self.assertEqual(exception.available, 1)
+        self.assertEqual(exception.requested, 2)
 
     @patch("order.signals.handlers.order_status_changed.send")
     @patch("order.signals.handlers.send_order_confirmation_email")
@@ -127,7 +115,7 @@ class OrderServiceTestCase(TestCase):
     def test_update_order_status_invalid(self):
         self.order.status = OrderStatus.PENDING
 
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(InvalidStatusTransitionError) as context:
             OrderService.update_order_status(self.order, OrderStatus.DELIVERED)
 
         self.assertEqual(self.order.status, OrderStatus.PENDING)
@@ -160,42 +148,42 @@ class OrderServiceTestCase(TestCase):
         self.assertIn(order1.id, order_ids)
         self.assertIn(order2.id, order_ids)
 
-    @patch("order.signals.order_canceled.send")
-    def test_cancel_order(self, mock_signal):
-        self.order.status = OrderStatus.PENDING
-        self.order.can_be_canceled = True
-        self.order.is_paid = False
-        self.order.payment_id = None
+    def test_cancel_order(self):
+        # Create a real order instead of using a mock
+        order = OrderService.create_order(
+            self.order_data, self.items_data, user=self.user
+        )
 
-        item1 = Mock()
-        item1.product = self.product1
-        item1.quantity = 2
+        # Verify initial state
+        self.assertEqual(order.status, OrderStatus.PENDING)
+        self.assertTrue(order.can_be_canceled)
 
-        item2 = Mock()
-        item2.product = self.product2
-        item2.quantity = 1
-
-        self.order.items.select_related.return_value = self.order.items
-        self.order.items.all.return_value = [item1, item2]
+        # Store initial stock levels
+        initial_stock_1 = self.product1.stock
+        initial_stock_2 = self.product2.stock
 
         canceled_order, refund_info = OrderService.cancel_order(
-            self.order,
+            order,
             reason="Test cancellation",
             refund_payment=True,
             canceled_by=self.user.id,
         )
 
         self.assertEqual(canceled_order.status, OrderStatus.CANCELED)
-        self.assertIsNone(refund_info)
+        self.assertIsNone(refund_info)  # No refund since order wasn't paid
 
-        mock_signal.assert_called_once()
+        # Verify stock was restored
+        self.product1.refresh_from_db()
+        self.product2.refresh_from_db()
+        self.assertEqual(self.product1.stock, initial_stock_1 + 2)
+        self.assertEqual(self.product2.stock, initial_stock_2 + 1)
 
     @patch("order.signals.order_canceled.send")
     def test_cancel_order_not_cancelable(self, mock_signal):
         self.order.status = OrderStatus.SHIPPED
         self.order.can_be_canceled = False
 
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(OrderCancellationError) as context:
             OrderService.cancel_order(self.order)
 
         self.assertIn("cannot be canceled", str(context.exception))

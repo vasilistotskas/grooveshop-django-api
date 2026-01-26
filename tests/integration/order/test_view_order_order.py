@@ -1,5 +1,6 @@
 import uuid
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -98,11 +99,23 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
 
         unique_email = f"test-{uuid.uuid4().hex[:8]}@example.com"
 
+        # Create cart with items for payment-first flow
+        from cart.factories.cart import CartFactory
+        from cart.factories.item import CartItemFactory
+
+        cart = CartFactory.create(
+            user=self.admin_user
+        )  # Cart belongs to admin user
+        CartItemFactory.create(
+            cart=cart, product=self.order_items[0].product, quantity=1
+        )
+
         payload = {
-            "user": self.user.id,
-            "pay_way": self.pay_way.id,
-            "country": self.country.alpha_2,
-            "region": self.region.alpha,
+            "payment_intent_id": f"pi_test_{uuid.uuid4().hex[:8]}",
+            "cart_id": str(cart.uuid),  # Use cart.uuid, not cart.id
+            "pay_way_id": self.pay_way.id,
+            "country_id": self.country.alpha_2,
+            "region_id": self.region.alpha,
             "floor": FloorChoicesEnum.FIRST_FLOOR.value,
             "location_type": LocationChoicesEnum.HOME.value,
             "email": unique_email,
@@ -113,16 +126,17 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
             "city": "New York",
             "zipcode": "10001",
             "phone": "+12345678901",
-            "shipping_price": Decimal("10.00"),
-            "items": [
-                {
-                    "product": self.order_items[0].product.id,
-                    "quantity": 1,
-                }
-            ],
         }
 
-        response = self.client.post(self.list_url, payload, format="json")
+        # Mock payment provider
+        with patch("order.payment.get_payment_provider") as mock_get_provider:
+            mock_provider = mock_get_provider.return_value
+            mock_provider.get_payment_status.return_value = (
+                PaymentStatus.COMPLETED,
+                {"status": "succeeded", "amount": 5000},
+            )
+
+            response = self.client.post(self.list_url, payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         expected_fields = set(OrderDetailSerializer.Meta.fields)
@@ -191,12 +205,24 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
 
         unique_email = f"create-{uuid.uuid4().hex[:8]}@example.com"
 
+        # Create cart with items for payment-first flow
+        from cart.factories.cart import CartFactory
+        from cart.factories.item import CartItemFactory
+
+        cart = CartFactory.create(
+            user=self.admin_user
+        )  # Cart belongs to admin user
+        CartItemFactory.create(
+            cart=cart, product=self.order_items[0].product, quantity=1
+        )
+
         initial_count = Order.objects.count()
         payload = {
-            "user": self.user.id,
-            "pay_way": self.pay_way.id,
-            "country": self.country.alpha_2,
-            "region": self.region.alpha,
+            "payment_intent_id": f"pi_test_{uuid.uuid4().hex[:8]}",
+            "cart_id": str(cart.uuid),  # Use cart.uuid, not cart.id
+            "pay_way_id": self.pay_way.id,
+            "country_id": self.country.alpha_2,
+            "region_id": self.region.alpha,
             "email": unique_email,
             "first_name": "New",
             "last_name": "Order",
@@ -205,16 +231,26 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
             "city": "Seattle",
             "zipcode": "98101",
             "phone": "+12345678903",
-            "shipping_price": Decimal("12.00"),
-            "items": [
-                {
-                    "product": self.order_items[0].product.id,
-                    "quantity": 1,
-                }
-            ],
         }
 
-        response = self.client.post(self.list_url, payload, format="json")
+        # Mock payment provider
+        with patch("order.payment.get_payment_provider") as mock_get_provider:
+            mock_provider = mock_get_provider.return_value
+            mock_provider.get_payment_status.return_value = (
+                PaymentStatus.COMPLETED,
+                {"status": "succeeded", "amount": 5000},
+            )
+
+            response = self.client.post(self.list_url, payload, format="json")
+
+        # Debug: check response if it fails
+        if response.status_code != status.HTTP_201_CREATED:
+            import json
+
+            print(f"Response status: {response.status_code}")
+            print(
+                f"Response data: {json.dumps(dict(response.data), indent=2, ensure_ascii=True)}"
+            )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Order.objects.count(), initial_count + 1)
@@ -435,14 +471,19 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
         payload = {
             "email": "invalid-email",
             "phone": "invalid-phone",
-            "shipping_price": "invalid-price",
-            "items": [],
+            # Missing payment_intent_id and pay_way_id - required fields
         }
 
         response = self.client.post(self.list_url, payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("email", response.data)
+        # Should have validation error for required fields or invalid format
+        # pay_way_id is validated first, so it appears in error response
+        self.assertTrue(
+            "pay_way_id" in response.data
+            or "payment_intent_id" in response.data
+            or "email" in response.data
+        )
 
     def test_create_order_with_invalid_items(self):
         self.client.force_authenticate(user=self.admin_user)

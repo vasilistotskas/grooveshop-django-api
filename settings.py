@@ -596,6 +596,10 @@ def get_celery_beat_schedule():
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
+        "cleanup-expired-stock-reservations": {
+            "task": "order.tasks.cleanup_expired_stock_reservations",
+            "schedule": SCHEDULE_PRESETS["every_hour"],
+        },
     }
 
     if path.exists("/.dockerenv") and not getenv("KUBERNETES_SERVICE_HOST"):

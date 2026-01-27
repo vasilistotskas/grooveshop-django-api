@@ -24,7 +24,11 @@ class TestProperty7PaymentConfirmationConvertsReservations:
         self.user = UserAccountFactory.create()
         # Patch the TTL to ensure reservations don't expire during slow test executions
         from unittest.mock import patch
-        self.patcher = patch("order.stock.StockManager.get_reservation_ttl_minutes", return_value=60)
+
+        self.patcher = patch(
+            "order.stock.StockManager.get_reservation_ttl_minutes",
+            return_value=60,
+        )
         self.patcher.start()
 
     def teardown_method(self):

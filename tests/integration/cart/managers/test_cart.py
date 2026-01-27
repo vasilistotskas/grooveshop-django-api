@@ -11,13 +11,19 @@ from cart.models import Cart
 from country.factories import CountryFactory
 from product.factories import ProductFactory
 from user.factories import UserAccountFactory
+from faker import Faker
 
 User = get_user_model()
 
 
+fake = Faker()
+
+
 @pytest.fixture
 def country():
-    return CountryFactory(alpha_2="US", name="United States")
+    return CountryFactory(
+        alpha_2=fake.unique.country_code(), name=fake.country()
+    )
 
 
 @pytest.fixture
@@ -175,7 +181,7 @@ class TestCartQuerySet:
         assert user_cart in recent_carts
 
     def test_by_country(self, user_cart, country):
-        carts_by_country = Cart.objects.by_country("US")
+        carts_by_country = Cart.objects.by_country(country.alpha_2)
         assert user_cart in carts_by_country
 
     def test_with_specific_product(self, user_cart, product):
@@ -262,7 +268,9 @@ class TestCartManager:
         assert user_cart in recent_carts
 
     def test_manager_delegates_to_queryset_by_country(self, user_cart):
-        carts_by_country = Cart.objects.by_country("US")
+        carts_by_country = Cart.objects.by_country(
+            user_cart.user.country.alpha_2
+        )
         assert user_cart in carts_by_country
 
     def test_manager_delegates_to_queryset_with_specific_product(

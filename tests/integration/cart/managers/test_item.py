@@ -14,13 +14,19 @@ from cart.models import Cart, CartItem
 from country.factories import CountryFactory
 from product.factories import ProductFactory
 from user.factories import UserAccountFactory
+from faker import Faker
 
 User = get_user_model()
 
 
+fake = Faker()
+
+
 @pytest.fixture
 def country():
-    return CountryFactory(alpha_2="US", name="United States")
+    return CountryFactory(
+        alpha_2=fake.unique.country_code(), name=fake.country()
+    )
 
 
 @pytest.fixture
@@ -90,7 +96,7 @@ class TestCartItemQuerySet:
     def test_with_product_data(self, cart, product):
         item = CartItemFactory(cart=cart, product=product)
 
-        items_with_data = CartItem.objects.with_product_data()
+        items_with_data = CartItem.objects.with_product_data().filter(cart=cart)
         item_with_data = items_with_data.get(id=item.id)
 
         assert hasattr(item_with_data, "product")
@@ -429,7 +435,7 @@ class TestCartItemQuerySetEdgeCases:
         CartItemFactory(cart=cart, product=ProductFactory(), quantity=7)
         CartItemFactory(cart=cart, product=ProductFactory(), quantity=2)
 
-        total = CartItem.objects.total_quantity()
+        total = CartItem.objects.filter(cart=cart).total_quantity()
         assert total == 12
 
     def test_price_range_boundary_conditions(self, cart):

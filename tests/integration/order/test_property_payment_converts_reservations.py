@@ -22,6 +22,13 @@ class TestProperty7PaymentConfirmationConvertsReservations:
     def setup_method(self):
         """Set up test data for each test method."""
         self.user = UserAccountFactory.create()
+        # Patch the TTL to ensure reservations don't expire during slow test executions
+        from unittest.mock import patch
+        self.patcher = patch("order.stock.StockManager.get_reservation_ttl_minutes", return_value=60)
+        self.patcher.start()
+
+    def teardown_method(self):
+        self.patcher.stop()
 
     @pytest.mark.parametrize(
         "scenario,products_data,expected_results",

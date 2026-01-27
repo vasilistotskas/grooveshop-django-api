@@ -41,7 +41,7 @@ class TestStockManagerReserveStock:
         # Verify expiration time is 15 minutes from now
         now = timezone.now()
         expected_expiry = now + timedelta(
-            minutes=StockManager.RESERVATION_TTL_MINUTES
+            minutes=StockManager.get_reservation_ttl_minutes()
         )
         time_diff = abs(
             (reservation.expires_at - expected_expiry).total_seconds()
@@ -1969,7 +1969,7 @@ class TestStockManagerCleanupExpiredReservations:
         # If created X minutes ago, it expires at (now - X minutes + 15 minutes)
         created_at = timezone.now() - timedelta(minutes=minutes_ago)
         expiration_time = created_at + timedelta(
-            minutes=StockManager.RESERVATION_TTL_MINUTES
+            minutes=StockManager.get_reservation_ttl_minutes()
         )
 
         reservation = StockReservation.objects.create(

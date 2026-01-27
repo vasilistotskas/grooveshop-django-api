@@ -62,7 +62,7 @@ class TestExpiredReservationsAreReleased:
         # Calculate when it was created and when it expired
         expired_at = timezone.now() - timedelta(minutes=minutes_expired)
         created_at = expired_at - timedelta(
-            minutes=StockManager.RESERVATION_TTL_MINUTES
+            minutes=StockManager.get_reservation_ttl_minutes()
         )
 
         expired_reservation = StockReservation.objects.create(
@@ -149,7 +149,7 @@ class TestExpiredReservationsAreReleased:
         # Create an active reservation (expires in the future)
         expires_at = timezone.now() + timedelta(minutes=minutes_until_expiry)
         created_at = expires_at - timedelta(
-            minutes=StockManager.RESERVATION_TTL_MINUTES
+            minutes=StockManager.get_reservation_ttl_minutes()
         )
 
         active_reservation = StockReservation.objects.create(
@@ -233,7 +233,7 @@ class TestExpiredReservationsAreReleased:
         for i in range(expired_count):
             expired_at = timezone.now() - timedelta(minutes=10 + i)
             created_at = expired_at - timedelta(
-                minutes=StockManager.RESERVATION_TTL_MINUTES
+                minutes=StockManager.get_reservation_ttl_minutes()
             )
 
             reservation = StockReservation.objects.create(
@@ -252,7 +252,7 @@ class TestExpiredReservationsAreReleased:
         for i in range(active_count):
             expires_at = timezone.now() + timedelta(minutes=5 + i)
             created_at = expires_at - timedelta(
-                minutes=StockManager.RESERVATION_TTL_MINUTES
+                minutes=StockManager.get_reservation_ttl_minutes()
             )
 
             reservation = StockReservation.objects.create(
@@ -309,7 +309,7 @@ class TestExpiredReservationsAreReleased:
         # Create an expired reservation that's already consumed
         expired_at = timezone.now() - timedelta(minutes=20)
         created_at = expired_at - timedelta(
-            minutes=StockManager.RESERVATION_TTL_MINUTES
+            minutes=StockManager.get_reservation_ttl_minutes()
         )
 
         consumed_reservation = StockReservation.objects.create(
@@ -374,7 +374,7 @@ class TestExpiredReservationsAreReleased:
             for res_idx in range(reservations_per_product):
                 expired_at = timezone.now() - timedelta(minutes=10 + res_idx)
                 created_at = expired_at - timedelta(
-                    minutes=StockManager.RESERVATION_TTL_MINUTES
+                    minutes=StockManager.get_reservation_ttl_minutes()
                 )
 
                 StockReservation.objects.create(
@@ -443,7 +443,7 @@ class TestExpiredReservationsAreReleased:
         # Create an expired reservation
         expired_at = timezone.now() - timedelta(minutes=20)
         created_at = expired_at - timedelta(
-            minutes=StockManager.RESERVATION_TTL_MINUTES
+            minutes=StockManager.get_reservation_ttl_minutes()
         )
 
         expired_reservation = StockReservation.objects.create(
@@ -532,7 +532,7 @@ class TestExpiredReservationsAreReleased:
         for i in range(5):
             expires_at = timezone.now() + timedelta(minutes=10 + i)
             created_at = expires_at - timedelta(
-                minutes=StockManager.RESERVATION_TTL_MINUTES
+                minutes=StockManager.get_reservation_ttl_minutes()
             )
 
             StockReservation.objects.create(

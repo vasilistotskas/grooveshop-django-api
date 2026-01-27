@@ -26,4 +26,4 @@ repos:
         types_or: [ python, pyi ]
 
 default_language_version:
-  python: python3.14.0
+  python: python3.14.2

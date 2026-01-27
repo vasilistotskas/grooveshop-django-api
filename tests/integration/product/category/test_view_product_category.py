@@ -210,6 +210,8 @@ class ProductCategoryViewSetTestCase(APITestCase):
         self.assertEqual(response.data["results"][0]["id"], self.category.id)
 
     def test_search_functionality(self):
+        # Refresh to ensure we have the latest translations from factory
+        self.category.refresh_from_db()
         url = self.get_product_category_list_url()
         search_value = (
             self.category.safe_translation_getter("name", any_language=True)

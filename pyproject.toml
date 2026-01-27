@@ -28,7 +28,7 @@ dependencies = [
   "django-cors-headers==4.9.0",
   "django-simple-history==3.11.0",
   "django-filter==25.2",
-  "django-unfold==0.76.0",
+  "django-unfold==0.77.1",
   "django-money==3.5.4",
   "django-mptt==0.18.0",
   "django-parler==2.3.0",
@@ -69,7 +69,7 @@ repository = "https://github.com/vasilistotskas/grooveshop-django-api"
 # ─────────────────────────────────────────────────────────
 [dependency-groups]
 dev = [
-    "coverage[toml]==7.13.1",
+    "coverage[toml]==7.13.2",
     "djangorestframework-stubs==3.16.7",
     "django-debug-toolbar==6.2.0",
     "django-stubs==5.2.9",
@@ -215,7 +215,7 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 timeout = 600
-addopts = "-vs --tb=short --maxfail=0"
+addopts = "--tb=short --maxfail=0 -n auto"
 
 # ─────────────────────────────────────────────────────────
 # Django-stubs configuration

@@ -68,7 +68,7 @@ class TestStockReservationsHaveCorrectTTL:
 
         # Calculate expected expiration time
         expected_expires_at = reservation.created_at + timedelta(
-            minutes=StockManager.RESERVATION_TTL_MINUTES
+            minutes=StockManager.get_reservation_ttl_minutes()
         )
 
         # Verify: expires_at equals created_at + 15 minutes
@@ -247,14 +247,14 @@ class TestStockReservationsHaveCorrectTTL:
 
     def test_ttl_uses_configured_constant(self):
         """
-        Test that TTL uses StockManager.RESERVATION_TTL_MINUTES constant.
+        Test that TTL uses StockManager.get_reservation_ttl_minutes() constant.
 
         This ensures the TTL is configurable and not hardcoded in multiple places.
         """
         product = ProductFactory(stock=100)
 
         # Get the configured TTL
-        configured_ttl_minutes = StockManager.RESERVATION_TTL_MINUTES
+        configured_ttl_minutes = StockManager.get_reservation_ttl_minutes()
 
         # Create reservation
         reservation = StockManager.reserve_stock(
@@ -281,5 +281,5 @@ class TestStockReservationsHaveCorrectTTL:
 
         # Verify the constant is 15 minutes as per requirement
         assert configured_ttl_minutes == 15, (
-            f"RESERVATION_TTL_MINUTES should be 15, got {configured_ttl_minutes}"
+            f"STOCK_RESERVATION_TTL_MINUTES should be 15, got {configured_ttl_minutes}"
         )

@@ -13,9 +13,9 @@ services:
       - "5432:5432"
     healthcheck:
       test: [ "CMD-SHELL", "sh -c 'pg_isready -U postgres -d postgres'" ]
-      start_period: 30s
+      start_period: 60s
       interval: 10s
-      timeout: 5s
+      timeout: 10s
       retries: 5
     networks:
       - grooveshop-backbone

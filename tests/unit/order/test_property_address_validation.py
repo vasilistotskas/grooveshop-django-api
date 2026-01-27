@@ -5,7 +5,6 @@ from order.services import OrderService
 
 
 class TestPropertyAddressValidation:
-    @pytest.mark.django_db
     @pytest.mark.parametrize(
         "missing_field,address_data",
         [
@@ -147,7 +146,6 @@ class TestPropertyAddressValidation:
             in str(exc_info.value.message_dict[missing_field][0]).lower()
         )
 
-    @pytest.mark.django_db
     @pytest.mark.parametrize(
         "field,empty_value",
         [
@@ -198,7 +196,6 @@ class TestPropertyAddressValidation:
         # Verify the specific field is in the error dict
         assert field in exc_info.value.message_dict
 
-    @pytest.mark.django_db
     @pytest.mark.parametrize(
         "invalid_email",
         [
@@ -238,7 +235,6 @@ class TestPropertyAddressValidation:
         assert "email" in exc_info.value.message_dict
         assert "valid" in str(exc_info.value.message_dict["email"][0]).lower()
 
-    @pytest.mark.django_db
     @pytest.mark.parametrize(
         "valid_email",
         [
@@ -271,7 +267,6 @@ class TestPropertyAddressValidation:
         # Should not raise any exception
         OrderService.validate_shipping_address(address_data)
 
-    @pytest.mark.django_db
     @pytest.mark.parametrize(
         "invalid_phone",
         [
@@ -305,7 +300,6 @@ class TestPropertyAddressValidation:
         # Verify phone field is in the error dict
         assert "phone" in exc_info.value.message_dict
 
-    @pytest.mark.django_db
     @pytest.mark.parametrize(
         "valid_phone",
         [
@@ -338,7 +332,6 @@ class TestPropertyAddressValidation:
         # Should not raise any exception
         OrderService.validate_shipping_address(address_data)
 
-    @pytest.mark.django_db
     @pytest.mark.parametrize(
         "invalid_country_id",
         [
@@ -375,7 +368,6 @@ class TestPropertyAddressValidation:
         # Verify country_id field is in the error dict
         assert "country_id" in exc_info.value.message_dict
 
-    @pytest.mark.django_db
     @pytest.mark.parametrize(
         "valid_country_id",
         [
@@ -407,7 +399,6 @@ class TestPropertyAddressValidation:
         # Should not raise any exception
         OrderService.validate_shipping_address(address_data)
 
-    @pytest.mark.django_db
     def test_complete_valid_address_passes_validation(self):
         """
         Test that a complete valid address passes all validation.
@@ -429,7 +420,6 @@ class TestPropertyAddressValidation:
         # Should not raise any exception
         OrderService.validate_shipping_address(address_data)
 
-    @pytest.mark.django_db
     @pytest.mark.parametrize(
         "missing_fields,address_data",
         [
@@ -501,7 +491,6 @@ class TestPropertyAddressValidation:
         for field in missing_fields:
             assert field in exc_info.value.message_dict
 
-    @pytest.mark.django_db
     def test_multiple_validation_errors_reported_together(self):
         """
         Test that multiple validation errors are reported together.
@@ -529,7 +518,6 @@ class TestPropertyAddressValidation:
         assert "country_id" in exc_info.value.message_dict
         assert "phone" in exc_info.value.message_dict
 
-    @pytest.mark.django_db
     def test_validation_error_has_field_specific_messages(self):
         """
         Test that ValidationError contains field-specific error messages.

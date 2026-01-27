@@ -4,6 +4,7 @@ from django.contrib.sites.models import Site
 from django.core.cache import cache
 from django.db import connection, connections, reset_queries
 
+
 settings.PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.MD5PasswordHasher",
 ]
@@ -46,8 +47,10 @@ def close_db_connections_on_teardown(request):
 
 
 @pytest.fixture(autouse=True)
-def _django_clear_site_cache():
-    Site.objects.clear_cache()
+def _django_clear_site_cache(request):
+    """Clear Site cache if DB access is allowed."""
+    if request.node.get_closest_marker("django_db"):
+        Site.objects.clear_cache()
 
 
 @pytest.fixture
@@ -58,13 +61,18 @@ def debug_query_count():
 
 
 @pytest.fixture(autouse=True)
-def _django_clear_cache():
-    try:
-        cache.clear()
-    except Exception as e:
-        # Ignore cache errors in tests (e.g., Redis not available)
-        print(f"Failed to clear cache: {e}")
-        pass
+def _django_clear_cache(request):
+    """Clear default cache if DB access is allowed.
+
+    This is required because some tests might mock cache.
+    """
+    if request.node.get_closest_marker("django_db"):
+        try:
+            cache.clear()
+        except Exception as e:
+            # Ignore cache errors in tests (e.g., Redis not available)
+            print(f"Failed to clear cache: {e}")
+            pass
 
 
 @pytest.fixture

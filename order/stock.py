@@ -106,8 +106,10 @@ class StockManager:
         )
 
         # Sum up all active reservation quantities
-        reserved_quantity = sum(
-            reservation.quantity for reservation in active_reservations
+        from django.db.models import Sum
+
+        reserved_quantity = (
+            active_reservations.aggregate(total=Sum("quantity"))["total"] or 0
         )
 
         # Calculate available stock

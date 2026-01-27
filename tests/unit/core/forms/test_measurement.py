@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 from django import forms
-from django.test import TestCase
+from django.test import SimpleTestCase
 from measurement.measures import Distance, Speed, Weight
 
 from core.forms.measurement import MeasurementFormField, MeasurementWidget
@@ -50,7 +50,7 @@ class MockBidimensionalMeasure:
         self.value = list(kwargs.values())[0]
 
 
-class TestMeasurementWidget(TestCase):
+class TestMeasurementWidget(SimpleTestCase):
     def setUp(self):
         self.unit_choices = [("kg", "Kilogram"), ("g", "Gram"), ("lb", "Pound")]
 
@@ -142,7 +142,7 @@ class TestMeasurementWidget(TestCase):
         self.assertEqual(result[1], "g")
 
 
-class TestMeasurementFormField(TestCase):
+class TestMeasurementFormField(SimpleTestCase):
     def test_init_with_invalid_measurement_type(self):
         with self.assertRaises(ValueError) as cm:
             MeasurementFormField(measurement=str)
@@ -317,7 +317,7 @@ class TestMeasurementFormField(TestCase):
         self.assertEqual(str(cm.exception), expected_msg)
 
 
-class TestMeasurementFormFieldIntegration(TestCase):
+class TestMeasurementFormFieldIntegration(SimpleTestCase):
     def test_weight_field_integration(self):
         field = MeasurementFormField(measurement=Weight)
 
@@ -369,7 +369,7 @@ class TestMeasurementFormFieldIntegration(TestCase):
         )
 
 
-class TestMeasurementFormFieldEdgeCases(TestCase):
+class TestMeasurementFormFieldEdgeCases(SimpleTestCase):
     def test_compress_with_malformed_data_list(self):
         field = MeasurementFormField(measurement=Weight)
 
@@ -419,7 +419,7 @@ class TestMeasurementFormFieldEdgeCases(TestCase):
         self.assertTrue(any(" / " in choice[1] for choice in choices))
 
 
-class TestMeasurementWidgetEdgeCases(TestCase):
+class TestMeasurementWidgetEdgeCases(SimpleTestCase):
     def test_decompress_with_ast_literal_eval_edge_cases(self):
         widget = MeasurementWidget(unit_choices=[("kg", "Kilogram")])
 

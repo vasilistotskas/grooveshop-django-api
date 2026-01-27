@@ -48,6 +48,9 @@ class OrderItemFilterTest(APITestCase):
             active=True,
             price=Money(25, "EUR"),
         )
+        self.product1.set_current_language("en")
+        self.product1.name = "UniqueTestProduct"
+        self.product1.save()
         self.product2 = ProductFactory(
             sku="PROD002",
             category=self.category1,

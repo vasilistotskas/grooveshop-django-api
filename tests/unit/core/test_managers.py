@@ -39,13 +39,13 @@ class TestOptimizedQuerySet:
     def test_for_list_calls_with_translations(self):
         """for_list() should call with_translations() by default."""
 
-        class TestModel(models.Model):
+        class ListTestModel(models.Model):
             name = models.CharField(max_length=100)
 
             class Meta:
                 app_label = "core"
 
-        qs = OptimizedQuerySet(model=TestModel)
+        qs = OptimizedQuerySet(model=ListTestModel)
         # for_list() should return a queryset (same instance for non-translatable)
         result = qs.for_list()
         assert result is qs
@@ -53,13 +53,13 @@ class TestOptimizedQuerySet:
     def test_for_detail_calls_for_list(self):
         """for_detail() should call for_list() by default."""
 
-        class TestModel(models.Model):
+        class DetailTestModel(models.Model):
             name = models.CharField(max_length=100)
 
             class Meta:
                 app_label = "core"
 
-        qs = OptimizedQuerySet(model=TestModel)
+        qs = OptimizedQuerySet(model=DetailTestModel)
         result = qs.for_detail()
         assert result is qs
 

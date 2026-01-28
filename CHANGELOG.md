@@ -3,6 +3,20 @@
 
 
 
+## v1.69.0 (2026-01-28)
+
+### Bug fixes
+
+* fix: ruff ([`dce35a4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dce35a4b05b6e652ccfe0dbc8c6c2c2e9d0e2c55))
+
+### Features
+
+* feat: dashboard enhance ([`5ef3bf4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ef3bf41a3d2c8807cb5627762f1e6b93e592f4b))
+
+* feat: Bump Versions, Improve testing ([`10c35a5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/10c35a58d28c82156bbd6ec73d7e16f9c8e4ad5d))
+
+* feat: order STOCK_RESERVATION_TTL_MINUTES from extra settings ([`29123a5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/29123a5d9710d2f2a1385b76188d39f1d00956bc))
+
 ## v1.68.0 (2026-01-26)
 
 ### Features

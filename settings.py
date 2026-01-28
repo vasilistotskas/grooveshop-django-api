@@ -160,7 +160,10 @@ ROOT_URLCONF = "core.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [path.join(BASE_DIR, "core/templates")],
+        "DIRS": [
+            path.join(BASE_DIR, "core/templates"),
+            path.join(BASE_DIR, "templates"),
+        ],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -1130,23 +1133,219 @@ UNFOLD = {
     ],
     "COLORS": {
         "primary": {
-            "50": "225 231 255",
-            "100": "198 211 255",
-            "200": "158 183 255",
-            "300": "117 153 255",
-            "400": "68  118 255",
-            "500": "0 61 255",
-            "600": "0 39 165",
-            "700": "0 31 131",
-            "800": "0 24 102",
-            "900": "0 16 67",
-            "950": "0 10 43",
+            "50": "238 242 255",
+            "100": "224 231 255",
+            "200": "199 210 254",
+            "300": "165 180 252",
+            "400": "129 140 248",
+            "500": "99 102 241",
+            "600": "79 70 229",
+            "700": "67 56 202",
+            "800": "55 48 163",
+            "900": "49 46 129",
+            "950": "30 27 75",
         },
     },
     "SHOW_LANGUAGES": True,
     "STYLES": [
         lambda request: static("css/styles.css"),
+        lambda request: static("css/admin.css"),
+        "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200",
     ],
+    "DASHBOARD_CALLBACK": "admin.dashboard.dashboard_callback",
+    "SIDEBAR": {
+        "show_search": True,
+        "show_all_applications": False,
+        "navigation": [
+            {
+                "title": _("Navigation"),
+                "separator": True,
+                "items": [
+                    {
+                        "title": _("Dashboard"),
+                        "icon": "dashboard",
+                        "link": reverse_lazy("admin:index"),
+                    },
+                ],
+            },
+            {
+                "title": _("Catalog"),
+                "separator": True,
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": _("Products"),
+                        "icon": "inventory_2",
+                        "link": reverse_lazy(
+                            "admin:product_product_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Categories"),
+                        "icon": "category",
+                        "link": reverse_lazy(
+                            "admin:product_productcategory_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Reviews"),
+                        "icon": "star_rate",
+                        "link": reverse_lazy(
+                            "admin:product_productreview_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Tags"),
+                        "icon": "label",
+                        "link": reverse_lazy("admin:tag_tag_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": _("Sales"),
+                "separator": True,
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": _("Orders"),
+                        "icon": "receipt_long",
+                        "link": reverse_lazy("admin:order_order_changelist"),
+                    },
+                    {
+                        "title": _("Carts"),
+                        "icon": "shopping_cart",
+                        "link": reverse_lazy("admin:cart_cart_changelist"),
+                    },
+                    {
+                        "title": _("Payment Methods"),
+                        "icon": "payments",
+                        "link": reverse_lazy("admin:pay_way_payway_changelist"),
+                    },
+                    {
+                        "title": _("VAT Rates"),
+                        "icon": "percent",
+                        "link": reverse_lazy("admin:vat_vat_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": _("Users & Engagement"),
+                "separator": True,
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": _("Users"),
+                        "icon": "people",
+                        "link": reverse_lazy(
+                            "admin:user_useraccount_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Subscriptions"),
+                        "icon": "mail",
+                        "link": reverse_lazy(
+                            "admin:user_usersubscription_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Subscription Topics"),
+                        "icon": "topic",
+                        "link": reverse_lazy(
+                            "admin:user_subscriptiontopic_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Groups"),
+                        "icon": "shield_person",
+                        "link": reverse_lazy("admin:auth_group_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": _("Blog & Content"),
+                "separator": True,
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": _("Blog Posts"),
+                        "icon": "article",
+                        "link": reverse_lazy("admin:blog_blogpost_changelist"),
+                    },
+                    {
+                        "title": _("Blog Authors"),
+                        "icon": "edit_note",
+                        "link": reverse_lazy(
+                            "admin:blog_blogauthor_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Blog Categories"),
+                        "icon": "folder_open",
+                        "link": reverse_lazy(
+                            "admin:blog_blogcategory_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Blog Comments"),
+                        "icon": "chat_bubble",
+                        "link": reverse_lazy(
+                            "admin:blog_blogcomment_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Blog Tags"),
+                        "icon": "tag",
+                        "link": reverse_lazy("admin:blog_blogtag_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": _("Communications"),
+                "separator": True,
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": _("Notifications"),
+                        "icon": "notifications_active",
+                        "link": reverse_lazy(
+                            "admin:notification_notification_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Contact Messages"),
+                        "icon": "contact_mail",
+                        "link": reverse_lazy(
+                            "admin:contact_contact_changelist"
+                        ),
+                    },
+                ],
+            },
+            {
+                "title": _("System Settings"),
+                "separator": True,
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": _("Countries"),
+                        "icon": "public",
+                        "link": reverse_lazy(
+                            "admin:country_country_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Regions"),
+                        "icon": "map",
+                        "link": reverse_lazy("admin:region_region_changelist"),
+                    },
+                    {
+                        "title": _("Sites"),
+                        "icon": "language",
+                        "link": reverse_lazy("admin:sites_site_changelist"),
+                    },
+                ],
+            },
+        ],
+    },
     "SITE_DROPDOWN": [
         {
             "icon": "cached",

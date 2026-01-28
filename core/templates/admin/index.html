@@ -1,0 +1,635 @@
+{% extends "admin/base.html" %}
+{% load i18n static %}
+
+{% block title %}{% trans "Dashboard" %} | {{ site_title }}{% endblock %}
+
+{% block branding %}
+<h1 id="site-name">
+    <a href="{% url 'admin:index' %}">{{ site_title }}</a>
+</h1>
+{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+    /* Ensure chart containers fill available height */
+    .chart-container {
+        position: relative;
+        width: 100%;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col gap-6 p-6">
+    {# Header #}
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-base-900 dark:text-base-50">{% trans "Dashboard" %}</h1>
+            <p class="text-base-500 mt-1">{% trans "Welcome back! Here's what's happening with your store." %}</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            {% for link in quick_links %}
+            <a href="{{ link.url }}"
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-base-100 dark:bg-base-700 text-base-700 dark:text-base-200 hover:bg-base-200 dark:hover:bg-base-600 transition-colors text-sm font-medium">
+                <span class="material-symbols-outlined text-lg">{{ link.icon }}</span>
+                {{ link.title }}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    {# KPI Cards Row 1: Primary Metrics #}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {# Total Revenue #}
+        <div class="relative overflow-hidden rounded-xl p-6 shadow-lg"
+            style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white;">
+            <div class="absolute top-0 right-0 -mt-4 -mr-4 h-24 w-24 rounded-full"
+                style="background: rgba(255,255,255,0.1);"></div>
+            <div class="relative">
+                <div class="flex items-center justify-between">
+                    <span class="material-symbols-outlined text-3xl" style="opacity: 0.8;">payments</span>
+                </div>
+                <p class="mt-4 text-3xl font-bold">€{{ kpi.revenue|floatformat:2|default:"0.00" }}</p>
+                <p class="mt-1 text-sm" style="opacity: 0.8;">{% trans "Total Revenue" %}</p>
+            </div>
+        </div>
+
+        {# Total Orders #}
+        <div class="relative overflow-hidden rounded-xl p-6 shadow-lg"
+            style="background: linear-gradient(135deg, #3b82f6 0%, #0891b2 100%); color: white;">
+            <div class="absolute top-0 right-0 -mt-4 -mr-4 h-24 w-24 rounded-full"
+                style="background: rgba(255,255,255,0.1);"></div>
+            <div class="relative">
+                <div class="flex items-center justify-between">
+                    <span class="material-symbols-outlined text-3xl" style="opacity: 0.8;">shopping_cart</span>
+                    {% if kpi.pending_orders > 0 %}
+                    <span class="rounded-full px-2 py-0.5 text-xs font-medium"
+                        style="background: rgba(255,255,255,0.2);">{{ kpi.pending_orders }} pending</span>
+                    {% endif %}
+                </div>
+                <p class="mt-4 text-3xl font-bold">{{ kpi.orders|default:"0" }}</p>
+                <p class="mt-1 text-sm" style="opacity: 0.8;">{% trans "Total Orders" %}</p>
+            </div>
+        </div>
+
+        {# Total Users #}
+        <div class="relative overflow-hidden rounded-xl p-6 shadow-lg"
+            style="background: linear-gradient(135deg, #10b981 0%, #14b8a6 100%); color: white;">
+            <div class="absolute top-0 right-0 -mt-4 -mr-4 h-24 w-24 rounded-full"
+                style="background: rgba(255,255,255,0.1);"></div>
+            <div class="relative">
+                <div class="flex items-center justify-between">
+                    <span class="material-symbols-outlined text-3xl" style="opacity: 0.8;">group</span>
+                    {% if kpi.new_users_today > 0 %}
+                    <span class="rounded-full px-2 py-0.5 text-xs font-medium"
+                        style="background: rgba(255,255,255,0.2);">+{{ kpi.new_users_today }} today</span>
+                    {% endif %}
+                </div>
+                <p class="mt-4 text-3xl font-bold">{{ kpi.users|default:"0" }}</p>
+                <p class="mt-1 text-sm" style="opacity: 0.8;">{% trans "Total Users" %}</p>
+            </div>
+        </div>
+
+        {# Active Products #}
+        <div class="relative overflow-hidden rounded-xl p-6 shadow-lg"
+            style="background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%); color: white;">
+            <div class="absolute top-0 right-0 -mt-4 -mr-4 h-24 w-24 rounded-full"
+                style="background: rgba(255,255,255,0.1);"></div>
+            <div class="relative">
+                <div class="flex items-center justify-between">
+                    <span class="material-symbols-outlined text-3xl" style="opacity: 0.8;">inventory_2</span>
+                    {% if kpi.low_stock > 0 %}
+                    <span class="rounded-full px-2 py-0.5 text-xs font-medium"
+                        style="background: rgba(239,68,68,0.8);">{{ kpi.low_stock }} low stock</span>
+                    {% endif %}
+                </div>
+                <p class="mt-4 text-3xl font-bold">{{ kpi.products|default:"0" }}</p>
+                <p class="mt-1 text-sm" style="opacity: 0.8;">{% trans "Active Products" %}</p>
+            </div>
+        </div>
+    </div>
+
+    {# KPI Cards Row 2: Secondary Metrics #}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        {# Avg Order Value #}
+        <div
+            class="rounded-xl bg-white dark:bg-base-800 p-4 shadow-sm border border-base-200 dark:border-base-700 flex items-center gap-3">
+            <div class="p-2 rounded-lg bg-base-100 dark:bg-base-700"><span
+                    class="material-symbols-outlined text-purple-500">receipt</span></div>
+            <div>
+                <p class="text-2xl font-bold text-base-900 dark:text-base-50">€{{ kpi.avg_order_value }}</p>
+                <p class="text-sm text-base-500">{% trans "Avg Order Value" %}</p>
+            </div>
+        </div>
+
+        {# Avg Rating #}
+        <div
+            class="rounded-xl bg-white dark:bg-base-800 p-4 shadow-sm border border-base-200 dark:border-base-700 flex items-center gap-3">
+            <div class="p-2 rounded-lg bg-base-100 dark:bg-base-700"><span
+                    class="material-symbols-outlined text-yellow-500">star</span></div>
+            <div>
+                <p class="text-2xl font-bold text-base-900 dark:text-base-50">{{ kpi.avg_rating }}</p>
+                <p class="text-sm text-base-500">{% trans "Avg Rating" %}</p>
+            </div>
+        </div>
+
+        {# Blog Views #}
+        <div
+            class="rounded-xl bg-white dark:bg-base-800 p-4 shadow-sm border border-base-200 dark:border-base-700 flex items-center gap-3">
+            <div class="p-2 rounded-lg bg-base-100 dark:bg-base-700"><span
+                    class="material-symbols-outlined text-blue-500">visibility</span></div>
+            <div>
+                <p class="text-2xl font-bold text-base-900 dark:text-base-50">{{ kpi.blog_views }}</p>
+                <p class="text-sm text-base-500">{% trans "Blog Views" %}</p>
+            </div>
+        </div>
+
+        {# Blog Likes #}
+        <div
+            class="rounded-xl bg-white dark:bg-base-800 p-4 shadow-sm border border-base-200 dark:border-base-700 flex items-center gap-3">
+            <div class="p-2 rounded-lg bg-base-100 dark:bg-base-700"><span
+                    class="material-symbols-outlined text-pink-500">favorite</span></div>
+            <div>
+                <p class="text-2xl font-bold text-base-900 dark:text-base-50">{{ kpi.total_blog_likes }}</p>
+                <p class="text-sm text-base-500">{% trans "Blog Likes" %}</p>
+            </div>
+        </div>
+
+        {# Subscribers #}
+        <div
+            class="rounded-xl bg-white dark:bg-base-800 p-4 shadow-sm border border-base-200 dark:border-base-700 flex items-center gap-3">
+            <div class="p-2 rounded-lg bg-base-100 dark:bg-base-700"><span
+                    class="material-symbols-outlined text-green-500">mail</span></div>
+            <div>
+                <p class="text-2xl font-bold text-base-900 dark:text-base-50">{{ kpi.subscribers }}</p>
+                <p class="text-sm text-base-500">{% trans "Subscribers" %}</p>
+            </div>
+        </div>
+
+        {# Pending Reviews #}
+        <div
+            class="rounded-xl bg-white dark:bg-base-800 p-4 shadow-sm border border-base-200 dark:border-base-700 flex items-center gap-3">
+            <div class="p-2 rounded-lg bg-base-100 dark:bg-base-700"><span
+                    class="material-symbols-outlined text-orange-500">rate_review</span></div>
+            <div>
+                <p class="text-2xl font-bold text-base-900 dark:text-base-50">{{ kpi.pending_reviews }}</p>
+                <p class="text-sm text-base-500">{% trans "Pending Reviews" %}</p>
+            </div>
+        </div>
+    </div>
+
+    {# Charts Row 1: Performance #}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div
+            class="lg:col-span-2 rounded-xl bg-white dark:bg-base-800 p-6 shadow-sm border border-base-200 dark:border-base-700">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-base-900 dark:text-base-50">{% trans "Performance Overview" %}
+                </h3>
+                <span class="text-xs text-base-500 bg-base-100 dark:bg-base-700 px-2 py-1 rounded">{% trans "Last 7 days" %}</span>
+            </div>
+            <div style="position: relative; height: 320px;"><canvas id="performanceChart"></canvas></div>
+        </div>
+
+        <div class="rounded-xl bg-white dark:bg-base-800 p-6 shadow-sm border border-base-200 dark:border-base-700">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-base-900 dark:text-base-50">{% trans "Order Status" %}</h3>
+            </div>
+            <div style="position: relative; height: 320px;" class="flex items-center justify-center"><canvas
+                    id="statusChart"></canvas></div>
+        </div>
+    </div>
+
+    {# Charts Row 2: Payment & Countries #}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="rounded-xl bg-white dark:bg-base-800 p-6 shadow-sm border border-base-200 dark:border-base-700">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-base-900 dark:text-base-50">{% trans "Payment Methods" %}</h3>
+            </div>
+            <div style="position: relative; height: 280px;" class="flex items-center justify-center"><canvas
+                    id="paymentChart"></canvas></div>
+        </div>
+
+        <div
+            class="lg:col-span-2 rounded-xl bg-white dark:bg-base-800 p-6 shadow-sm border border-base-200 dark:border-base-700">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-base-900 dark:text-base-50">{% trans "Top Countries" %}</h3>
+            </div>
+            <div style="position: relative; height: 280px;"><canvas id="countryChart"></canvas></div>
+        </div>
+    </div>
+
+    {# Users Chart #}
+    <div class="rounded-xl bg-white dark:bg-base-800 p-6 shadow-sm border border-base-200 dark:border-base-700">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-base-900 dark:text-base-50">{% trans "New User Registrations" %}</h3>
+            <span class="text-xs text-base-500 bg-base-100 dark:bg-base-700 px-2 py-1 rounded">{% trans "Last 7 days" %}</span>
+        </div>
+        <div style="position: relative; height: 200px;"><canvas id="usersChart"></canvas></div>
+    </div>
+
+    {# Inventory & Low Stock #}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="rounded-xl bg-white dark:bg-base-800 p-6 shadow-sm border border-base-200 dark:border-base-700">
+            <h3 class="text-lg font-semibold text-base-900 dark:text-base-50 flex items-center gap-2 mb-4">
+                <span class="material-symbols-outlined text-base-400">inventory</span>
+                {% trans "Inventory Health" %}
+            </h3>
+            <div class="mb-4">
+                <div class="flex justify-between text-sm mb-1">
+                    <span class="text-base-600 dark:text-base-400">{{ inventory_progress.title }}</span>
+                    <span class="font-medium text-base-900 dark:text-base-50">{{ inventory_progress.value }}%</span>
+                </div>
+                <div class="w-full bg-base-200 dark:bg-base-700 rounded-full h-3">
+                    <div class="h-3 rounded-full transition-all duration-500"
+                        style="width: {{ inventory_progress.value }}%; background: linear-gradient(90deg, #10b981, #059669);">
+                    </div>
+                </div>
+                <p class="text-xs text-base-500 mt-1">{{ inventory_progress.description }}</p>
+            </div>
+            <div class="grid grid-cols-2 gap-4 text-center">
+                <div class="rounded-lg bg-base-50 dark:bg-base-900 p-3">
+                    <p class="text-xl font-bold text-base-900 dark:text-base-50">{{ kpi.products }}</p>
+                    <p class="text-xs text-base-500">{% trans "Active" %}</p>
+                </div>
+                <div class="rounded-lg bg-base-50 dark:bg-base-900 p-3">
+                    <p class="text-xl font-bold text-red-600 dark:text-red-400">{{ kpi.low_stock }}</p>
+                    <p class="text-xs text-base-500">{% trans "Low Stock" %}</p>
+                </div>
+            </div>
+        </div>
+
+        <div
+            class="lg:col-span-2 rounded-xl bg-white dark:bg-base-800 shadow-sm border border-base-200 dark:border-base-700 overflow-hidden">
+            <div class="p-4 border-b border-base-200 dark:border-base-700 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-red-500">warning</span>
+                    {% trans "Low Stock Alert" %}
+                </h3>
+                <a href="{% url 'admin:product_product_changelist' %}?stock__lt=10"
+                    class="text-sm text-primary-600 dark:text-primary-400 hover:underline font-medium">{% trans "View All" %} →</a>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-base-50 dark:bg-base-900 text-base-600 dark:text-base-400 text-xs uppercase">
+                        <tr>
+                            {% for header in low_stock_table.headers %}
+                            <th class="px-4 py-3 text-left">{{ header }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-base-200 dark:divide-base-700">
+                        {% for row in low_stock_table.rows %}
+                        <tr class="hover:bg-base-50 dark:hover:bg-base-700/50 transition-colors">
+                            {% for cell in row %}
+                            <td class="px-4 py-3 text-base-700 dark:text-base-200">{{ cell|safe }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="{{ low_stock_table.headers|length }}"
+                                class="px-4 py-8 text-center text-green-600 dark:text-green-400"><span
+                                    class="material-symbols-outlined align-middle mr-1">check_circle</span> All products
+                                are well stocked!</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# Footer Stats #}
+    <div
+        class="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-xl bg-base-50 dark:bg-base-900 border border-base-200 dark:border-base-700">
+        <div class="text-center">
+            <p class="text-lg font-bold text-base-900 dark:text-base-50">{{ kpi.orders_this_month }}</p>
+            <p class="text-xs text-base-500">{% trans "Orders this month" %}</p>
+        </div>
+        <div class="text-center">
+            <p class="text-lg font-bold text-base-900 dark:text-base-50">{{ kpi.active_carts }}</p>
+            <p class="text-xs text-base-500">{% trans "Active Carts" %}</p>
+        </div>
+        <div class="text-center">
+            <p class="text-lg font-bold text-base-900 dark:text-base-50">{{ kpi.messages }}</p>
+            <p class="text-xs text-base-500">{% trans "Contact Messages" %}</p>
+        </div>
+        <div class="text-center">
+            <p class="text-lg font-bold text-base-900 dark:text-base-50">{{ kpi.subscribers }}</p>
+            <p class="text-xs text-base-500">{% trans "Newsletter Subscribers" %}</p>
+        </div>
+    </div>
+
+    {# Blog & Content Management Section #}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {# Blog Stats Card #}
+        <div class="rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-6 shadow-lg text-white">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="material-symbols-outlined text-3xl opacity-80">article</span>
+                <h3 class="text-lg font-semibold">{% trans "Blog Management" %}</h3>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-white/10 backdrop-blur-sm rounded-lg p-3">
+                    <p class="text-2xl font-bold">{{ kpi.blog_posts }}</p>
+                    <p class="text-xs opacity-80">{% trans "Total Posts" %}</p>
+                </div>
+                <div class="bg-white/10 backdrop-blur-sm rounded-lg p-3">
+                    <p class="text-2xl font-bold">{{ kpi.published_posts }}</p>
+                    <p class="text-xs opacity-80">{% trans "Published" %}</p>
+                </div>
+                <div class="bg-white/10 backdrop-blur-sm rounded-lg p-3">
+                    <p class="text-2xl font-bold">{{ kpi.featured_posts }}</p>
+                    <p class="text-xs opacity-80">{% trans "Featured" %}</p>
+                </div>
+                <div class="bg-white/10 backdrop-blur-sm rounded-lg p-3">
+                    <p class="text-2xl font-bold">{{ kpi.total_comments }}</p>
+                    <p class="text-xs opacity-80">{% trans "Comments" %}</p>
+                </div>
+            </div>
+            {% if kpi.pending_comments > 0 %}
+            <a href="{% url 'admin:blog_blogcomment_changelist' %}?approved__exact=0"
+                class="mt-4 flex items-center gap-2 bg-white/20 hover:bg-white/30 rounded-lg px-4 py-2 text-sm font-medium transition-colors">
+                <span class="material-symbols-outlined text-sm">pending</span>
+                {{ kpi.pending_comments }} {% trans "pending comments" %}
+            </a>
+            {% endif %}
+        </div>
+
+        {# Recent Orders Table #}
+        <div
+            class="lg:col-span-2 rounded-xl bg-white dark:bg-base-800 shadow-sm border border-base-200 dark:border-base-700 overflow-hidden">
+            <div class="p-4 border-b border-base-200 dark:border-base-700 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary-500">receipt_long</span>
+                    {% trans "Recent Orders" %}
+                </h3>
+                <a href="{% url 'admin:order_order_changelist' %}"
+                    class="text-sm text-primary-600 dark:text-primary-400 hover:underline font-medium">{% trans "View All" %} →</a>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-base-50 dark:bg-base-900 text-base-600 dark:text-base-400 text-xs uppercase">
+                        <tr>
+                            {% for header in orders_table.headers %}
+                            <th class="px-4 py-3 text-left">{{ header }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-base-200 dark:divide-base-700">
+                        {% for row in orders_table.rows %}
+                        <tr class="hover:bg-base-50 dark:hover:bg-base-700/50 transition-colors">
+                            {% for cell in row %}
+                            <td class="px-4 py-3 text-base-700 dark:text-base-200">{{ cell|safe }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="{{ orders_table.headers|length }}" class="px-4 py-8 text-center text-base-500">
+                                {% trans "No orders yet" %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# Recent Reviews and Top Products #}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {# Recent Reviews Table #}
+        <div
+            class="rounded-xl bg-white dark:bg-base-800 shadow-sm border border-base-200 dark:border-base-700 overflow-hidden">
+            <div class="p-4 border-b border-base-200 dark:border-base-700 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-yellow-500">star_rate</span>
+                    {% trans "Recent Reviews" %}
+                </h3>
+                <a href="{% url 'admin:product_productreview_changelist' %}"
+                    class="text-sm text-primary-600 dark:text-primary-400 hover:underline font-medium">{% trans "View All" %} →</a>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-base-50 dark:bg-base-900 text-base-600 dark:text-base-400 text-xs uppercase">
+                        <tr>
+                            {% for header in reviews_table.headers %}
+                            <th class="px-4 py-3 text-left">{{ header }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-base-200 dark:divide-base-700">
+                        {% for row in reviews_table.rows %}
+                        <tr class="hover:bg-base-50 dark:hover:bg-base-700/50 transition-colors">
+                            {% for cell in row %}
+                            <td class="px-4 py-3 text-base-700 dark:text-base-200">{{ cell|safe }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="{{ reviews_table.headers|length }}"
+                                class="px-4 py-8 text-center text-base-500">{% trans "No reviews yet" %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {# Top Products Table #}
+        <div
+            class="rounded-xl bg-white dark:bg-base-800 shadow-sm border border-base-200 dark:border-base-700 overflow-hidden">
+            <div class="p-4 border-b border-base-200 dark:border-base-700 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-blue-500">trending_up</span>
+                    {% trans "Top Products" %}
+                </h3>
+                <a href="{% url 'admin:product_product_changelist' %}"
+                    class="text-sm text-primary-600 dark:text-primary-400 hover:underline font-medium">{% trans "View All" %} →</a>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-base-50 dark:bg-base-900 text-base-600 dark:text-base-400 text-xs uppercase">
+                        <tr>
+                            {% for header in products_table.headers %}
+                            <th class="px-4 py-3 text-left">{{ header }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-base-200 dark:divide-base-700">
+                        {% for row in products_table.rows %}
+                        <tr class="hover:bg-base-50 dark:hover:bg-base-700/50 transition-colors">
+                            {% for cell in row %}
+                            <td class="px-4 py-3 text-base-700 dark:text-base-200">{{ cell|safe }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="{{ products_table.headers|length }}"
+                                class="px-4 py-8 text-center text-base-500">{% trans "No products yet" %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# Recent Messages #}
+    <div
+        class="rounded-xl bg-white dark:bg-base-800 shadow-sm border border-base-200 dark:border-base-700 overflow-hidden">
+        <div class="p-4 border-b border-base-200 dark:border-base-700 flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
+                <span class="material-symbols-outlined text-green-500">contact_mail</span>
+                {% trans "Recent Contact Messages" %}
+            </h3>
+            <a href="{% url 'admin:contact_contact_changelist' %}"
+                class="text-sm text-primary-600 dark:text-primary-400 hover:underline font-medium">{% trans "View All" %} →</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-base-50 dark:bg-base-900 text-base-600 dark:text-base-400 text-xs uppercase">
+                    <tr>
+                        {% for header in messages_table.headers %}
+                        <th class="px-4 py-3 text-left">{{ header }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-base-200 dark:divide-base-700">
+                    {% for row in messages_table.rows %}
+                    <tr class="hover:bg-base-50 dark:hover:bg-base-700/50 transition-colors">
+                        {% for cell in row %}
+                        <td class="px-4 py-3 text-base-700 dark:text-base-200">{{ cell|safe }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="{{ messages_table.headers|length }}" class="px-4 py-8 text-center text-base-500">{%
+                            trans "No messages yet" %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+{# Data Injection #}
+{{ performance_chart|json_script:"performance-data" }}
+{{ status_chart|json_script:"status-data" }}
+{{ payment_chart|json_script:"payment-data" }}
+{{ country_chart|json_script:"country-data" }}
+{{ users_chart|json_script:"users-data" }}
+
+{# Chart.js Initialization #}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const isDark = document.documentElement.classList.contains('dark');
+        const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+        const textColor = isDark ? '#e5e5e5' : '#525252';
+
+        Chart.defaults.color = textColor;
+        Chart.defaults.borderColor = gridColor;
+
+        // Helper to safely get data
+        function getData(id) {
+            try {
+                const el = document.getElementById(id);
+                if (!el) return null;
+                return JSON.parse(el.textContent);
+            } catch (e) {
+                console.error('Failed to parse data for', id, e);
+                return null;
+            }
+        }
+
+        // Performance
+        const perfData = getData('performance-data');
+        const perfCtx = document.getElementById('performanceChart');
+        if (perfCtx && perfData) {
+            new Chart(perfCtx, {
+                type: 'bar',
+                data: perfData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { position: 'top' } },
+                    scales: {
+                        y: { type: 'linear', position: 'left', title: { display: true, text: 'Orders' }, grid: { color: gridColor } },
+                        y1: { type: 'linear', position: 'right', title: { display: true, text: 'Revenue (€)' }, grid: { drawOnChartArea: false } }
+                    }
+                }
+            });
+        }
+
+        // Status
+        const statusData = getData('status-data');
+        const statusCtx = document.getElementById('statusChart');
+        if (statusCtx && statusData) {
+            new Chart(statusCtx, {
+                type: 'doughnut',
+                data: statusData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } },
+                    cutout: '60%'
+                }
+            });
+        }
+
+        // Payment
+        const paymentData = getData('payment-data');
+        const paymentCtx = document.getElementById('paymentChart');
+        if (paymentCtx && paymentData) {
+            new Chart(paymentCtx, {
+                type: 'doughnut',
+                data: paymentData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'right' } },
+                    cutout: '50%',
+                    layout: { padding: 0 }
+                }
+            });
+        }
+
+        // Country
+        const countryData = getData('country-data');
+        const countryCtx = document.getElementById('countryChart');
+        if (countryCtx && countryData) {
+            new Chart(countryCtx, {
+                type: 'bar',
+                data: countryData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: gridColor } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // Users
+        const usersData = getData('users-data');
+        const usersCtx = document.getElementById('usersChart');
+        if (usersCtx && usersData) {
+            new Chart(usersCtx, {
+                type: 'bar',
+                data: usersData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: gridColor } } }
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

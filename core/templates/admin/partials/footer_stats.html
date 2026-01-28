@@ -1,0 +1,21 @@
+{% load i18n %}
+{# Footer Stats Component #}
+<div
+    class="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-xl bg-base-50 dark:bg-base-900 border border-base-200 dark:border-base-700">
+    <div class="text-center">
+        <p class="text-lg font-bold text-base-900 dark:text-base-50">{{ kpi.orders_this_month }}</p>
+        <p class="text-xs text-base-500">{% trans "Orders this month" %}</p>
+    </div>
+    <div class="text-center">
+        <p class="text-lg font-bold text-base-900 dark:text-base-50">{{ kpi.active_carts }}</p>
+        <p class="text-xs text-base-500">{% trans "Active Carts" %}</p>
+    </div>
+    <div class="text-center">
+        <p class="text-lg font-bold text-base-900 dark:text-base-50">{{ kpi.messages }}</p>
+        <p class="text-xs text-base-500">{% trans "Contact Messages" %}</p>
+    </div>
+    <div class="text-center">
+        <p class="text-lg font-bold text-base-900 dark:text-base-50">{{ kpi.subscribers }}</p>
+        <p class="text-xs text-base-500">{% trans "Newsletter Subscribers" %}</p>
+    </div>
+</div>

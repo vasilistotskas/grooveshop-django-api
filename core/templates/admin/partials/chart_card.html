@@ -1,0 +1,19 @@
+{% load i18n %}
+{# Chart Card Component #}
+{# Usage: {% include "admin/partials/chart_card.html" with title=t chart_id=id subtitle=sub height=h %} #}
+
+<div class="rounded-xl bg-white dark:bg-base-800 p-6 shadow-sm border border-base-200 dark:border-base-700">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-semibold text-base-900 dark:text-base-50">
+            {{ title }}
+        </h3>
+        {% if subtitle %}
+        <span class="text-xs text-base-500 bg-base-100 dark:bg-base-700 px-2 py-1 rounded">
+            {{ subtitle }}
+        </span>
+        {% endif %}
+    </div>
+    <div class="{{ height|default:'h-64' }}">
+        <canvas id="{{ chart_id }}"></canvas>
+    </div>
+</div>

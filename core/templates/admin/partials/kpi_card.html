@@ -1,0 +1,21 @@
+{% load i18n %}
+{# KPI Card Component - Gradient style with icon #}
+{# Usage: {% include "admin/partials/kpi_card.html" with value=val label=lbl gradient=grad icon=ico badge=b %} #}
+
+<div class="relative overflow-hidden rounded-xl p-6 shadow-lg" style="background: {{ gradient }}; color: white;">
+    <div class="absolute top-0 right-0 -mt-4 -mr-4 h-24 w-24 rounded-full" style="background: rgba(255,255,255,0.1);">
+    </div>
+    <div class="relative">
+        <div class="flex items-center justify-between">
+            <span class="material-symbols-outlined text-3xl" style="opacity: 0.8;">{{ icon }}</span>
+            {% if badge %}
+            <span class="rounded-full px-2 py-0.5 text-xs font-medium"
+                style="background: {{ badge_bg|default:'rgba(255,255,255,0.2)' }};">
+                {{ badge }}
+            </span>
+            {% endif %}
+        </div>
+        <p class="mt-4 text-3xl font-bold">{{ prefix }}{{ value }}{{ suffix }}</p>
+        <p class="mt-1 text-sm" style="opacity: 0.8;">{{ label }}</p>
+    </div>
+</div>

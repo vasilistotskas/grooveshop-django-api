@@ -1,0 +1,56 @@
+.dark a:hover,
+.dark a:hover span {
+    color: inherit !important;
+}
+
+.dark nav a:hover span,
+.dark [data-sidebar] a:hover span,
+.dark aside a:hover span {
+    color: inherit !important;
+}
+
+.dark .group:hover span,
+.dark .group:hover .material-symbols-outlined {
+    color: inherit !important;
+}
+
+.dark a:hover .text-base-500,
+.dark a:hover .text-base-400,
+.dark a:hover .dark\:text-base-400,
+.dark a:hover .dark\:text-base-300 {
+    color: var(--color-base-100) !important;
+}
+
+.dark aside a:hover,
+.dark [class*="sidebar"] a:hover,
+.dark [class*="nav"] a:hover {
+    color: #fff !important;
+}
+
+.dark aside a:hover *,
+.dark [class*="sidebar"] a:hover *,
+.dark [class*="nav"] a:hover * {
+    color: inherit !important;
+}
+
+.material-symbols-outlined {
+    font-size: 20px !important;
+    width: 20px;
+    height: 20px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+header .material-symbols-outlined,
+.header .material-symbols-outlined,
+[class*="header"] .material-symbols-outlined {
+    font-size: 20px !important;
+    width: 20px;
+    height: 20px;
+}
+
+button .material-symbols-outlined {
+    font-size: 20px !important;
+}

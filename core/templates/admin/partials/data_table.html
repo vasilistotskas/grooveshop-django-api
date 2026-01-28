@@ -1,0 +1,44 @@
+{% load i18n %}
+{# Data Table Component #}
+{# Usage: {% include "admin/partials/data_table.html" with title=t icon=i rows=data headers=h link_url=url link_text=txt
+%} #}
+
+<div class="rounded-xl bg-white dark:bg-base-800 shadow-sm border border-base-200 dark:border-base-700 overflow-hidden">
+    <div class="p-4 border-b border-base-200 dark:border-base-700 flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
+            <span class="material-symbols-outlined text-base-400">{{ icon }}</span>
+            {{ title }}
+        </h3>
+        {% if link_url %}
+        <a href="{{ link_url }}" class="text-sm text-primary-600 dark:text-primary-400 hover:underline font-medium">
+            {{ link_text|default:_("View All") }} →
+        </a>
+        {% endif %}
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-base-50 dark:bg-base-900 text-base-600 dark:text-base-400 text-xs uppercase">
+                <tr>
+                    {% for header in headers %}
+                    <th class="px-4 py-3 text-left">{{ header }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-base-200 dark:divide-base-700">
+                {% for row in rows %}
+                <tr class="hover:bg-base-50 dark:hover:bg-base-700/50 transition-colors">
+                    {% for cell in row %}
+                    <td class="px-4 py-3 text-base-700 dark:text-base-200">{{ cell|safe }}</td>
+                    {% endfor %}
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="{{ headers|length }}" class="px-4 py-8 text-center text-base-500">
+                        {{ empty_message|default:_("No data available") }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>

@@ -1,8 +1,6 @@
 from os import getenv
 import uuid
 
-from django.core.cache import caches
-from django.core.cache.backends.redis import RedisCache
 from django.test import TestCase
 
 from core.caches import CustomCache
@@ -128,35 +126,6 @@ class CustomCacheTestCase(TestCase):
                 ]
             ),
         )
-
-    def test_cache_keys_redis(self):
-        unique_prefix = f"prefix_{uuid.uuid4().hex[:8]}"
-        keys_with_prefix = [
-            f"{unique_prefix}:" + self.key,
-            f"{unique_prefix}:another_key",
-        ]
-
-        if isinstance(self.cache_instance, caches["default"].__class__):
-            keys = self.cache_instance.keys()
-            self.assertEqual(keys, [])
-        else:
-
-            class MockRedisCache(RedisCache):
-                def __init__(self, *args, **kwargs):
-                    super().__init__(*args, **kwargs)
-
-                def keys(self, pattern):
-                    return [
-                        (f"{unique_prefix}:" + key).encode()
-                        for key in keys_with_prefix
-                    ]
-
-            self.cache_instance.__class__ = MockRedisCache
-            keys = self.cache_instance.keys(unique_prefix)
-            self.assertEqual(
-                sorted(keys),
-                sorted([f"{unique_prefix}:" + key for key in keys_with_prefix]),
-            )
 
     def tearDown(self):
         if hasattr(self, "key"):

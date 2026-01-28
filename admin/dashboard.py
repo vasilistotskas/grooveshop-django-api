@@ -2,7 +2,7 @@ from django.apps import apps
 from django.db.models import Count, Sum, Avg
 from django.db.models.functions import TruncDay
 from django.utils import timezone
-from django.utils.html import format_html
+from django.utils.html import format_html, escape
 from django.urls import reverse
 from datetime import timedelta
 
@@ -454,7 +454,7 @@ def dashboard_callback(request, context):
                     reverse("admin:order_order_change", args=[order.id]),
                     order.id,
                 ),
-                order.email or "N/A",
+                escape(order.email or "N/A"),
                 order.created_at.strftime("%b %d, %Y"),
                 status_badge,
             ]
@@ -479,7 +479,7 @@ def dashboard_callback(request, context):
                 format_html(
                     '<a href="{}" class="text-primary-600 dark:text-primary-400 font-medium hover:underline">{}</a>',
                     reverse("admin:product_product_change", args=[product.id]),
-                    name[:30],
+                    escape(name[:30]),
                 ),
                 format_html(
                     '<span class="font-semibold">{}</span>', product.view_count
@@ -507,8 +507,8 @@ def dashboard_callback(request, context):
         status_badge = _get_review_status_badge(review.status)
         reviews_table_rows.append(
             [
-                product_name[:25],
-                review.user.email[:25] if review.user else "Anonymous",
+                escape(product_name[:25]),
+                escape(review.user.email[:25] if review.user else "Anonymous"),
                 rating_stars,
                 status_badge,
             ]
@@ -527,13 +527,15 @@ def dashboard_callback(request, context):
             [
                 format_html(
                     '<div class="font-medium">{}</div><div class="text-xs text-base-600 dark:text-base-300">{}</div>',
-                    msg.name,
-                    msg.email,
+                    escape(msg.name),
+                    escape(msg.email),
                 ),
                 msg.created_at.strftime("%b %d"),
-                msg.message[:40] + "..."
-                if len(msg.message) > 40
-                else msg.message,
+                escape(
+                    msg.message[:40] + "..."
+                    if len(msg.message) > 40
+                    else msg.message
+                ),
             ]
         )
 

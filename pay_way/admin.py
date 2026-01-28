@@ -249,7 +249,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
             )
             return mark_safe(html)
         return mark_safe(
-            '<span class="text-base-400 dark:text-base-500 italic">'
+            '<span class="text-base-600 dark:text-base-300 italic">'
             "No provider"
             "</span>"
         )
@@ -328,7 +328,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
             )
             return mark_safe(html)
         return mark_safe(
-            '<span class="text-base-400 dark:text-base-500">No threshold</span>'
+            '<span class="text-base-600 dark:text-base-300">No threshold</span>'
         )
 
     free_threshold_display.short_description = _("Free Threshold")
@@ -368,7 +368,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
             )
             return mark_safe(html)
         return mark_safe(
-            '<span class="text-base-400 dark:text-base-500">-</span>'
+            '<span class="text-base-600 dark:text-base-300">-</span>'
         )
 
     sort_order_display.short_description = _("Order")
@@ -382,7 +382,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
             )
             return mark_safe(html)
         return mark_safe(
-            '<span class="text-base-400 dark:text-base-500">No icon</span>'
+            '<span class="text-base-600 dark:text-base-300">No icon</span>'
         )
 
     icon_preview.short_description = _("Icon")
@@ -390,7 +390,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
     def configuration_preview(self, obj):
         if not obj.configuration:
             return mark_safe(
-                '<span class="text-base-400 dark:text-base-500 italic">No configuration</span>'
+                '<span class="text-base-600 dark:text-base-300 italic">No configuration</span>'
             )
         keys = list(obj.configuration.keys())
         if len(keys) > 3:
@@ -401,7 +401,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
         html = (
             '<div class="text-sm">'
             '<div class="font-medium text-base-700 dark:text-base-300">Configuration Keys:</div>'
-            f'<div class="text-base-500 dark:text-base-400">{safe_list}</div>'
+            f'<div class="text-base-600 dark:text-base-300">{safe_list}</div>'
             "</div>"
         )
         return mark_safe(html)

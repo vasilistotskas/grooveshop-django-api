@@ -373,7 +373,7 @@ class UserAdmin(ModelAdmin):
         esc_name = conditional_escape(full_name)
         esc_email = conditional_escape(obj.email or "")
         html += f'<div><div class="font-medium text-base-900 dark:text-base-100">{esc_name}</div>'
-        html += f'<div class="text-sm text-base-500 dark:text-base-400">{esc_email}</div></div></div>'
+        html += f'<div class="text-sm text-base-600 dark:text-base-300">{esc_email}</div></div></div>'
         return mark_safe(html)
 
     user_profile_display.short_description = _("Profile")
@@ -398,7 +398,7 @@ class UserAdmin(ModelAdmin):
             )
             return mark_safe(html)
         return mark_safe(
-            '<span class="text-base-400 dark:text-base-500">No contact info</span>'
+            '<span class="text-base-600 dark:text-base-300">No contact info</span>'
         )
 
     contact_info_display.short_description = _("Contact")
@@ -414,7 +414,7 @@ class UserAdmin(ModelAdmin):
             html = f'<div class="text-sm text-base-700 dark:text-base-300"><span class="flex items-center gap-1"><span>📍</span><span>{text}</span></span></div>'
             return mark_safe(html)
         return mark_safe(
-            '<span class="text-base-400 dark:text-base-500">No location</span>'
+            '<span class="text-base-600 dark:text-base-300">No location</span>'
         )
 
     location_display.short_description = _("Location")
@@ -459,7 +459,7 @@ class UserAdmin(ModelAdmin):
                 '<div class="flex gap-1">' + "".join(icons) + "</div>"
             )
         return mark_safe(
-            '<span class="text-base-400 dark:text-base-500">-</span>'
+            '<span class="text-base-600 dark:text-base-300">-</span>'
         )
 
     social_links_display.short_description = _("Social")
@@ -516,7 +516,7 @@ class UserAdmin(ModelAdmin):
                 '<div class="space-y-1">' + "<br>".join(links) + "</div>"
             )
         return mark_safe(
-            '<span class="text-base-400 dark:text-base-500 italic">No social media links</span>'
+            '<span class="text-base-600 dark:text-base-300 italic">No social media links</span>'
         )
 
     social_links_summary.short_description = _("Social Links Summary")
@@ -525,7 +525,7 @@ class UserAdmin(ModelAdmin):
         subs = list(obj.subscriptions.select_related("topic").all())
         if not subs:
             return mark_safe(
-                '<span class="text-base-400 dark:text-base-500 italic">No subscriptions</span>'
+                '<span class="text-base-600 dark:text-base-300 italic">No subscriptions</span>'
             )
         active = sum(
             1
@@ -544,12 +544,12 @@ class UserAdmin(ModelAdmin):
         addrs = list(obj.addresses.all())
         if not addrs:
             return mark_safe(
-                '<span class="text-base-400 dark:text-base-500 italic">No addresses</span>'
+                '<span class="text-base-600 dark:text-base-300 italic">No addresses</span>'
             )
         main = next((a for a in addrs if a.is_main), None)
         esc_total = conditional_escape(str(len(addrs)))
         main_text = conditional_escape(str(main)) if main else "No main address"
-        html = f'<div class="text-sm"><div class="font-medium text-base-700 dark:text-base-300">Total: {esc_total}</div><div class="text-base-500 dark:text-base-400">Main: {main_text}</div></div>'
+        html = f'<div class="text-sm"><div class="font-medium text-base-700 dark:text-base-300">Total: {esc_total}</div><div class="text-base-600 dark:text-base-300">Main: {main_text}</div></div>'
         return mark_safe(html)
 
     address_summary.short_description = _("Address Summary")
@@ -641,7 +641,7 @@ class UserAddressAdmin(ModelAdmin):
         esc_title = conditional_escape(obj.title)
         addr = f"{obj.street} {obj.street_number}, {obj.city}"
         esc_addr = conditional_escape(addr)
-        html = f'<div class="text-sm"><div class="font-medium text-base-900 dark:text-base-100">{esc_title}</div><div class="text-base-500 dark:text-base-400">{esc_addr}</div></div>'
+        html = f'<div class="text-sm"><div class="font-medium text-base-900 dark:text-base-100">{esc_title}</div><div class="text-base-600 dark:text-base-300">{esc_addr}</div></div>'
         return mark_safe(html)
 
     address_display.short_description = _("Address")
@@ -649,7 +649,7 @@ class UserAddressAdmin(ModelAdmin):
     def contact_person(self, obj):
         esc_name = conditional_escape(f"{obj.first_name} {obj.last_name}")
         esc_email = conditional_escape(obj.user.email)
-        html = f'<div class="text-sm"><div class="font-medium text-base-700 dark:text-base-300">{esc_name}</div><div class="text-base-500 dark:text-base-400">{esc_email}</div></div>'
+        html = f'<div class="text-sm"><div class="font-medium text-base-700 dark:text-base-300">{esc_name}</div><div class="text-base-600 dark:text-base-300">{esc_email}</div></div>'
         return mark_safe(html)
 
     contact_person.short_description = _("Contact Person")
@@ -690,7 +690,7 @@ class UserAddressAdmin(ModelAdmin):
             )
             return mark_safe(html)
         return mark_safe(
-            '<span class="text-base-400 dark:text-base-500">No phone</span>'
+            '<span class="text-base-600 dark:text-base-300">No phone</span>'
         )
 
     contact_numbers.short_description = _("Contact Numbers")
@@ -771,7 +771,7 @@ class SubscriptionTopicAdmin(ModelAdmin, TranslatableAdmin):
         )
         esc_name = conditional_escape(name)
         esc_slug = conditional_escape(obj.slug)
-        html = f'<div class="text-sm"><div class="font-medium text-base-900 dark:text-base-100">{esc_name}</div><div class="text-base-500 dark:text-base-400">{esc_slug}</div></div>'
+        html = f'<div class="text-sm"><div class="font-medium text-base-900 dark:text-base-100">{esc_name}</div><div class="text-base-600 dark:text-base-300">{esc_slug}</div></div>'
         return mark_safe(html)
 
     name_display.short_description = _("Topic")
@@ -905,7 +905,7 @@ class UserSubscriptionAdmin(ModelAdmin):
     def subscription_info(self, obj):
         esc_id = conditional_escape(str(obj.id))
         date = conditional_escape(obj.created_at.strftime("%Y-%m-%d"))
-        html = f'<div class="text-sm"><div class="font-medium text-base-900 dark:text-base-100">Subscription #{esc_id}</div><div class="text-base-500 dark:text-base-400">{date}</div></div>'
+        html = f'<div class="text-sm"><div class="font-medium text-base-900 dark:text-base-100">Subscription #{esc_id}</div><div class="text-base-600 dark:text-base-300">{date}</div></div>'
         return mark_safe(html)
 
     subscription_info.short_description = _("Subscription")
@@ -914,7 +914,7 @@ class UserSubscriptionAdmin(ModelAdmin):
         name = obj.user.full_name or obj.user.username or "Anonymous"
         esc_name = conditional_escape(name)
         esc_email = conditional_escape(obj.user.email)
-        html = f'<div class="text-sm"><div class="font-medium text-base-700 dark:text-base-300">{esc_name}</div><div class="text-base-500 dark:text-base-400">{esc_email}</div></div>'
+        html = f'<div class="text-sm"><div class="font-medium text-base-700 dark:text-base-300">{esc_name}</div><div class="text-base-600 dark:text-base-300">{esc_email}</div></div>'
         return mark_safe(html)
 
     user_info.short_description = _("User")
@@ -926,7 +926,7 @@ class UserSubscriptionAdmin(ModelAdmin):
         )
         esc_topic = conditional_escape(topic)
         esc_cat = conditional_escape(obj.topic.get_category_display())
-        html = f'<div class="text-sm"><div class="font-medium text-base-700 dark:text-base-300">{esc_topic}</div><div class="text-base-500 dark:text-base-400">{esc_cat}</div></div>'
+        html = f'<div class="text-sm"><div class="font-medium text-base-700 dark:text-base-300">{esc_topic}</div><div class="text-base-600 dark:text-base-300">{esc_cat}</div></div>'
         return mark_safe(html)
 
     topic_info.short_description = _("Topic")

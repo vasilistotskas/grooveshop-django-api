@@ -232,7 +232,7 @@ class OrderItemInline(TabularInline):
             html = (
                 '<div class="text-sm">'
                 f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
-                f'<div class="text-base-500 dark:text-base-400">ID: {safe_id}</div>'
+                f'<div class="text-base-600 dark:text-base-300">ID: {safe_id}</div>'
                 "</div>"
             )
             return mark_safe(html)
@@ -318,7 +318,7 @@ class OrderHistoryInline(TabularInline):
             html = f'<div class="text-sm text-base-700 dark:text-base-300">{safe_name}</div>'
             return mark_safe(html)
         return mark_safe(
-            '<span class="text-base-400 dark:text-base-500">System</span>'
+            '<span class="text-base-600 dark:text-base-300">System</span>'
         )
 
     user_display.short_description = _("Changed By")
@@ -502,8 +502,8 @@ class OrderAdmin(ModelAdmin):
         html = (
             '<div class="text-sm">'
             f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
-            f'<div class="text-base-500 dark:text-base-400">{safe_email}</div>'
-            f'<div class="text-base-500 dark:text-base-400">{safe_phone}</div>'
+            f'<div class="text-base-600 dark:text-base-300">{safe_email}</div>'
+            f'<div class="text-base-600 dark:text-base-300">{safe_phone}</div>'
             "</div>"
         )
         return mark_safe(html)
@@ -536,7 +536,7 @@ class OrderAdmin(ModelAdmin):
         html = (
             '<div class="text-sm">'
             f'<div class="font-medium text-base-900 dark:text-base-100">{safe_count} items</div>'
-            f'<div class="text-base-500 dark:text-base-400">Qty: {safe_qty}</div>'
+            f'<div class="text-base-600 dark:text-base-300">Qty: {safe_qty}</div>'
             f'<div class="font-bold text-base-900 dark:text-base-100">{price_display}</div>'
             "</div>"
         )
@@ -554,7 +554,7 @@ class OrderAdmin(ModelAdmin):
             '<div class="text-sm">'
             f"<div>{payment_badge}</div>"
             f'<div class="font-medium text-base-900 dark:text-base-100">{safe_amount}</div>'
-            f'<div class="text-base-500 dark:text-base-400">{safe_method}</div>'
+            f'<div class="text-base-600 dark:text-base-300">{safe_method}</div>'
             "</div>"
         )
         return mark_safe(html)
@@ -573,15 +573,15 @@ class OrderAdmin(ModelAdmin):
             html = (
                 '<div class="text-sm">'
                 f'<div class="font-medium text-blue-600 dark:text-blue-400">{safe_tracking}</div>'
-                f'<div class="text-base-500 dark:text-base-400">{safe_carrier}</div>'
-                f'<div class="text-base-500 dark:text-base-400">{safe_city}</div>'
+                f'<div class="text-base-600 dark:text-base-300">{safe_carrier}</div>'
+                f'<div class="text-base-600 dark:text-base-300">{safe_city}</div>'
                 "</div>"
             )
         else:
             html = (
                 '<div class="text-sm">'
-                '<div class="text-base-500 dark:text-base-400">No tracking</div>'
-                f'<div class="text-base-500 dark:text-base-400">{safe_city}</div>'
+                '<div class="text-base-600 dark:text-base-300">No tracking</div>'
+                f'<div class="text-base-600 dark:text-base-300">{safe_city}</div>'
                 "</div>"
             )
         return mark_safe(html)
@@ -1233,7 +1233,7 @@ class OrderItemAdmin(ModelAdmin):
         html = (
             '<div class="text-sm">'
             f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
-            f'<div class="text-base-500 dark:text-base-400">ID: {safe_id}</div>'
+            f'<div class="text-base-600 dark:text-base-300">ID: {safe_id}</div>'
             "</div>"
         )
         return mark_safe(html)
@@ -1484,7 +1484,7 @@ class OrderHistoryAdmin(ModelAdmin):
             html = f'<div class="text-sm text-base-700 dark:text-base-300">{safe_name}</div>'
             return mark_safe(html)
         return mark_safe(
-            '<span class="text-base-400 dark:text-base-500 italic">System</span>'
+            '<span class="text-base-600 dark:text-base-300 italic">System</span>'
         )
 
     user_display.short_description = _("Changed By")
@@ -1536,7 +1536,7 @@ class OrderItemHistoryAdmin(ModelAdmin):
         html = (
             '<div class="text-sm">'
             f'<a href="{safe_url}" class="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">Item #{safe_item_id}</a>'
-            f'<div class="text-base-500 dark:text-base-400">Order #{safe_order_id}</div>'
+            f'<div class="text-base-600 dark:text-base-300">Order #{safe_order_id}</div>'
             "</div>"
         )
         return mark_safe(html)
@@ -1604,7 +1604,7 @@ class OrderItemHistoryAdmin(ModelAdmin):
             html = f'<div class="text-sm text-base-700 dark:text-base-300">{safe_name}</div>'
             return mark_safe(html)
         return mark_safe(
-            '<span class="text-base-400 dark:text-base-500 italic">System</span>'
+            '<span class="text-base-600 dark:text-base-300 italic">System</span>'
         )
 
     user_display.short_description = _("Changed By")

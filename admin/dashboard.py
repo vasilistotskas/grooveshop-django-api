@@ -396,7 +396,7 @@ def dashboard_callback(request, context):
         messages_table_rows.append(
             [
                 format_html(
-                    '<div class="font-medium">{}</div><div class="text-xs text-base-500">{}</div>',
+                    '<div class="font-medium">{}</div><div class="text-xs text-base-600 dark:text-base-300">{}</div>',
                     msg.name,
                     msg.email,
                 ),

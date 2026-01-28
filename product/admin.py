@@ -289,7 +289,7 @@ class ProductImageInline(TabularInline):
             )
             return mark_safe(html)
         return mark_safe(
-            '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-400 dark:text-base-500 text-xs">No Image</div>'
+            '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-600 dark:text-base-300 text-xs">No Image</div>'
         )
 
     image_preview.short_description = _("Preview")
@@ -345,7 +345,7 @@ class StockReservationInline(TabularInline):
         html = (
             '<div class="text-sm">'
             f'<div class="font-medium text-base-900 dark:text-base-100">#{safe_id}</div>'
-            f'<div class="text-xs text-base-500 dark:text-base-400">{safe_created}</div>'
+            f'<div class="text-xs text-base-600 dark:text-base-300">{safe_created}</div>'
             "</div>"
         )
         return mark_safe(html)
@@ -517,7 +517,7 @@ class StockLogInline(TabularInline):
                 "</span>"
             )
         else:
-            html = '<span class="text-sm text-base-500 dark:text-base-400">0</span>'
+            html = '<span class="text-sm text-base-600 dark:text-base-300">0</span>'
 
         return mark_safe(html)
 
@@ -556,7 +556,7 @@ class StockLogInline(TabularInline):
         reason = obj.reason or "N/A"
         safe_reason = conditional_escape(reason[:45])
         return mark_safe(
-            f'<span class="text-sm text-base-500 dark:text-base-400">{safe_reason}</span>'
+            f'<span class="text-sm text-base-600 dark:text-base-300">{safe_reason}</span>'
         )
 
     order_link.short_description = _("Related Order")
@@ -568,7 +568,7 @@ class StockLogInline(TabularInline):
             safe_user = conditional_escape(user_display[:20])
             html = f'<span class="text-sm text-base-600 dark:text-base-400">{safe_user}</span>'
         else:
-            html = '<span class="text-sm text-base-500 dark:text-base-400">System</span>'
+            html = '<span class="text-sm text-base-600 dark:text-base-300">System</span>'
 
         return mark_safe(html)
 
@@ -579,7 +579,7 @@ class StockLogInline(TabularInline):
         timestamp = obj.created_at.strftime("%m/%d %H:%M")
         safe_timestamp = conditional_escape(timestamp)
 
-        html = f'<span class="text-sm text-base-500 dark:text-base-400">{safe_timestamp}</span>'
+        html = f'<span class="text-sm text-base-600 dark:text-base-300">{safe_timestamp}</span>'
         return mark_safe(html)
 
     timestamp_display.short_description = _("Time")
@@ -799,7 +799,7 @@ class ProductAdmin(
             f"{image_html}"
             '<div class="text-sm">'
             f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
-            f'<div class="text-base-500 dark:text-base-400">#{safe_sku}</div>'
+            f'<div class="text-base-600 dark:text-base-300">#{safe_sku}</div>'
             "</div>"
             "</div>"
         )
@@ -829,12 +829,12 @@ class ProductAdmin(
             html = (
                 '<div class="text-sm">'
                 f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
-                f'<div class="text-xs text-base-500 dark:text-base-400">{safe_path}</div>'
+                f'<div class="text-xs text-base-600 dark:text-base-300">{safe_path}</div>'
                 "</div>"
             )
             return mark_safe(html)
         return mark_safe(
-            '<span class="text-base-400 dark:text-base-500">No Category</span>'
+            '<span class="text-base-600 dark:text-base-300">No Category</span>'
         )
 
     category_display.short_description = _("Category")
@@ -849,7 +849,7 @@ class ProductAdmin(
         safe_discount = conditional_escape(str(discount))
 
         price_class = (
-            "text-base-500 dark:text-base-400 line-through"
+            "text-base-600 dark:text-base-300 line-through"
             if discount > 0
             else "font-bold text-base-900 dark:text-base-100"
         )
@@ -1455,7 +1455,7 @@ class ProductCategoryImageInline(TabularInline):
             )
             return mark_safe(html)
         return mark_safe(
-            '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-400 dark:text-base-500 text-xs">No Image</div>'
+            '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-600 dark:text-base-300 text-xs">No Image</div>'
         )
 
     image_preview.short_description = _("Preview")
@@ -1580,8 +1580,8 @@ class ProductCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
         html = (
             '<div class="text-sm">'
             f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
-            f'<div class="text-base-500 dark:text-base-400">Level: {safe_level}</div>'
-            f'<div class="text-xs text-base-400 dark:text-base-500">{safe_path}</div>'
+            f'<div class="text-base-600 dark:text-base-300">Level: {safe_level}</div>'
+            f'<div class="text-xs text-base-600 dark:text-base-300">{safe_path}</div>'
             "</div>"
         )
         return mark_safe(html)
@@ -1600,8 +1600,8 @@ class ProductCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
         html = (
             '<div class="text-sm">'
             f'<div class="font-medium text-base-900 dark:text-base-100">Direct: {safe_direct}</div>'
-            f'<div class="text-base-600 dark:text-base-400">Total: {safe_total}</div>'
-            f'<div class="text-base-500 dark:text-base-500">Subcategories: {safe_children}</div>'
+            f'<div class="text-base-700 dark:text-base-200">Total: {safe_total}</div>'
+            f'<div class="text-base-600 dark:text-base-300">Subcategories: {safe_children}</div>'
             "</div>"
         )
         return mark_safe(html)
@@ -1638,7 +1638,7 @@ class ProductCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
             )
             return mark_safe(html)
         return mark_safe(
-            '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-400 dark:text-base-500 text-xs">'
+            '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-600 dark:text-base-300 text-xs">'
             "🖼"
             "</div>"
         )
@@ -1808,7 +1808,7 @@ class ProductReviewAdmin(ModelAdmin, TranslatableAdmin):
             html = (
                 '<div class="text-sm">'
                 f'<a href="{safe_url}" class="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">{safe_name}</a>'
-                f'<div class="text-base-500 dark:text-base-400">#{safe_id}</div>'
+                f'<div class="text-base-600 dark:text-base-300">#{safe_id}</div>'
                 "</div>"
             )
             return mark_safe(html)
@@ -1827,7 +1827,7 @@ class ProductReviewAdmin(ModelAdmin, TranslatableAdmin):
             html = (
                 '<div class="text-sm">'
                 f'<a href="{safe_url}" class="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">{safe_email}</a>'
-                f'<div class="text-base-500 dark:text-base-400">ID: {safe_id}</div>'
+                f'<div class="text-base-600 dark:text-base-300">ID: {safe_id}</div>'
                 "</div>"
             )
             return mark_safe(html)
@@ -2006,7 +2006,7 @@ class ProductFavouriteAdmin(ModelAdmin):
         html = (
             '<div class="text-sm">'
             f'<div class="font-medium text-base-900 dark:text-base-100">{safe_email}</div>'
-            f'<div class="text-base-500 dark:text-base-400">ID: {safe_id}</div>'
+            f'<div class="text-base-600 dark:text-base-300">ID: {safe_id}</div>'
             "</div>"
         )
         return mark_safe(html)
@@ -2024,7 +2024,7 @@ class ProductFavouriteAdmin(ModelAdmin):
         html = (
             '<div class="text-sm">'
             f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
-            f'<div class="text-base-500 dark:text-base-400">#{safe_sku}</div>'
+            f'<div class="text-base-600 dark:text-base-300">#{safe_sku}</div>'
             "</div>"
         )
         return mark_safe(html)
@@ -2109,7 +2109,7 @@ class ProductCategoryImageAdmin(ModelAdmin, TranslatableAdmin):
             )
             return mark_safe(html)
         return mark_safe(
-            '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-400 dark:text-base-500 text-xs">No Image</div>'
+            '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-600 dark:text-base-300 text-xs">No Image</div>'
         )
 
     image_preview.short_description = _("Preview")
@@ -2252,7 +2252,7 @@ class ProductImageAdmin(ModelAdmin, TranslatableAdmin):
             )
             return mark_safe(html)
         return mark_safe(
-            '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-400 dark:text-base-500 text-xs">No Image</div>'
+            '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-600 dark:text-base-300 text-xs">No Image</div>'
         )
 
     image_preview.short_description = _("Preview")
@@ -2268,7 +2268,7 @@ class ProductImageAdmin(ModelAdmin, TranslatableAdmin):
         html = (
             '<div class="text-sm">'
             f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
-            f'<div class="text-base-500 dark:text-base-400">#{safe_sku}</div>'
+            f'<div class="text-base-600 dark:text-base-300">#{safe_sku}</div>'
             "</div>"
         )
         return mark_safe(html)

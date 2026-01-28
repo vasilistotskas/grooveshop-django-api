@@ -223,7 +223,7 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
             f'<span class="text-blue-500">{link_icon}</span>'
             "</div>"
             f'<div class="text-base-600 dark:text-base-400">{safe_message}</div>'
-            f'<div class="text-xs text-base-500 dark:text-base-400">ID: {safe_id}</div>'
+            f'<div class="text-xs text-base-600 dark:text-base-300">ID: {safe_id}</div>'
             "</div>"
         )
         return mark_safe(html)
@@ -692,7 +692,7 @@ class NotificationUserAdmin(ModelAdmin):
             '<div class="text-sm">'
             f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
             f'<div class="text-base-600 dark:text-base-400">{safe_email}</div>'
-            f'<div class="text-xs text-base-500 dark:text-base-400">ID: {safe_id}</div>'
+            f'<div class="text-xs text-base-600 dark:text-base-300">ID: {safe_id}</div>'
             "</div>"
         )
         return mark_safe(html)
@@ -715,7 +715,7 @@ class NotificationUserAdmin(ModelAdmin):
             '<div class="text-sm">'
             f'<div class="font-medium text-base-900 dark:text-base-100">{safe_title}</div>'
             f'<div class="text-base-600 dark:text-base-400">{safe_kind}</div>'
-            f'<div class="text-xs text-base-500 dark:text-base-400">#{safe_id}</div>'
+            f'<div class="text-xs text-base-600 dark:text-base-300">#{safe_id}</div>'
             "</div>"
         )
         return mark_safe(html)
@@ -796,7 +796,7 @@ class NotificationUserAdmin(ModelAdmin):
             f"<span>{config['icon']}</span>"
             f"<span>{safe_priority}</span>"
             "</div>"
-            f'<div class="text-xs text-base-500 dark:text-base-400">{safe_category}</div>'
+            f'<div class="text-xs text-base-600 dark:text-base-300">{safe_category}</div>'
             "</div>"
         )
         return mark_safe(html)

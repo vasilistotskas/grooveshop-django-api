@@ -169,7 +169,7 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
             f'<div class="text-sm">'
             f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
             f'<div class="{safe_email_class}">{safe_email}</div>'
-            f'<div class="text-xs text-base-500 dark:text-base-400">ID: {safe_id}</div>'
+            f'<div class="text-xs text-base-600 dark:text-base-300">ID: {safe_id}</div>'
             f"</div>"
         )
         return mark_safe(html)
@@ -231,7 +231,7 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
             f'<div class="text-sm">'
             f'<div class="font-medium text-base-900 dark:text-base-100">{safe_chars} chars</div>'
             f'<div class="text-base-600 dark:text-base-400">{safe_words} words</div>'
-            f'<div class="text-base-500 dark:text-base-400">{safe_lines} lines</div>'
+            f'<div class="text-base-600 dark:text-base-300">{safe_lines} lines</div>'
             f'<div class="mt-1">{length_badge}</div>'
             f"</div>"
         )

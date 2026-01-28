@@ -431,7 +431,7 @@ class RegionAdmin(ModelAdmin, TranslatableAdmin):
             f"<span>{safe_name}</span>"
             "</div>"
             f'<div class="text-base-600 dark:text-base-400">Code: {safe_alpha}</div>'
-            f'<div class="text-xs text-base-500 dark:text-base-400">Sort: {safe_sort}</div>'
+            f'<div class="text-xs text-base-600 dark:text-base-300">Sort: {safe_sort}</div>'
             "</div>"
         )
         return mark_safe(html)

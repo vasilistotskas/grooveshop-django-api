@@ -204,7 +204,7 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
         usage_color = (
             "text-green-600 dark:text-green-400"
             if usage > 0
-            else "text-base-500 dark:text-base-400"
+            else "text-base-600 dark:text-base-300"
         )
         usage_icon = "🏷️"
         esc_color = conditional_escape(usage_color)
@@ -220,7 +220,7 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
             f"<span>{esc_label}</span>"
             "</div>"
             f'<div class="text-base-600 dark:text-base-400">ID: {esc_id}</div>'
-            f'<div class="text-xs text-base-500 dark:text-base-400">Sort: {esc_sort}</div>'
+            f'<div class="text-xs text-base-600 dark:text-base-300">Sort: {esc_sort}</div>'
             "</div>"
         )
         return mark_safe(html)
@@ -657,7 +657,7 @@ class TaggedItemAdmin(ModelAdmin):
             '<div class="text-sm">'
             f'<div class="font-medium text-base-900 dark:text-base-100">Item #{esc_id}</div>'
             f'<div class="text-base-600 dark:text-base-400">Object ID: {esc_obj}</div>'
-            f'<div class="text-xs text-base-500 dark:text-base-400">UUID: {esc_uuid}</div>'
+            f'<div class="text-xs text-base-600 dark:text-base-300">UUID: {esc_uuid}</div>'
             "</div>"
         )
         return mark_safe(html)

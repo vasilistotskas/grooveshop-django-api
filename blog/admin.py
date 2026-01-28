@@ -255,7 +255,7 @@ class BlogAuthorAdmin(ModelAdmin, TranslatableAdmin):
         html = (
             '<div class="flex items-center gap-2">'
             f'<strong class="text-base-900 dark:text-base-100">{safe_name}</strong>'
-            f'<span class="text-base-500 dark:text-base-400">({safe_email}</span>'
+            f'<span class="text-base-600 dark:text-base-300">({safe_email}</span>'
             "</div>"
         )
         return mark_safe(html)
@@ -490,7 +490,7 @@ class BlogCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
             )
             return mark_safe(html)
         return mark_safe(
-            '<span class="text-base-400 dark:text-base-500">No image</span>'
+            '<span class="text-base-600 dark:text-base-300">No image</span>'
         )
 
     category_image.short_description = _("Image")
@@ -700,7 +700,7 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
             )
             return mark_safe(html)
         return mark_safe(
-            '<span class="text-base-400 dark:text-base-500">No category</span>'
+            '<span class="text-base-600 dark:text-base-300">No category</span>'
         )
 
     category_badge.short_description = _("Category")
@@ -713,7 +713,7 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
             html = f'<span class="font-medium text-base-700 dark:text-base-300">{safe_name}</span>'
             return mark_safe(html)
         return mark_safe(
-            '<span class="text-base-400 dark:text-base-500">No author</span>'
+            '<span class="text-base-600 dark:text-base-300">No author</span>'
         )
 
     author_display.short_description = _("Author")
@@ -835,7 +835,7 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
             )
             return mark_safe(html)
         return mark_safe(
-            '<span class="text-base-400 dark:text-base-500">No image</span>'
+            '<span class="text-base-600 dark:text-base-300">No image</span>'
         )
 
     image_preview.short_description = ""
@@ -1027,12 +1027,12 @@ class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
             html = (
                 '<div class="text-sm">'
                 f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
-                f'<div class="text-base-500 dark:text-base-400">{safe_email}</div>'
+                f'<div class="text-base-600 dark:text-base-300">{safe_email}</div>'
                 "</div>"
             )
             return mark_safe(html)
         return mark_safe(
-            '<span class="text-base-400 dark:text-base-500 italic">Anonymous</span>'
+            '<span class="text-base-600 dark:text-base-300 italic">Anonymous</span>'
         )
 
     user_display.short_description = _("User")
@@ -1057,7 +1057,7 @@ class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
             )
             return mark_safe(html)
         return mark_safe(
-            '<span class="text-base-400 dark:text-base-500">No post</span>'
+            '<span class="text-base-600 dark:text-base-300">No post</span>'
         )
 
     post_link.short_description = _("Post")

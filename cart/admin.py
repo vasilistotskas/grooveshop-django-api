@@ -120,7 +120,7 @@ class CartItemInline(TabularInline):
             html = (
                 f'<div class="text-sm">'
                 f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
-                f'<div class="text-base-500 dark:text-base-400">ID: {safe_id}</div>'
+                f'<div class="text-base-600 dark:text-base-300">ID: {safe_id}</div>'
                 f"</div>"
             )
             return mark_safe(html)
@@ -135,7 +135,7 @@ class CartItemInline(TabularInline):
                 safe_final = conditional_escape(str(obj.final_price))
                 html = (
                     f'<div class="text-sm">'
-                    f'<div class="line-through text-base-500 dark:text-base-400">{safe_price}</div>'
+                    f'<div class="line-through text-base-600 dark:text-base-300">{safe_price}</div>'
                     f'<div class="font-medium text-green-600 dark:text-green-400">{safe_final}</div>'
                     f"</div>"
                 )
@@ -259,7 +259,7 @@ class CartAdmin(ModelAdmin):
             html = (
                 f'<div class="text-sm">'
                 f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
-                f'<div class="text-base-500 dark:text-base-400">{safe_email}</div>'
+                f'<div class="text-base-600 dark:text-base-300">{safe_email}</div>'
                 f"</div>"
             )
             return mark_safe(html)
@@ -267,7 +267,7 @@ class CartAdmin(ModelAdmin):
             return mark_safe(
                 '<div class="text-sm">'
                 '<div class="font-medium text-base-700 dark:text-base-300">Guest User</div>'
-                f'<div class="text-base-500 dark:text-base-400">Cart #{obj.id}</div>'
+                f'<div class="text-base-600 dark:text-base-300">Cart #{obj.id}</div>'
                 "</div>"
             )
 
@@ -334,7 +334,7 @@ class CartAdmin(ModelAdmin):
         html = (
             f'<div class="text-sm text-base-700 dark:text-base-300">'
             f'<div class="font-medium">{safe_total} items</div>'
-            f'<div class="text-base-500 dark:text-base-400">{safe_unique} unique</div>'
+            f'<div class="text-base-600 dark:text-base-300">{safe_unique} unique</div>'
             f"</div>"
         )
         return mark_safe(html)
@@ -503,7 +503,7 @@ class CartItemAdmin(ModelAdmin):
         html = (
             f'<div class="text-sm">'
             f'<div class="font-medium text-base-900 dark:text-base-100">Cart #{safe_cart}</div>'
-            f'<div class="text-base-500 dark:text-base-400">{safe_owner}</div>'
+            f'<div class="text-base-600 dark:text-base-300">{safe_owner}</div>'
             f"</div>"
         )
         return mark_safe(html)
@@ -520,7 +520,7 @@ class CartItemAdmin(ModelAdmin):
         html = (
             f'<div class="text-sm">'
             f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
-            f'<div class="text-base-500 dark:text-base-400">ID: {safe_id}</div>'
+            f'<div class="text-base-600 dark:text-base-300">ID: {safe_id}</div>'
             f"</div>"
         )
         return mark_safe(html)
@@ -551,7 +551,7 @@ class CartItemAdmin(ModelAdmin):
                 safe_total = conditional_escape(str(obj.total_price))
                 html = (
                     f'<div class="text-sm">'
-                    f'<div class="text-base-500 dark:text-base-400 line-through">{safe_price} each</div>'
+                    f'<div class="text-base-600 dark:text-base-300 line-through">{safe_price} each</div>'
                     f'<div class="font-medium text-green-600 dark:text-green-400">{safe_final} each</div>'
                     f'<div class="font-bold text-base-900 dark:text-base-100">Total: {safe_total}</div>'
                     f"</div>"
@@ -623,7 +623,7 @@ class CartItemAdmin(ModelAdmin):
             )
             return mark_safe(html)
         return mark_safe(
-            '<div class="text-sm text-base-500 dark:text-base-400">No discounts applied</div>'
+            '<div class="text-sm text-base-600 dark:text-base-300">No discounts applied</div>'
         )
 
     savings_info.short_description = _("Savings")

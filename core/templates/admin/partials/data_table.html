@@ -26,14 +26,14 @@
             </thead>
             <tbody class="divide-y divide-base-200 dark:divide-base-700">
                 {% for row in rows %}
-                <tr class="hover:bg-base-50 dark:hover:bg-base-700/50 transition-colors">
+                <tr class="hover:bg-base-50 dark:hover:bg-base-700/50">
                     {% for cell in row %}
                     <td class="px-4 py-3 text-base-700 dark:text-base-200">{{ cell|safe }}</td>
                     {% endfor %}
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="{{ headers|length }}" class="px-4 py-8 text-center text-base-500">
+                    <td colspan="{{ headers|length }}" class="px-4 py-8 text-center text-base-600 dark:text-base-300">
                         {{ empty_message|default:_("No data available") }}
                     </td>
                 </tr>

@@ -146,7 +146,7 @@ class CountryAdmin(ModelAdmin, TranslatableAdmin):
             f"<span>{safe_name}</span>"
             f"</div>"
             f'<div class="text-base-600 dark:text-base-400">{safe_alpha_2}</div>'
-            f'<div class="text-xs text-base-500 dark:text-base-400">Sort: {safe_sort_order}</div>'
+            f'<div class="text-xs text-base-600 dark:text-base-300">Sort: {safe_sort_order}</div>'
             f"</div>"
         )
         return mark_safe(html)
@@ -199,7 +199,7 @@ class CountryAdmin(ModelAdmin, TranslatableAdmin):
         iso_color = (
             "text-base-900 dark:text-base-100"
             if obj.iso_cc
-            else "text-base-400 dark:text-base-500"
+            else "text-base-600 dark:text-base-300"
         )
         safe_iso_color = conditional_escape(iso_color)
 
@@ -234,7 +234,7 @@ class CountryAdmin(ModelAdmin, TranslatableAdmin):
         else:
             phone_badge = (
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                "bg-gray-50 dark:bg-gray-900 text-base-500 dark:text-base-400 rounded border "
+                "bg-gray-50 dark:bg-gray-900 text-base-600 dark:text-base-300 rounded border "
                 'border-gray-200 dark:border-gray-700">📞 No Code</span>'
             )
 

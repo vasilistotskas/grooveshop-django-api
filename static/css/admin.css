@@ -34,9 +34,9 @@
 }
 
 .material-symbols-outlined {
-    font-size: 20px !important;
-    width: 20px;
-    height: 20px;
+    font-size: 20px;
+    width: auto;
+    height: auto;
     line-height: 1;
     display: inline-flex;
     align-items: center;
@@ -46,11 +46,36 @@
 header .material-symbols-outlined,
 .header .material-symbols-outlined,
 [class*="header"] .material-symbols-outlined {
-    font-size: 20px !important;
-    width: 20px;
-    height: 20px;
+    font-size: 20px;
+    width: auto;
+    height: auto;
 }
 
 button .material-symbols-outlined {
-    font-size: 20px !important;
+    font-size: 20px;
+}
+
+/* Enhanced Dark Mode Hover Visibility */
+.dark a[class*='bg-base-']:hover {
+    color: #fff !important;
+}
+
+/* Table Row Hover */
+.dark tr:hover td,
+.dark tr:hover td a {
+    color: #fff !important;
+}
+
+/* Forced High Contrast for Dark Mode Hover */
+.dark a.inline-flex:hover,
+.dark .flex-wrap > a:hover {
+    color: #ffffff !important;
+    background-color: #4b5563 !important; /* Ensure clear background */
+}
+
+.dark table tbody tr:hover td,
+.dark table tbody tr:hover th,
+.dark table tbody tr:hover a {
+    color: #ffffff !important;
+    background-color: #374151 !important; /* Ensure clear row background */
 }

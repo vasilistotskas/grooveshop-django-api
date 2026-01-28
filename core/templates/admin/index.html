@@ -84,9 +84,13 @@
             <div class="relative">
                 <div class="flex items-center justify-between">
                     <span class="material-symbols-outlined text-4xl" style="opacity: 0.8;">group</span>
-                    <div class="text-right">
-                        <span class="block text-xs font-medium"
-                            style="background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 4px;">{{ active_users }} active</span>
+                    <div class="text-right flex flex-col">
+                        <span class="rounded-full px-2 py-0.5 text-xs font-medium" style="background: rgba(255,255,255,0.2); opacity: 0.9;">
+                          {{ active_users }} active
+                        </span>
+                        <span class="rounded-full px-2 py-0.5 text-xs font-medium mt-1" style="background: rgba(255,255,255,0.1); opacity: 0.9;">
+                          {{ inactive_users }} inactive
+                        </span>
                     </div>
                 </div>
                 <p class="mt-4 text-3xl font-bold">{{ kpi.users|default:"0" }}</p>
@@ -103,8 +107,9 @@
                 <div class="flex items-center justify-between">
                     <span class="material-symbols-outlined text-4xl" style="opacity: 0.8;">inventory_2</span>
                     {% if kpi.low_stock > 0 %}
-                    <span class="rounded-full px-2 py-0.5 text-xs font-medium"
-                        style="background: rgba(239,68,68,0.8);">{{ kpi.low_stock }} low stock</span>
+                    <span class="rounded-full px-2 py-0.5 text-xs font-medium" style="background: rgba(239,68,68,0.8);">
+                      {{ kpi.low_stock }} low stock
+                    </span>
                     {% endif %}
                 </div>
                 <p class="mt-4 text-3xl font-bold">{{ kpi.products|default:"0" }}</p>

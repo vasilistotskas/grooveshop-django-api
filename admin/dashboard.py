@@ -443,7 +443,7 @@ def dashboard_callback(request, context):
     # Recent Orders Table
     recent_orders = Order.objects.select_related("user").order_by(
         "-created_at"
-    )[:5]
+    )[:8]
     orders_table_rows = []
     for order in recent_orders:
         status_badge = _get_status_badge(order.status)
@@ -701,6 +701,7 @@ def dashboard_callback(request, context):
             # Quick links
             "quick_links": quick_links,
             "active_users": active_users_count,
+            "inactive_users": inactive_users_count,
             "abandoned_carts": abandoned_carts_count,
             "discounted_products": discounted_products_count,
             # Legacy support for existing template parts

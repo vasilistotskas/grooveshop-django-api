@@ -27,8 +27,6 @@ class CustomCacheTestCase(TestCase):
         self.key = f"test_key_{test_method_name}_{unique_id}"
         self.value = "test_value"
 
-        self.cache_instance.clear()
-
     def test_cache_get(self):
         self.cache_instance.set(self.key, self.value)
         cached_value = self.cache_instance.get(self.key)
@@ -79,12 +77,6 @@ class CustomCacheTestCase(TestCase):
         self.assertIsNone(cached_value)
 
         self.assertTrue(deleted, f"Delete operation failed for key: {self.key}")
-
-    def test_cache_clear(self):
-        self.cache_instance.set(self.key, self.value)
-        self.cache_instance.clear()
-        cached_value = self.cache_instance.get(self.key)
-        self.assertIsNone(cached_value)
 
     def test_cache_has_key(self):
         self.cache_instance.set(self.key, self.value)

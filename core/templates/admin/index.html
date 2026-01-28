@@ -85,11 +85,13 @@
                 <div class="flex items-center justify-between">
                     <span class="material-symbols-outlined text-4xl" style="opacity: 0.8;">group</span>
                     <div class="text-right flex flex-col">
-                        <span class="rounded-full px-2 py-0.5 text-xs font-medium" style="background: rgba(255,255,255,0.2); opacity: 0.9;">
-                          {{ active_users }} active
+                        <span class="rounded-full px-2 py-0.5 text-xs font-medium"
+                            style="background: rgba(255,255,255,0.2); opacity: 0.9;">
+                            {{ active_users }} active
                         </span>
-                        <span class="rounded-full px-2 py-0.5 text-xs font-medium mt-1" style="background: rgba(255,255,255,0.1); opacity: 0.9;">
-                          {{ inactive_users }} inactive
+                        <span class="rounded-full px-2 py-0.5 text-xs font-medium mt-1"
+                            style="background: rgba(255,255,255,0.1); opacity: 0.9;">
+                            {{ inactive_users }} inactive
                         </span>
                     </div>
                 </div>
@@ -108,12 +110,13 @@
                     <span class="material-symbols-outlined text-4xl" style="opacity: 0.8;">inventory_2</span>
                     {% if kpi.low_stock > 0 %}
                     <span class="rounded-full px-2 py-0.5 text-xs font-medium" style="background: rgba(239,68,68,0.8);">
-                      {{ kpi.low_stock }} low stock
+                        {{ kpi.low_stock }} low stock
                     </span>
                     {% endif %}
                 </div>
                 <p class="mt-4 text-3xl font-bold">{{ kpi.products|default:"0" }}</p>
-                <p class="mt-1 text-sm text-white dark:text-white" style="opacity: 0.9;">{% trans "Active Products" %}</p>
+                <p class="mt-1 text-sm text-white dark:text-white" style="opacity: 0.9;">{% trans "Active Products" %}
+                </p>
             </div>
         </div>
     </div>
@@ -735,7 +738,7 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { position: 'right', labels: { boxWidth: 10, color: '#e5e5e5' } } },
+                    plugins: { legend: { position: 'right', labels: { boxWidth: 10, color: textColor } } },
                     cutout: '60%',
                     layout: { padding: 0 }
                 }
@@ -776,6 +779,54 @@
             });
         }
 
+    });
+
+    // Helper to update chart colors on theme change
+    function updateCharts() {
+        const isDark = document.documentElement.classList.contains('dark');
+        const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+        const textColor = isDark ? '#e5e5e5' : '#525252';
+
+        Chart.defaults.color = textColor;
+        Chart.defaults.borderColor = gridColor;
+
+        Object.values(Chart.instances).forEach(chart => {
+            // Update scales if they exist
+            if (chart.options.scales) {
+                ['x', 'y'].forEach(axis => {
+                    if (chart.options.scales[axis]) {
+                        if (chart.options.scales[axis].grid) {
+                            chart.options.scales[axis].grid.color = gridColor;
+                        }
+                        if (chart.options.scales[axis].ticks) {
+                            chart.options.scales[axis].ticks.color = textColor;
+                        }
+                    }
+                });
+            }
+
+            // Update specific charts
+            if (chart.canvas.id === 'blogCatChart') {
+                if (chart.options.plugins && chart.options.plugins.legend && chart.options.plugins.legend.labels) {
+                    chart.options.plugins.legend.labels.color = textColor;
+                }
+            }
+
+            chart.update();
+        });
+    }
+
+    // Observer for theme changes
+    const observer = new MutationObserver(function (mutations) {
+        mutations.forEach(function (mutation) {
+            if (mutation.attributeName === 'class') {
+                updateCharts();
+            }
+        });
+    });
+
+    observer.observe(document.documentElement, {
+        attributes: true
     });
 </script>
 {% endblock %}

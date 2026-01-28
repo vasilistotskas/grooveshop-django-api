@@ -3,6 +3,12 @@
 
 
 
+## v1.70.1 (2026-01-28)
+
+### Bug fixes
+
+* fix: dashboard ([`eec580a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eec580a1fa6d6c060eb2dec2b45784f3c644e2e5))
+
 ## v1.70.0 (2026-01-28)
 
 ### Bug fixes

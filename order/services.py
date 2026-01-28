@@ -349,7 +349,6 @@ class OrderService:
                     "total_price": str(cart.total_price.amount),
                     "currency": str(cart.total_price.currency),
                 },
-                "price_validation": validation_result.get("price_warnings", []),
             }
 
             # Track reservation IDs for this order
@@ -679,7 +678,6 @@ class OrderService:
                     "total_price": str(cart.total_price.amount),
                     "currency": str(cart.total_price.currency),
                 },
-                "price_validation": validation_result.get("price_warnings", []),
                 "payment_type": "offline",
             }
 
@@ -815,7 +813,6 @@ class OrderService:
         - Cart is not empty
         - All products still exist
         - All products are in stock
-        - Prices haven't changed significantly (>5% tolerance)
 
         Args:
             cart: Cart object to validate
@@ -825,8 +822,7 @@ class OrderService:
                 {
                     'valid': bool,
                     'errors': list[str],
-                    'warnings': list[str],
-                    'price_warnings': list[dict]
+                    'warnings': list[str]
                 }
 
         Example:
@@ -838,7 +834,6 @@ class OrderService:
         """
         errors = []
         warnings = []
-        price_warnings = []
 
         # Get cart items with optimized prefetching
         cart_items = cart.get_items()
@@ -850,7 +845,6 @@ class OrderService:
                 "valid": False,
                 "errors": errors,
                 "warnings": warnings,
-                "price_warnings": price_warnings,
             }
 
         # Check 2: All products exist and are in stock
@@ -876,77 +870,11 @@ class OrderService:
                     )
                 )
 
-            # Check 3: Prices haven't changed significantly (>5% tolerance)
-            current_price = product.final_price
-            # Use price_at_add if available, otherwise use current price (for backward compatibility)
-            cart_item_price = (
-                cart_item.price_at_add
-                if cart_item.price_at_add
-                else cart_item.product.final_price
-            )
-
-            # Calculate price difference percentage
-            if cart_item_price.amount > 0:
-                price_diff_percent = abs(
-                    (current_price.amount - cart_item_price.amount)
-                    / cart_item_price.amount
-                    * 100
-                )
-
-                # Get tolerance from settings (default 5%)
-                tolerance = getattr(
-                    settings, "PRICE_CHANGE_TOLERANCE_PERCENT", 5.0
-                )
-
-                if price_diff_percent > tolerance:
-                    # Price changed significantly - this is an error
-                    errors.append(
-                        _(
-                            "Price for product '{product}' has changed significantly. "
-                            "Was: {old_price}, Now: {new_price}"
-                        ).format(
-                            product=product.name,
-                            old_price=cart_item_price,
-                            new_price=current_price,
-                        )
-                    )
-                    price_warnings.append(
-                        {
-                            "product_id": product.id,
-                            "product_name": product.name,
-                            "old_price": str(cart_item_price.amount),
-                            "new_price": str(current_price.amount),
-                            "difference_percent": round(price_diff_percent, 2),
-                        }
-                    )
-                elif price_diff_percent > 0:
-                    # Price changed but within tolerance - this is a warning
-                    warnings.append(
-                        _(
-                            "Price for product '{product}' has changed slightly. "
-                            "Was: {old_price}, Now: {new_price}"
-                        ).format(
-                            product=product.name,
-                            old_price=cart_item_price,
-                            new_price=current_price,
-                        )
-                    )
-                    price_warnings.append(
-                        {
-                            "product_id": product.id,
-                            "product_name": product.name,
-                            "old_price": str(cart_item_price.amount),
-                            "new_price": str(current_price.amount),
-                            "difference_percent": round(price_diff_percent, 2),
-                        }
-                    )
-
         # Return validation results
         return {
             "valid": len(errors) == 0,
             "errors": errors,
             "warnings": warnings,
-            "price_warnings": price_warnings,
         }
 
     @classmethod

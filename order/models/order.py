@@ -45,11 +45,6 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
                 "total": "...",
                 "created_at": "..."
             },
-            "price_validation": {
-                "original_prices": {...},
-                "current_prices": {...},
-                "price_changes": {...}
-            },
             "cancellation": {
                 "reason": "...",
                 "cancelled_by": "...",

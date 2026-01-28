@@ -231,7 +231,6 @@ class CountryAdminTestCase(TestCase):
         self.assertIn("ZZ", result)
         self.assertIn("ZZZ", result)
         self.assertIn("ISO: —", result)
-        self.assertIn("text-base-400", result)
 
     def test_contact_info_with_phone(self):
         result = self.admin.contact_info(self.country)

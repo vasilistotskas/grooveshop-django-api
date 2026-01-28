@@ -21,7 +21,10 @@ def dashboard_callback(request, context):
     UserSubscription = apps.get_model("user", "UserSubscription")
     Contact = apps.get_model("contact", "Contact")
     Cart = apps.get_model("cart", "Cart")
+    Cart = apps.get_model("cart", "Cart")
     ProductCategory = apps.get_model("product", "ProductCategory")
+    BlogCategory = apps.get_model("blog", "BlogCategory")
+    StockLog = apps.get_model("order", "StockLog")
 
     # Import enums
     from order.enum.status import PaymentStatus, OrderStatus
@@ -302,11 +305,138 @@ def dashboard_callback(request, context):
 
     # 4. Total Blog Likes (KPI)
     # BlogPost has many-to-many to User via 'likes'
-    # Aggregating M2M count efficiently
     total_blog_likes = (
         BlogPost.objects.aggregate(total_likes=Count("likes"))["total_likes"]
         or 0
     )
+
+    # 5. Products with Discounts (KPI)
+    discounted_products_count = Product.objects.filter(
+        active=True, discount_percent__gt=0
+    ).count()
+
+    # 6. Active vs Inactive Users (KPI/Chart support)
+    active_users_count = User.objects.filter(is_active=True).count()
+    inactive_users_count = total_users - active_users_count
+
+    # ========== NEW CHART DATA ==========
+
+    # 1. Blog Posts by Category (Doughnut)
+    blog_category_counts = (
+        BlogCategory.objects.annotate(count=Count("blog_posts"))
+        .filter(count__gt=0)
+        .order_by("-count")[:5]
+    )
+    blog_cat_labels = []
+    blog_cat_data = []
+    for cat in blog_category_counts:
+        name = (
+            cat.safe_translation_getter("name", any_language=True) or "Unnamed"
+        )
+        blog_cat_labels.append(name)
+        blog_cat_data.append(cat.count)
+
+    blog_category_chart = {
+        "labels": blog_cat_labels,
+        "datasets": [
+            {
+                "data": blog_cat_data,
+                "backgroundColor": [
+                    "oklch(60% 0.15 280)",  # Purple
+                    "oklch(65% 0.15 300)",  # Magenta
+                    "oklch(70% 0.15 320)",  # Pink
+                    "oklch(75% 0.15 340)",  # Rose
+                    "oklch(80% 0.15 360)",  # Red
+                ],
+                "borderWidth": 0,
+            }
+        ],
+    }
+
+    # 2. Products by Category (Bar/Pie)
+    product_category_counts = (
+        ProductCategory.objects.annotate(count=Count("products"))
+        .filter(count__gt=0)
+        .order_by("-count")[:5]
+    )
+    prod_cat_labels = []
+    prod_cat_data = []
+    for cat in product_category_counts:
+        name = (
+            cat.safe_translation_getter("name", any_language=True) or "Unnamed"
+        )
+        prod_cat_labels.append(name)
+        prod_cat_data.append(cat.count)
+
+    product_category_chart = {
+        "labels": prod_cat_labels,
+        "datasets": [
+            {
+                "label": "Products",
+                "data": prod_cat_data,
+                "backgroundColor": "oklch(70% 0.15 85)",  # Orange/Yellow
+                "borderRadius": 4,
+            }
+        ],
+    }
+
+    # 3. Subscription Growth (Line Chart - Last 30 Days)
+    subs_by_day = (
+        UserSubscription.objects.filter(created_at__gte=month_ago)
+        .annotate(day=TruncDay("created_at"))
+        .values("day")
+        .annotate(count=Count("id"))
+        .order_by("day")
+    )
+    subs_dict = {
+        item["day"].strftime("%Y-%m-%d"): item["count"]
+        for item in subs_by_day
+        if item["day"]
+    }
+    subs_labels_30d = []
+    subs_data_30d = []
+    for i in range(30):
+        day_val = now - timedelta(days=29 - i)
+        day_str = day_val.strftime("%Y-%m-%d")
+        subs_labels_30d.append(day_val.strftime("%b %d"))
+        subs_data_30d.append(subs_dict.get(day_str, 0))
+
+    subscription_chart = {
+        "labels": subs_labels_30d,
+        "datasets": [
+            {
+                "label": "New Subscriptions",
+                "data": subs_data_30d,
+                "borderColor": "oklch(65% 0.2 145)",  # Green
+                "backgroundColor": "oklch(65% 0.2 145 / 0.1)",
+                "fill": True,
+                "tension": 0.4,
+            }
+        ],
+    }
+
+    # 4. Cart Abandonment (Pie)
+    # Active carts (updated < 24h) vs Abandoned carts (updated > 24h but < 30 days)
+    # We already have active_carts_count (<24h)
+    abandoned_threshold = now - timedelta(hours=24)
+    old_threshold = now - timedelta(days=30)
+    abandoned_carts_count = Cart.objects.filter(
+        updated_at__lt=abandoned_threshold, updated_at__gte=old_threshold
+    ).count()
+
+    cart_chart = {
+        "labels": ["Active (<24h)", "Abandoned (24h-30d)"],
+        "datasets": [
+            {
+                "data": [active_carts_count, abandoned_carts_count],
+                "backgroundColor": [
+                    "oklch(70% 0.15 145)",  # Green (Active)
+                    "oklch(65% 0.2 25)",  # Red (Abandoned)
+                ],
+                "borderWidth": 0,
+            }
+        ],
+    }
 
     # ========== TABLE DATA (Unfold format) ==========
 
@@ -439,6 +569,45 @@ def dashboard_callback(request, context):
         "rows": low_stock_rows,
     }
 
+    # Recent Stock Logs Table
+    recent_stock_logs = StockLog.objects.select_related(
+        "product", "performed_by"
+    ).order_by("-created_at")[:5]
+    stock_log_rows = []
+    for log in recent_stock_logs:
+        product_name = (
+            log.product.safe_translation_getter("name", any_language=True)
+            or "Unknown"
+        )
+        # Determine color based on operation type
+        op_color = "text-gray-600"
+        if log.operation_type == "INCREMENT":
+            op_color = "text-green-600"
+        elif log.operation_type == "DECREMENT":
+            op_color = "text-red-600"
+        elif log.operation_type == "RESERVE":
+            op_color = "text-yellow-600"
+
+        stock_log_rows.append(
+            [
+                format_html(
+                    '<span class="font-medium">{}</span>', product_name[:25]
+                ),
+                format_html(
+                    '<span class="{}">{}</span>',
+                    op_color,
+                    log.get_operation_type_display(),
+                ),
+                log.quantity_delta,
+                log.created_at.strftime("%b %d, %H:%M"),
+            ]
+        )
+
+    stock_log_table = {
+        "headers": ["Product", "Operation", "Qty", "Time"],
+        "rows": stock_log_rows,
+    }
+
     # ========== PROGRESS BARS ==========
 
     # Inventory health (percentage of products in stock)
@@ -516,16 +685,24 @@ def dashboard_callback(request, context):
             "status_chart": status_chart,
             "payment_chart": payment_chart,
             "country_chart": country_chart,
+            "blog_category_chart": blog_category_chart,
+            "product_category_chart": product_category_chart,
+            "subscription_chart": subscription_chart,
+            "cart_chart": cart_chart,
             # Tables (Unfold format)
             "orders_table": orders_table,
             "products_table": products_table,
             "reviews_table": reviews_table,
             "messages_table": messages_table,
             "low_stock_table": low_stock_table,
+            "stock_log_table": stock_log_table,
             # Progress bars
             "inventory_progress": inventory_progress,
             # Quick links
             "quick_links": quick_links,
+            "active_users": active_users_count,
+            "abandoned_carts": abandoned_carts_count,
+            "discounted_products": discounted_products_count,
             # Legacy support for existing template parts
             "recent_orders": recent_orders,
             "top_products": top_products,

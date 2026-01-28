@@ -22,6 +22,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.models.history import OrderHistory, OrderItemHistory
 from order.models.item import OrderItem
 from order.models.order import Order
+from order.models.stock_log import StockLog
 from order.services import OrderService
 
 
@@ -1608,3 +1609,41 @@ class OrderItemHistoryAdmin(ModelAdmin):
         )
 
     user_display.short_description = _("Changed By")
+
+
+@admin.register(StockLog)
+class StockLogAdmin(ModelAdmin):
+    list_display = (
+        "product",
+        "operation_type",
+        "quantity_delta",
+        "stock_before",
+        "stock_after",
+        "order",
+        "created_at",
+        "performed_by",
+    )
+    list_filter = (
+        "operation_type",
+        ("created_at", RangeDateTimeFilter),
+        "product__category",
+    )
+    search_fields = (
+        "product__translations__name",
+        "product__sku",
+        "order__id",
+        "reason",
+    )
+    readonly_fields = (
+        "product",
+        "operation_type",
+        "quantity_delta",
+        "stock_before",
+        "stock_after",
+        "order",
+        "reason",
+        "performed_by",
+        "created_at",
+    )
+    date_hierarchy = "created_at"
+    list_select_related = ("product", "order", "performed_by")

@@ -1101,7 +1101,7 @@ PHONENUMBER_DEFAULT_REGION = "GR"
 # Rosetta Translation Management
 ROSETTA_MESSAGES_PER_PAGE = 25
 ROSETTA_ENABLE_TRANSLATION_SUGGESTIONS = True
-ROSETTA_SHOW_AT_ADMIN_PANEL = True
+ROSETTA_SHOW_AT_ADMIN_PANEL = False
 ROSETTA_REQUIRES_AUTH = True
 ROSETTA_WSGI_AUTO_RELOAD = True
 ROSETTA_UWSGI_AUTO_RELOAD = True
@@ -1347,6 +1347,11 @@ UNFOLD = {
         ],
     },
     "SITE_DROPDOWN": [
+        {
+            "icon": "translate",
+            "title": _("Rosetta"),
+            "link": reverse_lazy("rosetta-file-list-redirect"),
+        },
         {
             "icon": "cached",
             "title": _("Cache"),

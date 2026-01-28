@@ -3,6 +3,24 @@
 
 
 
+## v1.70.0 (2026-01-28)
+
+### Bug fixes
+
+* fix: redunant test remove ([`517c119`](https://github.com/vasilistotskas/grooveshop-django-api/commit/517c11948fa879e58afe6b4336e4677caad17459))
+
+* fix: dashboard UI ([`0cd0c4f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0cd0c4f11571a850149ce5b33bb6e86d20b78063))
+
+* fix: dashboard UI ([`7e009dc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7e009dc17cc309e5dbd37b1100fce986043e5c3f))
+
+* fix: rosetta button ([`1fdeaed`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1fdeaed3279d79f5dfe59e02f320f342e6d26c24))
+
+### Features
+
+* feat: dashboard enhancements ([`b5f8b0f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5f8b0f5466c2cf023a221a065e1a5718c62f6b9))
+
+* feat: dashboard colors ([`6c172e2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6c172e210edd3096d0935a6ef85258d746895644))
+
 ## v1.69.0 (2026-01-28)
 
 ### Bug fixes

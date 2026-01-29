@@ -68,6 +68,8 @@ class IndexQuerySet:
         return self
 
     def order_by(self, *fields: str):
+        # Clear existing sort to avoid accumulation
+        self.__sort = []
         for field in fields:
             geopoint = "_" if "geoPoint" in field else ""
             if field.startswith("-"):
@@ -191,6 +193,19 @@ class IndexQuerySet:
         self.__locales = list(locales)
         return self
 
+    def facets(self, *facet_fields: str):
+        """
+        Add facets to the search query for dynamic filter counts and statistics.
+
+        Args:
+            *facet_fields: Field names to compute facets for
+
+        Returns:
+            self for method chaining
+        """
+        self.__facets = list(facet_fields)
+        return self
+
     def search(self, q: str = ""):
         results = self.index.search(
             q,
@@ -237,9 +252,17 @@ class IndexQuerySet:
                 }
             )
 
-        return {
+        response_data = {
             "results": enriched_results,
             "estimated_total_hits": results["estimatedTotalHits"],
             "offset": self.__offset,
             "limit": self.__limit,
         }
+
+        # Add facet data if present
+        if "facetDistribution" in results:
+            response_data["facetDistribution"] = results["facetDistribution"]
+        if "facetStats" in results:
+            response_data["facetStats"] = results["facetStats"]
+
+        return response_data

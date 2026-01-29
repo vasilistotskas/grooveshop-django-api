@@ -579,6 +579,47 @@ class TestIndexQuerySet:
         assert "_formatted" in enriched_result
         assert "_rankingScore" in enriched_result
 
+    @patch("meili.querysets.client")
+    def test_facets(self, mock_client):
+        mock_client.get_index.return_value = self.mock_index
+
+        queryset = IndexQuerySet(MockModel)
+        result = queryset.facets("category", "price", "brand")
+
+        assert result == queryset
+        assert queryset._IndexQuerySet__facets == ["category", "price", "brand"]
+
+    @patch("meili.querysets.client")
+    def test_search_with_facets(self, mock_client):
+        mock_client.get_index.return_value = self.mock_index
+
+        mock_search_results = {
+            "hits": [{"id": 1, "title": "Test Item"}],
+            "estimatedTotalHits": 1,
+            "facetDistribution": {"category": {"electronics": 10, "books": 5}},
+            "facetStats": {"price": {"min": 10.0, "max": 100.0}},
+        }
+        self.mock_index.search.return_value = mock_search_results
+
+        mock_obj = MagicMock()
+        mock_obj.pk = 1
+
+        mock_queryset = MagicMock()
+        mock_queryset.order_by.return_value = [mock_obj]
+        MockModel.objects.filter.return_value = mock_queryset
+
+        queryset = IndexQuerySet(MockModel)
+        queryset.facets("category", "price")
+        results = queryset.search("test")
+
+        call_args = self.mock_index.search.call_args[0][1]
+        assert call_args["facets"] == ["category", "price"]
+
+        assert "facetDistribution" in results
+        assert "facetStats" in results
+        assert results["facetDistribution"]["category"]["electronics"] == 10
+        assert results["facetStats"]["price"]["min"] == 10.0
+
 
 class TestNamedTuples:
     def test_radius_creation(self):

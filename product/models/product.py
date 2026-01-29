@@ -332,6 +332,7 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "final_price",
             "view_count",
             "category",
+            "category_name",
         )
         searchable_fields = ("id", "name", "description")
         displayed_fields = (
@@ -343,12 +344,14 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "final_price",
             "view_count",
             "category",
+            "category_name",
         )
         sortable_fields = (
             "likes_count",
             "final_price",
             "view_count",
             "discount_percent",
+            "created_at",
         )
         ranking_rules = [
             "words",
@@ -356,9 +359,6 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "proximity",
             "attribute",
             "sort",
-            "likes_count:desc",
-            "view_count:desc",
-            "final_price:desc",
             "exactness",
         ]
         synonyms = {
@@ -394,6 +394,16 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "likes_count": lambda obj: obj.master.likes_count,
             "view_count": lambda obj: obj.master.view_count,
             "final_price": lambda obj: float(obj.master.final_price.amount),
+            "discount_percent": lambda obj: float(obj.master.discount_percent),
+            "created_at": lambda obj: obj.master.created_at.isoformat(),
+            "category": lambda obj: obj.master.category.id
+            if obj.master.category
+            else None,
+            "category_name": lambda obj: (
+                obj.master.category.safe_translation_getter("name")
+                if obj.master.category
+                else None
+            ),
         }
 
     def __str__(self):

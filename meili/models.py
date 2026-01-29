@@ -160,7 +160,19 @@ class IndexMixin(models.Model):
         )
         _client.flush_tasks()
 
-        cls.meilisearch = IndexQuerySet(cls)
+    @classmethod
+    def get_meilisearch(cls):
+        """Return a fresh IndexQuerySet instance to avoid state accumulation."""
+        return IndexQuerySet(cls)
+
+    # Create a property-like descriptor for backward compatibility
+    class _MeilisearchDescriptor:
+        def __get__(self, obj, objtype=None):
+            if objtype is None:
+                objtype = type(obj)
+            return IndexQuerySet(objtype)
+
+    meilisearch = _MeilisearchDescriptor()
 
     def meili_filter(self) -> bool:
         return True

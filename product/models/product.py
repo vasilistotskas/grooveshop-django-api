@@ -324,6 +324,19 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
         verbose_name = _("Product Translation")
         verbose_name_plural = _("Product Translations")
 
+    @classmethod
+    def get_meilisearch_queryset(cls):
+        """Return optimized queryset for bulk indexing."""
+        from django.db.models import Count, Avg
+
+        return cls.objects.select_related(
+            "master", "master__category", "master__vat"
+        ).annotate(
+            _likes_count=Count("master__favourited_by", distinct=True),
+            _review_average=Avg("master__reviews__rate"),
+            _reviews_count=Count("master__reviews", distinct=True),
+        )
+
     class MeiliMeta:
         filterable_fields = (
             "name",
@@ -386,21 +399,24 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "disableOnAttributes": [],
         }
         faceting = {"maxValuesPerFacet": 100}
-        pagination = {"maxTotalHits": 1000}
+        pagination = {"maxTotalHits": 5_000_000}
 
     @classmethod
     def get_additional_meili_fields(cls):
         return {
-            "likes_count": lambda obj: obj.master.likes_count,
+            "likes_count": lambda obj: getattr(obj, "_likes_count", 0)
+            or obj.master.likes_count,
             "view_count": lambda obj: obj.master.view_count,
             "final_price": lambda obj: float(obj.master.final_price.amount),
             "discount_percent": lambda obj: float(obj.master.discount_percent),
-            "created_at": lambda obj: obj.master.created_at.isoformat(),
-            "category": lambda obj: obj.master.category.id
-            if obj.master.category
+            "created_at": lambda obj: obj.master.created_at.isoformat()
+            if obj.master.created_at
             else None,
+            "category": lambda obj: obj.master.category_id,
             "category_name": lambda obj: (
-                obj.master.category.safe_translation_getter("name")
+                obj.master.category.safe_translation_getter(
+                    "name", any_language=True
+                )
                 if obj.master.category
                 else None
             ),

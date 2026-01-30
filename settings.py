@@ -768,6 +768,7 @@ MEILISEARCH = {
     "DEBUG": DEBUG,
     "SYNC": DEBUG,
     "OFFLINE": bool(getenv("MEILI_OFFLINE", "False")),
+    "DEFAULT_BATCH_SIZE": int(getenv("MEILI_DEFAULT_BATCH_SIZE", "5000")),
 }
 
 SEED_DEFAULT_COUNT = int(getenv("SEED_DEFAULT_COUNT", "10"))

@@ -94,7 +94,7 @@ def handle_order_created(
                 cart = Cart.objects.filter(user=order.user).first()
                 if cart:
                     cart.delete()  # Delete entire cart, not just items
-                    logger.info(
+                    logger.debug(
                         "Cleared cart for user %s after order %s creation",
                         order.user.id,
                         order.id,

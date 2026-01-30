@@ -133,6 +133,15 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
         verbose_name = _("Blog Post Translation")
         verbose_name_plural = _("Blog Post Translations")
 
+    @classmethod
+    def get_meilisearch_queryset(cls):
+        """Return optimized queryset for bulk indexing."""
+        from django.db.models import Count
+
+        return cls.objects.select_related("master").annotate(
+            _likes_count=Count("master__likes", distinct=True)
+        )
+
     class MeiliMeta:
         filterable_fields = ("title", "language_code", "likes_count")
         searchable_fields = ("id", "title", "subtitle", "body")
@@ -186,7 +195,10 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
 
     @classmethod
     def get_additional_meili_fields(cls):
-        return {"likes_count": lambda obj: obj.master.likes_count}
+        return {
+            "likes_count": lambda obj: getattr(obj, "_likes_count", 0)
+            or obj.master.likes_count
+        }
 
     def __str__(self):
         title = self.title or "Untitled"

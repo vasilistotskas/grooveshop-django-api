@@ -1,10 +1,8 @@
 import logging
 from collections.abc import Iterable
-from json import loads
 from typing import Any, TypedDict
 
 from django.conf import settings
-from django.core.serializers import serialize
 from django.db import models
 from django.db.models.fields import Field
 from meilisearch.models.task import Task, TaskInfo
@@ -175,6 +173,12 @@ class IndexMixin(models.Model):
     meilisearch = _MeilisearchDescriptor()
 
     def meili_filter(self) -> bool:
+        """
+        A function to decide if the model should be added to meilisearch.
+
+        For example, if a post model could be a draft and that draft shouldn't
+        be in the search database, then this filter can make sure its not added.
+        """
         return True
 
     @classmethod
@@ -182,22 +186,41 @@ class IndexMixin(models.Model):
         return {}
 
     def meili_serialize(self):
-        serialized_model = loads(
-            serialize(
-                "json",
-                [self],
-                use_natural_foreign_keys=True,
-                use_natural_primary_keys=True,
-            )
-        )[0]
+        """
+        How to serialize the model to a dictionary to be used by meilisearch.
 
-        data = serialized_model["fields"]
+        By default, uses django.core.serializers.serialize and json.loads
+        Only serializes fields defined in displayed_fields, searchable_fields, and filterable_fields.
+        """
+        fields = {
+            *(self.MeiliMeta.displayed_fields or []),
+            *(self.MeiliMeta.searchable_fields or []),
+            *(self.MeiliMeta.filterable_fields or []),
+        }
 
+        # Try fast path first - direct field access
+        data = {}
+        for field_name in fields:
+            try:
+                value = getattr(self, field_name, None)
+                # Handle common types
+                if value is None:
+                    data[field_name] = None
+                elif isinstance(value, (str, int, float, bool)):
+                    data[field_name] = value
+                elif hasattr(value, "isoformat"):  # datetime/date
+                    data[field_name] = value.isoformat()
+                else:
+                    data[field_name] = str(value)
+            except AttributeError:
+                data[field_name] = None
+
+        # Add additional fields
         additional_fields = self.get_additional_meili_fields()
         for field_name, value_getter in additional_fields.items():
             try:
                 data[field_name] = value_getter(self)
-            except AttributeError:
+            except (AttributeError, TypeError):
                 data[field_name] = None
 
         if getattr(self.MeiliMeta, "include_pk_in_search", False):

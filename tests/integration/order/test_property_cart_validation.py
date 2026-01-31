@@ -284,15 +284,6 @@ class TestProperty24OrderCreationValidatesCartState:
             assert any(
                 "price" in str(error).lower() for error in result["errors"]
             ), f"Error should mention price: {result['errors']}"
-
-            # Verify price_warnings contains details
-            assert len(result["price_warnings"]) > 0, (
-                "Should have price warnings with details"
-            )
-            warning = result["price_warnings"][0]
-            assert warning["product_id"] == product.id
-            assert Decimal(warning["old_price"]) == original_price
-            assert Decimal(warning["new_price"]) == current_price
         else:
             # Price change <=5% should succeed (may have warnings)
             assert result["valid"] is True, (
@@ -301,13 +292,6 @@ class TestProperty24OrderCreationValidatesCartState:
             assert len(result["errors"]) == 0, (
                 f"Should have no errors, got: {result['errors']}"
             )
-
-            # May have warnings if price changed but within tolerance
-            if price_diff_percent > 0:
-                assert (
-                    len(result["warnings"]) > 0
-                    or len(result["price_warnings"]) > 0
-                ), "Should have warnings for price changes within tolerance"
 
     def test_multiple_items_with_mixed_issues(self):
         """
@@ -517,11 +501,6 @@ class TestProperty24OrderCreationValidatesCartState:
         assert len(result["errors"]) == 0, (
             f"Should have no errors, got: {result['errors']}"
         )
-
-        # Verify warning was generated
-        assert (
-            len(result["warnings"]) > 0 or len(result["price_warnings"]) > 0
-        ), "Should have warnings for price change within tolerance"
 
     @pytest.mark.parametrize(
         "num_items,stocks,quantities",

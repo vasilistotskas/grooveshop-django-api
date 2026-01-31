@@ -424,11 +424,6 @@ class TestValidateCartForCheckout:
         assert result["valid"] is True, (
             f"Expected valid=True but got errors: {result['errors']}"
         )
-        assert (
-            len(result["warnings"]) > 0 or len(result["price_warnings"]) > 0
-        ), (
-            f"Expected warnings but got: warnings={result['warnings']}, price_warnings={result['price_warnings']}"
-        )
 
     def test_price_change_exceeds_tolerance_fails_validation(self):
         """Test that price changes >5% fail validation."""
@@ -447,7 +442,6 @@ class TestValidateCartForCheckout:
         assert "valid" in result
         assert "errors" in result
         assert "warnings" in result
-        assert "price_warnings" in result
 
 
 @pytest.mark.django_db

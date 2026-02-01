@@ -1,3 +1,5 @@
+import os
+
 import pytest
 from django.conf import settings
 from django.contrib.sites.models import Site
@@ -19,6 +21,30 @@ settings.DATABASES["default"]["CONN_MAX_AGE"] = 0
 settings.CELERY_TASK_ALWAYS_EAGER = True
 settings.CELERY_TASK_EAGER_PROPAGATES = True
 settings.DEBUG = False
+
+
+def is_meilisearch_available():
+    """Check if Meilisearch is available for testing."""
+    try:
+        import meilisearch
+
+        host = os.environ.get("MEILI_HTTP_ADDR", "http://localhost:7700")
+        key = os.environ.get("MEILI_MASTER_KEY", "")
+        client = meilisearch.Client(host, key)
+        client.health()
+        return True
+    except Exception:
+        return False
+
+
+# Check Meilisearch availability once at module load
+MEILISEARCH_AVAILABLE = is_meilisearch_available()
+
+# Skip marker for tests requiring Meilisearch
+requires_meilisearch = pytest.mark.skipif(
+    not MEILISEARCH_AVAILABLE,
+    reason="Meilisearch is not available",
+)
 
 
 @pytest.fixture(autouse=True)

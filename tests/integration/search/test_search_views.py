@@ -18,6 +18,7 @@ from rest_framework import status
 from blog.models.post import BlogPost, BlogPostTranslation
 from product.models.product import Product, ProductTranslation
 from search.models import SearchClick, SearchQuery
+from tests.conftest import requires_meilisearch
 
 User = get_user_model()
 
@@ -518,6 +519,7 @@ class TestAnalyticsMetricsCompleteness:
         )
 
 
+@requires_meilisearch
 @pytest.mark.django_db
 class TestAnalyticsLoggingFailuresDontBreakSearch:
     """
@@ -529,6 +531,9 @@ class TestAnalyticsLoggingFailuresDontBreakSearch:
 
     For any search request, if analytics logging fails, the search should
     still complete successfully and return results.
+
+    NOTE: These tests require a running Meilisearch instance.
+    They are skipped in CI environments where Meilisearch is not available.
     """
 
     @pytest.mark.parametrize(
@@ -682,6 +687,7 @@ class TestAnalyticsLoggingFailuresDontBreakSearch:
                 ], "Search should handle database errors gracefully"
 
 
+@requires_meilisearch
 @pytest.mark.django_db
 class TestFederatedSearchEndToEnd:
     """
@@ -693,6 +699,9 @@ class TestFederatedSearchEndToEnd:
     - Content filtering (active products, published blog posts)
     - Greeklish expansion for Greek queries
     - Analytics tracking integration
+
+    NOTE: These tests require a running Meilisearch instance.
+    They are skipped in CI environments where Meilisearch is not available.
 
     Validates: Requirements 1.1-1.11, 2.8
     """

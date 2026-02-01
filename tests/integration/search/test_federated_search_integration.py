@@ -7,16 +7,22 @@ These tests validate the complete federated search flow including:
 - Analytics tracking
 - Greeklish expansion
 - Result weighting and merging
+
+NOTE: These tests require a running Meilisearch instance with properly
+configured indexes. They are skipped in CI environments where Meilisearch
+is not available.
 """
 
 import pytest
 from django.test import Client
 from django.contrib.auth import get_user_model
 from search.models import SearchQuery, SearchClick
+from tests.conftest import requires_meilisearch
 
 User = get_user_model()
 
 
+@requires_meilisearch
 @pytest.mark.django_db
 class TestFederatedSearchIntegration:
     """Integration tests for federated search endpoint."""

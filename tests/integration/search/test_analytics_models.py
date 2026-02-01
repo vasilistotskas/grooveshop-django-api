@@ -97,8 +97,8 @@ class TestSearchQueryModel:
 
             cursor.execute(
                 """
-                SELECT indexname 
-                FROM pg_indexes 
+                SELECT indexname
+                FROM pg_indexes
                 WHERE tablename = %s
                 """,
                 [table_name],
@@ -210,8 +210,8 @@ class TestSearchClickModel:
 
             cursor.execute(
                 """
-                SELECT indexname 
-                FROM pg_indexes 
+                SELECT indexname
+                FROM pg_indexes
                 WHERE tablename = %s
                 """,
                 [table_name],

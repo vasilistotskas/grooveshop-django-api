@@ -47,6 +47,10 @@ class EnhancedImageQuerySet(TranslatableQuerySet):
         """
         return self.for_list().with_product_translations()
 
+    def optimized_for_list(self) -> Self:
+        """Alias for for_list() for backward compatibility."""
+        return self.for_list()
+
     def main_images(self):
         return self.filter(is_main=True)
 
@@ -77,14 +81,6 @@ class EnhancedImageQuerySet(TranslatableQuerySet):
 
     def ordered_by_position(self):
         return self.order_by("sort_order", "created_at")
-
-    def optimized_for_list(self):
-        """Legacy method - use for_list() instead."""
-        return self.for_list()
-
-    def with_product_data(self):
-        """Legacy method - use for_detail() instead."""
-        return self.for_detail()
 
     def get_products_needing_images(self, max_images=5):
         from product.models.product import Product  # noqa: PLC0415
@@ -177,16 +173,19 @@ class EnhancedImageManager(TranslatableManager):
     def without_titles(self):
         return self.get_queryset().without_titles()
 
+    def ordered_by_position(self):
+        return self.get_queryset().ordered_by_position()
+
     def recent(self, days=7):
         return self.get_queryset().recent(days)
 
     def optimized_for_list(self):
-        """Legacy method - use for_list() instead."""
+        """Alias for for_list() for backward compatibility."""
         return self.get_queryset().for_list()
 
     def with_product_data(self):
-        """Legacy method - use for_detail() instead."""
-        return self.get_queryset().for_detail()
+        """Return queryset with product data prefetched."""
+        return self.get_queryset().with_product().with_product_translations()
 
     def get_products_needing_images(self, max_images=5):
         return self.get_queryset().get_products_needing_images(max_images)
@@ -196,6 +195,3 @@ class EnhancedImageManager(TranslatableManager):
 
     def bulk_update_sort_order(self, image_orders):
         return self.get_queryset().bulk_update_sort_order(image_orders)
-
-    def ordered_by_position(self):
-        return self.get_queryset().ordered_by_position()

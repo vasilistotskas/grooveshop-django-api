@@ -333,8 +333,8 @@ class TestEnhancedReviewQuerySet:
         assert review_with_comment not in reviews_without_comments
         assert review_with_whitespace_comment not in reviews_without_comments
 
-    def test_with_product_details(self, product_review):
-        queryset = ProductReview.objects.with_product_details()
+    def test_for_detail(self, product_review):
+        queryset = ProductReview.objects.for_detail()
 
         assert product_review in queryset
 
@@ -609,10 +609,8 @@ class TestProductReviewManager:
         assert review_with_comment not in reviews_without_comments
         assert review_with_whitespace_comment not in reviews_without_comments
 
-    def test_manager_delegates_to_queryset_with_product_details(
-        self, product_review
-    ):
-        reviews_with_details = ProductReview.objects.with_product_details()
+    def test_manager_delegates_to_queryset_for_detail(self, product_review):
+        reviews_with_details = ProductReview.objects.for_detail()
         review = reviews_with_details.get(id=product_review.id)
 
         assert hasattr(review, "product")

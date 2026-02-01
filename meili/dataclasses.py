@@ -15,3 +15,4 @@ class MeiliIndexSettings:
     typo_tolerance: dict[str, Any] | None = None
     faceting: dict[str, Any] | None = None
     pagination: dict[str, Any] | None = None
+    search_cutoff_ms: int | None = None

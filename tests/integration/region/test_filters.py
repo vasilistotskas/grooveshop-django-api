@@ -1,3 +1,5 @@
+import uuid
+
 from django.conf import settings
 from django.urls import reverse
 from rest_framework import status
@@ -16,62 +18,73 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 class RegionFilterTestCase(TestURLFixerMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
+        # Use unique alpha codes to avoid conflicts with parallel tests
+        cls.test_id = uuid.uuid4().hex[:4].upper()
+
         cls.country_gr = CountryFactory(
-            alpha_2="GR",
-            alpha_3="GRC",
-            iso_cc=300,
+            alpha_2=f"G{cls.test_id[:1]}",
+            alpha_3=f"GR{cls.test_id[:1]}",
+            iso_cc=300 + int(cls.test_id[:2], 16) % 100,
             phone_code=30,
         )
         cls.country_us = CountryFactory(
-            alpha_2="US",
-            alpha_3="USA",
-            iso_cc=840,
+            alpha_2=f"U{cls.test_id[1:2]}",
+            alpha_3=f"US{cls.test_id[1:2]}",
+            iso_cc=840 + int(cls.test_id[:2], 16) % 100,
             phone_code=1,
         )
         cls.country_de = CountryFactory(
-            alpha_2="DE",
-            alpha_3="DEU",
-            iso_cc=276,
+            alpha_2=f"D{cls.test_id[2:3]}",
+            alpha_3=f"DE{cls.test_id[2:3]}",
+            iso_cc=276 + int(cls.test_id[:2], 16) % 100,
             phone_code=49,
         )
 
         for country in [cls.country_gr, cls.country_us, cls.country_de]:
             for lang in languages:
                 country.set_current_language(lang)
-                if country.alpha_2 == "GR":
-                    country.name = "Greece" if lang == "en" else "Ελλάδα"
-                elif country.alpha_2 == "US":
+                if country == cls.country_gr:
                     country.name = (
-                        "United States"
+                        f"Greece-{cls.test_id}"
                         if lang == "en"
-                        else "Ηνωμένες Πολιτείες"
+                        else f"Ελλάδα-{cls.test_id}"
                     )
-                elif country.alpha_2 == "DE":
-                    country.name = "Germany" if lang == "en" else "Γερμανία"
+                elif country == cls.country_us:
+                    country.name = (
+                        f"United States-{cls.test_id}"
+                        if lang == "en"
+                        else f"Ηνωμένες Πολιτείες-{cls.test_id}"
+                    )
+                elif country == cls.country_de:
+                    country.name = (
+                        f"Germany-{cls.test_id}"
+                        if lang == "en"
+                        else f"Γερμανία-{cls.test_id}"
+                    )
                 country.save()
 
         cls.region_attica = RegionFactory(
-            alpha="GR-A",
+            alpha=f"{cls.country_gr.alpha_2}-A",
             country=cls.country_gr,
             sort_order=1,
         )
         cls.region_crete = RegionFactory(
-            alpha="GR-M",
+            alpha=f"{cls.country_gr.alpha_2}-M",
             country=cls.country_gr,
             sort_order=2,
         )
         cls.region_california = RegionFactory(
-            alpha="US-CA",
+            alpha=f"{cls.country_us.alpha_2}-CA",
             country=cls.country_us,
             sort_order=1,
         )
         cls.region_texas = RegionFactory(
-            alpha="US-TX",
+            alpha=f"{cls.country_us.alpha_2}-TX",
             country=cls.country_us,
             sort_order=2,
         )
         cls.region_bavaria = RegionFactory(
-            alpha="DE-BY",
+            alpha=f"{cls.country_de.alpha_2}-BY",
             country=cls.country_de,
             sort_order=1,
         )
@@ -94,22 +107,27 @@ class RegionFilterTestCase(TestURLFixerMixin, APITestCase):
         return reverse("region-list")
 
     def test_filter_by_alpha_partial_match(self):
-        response = self.client.get(self.get_region_list_url(), {"alpha": "GR"})
+        response = self.client.get(
+            self.get_region_list_url(), {"alpha": self.country_gr.alpha_2}
+        )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         self.assertEqual(len(response.data["results"]), 2)
         alpha_codes = [item["alpha"] for item in response.data["results"]]
-        self.assertIn("GR-A", alpha_codes)
-        self.assertIn("GR-M", alpha_codes)
+        self.assertIn(self.region_attica.alpha, alpha_codes)
+        self.assertIn(self.region_crete.alpha, alpha_codes)
 
     def test_filter_by_alpha_exact_match(self):
         response = self.client.get(
-            self.get_region_list_url(), {"alpha_exact": "GR-A"}
+            self.get_region_list_url(),
+            {"alpha_exact": self.region_attica.alpha},
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         self.assertEqual(len(response.data["results"]), 1)
-        self.assertEqual(response.data["results"][0]["alpha"], "GR-A")
+        self.assertEqual(
+            response.data["results"][0]["alpha"], self.region_attica.alpha
+        )
 
     def test_filter_by_alpha_exact_no_match(self):
         response = self.client.get(
@@ -121,33 +139,35 @@ class RegionFilterTestCase(TestURLFixerMixin, APITestCase):
 
     def test_filter_by_country_alpha_2(self):
         response = self.client.get(
-            self.get_region_list_url(), {"country": "US"}
+            self.get_region_list_url(), {"country": self.country_us.alpha_2}
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         self.assertEqual(len(response.data["results"]), 2)
         for item in response.data["results"]:
-            self.assertEqual(item["country"], "US")
+            self.assertEqual(item["country"], self.country_us.alpha_2)
 
     def test_filter_by_country_name_partial_match(self):
         response = self.client.get(
-            self.get_region_list_url(), {"country_name": "Gree"}
+            self.get_region_list_url(),
+            {"country_name": f"Greece-{self.test_id}"},
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         self.assertEqual(len(response.data["results"]), 2)
         for item in response.data["results"]:
-            self.assertEqual(item["country"], "GR")
+            self.assertEqual(item["country"], self.country_gr.alpha_2)
 
     def test_filter_by_country_name_case_insensitive(self):
         response = self.client.get(
-            self.get_region_list_url(), {"country_name": "greece"}
+            self.get_region_list_url(),
+            {"country_name": f"greece-{self.test_id}"},
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         self.assertEqual(len(response.data["results"]), 2)
         for item in response.data["results"]:
-            self.assertEqual(item["country"], "GR")
+            self.assertEqual(item["country"], self.country_gr.alpha_2)
 
     def test_filter_by_region_name_partial_match(self):
         response = self.client.get(
@@ -157,7 +177,7 @@ class RegionFilterTestCase(TestURLFixerMixin, APITestCase):
 
         self.assertGreaterEqual(len(response.data["results"]), 1)
         alpha_codes = [item["alpha"] for item in response.data["results"]]
-        self.assertIn("GR-A", alpha_codes)
+        self.assertIn(self.region_attica.alpha, alpha_codes)
 
     def test_filter_by_region_name_case_insensitive(self):
         response = self.client.get(
@@ -167,7 +187,7 @@ class RegionFilterTestCase(TestURLFixerMixin, APITestCase):
 
         self.assertGreaterEqual(len(response.data["results"]), 1)
         alpha_codes = [item["alpha"] for item in response.data["results"]]
-        self.assertIn("GR-A", alpha_codes)
+        self.assertIn(self.region_attica.alpha, alpha_codes)
 
     def test_filter_by_uuid(self):
         response = self.client.get(
@@ -188,7 +208,7 @@ class RegionFilterTestCase(TestURLFixerMixin, APITestCase):
 
     def test_filter_by_created_at_after(self):
         new_region = RegionFactory(
-            alpha="TEST-1",
+            alpha=f"T{self.test_id[:3]}1",
             country=self.country_gr,
         )
 
@@ -266,23 +286,28 @@ class RegionFilterTestCase(TestURLFixerMixin, APITestCase):
     def test_combined_filters(self):
         response = self.client.get(
             self.get_region_list_url(),
-            {"country": "GR", "alpha": "GR-A", "ordering": "sort_order"},
+            {
+                "country": self.country_gr.alpha_2,
+                "alpha": self.region_attica.alpha,
+                "ordering": "sort_order",
+            },
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         self.assertEqual(len(response.data["results"]), 1)
         result = response.data["results"][0]
-        self.assertEqual(result["alpha"], "GR-A")
-        self.assertEqual(result["country"], "GR")
+        self.assertEqual(result["alpha"], self.region_attica.alpha)
+        self.assertEqual(result["country"], self.country_gr.alpha_2)
 
     def test_search_functionality(self):
         response = self.client.get(
-            self.get_region_list_url(), {"search": "GR-A"}
+            self.get_region_list_url(), {"search": self.region_attica.alpha}
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         found = any(
-            item["alpha"] == "GR-A" for item in response.data["results"]
+            item["alpha"] == self.region_attica.alpha
+            for item in response.data["results"]
         )
         self.assertTrue(found)
 
@@ -292,15 +317,19 @@ class RegionFilterTestCase(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         found = any(
-            item["alpha"] == "US-CA" for item in response.data["results"]
+            item["alpha"] == self.region_california.alpha
+            for item in response.data["results"]
         )
         self.assertTrue(found)
 
-        response = self.client.get(self.get_region_list_url(), {"search": "DE"})
+        response = self.client.get(
+            self.get_region_list_url(), {"search": self.country_de.alpha_2}
+        )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         found = any(
-            item["country"] == "DE" for item in response.data["results"]
+            item["country"] == self.country_de.alpha_2
+            for item in response.data["results"]
         )
         self.assertTrue(found)
 
@@ -312,13 +341,14 @@ class RegionFilterTestCase(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         response = self.client.get(
-            self.get_region_list_url(), {"countryName": "Greece"}
+            self.get_region_list_url(),
+            {"countryName": f"Greece-{self.test_id}"},
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         self.assertEqual(len(response.data["results"]), 2)
         for item in response.data["results"]:
-            self.assertEqual(item["country"], "GR")
+            self.assertEqual(item["country"], self.country_gr.alpha_2)
 
     def test_empty_filter_values(self):
         response = self.client.get(
@@ -344,12 +374,13 @@ class RegionFilterTestCase(TestURLFixerMixin, APITestCase):
     def test_pagination_with_filters(self):
         for i in range(10):
             RegionFactory(
-                alpha=f"TEST-{i}",
+                alpha=f"T{self.test_id[:2]}{i}",
                 country=self.country_gr,
             )
 
         response = self.client.get(
-            self.get_region_list_url(), {"country": "GR", "page_size": 5}
+            self.get_region_list_url(),
+            {"country": self.country_gr.alpha_2, "page_size": 5},
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 

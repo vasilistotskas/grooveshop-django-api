@@ -143,17 +143,39 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
         )
 
     class MeiliMeta:
-        filterable_fields = ("title", "language_code", "likes_count")
+        filterable_fields = (
+            "title",
+            "language_code",
+            "likes_count",
+            "category",
+            "category_name",
+            "is_published",
+        )
         searchable_fields = ("id", "title", "subtitle", "body")
-        displayed_fields = ("id", "title", "subtitle", "body", "language_code")
-        sortable_fields = ("likes_count",)
+        displayed_fields = (
+            "id",
+            "title",
+            "subtitle",
+            "body",
+            "language_code",
+            "likes_count",
+            "view_count",
+            "created_at",
+            "category",
+            "category_name",
+            "is_published",
+        )
+        sortable_fields = (
+            "likes_count",
+            "view_count",
+            "created_at",
+        )
         ranking_rules = [
             "words",
             "typo",
             "proximity",
             "attribute",
             "sort",
-            "likes_count:desc",
             "exactness",
         ]
         synonyms = {
@@ -190,14 +212,28 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
             "disableOnWords": ["specific"],
             "disableOnAttributes": ["id"],
         }
-        faceting = {"maxValuesPerFacet": 50}
-        pagination = {"maxTotalHits": 1000}
+        faceting = {"maxValuesPerFacet": 100}
+        pagination = {"maxTotalHits": 50000}
+        search_cutoff_ms = 1500
 
     @classmethod
     def get_additional_meili_fields(cls):
         return {
             "likes_count": lambda obj: getattr(obj, "_likes_count", 0)
-            or obj.master.likes_count
+            or obj.master.likes_count,
+            "view_count": lambda obj: obj.master.view_count,
+            "created_at": lambda obj: obj.master.created_at.isoformat()
+            if obj.master.created_at
+            else None,
+            "category": lambda obj: obj.master.category_id,
+            "category_name": lambda obj: (
+                obj.master.category.safe_translation_getter(
+                    "name", any_language=True
+                )
+                if obj.master.category
+                else None
+            ),
+            "is_published": lambda obj: obj.master.is_published,
         }
 
     def __str__(self):

@@ -57,6 +57,10 @@ class Client:
             "pagination": index_settings.pagination or {"maxTotalHits": 1000},
         }
 
+        # Add searchCutoffMs if provided
+        if index_settings.search_cutoff_ms is not None:
+            settings_payload["searchCutoffMs"] = index_settings.search_cutoff_ms
+
         self.tasks.append(
             self._handle_sync(
                 self.client.index(index_name).update_settings(settings_payload)

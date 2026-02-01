@@ -163,8 +163,9 @@ class IndexMixin(models.Model):
         """Return a fresh IndexQuerySet instance to avoid state accumulation."""
         return IndexQuerySet(cls)
 
-    # Create a property-like descriptor for backward compatibility
     class _MeilisearchDescriptor:
+        """Descriptor that returns a fresh IndexQuerySet instance on each access."""
+
         def __get__(self, obj, objtype=None):
             if objtype is None:
                 objtype = type(obj)

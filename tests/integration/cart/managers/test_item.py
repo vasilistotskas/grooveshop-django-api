@@ -93,10 +93,10 @@ class TestCartItemQuerySet:
         items_for_user = CartItem.objects.for_user(anonymous_user)
         assert items_for_user.count() == 0
 
-    def test_with_product_data(self, cart, product):
+    def test_for_list(self, cart, product):
         item = CartItemFactory(cart=cart, product=product)
 
-        items_with_data = CartItem.objects.with_product_data().filter(cart=cart)
+        items_with_data = CartItem.objects.for_list().filter(cart=cart)
         item_with_data = items_with_data.get(id=item.id)
 
         assert hasattr(item_with_data, "product")
@@ -330,12 +330,10 @@ class TestCartItemManager:
         items_for_user = CartItem.objects.for_user(user)
         assert item in items_for_user
 
-    def test_manager_delegates_to_queryset_with_product_data(
-        self, cart, product
-    ):
+    def test_manager_delegates_to_queryset_for_list(self, cart, product):
         _ = CartItemFactory(cart=cart, product=product)
 
-        items_with_data = CartItem.objects.with_product_data()
+        items_with_data = CartItem.objects.for_list()
         assert items_with_data.count() == 1
 
     def test_manager_delegates_to_queryset_total_quantity(self, cart, product):

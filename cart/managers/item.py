@@ -62,10 +62,6 @@ class CartItemQuerySet(models.QuerySet):
             return self.filter(cart__user=user)
         return self.none()
 
-    def with_product_data(self):
-        """Legacy method - use for_list() instead."""
-        return self.for_list()
-
     def total_quantity(self):
         return self.aggregate(total=models.Sum("quantity"))["total"] or 0
 
@@ -147,10 +143,6 @@ class CartItemManager(models.Manager):
 
     def for_user(self, user):
         return self.get_queryset().for_user(user)
-
-    def with_product_data(self):
-        """Legacy method - use for_list() instead."""
-        return self.get_queryset().for_list()
 
     def total_quantity(self):
         return self.get_queryset().total_quantity()

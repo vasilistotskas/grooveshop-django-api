@@ -346,6 +346,9 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "view_count",
             "category",
             "category_name",
+            "stock",
+            "active",
+            "is_deleted",
         )
         searchable_fields = ("id", "name", "description")
         displayed_fields = (
@@ -358,6 +361,10 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "view_count",
             "category",
             "category_name",
+            "stock",
+            "discount_percent",
+            "active",
+            "is_deleted",
         )
         sortable_fields = (
             "likes_count",
@@ -365,6 +372,7 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "view_count",
             "discount_percent",
             "created_at",
+            "stock",
         )
         ranking_rules = [
             "words",
@@ -372,6 +380,8 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "proximity",
             "attribute",
             "sort",
+            "stock:desc",
+            "discount_percent:desc",
             "exactness",
         ]
         synonyms = {
@@ -400,6 +410,7 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
         }
         faceting = {"maxValuesPerFacet": 100}
         pagination = {"maxTotalHits": 5_000_000}
+        search_cutoff_ms = 1500
 
     @classmethod
     def get_additional_meili_fields(cls):
@@ -420,6 +431,9 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
                 if obj.master.category
                 else None
             ),
+            "stock": lambda obj: obj.master.stock,
+            "active": lambda obj: obj.master.active,
+            "is_deleted": lambda obj: obj.master.is_deleted,
         }
 
     def __str__(self):

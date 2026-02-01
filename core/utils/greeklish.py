@@ -342,7 +342,7 @@ class GreeklishConverter:
         return " ".join(variants)
 
 
-# Convenience functions for backward compatibility
+# Convenience functions for common use cases
 def is_greeklish(text: str) -> bool:
     """Check if text is Greeklish."""
     return GreeklishConverter.is_greeklish(text)

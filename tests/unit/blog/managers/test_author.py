@@ -83,20 +83,6 @@ class TestBlogAuthorManager(TestCase):
 
         assert author_no_bio not in authors_with_bio
 
-    def test_with_user_details_manager_method(self):
-        authors = BlogAuthor.objects.with_user_details()
-
-        assert authors.count() == 3
-
-        assert self.author_with_posts in authors
-        assert self.author_without_posts in authors
-        assert self.author_with_old_posts in authors
-
-        queryset = BlogAuthor.objects.with_user_details()
-        query_str = str(queryset.query)
-
-        assert 'INNER JOIN "user_useraccount"' in query_str
-
     def test_manager_returns_correct_queryset_type(self):
         queryset = BlogAuthor.objects.with_posts()
 
@@ -178,18 +164,6 @@ class TestBlogAuthorQuerySet(TestCase):
         assert self.author3 in queryset
 
         assert author_no_bio not in queryset
-
-    def test_with_user_details_queryset_method(self):
-        queryset = BlogAuthor.objects.filter().with_user_details()
-
-        assert queryset.count() == 3
-
-        assert self.author1 in queryset
-        assert self.author2 in queryset
-        assert self.author3 in queryset
-
-        query_str = str(queryset.query)
-        assert 'INNER JOIN "user_useraccount"' in query_str
 
     def test_queryset_chaining(self):
         queryset = (
@@ -295,4 +269,3 @@ class TestBlogAuthorManagerEdgeCases(TestCase):
         assert hasattr(queryset, "active")
         assert hasattr(queryset, "with_website")
         assert hasattr(queryset, "with_bio")
-        assert hasattr(queryset, "with_user_details")

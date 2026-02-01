@@ -102,10 +102,6 @@ class EnhancedReviewQuerySet(TranslatableQuerySet):
             | Q(translations__comment__exact="")
         ).distinct()
 
-    def with_product_details(self):
-        """Legacy method - use for_detail() instead."""
-        return self.for_detail()
-
     def annotate_user_review_count(self):
         return self.annotate(user_review_count=Count("user__product_reviews"))
 
@@ -170,10 +166,6 @@ class ProductReviewManager(TranslatableManager):
 
     def without_comments(self):
         return self.get_queryset().without_comments()
-
-    def with_product_details(self):
-        """Legacy method - use for_detail() instead."""
-        return self.get_queryset().for_detail()
 
     def annotate_user_review_count(self):
         return self.get_queryset().annotate_user_review_count()

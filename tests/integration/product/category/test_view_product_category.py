@@ -1,3 +1,5 @@
+import uuid
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.urls import reverse
@@ -19,11 +21,12 @@ User = get_user_model()
 
 class ProductCategoryViewSetTestCase(APITestCase):
     def setUp(self):
+        self.test_id = uuid.uuid4().hex[:8]
         self.category = ProductCategoryFactory()
         self.sub_category = ProductCategoryFactory(parent=self.category)
         self.user = User.objects.create_user(
-            email="test@example.com",
-            username="testuser",
+            email=f"test-{self.test_id}@example.com",
+            username=f"testuser-{self.test_id}",
             password="testpass123",
         )
 
@@ -84,7 +87,7 @@ class ProductCategoryViewSetTestCase(APITestCase):
 
     def test_create_request_response_serializers(self):
         payload = {
-            "slug": "new-category-enhanced",
+            "slug": f"new-category-enhanced-{self.test_id}",
             "parent": self.category.id,
             "translations": {
                 default_language: {
@@ -119,12 +122,12 @@ class ProductCategoryViewSetTestCase(APITestCase):
         self.assertTrue(expected_fields.issubset(set(response.data.keys())))
 
         category = ProductCategory.objects.get(id=response.data["id"])
-        self.assertEqual(category.slug, "new-category-enhanced")
+        self.assertEqual(category.slug, f"new-category-enhanced-{self.test_id}")
         self.assertEqual(category.parent.id, self.category.id)
 
     def test_update_request_response_serializers(self):
         payload = {
-            "slug": "updated-category-enhanced",
+            "slug": f"updated-category-enhanced-{self.test_id}",
             "translations": {
                 default_language: {
                     "name": "Updated Enhanced Category",
@@ -158,11 +161,13 @@ class ProductCategoryViewSetTestCase(APITestCase):
         self.assertTrue(expected_fields.issubset(set(response.data.keys())))
 
         category = ProductCategory.objects.get(id=response.data["id"])
-        self.assertEqual(category.slug, "updated-category-enhanced")
+        self.assertEqual(
+            category.slug, f"updated-category-enhanced-{self.test_id}"
+        )
 
     def test_partial_update_request_response_serializers(self):
         payload = {
-            "slug": "partial-updated-category-enhanced",
+            "slug": f"partial-updated-category-{self.test_id}",
         }
 
         url = self.get_product_category_detail_url(self.category.id)
@@ -190,7 +195,9 @@ class ProductCategoryViewSetTestCase(APITestCase):
         self.assertTrue(expected_fields.issubset(set(response.data.keys())))
 
         category = ProductCategory.objects.get(id=response.data["id"])
-        self.assertEqual(category.slug, "partial-updated-category-enhanced")
+        self.assertEqual(
+            category.slug, f"partial-updated-category-{self.test_id}"
+        )
 
     def test_filtering_functionality(self):
         parent_category = ProductCategoryFactory()
@@ -241,7 +248,7 @@ class ProductCategoryViewSetTestCase(APITestCase):
 
     def test_validation_errors_consistent(self):
         payload = {
-            "slug": "invalid-parent-category",
+            "slug": f"invalid-parent-category-{self.test_id}",
             "parent": 99999,
             "translations": {
                 default_language: {
@@ -272,8 +279,9 @@ class ProductCategoryViewSetTestCase(APITestCase):
             )
 
     def test_create_with_complex_payload(self):
+        unique_slug = f"complex-category-{self.test_id}"
         payload = {
-            "slug": "complex-category",
+            "slug": unique_slug,
             "parent": self.category.id,
             "translations": {
                 "en": {

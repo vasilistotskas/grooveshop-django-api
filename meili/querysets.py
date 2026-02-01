@@ -1,7 +1,11 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, NamedTuple
 
-from meili._client import client
 from django.db.models import Case, When
+
+from meili._client import client
 
 if TYPE_CHECKING:
     from .models import IndexMixin
@@ -23,27 +27,92 @@ class Point(NamedTuple):
     lng: float | str
 
 
+@dataclass(frozen=True)
+class QueryState:
+    """Immutable state container for IndexQuerySet to enable proper chaining."""
+
+    offset: int = 0
+    limit: int = 20
+    filters: tuple[str, ...] = ()
+    facets: tuple[str, ...] = ()
+    attributes_to_retrieve: tuple[str, ...] = ("*",)
+    attributes_to_crop: tuple[str, ...] = ()
+    crop_length: int = 10
+    crop_marker: str = "..."
+    attributes_to_highlight: tuple[str, ...] = ("*",)
+    highlight_pre_tag: str = "<mark>"
+    highlight_post_tag: str = "</mark>"
+    show_matches_position: bool = True
+    sort: tuple[str, ...] = ()
+    matching_strategy: Literal["last", "all"] = "last"
+    show_ranking_score: bool = True
+    attributes_to_search_on: tuple[str, ...] = ("*",)
+    locales: tuple[str, ...] = ()
+
+    def with_updates(self, **kwargs) -> "QueryState":
+        """Create a new QueryState with updated values."""
+        current = {
+            "offset": self.offset,
+            "limit": self.limit,
+            "filters": self.filters,
+            "facets": self.facets,
+            "attributes_to_retrieve": self.attributes_to_retrieve,
+            "attributes_to_crop": self.attributes_to_crop,
+            "crop_length": self.crop_length,
+            "crop_marker": self.crop_marker,
+            "attributes_to_highlight": self.attributes_to_highlight,
+            "highlight_pre_tag": self.highlight_pre_tag,
+            "highlight_post_tag": self.highlight_post_tag,
+            "show_matches_position": self.show_matches_position,
+            "sort": self.sort,
+            "matching_strategy": self.matching_strategy,
+            "show_ranking_score": self.show_ranking_score,
+            "attributes_to_search_on": self.attributes_to_search_on,
+            "locales": self.locales,
+        }
+        current.update(kwargs)
+        return QueryState(**current)
+
+
 class IndexQuerySet:
-    def __init__(self, model: type["IndexMixin"]):
-        self.model = model
-        self.index = client.get_index(model._meilisearch["index_name"])
+    """
+    Immutable queryset-like interface for Meilisearch queries.
+
+    Each method returns a new IndexQuerySet instance, allowing safe chaining
+    without state mutation issues.
+    """
+
+    def __init__(
+        self, model: type["IndexMixin"], state: QueryState | None = None
+    ):
+        self._model = model
+        self._state = state or QueryState()
+        # Initialize mutable state for method chaining
         self.__offset = 0
         self.__limit = 20
-        self.__filters: list[str] = []
-        self.__facets: list[str] = []
-        self.__attributes_to_retrieve: list[str] = ["*"]
-        self.__attributes_to_crop: list[str] = []
-        self.__crop_length: int = 10
-        self.__crop_marker: str = "..."
-        self.__attributes_to_highlight: list[str] = ["*"]
-        self.__highlight_pre_tag: str = "<mark>"
-        self.__highlight_post_tag: str = "</mark>"
-        self.__show_matches_position: bool = True
-        self.__sort: list[str] = []
-        self.__matching_strategy: Literal["last", "all"] = "last"
-        self.__show_ranking_score: bool = True
-        self.__attributes_to_search_on: list[str] = ["*"]
-        self.__locales: list[str] = []
+        self.__filters = []
+        self.__facets = []
+        self.__attributes_to_retrieve = ["*"]
+        self.__attributes_to_crop = []
+        self.__crop_length = 10
+        self.__crop_marker = "..."
+        self.__attributes_to_highlight = ["*"]
+        self.__highlight_pre_tag = "<mark>"
+        self.__highlight_post_tag = "</mark>"
+        self.__show_matches_position = True
+        self.__sort = []
+        self.__matching_strategy = "last"
+        self.__show_ranking_score = True
+        self.__attributes_to_search_on = ["*"]
+        self.__locales = []
+
+    @property
+    def model(self) -> type["IndexMixin"]:
+        return self._model
+
+    @property
+    def index(self):
+        return client.get_index(self._model._meilisearch["index_name"])
 
     def __repr__(self):
         return f"<IndexQuerySet for {self.model.__name__}>"
@@ -104,6 +173,26 @@ class IndexQuerySet:
         return self
 
     def _apply_regular_filters(self, **filters):
+        """
+        Apply filters to the search query.
+
+        Supported lookups:
+        - __exact or no lookup: Exact match
+        - __gte, __gt, __lte, __lt: Numeric comparisons
+        - __in: Value in list
+        - __range: Value in range
+        - __exists: Field existence
+        - __isnull: Null checks
+        - __contains: Substring matching (requires experimental feature)
+
+        Example:
+            .filter(name__contains="laptop")
+            # Generates: name CONTAINS "laptop"
+
+        Note: CONTAINS operator is experimental and must be enabled via:
+            POST /experimental-features
+            {"containsFilter": true}
+        """
         for full_lookup, value in filters.items():
             if "__" not in full_lookup or "__exact" in full_lookup:
                 if (
@@ -180,6 +269,14 @@ class IndexQuerySet:
                 self.__filters.append(
                     f"{full_lookup.split('__')[0]} {'NOT ' if not value else ''}IS NULL"
                 )
+            elif "__contains" in full_lookup:
+                if not isinstance(value, str):
+                    raise TypeError(
+                        f"CONTAINS operator only supports string values, not {type(value).__name__}. "
+                        f"Ensure the field '{full_lookup.split('__')[0]}' is a string field and the value is a string."
+                    )
+                field_name = full_lookup.split("__")[0]
+                self.__filters.append(f'{field_name} CONTAINS "{value}"')
 
     def matching_strategy(self, strategy: Literal["last", "all"]):
         self.__matching_strategy = strategy

@@ -14,6 +14,10 @@ class ProductCategoryFilter(
     CamelCaseTimeStampFilterSet,
 ):
     id = filters.NumberFilter(field_name="id")
+    id__in = filters.BaseInFilter(
+        field_name="id",
+        help_text="Filter by multiple category IDs (comma-separated)",
+    )
     slug = filters.CharFilter(field_name="slug", lookup_expr="icontains")
     active = filters.BooleanFilter(field_name="active")
 

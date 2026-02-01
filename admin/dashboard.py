@@ -706,7 +706,6 @@ def dashboard_callback(request, context):
             "inactive_users": inactive_users_count,
             "abandoned_carts": abandoned_carts_count,
             "discounted_products": discounted_products_count,
-            # Legacy support for existing template parts
             "recent_orders": recent_orders,
             "top_products": top_products,
             "recent_reviews": recent_reviews,

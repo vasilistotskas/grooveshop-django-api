@@ -74,10 +74,6 @@ class BlogAuthorQuerySet(TranslatableQuerySet):
             Q(translations__bio__isnull=True) | Q(translations__bio__exact="")
         ).distinct()
 
-    def with_user_details(self):
-        """Legacy method - use for_detail() instead."""
-        return self.for_detail()
-
 
 class BlogAuthorManager(TranslatableManager):
     """
@@ -115,7 +111,3 @@ class BlogAuthorManager(TranslatableManager):
 
     def with_bio(self):
         return self.get_queryset().with_bio()
-
-    def with_user_details(self):
-        """Legacy method - use for_detail() instead."""
-        return self.get_queryset().for_detail()

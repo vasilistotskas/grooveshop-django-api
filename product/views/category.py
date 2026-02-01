@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 from django.conf import settings
-from drf_spectacular.utils import extend_schema_view
-
+from drf_spectacular.utils import (
+    extend_schema,
+    extend_schema_view,
+    OpenApiResponse,
+)
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
@@ -44,7 +49,7 @@ res_serializers: ResponseSerializersConfig = {
         response_serializers=res_serializers,
     )
 )
-@cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
+@cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve", "all"])
 class ProductCategoryViewSet(BaseModelViewSet):
     queryset = ProductCategory.objects.all()
     filterset_class = ProductCategoryFilter
@@ -70,6 +75,43 @@ class ProductCategoryViewSet(BaseModelViewSet):
         Uses ProductCategory.objects.for_list() for list views and
         ProductCategory.objects.for_detail() for detail views.
         """
-        if self.action == "list":
+        if self.action in ["list", "all"]:
             return ProductCategory.objects.for_list()
         return ProductCategory.objects.for_detail()
+
+    @extend_schema(
+        operation_id="listAllProductCategory",
+        summary="List all product categories (unpaginated)",
+        description="Retrieve all product categories without pagination. "
+        "Useful for dropdowns, filters, and other UI components that need the complete list.",
+        tags=["Product Categories"],
+        parameters=[],  # Explicitly clear all parameters
+        responses={
+            200: OpenApiResponse(
+                response={
+                    "type": "array",
+                    "items": {"$ref": "#/components/schemas/ProductCategory"},
+                },
+                description="Array of all product categories",
+            ),
+        },
+    )
+    @action(
+        detail=False,
+        methods=["GET"],
+        url_path="all",
+        pagination_class=None,
+        filter_backends=[],
+    )
+    def all(self, request):
+        """
+        Return all categories without pagination.
+
+        This endpoint is optimized for cases where you need the complete
+        category list, such as filter dropdowns or category trees.
+        """
+        queryset = self.get_queryset()
+        serializer = ProductCategorySerializer(
+            queryset, many=True, context=self.get_serializer_context()
+        )
+        return Response(serializer.data)

@@ -165,6 +165,83 @@ class TestMeiliClient:
         assert call_args["pagination"] == {"maxTotalHits": 500}
 
     @patch("meili._client._Client")
+    def test_with_settings_search_cutoff_ms_included(self, mock_client_class):
+        """Test that searchCutoffMs is included in payload when provided."""
+        mock_client_instance = MagicMock()
+        mock_index = MagicMock()
+        mock_update_settings = MagicMock()
+
+        mock_client_class.return_value = mock_client_instance
+        mock_client_instance.index.return_value = mock_index
+        mock_index.update_settings.return_value = mock_update_settings
+
+        client = Client(self.settings)
+
+        index_settings = MeiliIndexSettings(search_cutoff_ms=1500)
+
+        client.with_settings("test_index", index_settings)
+
+        call_args = mock_index.update_settings.call_args[0][0]
+
+        assert "searchCutoffMs" in call_args
+        assert call_args["searchCutoffMs"] == 1500
+
+    @patch("meili._client._Client")
+    def test_with_settings_search_cutoff_ms_not_included_when_none(
+        self, mock_client_class
+    ):
+        """Test that searchCutoffMs is not included in payload when None."""
+        mock_client_instance = MagicMock()
+        mock_index = MagicMock()
+        mock_update_settings = MagicMock()
+
+        mock_client_class.return_value = mock_client_instance
+        mock_client_instance.index.return_value = mock_index
+        mock_index.update_settings.return_value = mock_update_settings
+
+        client = Client(self.settings)
+
+        index_settings = MeiliIndexSettings(search_cutoff_ms=None)
+
+        client.with_settings("test_index", index_settings)
+
+        call_args = mock_index.update_settings.call_args[0][0]
+
+        assert "searchCutoffMs" not in call_args
+
+    @patch("meili._client._Client")
+    @pytest.mark.parametrize(
+        "search_cutoff_ms",
+        [500, 1000, 1500, 2000, 3000],
+    )
+    def test_with_settings_search_cutoff_ms_various_values(
+        self, mock_client_class, search_cutoff_ms
+    ):
+        """Test that searchCutoffMs is correctly included for various values.
+
+        Property 13: SearchCutoffMs in settings payload
+        Validates: Requirements 4.2
+        """
+        mock_client_instance = MagicMock()
+        mock_index = MagicMock()
+        mock_update_settings = MagicMock()
+
+        mock_client_class.return_value = mock_client_instance
+        mock_client_instance.index.return_value = mock_index
+        mock_index.update_settings.return_value = mock_update_settings
+
+        client = Client(self.settings)
+
+        index_settings = MeiliIndexSettings(search_cutoff_ms=search_cutoff_ms)
+
+        client.with_settings("test_index", index_settings)
+
+        call_args = mock_index.update_settings.call_args[0][0]
+
+        assert "searchCutoffMs" in call_args
+        assert call_args["searchCutoffMs"] == search_cutoff_ms
+
+    @patch("meili._client._Client")
     def test_create_index_new(self, mock_client_class):
         mock_client_instance = MagicMock()
         mock_create_index = MagicMock()

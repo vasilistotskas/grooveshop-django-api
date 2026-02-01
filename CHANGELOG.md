@@ -3,6 +3,26 @@
 
 
 
+## v1.71.0 (2026-02-01)
+
+### Bug fixes
+
+* fix: lint ([`8659437`](https://github.com/vasilistotskas/grooveshop-django-api/commit/865943729fbe904871b1883030c7f522ff1dddf1))
+
+* fix: tests ([`dd32c03`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dd32c03129cbd343c33a592665a6b67ba4a9d793))
+
+* fix: tests ([`d833ac5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d833ac5aeb770138fbcf4a96cc4d27f671f229b3))
+
+* fix: remove price validation ([`f533a49`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f533a49bb5843a91c2ec873b18567ca0387b3ef7))
+
+### Features
+
+* feat: Search improvements ([`1c8aa9c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1c8aa9cda5d00c382c621bdaf4600dcd9a37c7aa))
+
+* feat: search improvements ([`1372e09`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1372e0994f53be84a33b012224de9444d77e1bdd))
+
+* feat: Product search improvements ([`f51a13f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f51a13f580e9a3f0228ccb760b8775007c6f04f5))
+
 ## v1.70.1 (2026-01-28)
 
 ### Bug fixes

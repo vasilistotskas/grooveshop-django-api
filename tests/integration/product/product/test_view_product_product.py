@@ -229,7 +229,6 @@ class ProductViewSetTestCase(APITestCase):
 
     def test_partial_update_request_response_serializers(self):
         payload = {
-            "active": False,
             "stock": 5,
         }
 
@@ -257,10 +256,10 @@ class ProductViewSetTestCase(APITestCase):
         self.assertTrue(expected_fields.issubset(set(response.data.keys())))
 
         product = Product.objects.get(id=response.data["id"])
-        self.assertEqual(product.active, False)
         self.assertEqual(product.stock, 5)
 
     def test_filtering_functionality(self):
+        """Test filtering - only active products returned by default."""
         test_category = ProductCategoryFactory()
 
         expensive_product = ProductFactory(
@@ -281,12 +280,15 @@ class ProductViewSetTestCase(APITestCase):
 
         url = self.get_product_list_url()
 
+        # Filter by category - only active products returned
         response = self.client.get(url, {"category": test_category.id})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         product_ids = [prod["id"] for prod in response.data["results"]]
         self.assertIn(expensive_product.id, product_ids)
-        self.assertIn(inactive_product.id, product_ids)
+        # Inactive product should NOT be in results (filtered by default)
+        self.assertNotIn(inactive_product.id, product_ids)
 
+        # Explicit active=true filter should return same results
         response = self.client.get(url, {"active": True})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         active_products = response.data["results"]

@@ -163,13 +163,9 @@ class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
         Optimized queryset for list views.
 
         Includes translations, category, and counts but not images/tags.
+        Only returns active, non-deleted products.
         """
-        return (
-            self.exclude_deleted()
-            .with_translations()
-            .with_category()
-            .with_counts()
-        )
+        return self.active().with_translations().with_category().with_counts()
 
     def for_detail(self) -> Self:
         """

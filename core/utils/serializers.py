@@ -13,6 +13,17 @@ from drf_spectacular.utils import OpenApiParameter
 
 
 class TranslatedFieldExtended(TranslatedFieldsField):
+    def to_representation(self, value):
+        """Convert null values to empty strings in translations."""
+        result = super().to_representation(value)
+        if isinstance(result, dict):
+            for lang_code, fields in result.items():
+                if isinstance(fields, dict):
+                    for field_name, field_value in fields.items():
+                        if field_value is None:
+                            fields[field_name] = ""
+        return result
+
     def to_internal_value(self, data):
         if data is None:
             return {}

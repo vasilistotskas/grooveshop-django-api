@@ -13,7 +13,7 @@ from user.factories import UserAccountFactory
 
 
 @pytest.mark.django_db(transaction=True)
-class TestProperty2ConcurrentStockOperationsPreventOverselling:
+class TestConcurrentStockOperationsPreventOverselling:
     """
     Test that concurrent stock operations prevent overselling through proper
     database-level locking (SELECT FOR UPDATE). Multiple threads attempting

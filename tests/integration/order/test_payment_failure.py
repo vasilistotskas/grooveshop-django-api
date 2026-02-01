@@ -21,6 +21,21 @@ class TestFailedPaymentReleasesReservations:
     making the stock available for other customers.
     """
 
+    def setup_method(self):
+        """Set up test data for each test method."""
+        # Patch the TTL to ensure reservations don't expire during slow test executions
+        from unittest.mock import patch
+
+        self.patcher = patch(
+            "order.stock.StockManager.get_reservation_ttl_minutes",
+            return_value=60,
+        )
+        self.patcher.start()
+
+    def teardown_method(self):
+        """Clean up after each test method."""
+        self.patcher.stop()
+
     @pytest.mark.parametrize(
         "failure_scenario,num_reservations,initial_stock,expected_available_after",
         [
@@ -635,6 +650,21 @@ class TestIntegrationWithWebhooks:
     These tests verify the complete flow from webhook receipt to reservation release.
     Note: Webhooks are handled via dj-stripe signals, not a separate webhooks module.
     """
+
+    def setup_method(self):
+        """Set up test data for each test method."""
+        # Patch the TTL to ensure reservations don't expire during slow test executions
+        from unittest.mock import patch
+
+        self.patcher = patch(
+            "order.stock.StockManager.get_reservation_ttl_minutes",
+            return_value=60,
+        )
+        self.patcher.start()
+
+    def teardown_method(self):
+        """Clean up after each test method."""
+        self.patcher.stop()
 
     @pytest.mark.parametrize(
         "webhook_event_type",

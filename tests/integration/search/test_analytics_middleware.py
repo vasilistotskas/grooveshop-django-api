@@ -251,11 +251,6 @@ class TestSearchAnalyticsMiddleware:
     def test_handles_database_error_gracefully(self, request_factory):
         """
         Test that database errors don't break the request.
-
-        Feature: meilisearch-enhancements, Property 11: Analytics logging
-        failures don't break search
-
-        Validates: Requirements 2.7
         """
 
         def get_response(request):

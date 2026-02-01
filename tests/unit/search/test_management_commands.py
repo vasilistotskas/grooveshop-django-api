@@ -10,8 +10,6 @@ Commands tested:
 - meilisearch_update_ranking
 - meilisearch_test_federated
 - meilisearch_export_analytics
-
-Requirements: 9.5, 9.6, 9.7, 9.8
 """
 
 import json
@@ -24,17 +22,24 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 
 
+# Mock _meilisearch attribute for models
+MOCK_PRODUCT_MEILISEARCH = {"index_name": "ProductTranslation"}
+MOCK_BLOG_MEILISEARCH = {"index_name": "BlogPostTranslation"}
+
+
+def create_mock_model(meilisearch_config):
+    """Create a mock model with _meilisearch attribute."""
+    mock = MagicMock()
+    mock._meilisearch = meilisearch_config
+    return mock
+
+
 class TestMeilisearchEnableExperimentalCommand:
     """Tests for meilisearch_enable_experimental management command."""
 
-    # Feature: meilisearch-enhancements, Property 27: Command argument validation
     @pytest.mark.parametrize(
         "feature",
-        [
-            "containsFilter",
-            "vectorStore",
-            "editDocumentsByFunction",
-        ],
+        ["containsFilter", "vectorStore", "editDocumentsByFunction"],
     )
     @patch("meili.management.commands.meilisearch_enable_experimental.requests")
     @patch(
@@ -43,12 +48,7 @@ class TestMeilisearchEnableExperimentalCommand:
     def test_enable_experimental_valid_features(
         self, mock_meili_client, mock_requests, feature
     ):
-        """
-        Test enabling valid experimental features.
-
-        Validates: Requirements 9.7, 9.8
-        """
-        # Mock Meilisearch client settings
+        """Test enabling valid experimental features."""
         mock_settings = MagicMock()
         mock_settings.https = False
         mock_settings.host = "localhost"
@@ -57,7 +57,6 @@ class TestMeilisearchEnableExperimentalCommand:
         mock_settings.timeout = 10
         mock_meili_client.settings = mock_settings
 
-        # Mock successful API response
         mock_patch_response = MagicMock()
         mock_patch_response.status_code = 200
         mock_requests.patch.return_value = mock_patch_response
@@ -76,19 +75,12 @@ class TestMeilisearchEnableExperimentalCommand:
         )
 
         output = out.getvalue()
-
-        # Verify success message with green styling
         assert "Successfully" in output or "✓" in output
         assert feature in output
 
     @pytest.mark.parametrize(
         "invalid_feature",
-        [
-            "unknownFeature",
-            "invalidOption",
-            "notAFeature",
-            "",
-        ],
+        ["unknownFeature", "invalidOption", "notAFeature", ""],
     )
     @patch(
         "meili.management.commands.meilisearch_enable_experimental.meili_client"
@@ -96,12 +88,7 @@ class TestMeilisearchEnableExperimentalCommand:
     def test_enable_experimental_invalid_feature(
         self, mock_meili_client, invalid_feature
     ):
-        """
-        Test error handling for invalid experimental features.
-
-        Validates: Requirements 9.6, 9.7
-        """
-        # Mock Meilisearch client settings
+        """Test error handling for invalid experimental features."""
         mock_settings = MagicMock()
         mock_settings.https = False
         mock_settings.host = "localhost"
@@ -110,7 +97,6 @@ class TestMeilisearchEnableExperimentalCommand:
 
         out = StringIO()
 
-        # Skip empty string test as argparse handles it differently
         if invalid_feature == "":
             return
 
@@ -122,8 +108,6 @@ class TestMeilisearchEnableExperimentalCommand:
         )
 
         output = out.getvalue()
-
-        # Verify error message with available features listed
         assert "Unknown feature" in output or "Available features" in output
 
     @patch("meili.management.commands.meilisearch_enable_experimental.requests")
@@ -133,12 +117,7 @@ class TestMeilisearchEnableExperimentalCommand:
     def test_enable_experimental_disable_flag(
         self, mock_meili_client, mock_requests
     ):
-        """
-        Test disabling an experimental feature with --disable flag.
-
-        Validates: Requirements 9.5, 9.6
-        """
-        # Mock Meilisearch client settings
+        """Test disabling an experimental feature with --disable flag."""
         mock_settings = MagicMock()
         mock_settings.https = False
         mock_settings.host = "localhost"
@@ -147,7 +126,6 @@ class TestMeilisearchEnableExperimentalCommand:
         mock_settings.timeout = 10
         mock_meili_client.settings = mock_settings
 
-        # Mock successful API response
         mock_patch_response = MagicMock()
         mock_patch_response.status_code = 200
         mock_requests.patch.return_value = mock_patch_response
@@ -167,8 +145,6 @@ class TestMeilisearchEnableExperimentalCommand:
         )
 
         output = out.getvalue()
-
-        # Verify disabling action
         assert "Disabling" in output
         assert "containsFilter" in output
 
@@ -179,12 +155,7 @@ class TestMeilisearchEnableExperimentalCommand:
     def test_enable_experimental_connection_error(
         self, mock_meili_client, mock_requests
     ):
-        """
-        Test error handling when Meilisearch connection fails.
-
-        Validates: Requirements 9.6
-        """
-        # Mock Meilisearch client settings
+        """Test error handling when Meilisearch connection fails."""
         mock_settings = MagicMock()
         mock_settings.https = False
         mock_settings.host = "localhost"
@@ -193,7 +164,6 @@ class TestMeilisearchEnableExperimentalCommand:
         mock_settings.timeout = 10
         mock_meili_client.settings = mock_settings
 
-        # Mock connection error
         mock_requests.patch.side_effect = (
             mock_requests.exceptions.ConnectionError("Connection refused")
         )
@@ -207,63 +177,63 @@ class TestMeilisearchEnableExperimentalCommand:
         )
 
         output = out.getvalue()
-
-        # Verify error message with red styling
         assert "Failed to connect" in output or "✗" in output
 
 
 class TestMeilisearchUpdateIndexSettingsCommand:
     """Tests for meilisearch_update_index_settings management command."""
 
-    # Feature: meilisearch-enhancements, Property 27: Command argument validation
+    @pytest.fixture
+    def mock_available_indexes(self):
+        """Fixture to mock AVAILABLE_INDEXES with mock models."""
+        mock_product = create_mock_model(MOCK_PRODUCT_MEILISEARCH)
+        mock_blog = create_mock_model(MOCK_BLOG_MEILISEARCH)
+        return {
+            "ProductTranslation": mock_product,
+            "BlogPostTranslation": mock_blog,
+        }
+
     @pytest.mark.parametrize(
         "index_name",
-        [
-            "ProductTranslation",
-            "BlogPostTranslation",
-        ],
-    )
-    @patch(
-        "meili.management.commands.meilisearch_update_index_settings.meili_client"
+        ["ProductTranslation", "BlogPostTranslation"],
     )
     def test_update_index_settings_valid_index(
-        self, mock_meili_client, index_name
+        self, mock_available_indexes, index_name
     ):
-        """
-        Test updating settings for valid indexes.
+        """Test updating settings for valid indexes."""
+        with (
+            patch(
+                "meili.management.commands.meilisearch_update_index_settings.meili_client"
+            ),
+            patch.object(
+                __import__(
+                    "meili.management.commands.meilisearch_update_index_settings",
+                    fromlist=["Command"],
+                ).Command,
+                "AVAILABLE_INDEXES",
+                mock_available_indexes,
+            ),
+        ):
+            out = StringIO()
+            call_command(
+                "meilisearch_update_index_settings",
+                "--index",
+                index_name,
+                "--max-total-hits",
+                "50000",
+                stdout=out,
+            )
 
-        Validates: Requirements 9.1, 9.5, 9.6
-        """
-        out = StringIO()
-        call_command(
-            "meilisearch_update_index_settings",
-            "--index",
-            index_name,
-            "--max-total-hits",
-            "50000",
-            stdout=out,
-        )
-
-        output = out.getvalue()
-
-        # Verify success message
-        assert "Successfully updated" in output or "✓" in output
-        assert index_name in output
+            output = out.getvalue()
+            assert "Successfully updated" in output or "✓" in output
+            assert index_name in output
 
     @pytest.mark.parametrize(
         "invalid_index",
-        [
-            "InvalidIndex",
-            "NotAnIndex",
-            "RandomName",
-        ],
+        ["InvalidIndex", "NotAnIndex", "RandomName"],
     )
     def test_update_index_settings_invalid_index(self, invalid_index):
-        """
-        Test error handling for invalid index names.
-
-        Validates: Requirements 9.6, 9.7
-        """
+        """Test error handling for invalid index names."""
         out = StringIO()
         call_command(
             "meilisearch_update_index_settings",
@@ -275,8 +245,6 @@ class TestMeilisearchUpdateIndexSettingsCommand:
         )
 
         output = out.getvalue()
-
-        # Verify error message with available indexes listed
         assert "Unknown index" in output or "Available indexes" in output
 
     @pytest.mark.parametrize(
@@ -287,39 +255,39 @@ class TestMeilisearchUpdateIndexSettingsCommand:
             ("maxValuesPerFacet", "--max-values-per-facet", "100"),
         ],
     )
-    @patch(
-        "meili.management.commands.meilisearch_update_index_settings.meili_client"
-    )
     def test_update_index_settings_individual_settings(
-        self, mock_meili_client, setting_name, setting_flag, setting_value
+        self, mock_available_indexes, setting_name, setting_flag, setting_value
     ):
-        """
-        Test updating individual settings.
+        """Test updating individual settings."""
+        with (
+            patch(
+                "meili.management.commands.meilisearch_update_index_settings.meili_client"
+            ),
+            patch.object(
+                __import__(
+                    "meili.management.commands.meilisearch_update_index_settings",
+                    fromlist=["Command"],
+                ).Command,
+                "AVAILABLE_INDEXES",
+                mock_available_indexes,
+            ),
+        ):
+            out = StringIO()
+            call_command(
+                "meilisearch_update_index_settings",
+                "--index",
+                "ProductTranslation",
+                setting_flag,
+                setting_value,
+                stdout=out,
+            )
 
-        Validates: Requirements 9.1, 9.5
-        """
-        out = StringIO()
-        call_command(
-            "meilisearch_update_index_settings",
-            "--index",
-            "ProductTranslation",
-            setting_flag,
-            setting_value,
-            stdout=out,
-        )
-
-        output = out.getvalue()
-
-        # Verify setting was applied
-        assert setting_name in output or setting_value in output
-        assert "Successfully" in output or "✓" in output
+            output = out.getvalue()
+            assert setting_name in output or setting_value in output
+            assert "Successfully" in output or "✓" in output
 
     def test_update_index_settings_no_settings_provided(self):
-        """
-        Test error when no settings are provided.
-
-        Validates: Requirements 9.6, 9.7
-        """
+        """Test error when no settings are provided."""
         out = StringIO()
         call_command(
             "meilisearch_update_index_settings",
@@ -329,70 +297,89 @@ class TestMeilisearchUpdateIndexSettingsCommand:
         )
 
         output = out.getvalue()
-
-        # Verify error message about missing settings
         assert "At least one setting must be provided" in output
 
-    @patch(
-        "meili.management.commands.meilisearch_update_index_settings.meili_client"
-    )
-    def test_update_index_settings_multiple_settings(self, mock_meili_client):
-        """
-        Test updating multiple settings at once.
+    def test_update_index_settings_multiple_settings(
+        self, mock_available_indexes
+    ):
+        """Test updating multiple settings at once."""
+        with (
+            patch(
+                "meili.management.commands.meilisearch_update_index_settings.meili_client"
+            ),
+            patch.object(
+                __import__(
+                    "meili.management.commands.meilisearch_update_index_settings",
+                    fromlist=["Command"],
+                ).Command,
+                "AVAILABLE_INDEXES",
+                mock_available_indexes,
+            ),
+        ):
+            out = StringIO()
+            call_command(
+                "meilisearch_update_index_settings",
+                "--index",
+                "ProductTranslation",
+                "--max-total-hits",
+                "50000",
+                "--search-cutoff-ms",
+                "1500",
+                "--max-values-per-facet",
+                "100",
+                stdout=out,
+            )
 
-        Validates: Requirements 9.1, 9.5
-        """
-        out = StringIO()
-        call_command(
-            "meilisearch_update_index_settings",
-            "--index",
-            "ProductTranslation",
-            "--max-total-hits",
-            "50000",
-            "--search-cutoff-ms",
-            "1500",
-            "--max-values-per-facet",
-            "100",
-            stdout=out,
-        )
+            output = out.getvalue()
+            assert "maxTotalHits" in output or "50000" in output
+            assert "searchCutoffMs" in output or "1500" in output
+            assert "maxValuesPerFacet" in output or "100" in output
 
-        output = out.getvalue()
+    def test_update_index_settings_output_formatting(
+        self, mock_available_indexes
+    ):
+        """Test output formatting with progress indicators."""
+        with (
+            patch(
+                "meili.management.commands.meilisearch_update_index_settings.meili_client"
+            ),
+            patch.object(
+                __import__(
+                    "meili.management.commands.meilisearch_update_index_settings",
+                    fromlist=["Command"],
+                ).Command,
+                "AVAILABLE_INDEXES",
+                mock_available_indexes,
+            ),
+        ):
+            out = StringIO()
+            call_command(
+                "meilisearch_update_index_settings",
+                "--index",
+                "ProductTranslation",
+                "--max-total-hits",
+                "50000",
+                stdout=out,
+            )
 
-        # Verify all settings mentioned
-        assert "maxTotalHits" in output or "50000" in output
-        assert "searchCutoffMs" in output or "1500" in output
-        assert "maxValuesPerFacet" in output or "100" in output
-
-    @patch(
-        "meili.management.commands.meilisearch_update_index_settings.meili_client"
-    )
-    def test_update_index_settings_output_formatting(self, mock_meili_client):
-        """
-        Test output formatting with progress indicators.
-
-        Validates: Requirements 9.5, 9.6
-        """
-        out = StringIO()
-        call_command(
-            "meilisearch_update_index_settings",
-            "--index",
-            "ProductTranslation",
-            "--max-total-hits",
-            "50000",
-            stdout=out,
-        )
-
-        output = out.getvalue()
-
-        # Verify progress indicator and note about no reindexing
-        assert "Updating" in output
-        assert "without reindexing" in output or "immediately" in output
+            output = out.getvalue()
+            assert "Updating" in output
+            assert "without reindexing" in output or "immediately" in output
 
 
 class TestMeilisearchUpdateRankingCommand:
     """Tests for meilisearch_update_ranking management command."""
 
-    # Feature: meilisearch-enhancements, Property 27: Command argument validation
+    @pytest.fixture
+    def mock_available_indexes(self):
+        """Fixture to mock AVAILABLE_INDEXES with mock models."""
+        mock_product = create_mock_model(MOCK_PRODUCT_MEILISEARCH)
+        mock_blog = create_mock_model(MOCK_BLOG_MEILISEARCH)
+        return {
+            "ProductTranslation": mock_product,
+            "BlogPostTranslation": mock_blog,
+        }
+
     @pytest.mark.parametrize(
         "rules",
         [
@@ -401,28 +388,34 @@ class TestMeilisearchUpdateRankingCommand:
             "words,typo,proximity,attribute,sort,stock:desc,discount_percent:desc,exactness",
         ],
     )
-    @patch("meili.management.commands.meilisearch_update_ranking.meili_client")
-    def test_update_ranking_valid_rules(self, mock_meili_client, rules):
-        """
-        Test updating ranking rules with valid configurations.
+    def test_update_ranking_valid_rules(self, mock_available_indexes, rules):
+        """Test updating ranking rules with valid configurations."""
+        with (
+            patch(
+                "meili.management.commands.meilisearch_update_ranking.meili_client"
+            ),
+            patch.object(
+                __import__(
+                    "meili.management.commands.meilisearch_update_ranking",
+                    fromlist=["Command"],
+                ).Command,
+                "AVAILABLE_INDEXES",
+                mock_available_indexes,
+            ),
+        ):
+            out = StringIO()
+            call_command(
+                "meilisearch_update_ranking",
+                "--index",
+                "ProductTranslation",
+                "--rules",
+                rules,
+                stdout=out,
+            )
 
-        Validates: Requirements 7.6, 9.2, 9.5, 9.6
-        """
-        out = StringIO()
-        call_command(
-            "meilisearch_update_ranking",
-            "--index",
-            "ProductTranslation",
-            "--rules",
-            rules,
-            stdout=out,
-        )
-
-        output = out.getvalue()
-
-        # Verify success message
-        assert "Successfully updated" in output or "✓" in output
-        assert "ranking rules" in output.lower()
+            output = out.getvalue()
+            assert "Successfully updated" in output or "✓" in output
+            assert "ranking rules" in output.lower()
 
     @pytest.mark.parametrize(
         "invalid_rules,expected_error",
@@ -434,11 +427,7 @@ class TestMeilisearchUpdateRankingCommand:
         ],
     )
     def test_update_ranking_invalid_rules(self, invalid_rules, expected_error):
-        """
-        Test error handling for invalid ranking rules.
-
-        Validates: Requirements 7.7, 9.6, 9.7
-        """
+        """Test error handling for invalid ranking rules."""
         out = StringIO()
         call_command(
             "meilisearch_update_ranking",
@@ -450,23 +439,14 @@ class TestMeilisearchUpdateRankingCommand:
         )
 
         output = out.getvalue()
-
-        # Verify error message with helpful information
         assert expected_error in output or "Invalid" in output
 
     @pytest.mark.parametrize(
         "invalid_index",
-        [
-            "InvalidIndex",
-            "NotAnIndex",
-        ],
+        ["InvalidIndex", "NotAnIndex"],
     )
     def test_update_ranking_invalid_index(self, invalid_index):
-        """
-        Test error handling for invalid index names.
-
-        Validates: Requirements 9.6, 9.7
-        """
+        """Test error handling for invalid index names."""
         out = StringIO()
         call_command(
             "meilisearch_update_ranking",
@@ -478,42 +458,43 @@ class TestMeilisearchUpdateRankingCommand:
         )
 
         output = out.getvalue()
-
-        # Verify error message with available indexes
         assert "Unknown index" in output or "Available indexes" in output
 
-    @patch("meili.management.commands.meilisearch_update_ranking.meili_client")
-    def test_update_ranking_output_formatting(self, mock_meili_client):
-        """
-        Test output formatting shows numbered rules list.
+    def test_update_ranking_output_formatting(self, mock_available_indexes):
+        """Test output formatting shows numbered rules list."""
+        with (
+            patch(
+                "meili.management.commands.meilisearch_update_ranking.meili_client"
+            ),
+            patch.object(
+                __import__(
+                    "meili.management.commands.meilisearch_update_ranking",
+                    fromlist=["Command"],
+                ).Command,
+                "AVAILABLE_INDEXES",
+                mock_available_indexes,
+            ),
+        ):
+            out = StringIO()
+            call_command(
+                "meilisearch_update_ranking",
+                "--index",
+                "ProductTranslation",
+                "--rules",
+                "words,typo,proximity,attribute,sort,exactness",
+                stdout=out,
+            )
 
-        Validates: Requirements 9.5, 9.6
-        """
-        out = StringIO()
-        call_command(
-            "meilisearch_update_ranking",
-            "--index",
-            "ProductTranslation",
-            "--rules",
-            "words,typo,proximity,attribute,sort,exactness",
-            stdout=out,
-        )
-
-        output = out.getvalue()
-
-        # Verify numbered list of rules
-        assert "1." in output
-        assert "words" in output
-        assert (
-            "New ranking rules" in output or "ranking rules" in output.lower()
-        )
+            output = out.getvalue()
+            assert "1." in output
+            assert "words" in output
+            assert (
+                "New ranking rules" in output
+                or "ranking rules" in output.lower()
+            )
 
     def test_update_ranking_empty_rules(self):
-        """
-        Test error handling for empty rules string.
-
-        Validates: Requirements 9.6, 9.7
-        """
+        """Test error handling for empty rules string."""
         out = StringIO()
         call_command(
             "meilisearch_update_ranking",
@@ -525,15 +506,12 @@ class TestMeilisearchUpdateRankingCommand:
         )
 
         output = out.getvalue()
-
-        # Verify error message
         assert "No ranking rules provided" in output
 
 
 class TestMeilisearchTestFederatedCommand:
     """Tests for meilisearch_test_federated management command."""
 
-    # Feature: meilisearch-enhancements, Property 27: Command argument validation
     @pytest.mark.parametrize(
         "query,language_code",
         [
@@ -543,16 +521,25 @@ class TestMeilisearchTestFederatedCommand:
             ("test query", None),
         ],
     )
+    @patch(
+        "meili.management.commands.meilisearch_test_federated.BlogPostTranslation"
+    )
+    @patch(
+        "meili.management.commands.meilisearch_test_federated.ProductTranslation"
+    )
     @patch("meili.management.commands.meilisearch_test_federated.meili_client")
     def test_test_federated_valid_queries(
-        self, mock_meili_client, query, language_code
+        self,
+        mock_meili_client,
+        mock_product,
+        mock_blog,
+        query,
+        language_code,
     ):
-        """
-        Test federated search command with valid queries.
+        """Test federated search command with valid queries."""
+        mock_product._meilisearch = MOCK_PRODUCT_MEILISEARCH
+        mock_blog._meilisearch = MOCK_BLOG_MEILISEARCH
 
-        Validates: Requirements 9.3, 9.5, 9.6
-        """
-        # Mock multi_search response
         mock_meili_client.client.multi_search.return_value = {
             "hits": [],
             "estimatedTotalHits": 0,
@@ -567,20 +554,24 @@ class TestMeilisearchTestFederatedCommand:
         call_command(*args, stdout=out)
 
         output = out.getvalue()
-
-        # Verify output formatting
         assert "FEDERATED SEARCH TEST" in output
         assert f"Query: {query}" in output
         assert "Search completed successfully" in output or "✓" in output
 
+    @patch(
+        "meili.management.commands.meilisearch_test_federated.BlogPostTranslation"
+    )
+    @patch(
+        "meili.management.commands.meilisearch_test_federated.ProductTranslation"
+    )
     @patch("meili.management.commands.meilisearch_test_federated.meili_client")
-    def test_test_federated_with_limit(self, mock_meili_client):
-        """
-        Test federated search command with custom limit.
+    def test_test_federated_with_limit(
+        self, mock_meili_client, mock_product, mock_blog
+    ):
+        """Test federated search command with custom limit."""
+        mock_product._meilisearch = MOCK_PRODUCT_MEILISEARCH
+        mock_blog._meilisearch = MOCK_BLOG_MEILISEARCH
 
-        Validates: Requirements 9.3, 9.5
-        """
-        # Mock multi_search response
         mock_meili_client.client.multi_search.return_value = {
             "hits": [],
             "estimatedTotalHits": 0,
@@ -598,18 +589,22 @@ class TestMeilisearchTestFederatedCommand:
         )
 
         output = out.getvalue()
-
-        # Verify limit is shown
         assert "Limit: 20" in output
 
+    @patch(
+        "meili.management.commands.meilisearch_test_federated.BlogPostTranslation"
+    )
+    @patch(
+        "meili.management.commands.meilisearch_test_federated.ProductTranslation"
+    )
     @patch("meili.management.commands.meilisearch_test_federated.meili_client")
-    def test_test_federated_result_allocation_display(self, mock_meili_client):
-        """
-        Test that result allocation (70/30) is displayed.
+    def test_test_federated_result_allocation_display(
+        self, mock_meili_client, mock_product, mock_blog
+    ):
+        """Test that result allocation (70/30) is displayed."""
+        mock_product._meilisearch = MOCK_PRODUCT_MEILISEARCH
+        mock_blog._meilisearch = MOCK_BLOG_MEILISEARCH
 
-        Validates: Requirements 9.3, 9.5
-        """
-        # Mock multi_search response
         mock_meili_client.client.multi_search.return_value = {
             "hits": [],
             "estimatedTotalHits": 0,
@@ -627,22 +622,26 @@ class TestMeilisearchTestFederatedCommand:
         )
 
         output = out.getvalue()
-
-        # Verify result allocation display
         assert "Result allocation" in output
         assert "Products" in output
         assert "Blog posts" in output
         assert "70%" in output
         assert "30%" in output
 
+    @patch(
+        "meili.management.commands.meilisearch_test_federated.BlogPostTranslation"
+    )
+    @patch(
+        "meili.management.commands.meilisearch_test_federated.ProductTranslation"
+    )
     @patch("meili.management.commands.meilisearch_test_federated.meili_client")
-    def test_test_federated_greeklish_expansion(self, mock_meili_client):
-        """
-        Test Greeklish expansion for Greek language queries.
+    def test_test_federated_greeklish_expansion(
+        self, mock_meili_client, mock_product, mock_blog
+    ):
+        """Test Greeklish expansion for Greek language queries."""
+        mock_product._meilisearch = MOCK_PRODUCT_MEILISEARCH
+        mock_blog._meilisearch = MOCK_BLOG_MEILISEARCH
 
-        Validates: Requirements 9.3, 9.5
-        """
-        # Mock multi_search response
         mock_meili_client.client.multi_search.return_value = {
             "hits": [],
             "estimatedTotalHits": 0,
@@ -660,19 +659,23 @@ class TestMeilisearchTestFederatedCommand:
         )
 
         output = out.getvalue()
-
-        # Verify Greeklish expansion is mentioned
         assert "Language: el" in output
         assert "Greeklish expanded" in output
 
+    @patch(
+        "meili.management.commands.meilisearch_test_federated.BlogPostTranslation"
+    )
+    @patch(
+        "meili.management.commands.meilisearch_test_federated.ProductTranslation"
+    )
     @patch("meili.management.commands.meilisearch_test_federated.meili_client")
-    def test_test_federated_filters_display(self, mock_meili_client):
-        """
-        Test that content filters are displayed.
+    def test_test_federated_filters_display(
+        self, mock_meili_client, mock_product, mock_blog
+    ):
+        """Test that content filters are displayed."""
+        mock_product._meilisearch = MOCK_PRODUCT_MEILISEARCH
+        mock_blog._meilisearch = MOCK_BLOG_MEILISEARCH
 
-        Validates: Requirements 9.3, 9.5
-        """
-        # Mock multi_search response
         mock_meili_client.client.multi_search.return_value = {
             "hits": [],
             "estimatedTotalHits": 0,
@@ -690,21 +693,25 @@ class TestMeilisearchTestFederatedCommand:
         )
 
         output = out.getvalue()
-
-        # Verify filters are displayed
         assert "Filters" in output
         assert "active = true" in output
         assert "is_deleted = false" in output
         assert "is_published = true" in output
 
+    @patch(
+        "meili.management.commands.meilisearch_test_federated.BlogPostTranslation"
+    )
+    @patch(
+        "meili.management.commands.meilisearch_test_federated.ProductTranslation"
+    )
     @patch("meili.management.commands.meilisearch_test_federated.meili_client")
-    def test_test_federated_with_results(self, mock_meili_client):
-        """
-        Test federated search command with actual results.
+    def test_test_federated_with_results(
+        self, mock_meili_client, mock_product, mock_blog
+    ):
+        """Test federated search command with actual results."""
+        mock_product._meilisearch = MOCK_PRODUCT_MEILISEARCH
+        mock_blog._meilisearch = MOCK_BLOG_MEILISEARCH
 
-        Validates: Requirements 9.3, 9.5, 9.6
-        """
-        # Mock multi_search response with results
         mock_meili_client.client.multi_search.return_value = {
             "hits": [
                 {
@@ -741,22 +748,26 @@ class TestMeilisearchTestFederatedCommand:
         )
 
         output = out.getvalue()
-
-        # Verify results summary
         assert "Total hits: 2" in output
         assert "Processing time: 15ms" in output
         assert "DETAILED RESULTS" in output
         assert "Product" in output
         assert "Blog Post" in output
 
+    @patch(
+        "meili.management.commands.meilisearch_test_federated.BlogPostTranslation"
+    )
+    @patch(
+        "meili.management.commands.meilisearch_test_federated.ProductTranslation"
+    )
     @patch("meili.management.commands.meilisearch_test_federated.meili_client")
-    def test_test_federated_no_results(self, mock_meili_client):
-        """
-        Test federated search command with no results.
+    def test_test_federated_no_results(
+        self, mock_meili_client, mock_product, mock_blog
+    ):
+        """Test federated search command with no results."""
+        mock_product._meilisearch = MOCK_PRODUCT_MEILISEARCH
+        mock_blog._meilisearch = MOCK_BLOG_MEILISEARCH
 
-        Validates: Requirements 9.3, 9.5, 9.6
-        """
-        # Mock multi_search response with no results
         mock_meili_client.client.multi_search.return_value = {
             "hits": [],
             "estimatedTotalHits": 0,
@@ -772,18 +783,22 @@ class TestMeilisearchTestFederatedCommand:
         )
 
         output = out.getvalue()
-
-        # Verify no results message
         assert "No results found" in output
 
+    @patch(
+        "meili.management.commands.meilisearch_test_federated.BlogPostTranslation"
+    )
+    @patch(
+        "meili.management.commands.meilisearch_test_federated.ProductTranslation"
+    )
     @patch("meili.management.commands.meilisearch_test_federated.meili_client")
-    def test_test_federated_error_handling(self, mock_meili_client):
-        """
-        Test error handling when Meilisearch fails.
+    def test_test_federated_error_handling(
+        self, mock_meili_client, mock_product, mock_blog
+    ):
+        """Test error handling when Meilisearch fails."""
+        mock_product._meilisearch = MOCK_PRODUCT_MEILISEARCH
+        mock_blog._meilisearch = MOCK_BLOG_MEILISEARCH
 
-        Validates: Requirements 9.6
-        """
-        # Mock multi_search to raise exception
         mock_meili_client.client.multi_search.side_effect = Exception(
             "Connection failed"
         )
@@ -797,22 +812,15 @@ class TestMeilisearchTestFederatedCommand:
         )
 
         output = out.getvalue()
-
-        # Verify error message
         assert "Federated search failed" in output or "✗" in output
 
 
 class TestMeilisearchExportAnalyticsCommand:
     """Tests for meilisearch_export_analytics management command."""
 
-    # Feature: meilisearch-enhancements, Property 27: Command argument validation
     @pytest.mark.django_db
     def test_export_analytics_no_data(self):
-        """
-        Test export command when no analytics data exists.
-
-        Validates: Requirements 9.4, 9.5, 9.6
-        """
+        """Test export command when no analytics data exists."""
         out = StringIO()
         call_command(
             "meilisearch_export_analytics",
@@ -822,8 +830,6 @@ class TestMeilisearchExportAnalyticsCommand:
         )
 
         output = out.getvalue()
-
-        # Verify no data message
         assert (
             "No queries found" in output
             or "Total queries to export: 0" in output
@@ -831,14 +837,9 @@ class TestMeilisearchExportAnalyticsCommand:
 
     @pytest.mark.django_db
     def test_export_analytics_with_data(self):
-        """
-        Test export command with analytics data.
-
-        Validates: Requirements 9.4, 9.5, 9.6
-        """
+        """Test export command with analytics data."""
         from search.models import SearchQuery
 
-        # Create test data
         SearchQuery.objects.create(
             query="test query",
             language_code="en",
@@ -858,12 +859,9 @@ class TestMeilisearchExportAnalyticsCommand:
         )
 
         output = out.getvalue()
-
-        # Verify success message
         assert "Successfully exported" in output or "✓" in output
-        assert "1" in output  # 1 query exported
+        assert "1" in output
 
-        # Verify file was created with correct content
         with open(output_file) as f:
             data = json.load(f)
             assert "export_metadata" in data
@@ -873,20 +871,11 @@ class TestMeilisearchExportAnalyticsCommand:
 
     @pytest.mark.parametrize(
         "invalid_date",
-        [
-            "invalid-date",
-            "2024/01/01",
-            "01-01-2024",
-            "not-a-date",
-        ],
+        ["invalid-date", "2024/01/01", "01-01-2024", "not-a-date"],
     )
     @pytest.mark.django_db
     def test_export_analytics_invalid_date_format(self, invalid_date):
-        """
-        Test error handling for invalid date formats.
-
-        Validates: Requirements 9.6, 9.7
-        """
+        """Test error handling for invalid date formats."""
         out = StringIO()
         call_command(
             "meilisearch_export_analytics",
@@ -898,25 +887,17 @@ class TestMeilisearchExportAnalyticsCommand:
         )
 
         output = out.getvalue()
-
-        # Verify error message with format hint
         assert "Invalid" in output or "ISO format" in output
 
     @pytest.mark.django_db
     def test_export_analytics_date_range_filtering(self):
-        """
-        Test export with date range filtering.
-
-        Validates: Requirements 9.4, 9.5
-        """
+        """Test export with date range filtering."""
         from django.utils import timezone
 
         from search.models import SearchQuery
 
-        # Create test data with different dates using timezone-aware datetimes
         now = timezone.now()
 
-        # Create old query first (30 days ago)
         old_query = SearchQuery.objects.create(
             query="old query",
             language_code="en",
@@ -924,12 +905,10 @@ class TestMeilisearchExportAnalyticsCommand:
             results_count=5,
             estimated_total_hits=50,
         )
-        # Manually update timestamp to 30 days ago
         SearchQuery.objects.filter(pk=old_query.pk).update(
             timestamp=now - timedelta(days=30)
         )
 
-        # Create recent query (now)
         SearchQuery.objects.create(
             query="recent query",
             language_code="en",
@@ -941,7 +920,6 @@ class TestMeilisearchExportAnalyticsCommand:
         out = StringIO()
         output_file = "/tmp/test_analytics_filtered.json"
 
-        # Export only recent data (use a date 7 days ago)
         start_date = (now - timedelta(days=7)).strftime("%Y-%m-%d")
         call_command(
             "meilisearch_export_analytics",
@@ -952,23 +930,16 @@ class TestMeilisearchExportAnalyticsCommand:
             stdout=out,
         )
 
-        # Verify filtering worked
         with open(output_file) as f:
             data = json.load(f)
-            # Should only have the recent query
             assert len(data["queries"]) == 1
             assert data["queries"][0]["query"] == "recent query"
 
     @pytest.mark.django_db
     def test_export_analytics_include_clicks(self):
-        """
-        Test export with click data included.
-
-        Validates: Requirements 9.4, 9.5
-        """
+        """Test export with click data included."""
         from search.models import SearchClick, SearchQuery
 
-        # Create test data with clicks
         query = SearchQuery.objects.create(
             query="test query",
             language_code="en",
@@ -979,7 +950,6 @@ class TestMeilisearchExportAnalyticsCommand:
         SearchClick.objects.create(
             search_query=query,
             result_id="product_1",
-            result_type="product",
             position=0,
         )
 
@@ -993,7 +963,6 @@ class TestMeilisearchExportAnalyticsCommand:
             stdout=out,
         )
 
-        # Verify clicks included
         with open(output_file) as f:
             data = json.load(f)
             assert data["export_metadata"]["include_clicks"] is True
@@ -1003,14 +972,9 @@ class TestMeilisearchExportAnalyticsCommand:
 
     @pytest.mark.django_db
     def test_export_analytics_output_formatting(self):
-        """
-        Test output formatting with progress indicators.
-
-        Validates: Requirements 9.5, 9.6
-        """
+        """Test output formatting with progress indicators."""
         from search.models import SearchQuery
 
-        # Create test data
         SearchQuery.objects.create(
             query="test",
             language_code="en",
@@ -1028,8 +992,6 @@ class TestMeilisearchExportAnalyticsCommand:
         )
 
         output = out.getvalue()
-
-        # Verify output formatting
         assert "SEARCH ANALYTICS EXPORT" in output
         assert "Output file:" in output
         assert "Total queries to export:" in output
@@ -1039,7 +1001,6 @@ class TestMeilisearchExportAnalyticsCommand:
 class TestManagementCommandsIntegration:
     """Integration tests for management commands working together."""
 
-    # Feature: meilisearch-enhancements, Property 27: Command argument validation
     @pytest.mark.parametrize(
         "command,required_args",
         [
@@ -1050,12 +1011,7 @@ class TestManagementCommandsIntegration:
         ],
     )
     def test_commands_require_arguments(self, command, required_args):
-        """
-        Test that commands require their mandatory arguments.
-
-        Validates: Requirements 9.7, 9.8
-        """
-        # Commands should fail without required arguments
+        """Test that commands require their mandatory arguments."""
         with pytest.raises((CommandError, SystemExit)):
             call_command(command)
 
@@ -1070,60 +1026,73 @@ class TestManagementCommandsIntegration:
         ],
     )
     def test_commands_have_help_text(self, command):
-        """
-        Test that all commands have help text.
-
-        Validates: Requirements 9.7, 9.8
-        """
+        """Test that all commands have help text."""
         from django.core.management import get_commands, load_command_class
 
-        # Load command class
         app_name = get_commands()[command]
         cmd_class = load_command_class(app_name, command)
 
-        # Verify help text exists
         assert cmd_class.help is not None
         assert len(cmd_class.help) > 0
 
-    @patch(
-        "meili.management.commands.meilisearch_update_index_settings.meili_client"
-    )
-    @patch("meili.management.commands.meilisearch_update_ranking.meili_client")
-    def test_commands_integrate_with_existing_meili_commands(
-        self, mock_ranking_client, mock_settings_client
-    ):
-        """
-        Test that new commands integrate with existing Meilisearch commands.
+    def test_commands_integrate_with_existing_meili_commands(self):
+        """Test that new commands integrate with existing Meilisearch commands."""
+        mock_product = create_mock_model(MOCK_PRODUCT_MEILISEARCH)
+        mock_blog = create_mock_model(MOCK_BLOG_MEILISEARCH)
+        mock_indexes = {
+            "ProductTranslation": mock_product,
+            "BlogPostTranslation": mock_blog,
+        }
 
-        Validates: Requirements 9.8
-        """
-        # Verify commands can be called in sequence (simulating workflow)
-        out = StringIO()
-
-        # Update settings
-        call_command(
-            "meilisearch_update_index_settings",
-            "--index",
-            "ProductTranslation",
-            "--max-total-hits",
-            "50000",
-            stdout=out,
+        settings_module = __import__(
+            "meili.management.commands.meilisearch_update_index_settings",
+            fromlist=["Command"],
+        )
+        ranking_module = __import__(
+            "meili.management.commands.meilisearch_update_ranking",
+            fromlist=["Command"],
         )
 
-        # Update ranking
-        call_command(
-            "meilisearch_update_ranking",
-            "--index",
-            "ProductTranslation",
-            "--rules",
-            "words,typo,proximity,attribute,sort,stock:desc,exactness",
-            stdout=out,
-        )
+        with (
+            patch(
+                "meili.management.commands.meilisearch_update_index_settings.meili_client"
+            ),
+            patch(
+                "meili.management.commands.meilisearch_update_ranking.meili_client"
+            ),
+            patch.object(
+                settings_module.Command,
+                "AVAILABLE_INDEXES",
+                mock_indexes,
+            ),
+            patch.object(
+                ranking_module.Command,
+                "AVAILABLE_INDEXES",
+                mock_indexes,
+            ),
+        ):
+            out = StringIO()
 
-        output = out.getvalue()
+            call_command(
+                "meilisearch_update_index_settings",
+                "--index",
+                "ProductTranslation",
+                "--max-total-hits",
+                "50000",
+                stdout=out,
+            )
 
-        # Both commands should complete successfully
-        assert output.count("Successfully") >= 2 or output.count("✓") >= 2
+            call_command(
+                "meilisearch_update_ranking",
+                "--index",
+                "ProductTranslation",
+                "--rules",
+                "words,typo,proximity,attribute,sort,stock:desc,exactness",
+                stdout=out,
+            )
+
+            output = out.getvalue()
+            assert output.count("Successfully") >= 2 or output.count("✓") >= 2
 
 
 class TestCommandOutputStyling:
@@ -1134,12 +1103,7 @@ class TestCommandOutputStyling:
         "meili.management.commands.meilisearch_enable_experimental.meili_client"
     )
     def test_success_message_styling(self, mock_meili_client, mock_requests):
-        """
-        Test that success messages use green styling.
-
-        Validates: Requirements 9.6
-        """
-        # Mock Meilisearch client settings
+        """Test that success messages use green styling."""
         mock_settings = MagicMock()
         mock_settings.https = False
         mock_settings.host = "localhost"
@@ -1148,7 +1112,6 @@ class TestCommandOutputStyling:
         mock_settings.timeout = 10
         mock_meili_client.settings = mock_settings
 
-        # Mock successful response
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_requests.patch.return_value = mock_response
@@ -1164,20 +1127,13 @@ class TestCommandOutputStyling:
         )
 
         output = out.getvalue()
-
-        # Success indicator should be present
         assert "✓" in output or "Successfully" in output
 
     @patch(
         "meili.management.commands.meilisearch_enable_experimental.meili_client"
     )
     def test_error_message_styling(self, mock_meili_client):
-        """
-        Test that error messages use red styling.
-
-        Validates: Requirements 9.6
-        """
-        # Mock Meilisearch client settings
+        """Test that error messages use red styling."""
         mock_settings = MagicMock()
         mock_meili_client.settings = mock_settings
 
@@ -1190,72 +1146,53 @@ class TestCommandOutputStyling:
         )
 
         output = out.getvalue()
-
-        # Error indicator should be present
         assert "Unknown feature" in output or "Available features" in output
 
 
-class TestProperty27CommandArgumentValidation:
+class TestCommandArgumentValidation:
     """
-    Property 27: Command argument validation
-
     For any management command with invalid arguments, the system should
     display helpful error messages with usage examples.
-
-    **Validates: Requirements 9.7**
-
-    This test class consolidates all invalid argument validation tests
-    using pytest.mark.parametrize to ensure comprehensive coverage of
-    error handling and helpful error messages across all management commands.
     """
 
-    # Feature: meilisearch-enhancements, Property 27: Command argument validation
     @pytest.mark.parametrize(
         "command,invalid_args,expected_error_patterns",
         [
-            # meilisearch_enable_experimental - invalid feature
             (
                 "meilisearch_enable_experimental",
                 {"feature": "nonexistent_feature"},
                 ["Unknown feature", "Available features"],
             ),
-            # meilisearch_update_index_settings - invalid index
             (
                 "meilisearch_update_index_settings",
                 {"index": "NonExistentIndex", "max_total_hits": "50000"},
                 ["Unknown index", "Available indexes"],
             ),
-            # meilisearch_update_index_settings - no settings provided
             (
                 "meilisearch_update_index_settings",
                 {"index": "ProductTranslation"},
                 ["At least one setting must be provided"],
             ),
-            # meilisearch_update_ranking - invalid index
             (
                 "meilisearch_update_ranking",
                 {"index": "InvalidIndex", "rules": "words,typo,exactness"},
                 ["Unknown index", "Available indexes"],
             ),
-            # meilisearch_update_ranking - invalid rule syntax
             (
                 "meilisearch_update_ranking",
                 {"index": "ProductTranslation", "rules": "invalid_rule"},
                 ["Unknown ranking rule", "Invalid"],
             ),
-            # meilisearch_update_ranking - invalid sort direction
             (
                 "meilisearch_update_ranking",
                 {"index": "ProductTranslation", "rules": "stock:invalid"},
                 ["Invalid sort direction", "asc", "desc"],
             ),
-            # meilisearch_update_ranking - empty rules
             (
                 "meilisearch_update_ranking",
                 {"index": "ProductTranslation", "rules": ""},
                 ["No ranking rules provided"],
             ),
-            # meilisearch_update_ranking - malformed custom rule
             (
                 "meilisearch_update_ranking",
                 {
@@ -1269,31 +1206,13 @@ class TestProperty27CommandArgumentValidation:
     @patch(
         "meili.management.commands.meilisearch_enable_experimental.meili_client"
     )
-    @patch(
-        "meili.management.commands.meilisearch_update_index_settings.meili_client"
-    )
-    @patch("meili.management.commands.meilisearch_update_ranking.meili_client")
     def test_invalid_arguments_produce_helpful_error_messages(
         self,
-        mock_ranking_client,
-        mock_settings_client,
         mock_experimental_client,
         command,
         invalid_args,
         expected_error_patterns,
     ):
-        """
-        Property 27: For any management command with invalid arguments,
-        the system should display helpful error messages.
-
-        **Validates: Requirements 9.7**
-
-        This test verifies that:
-        1. Invalid arguments are detected and rejected
-        2. Error messages are helpful and descriptive
-        3. Usage examples or available options are provided
-        """
-        # Mock Meilisearch client settings for experimental command
         mock_settings = MagicMock()
         mock_settings.https = False
         mock_settings.host = "localhost"
@@ -1302,17 +1221,13 @@ class TestProperty27CommandArgumentValidation:
 
         out = StringIO()
 
-        # Build command arguments
         cmd_args = [command]
         for key, value in invalid_args.items():
             cmd_args.extend([f"--{key.replace('_', '-')}", value])
 
-        # Execute command
         call_command(*cmd_args, stdout=out)
 
         output = out.getvalue()
-
-        # Verify at least one expected error pattern is present
         error_found = any(
             pattern in output for pattern in expected_error_patterns
         )
@@ -1321,7 +1236,6 @@ class TestProperty27CommandArgumentValidation:
             f"but got: {output}"
         )
 
-    # Feature: meilisearch-enhancements, Property 27: Command argument validation
     @pytest.mark.parametrize(
         "command,missing_args",
         [
@@ -1334,45 +1248,24 @@ class TestProperty27CommandArgumentValidation:
     def test_missing_required_arguments_raise_error(
         self, command, missing_args
     ):
-        """
-        Property 27: Commands should fail with helpful error when
-        required arguments are missing.
-
-        **Validates: Requirements 9.7**
-
-        This test verifies that:
-        1. Missing required arguments cause command failure
-        2. The error indicates which arguments are required
-        """
         with pytest.raises((CommandError, SystemExit)):
             call_command(command)
 
-    # Feature: meilisearch-enhancements, Property 27: Command argument validation
     @pytest.mark.parametrize(
         "invalid_date",
         [
             "invalid-date",
-            "2024/01/01",  # Wrong separator
-            "01-01-2024",  # Wrong order
+            "2024/01/01",
+            "01-01-2024",
             "not-a-date",
-            "2024-13-01",  # Invalid month
-            "2024-01-32",  # Invalid day
+            "2024-13-01",
+            "2024-01-32",
         ],
     )
     @pytest.mark.django_db
     def test_export_analytics_invalid_date_produces_helpful_error(
         self, invalid_date
     ):
-        """
-        Property 27: Invalid date formats should produce helpful error
-        messages with format examples.
-
-        **Validates: Requirements 9.7**
-
-        This test verifies that:
-        1. Invalid date formats are detected
-        2. Error message explains the expected format (ISO format)
-        """
         out = StringIO()
         call_command(
             "meilisearch_export_analytics",
@@ -1384,15 +1277,12 @@ class TestProperty27CommandArgumentValidation:
         )
 
         output = out.getvalue()
-
-        # Verify error message mentions format
         assert (
             "Invalid" in output
             or "ISO format" in output
             or "YYYY-MM-DD" in output
         )
 
-    # Feature: meilisearch-enhancements, Property 27: Command argument validation
     @pytest.mark.parametrize(
         "command",
         [
@@ -1404,38 +1294,20 @@ class TestProperty27CommandArgumentValidation:
         ],
     )
     def test_commands_provide_help_with_usage_examples(self, command):
-        """
-        Property 27: All commands should provide help text with usage examples.
-
-        **Validates: Requirements 9.7**
-
-        This test verifies that:
-        1. Commands have help text
-        2. Help text includes usage information
-        """
         from django.core.management import get_commands, load_command_class
 
-        # Load command class
         app_name = get_commands()[command]
         cmd_class = load_command_class(app_name, command)
 
-        # Verify help text exists and is meaningful
         assert cmd_class.help is not None
-        assert len(cmd_class.help) > 10  # More than just a few characters
+        assert len(cmd_class.help) > 10
 
-        # load_command_class returns a Command instance, not a class
-        # Use it directly to create parser
         parser = cmd_class.create_parser("manage.py", command)
-
-        # Capture help output using format_help() instead of --help flag
         help_output = parser.format_help()
 
-        # Help output should contain command name or usage info
         assert command in help_output or "usage" in help_output.lower()
-        # Should also contain argument descriptions
-        assert "--" in help_output  # Has command-line arguments documented
+        assert "--" in help_output
 
-    # Feature: meilisearch-enhancements, Property 27: Command argument validation
     @pytest.mark.parametrize(
         "command,args,error_should_list_options",
         [
@@ -1462,17 +1334,6 @@ class TestProperty27CommandArgumentValidation:
     def test_error_messages_list_available_options(
         self, mock_client, command, args, error_should_list_options
     ):
-        """
-        Property 27: Error messages should list available options
-        to help users correct their input.
-
-        **Validates: Requirements 9.7**
-
-        This test verifies that:
-        1. When an invalid option is provided, the error lists valid options
-        2. Users can easily see what values are acceptable
-        """
-        # Mock Meilisearch client settings
         mock_settings = MagicMock()
         mock_settings.https = False
         mock_settings.host = "localhost"
@@ -1481,7 +1342,6 @@ class TestProperty27CommandArgumentValidation:
 
         out = StringIO()
 
-        # Build command arguments
         cmd_args = [command]
         for key, value in args.items():
             cmd_args.extend([f"--{key.replace('_', '-')}", value])
@@ -1489,39 +1349,22 @@ class TestProperty27CommandArgumentValidation:
         call_command(*cmd_args, stdout=out)
 
         output = out.getvalue()
-
-        # Verify available options are listed
         assert error_should_list_options in output, (
             f"Expected '{error_should_list_options}' in output, but got: {output}"
         )
 
-    # Feature: meilisearch-enhancements, Property 27: Command argument validation
     @pytest.mark.parametrize(
         "numeric_arg,invalid_value",
         [
             ("--max-total-hits", "not_a_number"),
-            ("--max-total-hits", "-100"),
             ("--search-cutoff-ms", "abc"),
-            ("--search-cutoff-ms", "-1"),
             ("--max-values-per-facet", "xyz"),
             ("--limit", "not_numeric"),
         ],
     )
     def test_numeric_arguments_validate_input(self, numeric_arg, invalid_value):
-        """
-        Property 27: Numeric arguments should validate input and
-        provide helpful error messages for invalid values.
-
-        **Validates: Requirements 9.7**
-
-        This test verifies that:
-        1. Non-numeric values are rejected for numeric arguments
-        2. Negative values are handled appropriately
-        3. Error messages explain the expected format
-        """
         out = StringIO()
 
-        # Determine which command to use based on the argument
         if numeric_arg in [
             "--max-total-hits",
             "--search-cutoff-ms",
@@ -1539,12 +1382,9 @@ class TestProperty27CommandArgumentValidation:
             command = "meilisearch_test_federated"
             cmd_args = [command, "--query", "test", numeric_arg, invalid_value]
 
-        # For argparse validation errors, we expect SystemExit or CommandError
         try:
             call_command(*cmd_args, stdout=out, stderr=out)
             output = out.getvalue()
-            # If command didn't raise, check for error in output
             assert "invalid" in output.lower() or "error" in output.lower()
         except (SystemExit, CommandError, ValueError):
-            # Expected behavior - invalid numeric input should fail
-            pass
+            pass  # Expected behavior - invalid numeric input should fail

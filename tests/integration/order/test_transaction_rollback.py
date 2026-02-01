@@ -23,7 +23,7 @@ from country.factories import CountryFactory
     "database flush issues in parallel test execution. Tests pass in isolation.",
     strict=False,
 )
-class TestProperty20TransactionFailuresRollbackCompletely:
+class TestTransactionFailuresRollbackCompletely:
     """
     Test that database transactions rollback completely when exceptions occur,
     leaving no partial changes in the database.

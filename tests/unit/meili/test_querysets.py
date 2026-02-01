@@ -1,3 +1,9 @@
+"""
+Tests for IndexQuerySet - Meilisearch query builder.
+
+Tests the Django ORM-like interface for building and executing Meilisearch queries.
+"""
+
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -41,23 +47,24 @@ class TestIndexQuerySet:
         assert queryset.index == self.mock_index
         mock_client.get_index.assert_called_once_with("test_index")
 
-        assert queryset._IndexQuerySet__offset == 0
-        assert queryset._IndexQuerySet__limit == 20
-        assert queryset._IndexQuerySet__filters == []
-        assert queryset._IndexQuerySet__facets == []
-        assert queryset._IndexQuerySet__attributes_to_retrieve == ["*"]
-        assert queryset._IndexQuerySet__attributes_to_crop == []
-        assert queryset._IndexQuerySet__crop_length == 10
-        assert queryset._IndexQuerySet__crop_marker == "..."
-        assert queryset._IndexQuerySet__attributes_to_highlight == ["*"]
-        assert queryset._IndexQuerySet__highlight_pre_tag == "<mark>"
-        assert queryset._IndexQuerySet__highlight_post_tag == "</mark>"
-        assert queryset._IndexQuerySet__show_matches_position
-        assert queryset._IndexQuerySet__sort == []
-        assert queryset._IndexQuerySet__matching_strategy == "last"
-        assert queryset._IndexQuerySet__show_ranking_score
-        assert queryset._IndexQuerySet__attributes_to_search_on == ["*"]
-        assert queryset._IndexQuerySet__locales == []
+        # Check state via _state
+        assert queryset._state.offset == 0
+        assert queryset._state.limit == 20
+        assert queryset._state.filters == []
+        assert queryset._state.facets == []
+        assert queryset._state.attributes_to_retrieve == ["*"]
+        assert queryset._state.attributes_to_crop == []
+        assert queryset._state.crop_length == 10
+        assert queryset._state.crop_marker == "..."
+        assert queryset._state.attributes_to_highlight == ["*"]
+        assert queryset._state.highlight_pre_tag == "<mark>"
+        assert queryset._state.highlight_post_tag == "</mark>"
+        assert queryset._state.show_matches_position
+        assert queryset._state.sort == []
+        assert queryset._state.matching_strategy == "last"
+        assert queryset._state.show_ranking_score
+        assert queryset._state.attributes_to_search_on == ["*"]
+        assert queryset._state.locales == []
 
     @patch("meili.querysets.client")
     def test_queryset_repr_and_str(self, mock_client):
@@ -76,8 +83,8 @@ class TestIndexQuerySet:
         result = queryset[10:50]
 
         assert result == queryset
-        assert queryset._IndexQuerySet__offset == 10
-        assert queryset._IndexQuerySet__limit == 50
+        assert queryset._state.offset == 10
+        assert queryset._state.limit == 50
 
     @patch("meili.querysets.client")
     def test_queryset_getitem_invalid_index(self, mock_client):
@@ -111,8 +118,8 @@ class TestIndexQuerySet:
         result = queryset.paginate(limit=100, offset=25)
 
         assert result == queryset
-        assert queryset._IndexQuerySet__limit == 100
-        assert queryset._IndexQuerySet__offset == 25
+        assert queryset._state.limit == 100
+        assert queryset._state.offset == 25
 
     @patch("meili.querysets.client")
     def test_order_by_ascending(self, mock_client):
@@ -122,7 +129,7 @@ class TestIndexQuerySet:
         result = queryset.order_by("title", "created_at")
 
         assert result == queryset
-        assert queryset._IndexQuerySet__sort == ["title:asc", "created_at:asc"]
+        assert queryset._state.sort == ["title:asc", "created_at:asc"]
 
     @patch("meili.querysets.client")
     def test_order_by_descending(self, mock_client):
@@ -132,10 +139,7 @@ class TestIndexQuerySet:
         result = queryset.order_by("-title", "-created_at")
 
         assert result == queryset
-        assert queryset._IndexQuerySet__sort == [
-            "title:desc",
-            "created_at:desc",
-        ]
+        assert queryset._state.sort == ["title:desc", "created_at:desc"]
 
     @patch("meili.querysets.client")
     def test_order_by_mixed(self, mock_client):
@@ -145,7 +149,7 @@ class TestIndexQuerySet:
         result = queryset.order_by("title", "-created_at", "priority")
 
         assert result == queryset
-        assert queryset._IndexQuerySet__sort == [
+        assert queryset._state.sort == [
             "title:asc",
             "created_at:desc",
             "priority:asc",
@@ -159,10 +163,7 @@ class TestIndexQuerySet:
         result = queryset.order_by("geoPoint", "-geoPoint")
 
         assert result == queryset
-        assert queryset._IndexQuerySet__sort == [
-            "_geoPoint:asc",
-            "_geoPoint:desc",
-        ]
+        assert queryset._state.sort == ["_geoPoint:asc", "_geoPoint:desc"]
 
     @patch("meili.querysets.client")
     def test_matching_strategy(self, mock_client):
@@ -172,7 +173,7 @@ class TestIndexQuerySet:
         result = queryset.matching_strategy("all")
 
         assert result == queryset
-        assert queryset._IndexQuerySet__matching_strategy == "all"
+        assert queryset._state.matching_strategy == "all"
 
     @patch("meili.querysets.client")
     def test_attributes_to_search_on(self, mock_client):
@@ -196,7 +197,7 @@ class TestIndexQuerySet:
         result = queryset.filter(title="Test Title")
 
         assert result == queryset
-        assert "title = 'Test Title'" in queryset._IndexQuerySet__filters
+        assert "title = 'Test Title'" in queryset.filters
 
     @patch("meili.querysets.client")
     def test_filter_regular_exact_number(self, mock_client):
@@ -206,7 +207,7 @@ class TestIndexQuerySet:
         result = queryset.filter(price=100)
 
         assert result == queryset
-        assert "price = 100" in queryset._IndexQuerySet__filters
+        assert "price = 100" in queryset.filters
 
     @patch("meili.querysets.client")
     def test_filter_regular_empty_values(self, mock_client):
@@ -215,10 +216,9 @@ class TestIndexQuerySet:
         queryset = IndexQuerySet(MockModel)
         queryset.filter(empty_string="", empty_list=[], empty_dict={})
 
-        filters = queryset._IndexQuerySet__filters
-        assert "empty_string IS EMPTY" in filters
-        assert "empty_list IS EMPTY" in filters
-        assert "empty_dict IS EMPTY" in filters
+        assert "empty_string IS EMPTY" in queryset.filters
+        assert "empty_list IS EMPTY" in queryset.filters
+        assert "empty_dict IS EMPTY" in queryset.filters
 
     @patch("meili.querysets.client")
     def test_filter_regular_null_value(self, mock_client):
@@ -227,7 +227,7 @@ class TestIndexQuerySet:
         queryset = IndexQuerySet(MockModel)
         queryset.filter(nullable_field=None)
 
-        assert "nullable_field IS NULL" in queryset._IndexQuerySet__filters
+        assert "nullable_field IS NULL" in queryset.filters
 
     @patch("meili.querysets.client")
     def test_filter_gte(self, mock_client):
@@ -237,7 +237,7 @@ class TestIndexQuerySet:
         result = queryset.filter(price__gte=100)
 
         assert result == queryset
-        assert "price >= 100" in queryset._IndexQuerySet__filters
+        assert "price >= 100" in queryset.filters
 
     @patch("meili.querysets.client")
     def test_filter_gte_invalid_type(self, mock_client):
@@ -258,7 +258,7 @@ class TestIndexQuerySet:
         result = queryset.filter(price__gt=100.5)
 
         assert result == queryset
-        assert "price > 100.5" in queryset._IndexQuerySet__filters
+        assert "price > 100.5" in queryset.filters
 
     @patch("meili.querysets.client")
     def test_filter_lte(self, mock_client):
@@ -268,7 +268,7 @@ class TestIndexQuerySet:
         result = queryset.filter(price__lte=200)
 
         assert result == queryset
-        assert "price <= 200" in queryset._IndexQuerySet__filters
+        assert "price <= 200" in queryset.filters
 
     @patch("meili.querysets.client")
     def test_filter_lt(self, mock_client):
@@ -278,7 +278,7 @@ class TestIndexQuerySet:
         result = queryset.filter(price__lt=50.25)
 
         assert result == queryset
-        assert "price < 50.25" in queryset._IndexQuerySet__filters
+        assert "price < 50.25" in queryset.filters
 
     @patch("meili.querysets.client")
     def test_filter_in(self, mock_client):
@@ -288,10 +288,7 @@ class TestIndexQuerySet:
         result = queryset.filter(category__in=["electronics", "books"])
 
         assert result == queryset
-        assert (
-            "category IN ['electronics', 'books']"
-            in queryset._IndexQuerySet__filters
-        )
+        assert "category IN ['electronics', 'books']" in queryset.filters
 
     @patch("meili.querysets.client")
     def test_filter_in_invalid_type(self, mock_client):
@@ -312,7 +309,7 @@ class TestIndexQuerySet:
         result = queryset.filter(price__range=[10, 100])
 
         assert result == queryset
-        assert "price 10 TO 100" in queryset._IndexQuerySet__filters
+        assert "price 10 TO 100" in queryset.filters
 
     @patch("meili.querysets.client")
     def test_filter_range_tuple(self, mock_client):
@@ -322,7 +319,7 @@ class TestIndexQuerySet:
         result = queryset.filter(price__range=(5, 50))
 
         assert result == queryset
-        assert "price 5 TO 50" in queryset._IndexQuerySet__filters
+        assert "price 5 TO 50" in queryset.filters
 
     @patch("meili.querysets.client")
     def test_filter_range_range_object(self, mock_client):
@@ -332,7 +329,7 @@ class TestIndexQuerySet:
         result = queryset.filter(price__range=range(1, 10))
 
         assert result == queryset
-        assert "price 1 TO 10" in queryset._IndexQuerySet__filters
+        assert "price 1 TO 10" in queryset.filters
 
     @patch("meili.querysets.client")
     def test_filter_range_invalid_type(self, mock_client):
@@ -354,7 +351,7 @@ class TestIndexQuerySet:
         result = queryset.filter(field__exists=True)
 
         assert result == queryset
-        assert "field EXISTS" in queryset._IndexQuerySet__filters
+        assert "field EXISTS" in queryset.filters
 
     @patch("meili.querysets.client")
     def test_filter_exists_false(self, mock_client):
@@ -364,7 +361,7 @@ class TestIndexQuerySet:
         result = queryset.filter(field__exists=False)
 
         assert result == queryset
-        assert "field NOT EXISTS" in queryset._IndexQuerySet__filters
+        assert "field NOT EXISTS" in queryset.filters
 
     @patch("meili.querysets.client")
     def test_filter_exists_invalid_type(self, mock_client):
@@ -385,7 +382,7 @@ class TestIndexQuerySet:
         result = queryset.filter(field__isnull=True)
 
         assert result == queryset
-        assert "field IS NULL" in queryset._IndexQuerySet__filters
+        assert "field IS NULL" in queryset.filters
 
     @patch("meili.querysets.client")
     def test_filter_isnull_false(self, mock_client):
@@ -395,7 +392,7 @@ class TestIndexQuerySet:
         result = queryset.filter(field__isnull=False)
 
         assert result == queryset
-        assert "field NOT IS NULL" in queryset._IndexQuerySet__filters
+        assert "field NOT IS NULL" in queryset.filters
 
     @patch("meili.querysets.client")
     def test_filter_isnull_invalid_type(self, mock_client):
@@ -417,10 +414,7 @@ class TestIndexQuerySet:
         result = queryset.filter(radius)
 
         assert result == queryset
-        assert (
-            "_geoRadius(48.8566, 2.3522, 1000)"
-            in queryset._IndexQuerySet__filters
-        )
+        assert "_geoRadius(48.8566, 2.3522, 1000)" in queryset.filters
 
     @patch("meili.querysets.client")
     def test_filter_geo_bounding_box(self, mock_client):
@@ -431,10 +425,7 @@ class TestIndexQuerySet:
         result = queryset.filter(bbox)
 
         assert result == queryset
-        assert (
-            "_geoBoundingBox([48.9, 2.4], [48.8, 2.3])"
-            in queryset._IndexQuerySet__filters
-        )
+        assert "_geoBoundingBox([48.9, 2.4], [48.8, 2.3])" in queryset.filters
 
     @patch("meili.querysets.client")
     def test_filter_geo_unsupported_model(self, mock_client):
@@ -584,10 +575,10 @@ class TestIndexQuerySet:
         mock_client.get_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
-        result = queryset.facets("category", "price", "brand")
+        result = queryset.set_facets("category", "price", "brand")
 
         assert result == queryset
-        assert queryset._IndexQuerySet__facets == ["category", "price", "brand"]
+        assert queryset.facets == ["category", "price", "brand"]
 
     @patch("meili.querysets.client")
     def test_search_with_facets(self, mock_client):
@@ -609,7 +600,7 @@ class TestIndexQuerySet:
         MockModel.objects.filter.return_value = mock_queryset
 
         queryset = IndexQuerySet(MockModel)
-        queryset.facets("category", "price")
+        queryset.set_facets("category", "price")
         results = queryset.search("test")
 
         call_args = self.mock_index.search.call_args[0][1]

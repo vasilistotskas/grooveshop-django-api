@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from order.services import OrderService
 
 
-class TestPropertyAddressValidation:
+class TestAddressValidation:
     @pytest.mark.parametrize(
         "missing_field,address_data",
         [

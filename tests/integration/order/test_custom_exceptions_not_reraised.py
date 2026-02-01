@@ -24,7 +24,7 @@ from product.factories.product import ProductFactory
 
 
 @pytest.mark.django_db(transaction=True)
-class TestProperty22CustomExceptionsNotReraisedAsValueError:
+class TestCustomExceptionsNotReraisedAsValueError:
     """
     Test that custom exceptions are NOT caught and re-raised as ValueError.
     This ensures that the backward compatibility code has been properly removed

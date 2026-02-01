@@ -150,10 +150,12 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
             "category",
             "category_name",
             "is_published",
+            "master_id",
         )
         searchable_fields = ("id", "title", "subtitle", "body")
         displayed_fields = (
             "id",
+            "master_id",
             "title",
             "subtitle",
             "body",
@@ -219,6 +221,7 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
     @classmethod
     def get_additional_meili_fields(cls):
         return {
+            "master_id": lambda obj: obj.master_id,
             "likes_count": lambda obj: getattr(obj, "_likes_count", 0)
             or obj.master.likes_count,
             "view_count": lambda obj: obj.master.view_count,

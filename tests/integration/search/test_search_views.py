@@ -75,11 +75,6 @@ def sample_blog_posts(db):
 @pytest.mark.django_db
 class TestSearchQueryRecordCreation:
     """
-    Test Property 8: SearchQuery record creation.
-
-    Feature: meilisearch-enhancements, Property 8: SearchQuery record creation
-    Validates: Requirements 2.1, 2.2
-
     For any search request (product, blog, or federated), a SearchQuery model
     record should be created with query, language_code, content_type,
     results_count, and timestamp fields populated.
@@ -166,11 +161,6 @@ class TestSearchQueryRecordCreation:
 @pytest.mark.django_db
 class TestSearchClickRecordCreation:
     """
-    Test Property 9: SearchClick record creation.
-
-    Feature: meilisearch-enhancements, Property 9: SearchClick record creation
-    Validates: Requirements 2.3
-
     For any search result click event, a SearchClick model record should be
     created with search_query foreign key, result_id, result_type, position,
     and timestamp.
@@ -292,11 +282,6 @@ class TestSearchClickRecordCreation:
 @pytest.mark.django_db
 class TestAnalyticsMetricsCompleteness:
     """
-    Test Property 10: Analytics metrics completeness.
-
-    Feature: meilisearch-enhancements, Property 10: Analytics metrics completeness
-    Validates: Requirements 2.6
-
     For any analytics query, the response should include top_queries,
     zero_result_queries, search_volume, avg_results_count, and
     click_through_rate metrics.
@@ -523,12 +508,6 @@ class TestAnalyticsMetricsCompleteness:
 @pytest.mark.django_db
 class TestAnalyticsLoggingFailuresDontBreakSearch:
     """
-    Test Property 11: Analytics logging failures don't break search.
-
-    Feature: meilisearch-enhancements, Property 11: Analytics logging
-    failures don't break search
-    Validates: Requirements 2.7
-
     For any search request, if analytics logging fails, the search should
     still complete successfully and return results.
 

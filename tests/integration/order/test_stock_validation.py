@@ -9,7 +9,7 @@ from product.factories.product import ProductFactory
 
 
 @pytest.mark.django_db(transaction=True)
-class TestProperty4StockValidationPreventsInvalidOrders:
+class TestStockValidationPreventsInvalidOrders:
     """
     Test that OrderItem creation with quantity exceeding available stock
     is properly rejected with appropriate error.

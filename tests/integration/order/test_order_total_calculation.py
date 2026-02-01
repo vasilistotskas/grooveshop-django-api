@@ -7,12 +7,7 @@ from order.models.item import OrderItem
 from product.models import Product
 
 
-class TestPropertyOrderTotalCalculation:
-    """
-    Feature: checkout-order-audit
-    Property 26: Order Total Calculation Is Correct
-    """
-
+class TestOrderTotalCalculation:
     @pytest.mark.django_db
     @pytest.mark.parametrize(
         "items_data,shipping_amount,expected_total",

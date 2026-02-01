@@ -284,7 +284,7 @@ def product_meili_search(request):
 
     # Add facets for dynamic filter counts and stats
     if facets:
-        search_qs = search_qs.facets(*facets)
+        search_qs = search_qs.set_facets(*facets)
 
     enriched_results = search_qs.search(q=decoded_query)
 

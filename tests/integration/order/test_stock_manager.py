@@ -669,6 +669,21 @@ class TestStockManagerReleaseReservation:
 class TestStockManagerConvertReservationToSale:
     """Test suite for StockManager.convert_reservation_to_sale method."""
 
+    def setup_method(self):
+        """Set up test data for each test method."""
+        # Patch the TTL to ensure reservations don't expire during slow test executions
+        from unittest.mock import patch
+
+        self.patcher = patch(
+            "order.stock.StockManager.get_reservation_ttl_minutes",
+            return_value=60,
+        )
+        self.patcher.start()
+
+    def teardown_method(self):
+        """Clean up after each test method."""
+        self.patcher.stop()
+
     def test_convert_reservation_to_sale_success(self):
         """Test successful conversion of reservation to sale."""
         from order.factories import OrderFactory

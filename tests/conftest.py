@@ -12,7 +12,7 @@ settings.PASSWORD_HASHERS = [
 ]
 
 settings.DISABLE_CACHE = True
-settings.MEILI_OFFLINE = True
+settings.MEILISEARCH["OFFLINE"] = True
 
 settings.DATABASES["default"]["ATOMIC_REQUESTS"] = False
 settings.DATABASES["default"]["AUTOCOMMIT"] = True

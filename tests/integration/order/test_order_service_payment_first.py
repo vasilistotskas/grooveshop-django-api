@@ -17,8 +17,6 @@ from order.enum.status import OrderStatus, PaymentStatus
 class TestCreateOrderFromCart:
     """
     Test suite for OrderService.create_order_from_cart method.
-
-    Feature: checkout-order-audit, Task 7.1
     """
 
     def test_successful_order_creation_with_reservations(self):
@@ -547,8 +545,6 @@ class TestValidateShippingAddress:
 class TestCancelOrderWithStockManager:
     """
     Test suite for updated cancel_order method using StockManager.
-
-    Feature: checkout-order-audit, Task 7.1
     """
 
     def test_cancel_order_releases_reservations_and_restores_stock(self):

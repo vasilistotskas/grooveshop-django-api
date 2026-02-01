@@ -1,7 +1,6 @@
 """
 Unit tests for StockReservation model.
 
-Feature: checkout-order-audit
 Tests basic model functionality, properties, and database constraints.
 """
 

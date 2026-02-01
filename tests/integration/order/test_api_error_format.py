@@ -12,7 +12,7 @@ User = get_user_model()
 
 
 @pytest.mark.django_db
-class TestProperty23APIErrorsUseConsistentFormat:
+class TestAPIErrorsUseConsistentFormat:
     """
     Test that all API error responses use consistent ErrorResponseSerializer format
     with detail, status code, and field-level errors when applicable.

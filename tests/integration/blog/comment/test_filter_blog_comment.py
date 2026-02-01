@@ -1,4 +1,7 @@
 from datetime import timedelta
+from unittest.mock import patch
+
+from django.db.models import signals
 from django.utils import timezone
 from django.urls import reverse
 from rest_framework.test import APITestCase
@@ -92,9 +95,11 @@ class BlogCommentFilterTest(APITestCase):
         self.comment1.set_current_language("en")
         self.comment1.content = "This is a great article about technology!"
         self.comment1.save()
-        for i in range(5):
-            user = UserAccountFactory()
-            self.comment1.likes.add(user)
+        # Mute m2m_changed signal to prevent notification creation during tests
+        with patch.object(signals.m2m_changed, "send"):
+            for i in range(5):
+                user = UserAccountFactory()
+                self.comment1.likes.add(user)
 
         self.reply1_1 = BlogCommentFactory(
             post=self.post1,
@@ -107,7 +112,9 @@ class BlogCommentFilterTest(APITestCase):
         self.reply1_1.set_current_language("en")
         self.reply1_1.content = "I agree completely!"
         self.reply1_1.save()
-        self.reply1_1.likes.add(self.user1)
+        # Mute m2m_changed signal to prevent notification creation during tests
+        with patch.object(signals.m2m_changed, "send"):
+            self.reply1_1.likes.add(self.user1)
 
         self.reply1_1_1 = BlogCommentFactory(
             post=self.post1,

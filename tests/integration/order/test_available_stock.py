@@ -12,7 +12,7 @@ from user.factories.account import UserAccountFactory
 
 
 @pytest.mark.django_db(transaction=True)
-class TestProperty8AvailableStockExcludesReservations:
+class TestAvailableStockExcludesReservations:
     """
     Test that get_available_stock correctly calculates available stock by
     excluding only active reservations (not consumed and not expired).

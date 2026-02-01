@@ -1,7 +1,7 @@
 """
-Property validation tests for CONTAINS operator support.
+Tests for CONTAINS operator support in IndexQuerySet.
 
-This module tests that the IndexQuerySet correctly handles __contains lookup
+Tests that the IndexQuerySet correctly handles __contains lookup
 for substring matching using Meilisearch's experimental CONTAINS operator.
 """
 
@@ -57,22 +57,13 @@ class TestContainsOperator:
     def test_contains_filter_generation(
         self, mock_client, field, value, expected_filter
     ):
-        """
-        Property 20: CONTAINS filter generation.
-
-        For any field and substring value, applying __contains filter should
-        generate Meilisearch filter expression using CONTAINS operator with
-        correct syntax.
-
-        Validates: Requirements 6.1, 6.2
-        """
+        """Test CONTAINS filter generation for various fields."""
         mock_client.get_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         queryset.filter(**{f"{field}__contains": value})
 
-        # Access private attribute to check filters
-        assert expected_filter in queryset._IndexQuerySet__filters
+        assert expected_filter in queryset.filters
 
     @pytest.mark.parametrize(
         "value,expected_filter",
@@ -87,23 +78,13 @@ class TestContainsOperator:
     def test_contains_case_insensitive_matching(
         self, mock_client, value, expected_filter
     ):
-        """
-        Property 21: Case-insensitive CONTAINS matching.
-
-        For any string field and substring, CONTAINS operator should perform
-        case-insensitive matching by default (handled by Meilisearch).
-
-        Note: Meilisearch handles case-insensitivity internally. This test
-        verifies that we generate the correct filter syntax for all cases.
-
-        Validates: Requirements 6.3
-        """
+        """Test CONTAINS filter preserves case (Meilisearch handles case-insensitivity)."""
         mock_client.get_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         queryset.filter(name__contains=value)
 
-        assert expected_filter in queryset._IndexQuerySet__filters
+        assert expected_filter in queryset.filters
 
     @pytest.mark.parametrize(
         "field,invalid_value,expected_type",
@@ -122,14 +103,7 @@ class TestContainsOperator:
     def test_contains_type_validation(
         self, mock_client, field, invalid_value, expected_type
     ):
-        """
-        Property 22: CONTAINS type validation.
-
-        For any non-string field, applying __contains filter should raise
-        TypeError with descriptive message.
-
-        Validates: Requirements 6.4
-        """
+        """Test CONTAINS operator rejects non-string values with descriptive error."""
         mock_client.get_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
@@ -159,14 +133,7 @@ class TestContainsOperator:
     def test_contains_error_handling(
         self, mock_client, invalid_value, expected_type
     ):
-        """
-        Property 23: CONTAINS error handling.
-
-        For any CONTAINS operator error, the system should return a descriptive
-        error message explaining the issue.
-
-        Validates: Requirements 6.7
-        """
+        """Test CONTAINS operator provides descriptive error messages."""
         mock_client.get_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
@@ -175,49 +142,39 @@ class TestContainsOperator:
             queryset.filter(name__contains=invalid_value)
 
         error_message = str(exc_info.value)
-        # Verify error message is descriptive
         assert "CONTAINS operator only supports string values" in error_message
         assert expected_type in error_message
         assert "name" in error_message
-        # Verify it provides guidance
         assert "string field" in error_message
 
     @pytest.mark.parametrize(
         "substring",
         [
-            "a",  # Single character
-            "ab",  # Two characters
-            "laptop",  # Common word
-            "gaming laptop",  # Multiple words with space
-            "MacBook Pro",  # Mixed case with space
-            "ABC-123",  # With hyphen
-            "test@example",  # With special char
-            "product_name",  # With underscore
-            "",  # Empty string (edge case)
+            "a",
+            "ab",
+            "laptop",
+            "gaming laptop",
+            "MacBook Pro",
+            "ABC-123",
+            "test@example",
+            "product_name",
+            "",
         ],
     )
     @patch("meili.querysets.client")
     def test_contains_various_substring_values(self, mock_client, substring):
-        """
-        Test CONTAINS operator with various substring values.
-
-        Validates: Requirements 6.1, 6.2
-        """
+        """Test CONTAINS operator with various substring values."""
         mock_client.get_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         queryset.filter(name__contains=substring)
 
         expected_filter = f'name CONTAINS "{substring}"'
-        assert expected_filter in queryset._IndexQuerySet__filters
+        assert expected_filter in queryset.filters
 
     @patch("meili.querysets.client")
     def test_contains_with_multiple_filters(self, mock_client):
-        """
-        Test CONTAINS operator combined with other filters.
-
-        Validates: Requirements 6.1, 6.5
-        """
+        """Test CONTAINS operator combined with other filters."""
         mock_client.get_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
@@ -227,18 +184,13 @@ class TestContainsOperator:
             price__gte=500,
         )
 
-        filters = queryset._IndexQuerySet__filters
-        assert 'name CONTAINS "laptop"' in filters
-        assert "category = 'electronics'" in filters
-        assert "price >= 500" in filters
+        assert 'name CONTAINS "laptop"' in queryset.filters
+        assert "category = 'electronics'" in queryset.filters
+        assert "price >= 500" in queryset.filters
 
     @patch("meili.querysets.client")
     def test_contains_filter_chaining(self, mock_client):
-        """
-        Test CONTAINS operator with method chaining.
-
-        Validates: Requirements 6.5
-        """
+        """Test CONTAINS operator with method chaining."""
         mock_client.get_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
@@ -246,52 +198,39 @@ class TestContainsOperator:
             brand__contains="Apple"
         )
 
-        filters = result._IndexQuerySet__filters
-        assert 'name CONTAINS "laptop"' in filters
-        assert 'brand CONTAINS "Apple"' in filters
+        assert 'name CONTAINS "laptop"' in result.filters
+        assert 'brand CONTAINS "Apple"' in result.filters
 
     @pytest.mark.parametrize(
         "special_string",
         [
-            'test"quote',  # Contains double quote
-            "test'quote",  # Contains single quote
-            "test\\backslash",  # Contains backslash
-            "test\nnewline",  # Contains newline
-            "test\ttab",  # Contains tab
+            'test"quote',
+            "test'quote",
+            "test\\backslash",
+            "test\nnewline",
+            "test\ttab",
         ],
     )
     @patch("meili.querysets.client")
     def test_contains_with_special_characters(
         self, mock_client, special_string
     ):
-        """
-        Test CONTAINS operator with special characters in substring.
-
-        Note: This test documents current behavior. Special character escaping
-        may need to be added if Meilisearch requires it.
-
-        Validates: Requirements 6.1, 6.2
-        """
+        """Test CONTAINS operator with special characters in substring."""
         mock_client.get_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         queryset.filter(name__contains=special_string)
 
         expected_filter = f'name CONTAINS "{special_string}"'
-        assert expected_filter in queryset._IndexQuerySet__filters
+        assert expected_filter in queryset.filters
 
     @patch("meili.querysets.client")
     def test_contains_preserves_other_lookups(self, mock_client):
-        """
-        Test that adding CONTAINS support doesn't break existing lookups.
-
-        Validates: Requirements 6.1
-        """
+        """Test that CONTAINS support doesn't break existing lookups."""
         mock_client.get_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
 
-        # Test all existing lookups still work
         queryset.filter(
             name="exact_match",
             price__gte=100,
@@ -300,9 +239,8 @@ class TestContainsOperator:
             is_active__isnull=False,
         )
 
-        filters = queryset._IndexQuerySet__filters
-        assert "name = 'exact_match'" in filters
-        assert "price >= 100" in filters
-        assert "stock <= 50" in filters
-        assert "category IN ['electronics', 'computers']" in filters
-        assert "is_active NOT IS NULL" in filters
+        assert "name = 'exact_match'" in queryset.filters
+        assert "price >= 100" in queryset.filters
+        assert "stock <= 50" in queryset.filters
+        assert "category IN ['electronics', 'computers']" in queryset.filters
+        assert "is_active NOT IS NULL" in queryset.filters

@@ -1,9 +1,20 @@
+"""
+Data classes for Meilisearch configuration.
+"""
+
 from dataclasses import dataclass
 from typing import Any
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class MeiliIndexSettings:
+    """
+    Immutable configuration for a Meilisearch index.
+
+    Maps to Meilisearch's index settings API.
+    See: https://www.meilisearch.com/docs/reference/api/settings
+    """
+
     displayed_fields: list[str] | None = None
     searchable_fields: list[str] | None = None
     filterable_fields: list[str] | None = None

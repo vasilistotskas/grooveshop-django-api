@@ -1,3 +1,10 @@
+"""
+Meilisearch integration models and mixins.
+
+Provides the IndexMixin abstract base class that enables Django models
+to be automatically indexed in Meilisearch.
+"""
+
 import logging
 from collections.abc import Iterable
 from typing import Any, TypedDict
@@ -15,11 +22,15 @@ logger = logging.getLogger(__name__)
 
 
 class MeiliGeo(TypedDict):
+    """Geographic coordinates for Meilisearch geo-search."""
+
     lat: float | str
     lng: float | str
 
 
 class _Meili(TypedDict):
+    """Internal Meilisearch configuration for a model."""
+
     primary_key: str
     index_name: str
     displayed_fields: Iterable[str] | None
@@ -32,6 +43,26 @@ class _Meili(TypedDict):
 
 
 class IndexMixin(models.Model):
+    """
+    Abstract base class for Meilisearch-indexed Django models.
+
+    Provides automatic indexing via signals and a queryset-like interface
+    for searching via the `meilisearch` descriptor.
+
+    Usage:
+        class Product(IndexMixin):
+            name = models.CharField(max_length=255)
+            price = models.DecimalField(...)
+
+            class MeiliMeta:
+                filterable_fields = ("name", "price")
+                searchable_fields = ("name", "description")
+                sortable_fields = ("price", "created_at")
+
+        # Search products
+        results = Product.meilisearch.filter(price__gte=100).search("laptop")
+    """
+
     meilisearch: IndexQuerySet
     _meilisearch: _Meili
 
@@ -41,6 +72,28 @@ class IndexMixin(models.Model):
         abstract = True
 
     class MeiliMeta:
+        """
+        Configuration class for Meilisearch index settings.
+
+        Attributes:
+            displayed_fields: Fields returned in search results
+            searchable_fields: Fields searched for query matches
+            filterable_fields: Fields available for filtering
+            sortable_fields: Fields available for sorting
+            ranking_rules: Custom ranking rules
+            stop_words: Words to ignore in search
+            synonyms: Synonym mappings
+            distinct_attribute: Field for deduplication
+            typo_tolerance: Typo tolerance configuration
+            faceting: Faceting configuration
+            pagination: Pagination limits
+            supports_geo: Enable geo-search support
+            index_name: Custom index name (defaults to model name)
+            primary_key: Document primary key field
+            include_pk_in_search: Include PK in searchable fields
+            search_cutoff_ms: Maximum search time in milliseconds
+        """
+
         displayed_fields: Iterable[str] | None = None
         searchable_fields: Iterable[str] | None = None
         filterable_fields: Iterable[str] | None = None
@@ -56,39 +109,51 @@ class IndexMixin(models.Model):
         index_name: str | None = None
         primary_key: str = "pk"
         include_pk_in_search: bool = False
+        search_cutoff_ms: int | None = None
 
     @classmethod
     def get_meili_settings(cls) -> MeiliIndexSettings:
         """Extract MeiliIndexSettings from the model's MeiliMeta configuration."""
-        displayed_fields = getattr(cls.MeiliMeta, "displayed_fields", None)
-        searchable_fields = getattr(cls.MeiliMeta, "searchable_fields", None)
-        filterable_fields = getattr(cls.MeiliMeta, "filterable_fields", None)
-        sortable_fields = getattr(cls.MeiliMeta, "sortable_fields", None)
-        ranking_rules = getattr(cls.MeiliMeta, "ranking_rules", None)
-        stop_words = getattr(cls.MeiliMeta, "stop_words", None)
-        synonyms = getattr(cls.MeiliMeta, "synonyms", None)
-        distinct_attribute = getattr(cls.MeiliMeta, "distinct_attribute", None)
-        typo_tolerance = getattr(cls.MeiliMeta, "typo_tolerance", None)
-        faceting = getattr(cls.MeiliMeta, "faceting", None)
-        pagination = getattr(cls.MeiliMeta, "pagination", None)
-        supports_geo = getattr(cls.MeiliMeta, "supports_geo", False)
+        meta = cls.MeiliMeta
 
+        displayed_fields = getattr(meta, "displayed_fields", None)
+        searchable_fields = getattr(meta, "searchable_fields", None)
+        filterable_fields = getattr(meta, "filterable_fields", None)
+        sortable_fields = getattr(meta, "sortable_fields", None)
+        ranking_rules = getattr(meta, "ranking_rules", None)
+        stop_words = getattr(meta, "stop_words", None)
+        synonyms = getattr(meta, "synonyms", None)
+        distinct_attribute = getattr(meta, "distinct_attribute", None)
+        typo_tolerance = getattr(meta, "typo_tolerance", None)
+        faceting = getattr(meta, "faceting", None)
+        pagination = getattr(meta, "pagination", None)
+        supports_geo = getattr(meta, "supports_geo", False)
+        search_cutoff_ms = getattr(meta, "search_cutoff_ms", None)
+
+        # Add geo fields if geo-search is enabled
         if supports_geo:
-            filterable_fields = ("_geo",) + (filterable_fields or ())
-            sortable_fields = ("_geo",) + (sortable_fields or ())
+            filterable_fields = ("_geo",) + tuple(filterable_fields or ())
+            sortable_fields = ("_geo",) + tuple(sortable_fields or ())
 
         return MeiliIndexSettings(
-            displayed_fields=displayed_fields,
-            searchable_fields=searchable_fields,
-            filterable_fields=filterable_fields,
-            sortable_fields=sortable_fields,
-            ranking_rules=ranking_rules,
-            stop_words=stop_words,
+            displayed_fields=list(displayed_fields)
+            if displayed_fields
+            else None,
+            searchable_fields=list(searchable_fields)
+            if searchable_fields
+            else None,
+            filterable_fields=list(filterable_fields)
+            if filterable_fields
+            else None,
+            sortable_fields=list(sortable_fields) if sortable_fields else None,
+            ranking_rules=list(ranking_rules) if ranking_rules else None,
+            stop_words=list(stop_words) if stop_words else None,
             synonyms=synonyms,
             distinct_attribute=distinct_attribute,
             typo_tolerance=typo_tolerance,
             faceting=faceting,
             pagination=pagination,
+            search_cutoff_ms=search_cutoff_ms,
         )
 
     @classmethod
@@ -110,41 +175,39 @@ class IndexMixin(models.Model):
                 if task_uid:
                     finished = _client.wait_for_task(task_uid)
                     if finished.status == "failed":
-                        raise Exception(finished.error)
+                        raise Exception(
+                            f"Failed to update settings: {finished.error}"
+                        )
             _client.flush_tasks()
 
     def __init_subclass__(cls) -> None:
-        index_name = getattr(cls.MeiliMeta, "index_name", cls.__name__)
-        primary_key = getattr(cls.MeiliMeta, "primary_key", "pk")
-        supports_geo = getattr(cls.MeiliMeta, "supports_geo", False)
-        include_pk_in_search = getattr(
-            cls.MeiliMeta, "include_pk_in_search", False
-        )
+        """Initialize Meilisearch configuration when a subclass is created."""
+        super().__init_subclass__()
 
-        index_settings = cls.get_meili_settings()
+        # Skip abstract models
+        if getattr(cls._meta, "abstract", False):
+            return
 
-        if settings.MEILISEARCH.get("OFFLINE", False):
-            cls._meilisearch = _Meili(
-                primary_key=primary_key,
-                index_name=index_name,
-                displayed_fields=index_settings.displayed_fields,
-                searchable_fields=index_settings.searchable_fields,
-                filterable_fields=index_settings.filterable_fields,
-                sortable_fields=index_settings.sortable_fields,
-                supports_geo=supports_geo,
-                include_pk_in_search=include_pk_in_search,
-                tasks=[],
+        # Note: Due to Python's MRO, __init_subclass__ may not be called
+        # for models that inherit from multiple mixins where another mixin
+        # comes before IndexMixin. The _meilisearch attribute will be
+        # initialized in MeiliConfig.ready() for such cases.
+
+        meta = cls.MeiliMeta
+        index_name = getattr(meta, "index_name", None) or cls.__name__
+        primary_key = getattr(meta, "primary_key", "pk")
+        supports_geo = getattr(meta, "supports_geo", False)
+        include_pk_in_search = getattr(meta, "include_pk_in_search", False)
+
+        try:
+            index_settings = cls.get_meili_settings()
+        except Exception as e:
+            logger.warning(
+                f"Failed to get meili settings for {cls.__name__}: {e}"
             )
-        else:
-            try:
-                _client.create_index(index_name, primary_key).with_settings(
-                    index_name=index_name,
-                    index_settings=index_settings,
-                )
-            except Exception as e:
-                logger.error(f"Failed to create index {index_name}: {e}")
-                pass
+            return
 
+        # Initialize _meilisearch configuration
         cls._meilisearch = _Meili(
             primary_key=primary_key,
             index_name=index_name,
@@ -154,14 +217,28 @@ class IndexMixin(models.Model):
             sortable_fields=index_settings.sortable_fields,
             supports_geo=supports_geo,
             include_pk_in_search=include_pk_in_search,
-            tasks=[task for task in _client.tasks],
+            tasks=[],
         )
-        _client.flush_tasks()
 
-    @classmethod
-    def get_meilisearch(cls):
-        """Return a fresh IndexQuerySet instance to avoid state accumulation."""
-        return IndexQuerySet(cls)
+        # Skip index creation in offline mode
+        if settings.MEILISEARCH.get("OFFLINE", False):
+            return
+
+        # Create index and apply settings
+        try:
+            _client.create_index(index_name, primary_key).with_settings(
+                index_name=index_name,
+                index_settings=index_settings,
+            )
+
+            # Store tasks for reference
+            cls._meilisearch = _Meili(
+                **{**cls._meilisearch, "tasks": list(_client.tasks)}
+            )
+            _client.flush_tasks()
+
+        except Exception as e:
+            logger.warning(f"Failed to initialize index {index_name}: {e}")
 
     class _MeilisearchDescriptor:
         """Descriptor that returns a fresh IndexQuerySet instance on each access."""
@@ -173,67 +250,132 @@ class IndexMixin(models.Model):
 
     meilisearch = _MeilisearchDescriptor()
 
+    @classmethod
+    def get_meilisearch(cls) -> IndexQuerySet:
+        """Return a fresh IndexQuerySet instance."""
+        return IndexQuerySet(cls)
+
+    @classmethod
+    def get_meilisearch_queryset(cls):
+        """
+        Return an optimized Django queryset for bulk indexing.
+
+        Override this method to add select_related, prefetch_related,
+        or annotations needed for serialization.
+
+        Example:
+            @classmethod
+            def get_meilisearch_queryset(cls):
+                return cls.objects.select_related('category').annotate(
+                    review_count=Count('reviews')
+                )
+        """
+        return cls.objects.all()
+
     def meili_filter(self) -> bool:
         """
-        A function to decide if the model should be added to meilisearch.
+        Determine if this instance should be indexed.
 
-        For example, if a post model could be a draft and that draft shouldn't
-        be in the search database, then this filter can make sure its not added.
+        Override to implement conditional indexing logic.
+
+        Example:
+            def meili_filter(self) -> bool:
+                return self.is_published and not self.is_deleted
         """
         return True
 
     @classmethod
-    def get_additional_meili_fields(cls):
+    def get_additional_meili_fields(cls) -> dict[str, callable]:
+        """
+        Return additional fields to include in the indexed document.
+
+        Override to add computed fields not directly on the model.
+
+        Example:
+            @classmethod
+            def get_additional_meili_fields(cls):
+                return {
+                    'full_name': lambda obj: f"{obj.first_name} {obj.last_name}",
+                    'category_name': lambda obj: obj.category.name if obj.category else None,
+                }
+        """
         return {}
 
-    def meili_serialize(self):
+    def meili_serialize(self) -> dict:
         """
-        How to serialize the model to a dictionary to be used by meilisearch.
+        Serialize the model instance for Meilisearch indexing.
 
-        By default, uses django.core.serializers.serialize and json.loads
-        Only serializes fields defined in displayed_fields, searchable_fields, and filterable_fields.
+        Returns a dictionary containing all fields defined in displayed_fields,
+        searchable_fields, and filterable_fields, plus any additional fields.
         """
-        fields = {
-            *(self.MeiliMeta.displayed_fields or []),
-            *(self.MeiliMeta.searchable_fields or []),
-            *(self.MeiliMeta.filterable_fields or []),
-        }
+        meta = self.MeiliMeta
 
-        # Try fast path first - direct field access
+        # Collect all fields to serialize
+        fields = set()
+        if meta.displayed_fields:
+            fields.update(meta.displayed_fields)
+        if meta.searchable_fields:
+            fields.update(meta.searchable_fields)
+        if meta.filterable_fields:
+            fields.update(meta.filterable_fields)
+
+        # Serialize each field
         data = {}
         for field_name in fields:
+            # Skip internal Meilisearch fields
+            if field_name.startswith("_"):
+                continue
+
             try:
                 value = getattr(self, field_name, None)
-                # Handle common types
-                if value is None:
-                    data[field_name] = None
-                elif isinstance(value, (str, int, float, bool)):
-                    data[field_name] = value
-                elif hasattr(value, "isoformat"):  # datetime/date
-                    data[field_name] = value.isoformat()
-                else:
-                    data[field_name] = str(value)
+                data[field_name] = self._serialize_value(value)
             except AttributeError:
                 data[field_name] = None
 
-        # Add additional fields
+        # Add additional computed fields
         additional_fields = self.get_additional_meili_fields()
         for field_name, value_getter in additional_fields.items():
             try:
-                data[field_name] = value_getter(self)
+                data[field_name] = self._serialize_value(value_getter(self))
             except (AttributeError, TypeError):
                 data[field_name] = None
 
-        if getattr(self.MeiliMeta, "include_pk_in_search", False):
-            field = self._meta.get_field(self.MeiliMeta.primary_key)
+        # Optionally include primary key
+        if getattr(meta, "include_pk_in_search", False):
+            pk_field = meta.primary_key
+            field = self._meta.get_field(pk_field)
             if isinstance(field, Field):
-                data[self.MeiliMeta.primary_key] = field.value_to_string(self)
+                data[pk_field] = field.value_to_string(self)
             else:
-                data[self.MeiliMeta.primary_key] = str(
-                    getattr(self, self.MeiliMeta.primary_key)
-                )
+                data[pk_field] = str(getattr(self, pk_field))
 
         return data
 
+    def _serialize_value(self, value: Any) -> Any:
+        """Serialize a single value for Meilisearch."""
+        if value is None:
+            return None
+        elif isinstance(value, str | int | float | bool):
+            return value
+        elif hasattr(value, "isoformat"):  # datetime/date
+            return value.isoformat()
+        elif isinstance(value, list | tuple):
+            return [self._serialize_value(v) for v in value]
+        elif isinstance(value, dict):
+            return {k: self._serialize_value(v) for k, v in value.items()}
+        else:
+            return str(value)
+
     def meili_geo(self) -> MeiliGeo:
-        raise ValueError("Model does not support geolocation")
+        """
+        Return geographic coordinates for geo-search.
+
+        Override this method when supports_geo=True in MeiliMeta.
+
+        Example:
+            def meili_geo(self) -> MeiliGeo:
+                return {"lat": self.latitude, "lng": self.longitude}
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} has supports_geo=True but doesn't implement meili_geo()"
+        )

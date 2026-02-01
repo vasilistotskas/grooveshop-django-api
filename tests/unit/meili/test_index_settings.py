@@ -51,12 +51,8 @@ class TestMeiliIndexSettings:
         self, mock_client_class, search_cutoff_ms, expected_in_payload
     ):
         """
-        Property 13: SearchCutoffMs in settings payload.
-
         For any MeiliIndexSettings with search_cutoff_ms value, the Client.with_settings
         method should include searchCutoffMs in the settings payload sent to Meilisearch.
-
-        Validates: Requirements 4.2
         """
         mock_client_instance = MagicMock()
         mock_index = MagicMock()
@@ -204,12 +200,8 @@ class TestMeiliIndexSettings:
     @patch("meili._client._Client")
     def test_settings_update_without_reindexing(self, mock_client_class):
         """
-        Property 12: Settings update without reindexing.
-
         Test that update_meili_settings updates configuration without reindexing documents.
         This is a placeholder test - actual implementation will be tested with real models.
-
-        Validates: Requirements 3.7
         """
         mock_client_instance = MagicMock()
         mock_index = MagicMock()

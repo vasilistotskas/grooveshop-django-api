@@ -18,7 +18,7 @@ from user.factories.account import UserAccountFactory
 
 
 @pytest.mark.django_db(transaction=True)
-class TestProperty1StockOperationsAreAtomic:
+class TestStockOperationsAreAtomic:
     """
     Test that stock operations are atomic - they either complete fully or
     rollback completely with no partial updates.

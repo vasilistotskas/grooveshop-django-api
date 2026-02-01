@@ -349,10 +349,12 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "stock",
             "active",
             "is_deleted",
+            "master_id",
         )
         searchable_fields = ("id", "name", "description")
         displayed_fields = (
             "id",
+            "master_id",
             "name",
             "description",
             "language_code",
@@ -415,6 +417,7 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
     @classmethod
     def get_additional_meili_fields(cls):
         return {
+            "master_id": lambda obj: obj.master_id,
             "likes_count": lambda obj: getattr(obj, "_likes_count", 0)
             or obj.master.likes_count,
             "view_count": lambda obj: obj.master.view_count,

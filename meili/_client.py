@@ -10,6 +10,7 @@ from meili.dataclasses import MeiliIndexSettings
 
 class Client:
     def __init__(self, settings: _MeiliSettings):
+        self.settings = settings  # Store settings for management commands
         self.client = _Client(
             f"http{'s' if settings.https else ''}://{settings.host}:{settings.port}",
             settings.master_key,

@@ -10,7 +10,7 @@ from user.factories.account import UserAccountFactory
 
 
 @pytest.mark.django_db(transaction=True)
-class TestProperty3StockChangesAreAudited:
+class TestStockChangesAreAudited:
     """
     Test that all stock operations create comprehensive audit log entries
     with all required fields.

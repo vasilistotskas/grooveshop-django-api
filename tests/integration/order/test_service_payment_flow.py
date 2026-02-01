@@ -1,14 +1,3 @@
-"""
-Unit tests for OrderService payment-first flow methods.
-
-Feature: checkout-order-audit
-Tests for tasks 9.2-9.5:
-- Task 9.2: create_order_from_cart
-- Task 9.3: handle_payment_succeeded
-- Task 9.4: handle_payment_failed
-- Task 9.5: validation methods
-"""
-
 from decimal import Decimal
 from unittest.mock import Mock, patch
 

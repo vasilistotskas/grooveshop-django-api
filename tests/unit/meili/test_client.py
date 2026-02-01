@@ -217,11 +217,7 @@ class TestMeiliClient:
     def test_with_settings_search_cutoff_ms_various_values(
         self, mock_client_class, search_cutoff_ms
     ):
-        """Test that searchCutoffMs is correctly included for various values.
-
-        Property 13: SearchCutoffMs in settings payload
-        Validates: Requirements 4.2
-        """
+        """Test that searchCutoffMs is correctly included for various values."""
         mock_client_instance = MagicMock()
         mock_index = MagicMock()
         mock_update_settings = MagicMock()

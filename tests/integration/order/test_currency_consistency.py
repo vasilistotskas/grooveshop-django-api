@@ -7,7 +7,7 @@ from order.models.item import OrderItem
 from product.models import Product
 
 
-class TestPropertyCurrencyConsistency:
+class TestCurrencyConsistency:
     @pytest.mark.django_db
     @pytest.mark.parametrize(
         "currency",

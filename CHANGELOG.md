@@ -3,6 +3,14 @@
 
 
 
+## v1.72.1 (2026-02-01)
+
+### Bug fixes
+
+* fix: lint ([`56db3a9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/56db3a94cefa228f3f940b0ad526ad3669ca3725))
+
+* fix: search ([`690df05`](https://github.com/vasilistotskas/grooveshop-django-api/commit/690df05dee6de6a705d1830aa89e2641e6e60fb7))
+
 ## v1.72.0 (2026-02-01)
 
 ### Features

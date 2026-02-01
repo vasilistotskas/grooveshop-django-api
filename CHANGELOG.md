@@ -3,6 +3,12 @@
 
 
 
+## v1.72.0 (2026-02-01)
+
+### Features
+
+* feat: search improvements ([`0d236b9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0d236b97eb7221b3dcf574d1db123999881624ad))
+
 ## v1.71.0 (2026-02-01)
 
 ### Bug fixes

@@ -768,7 +768,7 @@ MEILISEARCH = {
     "CLIENT_AGENTS": None,
     "DEBUG": DEBUG,
     "SYNC": DEBUG,
-    "OFFLINE": bool(getenv("MEILI_OFFLINE", "False")),
+    "OFFLINE": getenv("MEILI_OFFLINE", "False") == "True",
     "DEFAULT_BATCH_SIZE": int(getenv("MEILI_DEFAULT_BATCH_SIZE", "5000")),
 }
 
@@ -1510,7 +1510,7 @@ TINYMCE_COMPRESSOR = False
 
 FILE_UPLOAD_MAX_MEMORY_SIZE = 2621440
 
-BLOG_COMMENT_AUTO_APPROVE = bool(getenv("BLOG_COMMENT_AUTO_APPROVE", "True"))
+BLOG_COMMENT_AUTO_APPROVE = getenv("BLOG_COMMENT_AUTO_APPROVE", "True") == "True"
 
 # Related Posts Strategies Configuration
 RELATED_POSTS_STRATEGIES = [

@@ -104,7 +104,9 @@ def reindex_product_translations(sender, instance, **kwargs):
         return
 
     # Get all translations for this product using the optimized queryset
-    translations = ProductTranslation.get_meilisearch_queryset().filter(master=instance)
+    translations = ProductTranslation.get_meilisearch_queryset().filter(
+        master=instance
+    )
 
     if not translations.exists():
         return

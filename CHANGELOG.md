@@ -3,6 +3,14 @@
 
 
 
+## v1.72.3 (2026-02-02)
+
+### Bug fixes
+
+* fix: queries ([`43c4956`](https://github.com/vasilistotskas/grooveshop-django-api/commit/43c4956a730f553419ca4cce3b944ef39edc5cd8))
+
+* fix: search ([`f029efd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f029efdf4303b863441b23705a153d2dd9462f60))
+
 ## v1.72.2 (2026-02-02)
 
 ### Bug fixes

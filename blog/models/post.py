@@ -152,7 +152,7 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
             "is_published",
             "master_id",
         )
-        searchable_fields = ("id", "title", "subtitle", "body")
+        searchable_fields = ("master_id", "title", "subtitle", "body")
         displayed_fields = (
             "id",
             "master_id",
@@ -243,11 +243,14 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
         """
         Determine if this translation should be indexed.
 
-        Only index translations published articles.
+        Only index translations for published articles.
         """
-        if not self.master:
+        if not self.master_id:
             return False
-        return self.master.is_published
+        try:
+            return self.master and self.master.is_published
+        except BlogPost.DoesNotExist:
+            return False
 
     def __str__(self):
         title = self.title or "Untitled"

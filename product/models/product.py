@@ -343,9 +343,12 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
 
         Only index translations for active, non-deleted products.
         """
-        if not self.master:
+        if not self.master_id:
             return False
-        return self.master.active and not self.master.is_deleted
+        try:
+            return self.master.active and not self.master.is_deleted
+        except Product.DoesNotExist:
+            return False
 
     class MeiliMeta:
         filterable_fields = (
@@ -361,7 +364,7 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "is_deleted",
             "master_id",
         )
-        searchable_fields = ("id", "name", "description")
+        searchable_fields = ("master_id", "name", "description")
         displayed_fields = (
             "id",
             "master_id",
@@ -392,9 +395,9 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "proximity",
             "attribute",
             "sort",
+            "exactness",
             "stock:desc",
             "discount_percent:desc",
-            "exactness",
         ]
         synonyms = {
             # English synonyms

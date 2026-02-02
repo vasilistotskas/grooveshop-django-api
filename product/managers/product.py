@@ -171,9 +171,17 @@ class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
         """
         Optimized queryset for detail views.
 
-        Includes everything from for_list() plus images and tags.
+        Includes translations, category, counts, images and tags.
+        Does NOT filter by active status - allows viewing/editing any product by ID.
         """
-        return self.for_list().with_images().with_tags()
+        return (
+            self.exclude_deleted()
+            .with_translations()
+            .with_category()
+            .with_counts()
+            .with_images()
+            .with_tags()
+        )
 
 
 class ProductManager(TranslatableManager):

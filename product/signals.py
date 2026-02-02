@@ -126,6 +126,7 @@ def reindex_product_translations(sender, instance, **kwargs):
     )
 
     if use_async:
+        logger.debug("Reindexing ProductTranslation Async")
         # Queue reindex tasks for each translation
         for translation in translations:
             index_document_task.delay(
@@ -134,6 +135,7 @@ def reindex_product_translations(sender, instance, **kwargs):
                 pk=translation.pk,
             )
     else:
+        logger.debug("Reindexing ProductTranslation Sync")
         # Synchronous reindexing for DEBUG mode
         from meili._client import client as _client
 

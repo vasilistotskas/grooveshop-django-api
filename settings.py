@@ -768,6 +768,7 @@ MEILISEARCH = {
     "CLIENT_AGENTS": None,
     "DEBUG": DEBUG,
     "SYNC": DEBUG,
+    "ASYNC_INDEXING": getenv("MEILI_ASYNC_INDEXING", "False") == "True",
     "OFFLINE": getenv("MEILI_OFFLINE", "False") == "True",
     "DEFAULT_BATCH_SIZE": int(getenv("MEILI_DEFAULT_BATCH_SIZE", "5000")),
 }

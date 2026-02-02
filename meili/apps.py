@@ -44,6 +44,7 @@ class MeiliConfig(AppConfig):
                 and settings.MEILISEARCH.get("ASYNC_INDEXING", True)
             )
             if use_async:
+                logger.debug("Indexing Document Async")
                 index_document_task.delay(
                     app_label=model._meta.app_label,
                     model_name=model._meta.model_name,
@@ -53,6 +54,7 @@ class MeiliConfig(AppConfig):
 
             # Synchronous indexing for DEBUG mode or when Celery unavailable
             try:
+                logger.debug("Indexing Document Sync")
                 serialized = model.meili_serialize()
                 pk = _get_document_pk(model)
                 geo = (
@@ -104,6 +106,7 @@ class MeiliConfig(AppConfig):
                 and settings.MEILISEARCH.get("ASYNC_INDEXING", True)
             )
             if use_async:
+                logger.debug("Deleting Document Async")
                 delete_document_task.delay(
                     index_name=model._meilisearch["index_name"],
                     document_pk=_get_document_pk(model),
@@ -112,6 +115,7 @@ class MeiliConfig(AppConfig):
 
             # Synchronous deletion for DEBUG mode or when Celery unavailable
             try:
+                logger.debug("Deleting Document Sync")
                 pk = _get_document_pk(model)
                 task = _client.get_index(
                     model._meilisearch["index_name"]

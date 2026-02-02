@@ -87,7 +87,7 @@ services:
       worker
       --max-tasks-per-child=50
       --max-memory-per-child=250000
-      --queues celery
+      --queues celery,meilisearch
       --pool=prefork
       --loglevel=debug
     env_file:

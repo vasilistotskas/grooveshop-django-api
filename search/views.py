@@ -95,6 +95,9 @@ def blog_post_meili_search(request):
         limit=limit, offset=offset
     )
 
+    # Always filter for published posts
+    search_qs = search_qs.filter(is_published=True)
+
     if language_code:
         search_qs = search_qs.filter(language_code=language_code)
         search_qs = search_qs.locales(language_code)
@@ -256,6 +259,9 @@ def product_meili_search(request):
     search_qs = ProductTranslation.meilisearch.paginate(
         limit=limit, offset=offset
     )
+
+    # Always filter for active, non-deleted products
+    search_qs = search_qs.filter(active=True, is_deleted=False)
 
     if language_code:
         search_qs = search_qs.filter(language_code=language_code)

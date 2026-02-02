@@ -239,6 +239,16 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
             "is_published": lambda obj: obj.master.is_published,
         }
 
+    def meili_filter(self) -> bool:
+        """
+        Determine if this translation should be indexed.
+
+        Only index translations published articles.
+        """
+        if not self.master:
+            return False
+        return self.master.is_published
+
     def __str__(self):
         title = self.title or "Untitled"
         return f"{title} ({self.language_code})"

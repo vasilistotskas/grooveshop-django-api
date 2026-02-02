@@ -337,6 +337,16 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             _reviews_count=Count("master__reviews", distinct=True),
         )
 
+    def meili_filter(self) -> bool:
+        """
+        Determine if this translation should be indexed.
+
+        Only index translations for active, non-deleted products.
+        """
+        if not self.master:
+            return False
+        return self.master.active and not self.master.is_deleted
+
     class MeiliMeta:
         filterable_fields = (
             "name",

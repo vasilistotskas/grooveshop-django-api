@@ -3,6 +3,14 @@
 
 
 
+## v1.72.2 (2026-02-02)
+
+### Bug fixes
+
+* fix: tests ([`a3a7c51`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a3a7c512a8784765f75b8b6e92bb553bf10cf86e))
+
+* fix: active products, TranslatedFieldExtended ([`49e12b3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/49e12b3b2a394432ce78b60ddec7d3b3ad97dd27))
+
 ## v1.72.1 (2026-02-01)
 
 ### Bug fixes

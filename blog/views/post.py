@@ -5,7 +5,7 @@ from functools import cached_property
 from importlib import import_module
 from typing import TYPE_CHECKING
 from django.conf import settings
-from django.db.models import F, Count, Q
+from django.db.models import F
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import (
@@ -356,14 +356,12 @@ class BlogPostViewSet(BaseModelViewSet):
         queryset = (
             self.get_queryset()
             .filter(published_at__gte=cutoff_date)
+            .with_likes_count()
+            .with_comments_count(approved_only=True)
             .annotate(
-                likes_count_annotation=Count("likes", distinct=True),
-                comments_count_annotation=Count(
-                    "comments", distinct=True, filter=Q(comments__approved=True)
-                ),
                 trending_score=F("view_count")
-                + (F("likes_count_annotation") * 2)
-                + (F("comments_count_annotation") * 3),
+                + (F("likes_count") * 2)
+                + (F("comments_count") * 3),
             )
             .order_by("-trending_score")
         )
@@ -388,8 +386,8 @@ class BlogPostViewSet(BaseModelViewSet):
     def popular(self, request):
         queryset = (
             self.get_queryset()
-            .annotate(likes_count_annotation=Count("likes", distinct=True))
-            .order_by("-likes_count_annotation", "-view_count")
+            .with_likes_count()
+            .order_by("-likes_count", "-view_count")
         )
 
         response_serializer_class = self.get_response_serializer()

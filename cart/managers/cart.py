@@ -7,11 +7,13 @@ from django.db import models
 from django.utils import timezone
 from extra_settings.models import Setting
 
+from core.managers import OptimizedManager, OptimizedQuerySet
+
 if TYPE_CHECKING:
     from typing import Self
 
 
-class CartQuerySet(models.QuerySet):
+class CartQuerySet(OptimizedQuerySet):
     """
     Optimized QuerySet for Cart model.
 
@@ -103,14 +105,19 @@ class CartQuerySet(models.QuerySet):
         return self.filter(items__product=product).distinct()
 
 
-class CartManager(models.Manager):
+class CartManager(OptimizedManager):
     """
     Manager for Cart model with optimized queryset methods.
+
+    Most methods are automatically delegated to CartQuerySet via __getattr__.
+    Only methods with custom logic beyond simple delegation are explicitly defined.
 
     Usage in ViewSet:
         def get_queryset(self):
             return Cart.objects.for_detail()
     """
+
+    queryset_class = CartQuerySet
 
     def get_queryset(self) -> CartQuerySet:
         return CartQuerySet(self.model, using=self._db)
@@ -123,46 +130,13 @@ class CartManager(models.Manager):
         """Return optimized queryset for detail views."""
         return self.get_queryset().for_detail()
 
-    def active(self) -> CartQuerySet:
-        return self.get_queryset().active()
-
-    def abandoned(self) -> CartQuerySet:
-        return self.get_queryset().abandoned()
-
-    def empty(self) -> CartQuerySet:
-        return self.get_queryset().empty()
-
-    def with_items(self) -> CartQuerySet:
-        return self.get_queryset().with_items()
-
-    def for_user(self, user) -> CartQuerySet:
-        return self.get_queryset().for_user(user)
-
-    def guest_carts(self) -> CartQuerySet:
-        return self.get_queryset().guest_carts()
-
-    def user_carts(self) -> CartQuerySet:
-        return self.get_queryset().user_carts()
-
-    def with_totals(self) -> CartQuerySet:
-        return self.get_queryset().with_totals()
-
-    def expired(self, days=30) -> CartQuerySet:
-        return self.get_queryset().expired(days)
-
-    def by_date_range(self, start_date, end_date) -> CartQuerySet:
-        return self.get_queryset().by_date_range(start_date, end_date)
-
-    def recent(self, days=7) -> CartQuerySet:
-        return self.get_queryset().recent(days)
-
-    def by_country(self, country_code) -> CartQuerySet:
-        return self.get_queryset().by_country(country_code)
-
-    def with_specific_product(self, product) -> CartQuerySet:
-        return self.get_queryset().with_specific_product(product)
-
     def cleanup_expired(self, days=30) -> int:
+        """
+        Delete expired carts and return count.
+
+        This method has custom logic beyond simple delegation,
+        so it's explicitly defined on the Manager.
+        """
         expired_carts = self.expired(days)
         count = expired_carts.count()
         expired_carts.delete()

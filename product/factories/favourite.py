@@ -4,7 +4,7 @@ import factory
 from django.apps import apps
 from django.contrib.auth import get_user_model
 
-from product.models.product import ProductFavourite
+from product.models import ProductFavourite
 
 User = get_user_model()
 

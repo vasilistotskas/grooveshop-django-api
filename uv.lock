@@ -829,14 +829,14 @@ wheels = [
 
 [[package]]
 name = "django-unfold"
-version = "0.77.1"
+version = "0.78.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/10/61/242b2b4b325951fded9497b0e058fb97f6c30e0b08b72cf8e70fd3e0b9d9/django_unfold-0.77.1.tar.gz", hash = "sha256:c8611a74cc1a944787c89e950bfbe29a8b8351078a79269f80fd974dc578dbd5", size = 1108615, upload-time = "2026-01-26T13:40:55.62Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d1/ad/af07a81930a063f5153c56d74468a953b220bde8b0265a75f06e3d4e1172/django_unfold-0.78.0.tar.gz", hash = "sha256:07bae46c0e3be9c24d8d2970cba2b16f02cc83761bfd6c1f54418da237b12b30", size = 1109489, upload-time = "2026-02-02T08:35:28Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8a/d4/c0004a8d5369060c92a1419623de2866375a73180f16732e7cc4c9ad3e32/django_unfold-0.77.1-py3-none-any.whl", hash = "sha256:9a4305d4c65eff4de37800f60c176e242f6cb4fa2c5e96b69a5d300390c86d11", size = 1223570, upload-time = "2026-01-26T13:40:53.706Z" },
+    { url = "https://files.pythonhosted.org/packages/20/eb/c34069a7e1b46c439da1868ef29b04edfbec1640e867b304492637ffdff6/django_unfold-0.78.0-py3-none-any.whl", hash = "sha256:dbf4ebaab2ac16d364b6eef449f09a8b618e9a11e57e580d458e9247a6a560e2", size = 1224843, upload-time = "2026-02-02T08:35:26.837Z" },
 ]
 
 [[package]]
@@ -1000,7 +1000,7 @@ wheels = [
 
 [[package]]
 name = "grooveshop-django-api"
-version = "1.72.2"
+version = "1.72.3"
 source = { virtual = "." }
 dependencies = [
     { name = "asgiref" },
@@ -1110,13 +1110,13 @@ requires-dist = [
     { name = "django-storages", specifier = "==1.14.6" },
     { name = "django-stubs-ext", specifier = "==5.2.9" },
     { name = "django-tinymce", specifier = "==5.0.0" },
-    { name = "django-unfold", specifier = "==0.77.1" },
+    { name = "django-unfold", specifier = "==0.78.0" },
     { name = "djangorestframework", specifier = "==3.16.1" },
     { name = "djangorestframework-camel-case", specifier = "==1.4.2" },
     { name = "drf-spectacular", specifier = "==0.29.0" },
     { name = "fido2", specifier = "==2.1.1" },
     { name = "flower", specifier = "==2.0.1" },
-    { name = "gunicorn", specifier = "==24.1.1" },
+    { name = "gunicorn", specifier = "==25.0.1" },
     { name = "importlib-resources", specifier = "==6.5.2" },
     { name = "measurement", specifier = "==3.2.2" },
     { name = "meilisearch", specifier = "==0.40.0" },
@@ -1161,14 +1161,14 @@ dev = [
 
 [[package]]
 name = "gunicorn"
-version = "24.1.1"
+version = "25.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "packaging" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/78/0a/10739c03537ec5b131a867bf94df2e412b437696c7e5d26970e2198a80d2/gunicorn-24.1.1.tar.gz", hash = "sha256:f006d110e5cb3102859b4f5cd48335dbd9cc28d0d27cd24ddbdafa6c60929408", size = 287567, upload-time = "2026-01-24T01:15:31.359Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9e/83/e8327358129ca4dffd4fa6b6004aa5085dc80e913dec9b253401d6bd23ad/gunicorn-25.0.1.tar.gz", hash = "sha256:573e053aa950246e307ea908bd7ddce1870d41a40aec0c935938c586f0b9b946", size = 9693127, upload-time = "2026-02-02T13:34:05.767Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/96/90/cfe637677916fc6f53cd2b05d5746e249f683e1fa14c9e745a88c66f7290/gunicorn-24.1.1-py3-none-any.whl", hash = "sha256:757f6b621fc4f7581a90600b2cd9df593461f06a41d7259cb9b94499dc4095a8", size = 114920, upload-time = "2026-01-24T01:15:29.656Z" },
+    { url = "https://files.pythonhosted.org/packages/e0/dc/f1da097b7e0de5cd7552c10667305879093125cd62ff7372ad07d184ed8f/gunicorn-25.0.1-py3-none-any.whl", hash = "sha256:23cbe968c6ae3c8efc3d118c8353fa0763efc2102d89d0d3cea696cede7ff6b1", size = 169961, upload-time = "2026-02-02T13:34:02.744Z" },
 ]
 
 [[package]]

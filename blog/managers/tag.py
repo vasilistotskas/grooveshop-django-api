@@ -2,13 +2,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from parler.managers import TranslatableManager, TranslatableQuerySet
+from core.managers import (
+    TranslatableOptimizedManager,
+    TranslatableOptimizedQuerySet,
+)
 
 if TYPE_CHECKING:
     from typing import Self
 
 
-class BlogTagQuerySet(TranslatableQuerySet):
+class BlogTagQuerySet(TranslatableOptimizedQuerySet):
     """
     Optimized QuerySet for BlogTag model.
 
@@ -41,7 +44,7 @@ class BlogTagQuerySet(TranslatableQuerySet):
         return self.for_list()
 
 
-class BlogTagManager(TranslatableManager):
+class BlogTagManager(TranslatableOptimizedManager):
     """
     Manager for BlogTag model with optimized queryset methods.
 
@@ -52,17 +55,7 @@ class BlogTagManager(TranslatableManager):
             return BlogTag.objects.for_detail()
     """
 
+    queryset_class = BlogTagQuerySet
+
     def get_queryset(self) -> BlogTagQuerySet:
         return BlogTagQuerySet(self.model, using=self._db).active_only()
-
-    def for_list(self) -> BlogTagQuerySet:
-        """Return optimized queryset for list views."""
-        return self.get_queryset().for_list()
-
-    def for_detail(self) -> BlogTagQuerySet:
-        """Return optimized queryset for detail views."""
-        return self.get_queryset().for_detail()
-
-    def all_tags(self) -> BlogTagQuerySet:
-        """Return all tags including inactive ones."""
-        return BlogTagQuerySet(self.model, using=self._db)

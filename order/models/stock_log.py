@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
 from core.models import TimeStampMixinModel
+from order.managers.stock import StockLogManager
 
 
 class StockLog(TimeStampMixinModel):
@@ -93,6 +96,9 @@ class StockLog(TimeStampMixinModel):
             "User who performed the operation (null for system operations)"
         ),
     )
+
+    # Manager
+    objects: StockLogManager = StockLogManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Stock Log")

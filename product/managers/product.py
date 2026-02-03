@@ -9,31 +9,48 @@ from django.db.models import (
     DecimalField,
     F,
     FloatField,
-    OuterRef,
-    Subquery,
     Value,
     When,
 )
 from django.db.models.functions import Coalesce
-from parler.managers import TranslatableManager, TranslatableQuerySet
 
-from core.models import (
-    SoftDeleteQuerySet,
+from core.managers import (
+    TranslatableOptimizedManager,
+    TranslatableOptimizedQuerySet,
 )
-from product.models.favourite import ProductFavourite
-from product.models.review import ProductReview
+from core.mixins import SoftDeleteQuerySetMixin
 
 if TYPE_CHECKING:
     from typing import Self
 
 
-class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
+class ProductQuerySet(
+    SoftDeleteQuerySetMixin,
+    TranslatableOptimizedQuerySet,
+):
     """
     Optimized QuerySet for Product model.
 
     Provides chainable methods for common operations and
     standardized `for_list()` and `for_detail()` methods.
     """
+
+    def with_likes_count(self) -> Self:
+        """Annotate with likes count from favourited_by relationship."""
+        return self.annotate(likes_count=Count("favourited_by", distinct=True))
+
+    def with_reviews_count(self) -> Self:
+        """Annotate with reviews count."""
+        return self.annotate(reviews_count=Count("reviews", distinct=True))
+
+    def with_review_average(self) -> Self:
+        """Annotate with average review rating."""
+        return self.annotate(
+            review_average=Coalesce(
+                Avg("reviews__rate"),
+                Value(0.0, output_field=FloatField()),
+            )
+        )
 
     def active(self) -> Self:
         return self.filter(active=True).exclude_deleted()
@@ -46,13 +63,6 @@ class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
 
     def out_of_stock(self) -> Self:
         return self.filter(stock=0)
-
-    def exclude_deleted(self) -> Self:
-        return self.exclude(is_deleted=True)
-
-    def with_translations(self) -> Self:
-        """Prefetch translations for better performance."""
-        return self.prefetch_related("translations")
 
     def with_category(self) -> Self:
         """Select related category and VAT."""
@@ -110,52 +120,10 @@ class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
             )
         )
 
-    def with_likes_count_annotation(self) -> Self:
-        """Annotate with likes count for efficient property access."""
-        likes_subquery = (
-            ProductFavourite.objects.filter(product_id=OuterRef("pk"))
-            .values("product_id")
-            .annotate(count=Count("id"))
-            .values("count")
-        )
-
-        return self.annotate(
-            _likes_count=Coalesce(Subquery(likes_subquery), Value(0)),
-            likes_count_annotation=Coalesce(Subquery(likes_subquery), Value(0)),
-        )
-
-    def with_review_average_annotation(self) -> Self:
-        """Annotate with review average for efficient property access."""
-        reviews_avg_subquery = (
-            ProductReview.objects.filter(product_id=OuterRef("pk"))
-            .values("product_id")
-            .annotate(
-                avg=Coalesce(Avg("rate"), Value(0, output_field=FloatField()))
-            )
-            .values("avg")
-        )
-
-        return self.annotate(
-            _review_average=Coalesce(
-                Subquery(reviews_avg_subquery),
-                Value(0, output_field=FloatField()),
-            ),
-            review_average_annotation=Coalesce(
-                Subquery(reviews_avg_subquery),
-                Value(0, output_field=FloatField()),
-            ),
-        )
-
-    def with_reviews_count_annotation(self) -> Self:
-        """Annotate with reviews count for efficient property access."""
-        return self.annotate(_reviews_count=Count("reviews", distinct=True))
-
     def with_counts(self) -> Self:
         """Annotate with all count fields for efficient property access."""
         return (
-            self.with_likes_count_annotation()
-            .with_review_average_annotation()
-            .with_reviews_count_annotation()
+            self.with_likes_count().with_review_average().with_reviews_count()
         )
 
     def for_list(self) -> Self:
@@ -184,9 +152,13 @@ class ProductQuerySet(TranslatableQuerySet, SoftDeleteQuerySet):
         )
 
 
-class ProductManager(TranslatableManager):
+class ProductManager(TranslatableOptimizedManager):
     """
     Manager for Product model with optimized queryset methods.
+
+    Most methods are automatically delegated to ProductQuerySet
+    via __getattr__. Only for_list() and for_detail() are explicitly
+    defined for IDE support.
 
     Usage in ViewSet:
         def get_queryset(self):
@@ -195,43 +167,12 @@ class ProductManager(TranslatableManager):
             return Product.objects.for_detail()
     """
 
-    def get_queryset(self) -> ProductQuerySet:
-        return ProductQuerySet(self.model, using=self._db).exclude_deleted()
+    queryset_class = ProductQuerySet
 
     def for_list(self) -> ProductQuerySet:
         """Return optimized queryset for list views."""
-        return ProductQuerySet(self.model, using=self._db).for_list()
+        return self.get_queryset().for_list()
 
     def for_detail(self) -> ProductQuerySet:
         """Return optimized queryset for detail views."""
-        return ProductQuerySet(self.model, using=self._db).for_detail()
-
-    def active(self) -> ProductQuerySet:
-        return self.get_queryset().active()
-
-    def inactive(self) -> ProductQuerySet:
-        return self.get_queryset().inactive()
-
-    def in_stock(self) -> ProductQuerySet:
-        return self.get_queryset().in_stock()
-
-    def out_of_stock(self) -> ProductQuerySet:
-        return self.get_queryset().out_of_stock()
-
-    def with_discount_value_annotation(self) -> ProductQuerySet:
-        return self.get_queryset().with_discount_value_annotation()
-
-    def with_vat_value_annotation(self) -> ProductQuerySet:
-        return self.get_queryset().with_vat_value_annotation()
-
-    def with_final_price_annotation(self) -> ProductQuerySet:
-        return self.get_queryset().with_final_price_annotation()
-
-    def with_price_save_percent_annotation(self) -> ProductQuerySet:
-        return self.get_queryset().with_price_save_percent_annotation()
-
-    def with_likes_count_annotation(self) -> ProductQuerySet:
-        return self.get_queryset().with_likes_count_annotation()
-
-    def with_review_average_annotation(self) -> ProductQuerySet:
-        return self.get_queryset().with_review_average_annotation()
+        return self.get_queryset().for_detail()

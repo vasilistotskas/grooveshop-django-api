@@ -3,29 +3,20 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from django.db.models import Count, Exists, OuterRef, Q
-from mptt.managers import TreeManager
-from mptt.querysets import TreeQuerySet
-from parler.managers import TranslatableManager, TranslatableQuerySet
+
+from core.managers import TreeTranslatableManager, TreeTranslatableQuerySet
 
 if TYPE_CHECKING:
     from typing import Self
 
 
-class BlogCategoryQuerySet(TranslatableQuerySet, TreeQuerySet):
+class BlogCategoryQuerySet(TreeTranslatableQuerySet):
     """
     Optimized QuerySet for BlogCategory model.
 
     Provides chainable methods for common operations and
     standardized `for_list()` and `for_detail()` methods.
     """
-
-    @classmethod
-    def as_manager(cls):
-        manager = BlogCategoryManager.from_queryset(cls)()
-        manager._built_with_as_manager = True
-        return manager
-
-    as_manager.queryset_only = True  # type: ignore[attr-defined]
 
     def with_translations(self) -> Self:
         """Prefetch translations for better performance."""
@@ -95,7 +86,7 @@ class BlogCategoryQuerySet(TranslatableQuerySet, TreeQuerySet):
         )
 
 
-class BlogCategoryManager(TreeManager, TranslatableManager):
+class BlogCategoryManager(TreeTranslatableManager):
     """
     Manager for BlogCategory model with optimized queryset methods.
 
@@ -106,16 +97,4 @@ class BlogCategoryManager(TreeManager, TranslatableManager):
             return BlogCategory.objects.for_detail()
     """
 
-    _queryset_class = BlogCategoryQuerySet
-
-    def for_list(self) -> BlogCategoryQuerySet:
-        """Return optimized queryset for list views."""
-        return self._queryset_class(self.model, using=self._db).for_list()
-
-    def for_detail(self) -> BlogCategoryQuerySet:
-        """Return optimized queryset for detail views."""
-        return self._queryset_class(self.model, using=self._db).for_detail()
-
-    def for_tree(self) -> BlogCategoryQuerySet:
-        """Return optimized queryset for tree views."""
-        return self._queryset_class(self.model, using=self._db).for_tree()
+    queryset_class = BlogCategoryQuerySet

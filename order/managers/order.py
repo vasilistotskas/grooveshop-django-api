@@ -1,28 +1,25 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
-from django.db import models
 from django.db.models import Count, ExpressionWrapper, F, Sum
 from djmoney.models.fields import MoneyField
 
+from core.managers import OptimizedManager, OptimizedQuerySet
+from core.mixins import SoftDeleteQuerySetMixin
 from order.enum.status import OrderStatus
 
 if TYPE_CHECKING:
     from typing import Self
 
 
-class OrderQuerySet(models.QuerySet):
+class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
     """
     Optimized QuerySet for Order model.
 
     Provides chainable methods for common operations and
     standardized `for_list()` and `for_detail()` methods.
     """
-
-    def exclude_deleted(self) -> Self:
-        """Exclude soft-deleted orders."""
-        return self.exclude(is_deleted=True)
 
     def with_user(self) -> Self:
         """Select related user for order."""
@@ -115,7 +112,7 @@ class OrderQuerySet(models.QuerySet):
         return self.filter(status=OrderStatus.REFUNDED)
 
 
-class OrderManager(models.Manager):
+class OrderManager(OptimizedManager):
     """
     Manager for Order model with optimized queryset methods.
 
@@ -126,12 +123,11 @@ class OrderManager(models.Manager):
             return Order.objects.for_detail()
     """
 
+    queryset_class = OrderQuerySet
+
     def get_queryset(self) -> OrderQuerySet:
         """Return base queryset excluding deleted orders."""
-        return cast(
-            "OrderQuerySet",
-            OrderQuerySet(self.model, using=self._db).exclude_deleted(),
-        )
+        return OrderQuerySet(self.model, using=self._db).exclude_deleted()
 
     def for_list(self) -> OrderQuerySet:
         """Return optimized queryset for list views."""
@@ -140,30 +136,3 @@ class OrderManager(models.Manager):
     def for_detail(self) -> OrderQuerySet:
         """Return optimized queryset for detail views."""
         return OrderQuerySet(self.model, using=self._db).for_detail()
-
-    def with_total_amounts(self) -> OrderQuerySet:
-        return self.get_queryset().with_total_amounts()
-
-    def pending(self) -> OrderQuerySet:
-        return self.get_queryset().pending()
-
-    def processing(self) -> OrderQuerySet:
-        return self.get_queryset().processing()
-
-    def shipped(self) -> OrderQuerySet:
-        return self.get_queryset().shipped()
-
-    def delivered(self) -> OrderQuerySet:
-        return self.get_queryset().delivered()
-
-    def completed(self) -> OrderQuerySet:
-        return self.get_queryset().completed()
-
-    def canceled(self) -> OrderQuerySet:
-        return self.get_queryset().canceled()
-
-    def returned(self) -> OrderQuerySet:
-        return self.get_queryset().returned()
-
-    def refunded(self) -> OrderQuerySet:
-        return self.get_queryset().refunded()

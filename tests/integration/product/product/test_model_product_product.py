@@ -290,15 +290,15 @@ class ProductQuerySetTestCase(TestCase):
         self.assertEqual(product2.price_save_percent_annotation, Decimal("0"))
 
     def test_queryset_with_likes_count_annotation(self):
-        queryset = Product.objects.with_likes_count_annotation()
+        queryset = Product.objects.with_likes_count()
         product1 = queryset.get(id=self.product1.id)
         product2 = queryset.get(id=self.product2.id)
 
-        self.assertEqual(product1.likes_count_annotation, 2)
-        self.assertEqual(product2.likes_count_annotation, 0)
+        self.assertEqual(product1.likes_count, 2)
+        self.assertEqual(product2.likes_count, 0)
 
     def test_queryset_with_review_average_annotation(self):
-        queryset = Product.objects.with_review_average_annotation()
+        queryset = Product.objects.with_review_average()
         product1 = queryset.get(id=self.product1.id)
         product2 = queryset.get(id=self.product2.id)
 
@@ -306,8 +306,8 @@ class ProductQuerySetTestCase(TestCase):
             product=self.product1
         ).aggregate(avg=Avg("rate"))["avg"]
 
-        self.assertEqual(product1.review_average_annotation, actual_avg)
-        self.assertEqual(product2.review_average_annotation, 0)
+        self.assertEqual(product1.review_average, actual_avg)
+        self.assertEqual(product2.review_average, 0)
 
     def test_annotations_match_property_values(self):
         """Test that model properties and annotations give consistent results"""
@@ -315,8 +315,8 @@ class ProductQuerySetTestCase(TestCase):
             Product.objects.with_discount_value_annotation()
             .with_final_price_annotation()
             .with_price_save_percent_annotation()
-            .with_likes_count_annotation()
-            .with_review_average_annotation()
+            .with_likes_count()
+            .with_review_average()
         )
         product1 = queryset.get(id=self.product1.id)
 
@@ -333,11 +333,9 @@ class ProductQuerySetTestCase(TestCase):
             product1.price_save_percent_annotation,
             product_instance.price_save_percent,
         )
+        self.assertEqual(product1.likes_count, product_instance.likes_count)
         self.assertEqual(
-            product1.likes_count_annotation, product_instance.likes_count
-        )
-        self.assertEqual(
-            product1.review_average_annotation, product_instance.review_average
+            product1.review_average, product_instance.review_average
         )
 
     def test_ordering_with_annotations(self):
@@ -371,23 +369,23 @@ class ProductQuerySetTestCase(TestCase):
     def test_chained_annotations(self):
         """Test that queryset methods can be chained properly"""
         queryset = (
-            Product.objects.with_likes_count_annotation()
-            .with_review_average_annotation()
+            Product.objects.with_likes_count()
+            .with_review_average()
             .with_final_price_annotation()
         )
 
         product1 = queryset.get(id=self.product1.id)
 
-        self.assertTrue(hasattr(product1, "likes_count_annotation"))
-        self.assertTrue(hasattr(product1, "review_average_annotation"))
+        self.assertTrue(hasattr(product1, "likes_count"))
+        self.assertTrue(hasattr(product1, "review_average"))
         self.assertTrue(hasattr(product1, "final_price_annotation"))
 
     def test_manager_methods(self):
         """Test that manager methods work correctly"""
-        likes_queryset = Product.objects.with_likes_count_annotation()
+        likes_queryset = Product.objects.with_likes_count()
         self.assertTrue(likes_queryset.exists())
 
-        review_queryset = Product.objects.with_review_average_annotation()
+        review_queryset = Product.objects.with_review_average()
         self.assertTrue(review_queryset.exists())
 
         price_queryset = Product.objects.with_final_price_annotation()
@@ -398,9 +396,7 @@ class ProductQuerySetTestCase(TestCase):
         user3 = UserAccountFactory(num_addresses=0)
         ProductFavouriteFactory(product=self.product1, user=user3)
 
-        queryset = Product.objects.with_likes_count_annotation().filter(
-            likes_count_annotation__gte=2
-        )
+        queryset = Product.objects.with_likes_count().filter(likes_count__gte=2)
 
         self.assertEqual(queryset.count(), 1)
         self.assertEqual(queryset.first().id, self.product1.id)
@@ -409,7 +405,7 @@ class ProductQuerySetTestCase(TestCase):
         """Test annotations work on empty querysets"""
         Product.objects.all().delete()
 
-        queryset = Product.objects.with_likes_count_annotation()
+        queryset = Product.objects.with_likes_count()
         self.assertEqual(queryset.count(), 0)
 
     def test_annotation_with_none_values(self):

@@ -5,13 +5,17 @@ from typing import TYPE_CHECKING
 from django.db import models
 from django.db.models import Count, Q
 from django.utils import timezone
-from parler.managers import TranslatableManager, TranslatableQuerySet
+
+from core.managers import (
+    TranslatableOptimizedManager,
+    TranslatableOptimizedQuerySet,
+)
 
 if TYPE_CHECKING:
     from typing import Self
 
 
-class EnhancedImageQuerySet(TranslatableQuerySet):
+class ProductImageQuerySet(TranslatableOptimizedQuerySet):
     """
     Optimized QuerySet for ProductImage model.
 
@@ -130,7 +134,7 @@ class EnhancedImageQuerySet(TranslatableQuerySet):
         return 0
 
 
-class EnhancedImageManager(TranslatableManager):
+class ProductImageManager(TranslatableOptimizedManager):
     """
     Manager for ProductImage model with optimized queryset methods.
 
@@ -141,57 +145,23 @@ class EnhancedImageManager(TranslatableManager):
             return ProductImage.objects.for_detail()
     """
 
-    def get_queryset(self) -> EnhancedImageQuerySet:
-        return EnhancedImageQuerySet(self.model, using=self._db)
+    queryset_class = ProductImageQuerySet
 
-    def for_list(self) -> EnhancedImageQuerySet:
+    def get_queryset(self) -> ProductImageQuerySet:
+        return ProductImageQuerySet(self.model, using=self._db)
+
+    def for_list(self) -> ProductImageQuerySet:
         """Return optimized queryset for list views."""
         return self.get_queryset().for_list()
 
-    def for_detail(self) -> EnhancedImageQuerySet:
+    def for_detail(self) -> ProductImageQuerySet:
         """Return optimized queryset for detail views."""
         return self.get_queryset().for_detail()
 
     def main_image(self, product):
+        """Get the first main image for a product."""
         return self.get_queryset().main_images().for_product(product).first()
-
-    def main_images(self):
-        return self.get_queryset().main_images()
-
-    def secondary_images(self):
-        return self.get_queryset().secondary_images()
-
-    def for_product(self, product):
-        return self.get_queryset().for_product(product)
-
-    def for_products(self, product_ids):
-        return self.get_queryset().for_products(product_ids)
-
-    def with_titles(self):
-        return self.get_queryset().with_titles()
-
-    def without_titles(self):
-        return self.get_queryset().without_titles()
-
-    def ordered_by_position(self):
-        return self.get_queryset().ordered_by_position()
-
-    def recent(self, days=7):
-        return self.get_queryset().recent(days)
-
-    def optimized_for_list(self):
-        """Alias for for_list() for backward compatibility."""
-        return self.get_queryset().for_list()
 
     def with_product_data(self):
         """Return queryset with product data prefetched."""
         return self.get_queryset().with_product().with_product_translations()
-
-    def get_products_needing_images(self, max_images=5):
-        return self.get_queryset().get_products_needing_images(max_images)
-
-    def get_products_without_main_image(self):
-        return self.get_queryset().get_products_without_main_image()
-
-    def bulk_update_sort_order(self, image_orders):
-        return self.get_queryset().bulk_update_sort_order(image_orders)

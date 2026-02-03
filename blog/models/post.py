@@ -89,17 +89,29 @@ class BlogPost(
 
     @property
     def likes_count(self) -> int:
-        # Use annotated value if available (from queryset), otherwise query
-        if hasattr(self, "_likes_count"):
-            return self._likes_count
+        """Return likes count from annotation or query database."""
+        # Check __dict__ first to avoid recursion with property
+        if "likes_count" in self.__dict__:
+            return self.__dict__["likes_count"]
         return self.likes.count()
+
+    @likes_count.setter
+    def likes_count(self, value: int) -> None:
+        """Allow Django to set the annotated value."""
+        self.__dict__["likes_count"] = value
 
     @property
     def comments_count(self) -> int:
-        # Use annotated value if available (from queryset), otherwise query
-        if hasattr(self, "_comments_count"):
-            return self._comments_count
+        """Return comments count from annotation or query database."""
+        # Check __dict__ first to avoid recursion with property
+        if "comments_count" in self.__dict__:
+            return self.__dict__["comments_count"]
         return self.comments.filter(approved=True).count()
+
+    @comments_count.setter
+    def comments_count(self, value: int) -> None:
+        """Allow Django to set the annotated value."""
+        self.__dict__["comments_count"] = value
 
     @property
     def all_comments_count(self) -> int:
@@ -107,10 +119,16 @@ class BlogPost(
 
     @property
     def tags_count(self) -> int:
-        # Use annotated value if available (from queryset), otherwise query
-        if hasattr(self, "_tags_count"):
-            return self._tags_count
+        """Return tags count from annotation or query database."""
+        # Check __dict__ first to avoid recursion with property
+        if "tags_count" in self.__dict__:
+            return self.__dict__["tags_count"]
         return self.tags.filter(active=True).count()
+
+    @tags_count.setter
+    def tags_count(self, value: int) -> None:
+        """Allow Django to set the annotated value."""
+        self.__dict__["tags_count"] = value
 
 
 class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):

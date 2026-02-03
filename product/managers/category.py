@@ -2,39 +2,21 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from mptt.managers import TreeManager
-from mptt.querysets import TreeQuerySet
-from parler.managers import TranslatableManager, TranslatableQuerySet
+from core.managers import TreeTranslatableManager, TreeTranslatableQuerySet
 
 if TYPE_CHECKING:
     from typing import Self
 
 
-class CategoryQuerySet(TranslatableQuerySet, TreeQuerySet):
+class CategoryQuerySet(TreeTranslatableQuerySet):
     """
     Optimized QuerySet for ProductCategory model.
 
     Combines Parler translations with MPTT tree structure.
     """
 
-    @classmethod
-    def as_manager(cls):
-        manager = CategoryManager.from_queryset(cls)()
-        manager._built_with_as_manager = True
-        return manager
-
-    as_manager.queryset_only = True  # type: ignore[attr-defined]
-
     def active(self) -> Self:
         return self.filter(active=True)
-
-    def with_translations(self) -> Self:
-        """Prefetch translations for better performance."""
-        return self.prefetch_related("translations")
-
-    def with_parent(self) -> Self:
-        """Select related parent category."""
-        return self.select_related("parent")
 
     def with_products_count(self) -> Self:
         """Annotate with products count."""
@@ -59,15 +41,15 @@ class CategoryQuerySet(TranslatableQuerySet, TreeQuerySet):
         return self.for_list().with_products_count()
 
 
-class CategoryManager(TreeManager, TranslatableManager):
+class CategoryManager(TreeTranslatableManager):
     """
     Manager for ProductCategory model with optimized queryset methods.
     """
 
-    _queryset_class = CategoryQuerySet
+    queryset_class = CategoryQuerySet
 
     def get_queryset(self) -> CategoryQuerySet:
-        return self._queryset_class(self.model, using=self._db)
+        return self.queryset_class(self.model, using=self._db)
 
     def for_list(self) -> CategoryQuerySet:
         """Return optimized queryset for list views."""
@@ -76,6 +58,3 @@ class CategoryManager(TreeManager, TranslatableManager):
     def for_detail(self) -> CategoryQuerySet:
         """Return optimized queryset for detail views."""
         return self.get_queryset().for_detail()
-
-    def active(self) -> CategoryQuerySet:
-        return self.get_queryset().active()

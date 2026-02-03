@@ -14,9 +14,7 @@ from core.managers import (
     TranslatableOptimizedQuerySet,
 )
 from core.mixins import (
-    CountAnnotationsMixin,
-    RelatedDataMixin,
-    TranslationsMixin,
+    SoftDeleteQuerySetMixin,
 )
 
 
@@ -130,314 +128,109 @@ class TestTranslatableOptimizedManager:
         assert hasattr(TranslatableOptimizedManager, "for_detail")
 
 
-class TestTranslationsMixin:
-    """Tests for TranslationsMixin."""
+class TestSoftDeleteQuerySetMixin:
+    """Tests for SoftDeleteQuerySetMixin."""
 
-    def test_with_translations_returns_self_for_non_translatable(self):
-        """with_translations() should return self if model has no translations."""
+    def test_exclude_deleted_filters_correctly(self):
+        """exclude_deleted() should exclude records where is_deleted=True."""
+        exclude_kwargs = {}
 
-        class MockQuerySet(TranslationsMixin):
-            def __init__(self):
-                self.model = type("Model", (), {})()
-
-            def prefetch_related(self, *args):
+        class MockQuerySet(SoftDeleteQuerySetMixin):
+            def exclude(self, **kwargs):
+                exclude_kwargs.update(kwargs)
                 return self
 
         qs = MockQuerySet()
-        result = qs.with_translations()
+        result = qs.exclude_deleted()
         assert result is qs
+        assert exclude_kwargs == {"is_deleted": True}
 
-    def test_with_translations_prefetches_for_translatable(self):
-        """with_translations() should prefetch translations if model has them."""
-        prefetch_called = []
+    def test_with_deleted_returns_all(self):
+        """with_deleted() should return all records."""
+        all_called = []
 
-        class MockQuerySet(TranslationsMixin):
-            def __init__(self):
-                self.model = type("Model", (), {"translations": True})()
-
-            def prefetch_related(self, *args):
-                prefetch_called.extend(args)
+        class MockQuerySet(SoftDeleteQuerySetMixin):
+            def all(self):
+                all_called.append(True)
                 return self
 
         qs = MockQuerySet()
-        qs.with_translations()
-        assert "translations" in prefetch_called
+        result = qs.with_deleted()
+        assert result is qs
+        assert len(all_called) == 1
 
+    def test_deleted_only_filters_correctly(self):
+        """deleted_only() should return only records where is_deleted=True."""
+        filter_kwargs = {}
 
-class TestCountAnnotationsMixin:
-    """Tests for CountAnnotationsMixin."""
-
-    def test_with_likes_count_annotates(self):
-        """with_likes_count() should annotate with _likes_count."""
-        annotate_kwargs = {}
-
-        class MockQuerySet(CountAnnotationsMixin):
-            def annotate(self, **kwargs):
-                annotate_kwargs.update(kwargs)
+        class MockQuerySet(SoftDeleteQuerySetMixin):
+            def filter(self, **kwargs):
+                filter_kwargs.update(kwargs)
                 return self
 
         qs = MockQuerySet()
-        qs.with_likes_count()
-        assert "_likes_count" in annotate_kwargs
+        result = qs.deleted_only()
+        assert result is qs
+        assert filter_kwargs == {"is_deleted": True}
 
-    def test_with_likes_count_custom_field(self):
-        """with_likes_count() should use custom field name."""
-        annotate_kwargs = {}
+    def test_methods_are_chainable(self):
+        """All soft delete methods should be chainable."""
+        call_log = []
 
-        class MockQuerySet(CountAnnotationsMixin):
-            def annotate(self, **kwargs):
-                annotate_kwargs.update(kwargs)
+        class MockQuerySet(SoftDeleteQuerySetMixin):
+            def exclude(self, **kwargs):
+                call_log.append(("exclude", kwargs))
+                return self
+
+            def filter(self, **kwargs):
+                call_log.append(("filter", kwargs))
+                return self
+
+            def all(self):
+                call_log.append(("all", {}))
                 return self
 
         qs = MockQuerySet()
-        qs.with_likes_count(field_name="favourites")
-        assert "_likes_count" in annotate_kwargs
 
-    def test_with_comments_count_annotates(self):
-        """with_comments_count() should annotate with _comments_count."""
-        annotate_kwargs = {}
+        # Test chaining exclude_deleted
+        result = qs.exclude_deleted()
+        assert result is qs
+        assert ("exclude", {"is_deleted": True}) in call_log
 
-        class MockQuerySet(CountAnnotationsMixin):
-            def annotate(self, **kwargs):
-                annotate_kwargs.update(kwargs)
-                return self
+        # Reset and test deleted_only
+        call_log.clear()
+        result = qs.deleted_only()
+        assert result is qs
+        assert ("filter", {"is_deleted": True}) in call_log
 
-        qs = MockQuerySet()
-        qs.with_comments_count()
-        assert "_comments_count" in annotate_kwargs
-
-    def test_with_reviews_count_annotates(self):
-        """with_reviews_count() should annotate with _reviews_count."""
-        annotate_kwargs = {}
-
-        class MockQuerySet(CountAnnotationsMixin):
-            def annotate(self, **kwargs):
-                annotate_kwargs.update(kwargs)
-                return self
-
-        qs = MockQuerySet()
-        qs.with_reviews_count()
-        assert "_reviews_count" in annotate_kwargs
-
-    def test_with_review_average_annotates(self):
-        """with_review_average() should annotate with _review_average."""
-        annotate_kwargs = {}
-
-        class MockQuerySet(CountAnnotationsMixin):
-            def annotate(self, **kwargs):
-                annotate_kwargs.update(kwargs)
-                return self
-
-        qs = MockQuerySet()
-        qs.with_review_average()
-        assert "_review_average" in annotate_kwargs
-
-    def test_with_tags_count_annotates(self):
-        """with_tags_count() should annotate with _tags_count."""
-        annotate_kwargs = {}
-
-        class MockQuerySet(CountAnnotationsMixin):
-            def annotate(self, **kwargs):
-                annotate_kwargs.update(kwargs)
-                return self
-
-        qs = MockQuerySet()
-        qs.with_tags_count()
-        assert "_tags_count" in annotate_kwargs
-
-    def test_with_items_count_annotates(self):
-        """with_items_count() should annotate with _items_count."""
-        annotate_kwargs = {}
-
-        class MockQuerySet(CountAnnotationsMixin):
-            def annotate(self, **kwargs):
-                annotate_kwargs.update(kwargs)
-                return self
-
-        qs = MockQuerySet()
-        qs.with_items_count()
-        assert "_items_count" in annotate_kwargs
-
-    def test_with_favourites_count_annotates(self):
-        """with_favourites_count() should annotate with _favourites_count."""
-        annotate_kwargs = {}
-
-        class MockQuerySet(CountAnnotationsMixin):
-            def annotate(self, **kwargs):
-                annotate_kwargs.update(kwargs)
-                return self
-
-        qs = MockQuerySet()
-        qs.with_favourites_count()
-        assert "_favourites_count" in annotate_kwargs
-
-
-class TestRelatedDataMixin:
-    """Tests for RelatedDataMixin."""
-
-    def test_with_user_selects_related(self):
-        """with_user() should select_related user."""
-        select_args = []
-
-        class MockQuerySet(RelatedDataMixin):
-            def select_related(self, *args):
-                select_args.extend(args)
-                return self
-
-        qs = MockQuerySet()
-        qs.with_user()
-        assert "user" in select_args
-
-    def test_with_user_custom_field(self):
-        """with_user() should use custom field name."""
-        select_args = []
-
-        class MockQuerySet(RelatedDataMixin):
-            def select_related(self, *args):
-                select_args.extend(args)
-                return self
-
-        qs = MockQuerySet()
-        qs.with_user(field_name="author")
-        assert "author" in select_args
-
-    def test_with_category_selects_related(self):
-        """with_category() should select_related category."""
-        select_args = []
-
-        class MockQuerySet(RelatedDataMixin):
-            def select_related(self, *args):
-                select_args.extend(args)
-                return self
-
-        qs = MockQuerySet()
-        qs.with_category()
-        assert "category" in select_args
-
-    def test_with_country_selects_related(self):
-        """with_country() should select_related country."""
-        select_args = []
-
-        class MockQuerySet(RelatedDataMixin):
-            def select_related(self, *args):
-                select_args.extend(args)
-                return self
-
-        qs = MockQuerySet()
-        qs.with_country()
-        assert "country" in select_args
-
-    def test_with_region_selects_related(self):
-        """with_region() should select_related region."""
-        select_args = []
-
-        class MockQuerySet(RelatedDataMixin):
-            def select_related(self, *args):
-                select_args.extend(args)
-                return self
-
-        qs = MockQuerySet()
-        qs.with_region()
-        assert "region" in select_args
-
-    def test_with_images_prefetches_with_translations(self):
-        """with_images() should prefetch images with translations by default."""
-        prefetch_args = []
-
-        class MockQuerySet(RelatedDataMixin):
-            def prefetch_related(self, *args):
-                prefetch_args.extend(args)
-                return self
-
-        qs = MockQuerySet()
-        qs.with_images()
-        assert "images__translations" in prefetch_args
-
-    def test_with_images_without_translations(self):
-        """with_images() should prefetch images without translations when specified."""
-        prefetch_args = []
-
-        class MockQuerySet(RelatedDataMixin):
-            def prefetch_related(self, *args):
-                prefetch_args.extend(args)
-                return self
-
-        qs = MockQuerySet()
-        qs.with_images(include_translations=False)
-        assert "images" in prefetch_args
-        assert "images__translations" not in prefetch_args
-
-    def test_with_tags_prefetches_with_translations(self):
-        """with_tags() should prefetch tags with translations by default."""
-        prefetch_args = []
-
-        class MockQuerySet(RelatedDataMixin):
-            def prefetch_related(self, *args):
-                prefetch_args.extend(args)
-                return self
-
-        qs = MockQuerySet()
-        qs.with_tags()
-        assert "tags__translations" in prefetch_args
-
-    def test_with_tags_without_translations(self):
-        """with_tags() should prefetch tags without translations when specified."""
-        prefetch_args = []
-
-        class MockQuerySet(RelatedDataMixin):
-            def prefetch_related(self, *args):
-                prefetch_args.extend(args)
-                return self
-
-        qs = MockQuerySet()
-        qs.with_tags(include_translations=False)
-        assert "tags" in prefetch_args
-        assert "tags__translations" not in prefetch_args
+        # Reset and test with_deleted
+        call_log.clear()
+        result = qs.with_deleted()
+        assert result is qs
+        assert ("all", {}) in call_log
 
 
 class TestMixinComposition:
-    """Tests for composing multiple mixins together."""
+    """Tests for composing SoftDeleteQuerySetMixin."""
 
-    def test_can_compose_all_mixins(self):
-        """All mixins should be composable into a single QuerySet class."""
+    def test_soft_delete_mixin_is_chainable(self):
+        """SoftDeleteQuerySetMixin methods should be chainable."""
 
-        class ComposedQuerySet(
-            TranslationsMixin, CountAnnotationsMixin, RelatedDataMixin
-        ):
+        class ComposedQuerySet(SoftDeleteQuerySetMixin):
             def __init__(self):
-                self.model = type("Model", (), {"translations": True})()
-                self._select_related = []
-                self._prefetch_related = []
-                self._annotate = {}
-
-            def select_related(self, *args):
-                self._select_related.extend(args)
-                return self
-
-            def prefetch_related(self, *args):
-                self._prefetch_related.extend(args)
-                return self
+                self._exclude = {}
 
             def annotate(self, **kwargs):
-                self._annotate.update(kwargs)
+                return self
+
+            def exclude(self, **kwargs):
+                self._exclude.update(kwargs)
                 return self
 
         qs = ComposedQuerySet()
 
-        # Chain all methods
-        result = (
-            qs.with_translations()
-            .with_user()
-            .with_category()
-            .with_likes_count()
-            .with_reviews_count()
-            .with_images()
-        )
+        # Chain methods
+        result = qs.exclude_deleted()
 
         assert result is qs
-        assert "translations" in qs._prefetch_related
-        assert "user" in qs._select_related
-        assert "category" in qs._select_related
-        assert "_likes_count" in qs._annotate
-        assert "_reviews_count" in qs._annotate
-        assert "images__translations" in qs._prefetch_related
+        assert qs._exclude == {"is_deleted": True}

@@ -126,7 +126,7 @@ res_serializers: ResponseSerializersConfig = {
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class NotificationUserViewSet(BaseModelViewSet):
-    queryset = NotificationUser.objects.optimized_for_list()
+    queryset = NotificationUser.objects.for_list()
     request_serializers = req_serializers
     response_serializers = res_serializers
 

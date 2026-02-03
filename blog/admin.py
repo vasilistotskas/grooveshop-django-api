@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.db import models
-from django.db.models import Count, Q
+from django.db.models import Count
 from django.utils import timezone
 from django.utils.html import conditional_escape
 from django.utils.safestring import mark_safe
@@ -33,17 +33,15 @@ class LikesCountFilter(RangeNumericListFilter):
     def queryset(self, request, queryset):
         filters = {}
 
-        queryset = queryset.annotate(
-            likes_count_annotation=Count("likes", distinct=True)
-        )
+        queryset = queryset.with_likes_count()
 
         value_from = self.used_parameters.get(f"{self.parameter_name}_from")
         if value_from and value_from != "":
-            filters["likes_count_annotation__gte"] = value_from
+            filters["likes_count__gte"] = value_from
 
         value_to = self.used_parameters.get(f"{self.parameter_name}_to")
         if value_to and value_to != "":
-            filters["likes_count_annotation__lte"] = value_to
+            filters["likes_count__lte"] = value_to
 
         return queryset.filter(**filters) if filters else queryset
 
@@ -61,19 +59,15 @@ class CommentsCountFilter(RangeNumericListFilter):
     def queryset(self, request, queryset):
         filters = {}
 
-        queryset = queryset.annotate(
-            comments_count_annotation=Count(
-                "comments", distinct=True, filter=Q(comments__approved=True)
-            )
-        )
+        queryset = queryset.with_comments_count(approved_only=True)
 
         value_from = self.used_parameters.get(f"{self.parameter_name}_from")
         if value_from and value_from != "":
-            filters["comments_count_annotation__gte"] = value_from
+            filters["comments_count__gte"] = value_from
 
         value_to = self.used_parameters.get(f"{self.parameter_name}_to")
         if value_to and value_to != "":
-            filters["comments_count_annotation__lte"] = value_to
+            filters["comments_count__lte"] = value_to
 
         return queryset.filter(**filters) if filters else queryset
 
@@ -91,19 +85,15 @@ class TagsCountFilter(RangeNumericListFilter):
     def queryset(self, request, queryset):
         filters = {}
 
-        queryset = queryset.annotate(
-            tags_count_annotation=Count(
-                "tags", distinct=True, filter=Q(tags__active=True)
-            )
-        )
+        queryset = queryset.with_tags_count(active_only=True)
 
         value_from = self.used_parameters.get(f"{self.parameter_name}_from")
         if value_from and value_from != "":
-            filters["tags_count_annotation__gte"] = value_from
+            filters["tags_count__gte"] = value_from
 
         value_to = self.used_parameters.get(f"{self.parameter_name}_to")
         if value_to and value_to != "":
-            filters["tags_count_annotation__lte"] = value_to
+            filters["tags_count__lte"] = value_to
 
         return queryset.filter(**filters) if filters else queryset
 
@@ -667,9 +657,9 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         return (
             super()
             .get_queryset(request)
-            .with_likes_count_annotation()
-            .with_comments_count_annotation()
-            .with_tags_count_annotation()
+            .with_likes_count()
+            .with_comments_count()
+            .with_tags_count()
         )
 
     def title_display(self, obj):

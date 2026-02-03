@@ -2,37 +2,27 @@
 Core mixins for reusable QuerySet optimization patterns.
 
 This module provides mixins that can be composed into custom QuerySets
-to handle common patterns like translations, count annotations, and related data.
+to handle common patterns like soft delete filtering.
 
 Usage:
-    from core.mixins import TranslationsMixin, CountAnnotationsMixin, RelatedDataMixin
+    from core.mixins import SoftDeleteQuerySetMixin
 
-    class ProductQuerySet(TranslationsMixin, CountAnnotationsMixin, models.QuerySet):
-        def for_list(self):
-            return (
-                self.with_translations()
-                    .with_likes_count(field_name='favourites')
-                    .with_reviews_count()
-            )
+    class ProductQuerySet(SoftDeleteQuerySetMixin, models.QuerySet):
+        def active(self):
+            return self.exclude_deleted().filter(active=True)
 
 Note:
     Mixins should be listed before models.QuerySet in the inheritance chain
     to ensure proper method resolution order (MRO).
 
 Available Mixins:
-    - TranslationsMixin: For Parler translatable models
-    - CountAnnotationsMixin: For count/aggregate annotations
-    - RelatedDataMixin: For common select_related/prefetch_related patterns
+    - SoftDeleteQuerySetMixin: For soft delete filtering operations
 """
 
 from core.mixins.queryset import (
-    CountAnnotationsMixin,
-    RelatedDataMixin,
-    TranslationsMixin,
+    SoftDeleteQuerySetMixin,
 )
 
 __all__ = [
-    "TranslationsMixin",
-    "CountAnnotationsMixin",
-    "RelatedDataMixin",
+    "SoftDeleteQuerySetMixin",
 ]

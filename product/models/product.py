@@ -36,9 +36,7 @@ from core.utils.generators import SlugifyConfig, unique_slugify
 from core.weight import zero_weight
 from meili.models import IndexMixin
 from product.managers.product import ProductManager
-from product.models.favourite import ProductFavourite
 from product.models.image import ProductImage
-from product.models.review import ProductReview
 from core.models import SeoModel
 from tag.models.tagged_item import TaggedModel
 
@@ -221,42 +219,46 @@ class Product(
 
     @property
     def likes_count(self) -> int:
-        """
-        Return the number of likes/favourites for this product.
+        """Return the number of likes/favourites for this product."""
+        # If annotation exists, use it
+        if "likes_count" in self.__dict__:
+            return self.__dict__["likes_count"]
+        # Otherwise query the database
+        return self.favourited_by.count()
 
-        Uses annotated value if available (from optimized queryset),
-        otherwise queries the database.
-        """
-        if hasattr(self, "_likes_count"):
-            return self._likes_count or 0
-        return ProductFavourite.objects.filter(product=self).count()
+    @likes_count.setter
+    def likes_count(self, value):
+        """Allow Django to set the annotation value."""
+        self.__dict__["likes_count"] = value
 
     @property
     def review_average(self) -> float:
-        """
-        Return the average review rating for this product.
+        """Return the average review rating for this product."""
+        # If annotation exists, use it
+        if "review_average" in self.__dict__:
+            return float(self.__dict__["review_average"])
+        # Otherwise query the database
+        avg = self.reviews.aggregate(avg=Avg("rate"))["avg"]
+        return float(avg) if avg is not None else 0.0
 
-        Uses annotated value if available (from optimized queryset),
-        otherwise queries the database.
-        """
-        if hasattr(self, "_review_average"):
-            return float(self._review_average or 0.0)
-        average = ProductReview.objects.filter(product=self).aggregate(
-            avg=Avg("rate")
-        )["avg"]
-        return float(average) if average is not None else 0.0
+    @review_average.setter
+    def review_average(self, value):
+        """Allow Django to set the annotation value."""
+        self.__dict__["review_average"] = value
 
     @property
     def review_count(self) -> int:
-        """
-        Return the number of reviews for this product.
+        """Return the number of reviews for this product."""
+        # If annotation exists (stored as reviews_count), use it
+        if "reviews_count" in self.__dict__:
+            return self.__dict__["reviews_count"]
+        # Otherwise query the database
+        return self.reviews.count()
 
-        Uses annotated value if available (from optimized queryset),
-        otherwise queries the database.
-        """
-        if hasattr(self, "_reviews_count"):
-            return self._reviews_count or 0
-        return ProductReview.objects.filter(product=self).count()
+    @review_count.setter
+    def review_count(self, value):
+        """Allow Django to set the annotation value."""
+        self.__dict__["reviews_count"] = value
 
     @property
     def vat_percent(self) -> Decimal:
@@ -327,7 +329,7 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
     @classmethod
     def get_meilisearch_queryset(cls):
         """Return optimized queryset for bulk indexing."""
-        from django.db.models import Count, Avg
+        from django.db.models import Count
 
         return cls.objects.select_related(
             "master", "master__category", "master__vat"

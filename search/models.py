@@ -8,6 +8,8 @@ This module provides models for:
 
 from django.db import models
 
+from search.managers import SearchClickManager, SearchQueryManager
+
 
 class SearchQuery(models.Model):
     """
@@ -28,6 +30,8 @@ class SearchQuery(models.Model):
         ("blog_post", "Blog Post"),
         ("federated", "Federated"),
     ]
+
+    objects: SearchQueryManager = SearchQueryManager()
 
     query = models.CharField(
         max_length=500,
@@ -130,6 +134,8 @@ class SearchClick(models.Model):
         ("product", "Product"),
         ("blog_post", "Blog Post"),
     ]
+
+    objects: SearchClickManager = SearchClickManager()
 
     search_query = models.ForeignKey(
         SearchQuery,

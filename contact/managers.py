@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from django.db import models
+from core.managers import OptimizedManager, OptimizedQuerySet
 
 if TYPE_CHECKING:
     from typing import Self
 
 
-class ContactQuerySet(models.QuerySet):
+class ContactQuerySet(OptimizedQuerySet):
     """
     Optimized QuerySet for Contact model.
 
@@ -36,9 +36,13 @@ class ContactQuerySet(models.QuerySet):
         return self.filter(email__iendswith=f"@{domain}")
 
 
-class ContactManager(models.Manager):
+class ContactManager(OptimizedManager):
     """
     Manager for Contact model with optimized queryset methods.
+
+    Most methods are automatically delegated to ContactQuerySet
+    via __getattr__. Only for_list() and for_detail() are explicitly
+    defined for IDE support.
 
     Usage in ViewSet:
         def get_queryset(self):
@@ -46,6 +50,8 @@ class ContactManager(models.Manager):
                 return Contact.objects.for_list()
             return Contact.objects.for_detail()
     """
+
+    queryset_class = ContactQuerySet
 
     def get_queryset(self) -> ContactQuerySet:
         return ContactQuerySet(self.model, using=self._db)
@@ -57,6 +63,3 @@ class ContactManager(models.Manager):
     def for_detail(self) -> ContactQuerySet:
         """Return optimized queryset for detail views."""
         return self.get_queryset().for_detail()
-
-    def by_email_domain(self, domain):
-        return self.get_queryset().by_email_domain(domain)

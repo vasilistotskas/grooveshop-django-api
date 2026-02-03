@@ -24,10 +24,16 @@ from core.managers.base import (
     TranslatableOptimizedManager,
     TranslatableOptimizedQuerySet,
 )
+from core.managers.tree import (
+    TreeTranslatableManager,
+    TreeTranslatableQuerySet,
+)
 
 __all__ = [
     "OptimizedQuerySet",
     "OptimizedManager",
     "TranslatableOptimizedQuerySet",
     "TranslatableOptimizedManager",
+    "TreeTranslatableQuerySet",
+    "TreeTranslatableManager",
 ]

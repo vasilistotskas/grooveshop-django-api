@@ -1,33 +1,54 @@
 from __future__ import annotations
 
-from parler.managers import TranslatableManager, TranslatableQuerySet
+from typing import TYPE_CHECKING
 
+from core.managers import (
+    TranslatableOptimizedManager,
+    TranslatableOptimizedQuerySet,
+)
 from product.enum.category import CategoryImageTypeEnum
 
+if TYPE_CHECKING:
+    from typing import Self
 
-class CategoryImageQuerySet(TranslatableQuerySet):
-    def active(self):
+
+class CategoryImageQuerySet(TranslatableOptimizedQuerySet):
+    """
+    Optimized QuerySet for CategoryImage model.
+
+    Provides chainable methods for filtering and retrieving category images.
+    """
+
+    def active(self) -> Self:
+        """Filter active images."""
         return self.filter(active=True)
 
-    def by_category(self, category):
+    def by_category(self, category) -> Self:
+        """Filter by category."""
         return self.filter(category=category)
 
-    def by_type(self, image_type: CategoryImageTypeEnum):
+    def by_type(self, image_type: CategoryImageTypeEnum) -> Self:
+        """Filter by image type."""
         return self.filter(image_type=image_type)
 
-    def main_images(self):
+    def main_images(self) -> Self:
+        """Filter main images."""
         return self.filter(image_type=CategoryImageTypeEnum.MAIN)
 
-    def banner_images(self):
+    def banner_images(self) -> Self:
+        """Filter banner images."""
         return self.filter(image_type=CategoryImageTypeEnum.BANNER)
 
-    def icon_images(self):
+    def icon_images(self) -> Self:
+        """Filter icon images."""
         return self.filter(image_type=CategoryImageTypeEnum.ICON)
 
-    def gallery_images(self):
+    def gallery_images(self) -> Self:
+        """Filter gallery images."""
         return self.filter(image_type=CategoryImageTypeEnum.GALLERY)
 
     def get_main_image(self, category):
+        """Get the main image for a category."""
         return self.filter(
             category=category,
             image_type=CategoryImageTypeEnum.MAIN,
@@ -35,6 +56,7 @@ class CategoryImageQuerySet(TranslatableQuerySet):
         ).first()
 
     def get_banner_image(self, category):
+        """Get the banner image for a category."""
         return self.filter(
             category=category,
             image_type=CategoryImageTypeEnum.BANNER,
@@ -42,6 +64,7 @@ class CategoryImageQuerySet(TranslatableQuerySet):
         ).first()
 
     def get_icon_image(self, category):
+        """Get the icon image for a category."""
         return self.filter(
             category=category,
             image_type=CategoryImageTypeEnum.ICON,
@@ -49,44 +72,39 @@ class CategoryImageQuerySet(TranslatableQuerySet):
         ).first()
 
     def get_image_by_type(self, category, image_type: CategoryImageTypeEnum):
+        """Get an image by category and type."""
         return self.filter(
             category=category, image_type=image_type, active=True
         ).first()
 
+    def for_list(self) -> Self:
+        """Return optimized queryset for list views."""
+        return self.with_translations().select_related("category")
 
-class CategoryImageManager(TranslatableManager):
+    def for_detail(self) -> Self:
+        """Return optimized queryset for detail views."""
+        return self.for_list()
+
+
+class CategoryImageManager(TranslatableOptimizedManager):
+    """
+    Manager for CategoryImage model.
+
+    Most methods are automatically delegated to CategoryImageQuerySet
+    via __getattr__. Only for_list() and for_detail() are explicitly
+    defined for IDE support.
+    """
+
+    queryset_class = CategoryImageQuerySet
+
     def get_queryset(self) -> CategoryImageQuerySet:
+        """Return the base queryset."""
         return CategoryImageQuerySet(self.model, using=self._db)
 
-    def active(self):
-        return self.get_queryset().active()
+    def for_list(self) -> CategoryImageQuerySet:
+        """Return optimized queryset for list views."""
+        return self.get_queryset().for_list()
 
-    def by_category(self, category):
-        return self.get_queryset().by_category(category)
-
-    def by_type(self, image_type: CategoryImageTypeEnum):
-        return self.get_queryset().by_type(image_type)
-
-    def main_images(self):
-        return self.get_queryset().main_images()
-
-    def banner_images(self):
-        return self.get_queryset().banner_images()
-
-    def icon_images(self):
-        return self.get_queryset().icon_images()
-
-    def gallery_images(self):
-        return self.get_queryset().gallery_images()
-
-    def get_main_image(self, category):
-        return self.get_queryset().get_main_image(category)
-
-    def get_banner_image(self, category):
-        return self.get_queryset().get_banner_image(category)
-
-    def get_icon_image(self, category):
-        return self.get_queryset().get_icon_image(category)
-
-    def get_image_by_type(self, category, image_type: CategoryImageTypeEnum):
-        return self.get_queryset().get_image_by_type(category, image_type)
+    def for_detail(self) -> CategoryImageQuerySet:
+        """Return optimized queryset for detail views."""
+        return self.get_queryset().for_detail()

@@ -5,15 +5,18 @@ from typing import TYPE_CHECKING
 
 from django.db.models import Count, Q
 from django.utils import timezone
-from parler.managers import TranslatableManager, TranslatableQuerySet
 
+from core.managers import (
+    TranslatableOptimizedManager,
+    TranslatableOptimizedQuerySet,
+)
 from product.enum.review import ReviewStatus
 
 if TYPE_CHECKING:
     from typing import Self
 
 
-class EnhancedReviewQuerySet(TranslatableQuerySet):
+class ProductReviewQuerySet(TranslatableOptimizedQuerySet):
     """
     Optimized QuerySet for ProductReview model.
 
@@ -106,7 +109,7 @@ class EnhancedReviewQuerySet(TranslatableQuerySet):
         return self.annotate(user_review_count=Count("user__product_reviews"))
 
 
-class ProductReviewManager(TranslatableManager):
+class ProductReviewManager(TranslatableOptimizedManager):
     """
     Manager for ProductReview model with optimized queryset methods.
 
@@ -117,55 +120,15 @@ class ProductReviewManager(TranslatableManager):
             return ProductReview.objects.for_detail()
     """
 
-    def get_queryset(self) -> EnhancedReviewQuerySet:
-        return EnhancedReviewQuerySet(self.model, using=self._db)
+    queryset_class = ProductReviewQuerySet
 
-    def for_list(self) -> EnhancedReviewQuerySet:
+    def get_queryset(self) -> ProductReviewQuerySet:
+        return ProductReviewQuerySet(self.model, using=self._db)
+
+    def for_list(self) -> ProductReviewQuerySet:
         """Return optimized queryset for list views."""
         return self.get_queryset().for_list()
 
-    def for_detail(self) -> EnhancedReviewQuerySet:
+    def for_detail(self) -> ProductReviewQuerySet:
         """Return optimized queryset for detail views."""
         return self.get_queryset().for_detail()
-
-    def approved(self):
-        return self.get_queryset().approved()
-
-    def pending(self):
-        return self.get_queryset().pending()
-
-    def rejected(self):
-        return self.get_queryset().rejected()
-
-    def published(self):
-        return self.get_queryset().published()
-
-    def visible(self):
-        return self.get_queryset().visible()
-
-    def for_product(self, product):
-        return self.get_queryset().for_product(product)
-
-    def for_user(self, user):
-        return self.get_queryset().for_user(user)
-
-    def by_rate(self, rate):
-        return self.get_queryset().by_rate(rate)
-
-    def high_rated(self, min_rate=4):
-        return self.get_queryset().high_rated(min_rate)
-
-    def low_rated(self, max_rate=2):
-        return self.get_queryset().low_rated(max_rate)
-
-    def recent(self, days=30):
-        return self.get_queryset().recent(days)
-
-    def with_comments(self):
-        return self.get_queryset().with_comments()
-
-    def without_comments(self):
-        return self.get_queryset().without_comments()
-
-    def annotate_user_review_count(self):
-        return self.get_queryset().annotate_user_review_count()

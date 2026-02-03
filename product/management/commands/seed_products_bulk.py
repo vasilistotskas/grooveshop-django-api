@@ -37,6 +37,178 @@ AVAILABLE_LANGUAGES = [
 # Discount percentages (weighted towards no discount)
 DISCOUNT_OPTIONS = [0, 0, 0, 0, 0, 5, 10, 15, 20, 25, 30, 50]
 
+# Brand names for more realistic products
+BRANDS = {
+    "electronics": [
+        "TechPro",
+        "SmartLife",
+        "DigiMax",
+        "ElectroVibe",
+        "GadgetHub",
+        "TechNova",
+        "PixelPro",
+        "SoundWave",
+    ],
+    "clothing": [
+        "StyleCo",
+        "UrbanWear",
+        "ClassicFit",
+        "ModernThreads",
+        "EcoFashion",
+        "PremiumStyle",
+        "ComfortZone",
+    ],
+    "home & garden": [
+        "HomeEssence",
+        "GardenPro",
+        "CozyLiving",
+        "NatureHome",
+        "ModernSpace",
+        "EcoHome",
+    ],
+    "sports & outdoors": [
+        "ActiveLife",
+        "FitPro",
+        "OutdoorMax",
+        "SportElite",
+        "AdventureGear",
+        "PeakPerformance",
+    ],
+    "beauty & personal care": [
+        "BeautyLux",
+        "NaturalGlow",
+        "PureEssence",
+        "SkinCare+",
+        "GlamourPro",
+        "OrganicBeauty",
+    ],
+    "books": [
+        "ClassicReads",
+        "ModernPress",
+        "LiteraryHub",
+        "BookWorld",
+        "PageTurner",
+    ],
+    "food & beverages": [
+        "OrganicChoice",
+        "PureNature",
+        "GourmetSelect",
+        "HealthyBite",
+        "FreshHarvest",
+    ],
+    "toys & games": [
+        "PlayTime",
+        "FunZone",
+        "CreativeKids",
+        "GameMaster",
+        "ToyWorld",
+    ],
+}
+
+# Colors for products
+COLORS = {
+    "en": [
+        "Black",
+        "White",
+        "Blue",
+        "Red",
+        "Green",
+        "Yellow",
+        "Purple",
+        "Orange",
+        "Pink",
+        "Gray",
+        "Brown",
+        "Navy",
+        "Beige",
+        "Silver",
+        "Gold",
+    ],
+    "de": [
+        "Schwarz",
+        "Weiß",
+        "Blau",
+        "Rot",
+        "Grün",
+        "Gelb",
+        "Lila",
+        "Orange",
+        "Rosa",
+        "Grau",
+        "Braun",
+        "Marine",
+        "Beige",
+        "Silber",
+        "Gold",
+    ],
+    "el": [
+        "Μαύρο",
+        "Λευκό",
+        "Μπλε",
+        "Κόκκινο",
+        "Πράσινο",
+        "Κίτρινο",
+        "Μωβ",
+        "Πορτοκαλί",
+        "Ροζ",
+        "Γκρι",
+        "Καφέ",
+        "Ναυτικό",
+        "Μπεζ",
+        "Ασημί",
+        "Χρυσό",
+    ],
+}
+
+# Sizes for applicable products
+SIZES = ["XS", "S", "M", "L", "XL", "XXL", "One Size"]
+
+# Materials for products
+MATERIALS = {
+    "en": [
+        "Cotton",
+        "Polyester",
+        "Leather",
+        "Wool",
+        "Silk",
+        "Bamboo",
+        "Stainless Steel",
+        "Plastic",
+        "Wood",
+        "Glass",
+        "Ceramic",
+        "Metal",
+    ],
+    "de": [
+        "Baumwolle",
+        "Polyester",
+        "Leder",
+        "Wolle",
+        "Seide",
+        "Bambus",
+        "Edelstahl",
+        "Kunststoff",
+        "Holz",
+        "Glas",
+        "Keramik",
+        "Metall",
+    ],
+    "el": [
+        "Βαμβάκι",
+        "Πολυεστέρας",
+        "Δέρμα",
+        "Μάλλινο",
+        "Μετάξι",
+        "Μπαμπού",
+        "Ανοξείδωτο",
+        "Πλαστικό",
+        "Ξύλο",
+        "Γυαλί",
+        "Κεραμικό",
+        "Μέταλλο",
+    ],
+}
+
 # Category-specific product data with translations and realistic attributes
 CATEGORY_PRODUCT_DATA: dict[str, dict[str, Any]] = {
     "electronics": {
@@ -101,6 +273,66 @@ CATEGORY_PRODUCT_DATA: dict[str, dict[str, Any]] = {
                 (
                     "LED Desk Lamp",
                     "Smart LED desk lamp with adjustable color temperature.",
+                ),
+                (
+                    "4K Action Camera",
+                    "Waterproof 4K action camera with image stabilization and WiFi connectivity.",
+                ),
+                (
+                    "Wireless Gaming Controller",
+                    "Ergonomic wireless controller with programmable buttons and vibration feedback.",
+                ),
+                (
+                    "Smart Home Hub",
+                    "Central control hub for all your smart home devices with voice assistant.",
+                ),
+                (
+                    "Noise Cancelling Earphones",
+                    "In-ear noise cancelling earphones with premium sound quality.",
+                ),
+                (
+                    "Portable Projector",
+                    "Mini LED projector with 1080p resolution and built-in speakers.",
+                ),
+                (
+                    "Wireless Phone Charger Stand",
+                    "Fast charging stand with adjustable viewing angle.",
+                ),
+                (
+                    "Smart LED Light Bulb",
+                    "WiFi-enabled color-changing LED bulb with app control.",
+                ),
+                (
+                    "USB Flash Drive 128GB",
+                    "High-speed USB 3.0 flash drive with metal casing.",
+                ),
+                (
+                    "Laptop Cooling Pad",
+                    "Adjustable cooling pad with 6 quiet fans and LED lighting.",
+                ),
+                (
+                    "Digital Drawing Tablet",
+                    "Graphics tablet with pressure-sensitive pen for digital art.",
+                ),
+                (
+                    "Smart Doorbell Camera",
+                    "HD video doorbell with motion detection and two-way audio.",
+                ),
+                (
+                    "Wireless Keyboard and Mouse Combo",
+                    "Slim wireless keyboard and mouse set with long battery life.",
+                ),
+                (
+                    "Phone Gimbal Stabilizer",
+                    "3-axis smartphone gimbal for smooth video recording.",
+                ),
+                (
+                    "VR Headset",
+                    "Virtual reality headset with adjustable lenses and comfortable padding.",
+                ),
+                (
+                    "Smart Plug WiFi",
+                    "WiFi smart plug with energy monitoring and voice control.",
                 ),
             ],
             "de": [
@@ -1764,6 +1996,20 @@ class Command(BaseCommand):
                 0, len(product_list.get("en", [])) - 1
             )
 
+            # Get category name for brand selection
+            category = ProductCategory.objects.get(id=product.category_id)
+            cat_name = (
+                category.safe_translation_getter("name", any_language=True)
+                or ""
+            ).lower()
+
+            # Select brand based on category
+            brand = None
+            for cat_key, brands in BRANDS.items():
+                if cat_key in cat_name or cat_name in cat_key:
+                    brand = random.choice(brands)
+                    break
+
             for lang_code in AVAILABLE_LANGUAGES:
                 lang_products = product_list.get(
                     lang_code, product_list.get("en", [])
@@ -1781,10 +2027,31 @@ class Command(BaseCommand):
 
                 # Add variation to make names unique
                 variation = self._get_variation(lang_code)
-                name = f"{base_name} {variation}"
+
+                # Add brand prefix (50% chance)
+                if brand and random.random() < 0.5:
+                    name = f"{brand} {base_name} {variation}"
+                else:
+                    name = f"{base_name} {variation}"
+
+                # Add color suffix (30% chance for applicable categories)
+                if random.random() < 0.3 and cat_name in [
+                    "clothing",
+                    "home & garden",
+                    "sports & outdoors",
+                ]:
+                    color = random.choice(COLORS.get(lang_code, COLORS["en"]))
+                    name = f"{name} - {color}"
+
+                # Add size suffix (20% chance for clothing)
+                if random.random() < 0.2 and "clothing" in cat_name:
+                    size = random.choice(SIZES)
+                    name = f"{name} ({size})"
 
                 # Enhance description with additional details
-                description = self._enhance_description(base_desc, lang_code)
+                description = self._enhance_description(
+                    base_desc, lang_code, product.category_id
+                )
 
                 translation = ProductTranslation(
                     master=product,
@@ -1818,6 +2085,17 @@ class Command(BaseCommand):
                 "Collection",
                 "Select",
                 "Prime",
+                "Deluxe",
+                "Standard",
+                "Basic",
+                "Professional",
+                "Home",
+                "Office",
+                "Studio",
+                "Sport",
+                "Travel",
+                "Compact",
+                "Extended",
             ],
             "de": [
                 "Pro",
@@ -1838,6 +2116,17 @@ class Command(BaseCommand):
                 "Kollektion",
                 "Select",
                 "Prime",
+                "Deluxe",
+                "Standard",
+                "Basic",
+                "Professional",
+                "Home",
+                "Office",
+                "Studio",
+                "Sport",
+                "Travel",
+                "Kompakt",
+                "Extended",
             ],
             "el": [
                 "Pro",
@@ -1858,12 +2147,25 @@ class Command(BaseCommand):
                 "Συλλογή",
                 "Select",
                 "Prime",
+                "Deluxe",
+                "Standard",
+                "Basic",
+                "Professional",
+                "Home",
+                "Office",
+                "Studio",
+                "Sport",
+                "Travel",
+                "Compact",
+                "Extended",
             ],
         }
         lang_variations = variations.get(lang_code, variations["en"])
         return random.choice(lang_variations)
 
-    def _enhance_description(self, base_desc: str, lang_code: str) -> str:
+    def _enhance_description(
+        self, base_desc: str, lang_code: str, category_id: int = None
+    ) -> str:
         """Enhance description with additional language-specific details."""
         extras = {
             "en": [
@@ -1872,6 +2174,16 @@ class Command(BaseCommand):
                 "A must-have for your collection.",
                 "Exceptional value for money.",
                 "Crafted with attention to detail.",
+                "Built to last with premium materials.",
+                "Ideal for both beginners and professionals.",
+                "Features innovative design and functionality.",
+                "Trusted by thousands of satisfied customers.",
+                "Comes with manufacturer warranty.",
+                "Easy to use and maintain.",
+                "Environmentally friendly and sustainable.",
+                "Award-winning design and performance.",
+                "Compatible with most devices and systems.",
+                "Free shipping on orders over $50.",
             ],
             "de": [
                 "Perfekt für den täglichen Gebrauch.",
@@ -1879,6 +2191,16 @@ class Command(BaseCommand):
                 "Ein Muss für Ihre Sammlung.",
                 "Außergewöhnliches Preis-Leistungs-Verhältnis.",
                 "Mit Liebe zum Detail gefertigt.",
+                "Gebaut für Langlebigkeit mit Premium-Materialien.",
+                "Ideal für Anfänger und Profis.",
+                "Verfügt über innovatives Design und Funktionalität.",
+                "Vertraut von Tausenden zufriedener Kunden.",
+                "Kommt mit Herstellergarantie.",
+                "Einfach zu bedienen und zu warten.",
+                "Umweltfreundlich und nachhaltig.",
+                "Preisgekröntes Design und Leistung.",
+                "Kompatibel mit den meisten Geräten.",
+                "Kostenloser Versand ab 50€.",
             ],
             "el": [
                 "Ιδανικό για καθημερινή χρήση.",
@@ -1886,10 +2208,26 @@ class Command(BaseCommand):
                 "Απαραίτητο για τη συλλογή σας.",
                 "Εξαιρετική σχέση ποιότητας-τιμής.",
                 "Κατασκευασμένο με προσοχή στη λεπτομέρεια.",
+                "Κατασκευασμένο για μακροχρόνια χρήση.",
+                "Ιδανικό για αρχάριους και επαγγελματίες.",
+                "Διαθέτει καινοτόμο σχεδιασμό και λειτουργικότητα.",
+                "Εμπιστεύονται χιλιάδες ικανοποιημένοι πελάτες.",
+                "Συνοδεύεται από εγγύηση κατασκευαστή.",
+                "Εύκολο στη χρήση και συντήρηση.",
+                "Φιλικό προς το περιβάλλον και βιώσιμο.",
+                "Βραβευμένος σχεδιασμός και απόδοση.",
+                "Συμβατό με τις περισσότερες συσκευές.",
+                "Δωρεάν αποστολή για παραγγελίες άνω των 50€.",
             ],
         }
         lang_extras = extras.get(lang_code, extras["en"])
         extra = random.choice(lang_extras)
+
+        # Add another random extra for more variety (30% chance)
+        if random.random() < 0.3:
+            extra2 = random.choice(lang_extras)
+            return f"{base_desc} {extra} {extra2}"
+
         return f"{base_desc} {extra}"
 
     def seed_products(

@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from django.db import models
+from core.managers import OptimizedManager, OptimizedQuerySet
 
 if TYPE_CHECKING:
     from typing import Self
 
 
-class FavouriteQuerySet(models.QuerySet):
+class FavouriteQuerySet(OptimizedQuerySet):
     """
     Optimized QuerySet for ProductFavourite model.
 
@@ -46,22 +46,30 @@ class FavouriteQuerySet(models.QuerySet):
         """
         return self.for_list().with_product_images()
 
-    def by_user(self, user_id: int):
+    def by_user(self, user_id: int) -> Self:
+        """Filter by user ID."""
         return self.filter(user_id=user_id)
 
-    def by_product(self, product_id: int):
+    def by_product(self, product_id: int) -> Self:
+        """Filter by product ID."""
         return self.filter(product_id=product_id)
 
-    def for_user(self, user):
+    def for_user(self, user) -> Self:
+        """Filter by user instance."""
         return self.filter(user=user)
 
-    def for_product(self, product):
+    def for_product(self, product) -> Self:
+        """Filter by product instance."""
         return self.filter(product=product)
 
 
-class FavouriteManager(models.Manager):
+class FavouriteManager(OptimizedManager):
     """
     Manager for ProductFavourite model with optimized queryset methods.
+
+    Most methods are automatically delegated to FavouriteQuerySet
+    via __getattr__. Only for_list() and for_detail() are explicitly
+    defined for IDE support.
 
     Usage in ViewSet:
         def get_queryset(self):
@@ -70,7 +78,10 @@ class FavouriteManager(models.Manager):
             return ProductFavourite.objects.for_detail()
     """
 
+    queryset_class = FavouriteQuerySet
+
     def get_queryset(self) -> FavouriteQuerySet:
+        """Return the base queryset."""
         return FavouriteQuerySet(self.model, using=self._db)
 
     def for_list(self) -> FavouriteQuerySet:
@@ -80,15 +91,3 @@ class FavouriteManager(models.Manager):
     def for_detail(self) -> FavouriteQuerySet:
         """Return optimized queryset for detail views."""
         return self.get_queryset().for_detail()
-
-    def by_user(self, user_id: int):
-        return self.get_queryset().by_user(user_id)
-
-    def by_product(self, product_id: int):
-        return self.get_queryset().by_product(product_id)
-
-    def for_user(self, user):
-        return self.get_queryset().for_user(user)
-
-    def for_product(self, product):
-        return self.get_queryset().for_product(product)

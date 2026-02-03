@@ -2,29 +2,19 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from mptt.managers import TreeManager
-from mptt.querysets import TreeQuerySet
-from parler.managers import TranslatableManager, TranslatableQuerySet
+from core.managers import TreeTranslatableManager, TreeTranslatableQuerySet
 
 if TYPE_CHECKING:
     from typing import Self
 
 
-class BlogCommentQuerySet(TranslatableQuerySet, TreeQuerySet):
+class BlogCommentQuerySet(TreeTranslatableQuerySet):
     """
     Optimized QuerySet for BlogComment model.
 
     Provides chainable methods for common operations and
     standardized `for_list()` and `for_detail()` methods.
     """
-
-    @classmethod
-    def as_manager(cls):
-        manager = BlogCommentManager.from_queryset(cls)()
-        manager._built_with_as_manager = True
-        return manager
-
-    as_manager.queryset_only = True  # type: ignore[attr-defined]
 
     def with_translations(self) -> Self:
         """Prefetch translations for better performance."""
@@ -82,7 +72,7 @@ class BlogCommentQuerySet(TranslatableQuerySet, TreeQuerySet):
         return self.filter(approved=True)
 
 
-class BlogCommentManager(TreeManager, TranslatableManager):
+class BlogCommentManager(TreeTranslatableManager):
     """
     Manager for BlogComment model with optimized queryset methods.
 
@@ -93,15 +83,4 @@ class BlogCommentManager(TreeManager, TranslatableManager):
             return BlogComment.objects.for_detail()
     """
 
-    _queryset_class = BlogCommentQuerySet
-
-    def for_list(self) -> BlogCommentQuerySet:
-        """Return optimized queryset for list views."""
-        return self._queryset_class(self.model, using=self._db).for_list()
-
-    def for_detail(self) -> BlogCommentQuerySet:
-        """Return optimized queryset for detail views."""
-        return self._queryset_class(self.model, using=self._db).for_detail()
-
-    def approved(self):
-        return self._queryset_class(self.model, using=self._db).approved()
+    queryset_class = BlogCommentQuerySet

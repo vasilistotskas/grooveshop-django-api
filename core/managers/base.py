@@ -33,7 +33,7 @@ Example:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from django.db import models
 
@@ -87,6 +87,9 @@ class OptimizedManager(models.Manager):
 
     Set `queryset_class` to your custom QuerySet class.
 
+    Methods not explicitly defined on the Manager are automatically
+    delegated to the QuerySet via __getattr__.
+
     Example:
         class ProductManager(OptimizedManager):
             queryset_class = ProductQuerySet
@@ -96,6 +99,19 @@ class OptimizedManager(models.Manager):
 
     def get_queryset(self) -> OptimizedQuerySet:
         return self.queryset_class(self.model, using=self._db)
+
+    def __getattr__(self, name: str) -> Any:
+        """
+        Delegate unknown attributes to the queryset.
+
+        Methods starting with underscore raise AttributeError to prevent
+        access to private/protected attributes.
+        """
+        if name.startswith("_"):
+            raise AttributeError(
+                f"'{type(self).__name__}' object has no attribute '{name}'"
+            )
+        return getattr(self.get_queryset(), name)
 
     def for_list(self) -> OptimizedQuerySet:
         """Return optimized queryset for list views."""
@@ -132,6 +148,9 @@ try:
         Base Manager for Parler translatable models.
 
         Set `queryset_class` to your custom QuerySet class.
+
+        Methods not explicitly defined on the Manager are automatically
+        delegated to the QuerySet via __getattr__.
         """
 
         queryset_class: type[TranslatableOptimizedQuerySet] = (
@@ -140,6 +159,19 @@ try:
 
         def get_queryset(self) -> TranslatableOptimizedQuerySet:
             return self.queryset_class(self.model, using=self._db)
+
+        def __getattr__(self, name: str) -> Any:
+            """
+            Delegate unknown attributes to the queryset.
+
+            Methods starting with underscore raise AttributeError to prevent
+            access to private/protected attributes.
+            """
+            if name.startswith("_"):
+                raise AttributeError(
+                    f"'{type(self).__name__}' object has no attribute '{name}'"
+                )
+            return getattr(self.get_queryset(), name)
 
         def for_list(self) -> TranslatableOptimizedQuerySet:
             """Return optimized queryset for list views."""

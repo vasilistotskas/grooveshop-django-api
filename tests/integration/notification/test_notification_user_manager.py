@@ -258,7 +258,7 @@ class TestNotificationUserQuerySet(TestCase):
             self.assertIsNotNone(notification_user.user.email)
 
     def test_optimized_for_list(self):
-        optimized_notifications = NotificationUser.objects.optimized_for_list()
+        optimized_notifications = NotificationUser.objects.for_list()
 
         self.assertGreater(len(optimized_notifications), 0)
         for notification_user in optimized_notifications:

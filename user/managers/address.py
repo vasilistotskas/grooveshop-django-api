@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from django.db import models
+from core.managers import OptimizedManager, OptimizedQuerySet
 
 if TYPE_CHECKING:
     from typing import Self
 
 
-class UserAddressQuerySet(models.QuerySet):
+class UserAddressQuerySet(OptimizedQuerySet):
     """
     Optimized QuerySet for UserAddress model.
 
@@ -44,10 +44,21 @@ class UserAddressQuerySet(models.QuerySet):
         """Filter to main addresses only."""
         return self.filter(is_main=True)
 
+    def get_user_addresses(self, user) -> Self:
+        """Get all addresses for a user, ordered by main status."""
+        return self.for_list().for_user(user).order_by("-is_main", "title")
 
-class UserAddressManager(models.Manager):
+    def get_main_address(self, user):
+        """Get the main address for a user."""
+        return self.for_list().for_user(user).main_only().first()
+
+
+class UserAddressManager(OptimizedManager):
     """
     Manager for UserAddress model with optimized queryset methods.
+
+    Methods not explicitly defined are automatically delegated to
+    UserAddressQuerySet via __getattr__.
 
     Usage in ViewSet:
         def get_queryset(self):
@@ -55,6 +66,8 @@ class UserAddressManager(models.Manager):
                 return UserAddress.objects.for_list()
             return UserAddress.objects.for_detail()
     """
+
+    queryset_class = UserAddressQuerySet
 
     def get_queryset(self) -> UserAddressQuerySet:
         return UserAddressQuerySet(self.model, using=self._db)
@@ -66,9 +79,3 @@ class UserAddressManager(models.Manager):
     def for_detail(self) -> UserAddressQuerySet:
         """Return optimized queryset for detail views."""
         return self.get_queryset().for_detail()
-
-    def get_user_addresses(self, user):
-        return self.for_list().for_user(user).order_by("-is_main", "title")
-
-    def get_main_address(self, user):
-        return self.for_list().for_user(user).main_only().first()

@@ -1,20 +1,29 @@
+from __future__ import annotations
+
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
 from django.conf import settings
-from django.db import models
 from django.db.models import Count, F, Sum
 from django.utils import timezone
 from djmoney.money import Money
 
+from core.managers import OptimizedManager, OptimizedQuerySet
 
-class OrderItemQuerySet(models.QuerySet):
-    def for_order(self, order):
+if TYPE_CHECKING:
+    from typing import Self
+
+
+class OrderItemQuerySet(OptimizedQuerySet):
+    """Optimized QuerySet for OrderItem model."""
+
+    def for_order(self, order) -> Self:
         return self.filter(order=order)
 
-    def for_product(self, product):
+    def for_product(self, product) -> Self:
         return self.filter(product=product)
 
-    def with_product_data(self):
+    def with_product_data(self) -> Self:
         return self.select_related("product").prefetch_related(
             "product__translations"
         )
@@ -25,7 +34,7 @@ class OrderItemQuerySet(models.QuerySet):
             or 0
         )
 
-    def annotate_total_price(self):
+    def annotate_total_price(self) -> Self:
         return self.annotate(calculated_total=F("price") * F("quantity"))
 
     def total_items_cost(self):
@@ -37,54 +46,43 @@ class OrderItemQuerySet(models.QuerySet):
             return Money(amount=total, currency=first_item.price.currency)
         return Money(amount=0, currency=settings.DEFAULT_CURRENCY)
 
-    def for_user(self, user):
+    def for_user(self, user) -> Self:
         return self.filter(order__user=user)
 
-    def refunded(self):
+    def refunded(self) -> Self:
         return self.filter(is_refunded=True)
 
-    def not_refunded(self):
+    def not_refunded(self) -> Self:
         return self.filter(is_refunded=False)
 
-    def recent(self, days=30):
+    def recent(self, days=30) -> Self:
         cutoff_date = timezone.now() - timedelta(days=days)
         return self.filter(order__created_at__gte=cutoff_date)
 
+    def for_list(self) -> Self:
+        """Return optimized queryset for list views."""
+        return self.select_related("order", "product")
 
-class OrderItemManager(models.Manager):
-    def get_queryset(self) -> OrderItemQuerySet:
-        return OrderItemQuerySet(self.model, using=self._db)
+    def for_detail(self) -> Self:
+        """Return optimized queryset for detail views."""
+        return self.for_list().with_product_data()
 
-    def for_product(self, product):
-        return self.get_queryset().for_product(product)
 
-    def for_order(self, order):
-        return self.get_queryset().for_order(order)
+class OrderItemManager(OptimizedManager):
+    """Manager for OrderItem model."""
 
-    def with_product_data(self):
-        return self.get_queryset().with_product_data()
+    queryset_class = OrderItemQuerySet
 
-    def sum_quantities(self):
-        return self.get_queryset().sum_quantities()
+    def for_list(self) -> OrderItemQuerySet:
+        return self.get_queryset().for_list()
 
-    def total_items_cost(self):
-        return self.get_queryset().total_items_cost()
-
-    def for_user(self, user):
-        return self.get_queryset().for_user(user)
-
-    def refunded(self):
-        return self.get_queryset().refunded()
-
-    def not_refunded(self):
-        return self.get_queryset().not_refunded()
-
-    def recent(self, days=30):
-        return self.get_queryset().recent(days)
+    def for_detail(self) -> OrderItemQuerySet:
+        return self.get_queryset().for_detail()
 
     def get_bestselling_products(self, limit=10, days=30):
         return (
-            self.recent(days)
+            self.get_queryset()
+            .recent(days)
             .values("product__id", "product__name")
             .annotate(
                 total_quantity=Sum("quantity"),

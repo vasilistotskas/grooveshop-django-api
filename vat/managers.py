@@ -49,12 +49,18 @@ class VatManager(models.Manager):
     """
     Manager for Vat model with optimized queryset methods.
 
+    Most methods are automatically delegated to VatQuerySet
+    via __getattr__. Only for_list() and for_detail() are explicitly
+    defined for IDE support.
+
     Usage in ViewSet:
         def get_queryset(self):
             if self.action == "list":
                 return Vat.objects.for_list()
             return Vat.objects.for_detail()
     """
+
+    queryset_class = VatQuerySet
 
     def get_queryset(self) -> VatQuerySet:
         return VatQuerySet(self.model, using=self._db)
@@ -66,18 +72,3 @@ class VatManager(models.Manager):
     def for_detail(self) -> VatQuerySet:
         """Return optimized queryset for detail views."""
         return self.get_queryset().for_detail()
-
-    def get_highest(self):
-        return self.get_queryset().order_by("-value").first()
-
-    def get_lowest(self):
-        return self.get_queryset().order_by("value").first()
-
-    def by_value(self, value):
-        return self.get_queryset().by_value(value)
-
-    def above_value(self, value):
-        return self.get_queryset().above_value(value)
-
-    def below_value(self, value):
-        return self.get_queryset().below_value(value)

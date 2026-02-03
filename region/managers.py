@@ -2,23 +2,22 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from parler.managers import TranslatableManager, TranslatableQuerySet
+from core.managers import (
+    TranslatableOptimizedManager,
+    TranslatableOptimizedQuerySet,
+)
 
 if TYPE_CHECKING:
     from typing import Self
 
 
-class RegionQuerySet(TranslatableQuerySet):
+class RegionQuerySet(TranslatableOptimizedQuerySet):
     """
     Optimized QuerySet for Region model.
 
     Provides chainable methods for common operations and
     standardized `for_list()` and `for_detail()` methods.
     """
-
-    def with_translations(self) -> Self:
-        """Prefetch translations for better performance."""
-        return self.prefetch_related("translations")
 
     def with_country(self) -> Self:
         """Select related country with translations."""
@@ -49,9 +48,12 @@ class RegionQuerySet(TranslatableQuerySet):
         return self.for_list()
 
 
-class RegionManager(TranslatableManager):
+class RegionManager(TranslatableOptimizedManager):
     """
     Manager for Region model with optimized queryset methods.
+
+    Methods not explicitly defined on the Manager are automatically
+    delegated to the QuerySet via __getattr__.
 
     Usage in ViewSet:
         def get_queryset(self):
@@ -59,6 +61,8 @@ class RegionManager(TranslatableManager):
                 return Region.objects.for_list()
             return Region.objects.for_detail()
     """
+
+    queryset_class = RegionQuerySet
 
     def get_queryset(self) -> RegionQuerySet:
         return RegionQuerySet(self.model, using=self._db)
@@ -70,12 +74,3 @@ class RegionManager(TranslatableManager):
     def for_detail(self) -> RegionQuerySet:
         """Return optimized queryset for detail views."""
         return self.get_queryset().for_detail()
-
-    def active(self) -> RegionQuerySet:
-        return self.get_queryset()
-
-    def by_country(self, country_code) -> RegionQuerySet:
-        return self.get_queryset().by_country(country_code)
-
-    def by_country_name(self, country_name) -> RegionQuerySet:
-        return self.get_queryset().by_country_name(country_name)

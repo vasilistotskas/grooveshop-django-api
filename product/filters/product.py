@@ -210,31 +210,27 @@ class ProductFilter(
     def filter_min_review_average(self, queryset, name, value):
         """Filter products with minimum review average"""
         if value is not None:
-            return queryset.with_review_average_annotation().filter(
-                review_average_annotation__gte=value
+            return queryset.with_review_average().filter(
+                review_average__gte=value
             )
         return queryset
 
     def filter_max_review_average(self, queryset, name, value):
         """Filter products with maximum review average"""
         if value is not None:
-            return queryset.with_review_average_annotation().filter(
-                review_average_annotation__lte=value
+            return queryset.with_review_average().filter(
+                review_average__lte=value
             )
         return queryset
 
     def filter_min_likes(self, queryset, name, value):
         """Filter products with minimum likes count"""
         if value is not None:
-            return queryset.with_likes_count_annotation().filter(
-                likes_count_annotation__gte=value
-            )
+            return queryset.with_likes_count().filter(likes_count__gte=value)
         return queryset
 
     def filter_max_likes(self, queryset, name, value):
         """Filter products with maximum likes count"""
         if value is not None:
-            return queryset.with_likes_count_annotation().filter(
-                likes_count_annotation__lte=value
-            )
+            return queryset.with_likes_count().filter(likes_count__lte=value)
         return queryset

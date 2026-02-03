@@ -5,13 +5,17 @@ from typing import TYPE_CHECKING
 
 from django.db.models import Q
 from django.utils import timezone
-from parler.managers import TranslatableManager, TranslatableQuerySet
+
+from core.managers import (
+    TranslatableOptimizedManager,
+    TranslatableOptimizedQuerySet,
+)
 
 if TYPE_CHECKING:
     from typing import Self
 
 
-class BlogAuthorQuerySet(TranslatableQuerySet):
+class BlogAuthorQuerySet(TranslatableOptimizedQuerySet):
     """
     Optimized QuerySet for BlogAuthor model.
 
@@ -27,7 +31,7 @@ class BlogAuthorQuerySet(TranslatableQuerySet):
         """Select related user."""
         return self.select_related("user")
 
-    def with_posts(self) -> Self:
+    def with_posts_prefetch(self) -> Self:
         """Prefetch blog posts."""
         return self.prefetch_related("blog_posts")
 
@@ -56,7 +60,8 @@ class BlogAuthorQuerySet(TranslatableQuerySet):
         """
         return self.for_list().with_posts_details()
 
-    def with_posts_filter(self):
+    def with_posts(self):
+        """Filter authors who have at least one blog post."""
         return self.filter(blog_posts__isnull=False).distinct()
 
     def without_posts(self):
@@ -75,7 +80,7 @@ class BlogAuthorQuerySet(TranslatableQuerySet):
         ).distinct()
 
 
-class BlogAuthorManager(TranslatableManager):
+class BlogAuthorManager(TranslatableOptimizedManager):
     """
     Manager for BlogAuthor model with optimized queryset methods.
 
@@ -86,28 +91,4 @@ class BlogAuthorManager(TranslatableManager):
             return BlogAuthor.objects.for_detail()
     """
 
-    def get_queryset(self) -> BlogAuthorQuerySet:
-        return BlogAuthorQuerySet(self.model, using=self._db)
-
-    def for_list(self) -> BlogAuthorQuerySet:
-        """Return optimized queryset for list views."""
-        return self.get_queryset().for_list()
-
-    def for_detail(self) -> BlogAuthorQuerySet:
-        """Return optimized queryset for detail views."""
-        return self.get_queryset().for_detail()
-
-    def with_posts(self):
-        return self.get_queryset().with_posts_filter()
-
-    def without_posts(self):
-        return self.get_queryset().without_posts()
-
-    def active(self):
-        return self.get_queryset().active()
-
-    def with_website(self):
-        return self.get_queryset().with_website()
-
-    def with_bio(self):
-        return self.get_queryset().with_bio()
+    queryset_class = BlogAuthorQuerySet

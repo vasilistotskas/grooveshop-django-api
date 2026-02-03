@@ -1,103 +1,107 @@
+from __future__ import annotations
+
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
 from django.utils import timezone
-from parler.managers import TranslatableManager, TranslatableQuerySet
+
+from core.managers import (
+    TranslatableOptimizedManager,
+    TranslatableOptimizedQuerySet,
+)
+
+if TYPE_CHECKING:
+    from typing import Self
 
 
-class OrderHistoryQuerySet(TranslatableQuerySet):
-    def for_order(self, order):
+class OrderHistoryQuerySet(TranslatableOptimizedQuerySet):
+    """Optimized QuerySet for OrderHistory model."""
+
+    def for_order(self, order) -> Self:
         return self.filter(order=order)
 
-    def by_change_type(self, change_type):
+    def by_change_type(self, change_type) -> Self:
         return self.filter(change_type=change_type)
 
-    def by_user(self, user):
+    def by_user(self, user) -> Self:
         return self.filter(user=user)
 
-    def recent(self, days=7):
+    def recent(self, days=7) -> Self:
         cutoff_date = timezone.now() - timedelta(days=days)
         return self.filter(created_at__gte=cutoff_date)
 
-    def status_changes(self):
+    def status_changes(self) -> Self:
         return self.filter(change_type="STATUS")
 
-    def payment_changes(self):
+    def payment_changes(self) -> Self:
         return self.filter(change_type="PAYMENT")
 
-    def system_changes(self):
+    def system_changes(self) -> Self:
         return self.filter(user__isnull=True)
 
-    def user_changes(self):
+    def user_changes(self) -> Self:
         return self.filter(user__isnull=False)
 
+    def for_list(self) -> Self:
+        """Return optimized queryset for list views."""
+        return self.with_translations().select_related("order", "user")
 
-class OrderHistoryManager(TranslatableManager):
-    def get_queryset(self) -> OrderHistoryQuerySet:
-        return OrderHistoryQuerySet(self.model, using=self._db)
-
-    def for_order(self, order):
-        return self.get_queryset().for_order(order)
-
-    def by_change_type(self, change_type):
-        return self.get_queryset().by_change_type(change_type)
-
-    def by_user(self, user):
-        return self.get_queryset().by_user(user)
-
-    def recent(self, days=7):
-        return self.get_queryset().recent(days)
-
-    def status_changes(self):
-        return self.get_queryset().status_changes()
-
-    def payment_changes(self):
-        return self.get_queryset().payment_changes()
-
-    def system_changes(self):
-        return self.get_queryset().system_changes()
-
-    def user_changes(self):
-        return self.get_queryset().user_changes()
+    def for_detail(self) -> Self:
+        """Return optimized queryset for detail views."""
+        return self.for_list()
 
 
-class OrderItemHistoryQuerySet(TranslatableQuerySet):
-    def for_order_item(self, order_item):
+class OrderHistoryManager(TranslatableOptimizedManager):
+    """Manager for OrderHistory model."""
+
+    queryset_class = OrderHistoryQuerySet
+
+    def for_list(self) -> OrderHistoryQuerySet:
+        return self.get_queryset().for_list()
+
+    def for_detail(self) -> OrderHistoryQuerySet:
+        return self.get_queryset().for_detail()
+
+
+class OrderItemHistoryQuerySet(TranslatableOptimizedQuerySet):
+    """Optimized QuerySet for OrderItemHistory model."""
+
+    def for_order_item(self, order_item) -> Self:
         return self.filter(order_item=order_item)
 
-    def for_order(self, order):
+    def for_order(self, order) -> Self:
         return self.filter(order_item__order=order)
 
-    def by_change_type(self, change_type):
+    def by_change_type(self, change_type) -> Self:
         return self.filter(change_type=change_type)
 
-    def quantity_changes(self):
+    def quantity_changes(self) -> Self:
         return self.filter(change_type="QUANTITY")
 
-    def price_changes(self):
+    def price_changes(self) -> Self:
         return self.filter(change_type="PRICE")
 
-    def refunds(self):
+    def refunds(self) -> Self:
         return self.filter(change_type="REFUND")
 
+    def for_list(self) -> Self:
+        """Return optimized queryset for list views."""
+        return self.with_translations().select_related(
+            "order_item", "order_item__order"
+        )
 
-class OrderItemHistoryManager(TranslatableManager):
-    def get_queryset(self) -> OrderItemHistoryQuerySet:
-        return OrderItemHistoryQuerySet(self.model, using=self._db)
+    def for_detail(self) -> Self:
+        """Return optimized queryset for detail views."""
+        return self.for_list()
 
-    def for_order_item(self, order_item):
-        return self.get_queryset().for_order_item(order_item)
 
-    def for_order(self, order):
-        return self.get_queryset().for_order(order)
+class OrderItemHistoryManager(TranslatableOptimizedManager):
+    """Manager for OrderItemHistory model."""
 
-    def by_change_type(self, change_type):
-        return self.get_queryset().by_change_type(change_type)
+    queryset_class = OrderItemHistoryQuerySet
 
-    def quantity_changes(self):
-        return self.get_queryset().quantity_changes()
+    def for_list(self) -> OrderItemHistoryQuerySet:
+        return self.get_queryset().for_list()
 
-    def price_changes(self):
-        return self.get_queryset().price_changes()
-
-    def refunds(self):
-        return self.get_queryset().refunds()
+    def for_detail(self) -> OrderItemHistoryQuerySet:
+        return self.get_queryset().for_detail()

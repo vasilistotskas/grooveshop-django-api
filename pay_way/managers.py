@@ -53,12 +53,18 @@ class PayWayManager(TranslatableManager):
     """
     Manager for PayWay model with optimized queryset methods.
 
+    Most methods are automatically delegated to PayWayQuerySet
+    via __getattr__. Only for_list() and for_detail() are explicitly
+    defined for IDE support.
+
     Usage in ViewSet:
         def get_queryset(self):
             if self.action == "list":
                 return PayWay.objects.for_list()
             return PayWay.objects.for_detail()
     """
+
+    queryset_class = PayWayQuerySet
 
     def get_queryset(self) -> PayWayQuerySet:
         return PayWayQuerySet(self.model, using=self._db)
@@ -70,15 +76,3 @@ class PayWayManager(TranslatableManager):
     def for_detail(self) -> PayWayQuerySet:
         """Return optimized queryset for detail views."""
         return self.get_queryset().for_detail()
-
-    def active(self):
-        return self.get_queryset().active()
-
-    def inactive(self):
-        return self.get_queryset().inactive()
-
-    def online_payments(self):
-        return self.get_queryset().online_payments()
-
-    def offline_payments(self):
-        return self.get_queryset().offline_payments()

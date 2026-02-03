@@ -1,4 +1,4 @@
-from django.db.models import Q, Count
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
@@ -118,27 +118,21 @@ class BlogPostFilter(
     def filter_min_likes(self, queryset, name, value):
         """Filter posts with minimum number of likes."""
         if value is not None:
-            return queryset.annotate(
-                likes_count_annotation=Count("likes", distinct=True)
-            ).filter(likes_count_annotation__gte=value)
+            return queryset.with_likes_count().filter(likes_count__gte=value)
         return queryset
 
     def filter_min_comments(self, queryset, name, value):
         """Filter posts with minimum number of approved comments."""
         if value is not None:
-            return queryset.annotate(
-                comments_count_annotation=Count(
-                    "comments", distinct=True, filter=Q(comments__approved=True)
-                )
-            ).filter(comments_count_annotation__gte=value)
+            return queryset.with_comments_count(approved_only=True).filter(
+                comments_count__gte=value
+            )
         return queryset
 
     def filter_min_tags(self, queryset, name, value):
         """Filter posts with minimum number of active tags."""
         if value is not None:
-            return queryset.annotate(
-                tags_count_annotation=Count(
-                    "tags", distinct=True, filter=Q(tags__active=True)
-                )
-            ).filter(tags_count_annotation__gte=value)
+            return queryset.with_tags_count(active_only=True).filter(
+                tags_count__gte=value
+            )
         return queryset

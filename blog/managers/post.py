@@ -3,13 +3,17 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from django.db.models import Count, Q
-from parler.managers import TranslatableManager, TranslatableQuerySet
+
+from core.managers import (
+    TranslatableOptimizedManager,
+    TranslatableOptimizedQuerySet,
+)
 
 if TYPE_CHECKING:
     from typing import Self
 
 
-class BlogPostQuerySet(TranslatableQuerySet):
+class BlogPostQuerySet(TranslatableOptimizedQuerySet):
     """
     Optimized QuerySet for BlogPost model.
 
@@ -17,9 +21,39 @@ class BlogPostQuerySet(TranslatableQuerySet):
     standardized `for_list()` and `for_detail()` methods.
     """
 
-    def with_translations(self) -> Self:
-        """Prefetch translations for better performance."""
-        return self.prefetch_related("translations")
+    def with_likes_count(self) -> Self:
+        """Annotate with likes count."""
+        return self.annotate(likes_count=Count("likes", distinct=True))
+
+    def with_comments_count(
+        self,
+        approved_only: bool = True,
+    ) -> Self:
+        """Annotate queryset with comments count."""
+        if approved_only:
+            return self.annotate(
+                comments_count=Count(
+                    "comments",
+                    distinct=True,
+                    filter=Q(comments__approved=True),
+                )
+            )
+        return self.annotate(comments_count=Count("comments", distinct=True))
+
+    def with_tags_count(
+        self,
+        active_only: bool = True,
+    ) -> Self:
+        """Annotate queryset with tags count."""
+        if active_only:
+            return self.annotate(
+                tags_count=Count(
+                    "tags",
+                    distinct=True,
+                    filter=Q(tags__active=True),
+                )
+            )
+        return self.annotate(tags_count=Count("tags", distinct=True))
 
     def with_author(self) -> Self:
         """Select related author and user."""
@@ -45,18 +79,10 @@ class BlogPostQuerySet(TranslatableQuerySet):
 
     def with_counts(self) -> Self:
         """Annotate with all count fields for efficient property access."""
-        return self.annotate(
-            _likes_count=Count("likes", distinct=True),
-            _comments_count=Count(
-                "comments",
-                distinct=True,
-                filter=Q(comments__approved=True),
-            ),
-            _tags_count=Count(
-                "tags",
-                distinct=True,
-                filter=Q(tags__active=True),
-            ),
+        return (
+            self.with_likes_count()
+            .with_comments_count(approved_only=True)
+            .with_tags_count(active_only=True)
         )
 
     def for_list(self) -> Self:
@@ -84,9 +110,13 @@ class BlogPostQuerySet(TranslatableQuerySet):
         return self.for_list()
 
 
-class BlogPostManager(TranslatableManager):
+class BlogPostManager(TranslatableOptimizedManager):
     """
     Manager for BlogPost model with optimized queryset methods.
+
+    Most methods are automatically delegated to BlogPostQuerySet
+    via __getattr__. Only for_list() and for_detail() are explicitly
+    defined for IDE support.
 
     Usage in ViewSet:
         def get_queryset(self):
@@ -94,6 +124,8 @@ class BlogPostManager(TranslatableManager):
                 return BlogPost.objects.for_list()
             return BlogPost.objects.for_detail()
     """
+
+    queryset_class = BlogPostQuerySet
 
     def get_queryset(self) -> BlogPostQuerySet:
         return BlogPostQuerySet(self.model, using=self._db)

@@ -1,9 +1,9 @@
 from .category import CategoryManager, CategoryQuerySet
 from .category_image import CategoryImageManager, CategoryImageQuerySet
 from .favourite import FavouriteManager, FavouriteQuerySet
-from .image import EnhancedImageManager, EnhancedImageQuerySet
+from .image import ProductImageManager, ProductImageQuerySet
 from .product import ProductManager, ProductQuerySet
-from .review import EnhancedReviewQuerySet, ProductReviewManager
+from .review import ProductReviewManager, ProductReviewQuerySet
 
 __all__ = [
     # Category
@@ -16,12 +16,12 @@ __all__ = [
     "FavouriteManager",
     "FavouriteQuerySet",
     # Image
-    "EnhancedImageManager",
-    "EnhancedImageQuerySet",
+    "ProductImageManager",
+    "ProductImageQuerySet",
     # Product
     "ProductManager",
     "ProductQuerySet",
     # Review
-    "EnhancedReviewQuerySet",
     "ProductReviewManager",
+    "ProductReviewQuerySet",
 ]

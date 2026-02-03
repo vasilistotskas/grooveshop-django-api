@@ -35,7 +35,7 @@ def product_review(user, product):
 
 
 @pytest.mark.django_db
-class TestEnhancedReviewQuerySet:
+class TestProductReviewQuerySet:
     def test_approved_reviews(self):
         approved_review = ProductReviewFactory(
             user=UserAccountFactory(),

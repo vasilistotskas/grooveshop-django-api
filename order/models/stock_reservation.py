@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
 from core.models import TimeStampMixinModel
+from order.managers.stock import StockReservationManager
 
 
 class StockReservation(TimeStampMixinModel):
@@ -66,6 +69,9 @@ class StockReservation(TimeStampMixinModel):
         blank=True,
         help_text=_("Order created from this reservation (set when consumed)"),
     )
+
+    # Manager
+    objects: StockReservationManager = StockReservationManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Stock Reservation")

@@ -10,7 +10,7 @@ from parler.models import TranslatableModel, TranslatedFields
 
 from core.fields.image import ImageAndSvgField
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
-from product.managers.image import EnhancedImageManager
+from product.managers.image import ProductImageManager
 
 
 class ProductImage(
@@ -28,7 +28,7 @@ class ProductImage(
         title=models.CharField(_("Title"), max_length=50, blank=True, null=True)
     )
 
-    objects: EnhancedImageManager = EnhancedImageManager()
+    objects: ProductImageManager = ProductImageManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Product Image")

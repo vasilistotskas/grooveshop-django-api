@@ -7,11 +7,13 @@ from django.db import models
 from django.utils import timezone
 from extra_settings.models import Setting
 
+from core.managers import OptimizedManager, OptimizedQuerySet
+
 if TYPE_CHECKING:
     from typing import Self
 
 
-class CartItemQuerySet(models.QuerySet):
+class CartItemQuerySet(OptimizedQuerySet):
     """
     Optimized QuerySet for CartItem model.
 
@@ -113,9 +115,12 @@ class CartItemQuerySet(models.QuerySet):
         return self.filter(product__discount_percent__gt=0)
 
 
-class CartItemManager(models.Manager):
+class CartItemManager(OptimizedManager):
     """
     Manager for CartItem model with optimized queryset methods.
+
+    Most methods are automatically delegated to CartItemQuerySet via __getattr__.
+    Only get_queryset(), for_list(), and for_detail() are explicitly defined.
 
     Usage in ViewSet:
         def get_queryset(self):
@@ -123,6 +128,8 @@ class CartItemManager(models.Manager):
                 return CartItem.objects.for_list()
             return CartItem.objects.for_detail()
     """
+
+    queryset_class = CartItemQuerySet
 
     def get_queryset(self) -> CartItemQuerySet:
         return CartItemQuerySet(self.model, using=self._db)
@@ -134,45 +141,3 @@ class CartItemManager(models.Manager):
     def for_detail(self) -> CartItemQuerySet:
         """Return optimized queryset for detail views."""
         return self.get_queryset().for_detail()
-
-    def for_cart(self, cart):
-        return self.get_queryset().for_cart(cart)
-
-    def for_product(self, product):
-        return self.get_queryset().for_product(product)
-
-    def for_user(self, user):
-        return self.get_queryset().for_user(user)
-
-    def total_quantity(self):
-        return self.get_queryset().total_quantity()
-
-    def by_product_popularity(self):
-        return self.get_queryset().by_product_popularity()
-
-    def high_quantity(self, threshold=5):
-        return self.get_queryset().high_quantity(threshold)
-
-    def recent(self, days=7):
-        return self.get_queryset().recent(days)
-
-    def by_date_range(self, start_date, end_date):
-        return self.get_queryset().by_date_range(start_date, end_date)
-
-    def by_quantity_range(self, min_qty, max_qty):
-        return self.get_queryset().by_quantity_range(min_qty, max_qty)
-
-    def by_price_range(self, min_price, max_price):
-        return self.get_queryset().by_price_range(min_price, max_price)
-
-    def expensive_items(self, threshold=100):
-        return self.get_queryset().expensive_items(threshold)
-
-    def in_active_carts(self):
-        return self.get_queryset().in_active_carts()
-
-    def in_abandoned_carts(self):
-        return self.get_queryset().in_abandoned_carts()
-
-    def with_discounts(self):
-        return self.get_queryset().with_discounts()

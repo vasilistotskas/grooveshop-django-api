@@ -114,10 +114,10 @@ class TestSoftDeleteQuerySetMixin:
 
     def test_soft_delete_with_for_list_optimization(self):
         """Soft delete methods should work with for_list() optimization."""
-        # Create products
-        active_product = ProductFactory(is_deleted=False)
+        # Create products - for_list() filters by active=True
+        active_product = ProductFactory(is_deleted=False, active=True)
         deleted_product = ProductFactory(
-            is_deleted=True, deleted_at=timezone.now()
+            is_deleted=True, deleted_at=timezone.now(), active=True
         )
 
         # Use for_list which should automatically exclude deleted

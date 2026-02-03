@@ -3,6 +3,30 @@
 
 
 
+## v1.73.0 (2026-02-03)
+
+### Bug fixes
+
+* fix: product admin performance ([`8786d31`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8786d31a3a4283c5e1e689ce60223622bab2a59c))
+
+* fix: test ([`eb93e86`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eb93e86be26a174352c826fc6c8392b3421a6d65))
+
+### Features
+
+* feat: Product Attributes ([`98551cf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/98551cf97018c710f875f5c72bf99363e70e2d4c))
+
+* feat(product): Add product attributes to OpenAPI schema
+
+- Add Attribute and AttributeValue endpoints (GET, POST, PUT, PATCH, DELETE)
+- Include translation support for all three languages (el, en, de)
+- Add ProductAttribute nested serialization in Product schema
+- All fields use camelCase naming convention
+- Validates requirement 6.8 ([`f3a7967`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f3a7967671faf1c925621f7bde7c1733bd84717a))
+
+* feat: improve admin settings UI/UX ([`a3d2e91`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a3d2e917466ef1da7de32d08855ed1a9f1b1803f))
+
+* feat: manager improvements ([`36c95a9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/36c95a90bb3a6a53d100988ccc8a21c6e7fa7b25))
+
 ## v1.72.3 (2026-02-02)
 
 ### Bug fixes

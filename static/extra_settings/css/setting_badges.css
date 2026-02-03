@@ -1,0 +1,301 @@
+/* Setting Type Badges - Light and Dark Mode Support */
+
+.setting-type-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: 9999px;
+    border: 1px solid;
+}
+
+/* Light Mode Colors */
+.setting-type-badge[data-type="bool"] {
+    background-color: #f3e8ff;
+    color: #7c3aed;
+    border-color: #c4b5fd;
+}
+
+.setting-type-badge[data-type="int"] {
+    background-color: #dbeafe;
+    color: #1d4ed8;
+    border-color: #93c5fd;
+}
+
+.setting-type-badge[data-type="float"] {
+    background-color: #cffafe;
+    color: #0e7490;
+    border-color: #67e8f9;
+}
+
+.setting-type-badge[data-type="decimal"] {
+    background-color: #ccfbf1;
+    color: #0f766e;
+    border-color: #5eead4;
+}
+
+.setting-type-badge[data-type="string"] {
+    background-color: #dcfce7;
+    color: #15803d;
+    border-color: #86efac;
+}
+
+.setting-type-badge[data-type="text"] {
+    background-color: #ecfccb;
+    color: #4d7c0f;
+    border-color: #bef264;
+}
+
+.setting-type-badge[data-type="json"] {
+    background-color: #fed7aa;
+    color: #c2410c;
+    border-color: #fdba74;
+}
+
+.setting-type-badge[data-type="date"] {
+    background-color: #fce7f3;
+    color: #be185d;
+    border-color: #f9a8d4;
+}
+
+.setting-type-badge[data-type="datetime"] {
+    background-color: #ffe4e6;
+    color: #be123c;
+    border-color: #fda4af;
+}
+
+.setting-type-badge[data-type="time"] {
+    background-color: #fae8ff;
+    color: #a21caf;
+    border-color: #f0abfc;
+}
+
+.setting-type-badge[data-type="duration"] {
+    background-color: #ede9fe;
+    color: #6d28d9;
+    border-color: #c4b5fd;
+}
+
+.setting-type-badge[data-type="email"] {
+    background-color: #e0e7ff;
+    color: #4338ca;
+    border-color: #a5b4fc;
+}
+
+.setting-type-badge[data-type="url"] {
+    background-color: #e0f2fe;
+    color: #0369a1;
+    border-color: #7dd3fc;
+}
+
+.setting-type-badge[data-type="file"] {
+    background-color: #fef3c7;
+    color: #b45309;
+    border-color: #fcd34d;
+}
+
+.setting-type-badge[data-type="image"] {
+    background-color: #fef9c3;
+    color: #a16207;
+    border-color: #fde047;
+}
+
+/* Dark Mode Colors */
+@media (prefers-color-scheme: dark) {
+    .setting-type-badge[data-type="bool"] {
+        background-color: #581c87;
+        color: #e9d5ff;
+        border-color: #7c3aed;
+    }
+
+    .setting-type-badge[data-type="int"] {
+        background-color: #1e3a8a;
+        color: #bfdbfe;
+        border-color: #3b82f6;
+    }
+
+    .setting-type-badge[data-type="float"] {
+        background-color: #164e63;
+        color: #a5f3fc;
+        border-color: #06b6d4;
+    }
+
+    .setting-type-badge[data-type="decimal"] {
+        background-color: #134e4a;
+        color: #99f6e4;
+        border-color: #14b8a6;
+    }
+
+    .setting-type-badge[data-type="string"] {
+        background-color: #14532d;
+        color: #bbf7d0;
+        border-color: #22c55e;
+    }
+
+    .setting-type-badge[data-type="text"] {
+        background-color: #365314;
+        color: #d9f99d;
+        border-color: #84cc16;
+    }
+
+    .setting-type-badge[data-type="json"] {
+        background-color: #7c2d12;
+        color: #fed7aa;
+        border-color: #f97316;
+    }
+
+    .setting-type-badge[data-type="date"] {
+        background-color: #831843;
+        color: #fbcfe8;
+        border-color: #ec4899;
+    }
+
+    .setting-type-badge[data-type="datetime"] {
+        background-color: #881337;
+        color: #fecdd3;
+        border-color: #f43f5e;
+    }
+
+    .setting-type-badge[data-type="time"] {
+        background-color: #701a75;
+        color: #f5d0fe;
+        border-color: #d946ef;
+    }
+
+    .setting-type-badge[data-type="duration"] {
+        background-color: #5b21b6;
+        color: #ddd6fe;
+        border-color: #8b5cf6;
+    }
+
+    .setting-type-badge[data-type="email"] {
+        background-color: #3730a3;
+        color: #c7d2fe;
+        border-color: #6366f1;
+    }
+
+    .setting-type-badge[data-type="url"] {
+        background-color: #0c4a6e;
+        color: #bae6fd;
+        border-color: #0ea5e9;
+    }
+
+    .setting-type-badge[data-type="file"] {
+        background-color: #78350f;
+        color: #fde68a;
+        border-color: #f59e0b;
+    }
+
+    .setting-type-badge[data-type="image"] {
+        background-color: #713f12;
+        color: #fef08a;
+        border-color: #eab308;
+    }
+}
+
+/* Unfold Dark Theme Support (when dark theme is explicitly set) */
+html[data-theme="dark"] .setting-type-badge[data-type="bool"],
+.dark .setting-type-badge[data-type="bool"] {
+    background-color: #581c87;
+    color: #e9d5ff;
+    border-color: #7c3aed;
+}
+
+html[data-theme="dark"] .setting-type-badge[data-type="int"],
+.dark .setting-type-badge[data-type="int"] {
+    background-color: #1e3a8a;
+    color: #bfdbfe;
+    border-color: #3b82f6;
+}
+
+html[data-theme="dark"] .setting-type-badge[data-type="float"],
+.dark .setting-type-badge[data-type="float"] {
+    background-color: #164e63;
+    color: #a5f3fc;
+    border-color: #06b6d4;
+}
+
+html[data-theme="dark"] .setting-type-badge[data-type="decimal"],
+.dark .setting-type-badge[data-type="decimal"] {
+    background-color: #134e4a;
+    color: #99f6e4;
+    border-color: #14b8a6;
+}
+
+html[data-theme="dark"] .setting-type-badge[data-type="string"],
+.dark .setting-type-badge[data-type="string"] {
+    background-color: #14532d;
+    color: #bbf7d0;
+    border-color: #22c55e;
+}
+
+html[data-theme="dark"] .setting-type-badge[data-type="text"],
+.dark .setting-type-badge[data-type="text"] {
+    background-color: #365314;
+    color: #d9f99d;
+    border-color: #84cc16;
+}
+
+html[data-theme="dark"] .setting-type-badge[data-type="json"],
+.dark .setting-type-badge[data-type="json"] {
+    background-color: #7c2d12;
+    color: #fed7aa;
+    border-color: #f97316;
+}
+
+html[data-theme="dark"] .setting-type-badge[data-type="date"],
+.dark .setting-type-badge[data-type="date"] {
+    background-color: #831843;
+    color: #fbcfe8;
+    border-color: #ec4899;
+}
+
+html[data-theme="dark"] .setting-type-badge[data-type="datetime"],
+.dark .setting-type-badge[data-type="datetime"] {
+    background-color: #881337;
+    color: #fecdd3;
+    border-color: #f43f5e;
+}
+
+html[data-theme="dark"] .setting-type-badge[data-type="time"],
+.dark .setting-type-badge[data-type="time"] {
+    background-color: #701a75;
+    color: #f5d0fe;
+    border-color: #d946ef;
+}
+
+html[data-theme="dark"] .setting-type-badge[data-type="duration"],
+.dark .setting-type-badge[data-type="duration"] {
+    background-color: #5b21b6;
+    color: #ddd6fe;
+    border-color: #8b5cf6;
+}
+
+html[data-theme="dark"] .setting-type-badge[data-type="email"],
+.dark .setting-type-badge[data-type="email"] {
+    background-color: #3730a3;
+    color: #c7d2fe;
+    border-color: #6366f1;
+}
+
+html[data-theme="dark"] .setting-type-badge[data-type="url"],
+.dark .setting-type-badge[data-type="url"] {
+    background-color: #0c4a6e;
+    color: #bae6fd;
+    border-color: #0ea5e9;
+}
+
+html[data-theme="dark"] .setting-type-badge[data-type="file"],
+.dark .setting-type-badge[data-type="file"] {
+    background-color: #78350f;
+    color: #fde68a;
+    border-color: #f59e0b;
+}
+
+html[data-theme="dark"] .setting-type-badge[data-type="image"],
+.dark .setting-type-badge[data-type="image"] {
+    background-color: #713f12;
+    color: #fef08a;
+    border-color: #eab308;
+}

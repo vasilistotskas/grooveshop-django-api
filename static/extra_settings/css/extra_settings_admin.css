@@ -1,0 +1,111 @@
+/* Hide all value fields by default */
+div.field-value_bool,
+div.field-value_date,
+div.field-value_datetime,
+div.field-value_decimal,
+div.field-value_duration,
+div.field-value_email,
+div.field-value_file,
+div.field-value_float,
+div.field-value_image,
+div.field-value_int,
+div.field-value_json,
+div.field-value_string,
+div.field-value_text,
+div.field-value_time,
+div.field-value_url {
+    display: none;
+}
+
+/* Show only the relevant value field based on selected type */
+body[data-setting-type="bool"] div.field-value_bool,
+body[data-setting-type="date"] div.field-value_date,
+body[data-setting-type="datetime"] div.field-value_datetime,
+body[data-setting-type="decimal"] div.field-value_decimal,
+body[data-setting-type="duration"] div.field-value_duration,
+body[data-setting-type="email"] div.field-value_email,
+body[data-setting-type="file"] div.field-value_file,
+body[data-setting-type="float"] div.field-value_float,
+body[data-setting-type="image"] div.field-value_image,
+body[data-setting-type="int"] div.field-value_int,
+body[data-setting-type="json"] div.field-value_json,
+body[data-setting-type="string"] div.field-value_string,
+body[data-setting-type="text"] div.field-value_text,
+body[data-setting-type="time"] div.field-value_time,
+body[data-setting-type="url"] div.field-value_url {
+    display: flex;
+}
+
+/* Highlight for value fields - using stronger selectors and border styling */
+div.field-line.field-value_bool,
+div.field-line.field-value_date,
+div.field-line.field-value_datetime,
+div.field-line.field-value_decimal,
+div.field-line.field-value_duration,
+div.field-line.field-value_email,
+div.field-line.field-value_file,
+div.field-line.field-value_float,
+div.field-line.field-value_image,
+div.field-line.field-value_int,
+div.field-line.field-value_json,
+div.field-line.field-value_string,
+div.field-line.field-value_text,
+div.field-line.field-value_time,
+div.field-line.field-value_url {
+    border-left-width: 4px;
+    border-left-style: solid;
+    border-left-color: #3b82f6;
+    background-color: #eff6ff;
+    padding-left: 1rem;
+}
+
+/* Dark mode for value fields */
+html[data-theme="dark"] div.field-line.field-value_bool,
+html[data-theme="dark"] div.field-line.field-value_date,
+html[data-theme="dark"] div.field-line.field-value_datetime,
+html[data-theme="dark"] div.field-line.field-value_decimal,
+html[data-theme="dark"] div.field-line.field-value_duration,
+html[data-theme="dark"] div.field-line.field-value_email,
+html[data-theme="dark"] div.field-line.field-value_file,
+html[data-theme="dark"] div.field-line.field-value_float,
+html[data-theme="dark"] div.field-line.field-value_image,
+html[data-theme="dark"] div.field-line.field-value_int,
+html[data-theme="dark"] div.field-line.field-value_json,
+html[data-theme="dark"] div.field-line.field-value_string,
+html[data-theme="dark"] div.field-line.field-value_text,
+html[data-theme="dark"] div.field-line.field-value_time,
+html[data-theme="dark"] div.field-line.field-value_url,
+.dark div.field-line.field-value_bool,
+.dark div.field-line.field-value_date,
+.dark div.field-line.field-value_datetime,
+.dark div.field-line.field-value_decimal,
+.dark div.field-line.field-value_duration,
+.dark div.field-line.field-value_email,
+.dark div.field-line.field-value_file,
+.dark div.field-line.field-value_float,
+.dark div.field-line.field-value_image,
+.dark div.field-line.field-value_int,
+.dark div.field-line.field-value_json,
+.dark div.field-line.field-value_string,
+.dark div.field-line.field-value_text,
+.dark div.field-line.field-value_time,
+.dark div.field-line.field-value_url {
+    border-left-color: #60a5fa;
+    background-color: #1e3a5f;
+}
+
+/* Highlight for type field */
+div.field-line.field-value_type {
+    border-left-width: 4px;
+    border-left-style: solid;
+    border-left-color: #9ca3af;
+    background-color: #f9fafb;
+    padding-left: 1rem;
+}
+
+/* Dark mode for type field */
+html[data-theme="dark"] div.field-line.field-value_type,
+.dark div.field-line.field-value_type {
+    border-left-color: #6b7280;
+    background-color: #1f2937;
+}

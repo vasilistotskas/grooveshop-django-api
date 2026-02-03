@@ -354,11 +354,136 @@ class UnfoldPeriodicTaskForm(PeriodicTaskForm):
 
 @admin.register(Setting)
 class SettingAdmin(ModelAdmin):
+    from core.forms.settings import SettingAdminForm
+
+    form = SettingAdminForm
+    compressed_fields = True
+    warn_unsaved_form = True
+    list_fullwidth = False
+    list_filter_submit = True
+
     list_display = [
-        "name",
-        "value_type",
-        "description",
+        "name_display",
+        "value_type_badge",
+        "value_preview",
+        "description_preview",
     ]
+    list_display_links = ["name_display"]
+    list_filter = ["value_type"]
+    search_fields = ["name", "description"]
+
+    class Media:
+        css = {
+            "all": (
+                "extra_settings/css/setting_badges.css",
+                "extra_settings/css/extra_settings_admin.css",
+            )
+        }
+        js = ("extra_settings/js/extra_settings_admin.js",)
+
+    # Use fieldsets for better control over field rendering
+    def get_fieldsets(self, request, obj=None):
+        """Dynamically return fieldsets based on the setting type."""
+        base_fieldset = (
+            _("Setting Information"),
+            {
+                "fields": ("name", "value_type", "description"),
+            },
+        )
+
+        # Always show all value fields - JavaScript will handle visibility
+        value_fieldset = (
+            _("Value"),
+            {
+                "fields": (
+                    "value_bool",
+                    "value_int",
+                    "value_float",
+                    "value_decimal",
+                    "value_string",
+                    "value_text",
+                    "value_json",
+                    "value_date",
+                    "value_datetime",
+                    "value_time",
+                    "value_duration",
+                    "value_email",
+                    "value_url",
+                    "value_file",
+                    "value_image",
+                ),
+                "description": _(
+                    "Enter the value based on the selected type above"
+                ),
+            },
+        )
+
+        validator_fieldset = (
+            _("Validation"),
+            {
+                "fields": ("validator",),
+                "classes": ("collapse",),
+            },
+        )
+
+        return [base_fieldset, value_fieldset, validator_fieldset]
+
+    def name_display(self, obj):
+        from django.utils.html import conditional_escape
+        from django.utils.safestring import mark_safe
+
+        safe_name = conditional_escape(obj.name)
+        html = f'<strong style="font-family: monospace; font-weight: 600;">{safe_name}</strong>'
+        return mark_safe(html)
+
+    name_display.short_description = _("Name")
+
+    def value_type_badge(self, obj):
+        from django.utils.html import conditional_escape
+        from django.utils.safestring import mark_safe
+
+        safe_type = conditional_escape(obj.value_type)
+        html = f'<span class="setting-type-badge" data-type="{safe_type}">{safe_type}</span>'
+        return mark_safe(html)
+
+    value_type_badge.short_description = _("Type")
+
+    def value_preview(self, obj):
+        from django.utils.html import conditional_escape
+        from django.utils.safestring import mark_safe
+
+        try:
+            value = str(obj.value)
+            if len(value) > 50:
+                value = value[:50] + "..."
+            safe_value = conditional_escape(value)
+
+            html = f'<code style="font-family: monospace; font-size: 0.875rem; padding: 0.125rem 0.25rem; background-color: rgba(0,0,0,0.05); border-radius: 0.25rem;">{safe_value}</code>'
+            return mark_safe(html)
+        except Exception:
+            return mark_safe(
+                '<span style="font-style: italic; opacity: 0.6;">-</span>'
+            )
+
+    value_preview.short_description = _("Current Value")
+
+    def description_preview(self, obj):
+        from django.utils.html import conditional_escape
+        from django.utils.safestring import mark_safe
+
+        if obj.description:
+            desc = obj.description
+            if len(desc) > 60:
+                desc = desc[:60] + "..."
+            safe_desc = conditional_escape(desc)
+            return mark_safe(
+                f'<span style="font-size: 0.875rem; opacity: 0.8;">{safe_desc}</span>'
+            )
+        return mark_safe(
+            '<span style="font-style: italic; opacity: 0.6;">-</span>'
+        )
+
+    description_preview.short_description = _("Description")
 
 
 @admin.register(PeriodicTask)

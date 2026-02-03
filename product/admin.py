@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import admin_thumbnails
 from django.contrib import admin, messages
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, Count, Avg, Prefetch
 from django.http import HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse_lazy
@@ -1377,18 +1377,76 @@ class ProductAdmin(
         return form
 
     def get_queryset(self, request):
+        from order.models.stock_reservation import StockReservation
+
+        # Only apply expensive annotations when filtering/sorting requires them
+        qs = super().get_queryset(request)
+
+        # Check if we need likes_count or review_average based on filters/ordering
+        needs_likes = (
+            any("likes_count" in str(param) for param in request.GET.keys())
+            or request.GET.get("o", "").find("likes") != -1
+        )
+
+        needs_reviews = (
+            any("review_average" in str(param) for param in request.GET.keys())
+            or request.GET.get("o", "").find("review") != -1
+        )
+
+        if needs_likes:
+            qs = qs.with_likes_count()
+        else:
+            # Add a default value to avoid attribute errors
+            qs = qs.annotate(likes_count=Count("favourited_by", distinct=True))
+
+        if needs_reviews:
+            qs = qs.with_review_average()
+        else:
+            # Add a default value to avoid attribute errors
+            qs = qs.annotate(review_average=Avg("reviews__rate"))
+
+        # Optimize related queries
+        now = timezone.now()
+        active_reservations = Prefetch(
+            "stock_reservations",
+            queryset=StockReservation.objects.filter(
+                expires_at__gt=now, consumed=False
+            ).only("id", "product_id", "quantity"),
+            to_attr="active_reservations_list",
+        )
+
+        main_images = Prefetch(
+            "images",
+            queryset=ProductImage.objects.filter(is_main=True).only(
+                "id", "product_id", "image", "is_main"
+            ),
+            to_attr="main_images_list",
+        )
+
         return (
-            super()
-            .get_queryset(request)
-            .with_likes_count()
-            .with_review_average()
-            .select_related("category", "vat", "changed_by")
+            qs.select_related("category", "vat", "changed_by")
             .prefetch_related(
-                "images",
-                "reviews",
-                "favourited_by",
-                "stock_reservations",
-                "stock_logs",
+                main_images,
+                active_reservations,
+                Prefetch(
+                    "category__parent", queryset=ProductCategory.objects.all()
+                ),
+            )
+            .only(
+                # Only load fields we actually display
+                "id",
+                "sku",
+                "active",
+                "price",
+                "price_currency",
+                "discount_percent",
+                "stock",
+                "view_count",
+                "created_at",
+                "updated_at",
+                "category_id",
+                "vat_id",
+                "changed_by_id",
             )
         )
 
@@ -1400,7 +1458,9 @@ class ProductAdmin(
             obj.safe_translation_getter("name", any_language=True)
             or "Untitled Product"
         )
-        main_image = obj.images.filter(is_main=True).first()
+        # Use prefetched main images to avoid N+1 queries
+        main_images = getattr(obj, "main_images_list", [])
+        main_image = main_images[0] if main_images else None
 
         safe_name = conditional_escape(name)
         safe_sku = conditional_escape(obj.sku[:8])
@@ -1493,18 +1553,13 @@ class ProductAdmin(
     pricing_info.short_description = _("Pricing")
 
     def stock_info(self, obj):
-        from order.models.stock_reservation import StockReservation
-
         stock = obj.stock
         safe_stock = conditional_escape(str(stock))
 
-        # Calculate reserved stock from active reservations
-        now = timezone.now()
-        reserved_qty = (
-            StockReservation.objects.filter(
-                product=obj, expires_at__gt=now, consumed=False
-            ).aggregate(total=Sum("quantity"))["total"]
-            or 0
+        # Use prefetched active reservations to avoid N+1 queries
+        reserved_qty = sum(
+            reservation.quantity
+            for reservation in getattr(obj, "active_reservations_list", [])
         )
 
         available_stock = stock - reserved_qty
@@ -2336,6 +2391,8 @@ class ProductReviewAdmin(ModelAdmin, TranslatableAdmin):
     compressed_fields = True
     list_fullwidth = True
     list_filter_sheet = True
+    list_per_page = 25  # Limit to 25 reviews per page for better performance
+    show_full_result_count = False  # Disable expensive COUNT(*) query
 
     list_display = [
         "review_info",
@@ -2349,8 +2406,8 @@ class ProductReviewAdmin(ModelAdmin, TranslatableAdmin):
         "status",
         ("rate", SliderNumericFilter),
         ("created_at", RangeDateTimeFilter),
-        ("product", RelatedDropdownFilter),
-        ("user", RelatedDropdownFilter),
+        # Removed RelatedDropdownFilter for product and user - too expensive with 1.2M products
+        # Use search instead to find specific products/users
     ]
     actions = [
         "approve_reviews",
@@ -2359,14 +2416,34 @@ class ProductReviewAdmin(ModelAdmin, TranslatableAdmin):
         "make_unpublished",
     ]
     search_fields = [
-        "translations__comment",
         "user__email",
         "user__username",
-        "product__translations__name",
+        # Removed translations__comment search - too expensive with 100k+ reviews
+        # Removed product__translations__name - too expensive with 1.2M products
     ]
     list_select_related = ["product", "user"]
     readonly_fields = ("created_at", "updated_at", "uuid")
     list_filter_submit = True
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+
+        # Optimize with minimal prefetching - only what's absolutely needed
+        # Avoid loading all translations upfront
+        return qs.select_related("product", "user").only(
+            # Review fields - minimal set
+            "id",
+            "product_id",
+            "user_id",
+            "rate",
+            "status",
+            "created_at",
+            # Product fields
+            "product__id",
+            # User fields
+            "user__id",
+            "user__email",
+        )
 
     fieldsets = (
         (

@@ -433,7 +433,7 @@ class SettingAdmin(ModelAdmin):
         from django.utils.safestring import mark_safe
 
         safe_name = conditional_escape(obj.name)
-        html = f'<strong style="font-family: monospace; font-weight: 600;">{safe_name}</strong>'
+        html = f'<strong style="font-weight: 600;">{safe_name}</strong>'
         return mark_safe(html)
 
     name_display.short_description = _("Name")
@@ -458,7 +458,7 @@ class SettingAdmin(ModelAdmin):
                 value = value[:50] + "..."
             safe_value = conditional_escape(value)
 
-            html = f'<code style="font-family: monospace; font-size: 0.875rem; padding: 0.125rem 0.25rem; background-color: rgba(0,0,0,0.05); border-radius: 0.25rem;">{safe_value}</code>'
+            html = f'<code style="font-size: 0.875rem; padding: 0.125rem 0.25rem; background-color: rgba(0,0,0,0.05); border-radius: 0.25rem;">{safe_value}</code>'
             return mark_safe(html)
         except Exception:
             return mark_safe(

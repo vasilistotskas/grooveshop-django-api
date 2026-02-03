@@ -62,6 +62,14 @@ schema_config = create_schema_view_config(
 
 @extend_schema_view(**schema_config)
 class ProductViewSet(BaseModelViewSet):
+    """
+    ViewSet for managing products.
+
+    Products are the core entities in the e-commerce system. Each product includes
+    basic information (name, description, price, stock), images, reviews, tags, and
+    attributes. Products support multi-language translations.
+    """
+
     queryset = Product.objects.all()
     request_serializers = req_serializers
     response_serializers = res_serializers

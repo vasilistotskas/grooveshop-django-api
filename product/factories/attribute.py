@@ -1,0 +1,68 @@
+import factory
+from django.apps import apps
+from django.conf import settings
+
+from core.factories import CustomDjangoModelFactory
+from product.models.attribute import Attribute
+
+available_languages = [
+    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+]
+
+
+class AttributeTranslationFactory(factory.django.DjangoModelFactory):
+    language_code = factory.Iterator(available_languages)
+    name = factory.Faker(
+        "random_element",
+        elements=[
+            "Size",
+            "Color",
+            "Capacity",
+            "Material",
+            "Brand",
+            "Weight",
+            "Dimensions",
+            "Screen Size",
+            "Resolution",
+            "Processor",
+            "RAM",
+            "Storage",
+            "Battery Life",
+            "Connectivity",
+            "Operating System",
+            "Warranty",
+            "Country of Origin",
+            "Model Year",
+            "Style",
+            "Pattern",
+        ],
+    )
+    master = factory.SubFactory("product.factories.attribute.AttributeFactory")
+
+    class Meta:
+        model = apps.get_model("product", "AttributeTranslation")
+        django_get_or_create = ("language_code", "master")
+
+
+class AttributeFactory(CustomDjangoModelFactory):
+    auto_translations = False
+
+    active = factory.Faker("pybool", truth_probability=90)
+
+    class Meta:
+        model = Attribute
+        skip_postgeneration_save = True
+
+    @factory.post_generation
+    def translations(self, create, extracted, **kwargs):
+        if not create:
+            return
+
+        translations = extracted or [
+            AttributeTranslationFactory(language_code=lang, master=self)
+            for lang in available_languages
+        ]
+
+        for translation in translations:
+            translation.master = self
+            translation.save()

@@ -1,6 +1,8 @@
 from django.urls import path
 from rest_framework.urlpatterns import format_suffix_patterns
 
+from product.views.attribute import AttributeViewSet
+from product.views.attribute_value import AttributeValueViewSet
 from product.views.category import ProductCategoryViewSet
 from product.views.category_image import ProductCategoryImageViewSet
 from product.views.favourite import ProductFavouriteViewSet
@@ -170,6 +172,40 @@ urlpatterns = [
         "product/category/image/by_type",
         ProductCategoryImageViewSet.as_view({"get": "by_type"}),
         name="product-category-image-by-type",
+    ),
+    path(
+        "product/attribute",
+        AttributeViewSet.as_view({"get": "list", "post": "create"}),
+        name="product-attribute-list",
+    ),
+    path(
+        "product/attribute/<int:pk>",
+        AttributeViewSet.as_view(
+            {
+                "get": "retrieve",
+                "put": "update",
+                "patch": "partial_update",
+                "delete": "destroy",
+            }
+        ),
+        name="product-attribute-detail",
+    ),
+    path(
+        "product/attribute/value",
+        AttributeValueViewSet.as_view({"get": "list", "post": "create"}),
+        name="product-attribute-value-list",
+    ),
+    path(
+        "product/attribute/value/<int:pk>",
+        AttributeValueViewSet.as_view(
+            {
+                "get": "retrieve",
+                "put": "update",
+                "patch": "partial_update",
+                "delete": "destroy",
+            }
+        ),
+        name="product-attribute-value-detail",
     ),
 ]
 

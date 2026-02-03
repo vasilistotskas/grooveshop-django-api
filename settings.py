@@ -1202,6 +1202,20 @@ UNFOLD = {
                         "icon": "label",
                         "link": reverse_lazy("admin:tag_tag_changelist"),
                     },
+                    {
+                        "title": _("Attributes"),
+                        "icon": "tune",
+                        "link": reverse_lazy(
+                            "admin:product_attribute_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Attribute Values"),
+                        "icon": "format_list_bulleted",
+                        "link": reverse_lazy(
+                            "admin:product_attributevalue_changelist"
+                        ),
+                    },
                 ],
             },
             {
@@ -1344,6 +1358,13 @@ UNFOLD = {
                         "title": _("Sites"),
                         "icon": "language",
                         "link": reverse_lazy("admin:sites_site_changelist"),
+                    },
+                    {
+                        "title": _("Extra Settings"),
+                        "icon": "settings",
+                        "link": reverse_lazy(
+                            "admin:extra_settings_setting_changelist"
+                        ),
                     },
                 ],
             },

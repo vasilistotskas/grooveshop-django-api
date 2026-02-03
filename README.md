@@ -38,7 +38,7 @@ The Django applications within this project include:
 
 - **Authentication and User Management**: Streamlined user account and session management.
 - **Multi-Language Support**: Accommodates various languages enhancing global usability.
-- **Advanced Search and Filtering**: Leverages Postgres Full-Text Search for efficient data retrieval.
+- **Advanced Search and Filtering**: Meilisearch-powered federated search with Greeklish support, instant search, and analytics tracking.
 - **Task Scheduling**: Utilizes Celery for background task management.
 - **Performance Optimization**: Implements caching strategies to improve API responsiveness.
 - **Testing**: Includes comprehensive unit and integration tests.
@@ -65,6 +65,115 @@ The Django applications within this project include:
 - Django 5.0 or higher
 - PostgreSQL
 - Redis
+- Meilisearch 1.5 or higher
+
+### Meilisearch Setup
+
+#### Installation
+
+**Using Docker:**
+```bash
+docker run -d \
+  --name meilisearch \
+  -p 7700:7700 \
+  -e MEILI_MASTER_KEY=YOUR_MASTER_KEY \
+  -v $(pwd)/meili_data:/meili_data \
+  getmeili/meilisearch:v1.5
+```
+
+**Using Docker Compose:**
+```yaml
+services:
+  meilisearch:
+    image: getmeili/meilisearch:v1.5
+    ports:
+      - "7700:7700"
+    environment:
+      - MEILI_MASTER_KEY=YOUR_MASTER_KEY
+    volumes:
+      - ./meili_data:/meili_data
+```
+
+#### Configuration
+
+Add Meilisearch settings to your `.env` file:
+```env
+MEILISEARCH_HOST=http://localhost:7700
+MEILISEARCH_MASTER_KEY=YOUR_MASTER_KEY
+```
+
+#### Enable Experimental Features
+
+Enable the CONTAINS operator for substring matching:
+```bash
+python manage.py meilisearch_enable_experimental --feature containsFilter
+```
+
+#### Configure Index Settings
+
+Update index settings for optimal performance:
+```bash
+# ProductTranslation index
+python manage.py meilisearch_update_index_settings \
+    --index ProductTranslation \
+    --max-total-hits 50000 \
+    --search-cutoff-ms 1500 \
+    --max-values-per-facet 100
+
+# BlogPostTranslation index
+python manage.py meilisearch_update_index_settings \
+    --index BlogPostTranslation \
+    --max-total-hits 50000 \
+    --search-cutoff-ms 1500 \
+    --max-values-per-facet 100
+```
+
+#### Configure Ranking Rules
+
+Set up custom ranking rules for e-commerce:
+```bash
+# Prioritize in-stock products and discounts
+python manage.py meilisearch_update_ranking \
+    --index ProductTranslation \
+    --rules "words,typo,proximity,attribute,sort,stock:desc,discount_percent:desc,exactness"
+
+# Prioritize popular blog posts
+python manage.py meilisearch_update_ranking \
+    --index BlogPostTranslation \
+    --rules "words,typo,proximity,attribute,sort,view_count:desc,exactness"
+```
+
+#### Sync Data to Meilisearch
+
+```bash
+# Sync all indexes
+python manage.py meilisearch_sync_all_indexes
+
+# Or sync specific indexes
+python manage.py meilisearch_sync_index --model ProductTranslation
+python manage.py meilisearch_sync_index --model BlogPostTranslation
+```
+
+#### Test Federated Search
+
+```bash
+python manage.py meilisearch_test_federated \
+    --query "laptop" \
+    --language-code en \
+    --limit 20
+```
+
+### OpenAPI Schema Generation
+
+Generate TypeScript types and Zod schemas for the frontend:
+
+```bash
+# Generate OpenAPI schema
+uv run python manage.py spectacular --color --file schema.yml
+
+# Frontend will use this schema to generate types
+# See grooveshop-storefront-ui-node-nuxt/README.md for frontend setup
+```
 
 ## License
 
@@ -177,6 +286,39 @@ This project is open-sourced under the MIT License. See the [LICENSE](LICENSE.md
 ### Django REST Framework - Spectacular
 - **Generate API Schema**:
   `uv run python manage.py spectacular --color --file schema.yml`
+
+### Meilisearch Management Commands
+
+#### Index Management
+- **Sync all indexes**:
+  `python manage.py meilisearch_sync_all_indexes`
+- **Sync specific index**:
+  `python manage.py meilisearch_sync_index --model ProductTranslation`
+- **Clear index**:
+  `python manage.py meilisearch_clear_index --index ProductTranslation`
+- **Drop index**:
+  `python manage.py meilisearch_drop --index ProductTranslation`
+- **Inspect index**:
+  `python manage.py meilisearch_inspect_index --index ProductTranslation`
+
+#### Configuration Commands
+- **Enable experimental features**:
+  `python manage.py meilisearch_enable_experimental --feature containsFilter`
+- **Update index settings**:
+  `python manage.py meilisearch_update_index_settings --index ProductTranslation --max-total-hits 50000 --search-cutoff-ms 1500`
+- **Update ranking rules**:
+  `python manage.py meilisearch_update_ranking --index ProductTranslation --rules "words,typo,proximity,attribute,sort,stock:desc,discount_percent:desc,exactness"`
+
+#### Testing and Analytics
+- **Test federated search**:
+  `python manage.py meilisearch_test_federated --query "laptop" --language-code en --limit 20`
+- **Export search analytics**:
+  `python manage.py meilisearch_export_analytics --start-date 2024-01-01 --end-date 2024-12-31 --output analytics.json`
+
+For detailed documentation, see:
+- [Search API Documentation](docs/api/search.md)
+- [CONTAINS Operator Guide](docs/search/contains-operator.md)
+- [Management Commands Reference](docs/search/management-commands.md)
 
 # Git Command Usage
 

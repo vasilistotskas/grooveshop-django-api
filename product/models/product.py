@@ -365,8 +365,16 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "active",
             "is_deleted",
             "master_id",
+            "attributes",
+            "attribute_values",
         )
-        searchable_fields = ("master_id", "name", "description")
+        searchable_fields = (
+            "master_id",
+            "name",
+            "description",
+            "attribute_names",
+            "attribute_values_text",
+        )
         displayed_fields = (
             "id",
             "master_id",
@@ -382,6 +390,8 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "discount_percent",
             "active",
             "is_deleted",
+            "attributes",
+            "attribute_data",
         )
         sortable_fields = (
             "likes_count",
@@ -452,6 +462,64 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "stock": lambda obj: obj.master.stock,
             "active": lambda obj: obj.master.active,
             "is_deleted": lambda obj: obj.master.is_deleted,
+            "attributes": lambda obj: list(
+                obj.master.product_attributes.values_list(
+                    "attribute_value__attribute_id", flat=True
+                ).distinct()
+            ),
+            "attribute_values": lambda obj: list(
+                obj.master.product_attributes.values_list(
+                    "attribute_value_id", flat=True
+                )
+            ),
+            "attribute_names": lambda obj: " ".join(
+                [
+                    pa.attribute_value.attribute.safe_translation_getter(
+                        "name",
+                        language_code=obj.language_code,
+                        any_language=True,
+                    )
+                    for pa in obj.master.product_attributes.select_related(
+                        "attribute_value__attribute"
+                    ).prefetch_related(
+                        "attribute_value__attribute__translations"
+                    )
+                ]
+            ),
+            "attribute_values_text": lambda obj: " ".join(
+                [
+                    pa.attribute_value.safe_translation_getter(
+                        "value",
+                        language_code=obj.language_code,
+                        any_language=True,
+                    )
+                    for pa in obj.master.product_attributes.select_related(
+                        "attribute_value"
+                    ).prefetch_related("attribute_value__translations")
+                ]
+            ),
+            "attribute_data": lambda obj: [
+                {
+                    "attribute_id": pa.attribute_value.attribute_id,
+                    "attribute_name": pa.attribute_value.attribute.safe_translation_getter(
+                        "name",
+                        language_code=obj.language_code,
+                        any_language=True,
+                    ),
+                    "value_id": pa.attribute_value_id,
+                    "value": pa.attribute_value.safe_translation_getter(
+                        "value",
+                        language_code=obj.language_code,
+                        any_language=True,
+                    ),
+                }
+                for pa in obj.master.product_attributes.select_related(
+                    "attribute_value__attribute"
+                ).prefetch_related(
+                    "attribute_value__translations",
+                    "attribute_value__attribute__translations",
+                )
+            ],
         }
 
     def __str__(self):

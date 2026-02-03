@@ -127,6 +127,23 @@ class ProductFilter(
         help_text="Maximum weight",
     )
 
+    attribute_value = filters.NumberFilter(
+        field_name="product_attributes__attribute_value_id",
+        help_text="Filter by attribute value ID",
+    )
+    attribute_value__in = filters.BaseInFilter(
+        field_name="product_attributes__attribute_value_id",
+        help_text="Filter by multiple attribute value IDs (comma-separated)",
+    )
+    attribute = filters.NumberFilter(
+        field_name="product_attributes__attribute_value__attribute_id",
+        help_text="Filter by attribute ID",
+    )
+    attribute__in = filters.BaseInFilter(
+        field_name="product_attributes__attribute_value__attribute_id",
+        help_text="Filter by multiple attribute IDs (comma-separated)",
+    )
+
     class Meta:
         model = Product
         fields = {

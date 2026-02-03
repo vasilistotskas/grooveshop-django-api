@@ -32,11 +32,14 @@ from core.forms.measurement import MeasurementWidget
 from core.units import WeightUnits
 from product.enum.review import ReviewStatus
 from product.forms import ApplyDiscountForm
+from product.models.attribute import Attribute
+from product.models.attribute_value import AttributeValue
 from product.models.category import ProductCategory
 from product.models.category_image import ProductCategoryImage
 from product.models.favourite import ProductFavourite
 from product.models.image import ProductImage
 from product.models.product import Product
+from product.models.product_attribute import ProductAttribute
 from product.models.review import ProductReview
 from tag.admin import TaggedItemInline
 
@@ -268,6 +271,622 @@ class StockReservationStatusFilter(DropdownFilter):
             )
 
         return queryset
+
+
+class AttributeValueInline(TabularInline):
+    """Inline for managing attribute values within attribute admin."""
+
+    model = AttributeValue
+    extra = 0
+    fields = ("value_display", "active", "sort_order", "usage_count_display")
+    readonly_fields = ("value_display", "usage_count_display", "sort_order")
+
+    tab = True
+    show_change_link = True
+
+    def value_display(self, obj):
+        """Display value with translation."""
+        if not obj.pk:
+            return "-"
+        value = (
+            obj.safe_translation_getter("value", any_language=True) or "Unnamed"
+        )
+        safe_value = conditional_escape(value)
+
+        status_icon = "✓" if obj.active else "✗"
+        status_class = (
+            "text-green-600 dark:text-green-400"
+            if obj.active
+            else "text-red-600 dark:text-red-400"
+        )
+
+        html = (
+            f'<div class="text-sm">'
+            f'<span class="{status_class}">{status_icon}</span> '
+            f'<span class="font-medium text-base-900 dark:text-base-100">{safe_value}</span>'
+            f"</div>"
+        )
+        return mark_safe(html)
+
+    value_display.short_description = _("Value")
+
+    def usage_count_display(self, obj):
+        """Display count of products using this value."""
+        if not obj.pk:
+            return "-"
+        count = obj.product_attributes.count()
+        safe_count = conditional_escape(str(count))
+
+        if count > 0:
+            color_class = "text-blue-600 dark:text-blue-400"
+        else:
+            color_class = "text-base-600 dark:text-base-300"
+
+        html = (
+            f'<span class="text-sm {color_class}">{safe_count} products</span>'
+        )
+        return mark_safe(html)
+
+    usage_count_display.short_description = _("Usage")
+
+
+@admin.register(Attribute)
+class AttributeAdmin(TranslatableAdmin, ModelAdmin):
+    """Admin interface for managing product attributes."""
+
+    compressed_fields = True
+    warn_unsaved_form = True
+    list_fullwidth = True
+    list_filter_submit = True
+    list_filter_sheet = True
+
+    list_display = [
+        "attribute_info",
+        "active_status_badge",
+        "values_count_display",
+        "usage_count_display",
+        "sort_order",
+        "created_display",
+    ]
+    search_fields = [
+        "id",
+        "translations__name",
+    ]
+    list_filter = [
+        "active",
+        ("created_at", RangeDateTimeFilter),
+        ("updated_at", RangeDateTimeFilter),
+    ]
+    inlines = [AttributeValueInline]
+    readonly_fields = (
+        "id",
+        "uuid",
+        "sort_order",
+        "created_at",
+        "updated_at",
+        "values_count_display",
+        "usage_count_display",
+        "attribute_analytics",
+    )
+    list_select_related = []
+    list_per_page = 25
+    actions = [
+        "activate_attributes",
+        "deactivate_attributes",
+    ]
+    date_hierarchy = "created_at"
+
+    fieldsets = (
+        (
+            _("Attribute Information"),
+            {
+                "fields": (
+                    "name",
+                    "active",
+                ),
+                "classes": ("wide",),
+            },
+        ),
+        (
+            _("Statistics"),
+            {
+                "fields": (
+                    "values_count_display",
+                    "usage_count_display",
+                    "attribute_analytics",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            _("System Information"),
+            {
+                "fields": (
+                    "id",
+                    "uuid",
+                    "sort_order",
+                    "created_at",
+                    "updated_at",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    def get_queryset(self, request):
+        """Optimize queryset with annotations."""
+        return (
+            super()
+            .get_queryset(request)
+            .with_values_count()
+            .with_usage_count()
+            .prefetch_related("translations", "values")
+        )
+
+    def attribute_info(self, obj):
+        """Display attribute name with icon."""
+        name = (
+            obj.safe_translation_getter("name", any_language=True) or "Unnamed"
+        )
+        safe_name = conditional_escape(name)
+        safe_id = conditional_escape(str(obj.id))
+
+        html = (
+            '<div class="text-sm">'
+            f'<div class="font-medium text-base-900 dark:text-base-100">📋 {safe_name}</div>'
+            f'<div class="text-xs text-base-600 dark:text-base-300">ID: {safe_id}</div>'
+            "</div>"
+        )
+        return mark_safe(html)
+
+    attribute_info.short_description = _("Attribute")
+
+    def active_status_badge(self, obj):
+        """Display active status with badge."""
+        if obj.active:
+            badge = (
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
+                "✅ Active"
+                "</span>"
+            )
+        else:
+            badge = (
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
+                "❌ Inactive"
+                "</span>"
+            )
+        return mark_safe(badge)
+
+    active_status_badge.short_description = _("Status")
+
+    def values_count_display(self, obj):
+        """Display count of attribute values."""
+        count = getattr(obj, "values_count", 0)
+        safe_count = conditional_escape(str(count))
+
+        if count > 0:
+            color_class = "text-blue-600 dark:text-blue-400"
+        else:
+            color_class = "text-base-600 dark:text-base-300"
+
+        html = f'<span class="text-sm {color_class}">{safe_count} values</span>'
+        return mark_safe(html)
+
+    values_count_display.short_description = _("Values")
+
+    def usage_count_display(self, obj):
+        """Display count of products using this attribute."""
+        count = getattr(obj, "usage_count", 0)
+        safe_count = conditional_escape(str(count))
+
+        if count > 10:
+            color_class = "text-green-600 dark:text-green-400"
+        elif count > 0:
+            color_class = "text-blue-600 dark:text-blue-400"
+        else:
+            color_class = "text-base-600 dark:text-base-300"
+
+        html = (
+            f'<span class="text-sm {color_class}">{safe_count} products</span>'
+        )
+        return mark_safe(html)
+
+    usage_count_display.short_description = _("Usage")
+
+    def created_display(self, obj):
+        """Display creation date with relative time."""
+        now = timezone.now()
+        diff = now - obj.created_at
+
+        if diff < timedelta(days=1):
+            time_ago = "Today"
+            color = "text-green-600 dark:text-green-400"
+        elif diff < timedelta(days=7):
+            time_ago = f"{diff.days}d ago"
+            color = "text-blue-600 dark:text-blue-400"
+        else:
+            time_ago = obj.created_at.strftime("%Y-%m-%d")
+            color = "text-base-600 dark:text-base-400"
+
+        safe_date = conditional_escape(obj.created_at.strftime("%Y-%m-%d"))
+        safe_time = conditional_escape(time_ago)
+
+        html = (
+            '<div class="text-sm">'
+            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_date}</div>'
+            f'<div class="{color}">{safe_time}</div>'
+            "</div>"
+        )
+        return mark_safe(html)
+
+    created_display.short_description = _("Created")
+
+    def attribute_analytics(self, obj):
+        """Display detailed analytics for the attribute."""
+        if not obj.created_at:
+            return "Available after creation."
+
+        now = timezone.now()
+        age = now - obj.created_at
+        last_updated = now - obj.updated_at
+
+        values_count = getattr(obj, "values_count", 0)
+        usage_count = getattr(obj, "usage_count", 0)
+        active_values = obj.values.filter(active=True).count()
+        inactive_values = values_count - active_values
+
+        safe_age = conditional_escape(str(age.days))
+        safe_updated = conditional_escape(str(last_updated.days))
+        safe_values = conditional_escape(str(values_count))
+        safe_active_values = conditional_escape(str(active_values))
+        safe_inactive_values = conditional_escape(str(inactive_values))
+        safe_usage = conditional_escape(str(usage_count))
+
+        html = (
+            '<div class="text-sm">'
+            '<div class="grid grid-cols-2 gap-2">'
+            f"<div><strong>Attribute Age:</strong></div><div>{safe_age} days</div>"
+            f"<div><strong>Last Updated:</strong></div><div>{safe_updated} days ago</div>"
+            f"<div><strong>Total Values:</strong></div><div>{safe_values}</div>"
+            f"<div><strong>Active Values:</strong></div><div>{safe_active_values}</div>"
+            f"<div><strong>Inactive Values:</strong></div><div>{safe_inactive_values}</div>"
+            f"<div><strong>Products Using:</strong></div><div>{safe_usage}</div>"
+            "</div>"
+            "</div>"
+        )
+        return mark_safe(html)
+
+    attribute_analytics.short_description = _("Analytics")
+
+    @action(
+        description=_("Activate selected attributes"),
+        variant=ActionVariant.SUCCESS,
+        icon="check_circle",
+    )
+    def activate_attributes(self, request, queryset):
+        """Bulk action to activate selected attributes."""
+        updated = queryset.update(active=True)
+        self.message_user(
+            request,
+            ngettext(
+                _("%(count)d attribute was successfully activated."),
+                _("%(count)d attributes were successfully activated."),
+                updated,
+            )
+            % {"count": updated},
+            messages.SUCCESS,
+        )
+
+    @action(
+        description=_("Deactivate selected attributes"),
+        variant=ActionVariant.WARNING,
+        icon="cancel",
+    )
+    def deactivate_attributes(self, request, queryset):
+        """Bulk action to deactivate selected attributes."""
+        updated = queryset.update(active=False)
+        self.message_user(
+            request,
+            ngettext(
+                _("%(count)d attribute was successfully deactivated."),
+                _("%(count)d attributes were successfully deactivated."),
+                updated,
+            )
+            % {"count": updated},
+            messages.SUCCESS,
+        )
+
+
+@admin.register(AttributeValue)
+class AttributeValueAdmin(TranslatableAdmin, ModelAdmin):
+    """Admin interface for managing attribute values."""
+
+    compressed_fields = True
+    warn_unsaved_form = True
+    list_fullwidth = True
+    list_filter_submit = True
+    list_filter_sheet = True
+
+    list_display = [
+        "value_info",
+        "attribute_display",
+        "active_status_badge",
+        "usage_count_display",
+        "sort_order",
+        "created_display",
+    ]
+    search_fields = [
+        "id",
+        "translations__value",
+        "attribute__translations__name",
+    ]
+    list_filter = [
+        "active",
+        ("attribute", RelatedDropdownFilter),
+        ("created_at", RangeDateTimeFilter),
+        ("updated_at", RangeDateTimeFilter),
+    ]
+    readonly_fields = (
+        "id",
+        "uuid",
+        "sort_order",
+        "created_at",
+        "updated_at",
+        "usage_count_display",
+        "value_analytics",
+    )
+    list_select_related = ["attribute"]
+    list_per_page = 25
+    actions = [
+        "activate_values",
+        "deactivate_values",
+    ]
+    date_hierarchy = "created_at"
+
+    fieldsets = (
+        (
+            _("Value Information"),
+            {
+                "fields": (
+                    "attribute",
+                    "value",
+                    "active",
+                ),
+                "classes": ("wide",),
+            },
+        ),
+        (
+            _("Statistics"),
+            {
+                "fields": (
+                    "usage_count_display",
+                    "value_analytics",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            _("System Information"),
+            {
+                "fields": (
+                    "id",
+                    "uuid",
+                    "sort_order",
+                    "created_at",
+                    "updated_at",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    def get_queryset(self, request):
+        """Optimize queryset with annotations."""
+        return (
+            super()
+            .get_queryset(request)
+            .with_usage_count()
+            .select_related("attribute")
+            .prefetch_related("translations", "attribute__translations")
+        )
+
+    def value_info(self, obj):
+        """Display value with icon."""
+        value = (
+            obj.safe_translation_getter("value", any_language=True) or "Unnamed"
+        )
+        safe_value = conditional_escape(value)
+        safe_id = conditional_escape(str(obj.id))
+
+        html = (
+            '<div class="text-sm">'
+            f'<div class="font-medium text-base-900 dark:text-base-100">🏷️ {safe_value}</div>'
+            f'<div class="text-xs text-base-600 dark:text-base-300">ID: {safe_id}</div>'
+            "</div>"
+        )
+        return mark_safe(html)
+
+    value_info.short_description = _("Value")
+
+    def attribute_display(self, obj):
+        """Display parent attribute name."""
+        if obj.attribute:
+            attribute_name = (
+                obj.attribute.safe_translation_getter("name", any_language=True)
+                or "Unnamed"
+            )
+            safe_name = conditional_escape(attribute_name)
+
+            html = f'<span class="text-sm text-base-900 dark:text-base-100">{safe_name}</span>'
+            return mark_safe(html)
+        return mark_safe(
+            '<span class="text-base-600 dark:text-base-300">No Attribute</span>'
+        )
+
+    attribute_display.short_description = _("Attribute")
+
+    def active_status_badge(self, obj):
+        """Display active status with badge."""
+        if obj.active:
+            badge = (
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
+                "✅ Active"
+                "</span>"
+            )
+        else:
+            badge = (
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
+                "❌ Inactive"
+                "</span>"
+            )
+        return mark_safe(badge)
+
+    active_status_badge.short_description = _("Status")
+
+    def usage_count_display(self, obj):
+        """Display count of products using this value."""
+        count = getattr(obj, "usage_count", 0)
+        safe_count = conditional_escape(str(count))
+
+        if count > 10:
+            color_class = "text-green-600 dark:text-green-400"
+        elif count > 0:
+            color_class = "text-blue-600 dark:text-blue-400"
+        else:
+            color_class = "text-base-600 dark:text-base-300"
+
+        html = (
+            f'<span class="text-sm {color_class}">{safe_count} products</span>'
+        )
+        return mark_safe(html)
+
+    usage_count_display.short_description = _("Usage")
+
+    def created_display(self, obj):
+        """Display creation date with relative time."""
+        now = timezone.now()
+        diff = now - obj.created_at
+
+        if diff < timedelta(days=1):
+            time_ago = "Today"
+            color = "text-green-600 dark:text-green-400"
+        elif diff < timedelta(days=7):
+            time_ago = f"{diff.days}d ago"
+            color = "text-blue-600 dark:text-blue-400"
+        else:
+            time_ago = obj.created_at.strftime("%Y-%m-%d")
+            color = "text-base-600 dark:text-base-400"
+
+        safe_date = conditional_escape(obj.created_at.strftime("%Y-%m-%d"))
+        safe_time = conditional_escape(time_ago)
+
+        html = (
+            '<div class="text-sm">'
+            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_date}</div>'
+            f'<div class="{color}">{safe_time}</div>'
+            "</div>"
+        )
+        return mark_safe(html)
+
+    created_display.short_description = _("Created")
+
+    def value_analytics(self, obj):
+        """Display detailed analytics for the value."""
+        if not obj.created_at:
+            return "Available after creation."
+
+        now = timezone.now()
+        age = now - obj.created_at
+        last_updated = now - obj.updated_at
+
+        usage_count = getattr(obj, "usage_count", 0)
+        attribute_name = (
+            obj.attribute.safe_translation_getter("name", any_language=True)
+            if obj.attribute
+            else "N/A"
+        )
+
+        safe_age = conditional_escape(str(age.days))
+        safe_updated = conditional_escape(str(last_updated.days))
+        safe_usage = conditional_escape(str(usage_count))
+        safe_attribute = conditional_escape(attribute_name)
+
+        html = (
+            '<div class="text-sm">'
+            '<div class="grid grid-cols-2 gap-2">'
+            f"<div><strong>Value Age:</strong></div><div>{safe_age} days</div>"
+            f"<div><strong>Last Updated:</strong></div><div>{safe_updated} days ago</div>"
+            f"<div><strong>Parent Attribute:</strong></div><div>{safe_attribute}</div>"
+            f"<div><strong>Products Using:</strong></div><div>{safe_usage}</div>"
+            "</div>"
+            "</div>"
+        )
+        return mark_safe(html)
+
+    value_analytics.short_description = _("Analytics")
+
+    @action(
+        description=_("Activate selected values"),
+        variant=ActionVariant.SUCCESS,
+        icon="check_circle",
+    )
+    def activate_values(self, request, queryset):
+        """Bulk action to activate selected attribute values."""
+        updated = queryset.update(active=True)
+        self.message_user(
+            request,
+            ngettext(
+                _("%(count)d attribute value was successfully activated."),
+                _("%(count)d attribute values were successfully activated."),
+                updated,
+            )
+            % {"count": updated},
+            messages.SUCCESS,
+        )
+
+    @action(
+        description=_("Deactivate selected values"),
+        variant=ActionVariant.WARNING,
+        icon="cancel",
+    )
+    def deactivate_values(self, request, queryset):
+        """Bulk action to deactivate selected attribute values."""
+        updated = queryset.update(active=False)
+        self.message_user(
+            request,
+            ngettext(
+                _("%(count)d attribute value was successfully deactivated."),
+                _("%(count)d attribute values were successfully deactivated."),
+                updated,
+            )
+            % {"count": updated},
+            messages.SUCCESS,
+        )
+
+
+class ProductAttributeInline(TabularInline):
+    """Inline for managing product attributes within product admin."""
+
+    model = ProductAttribute
+    extra = 1
+    fields = ("attribute_value",)
+    autocomplete_fields = ["attribute_value"]
+
+    tab = True
+    verbose_name = _("Product Attribute")
+    verbose_name_plural = _("Product Attributes")
+
+    def get_queryset(self, request):
+        """Optimize queryset with related data."""
+        qs = super().get_queryset(request)
+        return qs.select_related("attribute_value__attribute").prefetch_related(
+            "attribute_value__translations",
+            "attribute_value__attribute__translations",
+        )
 
 
 @admin_thumbnails.thumbnail("image")
@@ -630,6 +1249,7 @@ class ProductAdmin(
         ReviewAverageFilter,
     ]
     inlines = [
+        ProductAttributeInline,
         ProductImageInline,
         StockReservationInline,
         StockLogInline,

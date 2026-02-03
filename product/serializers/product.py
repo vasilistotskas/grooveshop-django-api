@@ -12,6 +12,7 @@ from core.api.serializers import MeasurementSerializerField
 from core.utils.serializers import TranslatedFieldExtended
 from product.models.category import ProductCategory
 from product.models.product import Product
+from product.serializers.product_attribute import ProductAttributeSerializer
 from vat.models import Vat
 
 
@@ -32,6 +33,9 @@ class ProductSerializer(
     vat_value = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     weight = MeasurementSerializerField(
         measurement=Weight, required=False, allow_null=True
+    )
+    attributes = ProductAttributeSerializer(
+        source="product_attributes", many=True, read_only=True
     )
 
     class Meta:
@@ -66,6 +70,7 @@ class ProductSerializer(
             "created_at",
             "updated_at",
             "uuid",
+            "attributes",
         )
 
         read_only_fields = (
@@ -84,6 +89,7 @@ class ProductSerializer(
             "created_at",
             "updated_at",
             "uuid",
+            "attributes",
         )
 
 

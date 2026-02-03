@@ -3,7 +3,7 @@ import logging
 import django.dispatch
 from asgiref.sync import sync_to_async
 from django.conf import settings
-from django.db.models.signals import post_save
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from simple_history.signals import post_create_historical_record
 
@@ -12,6 +12,7 @@ from notification.models.notification import Notification
 from notification.models.user import NotificationUser
 from product.models.favourite import ProductFavourite
 from product.models.product import Product, ProductTranslation
+from product.models.product_attribute import ProductAttribute
 
 logger = logging.getLogger(__name__)
 
@@ -230,3 +231,87 @@ async def notify_product_price_lowered(
         await NotificationUser.objects.acreate(
             user=user, notification=notification
         )
+
+
+@receiver([post_save, post_delete], sender=ProductAttribute)
+def update_product_search_index_on_attribute_change(sender, instance, **kwargs):
+    """
+    Update search index when product attributes are added, updated, or deleted.
+
+    This ensures Meilisearch stays in sync when product attributes change,
+    updating the attributes, attribute_values, attribute_names, and
+    attribute_values_text fields in the search index.
+    """
+    if settings.MEILISEARCH.get("OFFLINE", False):
+        return
+
+    # Get all translations for this product using the optimized queryset
+    translations = ProductTranslation.get_meilisearch_queryset().filter(
+        master=instance.product
+    )
+
+    if not translations.exists():
+        return
+
+    # Check if async indexing is enabled
+    try:
+        from meili.tasks import index_document_task
+
+        celery_available = True
+    except ImportError:
+        celery_available = False
+
+    use_async = (
+        not settings.DEBUG
+        and celery_available
+        and settings.MEILISEARCH.get("ASYNC_INDEXING", True)
+    )
+
+    if use_async:
+        logger.debug(
+            f"Reindexing ProductTranslation Async due to ProductAttribute change for product {instance.product_id}"
+        )
+        # Queue reindex tasks for each translation
+        for translation in translations:
+            index_document_task.delay(
+                app_label="product",
+                model_name="producttranslation",
+                pk=translation.pk,
+            )
+    else:
+        logger.debug(
+            f"Reindexing ProductTranslation Sync due to ProductAttribute change for product {instance.product_id}"
+        )
+        # Synchronous reindexing for DEBUG mode
+        from meili._client import client as _client
+
+        for translation in translations:
+            try:
+                if not translation.meili_filter():
+                    continue
+
+                serialized = translation.meili_serialize()
+                pk = translation._meta.pk.value_to_string(translation)
+
+                document = {
+                    **serialized,
+                    "id": pk,
+                    "pk": pk,
+                }
+
+                task = _client.get_index(
+                    translation._meilisearch["index_name"]
+                ).add_documents([document])
+
+                if settings.DEBUG:
+                    finished = _client.wait_for_task(task.task_uid)
+                    if finished.status == "failed":
+                        logger.error(
+                            f"Failed to reindex ProductTranslation pk={translation.pk}: {finished.error}"
+                        )
+            except Exception as e:
+                logger.error(
+                    f"Error reindexing ProductTranslation pk={translation.pk}: {e}"
+                )
+                if settings.DEBUG:
+                    raise

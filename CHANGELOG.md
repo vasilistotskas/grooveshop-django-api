@@ -3,6 +3,12 @@
 
 
 
+## v1.73.1 (2026-02-04)
+
+### Bug fixes
+
+* fix: attributes ([`619946a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/619946abbcfe30f25b59deca03844b5d1552d210))
+
 ## v1.73.0 (2026-02-03)
 
 ### Bug fixes

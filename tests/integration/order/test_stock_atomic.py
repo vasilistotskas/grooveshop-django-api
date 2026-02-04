@@ -159,7 +159,7 @@ class TestStockOperationsAreAtomic:
                     f"Stock went negative: {product.stock}"
                 )
 
-            except InsufficientStockError, InvalidOrderDataError:
+            except (InsufficientStockError, InvalidOrderDataError):
                 # Order failed due to insufficient stock (cart validation or stock check)
                 # Verify stock was NOT changed
                 product.refresh_from_db()

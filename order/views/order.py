@@ -358,7 +358,7 @@ class OrderViewSet(BaseModelViewSet):
                     obj = OrderService.get_order_by_uuid(order_id)
                     self.check_object_permissions(self.request, obj)
                     return obj
-                except ValueError, TypeError:
+                except (ValueError, TypeError):
                     pass
 
             obj = OrderService.get_order_by_id(int(order_id))

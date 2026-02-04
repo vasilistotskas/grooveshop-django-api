@@ -227,6 +227,7 @@ django_settings_module = "settings"
 # Ruff configuration
 # ─────────────────────────────────────────────────────────
 [tool.ruff]
+target-version = "py313"
 line-length = 80
 exclude = ["**/migrations/**"]
 

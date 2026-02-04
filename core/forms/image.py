@@ -133,7 +133,7 @@ class ImageAndSvgField(ImageField):
 
             return True
 
-        except ET.ParseError, ValueError:
+        except (ET.ParseError, ValueError):
             return False
         finally:
             if hasattr(f, "seek") and callable(f.seek):

@@ -158,7 +158,7 @@ def create_schema_view_config(
                 enum=available_languages,
                 default=default_language,
             )
-        except AttributeError, KeyError:
+        except (AttributeError, KeyError):
             language_parameter = None
 
     pagination_parameters = []

@@ -22,7 +22,7 @@ class CursorPaginator(pagination.CursorPagination):
         if page_size_param:
             try:
                 self.page_size = min(int(page_size_param), self.max_page_size)
-            except ValueError, TypeError:
+            except (ValueError, TypeError):
                 pass
 
         self.total_items = queryset.count()

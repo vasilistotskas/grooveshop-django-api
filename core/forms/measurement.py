@@ -56,7 +56,7 @@ class MeasurementWidget(forms.MultiWidget):
                 try:
                     literal_value = ast.literal_eval(value)
                     magnitude, unit = literal_value
-                except ValueError, SyntaxError:
+                except (ValueError, SyntaxError):
                     literal_value = value
                     magnitude, unit = [
                         v.strip() for v in literal_value.split(" ")

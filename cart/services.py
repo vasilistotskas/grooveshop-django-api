@@ -58,7 +58,7 @@ class CartService:
         if self.cart_id:
             try:
                 self.cart_id = int(self.cart_id)
-            except ValueError, TypeError:
+            except (ValueError, TypeError):
                 self.cart_id = None
 
     def __str__(self):

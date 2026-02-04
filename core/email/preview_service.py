@@ -45,6 +45,9 @@ class EmailTemplatePreviewService:
         """Generate preview for a template."""
         from django.utils import translation
 
+        # Store the current language to restore it later
+        current_language = translation.get_language()
+
         try:
             # Activate the selected language for template rendering
             translation.activate(language)
@@ -66,7 +69,7 @@ class EmailTemplatePreviewService:
                 html_template = f"emails/{category}/{template_name}.html"
                 txt_template = f"emails/{category}/{template_name}.txt"
 
-            # Render templates
+            # Render templates with the activated language
             html_content = self._render_template(html_template, context)
             text_content = self._render_template(txt_template, context)
 
@@ -99,8 +102,8 @@ class EmailTemplatePreviewService:
                 error=str(e),
             )
         finally:
-            # Deactivate translation to restore default language
-            translation.deactivate()
+            # Restore the original language
+            translation.activate(current_language)
 
     def _get_context_data_for_category(
         self, template_name: str, order_id: Optional[int] = None
@@ -256,6 +259,7 @@ class EmailTemplatePreviewService:
     def _render_template(self, template_path: str, context: dict) -> str:
         """Render template with context."""
         from django.template import TemplateDoesNotExist, TemplateSyntaxError
+        from django.utils import translation
         import os
 
         # Add context processor variables that are needed for email templates
@@ -266,7 +270,8 @@ class EmailTemplatePreviewService:
             "SITE_NAME": os.getenv("SITE_NAME", "Grooveshop"),
             "SITE_URL": settings.NUXT_BASE_URL,
             "INFO_EMAIL": settings.INFO_EMAIL,
-            "LANGUAGE_CODE": settings.LANGUAGE_CODE,
+            "LANGUAGE_CODE": translation.get_language()
+            or settings.LANGUAGE_CODE,
         }
 
         try:

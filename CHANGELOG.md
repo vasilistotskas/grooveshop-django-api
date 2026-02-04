@@ -3,6 +3,12 @@
 
 
 
+## v1.73.2 (2026-02-04)
+
+### Bug fixes
+
+* fix: lint ([`a908e56`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a908e5698578a9b0275d9bfc7b9b7a45b55f304c))
+
 ## v1.73.1 (2026-02-04)
 
 ### Bug fixes

@@ -236,7 +236,8 @@ class Product(
         """Return the average review rating for this product."""
         # If annotation exists, use it
         if "review_average" in self.__dict__:
-            return float(self.__dict__["review_average"])
+            cached_value = self.__dict__["review_average"]
+            return float(cached_value) if cached_value is not None else 0.0
         # Otherwise query the database
         avg = self.reviews.aggregate(avg=Avg("rate"))["avg"]
         return float(avg) if avg is not None else 0.0
@@ -443,14 +444,17 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
     def get_additional_meili_fields(cls):
         return {
             "master_id": lambda obj: obj.master_id,
-            "likes_count": lambda obj: getattr(obj, "_likes_count", 0)
-            or obj.master.likes_count,
+            "likes_count": lambda obj: (
+                getattr(obj, "_likes_count", 0) or obj.master.likes_count
+            ),
             "view_count": lambda obj: obj.master.view_count,
             "final_price": lambda obj: float(obj.master.final_price.amount),
             "discount_percent": lambda obj: float(obj.master.discount_percent),
-            "created_at": lambda obj: obj.master.created_at.isoformat()
-            if obj.master.created_at
-            else None,
+            "created_at": lambda obj: (
+                obj.master.created_at.isoformat()
+                if obj.master.created_at
+                else None
+            ),
             "category": lambda obj: obj.master.category_id,
             "category_name": lambda obj: (
                 obj.master.category.safe_translation_getter(

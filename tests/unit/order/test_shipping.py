@@ -249,8 +249,8 @@ class ShippingServiceTestCase(TestCase):
         ]
         ups_carrier.get_shipping_options.return_value = ups_options
 
-        mock_get_carrier.side_effect = (
-            lambda carrier: fedex_carrier if carrier == "fedex" else ups_carrier
+        mock_get_carrier.side_effect = lambda carrier: (
+            fedex_carrier if carrier == "fedex" else ups_carrier
         )
 
         options = ShippingService.get_available_shipping_options(

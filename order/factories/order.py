@@ -139,9 +139,9 @@ class OrderFactory(factory.django.DjangoModelFactory):
         lambda _: PhoneNumber.from_string(fake.phone_number(), region="US")
     )
     customer_notes = factory.LazyFunction(
-        lambda: fake.paragraph(nb_sentences=2)
-        if random.randint(1, 10) > 7
-        else ""
+        lambda: (
+            fake.paragraph(nb_sentences=2) if random.randint(1, 10) > 7 else ""
+        )
     )
     status = factory.LazyFunction(
         lambda: random.choice([s[0] for s in OrderStatus.choices])
@@ -162,18 +162,20 @@ class OrderFactory(factory.django.DjangoModelFactory):
         lambda: random.choice([s[0] for s in OrderDocumentTypeEnum.choices])
     )
     paid_amount = factory.LazyFunction(
-        lambda: Money(
-            fake.pydecimal(
-                left_digits=3,
-                right_digits=2,
-                min_value=10,
-                max_value=99,
-                positive=True,
-            ),
-            settings.DEFAULT_CURRENCY,
+        lambda: (
+            Money(
+                fake.pydecimal(
+                    left_digits=3,
+                    right_digits=2,
+                    min_value=10,
+                    max_value=99,
+                    positive=True,
+                ),
+                settings.DEFAULT_CURRENCY,
+            )
+            if random.randint(1, 10) > 3
+            else Money(0, settings.DEFAULT_CURRENCY)
         )
-        if random.randint(1, 10) > 3
-        else Money(0, settings.DEFAULT_CURRENCY)
     )
     payment_status = factory.LazyFunction(
         lambda: random.choice([s[0] for s in PaymentStatus.choices])
@@ -182,24 +184,28 @@ class OrderFactory(factory.django.DjangoModelFactory):
         lambda: f"payment_{fake.uuid4()}" if random.randint(1, 10) > 3 else ""
     )
     payment_method = factory.LazyFunction(
-        lambda: random.choice(
-            ["CREDIT_CARD", "PAYPAL", "BANK_TRANSFER", "STRIPE"]
+        lambda: (
+            random.choice(["CREDIT_CARD", "PAYPAL", "BANK_TRANSFER", "STRIPE"])
+            if random.randint(1, 10) > 3
+            else ""
         )
-        if random.randint(1, 10) > 3
-        else ""
     )
     tracking_number = factory.LazyFunction(
         lambda: generate_tracking_number() if random.randint(1, 10) > 5 else ""
     )
     shipping_carrier = factory.LazyFunction(
-        lambda: random.choice(["FEDEX", "UPS", "USPS", "DHL"])
-        if random.randint(1, 10) > 5
-        else ""
+        lambda: (
+            random.choice(["FEDEX", "UPS", "USPS", "DHL"])
+            if random.randint(1, 10) > 5
+            else ""
+        )
     )
     status_updated_at = factory.LazyFunction(
-        lambda: timezone.now() - timedelta(days=random.randint(0, 30))
-        if random.randint(1, 10) > 3
-        else None
+        lambda: (
+            timezone.now() - timedelta(days=random.randint(0, 30))
+            if random.randint(1, 10) > 3
+            else None
+        )
     )
 
     class Meta:

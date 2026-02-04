@@ -489,7 +489,7 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
                     if "metadata" not in validated_data:
                         validated_data["metadata"] = {}
                     validated_data["metadata"]["cart_id"] = cart_id
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     pass
 
         # Validate and lock stock BEFORE creating order

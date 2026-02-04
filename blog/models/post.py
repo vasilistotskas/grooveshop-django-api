@@ -240,12 +240,15 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
     def get_additional_meili_fields(cls):
         return {
             "master_id": lambda obj: obj.master_id,
-            "likes_count": lambda obj: getattr(obj, "_likes_count", 0)
-            or obj.master.likes_count,
+            "likes_count": lambda obj: (
+                getattr(obj, "_likes_count", 0) or obj.master.likes_count
+            ),
             "view_count": lambda obj: obj.master.view_count,
-            "created_at": lambda obj: obj.master.created_at.isoformat()
-            if obj.master.created_at
-            else None,
+            "created_at": lambda obj: (
+                obj.master.created_at.isoformat()
+                if obj.master.created_at
+                else None
+            ),
             "category": lambda obj: obj.master.category_id,
             "category_name": lambda obj: (
                 obj.master.category.safe_translation_getter(

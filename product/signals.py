@@ -190,8 +190,10 @@ async def notify_product_price_lowered(
 
     async def get_instance_name():
         return await sync_to_async(
-            lambda: instance.safe_translation_getter("name", any_language=True)
-            or f"Product {instance.slug or instance.id}",
+            lambda: (
+                instance.safe_translation_getter("name", any_language=True)
+                or f"Product {instance.slug or instance.id}"
+            ),
             thread_sensitive=True,
         )()
 

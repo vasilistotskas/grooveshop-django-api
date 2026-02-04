@@ -106,7 +106,7 @@ def preview_template_ajax(request: HttpRequest) -> JsonResponse:
         if order_id:
             try:
                 order_id = int(order_id)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 order_id = None
 
         # Generate preview

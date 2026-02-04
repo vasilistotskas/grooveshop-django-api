@@ -479,7 +479,7 @@ class UnsubscribeView(APIView):
         try:
             uid = urlsafe_base64_decode(uidb64).decode()
             user = User.objects.get(pk=uid)
-        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        except TypeError, ValueError, OverflowError, User.DoesNotExist:
             return Response(
                 {"error": "Invalid unsubscribe link"},
                 status=status.HTTP_400_BAD_REQUEST,

@@ -163,6 +163,33 @@ COLORS = {
 # Sizes for applicable products
 SIZES = ["XS", "S", "M", "L", "XL", "XXL", "One Size"]
 
+# Category-to-attribute mapping for realistic product attributes
+# Maps category names (lowercase) to appropriate attribute names
+CATEGORY_ATTRIBUTE_MAPPING = {
+    "electronics": [
+        "Brand",
+        "Color",
+        "Capacity",
+        "Connectivity",
+        "Screen Size",
+        "Material",
+    ],
+    "clothing": ["Brand", "Size", "Color", "Material", "Fit", "Style"],
+    "home & garden": ["Brand", "Material", "Color", "Size", "Style"],
+    "sports & outdoors": [
+        "Brand",
+        "Size",
+        "Color",
+        "Material",
+        "Activity Type",
+        "Fit",
+    ],
+    "beauty & personal care": ["Brand", "Size", "Scent", "Skin Type", "Type"],
+    "books": ["Author", "Publisher", "Format", "Language", "Genre"],
+    "food & beverages": ["Brand", "Size", "Flavor", "Dietary", "Type"],
+    "toys & games": ["Brand", "Age Range", "Material", "Theme", "Type"],
+}
+
 # Materials for products
 MATERIALS = {
     "en": [
@@ -1874,6 +1901,47 @@ class Command(BaseCommand):
         self.stdout.write(f"\nFound {len(categories)} categories")
         self.stdout.write(f"Found {len(vats)} VAT records")
 
+        # Fetch attributes and their values for assignment
+        from product.models.attribute import Attribute
+
+        attributes = list(
+            Attribute.objects.filter(active=True).prefetch_related(
+                "values", "translations"
+            )
+        )
+        if attributes:
+            self.stdout.write(f"Found {len(attributes)} active attributes")
+            # Build a map of attribute_id -> dict with name and list of active attribute values
+            # This allows us to match attributes to categories by name
+            self.attribute_values_map = {}
+            for attr in attributes:
+                active_values = [v for v in attr.values.all() if v.active]
+                if active_values:
+                    # Get attribute name in English for category mapping
+                    attr_name = attr.safe_translation_getter(
+                        "name", language_code="en"
+                    )
+                    if not attr_name:
+                        # Fallback to any language if English not available
+                        attr_name = attr.safe_translation_getter(
+                            "name", any_language=True
+                        )
+
+                    self.attribute_values_map[attr.id] = {
+                        "name": attr_name,
+                        "values": active_values,
+                    }
+            self.stdout.write(
+                f"Prepared {len(self.attribute_values_map)} attributes with values for assignment"
+            )
+        else:
+            self.stdout.write(
+                self.style.WARNING(
+                    "No attributes found. Products will be created without attributes."
+                )
+            )
+            self.attribute_values_map = {}
+
         # Build category data map
         self.category_data_map = {}
         for cat in categories:
@@ -2062,6 +2130,89 @@ class Command(BaseCommand):
                 translations.append(translation)
 
         return translations
+
+    def generate_product_attributes(self, products: list[Product]) -> list:
+        """
+        Generate product attribute assignments with category awareness.
+
+        This method assigns attributes to products based on their category,
+        ensuring semantic correctness (e.g., "Brand" gets brand values, not materials).
+        Uses CATEGORY_ATTRIBUTE_MAPPING to determine which attributes are appropriate
+        for each category.
+        """
+        from product.models.product_attribute import ProductAttribute
+
+        product_attributes = []
+
+        for product in products:
+            # Skip if no attributes available
+            if not self.attribute_values_map:
+                continue
+
+            # Get product category
+            category = product.category
+            if not category:
+                continue
+
+            # Get category name for mapping lookup
+            category_name = category.safe_translation_getter(
+                "name", language_code="en"
+            )
+            if not category_name:
+                category_name = category.safe_translation_getter(
+                    "name", any_language=True
+                )
+
+            if not category_name:
+                continue
+
+            # Normalize category name to lowercase for mapping lookup
+            category_name_lower = category_name.lower()
+
+            # Get appropriate attributes for this category
+            allowed_attribute_names = CATEGORY_ATTRIBUTE_MAPPING.get(
+                category_name_lower, []
+            )
+
+            if not allowed_attribute_names:
+                # If category not in mapping, skip attribute assignment
+                # This prevents random assignment to unmapped categories
+                continue
+
+            # Filter attributes to only those appropriate for this category
+            allowed_attribute_ids = [
+                attr_id
+                for attr_id, attr_data in self.attribute_values_map.items()
+                if attr_data["name"] in allowed_attribute_names
+            ]
+
+            if not allowed_attribute_ids:
+                # No matching attributes found for this category
+                continue
+
+            # Randomly assign 1-3 appropriate attributes (70% chance of having attributes)
+            if random.random() < 0.7:
+                num_attributes = random.randint(
+                    1, min(3, len(allowed_attribute_ids))
+                )
+                selected_attribute_ids = random.sample(
+                    allowed_attribute_ids, num_attributes
+                )
+
+                # For each selected attribute, pick one random value
+                for attr_id in selected_attribute_ids:
+                    available_values = self.attribute_values_map[attr_id][
+                        "values"
+                    ]
+                    if available_values:
+                        selected_value = random.choice(available_values)
+                        product_attribute = ProductAttribute(
+                            product=product,
+                            attribute_value=selected_value,
+                        )
+                        product_attributes.append(product_attribute)
+
+        return product_attributes
 
     def _get_variation(self, lang_code: str) -> str:
         """Generate language-appropriate product name variation."""
@@ -2267,6 +2418,25 @@ class Command(BaseCommand):
                     translations,
                     batch_size=batch_size * len(AVAILABLE_LANGUAGES),
                 )
+
+                # Assign attributes to products if available
+                if self.attribute_values_map:
+                    product_attributes = self.generate_product_attributes(
+                        products
+                    )
+                    if product_attributes:
+                        from product.models.product_attribute import (
+                            ProductAttribute,
+                        )
+
+                        ProductAttribute.objects.bulk_create(
+                            product_attributes,
+                            batch_size=batch_size
+                            * 3,  # Assuming avg 3 attributes per product
+                        )
+                        self.stdout.write(
+                            f"  ✓ Assigned {len(product_attributes)} attribute values to products"
+                        )
 
                 created_count += current_batch_size
 

@@ -28,30 +28,36 @@ def get_fake_useragent():
 class OrderHistoryFactory(factory.django.DjangoModelFactory):
     order = factory.SubFactory("order.factories.order.OrderFactory")
     user = factory.LazyFunction(
-        lambda: User.objects.order_by("?").first()
-        if User.objects.exists()
-        else None
+        lambda: (
+            User.objects.order_by("?").first()
+            if User.objects.exists()
+            else None
+        )
     )
     change_type = factory.Iterator(
         [choice[0] for choice in OrderHistory.OrderHistoryChangeType.choices]
     )
     previous_value = factory.LazyFunction(
-        lambda: {
-            "status": random.choice(
-                [choice[0] for choice in OrderStatus.choices]
-            )
-        }
-        if random.choice([True, False])
-        else None
+        lambda: (
+            {
+                "status": random.choice(
+                    [choice[0] for choice in OrderStatus.choices]
+                )
+            }
+            if random.choice([True, False])
+            else None
+        )
     )
     new_value = factory.LazyFunction(
-        lambda: {
-            "status": random.choice(
-                [choice[0] for choice in OrderStatus.choices]
-            )
-        }
-        if random.choice([True, False])
-        else {"note": fake.sentence()}
+        lambda: (
+            {
+                "status": random.choice(
+                    [choice[0] for choice in OrderStatus.choices]
+                )
+            }
+            if random.choice([True, False])
+            else {"note": fake.sentence()}
+        )
     )
     ip_address = factory.Faker("ipv4")
     user_agent = factory.LazyFunction(get_fake_useragent)
@@ -239,9 +245,11 @@ class OrderHistoryFactory(factory.django.DjangoModelFactory):
 class OrderItemHistoryFactory(factory.django.DjangoModelFactory):
     order_item = factory.SubFactory("order.factories.item.OrderItemFactory")
     user = factory.LazyFunction(
-        lambda: User.objects.order_by("?").first()
-        if User.objects.exists()
-        else None
+        lambda: (
+            User.objects.order_by("?").first()
+            if User.objects.exists()
+            else None
+        )
     )
     change_type = factory.Iterator(
         [
@@ -250,16 +258,20 @@ class OrderItemHistoryFactory(factory.django.DjangoModelFactory):
         ]
     )
     previous_value = factory.LazyFunction(
-        lambda: {"quantity": random.randint(1, 5)}
-        if random.choice([True, False])
-        else None
+        lambda: (
+            {"quantity": random.randint(1, 5)}
+            if random.choice([True, False])
+            else None
+        )
     )
     new_value = factory.LazyFunction(
-        lambda: {"quantity": random.randint(1, 5)}
-        if random.choice([True, False])
-        else {
-            "price": f"${random.randint(10, 100)}.{random.randint(0, 99):02d}"
-        }
+        lambda: (
+            {"quantity": random.randint(1, 5)}
+            if random.choice([True, False])
+            else {
+                "price": f"${random.randint(10, 100)}.{random.randint(0, 99):02d}"
+            }
+        )
     )
 
     class Meta:

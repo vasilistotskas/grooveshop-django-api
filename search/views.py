@@ -193,6 +193,15 @@ def blog_post_meili_search(request):
             required=False,
         ),
         OpenApiParameter(
+            name="attribute_value",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            description=_(
+                "Comma-separated attribute value IDs (attribute_values IN [ids])"
+            ),
+            required=False,
+        ),
+        OpenApiParameter(
             name="sort",
             type=str,
             location=OpenApiParameter.QUERY,
@@ -242,6 +251,7 @@ def product_meili_search(request):
     likes_min = request.query_params.get("likes_min")
     views_min = request.query_params.get("views_min")
     categories_param = request.query_params.get("categories", "")
+    attribute_value_param = request.query_params.get("attribute_value", "")
     sort_param = request.query_params.get("sort")
 
     # Parse facets parameter
@@ -283,6 +293,17 @@ def product_meili_search(request):
     if categories:
         category_ids = [int(c) for c in categories]
         search_qs = search_qs.filter(category__in=category_ids)
+
+    # Apply attribute value filter (multi-select with IN operator)
+    if attribute_value_param:
+        attribute_values = [
+            av.strip() for av in attribute_value_param.split(",") if av.strip()
+        ]
+        if attribute_values:
+            attribute_value_ids = [int(av) for av in attribute_values]
+            search_qs = search_qs.filter(
+                attribute_values__in=attribute_value_ids
+            )
 
     # Apply sort
     if sort_param:

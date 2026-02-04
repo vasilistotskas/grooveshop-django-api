@@ -337,7 +337,7 @@ class IndexMixin(models.Model):
         for field_name, value_getter in additional_fields.items():
             try:
                 data[field_name] = self._serialize_value(value_getter(self))
-            except (AttributeError, TypeError):
+            except AttributeError, TypeError:
                 data[field_name] = None
 
         # Optionally include primary key

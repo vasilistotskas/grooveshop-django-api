@@ -3,6 +3,12 @@
 
 
 
+## v1.74.0 (2026-02-05)
+
+### Features
+
+* feat: code cleanup ([`ca4f513`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ca4f513c565e5290d6b030f3aac25b45db1c3f09))
+
 ## v1.73.2 (2026-02-04)
 
 ### Bug fixes

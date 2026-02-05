@@ -1,4 +1,4 @@
-from allauth.headless.tokens.sessions import (
+from allauth.headless.tokens.strategies.sessions import (
     SessionTokenStrategy as BaseSessionTokenStrategy,
 )
 from knox.models import get_token_model

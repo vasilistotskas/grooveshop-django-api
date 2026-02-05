@@ -11,7 +11,7 @@ from django.core.management.base import BaseCommand
 from django.utils.translation import gettext as _
 
 from blog.models.post import BlogPostTranslation
-from core.utils.greeklish import expand_greeklish_query
+from search.greeklish import expand_greeklish_query
 from meili._client import client as meili_client
 from product.models.product import ProductTranslation
 

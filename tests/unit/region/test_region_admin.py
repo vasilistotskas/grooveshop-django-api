@@ -103,17 +103,34 @@ class TestRegionStatusFilter(TestCase):
         )
         filter_instance.used_parameters = {"region_status": "no_name"}
 
-        queryset = Region.objects.all()
+        # Only query regions from our test country to avoid interference from parallel tests
+        queryset = Region.objects.filter(country=self.country)
         filtered_queryset = filter_instance.queryset(self.request, queryset)
 
-        regions_without_names = list(filtered_queryset)
-        # Only check our specific test regions, not all regions in the database
-        # (other parallel tests may have created regions)
-        self.assertNotIn(self.region_with_name, regions_without_names)
-        # Verify our region without name is in the filtered results
-        # by checking if any region with our alpha code is present
-        region_alphas = [r.alpha for r in regions_without_names]
-        self.assertIn(self.region_without_name.alpha, region_alphas)
+        # Get distinct regions (filter may return duplicates due to translation joins)
+        regions_without_names = list(filtered_queryset.distinct())
+
+        # Get the PKs of regions we expect
+        expected_without_name_pks = {
+            self.region_without_name.pk,
+            self.recent_region.pk,
+            self.old_region.pk,
+        }
+        not_expected_pks = {self.region_with_name.pk}
+
+        result_pks = {r.pk for r in regions_without_names}
+
+        # Verify our region with name is NOT in the filtered results
+        self.assertFalse(
+            not_expected_pks & result_pks,
+            f"Region with name (pk={self.region_with_name.pk}) should not be in results",
+        )
+
+        # Verify our regions without names ARE in the filtered results
+        self.assertTrue(
+            expected_without_name_pks.issubset(result_pks),
+            f"Expected regions without names {expected_without_name_pks} to be in results {result_pks}",
+        )
 
     def test_queryset_recent_filter(self):
         filter_instance = RegionStatusFilter(

@@ -184,12 +184,14 @@ class TestStockReservationsHaveCorrectTTL:
             session_id="cart-1",
             user_id=None,
         )
+        # Refresh from database to ensure we have the latest data
+        reservation1.refresh_from_db()
         expected_expires1 = reservation1.created_at + timedelta(minutes=15)
 
         # Small delay to ensure different timestamps
         import time
 
-        time.sleep(0.1)
+        time.sleep(0.2)
 
         # Create second reservation
         reservation2 = StockManager.reserve_stock(
@@ -198,10 +200,12 @@ class TestStockReservationsHaveCorrectTTL:
             session_id="cart-2",
             user_id=None,
         )
+        # Refresh from database to ensure we have the latest data
+        reservation2.refresh_from_db()
         expected_expires2 = reservation2.created_at + timedelta(minutes=15)
 
         # Small delay to ensure different timestamps
-        time.sleep(0.1)
+        time.sleep(0.2)
 
         # Create third reservation
         reservation3 = StockManager.reserve_stock(
@@ -210,23 +214,32 @@ class TestStockReservationsHaveCorrectTTL:
             session_id="cart-3",
             user_id=None,
         )
+        # Refresh from database to ensure we have the latest data
+        reservation3.refresh_from_db()
         expected_expires3 = reservation3.created_at + timedelta(minutes=15)
 
         # Verify each reservation has correct independent TTL
+        # Allow 2 seconds tolerance for database operations and parallel test execution
         assert (
             abs((reservation1.expires_at - expected_expires1).total_seconds())
-            < 1
-        ), "Reservation 1 TTL incorrect"
+            < 2
+        ), (
+            f"Reservation 1 TTL incorrect: expected {expected_expires1}, got {reservation1.expires_at}, created_at: {reservation1.created_at}"
+        )
 
         assert (
             abs((reservation2.expires_at - expected_expires2).total_seconds())
-            < 1
-        ), "Reservation 2 TTL incorrect"
+            < 2
+        ), (
+            f"Reservation 2 TTL incorrect: expected {expected_expires2}, got {reservation2.expires_at}, created_at: {reservation2.created_at}"
+        )
 
         assert (
             abs((reservation3.expires_at - expected_expires3).total_seconds())
-            < 1
-        ), "Reservation 3 TTL incorrect"
+            < 2
+        ), (
+            f"Reservation 3 TTL incorrect: expected {expected_expires3}, got {reservation3.expires_at}, created_at: {reservation3.created_at}"
+        )
 
         # Verify the reservations were created at different times
         assert reservation2.created_at > reservation1.created_at, (

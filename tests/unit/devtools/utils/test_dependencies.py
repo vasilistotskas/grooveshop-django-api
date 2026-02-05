@@ -5,7 +5,7 @@ from django.db import models
 from django.db.models.fields.related import ForeignKey, OneToOneField
 from django.test import TestCase
 
-from core.utils.dependencies import (
+from devtools.utils.dependencies import (
     DependencyNode,
     CircularDependencyError,
     DependencyAnalyzer,
@@ -216,7 +216,7 @@ class TestDependencyAnalyzer(TestCase):
         self.assertEqual(self.analyzer.model_to_factory, {})
 
     @patch(
-        "core.utils.dependencies.TranslationUtilities.is_translation_factory"
+        "devtools.utils.dependencies.TranslationUtilities.is_translation_factory"
     )
     def test_create_nodes(self, mock_is_translation):
         mock_is_translation.return_value = False
@@ -229,7 +229,7 @@ class TestDependencyAnalyzer(TestCase):
         self.assertEqual(len(self.analyzer.nodes), 2)
 
     @patch(
-        "core.utils.dependencies.TranslationUtilities.is_translation_factory"
+        "devtools.utils.dependencies.TranslationUtilities.is_translation_factory"
     )
     def test_create_nodes_skips_translation_factories(
         self, mock_is_translation
@@ -272,7 +272,7 @@ class TestDependencyAnalyzer(TestCase):
         )
 
     @patch(
-        "core.utils.dependencies.TranslationUtilities.is_translation_factory"
+        "devtools.utils.dependencies.TranslationUtilities.is_translation_factory"
     )
     def test_analyze_model_dependencies(self, mock_is_translation):
         mock_is_translation.return_value = False
@@ -296,7 +296,7 @@ class TestDependencyAnalyzer(TestCase):
         self.assertIn(user_node, profile_node.dependencies)
 
     @patch(
-        "core.utils.dependencies.TranslationUtilities.is_translation_factory"
+        "devtools.utils.dependencies.TranslationUtilities.is_translation_factory"
     )
     def test_analyze_explicit_dependencies(self, mock_is_translation):
         mock_is_translation.return_value = False
@@ -320,7 +320,7 @@ class TestDependencyAnalyzer(TestCase):
         self.assertIn(profile_node, explicit_node.dependencies)
 
     @patch(
-        "core.utils.dependencies.TranslationUtilities.is_translation_factory"
+        "devtools.utils.dependencies.TranslationUtilities.is_translation_factory"
     )
     def test_detect_circular_dependencies(self, mock_is_translation):
         mock_is_translation.return_value = False
@@ -337,7 +337,7 @@ class TestDependencyAnalyzer(TestCase):
             self.analyzer._detect_circular_dependencies()
 
     @patch(
-        "core.utils.dependencies.TranslationUtilities.is_translation_factory"
+        "devtools.utils.dependencies.TranslationUtilities.is_translation_factory"
     )
     def test_topological_sort(self, mock_is_translation):
         mock_is_translation.return_value = False
@@ -364,7 +364,7 @@ class TestDependencyAnalyzer(TestCase):
         self.assertLess(user_index, profile_index)
 
     @patch(
-        "core.utils.dependencies.TranslationUtilities.is_translation_factory"
+        "devtools.utils.dependencies.TranslationUtilities.is_translation_factory"
     )
     def test_get_dependency_report(self, mock_is_translation):
         mock_is_translation.return_value = False
@@ -379,9 +379,9 @@ class TestDependencyAnalyzer(TestCase):
         self.assertIn("Statistics:", report)
 
     @patch(
-        "core.utils.dependencies.TranslationUtilities.is_translation_factory"
+        "devtools.utils.dependencies.TranslationUtilities.is_translation_factory"
     )
-    @patch("core.utils.dependencies.logger")
+    @patch("devtools.utils.dependencies.logger")
     def test_analyze_factory_dependencies_full_flow(
         self, mock_logger, mock_is_translation
     ):
@@ -428,9 +428,9 @@ class TestFactoryOrchestrator(TestCase):
         self.assertIsInstance(self.orchestrator.analyzer, DependencyAnalyzer)
 
     @patch(
-        "core.utils.dependencies.TranslationUtilities.is_translation_factory"
+        "devtools.utils.dependencies.TranslationUtilities.is_translation_factory"
     )
-    @patch("core.utils.dependencies.logger")
+    @patch("devtools.utils.dependencies.logger")
     def test_get_execution_order(self, mock_logger, mock_is_translation):
         mock_is_translation.return_value = False
 
@@ -458,7 +458,7 @@ class TestFactoryOrchestrator(TestCase):
             self.assertLess(user_index, profile_index)
 
     @patch(
-        "core.utils.dependencies.TranslationUtilities.is_translation_factory"
+        "devtools.utils.dependencies.TranslationUtilities.is_translation_factory"
     )
     def test_get_dependency_report(self, mock_is_translation):
         mock_is_translation.return_value = False
@@ -472,7 +472,9 @@ class TestFactoryOrchestrator(TestCase):
 
 
 class TestModuleFunctions(TestCase):
-    @patch("core.utils.dependencies.FactoryOrchestrator.get_execution_order")
+    @patch(
+        "devtools.utils.dependencies.FactoryOrchestrator.get_execution_order"
+    )
     def test_get_factory_execution_order(self, mock_get_order):
         factory_classes = [MockUserFactory, MockProfileFactory]
         expected_order = [MockUserFactory, MockProfileFactory]
@@ -483,8 +485,12 @@ class TestModuleFunctions(TestCase):
         self.assertEqual(result, expected_order)
         mock_get_order.assert_called_once_with(factory_classes)
 
-    @patch("core.utils.dependencies.FactoryOrchestrator.get_dependency_report")
-    @patch("core.utils.dependencies.FactoryOrchestrator.get_execution_order")
+    @patch(
+        "devtools.utils.dependencies.FactoryOrchestrator.get_dependency_report"
+    )
+    @patch(
+        "devtools.utils.dependencies.FactoryOrchestrator.get_execution_order"
+    )
     def test_analyze_factory_dependencies_function(
         self, mock_get_order, mock_get_report
     ):

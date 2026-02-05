@@ -128,13 +128,11 @@ class TestClearDuplicateHistoryTask:
     ):
         result = clear_duplicate_history_task()
 
-        mock_call_command.assert_called_once_with(
-            "clean_duplicate_history", "--auto"
-        )
+        mock_call_command.assert_called_once_with("clean_duplicate_history")
         assert result["status"] == "success"
         assert "Duplicate history entries cleaned" in result["message"]
 
-    @patch("core.tasks.management.call_command")
+    @patch("django.core.management.call_command")
     def test_duplicate_history_cleanup_with_parameters(self, mock_call_command):
         excluded_fields = ["field1", "field2"]
         minutes = 30
@@ -150,7 +148,6 @@ class TestClearDuplicateHistoryTask:
             "--excluded_fields",
             "field1",
             "field2",
-            "--auto",
         )
         assert result["status"] == "success"
         assert result["parameters"]["excluded_fields"] == excluded_fields

@@ -3,7 +3,7 @@ import importlib
 import factory
 from django.apps import apps
 
-from core.factories import CustomDjangoModelFactory
+from devtools.factories import CustomDjangoModelFactory
 from product.models.product_attribute import ProductAttribute
 
 

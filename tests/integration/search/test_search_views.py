@@ -41,27 +41,30 @@ def authenticated_user(db):
 def sample_products(db):
     """Create sample products for testing."""
     products = []
+    translations = []
     for i in range(5):
         product = Product.objects.create()
         # Create English translation using Parler's API
-        ProductTranslation.objects.create(
+        translation = ProductTranslation.objects.create(
             master=product,
             language_code="en",
             name=f"Test Product {i}",
             description=f"Description for product {i}",
         )
         products.append(product)
-    return products
+        translations.append(translation)
+    return {"products": products, "translations": translations}
 
 
 @pytest.fixture
 def sample_blog_posts(db):
     """Create sample blog posts for testing."""
     posts = []
+    translations = []
     for i in range(3):
         post = BlogPost.objects.create()
         # Create English translation using Parler's API
-        BlogPostTranslation.objects.create(
+        translation = BlogPostTranslation.objects.create(
             master=post,
             language_code="en",
             title=f"Test Blog Post {i}",
@@ -69,7 +72,8 @@ def sample_blog_posts(db):
             body=f"Body content for post {i}",
         )
         posts.append(post)
-    return posts
+        translations.append(translation)
+    return {"posts": posts, "translations": translations}
 
 
 @pytest.mark.django_db
@@ -702,15 +706,20 @@ class TestFederatedSearchEndToEnd:
         5. Content type tagging
         6. Response serialization
         """
+        # Get the translation IDs for mocking
+        product_translation = sample_products["translations"][0]
+        blog_translation = sample_blog_posts["translations"][0]
+
         # Mock Meilisearch multi_search to return federated results
+        # Use the correct import path from search.views
         with patch(
-            "meili._client.client.client.multi_search"
+            "search.views.meili_client.client.multi_search"
         ) as mock_multi_search:
             # Simulate federated search response from Meilisearch
             mock_multi_search.return_value = {
                 "hits": [
                     {
-                        "id": str(sample_products[0].id),
+                        "id": str(product_translation.id),
                         "name": "Test Product 0",
                         "language_code": "en",
                         "_formatted": {
@@ -728,7 +737,7 @@ class TestFederatedSearchEndToEnd:
                         },
                     },
                     {
-                        "id": str(sample_blog_posts[0].id),
+                        "id": str(blog_translation.id),
                         "title": "Test Blog Post 0",
                         "language_code": "en",
                         "_formatted": {

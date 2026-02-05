@@ -3,7 +3,7 @@ from django.apps import apps
 from django.conf import settings
 from faker import Faker
 
-from core.factories import CustomDjangoModelFactory
+from devtools.factories import CustomDjangoModelFactory
 from product.models.category import ProductCategory
 
 fake = Faker()

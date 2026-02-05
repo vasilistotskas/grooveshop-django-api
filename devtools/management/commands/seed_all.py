@@ -15,9 +15,9 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import IntegrityError, models, transaction
 from django.db.models import Model
 
-from core.factories import CustomDjangoModelFactory, TranslationUtilities
-from core.utils.dependencies import DependencyAnalyzer, FactoryOrchestrator
-from core.utils.profiler import FactoryProfiler
+from devtools.factories import CustomDjangoModelFactory, TranslationUtilities
+from devtools.utils.dependencies import DependencyAnalyzer, FactoryOrchestrator
+from devtools.utils.profiler import FactoryProfiler
 
 logger = logging.getLogger(__name__)
 

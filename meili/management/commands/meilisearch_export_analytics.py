@@ -9,6 +9,7 @@ import json
 from datetime import datetime
 
 from django.core.management.base import BaseCommand
+from django.utils import timezone
 from django.utils.translation import gettext as _
 
 from search.models import SearchClick, SearchQuery
@@ -75,6 +76,9 @@ class Command(BaseCommand):
         if start_date_str:
             try:
                 start_date = datetime.fromisoformat(start_date_str)
+                # Make timezone-aware if naive
+                if timezone.is_naive(start_date):
+                    start_date = timezone.make_aware(start_date)
                 queries_qs = queries_qs.filter(timestamp__gte=start_date)
             except ValueError:
                 self.stdout.write(
@@ -88,6 +92,9 @@ class Command(BaseCommand):
         if end_date_str:
             try:
                 end_date = datetime.fromisoformat(end_date_str)
+                # Make timezone-aware if naive
+                if timezone.is_naive(end_date):
+                    end_date = timezone.make_aware(end_date)
                 queries_qs = queries_qs.filter(timestamp__lte=end_date)
             except ValueError:
                 self.stdout.write(

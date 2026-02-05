@@ -87,6 +87,7 @@ DJANGO_APPS = [
 
 LOCAL_APPS = [
     "core",
+    "devtools",
     "user",
     "product",
     "order",
@@ -193,6 +194,9 @@ LANGUAGE_CODE = getenv("LANGUAGE_CODE", "el")
 TIME_ZONE = getenv("TIME_ZONE", "Europe/Athens")
 USE_I18N = getenv("USE_I18N", "True") == "True"
 USE_TZ = getenv("USE_TZ", "True") == "True"
+
+# Forms URL field configuration (Django 6.0 compatibility)
+FORMS_URLFIELD_ASSUME_HTTPS = not DEBUG
 
 SITE_ID = int(getenv("SITE_ID", "1"))
 

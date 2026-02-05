@@ -54,23 +54,23 @@ class HomeView(View):
 def upload_image(request):
     USE_AWS = os.getenv("USE_AWS", "False") == "True"
 
-    user = request.user
-    if not user.is_superuser:
+    if not request.user.is_superuser:
         return JsonResponse(
-            {"Error Message": "You are not authorized to upload images"}
+            {"Error Message": "You are not authorized to upload images"},
+            status=403,
         )
 
     if request.method != "POST":
-        return JsonResponse({"Error Message": "Wrong request"})
+        return JsonResponse({"Error Message": "Method not allowed"}, status=405)
 
-    file_obj = request.FILES["file"]
-    file_name_suffix = file_obj.name.split(".")[-1].lower()
-    if file_name_suffix not in ["jpg", "png", "gif", "jpeg"]:
-        return JsonResponse(
-            {
-                "Error Message": f"Wrong file suffix ({file_name_suffix}), supported are .jpg, .png, .gif, .jpeg"
-            }
-        )
+    from core.forms import ImageUploadForm
+
+    form = ImageUploadForm(request.POST, request.FILES)
+
+    if not form.is_valid():
+        return JsonResponse({"Error Message": form.errors["file"][0]})
+
+    file_obj = form.cleaned_data["file"]
 
     if USE_AWS:
         storage = TinymceS3Storage()
@@ -95,7 +95,8 @@ def upload_image(request):
         raise ValidationError(_("Invalid file path"))
 
     if os.path.exists(file_path):
-        sanitized_name = str(uuid4()) + "." + file_name_suffix
+        file_name_suffix = os.path.splitext(file_obj.name)[1].lower()
+        sanitized_name = str(uuid4()) + file_name_suffix
         file_path = os.path.join(upload_dir, sanitized_name)
 
     with open(file_path, "wb+") as f:

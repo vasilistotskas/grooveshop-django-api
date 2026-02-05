@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch, MagicMock
 
 from django.test import TestCase
 
-from core.utils.profiler import (
+from devtools.utils.profiler import (
     ProfileLevel,
     FactoryExecutionMetrics,
     SessionMetrics,
@@ -281,7 +281,7 @@ class TestMemoryProfiler(TestCase):
     def test_get_memory_usage_fallback(self, mock_get_memory, mock_is_tracing):
         mock_get_memory.return_value = (1024, 2048)
 
-        with patch("core.utils.profiler.psutil", None):
+        with patch("devtools.utils.profiler.psutil", None):
             result = self.profiler.update_peak()
             self.assertEqual(result, 1024)
 
@@ -520,7 +520,7 @@ class TestReportBuilder(TestCase):
 
 
 class TestModuleFunctions(TestCase):
-    @patch("core.utils.profiler.FactoryProfiler")
+    @patch("devtools.utils.profiler.FactoryProfiler")
     def test_profile_factory_execution(self, mock_profiler_class):
         mock_metrics = FactoryExecutionMetrics(
             factory_name="TestFactory",
@@ -549,7 +549,7 @@ class TestModuleFunctions(TestCase):
         self.assertEqual(result, mock_metrics)
         mock_profiler.profile_factory.assert_called_once_with(mock_factory, 10)
 
-    @patch("core.utils.profiler.FactoryProfiler")
+    @patch("devtools.utils.profiler.FactoryProfiler")
     def test_benchmark_factories(self, mock_profiler_class):
         mock_profiler = Mock()
         mock_profiler_class.return_value = mock_profiler

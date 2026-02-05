@@ -36,6 +36,8 @@ class TestOptimizedManagerDelegation:
 
             class Meta:
                 app_label = "core"
+                # Use unique model name to avoid registration conflicts
+                db_table = "test_model_delegation_1"
 
         manager = TestManager()
         manager.model = TestModel
@@ -50,12 +52,13 @@ class TestOptimizedManagerDelegation:
         class TestManager(OptimizedManager):
             pass
 
-        class TestModel(models.Model):
+        class TestModel2(models.Model):
             class Meta:
                 app_label = "core"
+                db_table = "test_model_delegation_2"
 
         manager = TestManager()
-        manager.model = TestModel
+        manager.model = TestModel2
 
         with pytest.raises(AttributeError) as exc_info:
             manager._private_method()
@@ -70,12 +73,13 @@ class TestOptimizedManagerDelegation:
         class TestManager(OptimizedManager):
             pass
 
-        class TestModel(models.Model):
+        class TestModel3(models.Model):
             class Meta:
                 app_label = "core"
+                db_table = "test_model_delegation_3"
 
         manager = TestManager()
-        manager.model = TestModel
+        manager.model = TestModel3
 
         with pytest.raises(AttributeError):
             manager.nonexistent_method()
@@ -94,15 +98,16 @@ class TestOptimizedManagerDelegation:
                 """Override for_list with custom logic."""
                 return self.get_queryset().filter(manager_optimized=True)
 
-        class TestModel(models.Model):
+        class TestModel4(models.Model):
             list_optimized = models.BooleanField(default=False)
             manager_optimized = models.BooleanField(default=False)
 
             class Meta:
                 app_label = "core"
+                db_table = "test_model_delegation_4"
 
         manager = TestManager()
-        manager.model = TestModel
+        manager.model = TestModel4
 
         # Should use Manager's explicit method, not delegate
         result = manager.for_list()
@@ -122,15 +127,16 @@ class TestOptimizedManagerDelegation:
         class TestManager(OptimizedManager):
             queryset_class = TestQuerySet
 
-        class TestModel(models.Model):
+        class TestModel5(models.Model):
             active = models.BooleanField(default=True)
             published = models.BooleanField(default=True)
 
             class Meta:
                 app_label = "core"
+                db_table = "test_model_delegation_5"
 
         manager = TestManager()
-        manager.model = TestModel
+        manager.model = TestModel5
 
         # Both methods should be delegated and chainable
         result = manager.active().published()
@@ -196,14 +202,15 @@ class TestManagerDelegationIntegration:
         class TestManager(OptimizedManager):
             pass
 
-        class TestModel(models.Model):
+        class TestModel6(models.Model):
             name = models.CharField(max_length=100)
 
             class Meta:
                 app_label = "core"
+                db_table = "test_model_delegation_6"
 
         manager = TestManager()
-        manager.model = TestModel
+        manager.model = TestModel6
 
         # filter is a standard QuerySet method, should be delegated
         result = manager.filter(name="test")
@@ -215,14 +222,15 @@ class TestManagerDelegationIntegration:
         class TestManager(OptimizedManager):
             pass
 
-        class TestModel(models.Model):
+        class TestModel7(models.Model):
             active = models.BooleanField(default=True)
 
             class Meta:
                 app_label = "core"
+                db_table = "test_model_delegation_7"
 
         manager = TestManager()
-        manager.model = TestModel
+        manager.model = TestModel7
 
         # exclude is a standard QuerySet method, should be delegated
         result = manager.exclude(active=False)
@@ -235,14 +243,15 @@ class TestManagerDelegationIntegration:
         class TestManager(OptimizedManager):
             pass
 
-        class TestModel(models.Model):
+        class TestModel8(models.Model):
             name = models.CharField(max_length=100)
 
             class Meta:
                 app_label = "core"
+                db_table = "test_model_delegation_8"
 
         manager = TestManager()
-        manager.model = TestModel
+        manager.model = TestModel8
 
         # annotate is a standard QuerySet method, should be delegated
         result = manager.annotate(count=Count("id"))
@@ -254,14 +263,15 @@ class TestManagerDelegationIntegration:
         class TestManager(OptimizedManager):
             pass
 
-        class TestModel(models.Model):
+        class TestModel9(models.Model):
             name = models.CharField(max_length=100)
 
             class Meta:
                 app_label = "core"
+                db_table = "test_model_delegation_9"
 
         manager = TestManager()
-        manager.model = TestModel
+        manager.model = TestModel9
 
         # select_related is a standard QuerySet method, should be delegated
         result = manager.select_related("category")
@@ -273,14 +283,15 @@ class TestManagerDelegationIntegration:
         class TestManager(OptimizedManager):
             pass
 
-        class TestModel(models.Model):
+        class TestModel10(models.Model):
             name = models.CharField(max_length=100)
 
             class Meta:
                 app_label = "core"
+                db_table = "test_model_delegation_10"
 
         manager = TestManager()
-        manager.model = TestModel
+        manager.model = TestModel10
 
         # prefetch_related is a standard QuerySet method, should be delegated
         result = manager.prefetch_related("tags")

@@ -5,7 +5,24 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 
-class IsOwnerOrAdmin(BasePermission):
+class IsOwnerMixin:
+    def _is_owner(self, user, obj):
+        if hasattr(obj, "user"):
+            return obj.user == user
+
+        if isinstance(obj, User):
+            return obj.id == user.id
+
+        if hasattr(obj, "owner"):
+            return obj.owner == user
+
+        if hasattr(obj, "created_by"):
+            return obj.created_by == user
+
+        return False
+
+
+class IsOwnerOrAdmin(IsOwnerMixin, BasePermission):
     message = _("You do not have permission to access this object.")
 
     def has_permission(self, request, view):
@@ -17,26 +34,8 @@ class IsOwnerOrAdmin(BasePermission):
 
         return self._is_owner(request.user, obj)
 
-    def _is_owner(self, user, obj):
-        if hasattr(obj, "user"):
-            return obj.user == user
 
-        if self._is_user_instance(obj):
-            return obj.id == user.id
-
-        if hasattr(obj, "owner"):
-            return obj.owner == user
-
-        if hasattr(obj, "created_by"):
-            return obj.created_by == user
-
-        return False
-
-    def _is_user_instance(self, obj):
-        return isinstance(obj, User)
-
-
-class IsOwnerOrAdminOrGuest(BasePermission):
+class IsOwnerOrAdminOrGuest(IsOwnerMixin, BasePermission):
     message = _("You do not have permission to access this object.")
 
     def has_permission(self, request, view):
@@ -59,20 +58,5 @@ class IsOwnerOrAdminOrGuest(BasePermission):
 
         if request.user and request.user.is_authenticated:
             return self._is_owner(request.user, obj)
-
-        return False
-
-    def _is_owner(self, user, obj):
-        if hasattr(obj, "user"):
-            return obj.user == user
-
-        if isinstance(obj, User):
-            return obj.id == user.id
-
-        if hasattr(obj, "owner"):
-            return obj.owner == user
-
-        if hasattr(obj, "created_by"):
-            return obj.created_by == user
 
         return False

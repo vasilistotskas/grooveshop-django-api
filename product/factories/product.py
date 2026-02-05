@@ -5,7 +5,7 @@ from django.apps import apps
 from django.conf import settings
 from faker import Faker
 
-from core.factories import CustomDjangoModelFactory
+from devtools.factories import CustomDjangoModelFactory
 from product.factories.image import ProductImageFactory
 from product.factories.review import ProductReviewFactory
 from product.models.product import Product

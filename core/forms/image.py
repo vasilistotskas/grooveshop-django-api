@@ -8,6 +8,7 @@ from django.conf import settings
 from django.core import validators
 from django.core.exceptions import ValidationError
 from django.forms import ImageField
+from django import forms
 from django.utils.translation import gettext_lazy as _
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -144,3 +145,7 @@ class ImageAndSvgField(ImageField):
                         f.seek(0)
                 except OSError:
                     pass
+
+
+class ImageUploadForm(forms.Form):
+    file = ImageAndSvgField()

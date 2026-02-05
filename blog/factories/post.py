@@ -9,7 +9,7 @@ from faker import Faker
 from blog.factories.comment import BlogCommentFactory
 from blog.factories.tag import BlogTagFactory
 from blog.models.post import BlogPost
-from core.factories import CustomDjangoModelFactory
+from devtools.factories import CustomDjangoModelFactory
 
 
 fake = Faker()

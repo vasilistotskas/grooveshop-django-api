@@ -126,8 +126,6 @@ def clear_duplicate_history_task(excluded_fields=None, minutes=None):
         if excluded_fields:
             command_args.extend(["--excluded_fields", *excluded_fields])
 
-        command_args.append("--auto")
-
         with transaction.atomic():
             management.call_command(*command_args)
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 
-from core.utils.greeklish import (
+from search.greeklish import (
     GreeklishConverter,
     expand_greeklish_query,
     greeklish_to_greek,

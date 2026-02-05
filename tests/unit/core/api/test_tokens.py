@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from allauth.headless.tokens.sessions import (
+from allauth.headless.tokens.strategies.sessions import (
     SessionTokenStrategy as BaseSessionTokenStrategy,
 )
 from django.contrib.auth import get_user_model

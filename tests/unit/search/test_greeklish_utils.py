@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 
-from core.utils.greeklish import expand_greeklish_query, is_greeklish
+from search.greeklish import expand_greeklish_query, is_greeklish
 
 # Comprehensive Greeklish test cases
 GREEKLISH_TEST_CASES = [

@@ -4,11 +4,18 @@ from django.conf import settings
 from django.http import HttpRequest
 
 
+from functools import lru_cache
+
+
+@lru_cache(maxsize=1)
 def get_version_from_toml():
-    with open("pyproject.toml") as toml_file:
-        toml_content = toml_file.read()
-        version = toml_content.split('version = "')[1].split('"\n')[0]
-    return version
+    try:
+        with open("pyproject.toml") as toml_file:
+            toml_content = toml_file.read()
+            version = toml_content.split('version = "')[1].split('"\n')[0]
+        return version
+    except (FileNotFoundError, IndexError):
+        return "0.0.0"
 
 
 def metadata(request: HttpRequest):

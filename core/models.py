@@ -11,6 +11,10 @@ from django_stubs_ext.db.models import TypedModelMeta
 
 
 class SeoModel(models.Model):
+    """
+    Abstract model that adds SEO fields (title, description, keywords).
+    """
+
     seo_title = models.CharField(
         _("Seo Title"), max_length=70, blank=True, default=""
     )
@@ -26,6 +30,10 @@ class SeoModel(models.Model):
 
 
 class SortableModel(models.Model):
+    """
+    Abstract model that adds a sort_order field and methods for moving items up/down.
+    """
+
     sort_order = models.IntegerField(_("Sort Order"), editable=False, null=True)
 
     class Meta(TypedModelMeta):
@@ -83,6 +91,10 @@ class SortableModel(models.Model):
 
 
 class TimeStampMixinModel(models.Model):
+    """
+    Abstract model that adds created_at and updated_at timestamps.
+    """
+
     created_at = models.DateTimeField(_("Created At"), auto_now_add=True)
     updated_at = models.DateTimeField(_("Updated At"), auto_now=True)
 
@@ -101,6 +113,10 @@ class TimeStampMixinModel(models.Model):
 
 
 class UUIDModel(models.Model):
+    """
+    Abstract model that adds a unique UUID field.
+    """
+
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
 
     class Meta(TypedModelMeta):
@@ -108,6 +124,10 @@ class UUIDModel(models.Model):
 
 
 class PublishedQuerySet(models.QuerySet):
+    """
+    QuerySet for PublishableModel that provides a published() filter.
+    """
+
     def published(self):
         today = timezone.now()
         return self.filter(
@@ -120,6 +140,10 @@ PublishableManager = models.Manager.from_queryset(PublishedQuerySet)
 
 
 class PublishableModel(models.Model):
+    """
+    Abstract model that adds published_at and is_published fields.
+    """
+
     published_at = models.DateTimeField(
         _("Published At"), null=True, blank=True
     )
@@ -145,6 +169,10 @@ class PublishableModel(models.Model):
 
 
 class MetaDataModel(models.Model):
+    """
+    Abstract model that adds private_metadata and metadata JSON fields.
+    """
+
     private_metadata = JSONField(
         blank=True, default=dict, encoder=DjangoJSONEncoder
     )
@@ -200,6 +228,10 @@ class MetaDataModel(models.Model):
 
 
 class SoftDeleteMixin(models.Model):
+    """
+    Abstract model that adds soft delete functionality.
+    """
+
     deleted_at = models.DateTimeField(null=True, blank=True)
     is_deleted = models.BooleanField(default=False)
 
@@ -218,6 +250,10 @@ class SoftDeleteMixin(models.Model):
 
 
 class SoftDeleteQuerySet(models.QuerySet):
+    """
+    QuerySet that overrides delete() to perform soft delete.
+    """
+
     def delete(self):
         return super().update(deleted_at=timezone.now(), is_deleted=True)
 
@@ -229,6 +265,10 @@ class SoftDeleteQuerySet(models.QuerySet):
 
 
 class SoftDeleteManager(models.Manager):
+    """
+    Manager that filters out soft-deleted items by default.
+    """
+
     def get_queryset(self) -> SoftDeleteQuerySet:
         return SoftDeleteQuerySet(self.model, using=self._db).exclude(
             is_deleted=True

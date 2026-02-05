@@ -8,16 +8,18 @@ from order.models.item import OrderItem
 from product.factories.product import ProductFactory
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.fixture
+def test_order(db):
+    """Create a test order for stock validation tests."""
+    return OrderFactory.create()
+
+
+@pytest.mark.django_db
 class TestStockValidationPreventsInvalidOrders:
     """
     Test that OrderItem creation with quantity exceeding available stock
     is properly rejected with appropriate error.
     """
-
-    def setup_method(self):
-        """Set up test data for each test method."""
-        self.order = OrderFactory.create()
 
     @pytest.mark.parametrize(
         "stock,quantity,should_fail,description",
@@ -60,7 +62,7 @@ class TestStockValidationPreventsInvalidOrders:
         ],
     )
     def test_orderitem_creation_validates_stock(
-        self, stock, quantity, should_fail, description
+        self, test_order, stock, quantity, should_fail, description
     ):
         """
         Test that OrderItem creation validates quantity against available stock.
@@ -81,7 +83,7 @@ class TestStockValidationPreventsInvalidOrders:
 
         # Create OrderItem (not saved yet)
         order_item = OrderItem(
-            order=self.order,
+            order=test_order,
             product=product,
             price=product.price,
             quantity=quantity,
@@ -136,7 +138,9 @@ class TestStockValidationPreventsInvalidOrders:
             "stock_1_quantity_2",
         ],
     )
-    def test_orderitem_clean_prevents_insufficient_stock(self, stock, quantity):
+    def test_orderitem_clean_prevents_insufficient_stock(
+        self, test_order, stock, quantity
+    ):
         """
         Test that OrderItem.clean() prevents creation when quantity > stock.
 
@@ -153,7 +157,7 @@ class TestStockValidationPreventsInvalidOrders:
 
         # Create new OrderItem (not saved)
         order_item = OrderItem(
-            order=self.order,
+            order=test_order,
             product=product,
             price=product.price,
             quantity=quantity,
@@ -194,7 +198,7 @@ class TestStockValidationPreventsInvalidOrders:
         ],
     )
     def test_orderitem_creation_succeeds_with_sufficient_stock(
-        self, stock, quantity
+        self, test_order, stock, quantity
     ):
         """
         Test that OrderItem creation succeeds when quantity <= stock.
@@ -212,7 +216,7 @@ class TestStockValidationPreventsInvalidOrders:
 
         # Create OrderItem
         order_item = OrderItem(
-            order=self.order,
+            order=test_order,
             product=product,
             price=product.price,
             quantity=quantity,
@@ -232,11 +236,11 @@ class TestStockValidationPreventsInvalidOrders:
         assert order_item.product == product, (
             "OrderItem should reference correct product"
         )
-        assert order_item.order == self.order, (
+        assert order_item.order == test_order, (
             "OrderItem should reference correct order"
         )
 
-    def test_existing_orderitem_stock_not_checked(self):
+    def test_existing_orderitem_stock_not_checked(self, test_order):
         """
         Test that existing OrderItems are not validated against current stock.
 
@@ -253,7 +257,7 @@ class TestStockValidationPreventsInvalidOrders:
 
         # Create and save OrderItem
         order_item = OrderItem(
-            order=self.order,
+            order=test_order,
             product=product,
             price=product.price,
             quantity=5,
@@ -301,7 +305,7 @@ class TestStockValidationPreventsInvalidOrders:
         ],
     )
     def test_sequential_orderitems_validate_remaining_stock(
-        self, initial_stock, first_quantity, second_quantity
+        self, test_order, initial_stock, first_quantity, second_quantity
     ):
         """
         Test that stock validation considers previously created OrderItems.
@@ -324,7 +328,7 @@ class TestStockValidationPreventsInvalidOrders:
 
         # Create first OrderItem
         first_item = OrderItem(
-            order=self.order,
+            order=test_order,
             product=product,
             price=product.price,
             quantity=first_quantity,
@@ -364,7 +368,7 @@ class TestStockValidationPreventsInvalidOrders:
             second_item.save()
             assert second_item.pk is not None
 
-    def test_zero_quantity_rejected(self):
+    def test_zero_quantity_rejected(self, test_order):
         """
         Test that OrderItem with zero quantity is rejected.
 
@@ -379,7 +383,7 @@ class TestStockValidationPreventsInvalidOrders:
         product.save()
 
         order_item = OrderItem(
-            order=self.order,
+            order=test_order,
             product=product,
             price=product.price,
             quantity=0,
@@ -396,7 +400,7 @@ class TestStockValidationPreventsInvalidOrders:
             f"Error should mention quantity must be greater than 0: {error_message}"
         )
 
-    def test_negative_quantity_rejected(self):
+    def test_negative_quantity_rejected(self, test_order):
         """
         Test that OrderItem with negative quantity is rejected.
 
@@ -410,7 +414,7 @@ class TestStockValidationPreventsInvalidOrders:
         product.save()
 
         order_item = OrderItem(
-            order=self.order,
+            order=test_order,
             product=product,
             price=product.price,
             quantity=-5,

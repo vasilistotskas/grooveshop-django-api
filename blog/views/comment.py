@@ -313,7 +313,10 @@ class BlogCommentViewSet(BaseModelViewSet):
                     likes_count_field=Count("likes", distinct=True),
                 )
                 .filter(user=request.user)
+                .order_by("-created_at")
             )
+        else:
+            queryset = queryset.order_by("-created_at")
 
         response_serializer_class = self.get_response_serializer()
         return self.paginate_and_serialize(

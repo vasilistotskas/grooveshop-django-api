@@ -19,7 +19,7 @@ from django.db.models.fields.related import (
     OneToOneField,
 )
 
-from core.factories import TranslationUtilities
+from devtools.factories import TranslationUtilities
 
 logger = logging.getLogger(__name__)
 

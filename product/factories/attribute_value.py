@@ -4,7 +4,7 @@ import factory
 from django.apps import apps
 from django.conf import settings
 
-from core.factories import CustomDjangoModelFactory
+from devtools.factories import CustomDjangoModelFactory
 from product.models.attribute_value import AttributeValue
 
 available_languages = [

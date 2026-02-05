@@ -6,7 +6,7 @@ from django.conf import settings
 from faker import Faker
 
 from blog.models.category import BlogCategory
-from core.factories import CustomDjangoModelFactory
+from devtools.factories import CustomDjangoModelFactory
 
 fake = Faker()
 

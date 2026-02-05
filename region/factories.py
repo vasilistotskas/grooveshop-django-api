@@ -5,7 +5,7 @@ from django.apps import apps
 from django.conf import settings
 from faker import Faker
 
-from core.factories import (
+from devtools.factories import (
     CustomDjangoModelFactory,
     custom_seeding,
     SeedingResult,

@@ -5,6 +5,7 @@ from datetime import datetime
 from urllib.parse import unquote
 
 from django.db.models import Avg, Count
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
@@ -14,7 +15,7 @@ from rest_framework.response import Response
 
 from blog.models.post import BlogPostTranslation
 from core.api.serializers import ErrorResponseSerializer
-from core.utils.greeklish import expand_greeklish_query
+from search.greeklish import expand_greeklish_query
 from meili._client import client as meili_client
 from product.models.product import ProductTranslation
 from search.models import SearchClick, SearchQuery
@@ -624,6 +625,9 @@ def search_analytics(request):
     if start_date_str:
         try:
             start_date = datetime.fromisoformat(start_date_str)
+            # Make timezone-aware if naive
+            if timezone.is_naive(start_date):
+                start_date = timezone.make_aware(start_date)
             queries_qs = queries_qs.filter(timestamp__gte=start_date)
         except ValueError:
             raise ValidationError(
@@ -637,6 +641,9 @@ def search_analytics(request):
     if end_date_str:
         try:
             end_date = datetime.fromisoformat(end_date_str)
+            # Make timezone-aware if naive
+            if timezone.is_naive(end_date):
+                end_date = timezone.make_aware(end_date)
             queries_qs = queries_qs.filter(timestamp__lte=end_date)
         except ValueError:
             raise ValidationError(

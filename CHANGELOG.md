@@ -3,6 +3,16 @@
 
 
 
+## v1.75.0 (2026-02-06)
+
+### Bug fixes
+
+* fix: Remove useless files ([`4d97432`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4d9743252552d8df26fbbe80ce45662d44237fb5))
+
+### Features
+
+* feat: improvements ([`798b9a8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/798b9a83d60e5aa4613f9aaf5f37b7df95eda48d))
+
 ## v1.74.0 (2026-02-05)
 
 ### Features

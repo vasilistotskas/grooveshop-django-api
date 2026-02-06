@@ -1,9 +1,4 @@
-import re
-from djangorestframework_camel_case.util import (
-    camel_to_underscore,
-    camelize_re,
-    underscore_to_camel as underscore_to_camel_callback,
-)
+from djangorestframework_camel_case.util import camel_to_underscore
 from django_filters import rest_framework as filters
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.extensions import OpenApiFilterExtension
@@ -11,9 +6,7 @@ from drf_spectacular.plumbing import build_parameter_type
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter
 
-
-def snake_to_camel(snake_str):
-    return re.sub(camelize_re, underscore_to_camel_callback, snake_str)
+from core.utils.string_case import snake_to_camel
 
 
 class CamelCaseFilterMixin:

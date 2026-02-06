@@ -1,3 +1,5 @@
+import logging
+
 from django import forms
 from django.contrib import messages
 from django.core import management
@@ -8,6 +10,8 @@ from unfold.sites import UnfoldAdminSite
 
 from core.caches import cache_instance
 from core.utils.views import cache_methods_registry
+
+logger = logging.getLogger(__name__)
 
 
 class ClearCacheForm(forms.Form):
@@ -60,27 +64,47 @@ class MyAdminSite(UnfoldAdminSite):
 
     @staticmethod
     def clear_cache_for_class(request, class_name):
+        """
+        Clear all cache keys matching a class name pattern.
+
+        Uses Django's cache API to ensure proper key handling.
+        """
         cache_keys = cache_instance.keys(class_name)
 
         if not cache_keys:
-            messages.info(request, _("No keys found for %(class_name)s"))
+            messages.info(
+                request,
+                _("No keys found for %(class_name)s")
+                % {"class_name": class_name},
+            )
             return
 
-        if cache_keys:
-            deleted_keys = 0
-            client = cache_instance._cache.get_client()
-            for key in cache_keys:
-                resp = client.delete(key)
-                if resp:
+        # Use Django's cache API to delete keys properly
+        # This ensures keys are transformed correctly with version prefix
+        deleted_keys = 0
+        for key in cache_keys:
+            try:
+                # Use cache_instance.delete() which handles key transformation
+                if cache_instance.delete(key):
                     deleted_keys += 1
+            except Exception as e:
+                logger.warning(f"Failed to delete cache key {key}: {e}")
 
-            if deleted_keys > 0:
-                messages.success(
-                    request,
-                    _("Deleted %(deleted_keys)s keys for %(class_name)s"),
-                )
-            else:
-                messages.info(request, _("No keys found for %(class_name)s"))
+        if deleted_keys > 0:
+            messages.success(
+                request,
+                _("Deleted %(deleted_keys)s keys for %(class_name)s")
+                % {
+                    "deleted_keys": deleted_keys,
+                    "class_name": class_name,
+                },
+            )
+        else:
+            messages.info(
+                request,
+                _("No keys found for %(class_name)s")
+                % {"class_name": class_name},
+            )
 
     def clear_site_cache_view(self, request):
         self.clear_site_cache()

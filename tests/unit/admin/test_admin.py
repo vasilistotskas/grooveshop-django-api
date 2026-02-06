@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 
@@ -182,10 +182,9 @@ class TestMyAdminSite(TestCase):
     @patch("admin.admin.cache_instance")
     @patch("admin.admin.messages")
     def test_clear_cache_for_class_with_keys(self, mock_messages, mock_cache):
+        """Test clearing cache with successful deletions."""
         mock_cache.keys.return_value = ["key1", "key2", "key3"]
-        mock_client = MagicMock()
-        mock_client.delete.return_value = True
-        mock_cache._cache.get_client.return_value = mock_client
+        mock_cache.delete.return_value = True
 
         request = self.factory.get("/")
         request.user = self.admin_user
@@ -196,7 +195,8 @@ class TestMyAdminSite(TestCase):
 
         self.admin_site.clear_cache_for_class(request, "TestClass")
 
-        self.assertEqual(mock_client.delete.call_count, 3)
+        # Verify delete was called 3 times (once per key)
+        self.assertEqual(mock_cache.delete.call_count, 3)
         mock_messages.success.assert_called_once()
 
     @patch("admin.admin.cache_instance")
@@ -220,10 +220,10 @@ class TestMyAdminSite(TestCase):
     def test_clear_cache_for_class_delete_failures(
         self, mock_messages, mock_cache
     ):
+        """Test clearing cache with some delete failures."""
         mock_cache.keys.return_value = ["key1", "key2", "key3"]
-        mock_client = MagicMock()
-        mock_client.delete.side_effect = [True, False, False]
-        mock_cache._cache.get_client.return_value = mock_client
+        # Simulate: first succeeds, second and third fail
+        mock_cache.delete.side_effect = [True, False, False]
 
         request = self.factory.get("/")
         request.user = self.admin_user
@@ -234,7 +234,9 @@ class TestMyAdminSite(TestCase):
 
         self.admin_site.clear_cache_for_class(request, "TestClass")
 
-        self.assertEqual(mock_client.delete.call_count, 3)
+        # Verify delete was called 3 times
+        self.assertEqual(mock_cache.delete.call_count, 3)
+        # Should show success message with count of 1 successful deletion
         mock_messages.success.assert_called_once()
 
     @patch("admin.admin.cache_instance")
@@ -242,10 +244,10 @@ class TestMyAdminSite(TestCase):
     def test_clear_cache_for_class_all_delete_failures(
         self, mock_messages, mock_cache
     ):
+        """Test clearing cache when all deletions fail."""
         mock_cache.keys.return_value = ["key1", "key2"]
-        mock_client = MagicMock()
-        mock_client.delete.return_value = False
-        mock_cache._cache.get_client.return_value = mock_client
+        # All deletions fail
+        mock_cache.delete.return_value = False
 
         request = self.factory.get("/")
         request.user = self.admin_user
@@ -256,6 +258,7 @@ class TestMyAdminSite(TestCase):
 
         self.admin_site.clear_cache_for_class(request, "TestClass")
 
+        # Should show info message when no keys were deleted
         mock_messages.info.assert_called_once()
 
     @patch("admin.admin.messages")

@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import uuid
-from typing import Any, cast
+from typing import Any
 
 from django.contrib.postgres.indexes import BTreeIndex, GinIndex
 from django.core.serializers.json import DjangoJSONEncoder
@@ -32,6 +34,8 @@ class SeoModel(models.Model):
 class SortableModel(models.Model):
     """
     Abstract model that adds a sort_order field and methods for moving items up/down.
+
+    Provides thread-safe ordering with database-level locking to prevent race conditions.
     """
 
     sort_order = models.IntegerField(_("Sort Order"), editable=False, null=True)
@@ -42,52 +46,103 @@ class SortableModel(models.Model):
             BTreeIndex(fields=["sort_order"], name="%(class)s_sort_order_ix"),
         ]
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """
+        Save the model instance, automatically assigning sort_order for new instances.
+
+        Uses database-level locking to prevent race conditions when multiple
+        instances are created simultaneously.
+        """
         if self.pk is None:
-            qs = self.get_ordering_queryset()
-            existing_max = self.get_max_sort_order(qs)
-            self.sort_order = 0 if existing_max is None else existing_max + 1
+            with transaction.atomic():
+                # Lock the table to prevent race conditions
+                qs = self.get_ordering_queryset().select_for_update()
+                existing_max = self.get_max_sort_order(qs)
+                self.sort_order = (
+                    0 if existing_max is None else existing_max + 1
+                )
         super().save(*args, **kwargs)
 
-    def get_ordering_queryset(self):
-        model_class = cast("type[models.Model]", self.__class__)
+    def get_ordering_queryset(self) -> models.QuerySet[SortableModel]:
+        """
+        Get the queryset used for ordering operations.
+
+        Override this method to customize ordering scope (e.g., per category).
+
+        Returns:
+            QuerySet of all instances to consider for ordering
+        """
+        model_class = self.__class__
         return model_class._default_manager.all()
 
     @staticmethod
-    def get_max_sort_order(qs):
+    def get_max_sort_order(qs: models.QuerySet[SortableModel]) -> int:
+        """
+        Get the maximum sort_order value from a queryset.
+
+        Args:
+            qs: QuerySet to check for maximum sort_order
+
+        Returns:
+            Maximum sort_order value, or 0 if queryset is empty
+        """
         return qs.aggregate(Max("sort_order"))["sort_order__max"] or 0
 
-    def move_up(self):
-        if self.sort_order is not None and self.sort_order > 0:
-            qs = self.get_ordering_queryset()
-            prev_item = qs.get(sort_order=self.sort_order - 1)
-            prev_item.sort_order, self.sort_order = (
-                self.sort_order,
-                prev_item.sort_order,
-            )
-            prev_item.save()
-            self.save()
+    def move_up(self) -> None:
+        """
+        Move this item up in the sort order (decrease sort_order by 1).
 
-    def move_down(self):
+        Swaps sort_order with the previous item in a transaction.
+        """
+        if self.sort_order is not None and self.sort_order > 0:
+            with transaction.atomic():
+                qs = self.get_ordering_queryset().select_for_update()
+                try:
+                    prev_item = qs.get(sort_order=self.sort_order - 1)
+                    prev_item.sort_order, self.sort_order = (
+                        self.sort_order,
+                        prev_item.sort_order,
+                    )
+                    prev_item.save(update_fields=["sort_order"])
+                    self.save(update_fields=["sort_order"])
+                except self.__class__.DoesNotExist:
+                    pass
+
+    def move_down(self) -> None:
+        """
+        Move this item down in the sort order (increase sort_order by 1).
+
+        Swaps sort_order with the next item in a transaction.
+        """
         if self.sort_order is not None:
-            qs = self.get_ordering_queryset()
-            next_item = qs.filter(sort_order__gt=self.sort_order).first()
-            if next_item:
-                next_item.sort_order, self.sort_order = (
-                    self.sort_order,
-                    next_item.sort_order,
-                )
-                next_item.save()
-                self.save()
+            with transaction.atomic():
+                qs = self.get_ordering_queryset().select_for_update()
+                next_item = qs.filter(sort_order__gt=self.sort_order).first()
+                if next_item:
+                    next_item.sort_order, self.sort_order = (
+                        self.sort_order,
+                        next_item.sort_order,
+                    )
+                    next_item.save(update_fields=["sort_order"])
+                    self.save(update_fields=["sort_order"])
 
     @transaction.atomic
-    def delete(self, *args, **kwargs):
+    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
+        """
+        Delete the instance and reorder remaining items.
+
+        Decrements sort_order for all items after this one to maintain
+        continuous ordering.
+
+        Returns:
+            Tuple of (number of objects deleted, dict of deletions per type)
+        """
         if self.sort_order is not None:
             qs = self.get_ordering_queryset()
             qs.filter(sort_order__gt=self.sort_order).update(
                 sort_order=F("sort_order") - 1
             )
-        super().delete(*args, **kwargs)
+        return super().delete(*args, **kwargs)
 
 
 class TimeStampMixinModel(models.Model):
@@ -230,6 +285,9 @@ class MetaDataModel(models.Model):
 class SoftDeleteMixin(models.Model):
     """
     Abstract model that adds soft delete functionality.
+
+    Provides soft delete capability where records are marked as deleted
+    rather than being removed from the database.
     """
 
     deleted_at = models.DateTimeField(null=True, blank=True)
@@ -238,46 +296,108 @@ class SoftDeleteMixin(models.Model):
     class Meta(TypedModelMeta):
         abstract = True
 
-    def delete(self, using=None, keep_parents=False):
+    def delete(
+        self, using: str | None = None, keep_parents: bool = False
+    ) -> tuple[int, dict[str, int]]:
+        """
+        Soft delete the instance by marking it as deleted.
+
+        Uses update_fields for better performance instead of full model save.
+
+        Args:
+            using: Database alias to use
+            keep_parents: Whether to keep parent records (unused in soft delete)
+
+        Returns:
+            Tuple of (0, {}) to match Django's delete signature
+        """
         self.deleted_at = timezone.now()
         self.is_deleted = True
-        self.save()
+        self.save(update_fields=["deleted_at", "is_deleted"])
+        return (0, {})
 
-    def restore(self):
+    def restore(self) -> None:
+        """
+        Restore a soft-deleted instance.
+
+        Uses update_fields for better performance.
+        """
         self.deleted_at = None
         self.is_deleted = False
-        self.save()
+        self.save(update_fields=["deleted_at", "is_deleted"])
 
 
 class SoftDeleteQuerySet(models.QuerySet):
     """
     QuerySet that overrides delete() to perform soft delete.
+
+    Provides methods for soft delete, restore, and hard delete operations.
     """
 
-    def delete(self):
-        return super().update(deleted_at=timezone.now(), is_deleted=True)
+    def delete(self) -> tuple[int, dict[str, int]]:
+        """
+        Soft delete all instances in the queryset.
 
-    def restore(self):
+        Returns:
+            Tuple of (number updated, dict of updates per model)
+        """
+        count = super().update(deleted_at=timezone.now(), is_deleted=True)
+        return (count, {self.model._meta.label: count})
+
+    def restore(self) -> int:
+        """
+        Restore all soft-deleted instances in the queryset.
+
+        Returns:
+            Number of instances restored
+        """
         return super().update(deleted_at=None, is_deleted=False)
 
-    def hard_delete(self):
+    def hard_delete(self) -> tuple[int, dict[str, int]]:
+        """
+        Permanently delete all instances in the queryset.
+
+        Returns:
+            Tuple of (number deleted, dict of deletions per model)
+        """
         return super().delete()
 
 
 class SoftDeleteManager(models.Manager):
     """
     Manager that filters out soft-deleted items by default.
+
+    Provides methods to access all records including deleted ones,
+    or only deleted records.
     """
 
     def get_queryset(self) -> SoftDeleteQuerySet:
+        """
+        Get the default queryset excluding soft-deleted items.
+
+        Returns:
+            QuerySet with is_deleted=False filter applied
+        """
         return SoftDeleteQuerySet(self.model, using=self._db).exclude(
             is_deleted=True
         )
 
-    def all_with_deleted(self):
+    def all_with_deleted(self) -> SoftDeleteQuerySet:
+        """
+        Get all records including soft-deleted ones.
+
+        Returns:
+            Unfiltered QuerySet
+        """
         return SoftDeleteQuerySet(self.model, using=self._db)
 
-    def deleted_only(self):
+    def deleted_only(self) -> SoftDeleteQuerySet:
+        """
+        Get only soft-deleted records.
+
+        Returns:
+            QuerySet with is_deleted=True filter applied
+        """
         return SoftDeleteQuerySet(self.model, using=self._db).filter(
             is_deleted=True
         )

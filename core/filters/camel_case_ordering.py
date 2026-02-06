@@ -1,21 +1,16 @@
-import re
 from drf_spectacular.extensions import OpenApiFilterExtension
-
-from djangorestframework_camel_case.util import (
-    camelize_re,
-    underscore_to_camel as underscore_to_camel_callback,
-)
 from rest_framework.filters import OrderingFilter
 from rest_framework.request import Request
 from rest_framework.views import APIView
+
+from core.utils.string_case import camel_to_snake, snake_to_camel
 
 
 class CamelCaseOrderingFilter(OrderingFilter):
     @staticmethod
     def camel_to_snake(name: str) -> str:
-        name = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
-        name = re.sub("([a-z0-9])([A-Z])", r"\1_\2", name)
-        return name.lower()
+        """Convert camelCase to snake_case."""
+        return camel_to_snake(name)
 
     def get_ordering(
         self, request: Request, queryset, view: APIView
@@ -57,10 +52,6 @@ class CamelCaseOrderingFilter(OrderingFilter):
         if ordering:
             return [param.strip() for param in ordering.split(",")]
         return None
-
-
-def snake_to_camel(snake_str):
-    return re.sub(camelize_re, underscore_to_camel_callback, snake_str)
 
 
 class CamelCaseOrderingFilterExtension(OpenApiFilterExtension):

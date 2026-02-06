@@ -16,6 +16,11 @@ backups/*
 
 # Backup files #
 *.bak
+*~
+*.swp
+*.swo
+.*.swp
+.*.swo
 
 # If you are using PyCharm #
 .idea/

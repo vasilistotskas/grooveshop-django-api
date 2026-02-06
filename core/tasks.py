@@ -2,6 +2,7 @@ import logging
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 from celery import Task
 from django.conf import settings
@@ -406,27 +407,35 @@ def clear_development_log_files_task(days=7):
     autoretry_for=(Exception,),
     retry_backoff=True,
 )
-def send_inactive_user_notifications():
+def send_inactive_user_notifications() -> dict[str, Any]:
+    """
+    Send re-engagement emails to inactive users.
+
+    Uses iterator() for memory-efficient processing of large user sets.
+
+    Returns:
+        Dictionary with task execution statistics
+    """
     cutoff_date = timezone.now() - timedelta(days=60)
 
-    inactive_users = list(
-        User.objects.filter(
-            last_login__lt=cutoff_date,
-            is_active=True,
-            email__isnull=False,
-            email__gt="",
-        ).values_list("id", "email", "first_name", "username")[
-            :1000
-        ]  # Limit to prevent memory issues
-    )
+    # Use iterator() for memory efficiency instead of list()
+    inactive_users_qs = User.objects.filter(
+        last_login__lt=cutoff_date,
+        is_active=True,
+        email__isnull=False,
+        email__gt="",
+    ).values_list("id", "email", "first_name", "username")[:1000]
 
-    total_users = len(inactive_users)
     success_count = 0
-    failed_emails = []
+    failed_emails: list[dict[str, Any]] = []
+    total_users = 0
 
-    logger.info(f"Starting to send emails to {total_users} inactive users")
+    logger.info("Starting to send emails to inactive users")
 
-    for user_id, email, first_name, username in inactive_users:
+    # Use iterator() to avoid loading all users into memory
+    for user_id, email, first_name, username in inactive_users_qs.iterator():
+        total_users += 1
+
         try:
             mail_subject = _("We miss you!")
 

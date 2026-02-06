@@ -15,7 +15,7 @@ permissions:
 env:
   SYSTEM_ENV: ci
   MEILI_HOST: 127.0.0.1
-  UV_VERSION: "0.9.28"
+  UV_VERSION: "0.10.0"
   FORCE_COLOR: 1
 
 jobs:

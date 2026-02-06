@@ -13,14 +13,8 @@ from user.models.subscription import SubscriptionTopic, UserSubscription
 
 class SubscriptionTopicFilterTest(APITestCase):
     def setUp(self):
-        # Clear all subscriptions and topics including translations
         UserSubscription.objects.all().delete()
         SubscriptionTopic.objects.all().delete()
-
-        # Force clear any cached translations
-        from django.core.cache import cache
-
-        cache.clear()
 
         self.now = timezone.now()
 

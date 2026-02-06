@@ -64,14 +64,10 @@ class MyAdminSite(UnfoldAdminSite):
 
     @staticmethod
     def clear_cache_for_class(request, class_name):
-        """
-        Clear all cache keys matching a class name pattern.
+        """Clear all raw Redis keys matching a class name pattern."""
+        raw_keys = cache_instance.keys(class_name)
 
-        Uses Django's cache API to ensure proper key handling.
-        """
-        cache_keys = cache_instance.keys(class_name)
-
-        if not cache_keys:
+        if not raw_keys:
             messages.info(
                 request,
                 _("No keys found for %(class_name)s")
@@ -79,16 +75,7 @@ class MyAdminSite(UnfoldAdminSite):
             )
             return
 
-        # Use Django's cache API to delete keys properly
-        # This ensures keys are transformed correctly with version prefix
-        deleted_keys = 0
-        for key in cache_keys:
-            try:
-                # Use cache_instance.delete() which handles key transformation
-                if cache_instance.delete(key):
-                    deleted_keys += 1
-            except Exception as e:
-                logger.warning(f"Failed to delete cache key {key}: {e}")
+        deleted_keys = cache_instance.delete_raw_keys(raw_keys)
 
         if deleted_keys > 0:
             messages.success(

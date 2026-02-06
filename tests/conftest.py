@@ -88,16 +88,15 @@ def debug_query_count():
 
 @pytest.fixture(autouse=True)
 def _django_clear_cache(request):
-    """Clear default cache if DB access is allowed.
+    """Clear default cache before tests that use the DB.
 
-    This is required because some tests might mock cache.
+    Uses delete_pattern instead of clear() to avoid FLUSHDB which
+    would wipe keys that parallel xdist workers are using.
     """
     if request.node.get_closest_marker("django_db"):
         try:
             cache.clear()
-        except Exception as e:
-            # Ignore cache errors in tests (e.g., Redis not available)
-            print(f"Failed to clear cache: {e}")
+        except Exception:
             pass
 
 

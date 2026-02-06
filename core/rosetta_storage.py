@@ -1,81 +1,57 @@
 """
 Custom Rosetta storage backend that clears translation cache on save.
 
-Uses Django's public API for cache invalidation to ensure compatibility
-across Django versions.
+Sets a version key in Redis so that all pods in a multi-replica deployment
+can detect when translations have changed and reload them.
 """
 
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from rosetta.storage import CacheRosettaStorage
 
 logger = logging.getLogger(__name__)
 
+TRANSLATION_VERSION_CACHE_KEY = "rosetta:translation_version"
+
 
 class CacheClearingRosettaStorage(CacheRosettaStorage):
     """
-    Custom Rosetta storage that clears Django's translation cache
-    whenever translations are saved.
+    Custom Rosetta storage that bumps a shared translation version in
+    the cache (Redis) whenever translations are saved.
 
-    This ensures that updated translations are immediately visible
-    across all processes in a multi-process environment.
-
-    Uses Django's public cache API instead of accessing private attributes
-    to maintain compatibility with future Django versions.
+    A companion middleware (TranslationReloadMiddleware) checks this
+    version on each request and reloads the gettext catalogs when it
+    detects a change, ensuring all replicas serve fresh translations.
     """
 
     def set(self, key: str, val: Any) -> Any:
-        """
-        Override set to clear translation cache after saving.
-
-        Args:
-            key: Storage key for the translation data
-            val: Translation data to store
-
-        Returns:
-            Result from parent set method
-        """
         result = super().set(key, val)
 
-        # Clear translation cache using public API
         try:
             from django.core.cache import cache
-            from django.utils.translation import get_language
 
-            current_language = get_language()
-            cache_keys = [
-                f"translations.{current_language}",
-                "translations.*",
-            ]
+            # Bump the shared translation version so all pods pick it up
+            cache.set(TRANSLATION_VERSION_CACHE_KEY, time.time(), timeout=None)
 
-            for cache_key in cache_keys:
-                cache.delete(cache_key)
+            # Also reload translations on this pod immediately
+            _reload_translations()
 
-            logger.debug("Translation cache cleared after Rosetta save")
-
+            logger.info("Translation version bumped after Rosetta save")
         except Exception as e:
-            logger.error(f"Failed to clear translation cache: {e}")
-
-            # Fallback to private API only if public API fails
-            try:
-                from django.utils.translation import trans_real
-
-                if hasattr(trans_real, "_translations"):
-                    trans_real._translations = {}
-                if hasattr(trans_real, "_default"):
-                    trans_real._default = None
-                if hasattr(trans_real, "_active"):
-                    trans_real._active = None
-
-                logger.warning(
-                    "Used private API fallback for translation cache clearing"
-                )
-            except Exception as fallback_error:
-                logger.error(
-                    f"Translation cache clearing failed: {fallback_error}"
-                )
+            logger.error(f"Failed to bump translation version: {e}")
 
         return result
+
+
+def _reload_translations():
+    """Force Django to reload gettext catalogs from disk."""
+    from django.utils.translation import trans_real
+
+    if hasattr(trans_real, "_translations"):
+        trans_real._translations = {}
+    if hasattr(trans_real, "_default"):
+        trans_real._default = None

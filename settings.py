@@ -143,6 +143,7 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
+    "core.middleware.translation_reload.TranslationReloadMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -1110,8 +1111,8 @@ ROSETTA_MESSAGES_PER_PAGE = 25
 ROSETTA_ENABLE_TRANSLATION_SUGGESTIONS = True
 ROSETTA_SHOW_AT_ADMIN_PANEL = False
 ROSETTA_REQUIRES_AUTH = True
-ROSETTA_WSGI_AUTO_RELOAD = True
-ROSETTA_UWSGI_AUTO_RELOAD = True
+ROSETTA_WSGI_AUTO_RELOAD = False
+ROSETTA_UWSGI_AUTO_RELOAD = False
 ROSETTA_AUTO_COMPILE = True
 ROSETTA_POFILE_WRAP_WIDTH = 0
 ROSETTA_CACHE_NAME = "default"

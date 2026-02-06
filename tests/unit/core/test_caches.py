@@ -13,9 +13,12 @@ class CustomCacheTestCase(TestCase):
         REDIS_HOST = getenv("REDIS_HOST", "localhost")
         REDIS_PORT = getenv("REDIS_PORT", "6379")
 
+        # Use DBs 1-15 to avoid DB 0 which is used by Django's default
+        # cache.  conftest's cache.clear() calls FLUSHDB on DB 0, so
+        # running on DB 0 causes races with other parallel workers.
         worker_id = getenv("PYTEST_XDIST_WORKER", "gw0")
-        db_number = "".join(filter(str.isdigit, worker_id)) or "0"
-        db_number = str(int(db_number) % 16)
+        worker_num = int("".join(filter(str.isdigit, worker_id)) or "0")
+        db_number = str((worker_num % 15) + 1)
 
         REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/{db_number}"
         self.cache_instance = CustomCache(server=REDIS_URL, params={})
@@ -108,24 +111,39 @@ class CustomCacheTestCase(TestCase):
 
     def test_cache_keys(self):
         unique_prefix = f"search_key_{uuid.uuid4().hex[:8]}"
-        new_keys = {
-            f"{unique_prefix}_1": "search_value1",
-            f"{unique_prefix}_2": "search_value2",
-            f"{unique_prefix}_3": "search_value3",
-        }
+        logical_keys = [
+            f"{unique_prefix}_1",
+            f"{unique_prefix}_2",
+            f"{unique_prefix}_3",
+        ]
+        new_keys = {k: f"value_{i}" for i, k in enumerate(logical_keys)}
         self.cache_instance.set_many(new_keys)
 
-        keys = self.cache_instance.keys(unique_prefix)
-        self.assertEqual(
-            sorted(keys),
-            sorted(
-                [
-                    f"{unique_prefix}_1",
-                    f"{unique_prefix}_2",
-                    f"{unique_prefix}_3",
-                ]
-            ),
+        # keys() returns raw Redis keys (including version prefix)
+        raw_keys = self.cache_instance.keys(unique_prefix)
+        expected_raw = sorted(
+            self.cache_instance.make_key(k) for k in logical_keys
         )
+        self.assertEqual(sorted(raw_keys), expected_raw)
+
+    def test_delete_raw_keys(self):
+        unique_prefix = f"delraw_{uuid.uuid4().hex[:8]}"
+        logical_keys = [f"{unique_prefix}_1", f"{unique_prefix}_2"]
+        self.cache_instance.set_many({k: "v" for k in logical_keys})
+
+        raw_keys = self.cache_instance.keys(unique_prefix)
+        self.assertEqual(len(raw_keys), 2)
+
+        deleted = self.cache_instance.delete_raw_keys(raw_keys)
+        self.assertEqual(deleted, 2)
+
+        # Verify keys are gone
+        remaining = self.cache_instance.keys(unique_prefix)
+        self.assertEqual(remaining, [])
+
+    def test_delete_raw_keys_empty(self):
+        deleted = self.cache_instance.delete_raw_keys([])
+        self.assertEqual(deleted, 0)
 
     def tearDown(self):
         if hasattr(self, "key"):

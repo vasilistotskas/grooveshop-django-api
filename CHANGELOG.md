@@ -3,6 +3,16 @@
 
 
 
+## v1.76.0 (2026-02-07)
+
+### Bug fixes
+
+* fix: cache ([`1c2bfc2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1c2bfc2e423ab483a133794e5ca8afe7c1e5ceae))
+
+### Features
+
+* feat: Remove useless codebase ([`1fb077b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1fb077bf2d3c314968c33c6b4e98583d176ea80d))
+
 ## v1.75.0 (2026-02-06)
 
 ### Bug fixes

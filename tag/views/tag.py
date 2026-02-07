@@ -14,24 +14,18 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
+    SerializersConfig,
     create_schema_view_config,
-    RequestSerializersConfig,
-    ResponseSerializersConfig,
+    crud_config,
 )
 from core.utils.views import cache_methods
 
-req_serializers: RequestSerializersConfig = {
-    "create": TagWriteSerializer,
-    "update": TagWriteSerializer,
-    "partial_update": TagWriteSerializer,
-}
-
-res_serializers: ResponseSerializersConfig = {
-    "create": TagDetailSerializer,
-    "list": TagSerializer,
-    "retrieve": TagDetailSerializer,
-    "update": TagDetailSerializer,
-    "partial_update": TagDetailSerializer,
+serializers_config: SerializersConfig = {
+    **crud_config(
+        list=TagSerializer,
+        detail=TagDetailSerializer,
+        write=TagWriteSerializer,
+    ),
 }
 
 
@@ -41,16 +35,14 @@ res_serializers: ResponseSerializersConfig = {
         display_config={
             "tag": "Tags",
         },
-        request_serializers=req_serializers,
-        response_serializers=res_serializers,
+        serializers_config=serializers_config,
         error_serializer=ErrorResponseSerializer,
     )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class TagViewSet(BaseModelViewSet):
     queryset = Tag.objects.all()
-    response_serializers = res_serializers
-    request_serializers = req_serializers
+    serializers_config = serializers_config
     filterset_class = TagFilter
     ordering_fields = [
         "id",

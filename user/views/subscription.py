@@ -18,9 +18,10 @@ from core.api.permissions import IsOwnerOrAdmin
 from core.api.serializers import ErrorResponseSerializer, DetailSerializer
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
+    ActionConfig,
+    SerializersConfig,
     create_schema_view_config,
-    RequestSerializersConfig,
-    ResponseSerializersConfig,
+    crud_config,
 )
 from user.filters.subscription import (
     SubscriptionTopicFilter,
@@ -42,54 +43,15 @@ logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
-subscription_topic_req_serializers: RequestSerializersConfig = {
-    "create": SubscriptionTopicWriteSerializer,
-    "update": SubscriptionTopicWriteSerializer,
-    "partial_update": SubscriptionTopicWriteSerializer,
-    "subscribe": None,
-    "unsubscribe": None,
-}
-
-subscription_topic_res_serializers: ResponseSerializersConfig = {
-    "create": SubscriptionTopicDetailSerializer,
-    "list": SubscriptionTopicSerializer,
-    "retrieve": SubscriptionTopicDetailSerializer,
-    "update": SubscriptionTopicDetailSerializer,
-    "partial_update": SubscriptionTopicDetailSerializer,
-    "my_subscriptions": SubscriptionTopicSerializer,
-    "subscribe": UserSubscriptionSerializer,
-    "unsubscribe": DetailSerializer,
-}
-
-
-@extend_schema_view(
-    **create_schema_view_config(
-        model_class=SubscriptionTopic,
-        display_config={
-            "tag": "Subscription Topics",
-        },
-        request_serializers=subscription_topic_req_serializers,
-        response_serializers=subscription_topic_res_serializers,
-    )
-)
-class SubscriptionTopicViewSet(BaseModelViewSet):
-    queryset = SubscriptionTopic.objects.filter(is_active=True)
-    request_serializers = subscription_topic_req_serializers
-    response_serializers = subscription_topic_res_serializers
-    permission_classes = [IsAuthenticated]
-    filterset_class = SubscriptionTopicFilter
-    ordering_fields = ["category", "created_at", "updated_at", "slug"]
-    ordering = ["category"]
-    search_fields = ["translations__name", "translations__description", "slug"]
-
-    def get_queryset(self):
-        return (
-            SubscriptionTopic.objects.for_list()
-            .filter(is_active=True)
-            .distinct()
-        )
-
-    @extend_schema(
+subscription_topic_config: SerializersConfig = {
+    **crud_config(
+        list=SubscriptionTopicSerializer,
+        detail=SubscriptionTopicDetailSerializer,
+        write=SubscriptionTopicWriteSerializer,
+    ),
+    "my_subscriptions": ActionConfig(
+        response=SubscriptionTopicSerializer,
+        many=True,
         operation_id="getMySubscriptionTopics",
         summary=_("Get my subscriptions"),
         description=_(
@@ -114,9 +76,58 @@ class SubscriptionTopicViewSet(BaseModelViewSet):
                     },
                 },
             },
-            401: ErrorResponseSerializer,
         },
+    ),
+    "subscribe": ActionConfig(
+        response=UserSubscriptionSerializer,
+        operation_id="subscribeToTopic",
+        summary=_("Subscribe to a topic"),
+        description=_(
+            "Subscribe the current user to a specific subscription topic."
+        ),
+        tags=["Subscription Topics"],
+        responses={
+            201: UserSubscriptionSerializer,
+        },
+    ),
+    "unsubscribe": ActionConfig(
+        response=DetailSerializer,
+        operation_id="unsubscribeFromTopic",
+        summary=_("Unsubscribe from a topic"),
+        description=_(
+            "Unsubscribe the current user from a specific subscription topic."
+        ),
+        tags=["Subscription Topics"],
+    ),
+}
+
+
+@extend_schema_view(
+    **create_schema_view_config(
+        model_class=SubscriptionTopic,
+        display_config={
+            "tag": "Subscription Topics",
+        },
+        serializers_config=subscription_topic_config,
+        error_serializer=ErrorResponseSerializer,
     )
+)
+class SubscriptionTopicViewSet(BaseModelViewSet):
+    queryset = SubscriptionTopic.objects.filter(is_active=True)
+    serializers_config = subscription_topic_config
+    permission_classes = [IsAuthenticated]
+    filterset_class = SubscriptionTopicFilter
+    ordering_fields = ["category", "created_at", "updated_at", "slug"]
+    ordering = ["category"]
+    search_fields = ["translations__name", "translations__description", "slug"]
+
+    def get_queryset(self):
+        return (
+            SubscriptionTopic.objects.for_list()
+            .filter(is_active=True)
+            .distinct()
+        )
+
     @action(detail=False, methods=["GET"])
     def my_subscriptions(self, request):
         user = request.user
@@ -146,21 +157,6 @@ class SubscriptionTopicViewSet(BaseModelViewSet):
 
         return Response(response_data)
 
-    @extend_schema(
-        operation_id="subscribeToTopic",
-        summary=_("Subscribe to a topic"),
-        description=_(
-            "Subscribe the current user to a specific subscription topic."
-        ),
-        tags=["Subscription Topics"],
-        responses={
-            200: UserSubscriptionSerializer,
-            201: UserSubscriptionSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    )
     @action(detail=True, methods=["POST"])
     def subscribe(self, request, pk=None):
         topic = self.get_object()
@@ -218,20 +214,6 @@ class SubscriptionTopicViewSet(BaseModelViewSet):
             response_serializer.data, status=status.HTTP_201_CREATED
         )
 
-    @extend_schema(
-        operation_id="unsubscribeFromTopic",
-        summary=_("Unsubscribe from a topic"),
-        description=_(
-            "Unsubscribe the current user from a specific subscription topic."
-        ),
-        tags=["Subscription Topics"],
-        responses={
-            200: None,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    )
     @action(detail=True, methods=["POST"])
     def unsubscribe(self, request, pk=None):
         topic = self.get_object()
@@ -255,22 +237,31 @@ class SubscriptionTopicViewSet(BaseModelViewSet):
             )
 
 
-user_subscription_req_serializers: RequestSerializersConfig = {
-    "create": UserSubscriptionWriteSerializer,
-    "update": UserSubscriptionWriteSerializer,
-    "partial_update": UserSubscriptionWriteSerializer,
-    "bulk_update": BulkSubscriptionSerializer,
-    "confirm": None,
-}
-
-user_subscription_res_serializers: ResponseSerializersConfig = {
-    "create": UserSubscriptionDetailSerializer,
-    "list": UserSubscriptionSerializer,
-    "retrieve": UserSubscriptionDetailSerializer,
-    "update": UserSubscriptionDetailSerializer,
-    "partial_update": UserSubscriptionDetailSerializer,
-    "bulk_update": None,
-    "confirm": UserSubscriptionDetailSerializer,
+user_subscription_config: SerializersConfig = {
+    **crud_config(
+        list=UserSubscriptionSerializer,
+        detail=UserSubscriptionDetailSerializer,
+        write=UserSubscriptionWriteSerializer,
+    ),
+    "bulk_update": ActionConfig(
+        request=BulkSubscriptionSerializer,
+        operation_id="bulkUpdateUserSubscriptions",
+        summary=_("Bulk update user subscriptions"),
+        description=_("Subscribe or unsubscribe from multiple topics at once."),
+        tags=["User Subscriptions"],
+        responses={
+            200: None,
+        },
+    ),
+    "confirm": ActionConfig(
+        response=UserSubscriptionDetailSerializer,
+        operation_id="confirmUserSubscription",
+        summary=_("Confirm a user subscription"),
+        description=_(
+            "Confirm a pending subscription using the confirmation token."
+        ),
+        tags=["User Subscriptions"],
+    ),
 }
 
 
@@ -280,14 +271,13 @@ user_subscription_res_serializers: ResponseSerializersConfig = {
         display_config={
             "tag": "User Subscription",
         },
-        request_serializers=user_subscription_req_serializers,
-        response_serializers=user_subscription_res_serializers,
+        serializers_config=user_subscription_config,
+        error_serializer=ErrorResponseSerializer,
     )
 )
 class UserSubscriptionViewSet(BaseModelViewSet):
     queryset = UserSubscription.objects.none()
-    request_serializers = user_subscription_req_serializers
-    response_serializers = user_subscription_res_serializers
+    serializers_config = user_subscription_config
 
     permission_classes = [IsOwnerOrAdmin]
     filterset_class = UserSubscriptionFilter
@@ -314,18 +304,6 @@ class UserSubscriptionViewSet(BaseModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
-    @extend_schema(
-        operation_id="bulkUpdateUserSubscriptions",
-        summary=_("Bulk update user subscriptions"),
-        description=_("Subscribe or unsubscribe from multiple topics at once."),
-        tags=["User Subscriptions"],
-        request=BulkSubscriptionSerializer,
-        responses={
-            200: None,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-        },
-    )
     @action(detail=False, methods=["POST"])
     def bulk_update(self, request):
         request_serializer_class = self.get_request_serializer()
@@ -402,21 +380,6 @@ class UserSubscriptionViewSet(BaseModelViewSet):
 
         return Response(results)
 
-    @extend_schema(
-        operation_id="confirmUserSubscription",
-        summary=_("Confirm a user subscription"),
-        description=_(
-            "Confirm a pending subscription using the confirmation token."
-        ),
-        tags=["User Subscriptions"],
-        responses={
-            200: UserSubscriptionDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            403: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    )
     @action(detail=True, methods=["POST"])
     def confirm(self, request, pk=None):
         try:

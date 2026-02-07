@@ -14,24 +14,18 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
+    SerializersConfig,
     create_schema_view_config,
-    RequestSerializersConfig,
-    ResponseSerializersConfig,
+    crud_config,
 )
 from core.utils.views import cache_methods
 
-req_serializers: RequestSerializersConfig = {
-    "create": TaggedItemWriteSerializer,
-    "update": TaggedItemWriteSerializer,
-    "partial_update": TaggedItemWriteSerializer,
-}
-
-res_serializers: ResponseSerializersConfig = {
-    "create": TaggedItemDetailSerializer,
-    "list": TaggedItemSerializer,
-    "retrieve": TaggedItemDetailSerializer,
-    "update": TaggedItemDetailSerializer,
-    "partial_update": TaggedItemDetailSerializer,
+serializers_config: SerializersConfig = {
+    **crud_config(
+        list=TaggedItemSerializer,
+        detail=TaggedItemDetailSerializer,
+        write=TaggedItemWriteSerializer,
+    ),
 }
 
 
@@ -41,16 +35,14 @@ res_serializers: ResponseSerializersConfig = {
         display_config={
             "tag": "Tagged Items",
         },
-        request_serializers=req_serializers,
-        response_serializers=res_serializers,
+        serializers_config=serializers_config,
         error_serializer=ErrorResponseSerializer,
     )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class TaggedItemViewSet(BaseModelViewSet):
     queryset = TaggedItem.objects.all()
-    response_serializers = res_serializers
-    request_serializers = req_serializers
+    serializers_config = serializers_config
     filterset_class = TaggedItemFilter
     ordering_fields = [
         "id",

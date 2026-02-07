@@ -5,7 +5,6 @@ from django.utils.translation import gettext_lazy as _
 from drf_spectacular.openapi import OpenApiTypes
 from drf_spectacular.utils import (
     OpenApiParameter,
-    extend_schema,
     extend_schema_view,
 )
 from rest_framework import status
@@ -25,9 +24,9 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
+    ActionConfig,
+    SerializersConfig,
     create_schema_view_config,
-    RequestSerializersConfig,
-    ResponseSerializersConfig,
 )
 
 GUEST_CART_HEADERS = [
@@ -40,139 +39,88 @@ GUEST_CART_HEADERS = [
     ),
 ]
 
-req_serializers: RequestSerializersConfig = {
-    "create": CartItemCreateSerializer,
-    "update": CartItemUpdateSerializer,
-    "partial_update": CartItemUpdateSerializer,
+serializers_config: SerializersConfig = {
+    "list": ActionConfig(
+        response=CartItemSerializer,
+        many=True,
+        operation_id="listCartItem",
+        summary=_("List cart items"),
+        description=_(
+            "Retrieve a list of cart items with filtering and search capabilities. For guest users, include X-Cart-Id header to maintain cart session."
+        ),
+        tags=["Cart Items"],
+        parameters=GUEST_CART_HEADERS,
+    ),
+    "create": ActionConfig(
+        request=CartItemCreateSerializer,
+        response=CartItemDetailSerializer,
+        operation_id="createCartItem",
+        summary=_("Create a cart item"),
+        description=_(
+            "Create a new cart item. Requires authentication. For guest users, include X-Cart-Id header to maintain cart session."
+        ),
+        tags=["Cart Items"],
+        parameters=GUEST_CART_HEADERS,
+    ),
+    "retrieve": ActionConfig(
+        response=CartItemDetailSerializer,
+        operation_id="retrieveCartItem",
+        summary=_("Retrieve a cart item"),
+        description=_(
+            "Get detailed information about a specific cart item. For guest users, include X-Cart-Id header to maintain cart session."
+        ),
+        tags=["Cart Items"],
+        parameters=GUEST_CART_HEADERS,
+    ),
+    "update": ActionConfig(
+        request=CartItemUpdateSerializer,
+        response=CartItemDetailSerializer,
+        operation_id="updateCartItem",
+        summary=_("Update a cart item"),
+        description=_(
+            "Update cart item information. Requires authentication. For guest users, include X-Cart-Id header to maintain cart session."
+        ),
+        tags=["Cart Items"],
+        parameters=GUEST_CART_HEADERS,
+    ),
+    "partial_update": ActionConfig(
+        request=CartItemUpdateSerializer,
+        response=CartItemDetailSerializer,
+        operation_id="partialUpdateCartItem",
+        summary=_("Partially update a cart item"),
+        description=_(
+            "Partially update cart item information. Requires authentication. For guest users, include X-Cart-Id header to maintain cart session."
+        ),
+        tags=["Cart Items"],
+        parameters=GUEST_CART_HEADERS,
+    ),
+    "destroy": ActionConfig(
+        operation_id="destroyCartItem",
+        summary=_("Delete a cart item"),
+        description=_(
+            "Delete a cart item. Requires authentication. For guest users, include X-Cart-Id header to maintain cart session."
+        ),
+        tags=["Cart Items"],
+        parameters=GUEST_CART_HEADERS,
+    ),
 }
 
-res_serializers: ResponseSerializersConfig = {
-    "create": CartItemDetailSerializer,
-    "list": CartItemSerializer,
-    "retrieve": CartItemDetailSerializer,
-    "update": CartItemDetailSerializer,
-    "partial_update": CartItemDetailSerializer,
-}
 
-cart_item_schema_config = create_schema_view_config(
-    model_class=CartItem,
-    request_serializers=req_serializers,
-    response_serializers=res_serializers,
-    error_serializer=ErrorResponseSerializer,
-    display_config={
-        "tag": "Cart Items",
-        "display_name": _("cart item"),
-        "display_name_plural": _("cart items"),
-    },
+@extend_schema_view(
+    **create_schema_view_config(
+        model_class=CartItem,
+        serializers_config=serializers_config,
+        error_serializer=ErrorResponseSerializer,
+        display_config={
+            "tag": "Cart Items",
+            "display_name": _("cart item"),
+            "display_name_plural": _("cart items"),
+        },
+    )
 )
-
-cart_item_schema_config.update(
-    {
-        "list": extend_schema(
-            operation_id="listCartItem",
-            summary=_("List cart items"),
-            description=_(
-                "Retrieve a list of cart items with filtering and search capabilities. For guest users, include X-Cart-Id header to maintain cart session."
-            ),
-            tags=["Cart Items"],
-            parameters=GUEST_CART_HEADERS,
-            responses={
-                200: CartItemSerializer(many=True),
-                400: ErrorResponseSerializer,
-                401: ErrorResponseSerializer,
-                403: ErrorResponseSerializer,
-                404: ErrorResponseSerializer,
-            },
-        ),
-        "create": extend_schema(
-            operation_id="createCartItem",
-            summary=_("Create a cart item"),
-            description=_(
-                "Create a new cart item. Requires authentication. For guest users, include X-Cart-Id header to maintain cart session."
-            ),
-            tags=["Cart Items"],
-            parameters=GUEST_CART_HEADERS,
-            request=CartItemCreateSerializer,
-            responses={
-                201: CartItemDetailSerializer,
-                400: ErrorResponseSerializer,
-                401: ErrorResponseSerializer,
-                403: ErrorResponseSerializer,
-            },
-        ),
-        "retrieve": extend_schema(
-            operation_id="retrieveCartItem",
-            summary=_("Retrieve a cart item"),
-            description=_(
-                "Get detailed information about a specific cart item. For guest users, include X-Cart-Id header to maintain cart session."
-            ),
-            tags=["Cart Items"],
-            parameters=GUEST_CART_HEADERS,
-            responses={
-                200: CartItemDetailSerializer,
-                401: ErrorResponseSerializer,
-                403: ErrorResponseSerializer,
-                404: ErrorResponseSerializer,
-            },
-        ),
-        "update": extend_schema(
-            operation_id="updateCartItem",
-            summary=_("Update a cart item"),
-            description=_(
-                "Update cart item information. Requires authentication. For guest users, include X-Cart-Id header to maintain cart session."
-            ),
-            tags=["Cart Items"],
-            parameters=GUEST_CART_HEADERS,
-            request=CartItemUpdateSerializer,
-            responses={
-                200: CartItemDetailSerializer,
-                400: ErrorResponseSerializer,
-                401: ErrorResponseSerializer,
-                403: ErrorResponseSerializer,
-                404: ErrorResponseSerializer,
-            },
-        ),
-        "partial_update": extend_schema(
-            operation_id="partialUpdateCartItem",
-            summary=_("Partially update a cart item"),
-            description=_(
-                "Partially update cart item information. Requires authentication. For guest users, include X-Cart-Id header to maintain cart session."
-            ),
-            tags=["Cart Items"],
-            parameters=GUEST_CART_HEADERS,
-            request=CartItemUpdateSerializer,
-            responses={
-                200: CartItemDetailSerializer,
-                400: ErrorResponseSerializer,
-                401: ErrorResponseSerializer,
-                403: ErrorResponseSerializer,
-                404: ErrorResponseSerializer,
-            },
-        ),
-        "destroy": extend_schema(
-            operation_id="destroyCartItem",
-            summary=_("Delete a cart item"),
-            description=_(
-                "Delete a cart item. Requires authentication. For guest users, include X-Cart-Id header to maintain cart session."
-            ),
-            tags=["Cart Items"],
-            parameters=GUEST_CART_HEADERS,
-            responses={
-                204: None,
-                401: ErrorResponseSerializer,
-                403: ErrorResponseSerializer,
-                404: ErrorResponseSerializer,
-            },
-        ),
-    }
-)
-
-
-@extend_schema_view(**cart_item_schema_config)
 class CartItemViewSet(BaseModelViewSet):
     queryset = CartItem.objects.all()
-    response_serializers = res_serializers
-    request_serializers = req_serializers
+    serializers_config = serializers_config
     filterset_class = CartItemFilter
     ordering_fields = [
         "id",

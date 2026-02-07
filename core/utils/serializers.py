@@ -1,6 +1,7 @@
 import json
 import re
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any, NotRequired, TypedDict
 
 from django.db import models
@@ -58,50 +59,65 @@ class DisplayConfig(TypedDict):
     display_name_plural: NotRequired[str]
 
 
-type RequestSerializersConfig = dict[str, type[serializers.Serializer]]
-type ResponseSerializersConfig = dict[str, type[serializers.Serializer]]
+@dataclass(frozen=True, slots=True)
+class ActionConfig:
+    """Per-action serializer and schema configuration."""
+
+    request: type[serializers.Serializer] | None = None
+    response: type[serializers.Serializer] | None = None
+    responses: dict[int, type[serializers.Serializer] | None] | None = None
+    operation_id: str | None = None
+    summary: str | None = None
+    description: str | None = None
+    tags: list[str] | None = None
+    parameters: list | None = None
+    deprecated: bool = False
+    many: bool = False
+
+    def get_response_map(self, *, error_serializer=None, default_status=200):
+        result = {}
+        if error_serializer:
+            result.update(
+                {
+                    400: error_serializer,
+                    401: error_serializer,
+                    403: error_serializer,
+                    404: error_serializer,
+                    500: error_serializer,
+                }
+            )
+        if self.response is not None:
+            result[default_status] = (
+                self.response(many=True) if self.many else self.response
+            )
+        if self.responses:
+            result.update(self.responses)
+        return result
 
 
-def create_schema_view_config(
-    model_class: type[models.Model],
-    request_serializers: RequestSerializersConfig | None = None,
-    response_serializers: ResponseSerializersConfig | None = None,
-    error_serializer=None,
-    additional_responses=None,
-    display_config: DisplayConfig | Mapping[str, Any] | None = None,
-    include_language_param: bool = True,
-    include_pagination_params: bool = True,
-):
-    """
-    Create schema configuration for a ViewSet with translation support.
+type SerializersConfig = dict[str, ActionConfig]
 
-    Args:
-        model_class: The Django model class
-        request_serializers: Dict with keys: create, update, partial_update
-        response_serializers: Dict with keys: create, list, retrieve, update, partial_update, destroy
-        error_serializer: Serializer for error responses
-        additional_responses: Dict with additional responses per action
-        display_config: DisplayConfig or dict with optional keys:
-            - tag: Override for OpenAPI tag (default: model's verbose_name_plural)
-            - display_name: Override for singular name (default: model's verbose_name)
-            - display_name_plural: Override for plural name (default: model's verbose_name_plural)
-        include_language_param: Whether to include the language query parameter for translation-enabled models
-        include_pagination_params: Whether to include pagination query parameters for list endpoints
 
-    Note:
-        This function fully supports Django translations. If your model uses
-        gettext_lazy for verbose_name/verbose_name_plural, all generated
-        summaries and descriptions will be properly translated.
-    """
-    if request_serializers is None:
-        request_serializers = {}
-    if response_serializers is None:
-        response_serializers = {}
-    if additional_responses is None:
-        additional_responses = {}
-    if display_config is None:
-        display_config = {}
+def crud_config(
+    *,
+    list: type[serializers.Serializer],
+    detail: type[serializers.Serializer],
+    write: type[serializers.Serializer] | None = None,
+) -> SerializersConfig:
+    """Convenience factory for the most common CRUD pattern."""
+    config: SerializersConfig = {
+        "list": ActionConfig(response=list),
+        "retrieve": ActionConfig(response=detail),
+    }
+    if write:
+        config["create"] = ActionConfig(request=write, response=detail)
+        config["update"] = ActionConfig(request=write, response=detail)
+        config["partial_update"] = ActionConfig(request=write, response=detail)
+    return config
 
+
+def _resolve_display_names(model_class, display_config):
+    """Resolve display_name, display_name_plural, and tag from model and config."""
     model_name = model_class.__name__
 
     display_name = display_config.get("display_name")
@@ -127,188 +143,296 @@ def create_schema_view_config(
         else:
             tag = camel_to_words(model_name)
 
-    base_error_responses = (
-        {
-            400: error_serializer,
-            401: error_serializer,
-            403: error_serializer,
-            404: error_serializer,
-            500: error_serializer,
-        }
-        if error_serializer
-        else {}
-    )
+    return display_name, display_name_plural, tag
 
-    language_parameter = None
-    if include_language_param:
-        from django.conf import settings
 
-        try:
-            available_languages = [
-                lang["code"]
-                for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
-            ]
-            default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
-            language_parameter = OpenApiParameter(
-                name="language_code",
-                description=_("Language code for translations (%s)")
-                % ", ".join(available_languages),
-                required=False,
-                type=str,
-                enum=available_languages,
-                default=default_language,
-            )
-        except (AttributeError, KeyError):
-            language_parameter = None
+def _build_language_parameter(include_language_param):
+    """Build language OpenAPI parameter if enabled."""
+    if not include_language_param:
+        return None
+    from django.conf import settings
 
-    pagination_parameters = []
-    if include_pagination_params:
-        pagination_type_parameter = OpenApiParameter(
+    try:
+        available_languages = [
+            lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
+        ]
+        default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
+        return OpenApiParameter(
+            name="language_code",
+            description=_("Language code for translations (%s)")
+            % ", ".join(available_languages),
+            required=False,
+            type=str,
+            enum=available_languages,
+            default=default_language,
+        )
+    except (AttributeError, KeyError):
+        return None
+
+
+def _build_pagination_parameters(include_pagination_params):
+    """Build pagination OpenAPI parameters if enabled."""
+    if not include_pagination_params:
+        return []
+    return [
+        OpenApiParameter(
             name="pagination_type",
             description=_("Pagination strategy type"),
             required=False,
             type=str,
             enum=["pageNumber", "cursor", "limitOffset"],
             default="pageNumber",
-        )
-
-        pagination_parameter = OpenApiParameter(
+        ),
+        OpenApiParameter(
             name="pagination",
             description=_("Enable or disable pagination"),
             required=False,
             type=str,
             enum=["true", "false"],
             default="true",
-        )
-
-        page_size_parameter = OpenApiParameter(
+        ),
+        OpenApiParameter(
             name="page_size",
             description=_("Number of results to return per page"),
             required=False,
             type=int,
             default=20,
-        )
+        ),
+    ]
 
-        pagination_parameters = [
-            pagination_type_parameter,
-            pagination_parameter,
-            page_size_parameter,
-        ]
+
+# Default status codes per CRUD action
+_CRUD_DEFAULT_STATUS = {
+    "create": 201,
+    "destroy": 204,
+}
+
+# Default summaries/descriptions per CRUD action
+_CRUD_TEMPLATES = {
+    "list": {
+        "op_prefix": "list",
+        "summary": _("List %(name)s"),
+        "description": _(
+            "Retrieve a list of %(name)s with filtering and search capabilities. "
+            "Supports multiple pagination strategies: pageNumber (default), cursor, and limitOffset."
+        ),
+        "use_plural": True,
+    },
+    "create": {
+        "op_prefix": "create",
+        "summary": _("Create a %(name)s"),
+        "description": _("Create a new %(name)s. Requires authentication."),
+        "use_plural": False,
+    },
+    "retrieve": {
+        "op_prefix": "retrieve",
+        "summary": _("Retrieve a %(name)s"),
+        "description": _("Get detailed information about a specific %(name)s."),
+        "use_plural": False,
+    },
+    "update": {
+        "op_prefix": "update",
+        "summary": _("Update a %(name)s"),
+        "description": _(
+            "Update %(name)s information. Requires authentication."
+        ),
+        "use_plural": False,
+    },
+    "partial_update": {
+        "op_prefix": "partialUpdate",
+        "summary": _("Partially update a %(name)s"),
+        "description": _(
+            "Partially update %(name)s information. Requires authentication."
+        ),
+        "use_plural": False,
+    },
+    "destroy": {
+        "op_prefix": "destroy",
+        "summary": _("Delete a %(name)s"),
+        "description": _("Delete a %(name)s. Requires authentication."),
+        "use_plural": False,
+    },
+}
+
+# Error codes to filter per action type
+_NO_400_ACTIONS = {"retrieve", "destroy"}
+_NO_500_ACTIONS = {"destroy"}
+
+
+def create_schema_view_config(
+    model_class: type[models.Model],
+    serializers_config: SerializersConfig,
+    error_serializer=None,
+    additional_responses=None,
+    display_config: DisplayConfig | Mapping[str, Any] | None = None,
+    include_language_param: bool = True,
+    include_pagination_params: bool = True,
+):
+    """
+    Create schema configuration for a ViewSet with translation support.
+
+    Iterates over ALL keys in ``serializers_config`` – including custom
+    actions – and auto-generates ``@extend_schema`` for each.
+    """
+    if additional_responses is None:
+        additional_responses = {}
+    if display_config is None:
+        display_config = {}
+
+    model_name = model_class.__name__
+    display_name, display_name_plural, tag = _resolve_display_names(
+        model_class, display_config
+    )
+
+    language_parameter = _build_language_parameter(include_language_param)
+    pagination_parameters = _build_pagination_parameters(
+        include_pagination_params
+    )
 
     list_parameters = []
     if language_parameter:
         list_parameters.append(language_parameter)
     list_parameters.extend(pagination_parameters)
 
-    create_request_serializer = request_serializers.get("create")
-    update_request_serializer = request_serializers.get("update")
-    partial_update_request_serializer = request_serializers.get(
-        "partial_update"
-    )
+    config = {}
 
-    create_response_serializer = response_serializers.get("create")
-    list_response_serializer = response_serializers.get("list")
-    retrieve_response_serializer = response_serializers.get("retrieve")
-    update_response_serializer = response_serializers.get("update")
-    partial_update_response_serializer = response_serializers.get(
-        "partial_update"
-    )
-    destroy_response_serializer = response_serializers.get("destroy")
+    for action_name, ac in serializers_config.items():
+        default_status = _CRUD_DEFAULT_STATUS.get(action_name, 200)
+        tpl = _CRUD_TEMPLATES.get(action_name)
 
-    config = {
-        "list": extend_schema(
-            operation_id=f"list{model_name}",
-            summary=_("List %(name)s") % {"name": display_name_plural},
-            description=_(
-                "Retrieve a list of %(name)s with filtering and search capabilities. "
-                "Supports multiple pagination strategies: pageNumber (default), cursor, and limitOffset."
+        # ── operation_id ──
+        if ac.operation_id:
+            operation_id = ac.operation_id
+        elif tpl:
+            operation_id = f"{tpl['op_prefix']}{model_name}"
+        else:
+            operation_id = f"{action_name}{model_name}"
+
+        # ── summary / description ──
+        name_for_tpl = (
+            display_name_plural
+            if (tpl and tpl.get("use_plural"))
+            else display_name
+        )
+        if ac.summary:
+            summary = ac.summary
+        elif tpl:
+            summary = tpl["summary"] % {"name": name_for_tpl}
+        else:
+            summary = f"{action_name.replace('_', ' ').title()} {display_name}"
+
+        if ac.description:
+            description = ac.description
+        elif tpl:
+            description = tpl["description"] % {"name": name_for_tpl}
+        else:
+            description = summary
+
+        # ── tags ──
+        tags = ac.tags if ac.tags else [tag]
+
+        # ── parameters ──
+        if ac.parameters is not None:
+            parameters = ac.parameters
+        elif action_name == "list":
+            parameters = list_parameters
+        elif action_name in {"create", "retrieve", "update", "partial_update"}:
+            parameters = [language_parameter] if language_parameter else None
+        else:
+            parameters = None
+
+        # ── request ──
+        request_body = ac.request
+
+        # ── responses ──
+        responses = ac.get_response_map(
+            error_serializer=error_serializer,
+            default_status=default_status,
+        )
+
+        # Filter inappropriate error codes
+        if action_name in _NO_400_ACTIONS:
+            responses.pop(400, None)
+        if action_name in _NO_500_ACTIONS:
+            responses.pop(500, None)
+
+        # Apply additional_responses overrides (backward compat)
+        if action_name in additional_responses:
+            responses.update(additional_responses[action_name])
+
+        # Handle list action many=True
+        if action_name == "list" and default_status in responses:
+            resp_val = responses[default_status]
+            if isinstance(resp_val, type) and issubclass(
+                resp_val, serializers.Serializer
+            ):
+                responses[default_status] = resp_val(many=True)
+
+        config[action_name] = extend_schema(
+            operation_id=operation_id,
+            summary=summary,
+            description=description,
+            tags=tags,
+            parameters=parameters,
+            request=request_body,
+            responses=responses,
+            deprecated=ac.deprecated if ac.deprecated else None,
+        )
+
+    # Ensure CRUD actions that have no config still get a schema entry
+    for crud_action in [
+        "list",
+        "create",
+        "retrieve",
+        "update",
+        "partial_update",
+        "destroy",
+    ]:
+        if crud_action not in config:
+            tpl = _CRUD_TEMPLATES[crud_action]
+            crud_default_status = _CRUD_DEFAULT_STATUS.get(crud_action, 200)
+            name_for_tpl = (
+                display_name_plural if tpl.get("use_plural") else display_name
             )
-            % {"name": display_name_plural},
-            tags=[tag],
-            parameters=list_parameters,
-            responses={
-                200: list_response_serializer(many=True)
-                if list_response_serializer
-                else None,
-                **base_error_responses,
-                **additional_responses.get("list", {}),
-            },
-        ),
-        "create": extend_schema(
-            operation_id=f"create{model_name}",
-            summary=_("Create a %(name)s") % {"name": display_name},
-            description=_("Create a new %(name)s. Requires authentication.")
-            % {"name": display_name},
-            tags=[tag],
-            parameters=[language_parameter] if language_parameter else None,
-            request=create_request_serializer,
-            responses={
-                201: create_response_serializer,
-                **base_error_responses,
-                **additional_responses.get("create", {}),
-            },
-        ),
-        "retrieve": extend_schema(
-            operation_id=f"retrieve{model_name}",
-            summary=_("Retrieve a %(name)s") % {"name": display_name},
-            description=_("Get detailed information about a specific %(name)s.")
-            % {"name": display_name},
-            tags=[tag],
-            parameters=[language_parameter] if language_parameter else None,
-            responses={
-                200: retrieve_response_serializer,
-                **{k: v for k, v in base_error_responses.items() if k != 400},
-                **additional_responses.get("retrieve", {}),
-            },
-        ),
-        "update": extend_schema(
-            operation_id=f"update{model_name}",
-            summary=_("Update a %(name)s") % {"name": display_name},
-            description=_(
-                "Update %(name)s information. Requires authentication."
+
+            responses = {}
+            if error_serializer:
+                responses = {
+                    400: error_serializer,
+                    401: error_serializer,
+                    403: error_serializer,
+                    404: error_serializer,
+                    500: error_serializer,
+                }
+            if crud_action in _NO_400_ACTIONS:
+                responses.pop(400, None)
+            if crud_action in _NO_500_ACTIONS:
+                responses.pop(500, None)
+            if crud_action in additional_responses:
+                responses.update(additional_responses[crud_action])
+
+            parameters = None
+            if crud_action == "list":
+                parameters = list_parameters
+            elif crud_action in {
+                "create",
+                "retrieve",
+                "update",
+                "partial_update",
+            }:
+                parameters = (
+                    [language_parameter] if language_parameter else None
+                )
+
+            config[crud_action] = extend_schema(
+                operation_id=f"{tpl['op_prefix']}{model_name}",
+                summary=tpl["summary"] % {"name": name_for_tpl},
+                description=tpl["description"] % {"name": name_for_tpl},
+                tags=[tag],
+                parameters=parameters,
+                responses={crud_default_status: None, **responses}
+                if crud_default_status not in responses
+                else responses,
             )
-            % {"name": display_name},
-            tags=[tag],
-            parameters=[language_parameter] if language_parameter else None,
-            request=update_request_serializer,
-            responses={
-                200: update_response_serializer,
-                **base_error_responses,
-                **additional_responses.get("update", {}),
-            },
-        ),
-        "partial_update": extend_schema(
-            operation_id=f"partialUpdate{model_name}",
-            summary=_("Partially update a %(name)s") % {"name": display_name},
-            description=_(
-                "Partially update %(name)s information. Requires authentication."
-            )
-            % {"name": display_name},
-            tags=[tag],
-            parameters=[language_parameter] if language_parameter else None,
-            request=partial_update_request_serializer,
-            responses={
-                200: partial_update_response_serializer,
-                **base_error_responses,
-                **additional_responses.get("partial_update", {}),
-            },
-        ),
-        "destroy": extend_schema(
-            operation_id=f"destroy{model_name}",
-            summary=_("Delete a %(name)s") % {"name": display_name},
-            description=_("Delete a %(name)s. Requires authentication.")
-            % {"name": display_name},
-            tags=[tag],
-            responses={
-                204: destroy_response_serializer,
-                **{
-                    k: v
-                    for k, v in base_error_responses.items()
-                    if k not in [400, 500]
-                },
-                **additional_responses.get("destroy", {}),
-            },
-        ),
-    }
 
     return config

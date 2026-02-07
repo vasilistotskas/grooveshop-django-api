@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.utils import (
-    extend_schema,
-    extend_schema_view,
-)
+from drf_spectacular.utils import extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
 
@@ -13,9 +10,9 @@ from rest_framework.response import Response
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
+    ActionConfig,
+    SerializersConfig,
     create_schema_view_config,
-    RequestSerializersConfig,
-    ResponseSerializersConfig,
 )
 from product.filters.favourite import ProductFavouriteFilter
 from product.models.favourite import ProductFavourite
@@ -28,34 +25,55 @@ from product.serializers.favourite import (
     ProductFavouriteWriteSerializer,
 )
 
-req_serializers: RequestSerializersConfig = {
-    "create": ProductFavouriteWriteSerializer,
-    "update": ProductFavouriteWriteSerializer,
-    "partial_update": ProductFavouriteWriteSerializer,
-    "favourites_by_products": ProductFavouriteByProductsRequestSerializer,
+serializers_config: SerializersConfig = {
+    "list": ActionConfig(response=ProductFavouriteSerializer),
+    "retrieve": ActionConfig(response=ProductFavouriteDetailSerializer),
+    "create": ActionConfig(
+        request=ProductFavouriteWriteSerializer,
+        response=ProductFavouriteWriteSerializer,
+    ),
+    "update": ActionConfig(
+        request=ProductFavouriteWriteSerializer,
+        response=ProductFavouriteWriteSerializer,
+    ),
+    "partial_update": ActionConfig(
+        request=ProductFavouriteWriteSerializer,
+        response=ProductFavouriteWriteSerializer,
+    ),
+    "product": ActionConfig(
+        response=ProductDetailResponseSerializer,
+        operation_id="getProductFavouriteProduct",
+        summary=_("Get favourite product details"),
+        description=_(
+            "Get detailed information about the product in this favourite entry."
+        ),
+        tags=["Product Favourites"],
+    ),
+    "favourites_by_products": ActionConfig(
+        request=ProductFavouriteByProductsRequestSerializer,
+        response=ProductFavouriteByProductsResponseSerializer,
+        many=True,
+        operation_id="getProductFavouritesByProducts",
+        summary=_("Get favourites by product IDs"),
+        description=_(
+            "Get favourite entries for the specified product IDs. Requires authentication."
+        ),
+        tags=["Product Favourites"],
+        parameters=[],
+    ),
 }
 
-res_serializers: ResponseSerializersConfig = {
-    "create": ProductFavouriteWriteSerializer,
-    "list": ProductFavouriteSerializer,
-    "retrieve": ProductFavouriteDetailSerializer,
-    "update": ProductFavouriteWriteSerializer,
-    "partial_update": ProductFavouriteWriteSerializer,
-    "product": ProductDetailResponseSerializer,
-    "favourites_by_products": ProductFavouriteByProductsResponseSerializer,
-}
 
-schema_config = create_schema_view_config(
-    model_class=ProductFavourite,
-    display_config={
-        "tag": "Product Favourites",
-    },
-    request_serializers=req_serializers,
-    response_serializers=res_serializers,
+@extend_schema_view(
+    **create_schema_view_config(
+        model_class=ProductFavourite,
+        display_config={
+            "tag": "Product Favourites",
+        },
+        serializers_config=serializers_config,
+        error_serializer=ErrorResponseSerializer,
+    )
 )
-
-
-@extend_schema_view(**schema_config)
 class ProductFavouriteViewSet(BaseModelViewSet):
     queryset = ProductFavourite.objects.all()
     filterset_class = ProductFavouriteFilter
@@ -71,8 +89,7 @@ class ProductFavouriteViewSet(BaseModelViewSet):
         "user__username",
         "product__translations__name",
     ]
-    response_serializers = res_serializers
-    request_serializers = req_serializers
+    serializers_config = serializers_config
 
     def get_queryset(self):
         if self.action == "list":
@@ -99,17 +116,6 @@ class ProductFavouriteViewSet(BaseModelViewSet):
             headers=headers,
         )
 
-    @extend_schema(
-        operation_id="getProductFavouriteProduct",
-        summary=_("Get favourite product details"),
-        description=_(
-            "Get detailed information about the product in this favourite entry."
-        ),
-        tags=["Product Favourites"],
-        responses={
-            200: ProductDetailResponseSerializer,
-        },
-    )
     @action(detail=True, methods=["GET"])
     def product(self, request, *args, **kwargs):
         product_favourite = self.get_object()
@@ -124,33 +130,7 @@ class ProductFavouriteViewSet(BaseModelViewSet):
         )
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 
-    @extend_schema(
-        operation_id="getProductFavouritesByProducts",
-        summary=_("Get favourites by product IDs"),
-        description=_(
-            "Get favourite entries for the specified product IDs. Requires authentication."
-        ),
-        tags=["Product Favourites"],
-        request=ProductFavouriteByProductsRequestSerializer,
-        responses={
-            200: {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "id": {"type": "integer"},
-                        "userId": {"type": "integer"},
-                        "productId": {"type": "integer"},
-                        "createdAt": {"type": "string", "format": "date-time"},
-                    },
-                    "required": ["id", "userId", "productId", "createdAt"],
-                },
-            },
-            404: ErrorResponseSerializer,
-        },
-        parameters=[],
-    )
-    @action(detail=False, methods=["POST"])
+    @action(detail=False, methods=["POST"], pagination_class=None)
     def favourites_by_products(self, request, *args, **kwargs):
         user = request.user
         request_serializer_class = self.get_request_serializer()

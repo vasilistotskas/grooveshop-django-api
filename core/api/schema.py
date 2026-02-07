@@ -1,5 +1,36 @@
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
+from drf_spectacular.openapi import AutoSchema as SpectacularAutoSchema
+
+
+class AutoSchema(SpectacularAutoSchema):
+    """Custom AutoSchema that respects @action-level pagination_class overrides.
+
+    drf-spectacular's default AutoSchema always uses the viewset-level
+    pagination_class for schema generation, even when a custom @action
+    explicitly sets ``pagination_class=None``.  DRF only applies action-level
+    kwargs at runtime, so the schema generator never sees them.
+
+    This subclass reads the ``pagination_class`` kwarg stored on the action
+    function by DRF's ``@action`` decorator and honours it during schema
+    generation.
+
+    Convention: custom ``@action`` methods that return plain (unpaginated)
+    arrays **must** declare ``pagination_class=None`` in the decorator.
+    """
+
+    def _get_paginator(self):
+        action = getattr(self.view, "action", None)
+        if action:
+            action_func = getattr(self.view, action, None)
+            if action_func:
+                action_kwargs = getattr(action_func, "kwargs", {})
+                if "pagination_class" in action_kwargs:
+                    pagination_class = action_kwargs["pagination_class"]
+                    if pagination_class is None:
+                        return None
+                    return pagination_class()
+        return super()._get_paginator()
 
 
 def generate_schema_multi_lang(model_instance):

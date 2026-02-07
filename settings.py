@@ -247,7 +247,7 @@ REST_FRAMEWORK = {
         "core.filters.camel_case_ordering.CamelCaseOrderingFilter",
         "rest_framework.filters.SearchFilter",
     ],
-    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_SCHEMA_CLASS": "core.api.schema.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "core.pagination.page_number.PageNumberPaginator",
     "PAGE_SIZE": 12,
     "DEFAULT_RENDERER_CLASSES": (

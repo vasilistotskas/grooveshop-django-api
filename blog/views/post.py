@@ -10,7 +10,6 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import (
     OpenApiParameter,
-    extend_schema,
     extend_schema_view,
 )
 from rest_framework import status
@@ -36,38 +35,124 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
+    ActionConfig,
+    SerializersConfig,
     create_schema_view_config,
-    RequestSerializersConfig,
-    ResponseSerializersConfig,
+    crud_config,
 )
 from core.utils.views import cache_methods
 
 if TYPE_CHECKING:
     from blog.strategies.related_posts_strategy import RelatedPostsStrategy
 
-req_serializers: RequestSerializersConfig = {
-    "create": BlogPostWriteSerializer,
-    "update": BlogPostWriteSerializer,
-    "partial_update": BlogPostWriteSerializer,
-    "liked_posts": BlogPostLikedPostsRequestSerializer,
-    "update_likes": None,
-    "update_view_count": None,
-}
-
-res_serializers: ResponseSerializersConfig = {
-    "create": BlogPostDetailSerializer,
-    "list": BlogPostSerializer,
-    "retrieve": BlogPostDetailSerializer,
-    "update": BlogPostDetailSerializer,
-    "partial_update": BlogPostDetailSerializer,
-    "update_likes": BlogPostDetailSerializer,
-    "update_view_count": BlogPostDetailSerializer,
-    "related_posts": BlogPostSerializer,
-    "liked_posts": BlogPostLikedPostsResponseSerializer,
-    "comments": BlogCommentSerializer,
-    "trending": BlogPostSerializer,
-    "popular": BlogPostSerializer,
-    "featured": BlogPostSerializer,
+serializers_config: SerializersConfig = {
+    **crud_config(
+        list=BlogPostSerializer,
+        detail=BlogPostDetailSerializer,
+        write=BlogPostWriteSerializer,
+    ),
+    "update_likes": ActionConfig(
+        response=BlogPostDetailSerializer,
+        operation_id="toggleBlogPostLike",
+        summary=_("Toggle post like"),
+        description=_("Like or unlike a blog post. Toggles the like status."),
+        tags=["Blog Posts"],
+    ),
+    "update_view_count": ActionConfig(
+        response=BlogPostDetailSerializer,
+        operation_id="incrementBlogPostViews",
+        summary=_("Increment post view count"),
+        description=_("Increment the view count for a blog post."),
+        tags=["Blog Posts"],
+    ),
+    "related_posts": ActionConfig(
+        response=BlogPostSerializer,
+        many=True,
+        operation_id="listBlogPostRelated",
+        summary=_("Get related posts"),
+        description=_("Get related posts for a blog post."),
+        tags=["Blog Posts"],
+        parameters=[
+            OpenApiParameter(
+                name="id",
+                description="A unique integer value identifying this blog post.",
+                required=True,
+                type=int,
+                location=OpenApiParameter.PATH,
+            ),
+        ],
+    ),
+    "liked_posts": ActionConfig(
+        request=BlogPostLikedPostsRequestSerializer,
+        response=BlogPostLikedPostsResponseSerializer,
+        operation_id="checkBlogPostLikes",
+        summary=_("Get liked posts"),
+        description=_("Get all posts that the authenticated user has liked."),
+        tags=["Blog Posts"],
+    ),
+    "comments": ActionConfig(
+        response=BlogCommentSerializer,
+        many=True,
+        operation_id="listBlogPostComments",
+        summary=_("Get post comments"),
+        description=_("Get all comments for a blog post."),
+        tags=["Blog Posts"],
+        parameters=[
+            OpenApiParameter(
+                name="parent",
+                type=str,
+                description="Parent comment ID",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="parent__isnull",
+                type=bool,
+                description="Filter comments with no parent",
+                required=False,
+            ),
+        ],
+    ),
+    "trending": ActionConfig(
+        response=BlogPostSerializer,
+        many=True,
+        operation_id="listTrendingBlogPosts",
+        summary=_("Get trending posts"),
+        description=_(
+            "Get trending blog posts based on recent engagement metrics. "
+            "Combines views, likes, and comments from recent time period."
+        ),
+        tags=["Blog Posts"],
+        parameters=[
+            OpenApiParameter(
+                name="days",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                description="Number of days to look back for trending calculation",
+                required=False,
+                default=7,
+            ),
+        ],
+    ),
+    "popular": ActionConfig(
+        response=BlogPostSerializer,
+        many=True,
+        operation_id="listPopularBlogPosts",
+        summary=_("Get popular posts"),
+        description=_(
+            "Get most popular blog posts based on all-time engagement metrics."
+        ),
+        tags=["Blog Posts"],
+    ),
+    "featured": ActionConfig(
+        response=BlogPostSerializer,
+        many=True,
+        operation_id="listFeaturedBlogPosts",
+        summary=_("Get featured posts"),
+        description=_(
+            "Get posts marked as featured, ordered by publication date."
+        ),
+        tags=["Blog Posts"],
+    ),
 }
 
 
@@ -77,16 +162,14 @@ res_serializers: ResponseSerializersConfig = {
         display_config={
             "tag": "Blog Post",
         },
-        request_serializers=req_serializers,
-        response_serializers=res_serializers,
+        serializers_config=serializers_config,
         error_serializer=ErrorResponseSerializer,
     )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class BlogPostViewSet(BaseModelViewSet):
     queryset = BlogPost.objects.all()
-    request_serializers = req_serializers
-    response_serializers = res_serializers
+    serializers_config = serializers_config
 
     ordering_fields = [
         "id",
@@ -145,18 +228,6 @@ class BlogPostViewSet(BaseModelViewSet):
     def get_related_posts_strategy(self):
         return self.related_posts_strategy
 
-    @extend_schema(
-        operation_id="toggleBlogPostLike",
-        summary=_("Toggle post like"),
-        description=_("Like or unlike a blog post. Toggles the like status."),
-        tags=["Blog Posts"],
-        request=None,
-        responses={
-            200: BlogPostDetailSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    )
     @action(detail=True, methods=["POST"])
     def update_likes(self, request, pk=None):
         if not request.user.is_authenticated:
@@ -180,16 +251,6 @@ class BlogPostViewSet(BaseModelViewSet):
         )
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 
-    @extend_schema(
-        operation_id="incrementBlogPostViews",
-        summary=_("Increment post view count"),
-        description=_("Increment the view count for a blog post."),
-        tags=["Blog Posts"],
-        responses={
-            200: BlogPostDetailSerializer,
-            404: ErrorResponseSerializer,
-        },
-    )
     @action(detail=True, methods=["POST"])
     def update_view_count(self, request, pk=None):
         post = self.get_object()
@@ -202,29 +263,7 @@ class BlogPostViewSet(BaseModelViewSet):
         )
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 
-    @extend_schema(
-        operation_id="listBlogPostRelated",
-        summary=_("Get related posts"),
-        description=_("Get related posts for a blog post."),
-        tags=["Blog Posts"],
-        parameters=[
-            OpenApiParameter(
-                name="id",
-                description="A unique integer value identifying this blog post.",
-                required=True,
-                type=int,
-                location=OpenApiParameter.PATH,
-            ),
-        ],
-        responses={
-            200: {
-                "type": "array",
-                "items": {"$ref": "#/components/schemas/BlogPost"},
-            },
-            404: ErrorResponseSerializer,
-        },
-    )
-    @action(detail=True, methods=["GET"])
+    @action(detail=True, methods=["GET"], pagination_class=None)
     def related_posts(self, request, pk=None):
         post = self.get_object()
         strategy = self.get_related_posts_strategy()
@@ -236,17 +275,6 @@ class BlogPostViewSet(BaseModelViewSet):
         )
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 
-    @extend_schema(
-        operation_id="checkBlogPostLikes",
-        summary=_("Get liked posts"),
-        description=_("Get all posts that the authenticated user has liked."),
-        tags=["Blog Posts"],
-        request=BlogPostLikedPostsRequestSerializer,
-        responses={
-            200: BlogPostLikedPostsResponseSerializer,
-            400: ErrorResponseSerializer,
-        },
-    )
     @action(detail=False, methods=["POST"])
     def liked_posts(self, request, *args, **kwargs):
         request_serializer_class = self.get_request_serializer()
@@ -269,30 +297,6 @@ class BlogPostViewSet(BaseModelViewSet):
         response_serializer = response_serializer_class(response_data)
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 
-    @extend_schema(
-        operation_id="listBlogPostComments",
-        summary=_("Get post comments"),
-        description=_("Get all comments for a blog post."),
-        tags=["Blog Posts"],
-        parameters=[
-            OpenApiParameter(
-                name="parent",
-                type=str,
-                description="Parent comment ID",
-                required=False,
-            ),
-            OpenApiParameter(
-                name="parent__isnull",
-                type=bool,
-                description="Filter comments with no parent",
-                required=False,
-            ),
-        ],
-        responses={
-            200: BlogCommentSerializer(many=True),
-            404: ErrorResponseSerializer,
-        },
-    )
     @action(detail=True, methods=["GET"])
     def comments(self, request, pk=None):
         post = self.get_object()
@@ -326,28 +330,6 @@ class BlogPostViewSet(BaseModelViewSet):
             queryset, request, serializer_class=response_serializer_class
         )
 
-    @extend_schema(
-        operation_id="listTrendingBlogPosts",
-        summary=_("Get trending posts"),
-        description=_(
-            "Get trending blog posts based on recent engagement metrics. "
-            "Combines views, likes, and comments from recent time period."
-        ),
-        tags=["Blog Posts"],
-        parameters=[
-            OpenApiParameter(
-                name="days",
-                type=int,
-                location=OpenApiParameter.QUERY,
-                description="Number of days to look back for trending calculation",
-                required=False,
-                default=7,
-            ),
-        ],
-        responses={
-            200: BlogPostSerializer(many=True),
-        },
-    )
     @action(detail=False, methods=["GET"])
     def trending(self, request):
         days = int(request.query_params.get("days", 7))
@@ -371,17 +353,6 @@ class BlogPostViewSet(BaseModelViewSet):
             queryset, request, serializer_class=response_serializer_class
         )
 
-    @extend_schema(
-        operation_id="listPopularBlogPosts",
-        summary=_("Get popular posts"),
-        description=_(
-            "Get most popular blog posts based on all-time engagement metrics."
-        ),
-        tags=["Blog Posts"],
-        responses={
-            200: BlogPostSerializer(many=True),
-        },
-    )
     @action(detail=False, methods=["GET"])
     def popular(self, request):
         queryset = (
@@ -395,17 +366,6 @@ class BlogPostViewSet(BaseModelViewSet):
             queryset, request, serializer_class=response_serializer_class
         )
 
-    @extend_schema(
-        operation_id="listFeaturedBlogPosts",
-        summary=_("Get featured posts"),
-        description=_(
-            "Get posts marked as featured, ordered by publication date."
-        ),
-        tags=["Blog Posts"],
-        responses={
-            200: BlogPostSerializer(many=True),
-        },
-    )
     @action(detail=False, methods=["GET"])
     def featured(self, request):
         queryset = (

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
 
@@ -12,9 +12,10 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
+    ActionConfig,
+    SerializersConfig,
     create_schema_view_config,
-    RequestSerializersConfig,
-    ResponseSerializersConfig,
+    crud_config,
 )
 from core.utils.views import cache_methods
 from region.filters import RegionFilter
@@ -25,19 +26,22 @@ from region.serializers import (
     RegionWriteSerializer,
 )
 
-req_serializers: RequestSerializersConfig = {
-    "create": RegionWriteSerializer,
-    "update": RegionWriteSerializer,
-    "partial_update": RegionWriteSerializer,
-}
-
-res_serializers: ResponseSerializersConfig = {
-    "create": RegionDetailSerializer,
-    "list": RegionSerializer,
-    "retrieve": RegionDetailSerializer,
-    "update": RegionDetailSerializer,
-    "partial_update": RegionDetailSerializer,
-    "get_regions_by_country_alpha_2": RegionSerializer,
+serializers_config: SerializersConfig = {
+    **crud_config(
+        list=RegionSerializer,
+        detail=RegionDetailSerializer,
+        write=RegionWriteSerializer,
+    ),
+    "get_regions_by_country_alpha_2": ActionConfig(
+        response=RegionSerializer,
+        many=True,
+        operation_id="listRegionsByCountry",
+        summary=_("Get regions by country"),
+        description=_(
+            "Get all regions for a specific country using its alpha-2 code."
+        ),
+        tags=["Geography"],
+    ),
 }
 
 
@@ -47,21 +51,8 @@ res_serializers: ResponseSerializersConfig = {
         display_config={
             "tag": "Regions",
         },
-        request_serializers=req_serializers,
-        response_serializers=res_serializers,
+        serializers_config=serializers_config,
         error_serializer=ErrorResponseSerializer,
-    ),
-    get_regions_by_country_alpha_2=extend_schema(
-        operation_id="listRegionsByCountry",
-        summary=_("Get regions by country"),
-        description=_(
-            "Get all regions for a specific country using its alpha-2 code."
-        ),
-        tags=["Geography"],
-        responses={
-            200: RegionSerializer(many=True),
-            404: ErrorResponseSerializer,
-        },
     ),
 )
 @cache_methods(
@@ -74,8 +65,7 @@ class RegionViewSet(BaseModelViewSet):
     ordering_fields = ["created_at", "alpha", "sort_order"]
     ordering = ["-created_at"]
     search_fields = ["alpha", "translations__name", "country__alpha_2"]
-    response_serializers = res_serializers
-    request_serializers = req_serializers
+    serializers_config = serializers_config
 
     def get_queryset(self):
         """

@@ -2,10 +2,7 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.utils import (
-    extend_schema,
-    extend_schema_view,
-)
+from drf_spectacular.utils import extend_schema_view
 from rest_framework.decorators import action
 
 from rest_framework.response import Response
@@ -14,9 +11,10 @@ from core.api.permissions import IsOwnerOrAdmin
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
+    ActionConfig,
+    SerializersConfig,
     create_schema_view_config,
-    RequestSerializersConfig,
-    ResponseSerializersConfig,
+    crud_config,
 )
 from core.utils.views import cache_methods
 from user.filters.address import UserAddressFilter
@@ -27,21 +25,26 @@ from user.serializers.address import (
     UserAddressWriteSerializer,
 )
 
-req_serializers: RequestSerializersConfig = {
-    "create": UserAddressWriteSerializer,
-    "update": UserAddressWriteSerializer,
-    "partial_update": UserAddressWriteSerializer,
-    "set_main": None,
-}
-
-res_serializers: ResponseSerializersConfig = {
-    "create": UserAddressDetailSerializer,
-    "list": UserAddressSerializer,
-    "retrieve": UserAddressDetailSerializer,
-    "update": UserAddressDetailSerializer,
-    "partial_update": UserAddressDetailSerializer,
-    "set_main": UserAddressDetailSerializer,
-    "get_main": UserAddressDetailSerializer,
+serializers_config: SerializersConfig = {
+    **crud_config(
+        list=UserAddressSerializer,
+        detail=UserAddressDetailSerializer,
+        write=UserAddressWriteSerializer,
+    ),
+    "set_main": ActionConfig(
+        response=UserAddressDetailSerializer,
+        operation_id="setMainUserAddress",
+        summary=_("Set address as main"),
+        description=_("Set this address as the user's main address."),
+        tags=["User Addresses"],
+    ),
+    "get_main": ActionConfig(
+        response=UserAddressDetailSerializer,
+        operation_id="getMainUserAddress",
+        summary=_("Get main address"),
+        description=_("Retrieve the user's main address."),
+        tags=["User Addresses"],
+    ),
 }
 
 
@@ -51,39 +54,14 @@ res_serializers: ResponseSerializersConfig = {
         display_config={
             "tag": "User Addresses",
         },
-        request_serializers=req_serializers,
-        response_serializers=res_serializers,
+        serializers_config=serializers_config,
         error_serializer=ErrorResponseSerializer,
-    ),
-    set_main=extend_schema(
-        operation_id="setMainUserAddress",
-        summary=_("Set address as main"),
-        description=_("Set this address as the user's main address."),
-        tags=["User Addresses"],
-        request=None,
-        responses={
-            200: UserAddressDetailSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    get_main=extend_schema(
-        operation_id="getMainUserAddress",
-        summary=_("Get main address"),
-        description=_("Retrieve the user's main address."),
-        tags=["User Addresses"],
-        responses={
-            200: UserAddressDetailSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
+    )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class UserAddressViewSet(BaseModelViewSet):
     queryset = UserAddress.objects.none()
-    response_serializers = res_serializers
-    request_serializers = req_serializers
+    serializers_config = serializers_config
     permission_classes = [IsOwnerOrAdmin]
     filterset_class = UserAddressFilter
     ordering_fields = [

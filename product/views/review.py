@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -11,9 +11,10 @@ from core.api.permissions import IsOwnerOrAdmin
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
+    ActionConfig,
+    SerializersConfig,
     create_schema_view_config,
-    RequestSerializersConfig,
-    ResponseSerializersConfig,
+    crud_config,
 )
 from product.enum.review import ReviewStatus
 from product.filters.review import ProductReviewFilter
@@ -25,20 +26,30 @@ from product.serializers.review import (
     ProductReviewWriteSerializer,
 )
 
-req_serializers: RequestSerializersConfig = {
-    "create": ProductReviewWriteSerializer,
-    "update": ProductReviewWriteSerializer,
-    "partial_update": ProductReviewWriteSerializer,
-}
-
-res_serializers: ResponseSerializersConfig = {
-    "create": ProductReviewDetailSerializer,
-    "list": ProductReviewSerializer,
-    "retrieve": ProductReviewDetailSerializer,
-    "update": ProductReviewDetailSerializer,
-    "partial_update": ProductReviewDetailSerializer,
-    "user_product_review": ProductReviewDetailSerializer,
-    "product": ProductSerializer,
+serializers_config: SerializersConfig = {
+    **crud_config(
+        list=ProductReviewSerializer,
+        detail=ProductReviewDetailSerializer,
+        write=ProductReviewWriteSerializer,
+    ),
+    "user_product_review": ActionConfig(
+        response=ProductReviewDetailSerializer,
+        operation_id="getUserProductReview",
+        summary=_("Get user's review for a product"),
+        description=_(
+            "Get the current user's review for a specific product. Requires authentication."
+        ),
+        tags=["Product Reviews"],
+    ),
+    "product": ActionConfig(
+        response=ProductSerializer,
+        operation_id="getProductReviewProduct",
+        summary=_("Get reviewed product details"),
+        description=_(
+            "Get detailed information about the product this review is for."
+        ),
+        tags=["Product Reviews"],
+    ),
 }
 
 
@@ -48,8 +59,7 @@ res_serializers: ResponseSerializersConfig = {
         display_config={
             "tag": "Product Reviews",
         },
-        request_serializers=req_serializers,
-        response_serializers=res_serializers,
+        serializers_config=serializers_config,
         error_serializer=ErrorResponseSerializer,
     )
 )
@@ -74,8 +84,7 @@ class ProductReviewViewSet(BaseModelViewSet):
         "user__last_name",
         "translations__comment",
     ]
-    response_serializers = res_serializers
-    request_serializers = req_serializers
+    serializers_config = serializers_config
 
     def get_queryset(self):
         if self.action == "list":
@@ -108,20 +117,6 @@ class ProductReviewViewSet(BaseModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
-    @extend_schema(
-        operation_id="getUserProductReview",
-        summary=_("Get user's review for a product"),
-        description=_(
-            "Get the current user's review for a specific product. Requires authentication."
-        ),
-        tags=["Product Reviews"],
-        responses={
-            200: ProductReviewDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    )
     @action(detail=True, methods=["GET"])
     def user_product_review(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
@@ -148,18 +143,6 @@ class ProductReviewViewSet(BaseModelViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-    @extend_schema(
-        operation_id="getProductReviewProduct",
-        summary=_("Get reviewed product details"),
-        description=_(
-            "Get detailed information about the product this review is for."
-        ),
-        tags=["Product Reviews"],
-        responses={
-            200: ProductSerializer,
-            404: ErrorResponseSerializer,
-        },
-    )
     @action(detail=True, methods=["GET"])
     def product(self, request, *args, **kwargs):
         review = self.get_object()

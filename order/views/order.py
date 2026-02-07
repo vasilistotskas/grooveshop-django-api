@@ -8,7 +8,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import (
@@ -24,8 +24,8 @@ from core.api.permissions import IsOwnerOrAdmin, IsOwnerOrAdminOrGuest
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
-    RequestSerializersConfig,
-    ResponseSerializersConfig,
+    ActionConfig,
+    SerializersConfig,
     create_schema_view_config,
 )
 from core.utils.views import cache_methods
@@ -60,124 +60,72 @@ from pay_way.services import PayWayService
 
 logger = logging.getLogger(__name__)
 
-req_serializers: RequestSerializersConfig = {
-    "create": OrderCreateFromCartSerializer,
-    "update": OrderWriteSerializer,
-    "partial_update": OrderWriteSerializer,
-    "add_tracking": AddTrackingSerializer,
-    "update_status": UpdateStatusSerializer,
-    "create_payment_intent": CreatePaymentIntentRequestSerializer,
-    "create_checkout_session": CreateCheckoutSessionRequestSerializer,
-    "cancel": CancelOrderRequestSerializer,
-    "refund_order": RefundOrderRequestSerializer,
-}
-
-res_serializers: ResponseSerializersConfig = {
-    "create": OrderDetailSerializer,
-    "list": OrderSerializer,
-    "retrieve": OrderDetailSerializer,
-    "update": OrderDetailSerializer,
-    "partial_update": OrderDetailSerializer,
-    "retrieve_by_uuid": OrderDetailSerializer,
-    "cancel": OrderDetailSerializer,
-    "my_orders": OrderSerializer,
-    "add_tracking": OrderDetailSerializer,
-    "update_status": OrderDetailSerializer,
-    "create_payment_intent": CreatePaymentIntentResponseSerializer,
-    "create_checkout_session": CreateCheckoutSessionResponseSerializer,
-    "refund_order": RefundOrderResponseSerializer,
-    "payment_status": PaymentStatusResponseSerializer,
-}
-
-
-@extend_schema_view(
-    **create_schema_view_config(
-        model_class=Order,
-        display_config={"tag": "Orders"},
-        request_serializers=req_serializers,
-        response_serializers=res_serializers,
+serializers_config: SerializersConfig = {
+    "list": ActionConfig(response=OrderSerializer),
+    "retrieve": ActionConfig(response=OrderDetailSerializer),
+    "create": ActionConfig(
+        request=OrderCreateFromCartSerializer, response=OrderDetailSerializer
     ),
-    retrieve_by_uuid=extend_schema(
+    "update": ActionConfig(
+        request=OrderWriteSerializer, response=OrderDetailSerializer
+    ),
+    "partial_update": ActionConfig(
+        request=OrderWriteSerializer, response=OrderDetailSerializer
+    ),
+    "retrieve_by_uuid": ActionConfig(
+        response=OrderDetailSerializer,
         operation_id="retrieveOrderByUuid",
         summary=_("Retrieve an order by UUID"),
         description=_(
             "Get detailed information about a specific order using its UUID"
         ),
         tags=["Orders"],
-        responses={
-            200: OrderDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
     ),
-    cancel=extend_schema(
+    "cancel": ActionConfig(
+        request=CancelOrderRequestSerializer,
+        response=OrderDetailSerializer,
         operation_id="cancelOrder",
         summary=_("Cancel an order"),
         description=_("Cancel an existing order and restore product stock"),
         tags=["Orders"],
-        request=CancelOrderRequestSerializer,
-        responses={
-            200: OrderDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
     ),
-    my_orders=extend_schema(
+    "my_orders": ActionConfig(
+        response=OrderSerializer,
+        many=True,
         operation_id="listMyOrders",
         summary=_("List current user's orders"),
         description=_("Returns a list of the authenticated user's orders"),
         tags=["Orders"],
-        responses={
-            200: OrderSerializer(many=True),
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
     ),
-    add_tracking=extend_schema(
+    "add_tracking": ActionConfig(
+        request=AddTrackingSerializer,
+        response=OrderDetailSerializer,
         operation_id="addOrderTracking",
         summary=_("Add tracking information to an order"),
         description=_("Add tracking information to an existing order"),
         tags=["Orders"],
-        request=AddTrackingSerializer,
-        responses={
-            200: OrderDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
     ),
-    update_status=extend_schema(
+    "update_status": ActionConfig(
+        request=UpdateStatusSerializer,
+        response=OrderDetailSerializer,
         operation_id="updateOrderStatus",
         summary=_("Update the status of an order"),
         description=_("Update the status of an existing order"),
         tags=["Orders"],
-        request=UpdateStatusSerializer,
-        responses={
-            200: OrderDetailSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
     ),
-    create_payment_intent=extend_schema(
+    "create_payment_intent": ActionConfig(
+        request=CreatePaymentIntentRequestSerializer,
+        response=CreatePaymentIntentResponseSerializer,
         operation_id="createOrderPaymentIntent",
         summary=_("Create a payment intent for an order"),
         description=_(
             "Create a payment intent for Stripe payments on an existing order"
         ),
         tags=["Orders"],
-        request=CreatePaymentIntentRequestSerializer,
-        responses={
-            200: CreatePaymentIntentResponseSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
     ),
-    create_checkout_session=extend_schema(
+    "create_checkout_session": ActionConfig(
+        request=CreateCheckoutSessionRequestSerializer,
+        response=CreateCheckoutSessionResponseSerializer,
         operation_id="createOrderCheckoutSession",
         summary=_("Create a Stripe Checkout Session for an order"),
         description=_(
@@ -185,15 +133,10 @@ res_serializers: ResponseSerializersConfig = {
             "The customer will be redirected to Stripe's checkout page to complete payment."
         ),
         tags=["Orders"],
-        request=CreateCheckoutSessionRequestSerializer,
-        responses={
-            200: CreateCheckoutSessionResponseSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
     ),
-    refund_order=extend_schema(
+    "refund_order": ActionConfig(
+        request=RefundOrderRequestSerializer,
+        response=RefundOrderResponseSerializer,
         operation_id="refundOrder",
         summary=_("Refund an order payment"),
         description=_(
@@ -201,16 +144,9 @@ res_serializers: ResponseSerializersConfig = {
             "Only available for paid orders with valid payment providers."
         ),
         tags=["Orders"],
-        request=RefundOrderRequestSerializer,
-        responses={
-            200: RefundOrderResponseSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            403: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
     ),
-    payment_status=extend_schema(
+    "payment_status": ActionConfig(
+        response=PaymentStatusResponseSerializer,
         operation_id="getOrderPaymentStatus",
         summary=_("Get payment status for an order"),
         description=_(
@@ -218,19 +154,22 @@ res_serializers: ResponseSerializersConfig = {
             "This fetches the latest status directly from Stripe/PayPal."
         ),
         tags=["Orders"],
-        responses={
-            200: PaymentStatusResponseSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
+    ),
+}
+
+
+@extend_schema_view(
+    **create_schema_view_config(
+        model_class=Order,
+        display_config={"tag": "Orders"},
+        serializers_config=serializers_config,
+        error_serializer=ErrorResponseSerializer,
     ),
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class OrderViewSet(BaseModelViewSet):
     queryset = Order.objects.all()
-    request_serializers = req_serializers
-    response_serializers = res_serializers
+    serializers_config = serializers_config
 
     filterset_class = OrderFilter
     ordering_fields = [

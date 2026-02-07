@@ -6,7 +6,6 @@ from django.utils.translation import gettext_lazy as _
 from drf_spectacular.openapi import OpenApiTypes
 from drf_spectacular.utils import (
     OpenApiParameter,
-    extend_schema,
     extend_schema_view,
 )
 from rest_framework import status
@@ -30,9 +29,9 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
+    ActionConfig,
+    SerializersConfig,
     create_schema_view_config,
-    RequestSerializersConfig,
-    ResponseSerializersConfig,
 )
 from order.exceptions import InsufficientStockError, StockReservationError
 from order.stock import StockManager
@@ -49,122 +48,121 @@ GUEST_CART_HEADERS = [
     ),
 ]
 
-req_serializers: RequestSerializersConfig = {
-    "update": CartWriteSerializer,
-    "partial_update": CartWriteSerializer,
-    "release_reservations": ReleaseReservationsRequestSerializer,
+serializers_config: SerializersConfig = {
+    "list": ActionConfig(
+        response=CartSerializer,
+        many=True,
+        operation_id="listCart",
+        summary=_("Get cart"),
+        description=_(
+            "Get a cart. For guest users, include X-Cart-Id header to maintain cart session."
+        ),
+        tags=["Cart"],
+        parameters=GUEST_CART_HEADERS,
+    ),
+    "retrieve": ActionConfig(
+        response=CartDetailSerializer,
+        operation_id="retrieveCart",
+        summary=_("Get cart"),
+        description=_(
+            "Get a cart. For guest users, include X-Cart-Id header to maintain cart session."
+        ),
+        tags=["Cart"],
+        parameters=GUEST_CART_HEADERS,
+    ),
+    "update": ActionConfig(
+        request=CartWriteSerializer,
+        response=CartDetailSerializer,
+        operation_id="updateCart",
+        summary=_("Update cart"),
+        description=_(
+            "Update a cart. For guest users, include X-Cart-Id header to maintain cart session."
+        ),
+        tags=["Cart"],
+        parameters=GUEST_CART_HEADERS,
+    ),
+    "partial_update": ActionConfig(
+        request=CartWriteSerializer,
+        response=CartDetailSerializer,
+        operation_id="partialUpdateCart",
+        summary=_("Update cart"),
+        description=_(
+            "Update a cart. For guest users, include X-Cart-Id header to maintain cart session."
+        ),
+        tags=["Cart"],
+        parameters=GUEST_CART_HEADERS,
+    ),
+    "destroy": ActionConfig(
+        operation_id="destroyCart",
+        summary=_("Delete cart"),
+        description=_(
+            "Delete a cart. For guest users, include X-Cart-Id header to maintain cart session."
+        ),
+        tags=["Cart"],
+        parameters=GUEST_CART_HEADERS,
+    ),
+    "create": ActionConfig(
+        operation_id="createCart",
+        summary=_("Create cart"),
+        description=_("Cart creation is not allowed via API."),
+        tags=["Cart"],
+        responses={405: ErrorResponseSerializer},
+    ),
+    "reserve_stock": ActionConfig(
+        response=ReserveStockResponseSerializer,
+        operation_id="reserveCartStock",
+        summary=_("Reserve stock for cart items"),
+        description=_(
+            "Reserve stock for all items in the cart during checkout. "
+            "Creates temporary stock reservations with 15-minute TTL. "
+            "Returns list of reservation IDs to be used during order creation."
+        ),
+        tags=["Cart"],
+        parameters=GUEST_CART_HEADERS,
+    ),
+    "release_reservations": ActionConfig(
+        request=ReleaseReservationsRequestSerializer,
+        response=ReleaseReservationsResponseSerializer,
+        operation_id="releaseCartReservations",
+        summary=_("Release stock reservations"),
+        description=_(
+            "Release stock reservations when checkout is abandoned or payment fails. "
+            "This makes the reserved stock available for other customers."
+        ),
+        tags=["Cart"],
+        parameters=GUEST_CART_HEADERS,
+    ),
+    "create_payment_intent": ActionConfig(
+        operation_id="createCartPaymentIntent",
+        summary=_("Create payment intent from cart"),
+        description=_(
+            "Create a Stripe payment intent based on cart total before order creation. "
+            "This is required for online payment methods (Stripe) in the payment-first flow. "
+            "Returns client_secret for frontend payment confirmation and payment_intent_id "
+            "to be included in order creation request."
+        ),
+        tags=["Cart"],
+        parameters=GUEST_CART_HEADERS,
+    ),
 }
 
-res_serializers: ResponseSerializersConfig = {
-    "list": CartSerializer,
-    "retrieve": CartDetailSerializer,
-    "update": CartDetailSerializer,
-    "partial_update": CartDetailSerializer,
-    "reserve_stock": ReserveStockResponseSerializer,
-    "release_reservations": ReleaseReservationsResponseSerializer,
-}
 
-cart_schema_config = create_schema_view_config(
-    model_class=Cart,
-    request_serializers=req_serializers,
-    response_serializers=res_serializers,
-    error_serializer=ErrorResponseSerializer,
-    display_config={
-        "tag": "Cart",
-        "display_name": _("cart"),
-        "display_name_plural": _("carts"),
-    },
+@extend_schema_view(
+    **create_schema_view_config(
+        model_class=Cart,
+        serializers_config=serializers_config,
+        error_serializer=ErrorResponseSerializer,
+        display_config={
+            "tag": "Cart",
+            "display_name": _("cart"),
+            "display_name_plural": _("carts"),
+        },
+    )
 )
-
-cart_schema_config.update(
-    {
-        "list": extend_schema(
-            operation_id="listCart",
-            summary=_("Get cart"),
-            description=_(
-                "Get a cart. For guest users, include X-Cart-Id header to maintain cart session."
-            ),
-            tags=["Cart"],
-            parameters=GUEST_CART_HEADERS,
-            responses={
-                200: CartSerializer(many=True),
-                404: ErrorResponseSerializer,
-            },
-        ),
-        "retrieve": extend_schema(
-            operation_id="retrieveCart",
-            summary=_("Get cart"),
-            description=_(
-                "Get a cart. For guest users, include X-Cart-Id header to maintain cart session."
-            ),
-            tags=["Cart"],
-            parameters=GUEST_CART_HEADERS,
-            responses={
-                200: CartDetailSerializer,
-                404: ErrorResponseSerializer,
-            },
-        ),
-        "update": extend_schema(
-            operation_id="updateCart",
-            summary=_("Update cart"),
-            description=_(
-                "Update a cart. For guest users, include X-Cart-Id header to maintain cart session."
-            ),
-            tags=["Cart"],
-            parameters=GUEST_CART_HEADERS,
-            request=CartWriteSerializer,
-            responses={
-                200: CartDetailSerializer,
-                404: ErrorResponseSerializer,
-            },
-        ),
-        "partial_update": extend_schema(
-            operation_id="partialUpdateCart",
-            summary=_("Update cart"),
-            description=_(
-                "Update a cart. For guest users, include X-Cart-Id header to maintain cart session."
-            ),
-            tags=["Cart"],
-            parameters=GUEST_CART_HEADERS,
-            request=CartWriteSerializer,
-            responses={
-                200: CartDetailSerializer,
-                404: ErrorResponseSerializer,
-            },
-        ),
-        "destroy": extend_schema(
-            operation_id="destroyCart",
-            summary=_("Delete cart"),
-            description=_(
-                "Delete a cart. For guest users, include X-Cart-Id header to maintain cart session."
-            ),
-            tags=["Cart"],
-            parameters=GUEST_CART_HEADERS,
-            responses={
-                204: None,
-                401: ErrorResponseSerializer,
-                404: ErrorResponseSerializer,
-            },
-        ),
-        "create": extend_schema(
-            operation_id="createCart",
-            summary=_("Create cart"),
-            description=_("Cart creation is not allowed via API."),
-            tags=["Cart"],
-            responses={
-                405: ErrorResponseSerializer,
-            },
-        ),
-    }
-)
-
-
-@extend_schema_view(**cart_schema_config)
 class CartViewSet(BaseModelViewSet):
     cart_service: CartService
     queryset = Cart.objects.all()
-    response_serializers = res_serializers
-    request_serializers = req_serializers
+    serializers_config = serializers_config
     filterset_class = CartFilter
     ordering_fields = [
         "id",
@@ -250,23 +248,6 @@ class CartViewSet(BaseModelViewSet):
             return Response(status=status.HTTP_204_NO_CONTENT)
         return Response(status=status.HTTP_404_NOT_FOUND)
 
-    @extend_schema(
-        operation_id="reserveCartStock",
-        summary=_("Reserve stock for cart items"),
-        description=_(
-            "Reserve stock for all items in the cart during checkout. "
-            "Creates temporary stock reservations with 15-minute TTL. "
-            "Returns list of reservation IDs to be used during order creation."
-        ),
-        tags=["Cart"],
-        parameters=GUEST_CART_HEADERS,
-        request=None,
-        responses={
-            200: ReserveStockResponseSerializer,
-            400: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    )
     @action(detail=False, methods=["post"], url_path="reserve-stock")
     def reserve_stock(self, request, *args, **kwargs):
         """
@@ -355,21 +336,6 @@ class CartViewSet(BaseModelViewSet):
             status=status.HTTP_200_OK,
         )
 
-    @extend_schema(
-        operation_id="releaseCartReservations",
-        summary=_("Release stock reservations"),
-        description=_(
-            "Release stock reservations when checkout is abandoned or payment fails. "
-            "This makes the reserved stock available for other customers."
-        ),
-        tags=["Cart"],
-        parameters=GUEST_CART_HEADERS,
-        request=ReleaseReservationsRequestSerializer,
-        responses={
-            200: ReleaseReservationsResponseSerializer,
-            400: ErrorResponseSerializer,
-        },
-    )
     @action(detail=False, methods=["post"], url_path="release-reservations")
     def release_reservations(self, request, *args, **kwargs):
         """
@@ -427,47 +393,6 @@ class CartViewSet(BaseModelViewSet):
 
         return Response(response_data, status=status.HTTP_200_OK)
 
-    @extend_schema(
-        operation_id="createCartPaymentIntent",
-        summary=_("Create payment intent from cart"),
-        description=_(
-            "Create a Stripe payment intent based on cart total before order creation. "
-            "This is required for online payment methods (Stripe) in the payment-first flow. "
-            "Returns client_secret for frontend payment confirmation and payment_intent_id "
-            "to be included in order creation request."
-        ),
-        tags=["Cart"],
-        parameters=GUEST_CART_HEADERS,
-        request={
-            "application/json": {
-                "type": "object",
-                "properties": {
-                    "pay_way_id": {
-                        "type": "integer",
-                        "description": "Payment method ID (must be Stripe)",
-                    }
-                },
-                "required": ["pay_way_id"],
-            }
-        },
-        responses={
-            200: {
-                "type": "object",
-                "properties": {
-                    "client_secret": {
-                        "type": "string",
-                        "description": "Stripe client secret for payment confirmation",
-                    },
-                    "payment_intent_id": {
-                        "type": "string",
-                        "description": "Payment intent ID to include in order creation",
-                    },
-                },
-            },
-            400: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    )
     @action(detail=False, methods=["post"], url_path="create-payment-intent")
     def create_payment_intent(self, request, *args, **kwargs):
         """

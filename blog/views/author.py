@@ -2,10 +2,7 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.utils import (
-    extend_schema,
-    extend_schema_view,
-)
+from drf_spectacular.utils import extend_schema_view
 from rest_framework.decorators import action
 
 from blog.filters.author import BlogAuthorFilter
@@ -21,25 +18,29 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
+    ActionConfig,
+    SerializersConfig,
     create_schema_view_config,
-    RequestSerializersConfig,
-    ResponseSerializersConfig,
+    crud_config,
 )
 from core.utils.views import cache_methods
 
-req_serializers: RequestSerializersConfig = {
-    "create": BlogAuthorWriteSerializer,
-    "update": BlogAuthorWriteSerializer,
-    "partial_update": BlogAuthorWriteSerializer,
-}
-
-res_serializers: ResponseSerializersConfig = {
-    "create": BlogAuthorDetailSerializer,
-    "list": BlogAuthorSerializer,
-    "retrieve": BlogAuthorDetailSerializer,
-    "update": BlogAuthorDetailSerializer,
-    "partial_update": BlogAuthorDetailSerializer,
-    "posts": BlogPostSerializer,
+serializers_config: SerializersConfig = {
+    **crud_config(
+        list=BlogAuthorSerializer,
+        detail=BlogAuthorDetailSerializer,
+        write=BlogAuthorWriteSerializer,
+    ),
+    "posts": ActionConfig(
+        response=BlogPostSerializer,
+        many=True,
+        operation_id="getBlogAuthorPosts",
+        summary=_("Get author's blog posts"),
+        description=_(
+            "Retrieve all blog posts written by this author with proper pagination."
+        ),
+        tags=["Blog Authors"],
+    ),
 }
 
 
@@ -49,8 +50,8 @@ res_serializers: ResponseSerializersConfig = {
         display_config={
             "tag": "Blog Authors",
         },
-        request_serializers=req_serializers,
-        response_serializers=res_serializers,
+        serializers_config=serializers_config,
+        error_serializer=ErrorResponseSerializer,
     )
 )
 @cache_methods(
@@ -58,8 +59,7 @@ res_serializers: ResponseSerializersConfig = {
 )
 class BlogAuthorViewSet(BaseModelViewSet):
     queryset = BlogAuthor.objects.none()
-    response_serializers = res_serializers
-    request_serializers = req_serializers
+    serializers_config = serializers_config
 
     def get_filterset_class(self):
         if self.action == "posts":
@@ -99,18 +99,6 @@ class BlogAuthorViewSet(BaseModelViewSet):
         "translations__bio",
     ]
 
-    @extend_schema(
-        operation_id="getBlogAuthorPosts",
-        summary=_("Get author's blog posts"),
-        description=_(
-            "Retrieve all blog posts written by this author with proper pagination."
-        ),
-        tags=["Blog Authors"],
-        responses={
-            200: BlogPostSerializer(many=True),
-            404: ErrorResponseSerializer,
-        },
-    )
     @action(detail=True, methods=["GET"])
     def posts(self, request, pk=None, *args, **kwargs):
         self.ordering_fields = []

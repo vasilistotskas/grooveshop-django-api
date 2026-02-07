@@ -22,9 +22,7 @@ from rest_framework import status
 from rest_framework.decorators import (
     action,
     api_view,
-    permission_classes as permission_classes_decorator,
 )
-from rest_framework.permissions import IsAdminUser
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -38,10 +36,7 @@ from core.api.serializers import (
 from core.pagination.cursor import CursorPaginator
 from core.pagination.limit_offset import LimitOffsetPaginator
 from core.pagination.page_number import PageNumberPaginator
-from core.utils.serializers import (
-    RequestSerializersConfig,
-    ResponseSerializersConfig,
-)
+from core.utils.serializers import SerializersConfig
 from core.utils.views import TranslationsProcessingMixin
 
 logger = logging.getLogger(__name__)
@@ -105,15 +100,13 @@ class RequestResponseSerializerMixin:
         "partial_update",
         "destroy",
     ]
-    request_serializers: RequestSerializersConfig = {}
-    response_serializers: ResponseSerializersConfig = {}
+    serializers_config: SerializersConfig = {}
 
     def get_serializer_class(self):
         """
         Return the serializer class for this action.
 
-        This method is used by DRF's built-in methods and schema generation.
-        It prioritizes response serializers since they're more commonly needed
+        Prioritizes response serializers since they're more commonly needed
         for general serialization tasks.
         """
         has_explicit_serializer_class = (
@@ -121,7 +114,6 @@ class RequestResponseSerializerMixin:
             and self.serializer_class is not None
         )
 
-        # Handle edge case where action might be None or empty
         current_action = getattr(self, "action", None)
         if not current_action:
             if has_explicit_serializer_class:
@@ -131,36 +123,20 @@ class RequestResponseSerializerMixin:
                 "Ensure the view has a valid action or define serializer_class."
             )
 
-        # Try to get response serializer for current action first
-        if hasattr(self, "response_serializers") and self.response_serializers:
-            response_serializer_class = self.response_serializers.get(
-                current_action
-            )
-            if response_serializer_class is not None:
-                return response_serializer_class
+        cfg = self.serializers_config.get(current_action)
+        if cfg:
+            if cfg.response is not None:
+                return cfg.response
+            if cfg.request is not None:
+                return cfg.request
 
-        # For write operations, try request serializers as fallback
-        if (
-            hasattr(self, "request")
-            and self.request.method in ["POST", "PUT", "PATCH"]
-            and hasattr(self, "request_serializers")
-            and self.request_serializers
-        ):
-            request_serializer_class = self.request_serializers.get(
-                current_action
-            )
-            if request_serializer_class is not None:
-                return request_serializer_class
-
-        # Fall back to the default serializer class if available
         if has_explicit_serializer_class:
             return self.serializer_class
 
-        # If no serializer is found, raise an error
         raise ImproperlyConfigured(
             "No serializer found for action '{action}' and no default serializer defined. "
-            "Define {cls}.response_serializers['{action}'], {cls}.request_serializers['{action}'], "
-            "or set {cls}.serializer_class, or override {cls}.get_serializer_class().".format(
+            "Define {cls}.serializers_config['{action}'] or set {cls}.serializer_class, "
+            "or override {cls}.get_serializer_class().".format(
                 action=current_action, cls=self.__class__.__name__
             )
         )
@@ -169,34 +145,20 @@ class RequestResponseSerializerMixin:
         """
         Get the serializer CLASS for request data validation.
         Returns a class, not an instance.
-
-        Note: *args, **kwargs are kept for compatibility but not used
-        since this returns a class.
         """
-        if hasattr(self, "request_serializers") and self.request_serializers:
-            request_serializer_class = self.request_serializers.get(self.action)
-            if request_serializer_class is not None:
-                return request_serializer_class
-
-        # Fall back to the main serializer class
+        cfg = self.serializers_config.get(self.action)
+        if cfg and cfg.request is not None:
+            return cfg.request
         return self.get_serializer_class()
 
     def get_response_serializer(self, *args, **kwargs):
         """
         Get the serializer CLASS for response data formatting.
         Returns a class, not an instance.
-
-        Note: *args, **kwargs are kept for compatibility with existing code
-        but are not used since this returns a class.
         """
-        if hasattr(self, "response_serializers") and self.response_serializers:
-            response_serializer_class = self.response_serializers.get(
-                self.action
-            )
-            if response_serializer_class is not None:
-                return response_serializer_class
-
-        # Fall back to the main serializer class
+        cfg = self.serializers_config.get(self.action)
+        if cfg and cfg.response is not None:
+            return cfg.response
         return self.get_serializer_class()
 
     def get_serializer_for_schema(self, action_name=None):
@@ -214,30 +176,15 @@ class RequestResponseSerializerMixin:
             request_serializer_class = None
             response_serializer_class = None
 
-            # Get request serializer class
-            if (
-                hasattr(self, "request_serializers")
-                and self.request_serializers
-            ):
-                request_serializer_class = self.request_serializers.get(
-                    action_name
-                )
+            cfg = self.serializers_config.get(action_name)
+            if cfg:
+                request_serializer_class = cfg.request
+                response_serializer_class = cfg.response
 
-            # Get response serializer class
-            if (
-                hasattr(self, "response_serializers")
-                and self.response_serializers
-            ):
-                response_serializer_class = self.response_serializers.get(
-                    action_name
-                )
-
-            # Use the main get_serializer_class as fallback, but handle errors gracefully
             fallback_class = None
             try:
                 fallback_class = self.get_serializer_class()
             except ImproperlyConfigured:
-                # If no fallback is available, we'll handle this below
                 pass
 
             if request_serializer_class is None:
@@ -245,14 +192,13 @@ class RequestResponseSerializerMixin:
             if response_serializer_class is None:
                 response_serializer_class = fallback_class
 
-            # Ensure we have at least something for schema generation
             if (
                 request_serializer_class is None
                 and response_serializer_class is None
             ):
                 raise ImproperlyConfigured(
                     f"No serializers found for action '{action_name}' in {self.__class__.__name__}. "
-                    "Define request_serializers, response_serializers, or serializer_class."
+                    "Define serializers_config or serializer_class."
                 )
 
             return {

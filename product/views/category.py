@@ -1,19 +1,17 @@
 from __future__ import annotations
 
 from django.conf import settings
-from drf_spectacular.utils import (
-    extend_schema,
-    extend_schema_view,
-    OpenApiResponse,
-)
+from drf_spectacular.utils import extend_schema_view
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
+    ActionConfig,
+    SerializersConfig,
     create_schema_view_config,
-    RequestSerializersConfig,
-    ResponseSerializersConfig,
+    crud_config,
 )
 from core.utils.views import cache_methods
 from product.filters.category import ProductCategoryFilter
@@ -24,18 +22,22 @@ from product.serializers.category import (
     ProductCategoryWriteSerializer,
 )
 
-req_serializers: RequestSerializersConfig = {
-    "create": ProductCategoryWriteSerializer,
-    "update": ProductCategoryWriteSerializer,
-    "partial_update": ProductCategoryWriteSerializer,
-}
-
-res_serializers: ResponseSerializersConfig = {
-    "create": ProductCategoryDetailSerializer,
-    "list": ProductCategorySerializer,
-    "retrieve": ProductCategoryDetailSerializer,
-    "update": ProductCategoryDetailSerializer,
-    "partial_update": ProductCategoryDetailSerializer,
+serializers_config: SerializersConfig = {
+    **crud_config(
+        list=ProductCategorySerializer,
+        detail=ProductCategoryDetailSerializer,
+        write=ProductCategoryWriteSerializer,
+    ),
+    "all": ActionConfig(
+        response=ProductCategorySerializer,
+        many=True,
+        operation_id="listAllProductCategory",
+        summary="List all product categories (unpaginated)",
+        description="Retrieve all product categories without pagination. "
+        "Useful for dropdowns, filters, and other UI components that need the complete list.",
+        tags=["Product Categories"],
+        parameters=[],
+    ),
 }
 
 
@@ -45,16 +47,15 @@ res_serializers: ResponseSerializersConfig = {
         display_config={
             "tag": "Product Categories",
         },
-        request_serializers=req_serializers,
-        response_serializers=res_serializers,
+        serializers_config=serializers_config,
+        error_serializer=ErrorResponseSerializer,
     )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve", "all"])
 class ProductCategoryViewSet(BaseModelViewSet):
     queryset = ProductCategory.objects.all()
     filterset_class = ProductCategoryFilter
-    response_serializers = res_serializers
-    request_serializers = req_serializers
+    serializers_config = serializers_config
     ordering_fields = [
         "id",
         "sort_order",
@@ -79,23 +80,6 @@ class ProductCategoryViewSet(BaseModelViewSet):
             return ProductCategory.objects.for_list()
         return ProductCategory.objects.for_detail()
 
-    @extend_schema(
-        operation_id="listAllProductCategory",
-        summary="List all product categories (unpaginated)",
-        description="Retrieve all product categories without pagination. "
-        "Useful for dropdowns, filters, and other UI components that need the complete list.",
-        tags=["Product Categories"],
-        parameters=[],  # Explicitly clear all parameters
-        responses={
-            200: OpenApiResponse(
-                response={
-                    "type": "array",
-                    "items": {"$ref": "#/components/schemas/ProductCategory"},
-                },
-                description="Array of all product categories",
-            ),
-        },
-    )
     @action(
         detail=False,
         methods=["GET"],

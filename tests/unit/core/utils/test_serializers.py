@@ -8,10 +8,11 @@ from rest_framework import serializers
 from rest_framework.test import APIRequestFactory
 from rest_framework.viewsets import ModelViewSet
 from core.utils.serializers import (
+    ActionConfig,
+    SerializersConfig,
     TranslatedFieldExtended,
     create_schema_view_config,
-    RequestSerializersConfig,
-    ResponseSerializersConfig,
+    crud_config,
 )
 
 
@@ -59,14 +60,12 @@ class DummyTestWriteSerializer(serializers.Serializer):
 
 
 class DummyTestViewSet(ModelViewSet):
-    response_serializers = {
-        "create": DummyTestDetailSerializer,
-        "update": DummyTestDetailSerializer,
-        "partial_update": DummyTestDetailSerializer,
-    }
-    request_serializers = {
-        "create": DummyTestWriteSerializer,
-        "update": DummyTestWriteSerializer,
+    serializers_config: SerializersConfig = {
+        **crud_config(
+            list=DummyTestSerializer,
+            detail=DummyTestDetailSerializer,
+            write=DummyTestWriteSerializer,
+        ),
     }
 
 
@@ -108,18 +107,12 @@ class TestTranslatedFieldExtended(TestCase):
 
 class TestCreateSchemaViewConfig(TestCase):
     def test_basic_config_generation(self):
-        req_serializers: RequestSerializersConfig = {
-            "create": DummyTestWriteSerializer,
-            "update": DummyTestWriteSerializer,
-            "partial_update": DummyTestWriteSerializer,
-        }
-
-        res_serializers: ResponseSerializersConfig = {
-            "create": DummyTestDetailSerializer,
-            "list": DummyTestSerializer,
-            "retrieve": DummyTestDetailSerializer,
-            "update": DummyTestDetailSerializer,
-            "partial_update": DummyTestDetailSerializer,
+        serializers_config: SerializersConfig = {
+            **crud_config(
+                list=DummyTestSerializer,
+                detail=DummyTestDetailSerializer,
+                write=DummyTestWriteSerializer,
+            ),
         }
 
         config = create_schema_view_config(
@@ -127,8 +120,7 @@ class TestCreateSchemaViewConfig(TestCase):
             display_config={
                 "tag": "Test Models",
             },
-            request_serializers=req_serializers,
-            response_serializers=res_serializers,
+            serializers_config=serializers_config,
         )
 
         assert "list" in config
@@ -143,18 +135,12 @@ class TestCreateSchemaViewConfig(TestCase):
             assert hasattr(decorator, "__name__")
 
     def test_config_with_error_serializer(self):
-        req_serializers: RequestSerializersConfig = {
-            "create": DummyTestWriteSerializer,
-            "update": DummyTestWriteSerializer,
-            "partial_update": DummyTestWriteSerializer,
-        }
-
-        res_serializers: ResponseSerializersConfig = {
-            "create": DummyTestDetailSerializer,
-            "list": DummyTestSerializer,
-            "retrieve": DummyTestDetailSerializer,
-            "update": DummyTestDetailSerializer,
-            "partial_update": DummyTestDetailSerializer,
+        serializers_config: SerializersConfig = {
+            **crud_config(
+                list=DummyTestSerializer,
+                detail=DummyTestDetailSerializer,
+                write=DummyTestWriteSerializer,
+            ),
         }
 
         config = create_schema_view_config(
@@ -162,8 +148,7 @@ class TestCreateSchemaViewConfig(TestCase):
             display_config={
                 "tag": "Test Models",
             },
-            request_serializers=req_serializers,
-            response_serializers=res_serializers,
+            serializers_config=serializers_config,
             error_serializer=DummyTestSerializer,
         )
 
@@ -185,18 +170,12 @@ class TestCreateSchemaViewConfig(TestCase):
             "create": {409: DummyTestSerializer},
         }
 
-        req_serializers: RequestSerializersConfig = {
-            "create": DummyTestWriteSerializer,
-            "update": DummyTestWriteSerializer,
-            "partial_update": DummyTestWriteSerializer,
-        }
-
-        res_serializers: ResponseSerializersConfig = {
-            "create": DummyTestDetailSerializer,
-            "list": DummyTestSerializer,
-            "retrieve": DummyTestDetailSerializer,
-            "update": DummyTestDetailSerializer,
-            "partial_update": DummyTestDetailSerializer,
+        serializers_config: SerializersConfig = {
+            **crud_config(
+                list=DummyTestSerializer,
+                detail=DummyTestDetailSerializer,
+                write=DummyTestWriteSerializer,
+            ),
         }
 
         config = create_schema_view_config(
@@ -204,8 +183,7 @@ class TestCreateSchemaViewConfig(TestCase):
             display_config={
                 "tag": "Test Models",
             },
-            request_serializers=req_serializers,
-            response_serializers=res_serializers,
+            serializers_config=serializers_config,
             additional_responses=additional_responses,
         )
 
@@ -221,19 +199,19 @@ class TestCreateSchemaViewConfig(TestCase):
             assert operation in config
             assert callable(config[operation])
 
-    def test_config_request_response_serializers(self):
-        req_serializers: RequestSerializersConfig = {
-            "create": DummyTestWriteSerializer,
-            "update": DummyTestWriteSerializer,
-            "partial_update": DummyTestWriteSerializer,
-        }
-
-        res_serializers: ResponseSerializersConfig = {
-            "create": DummyTestDetailSerializer,
-            "list": DummyTestSerializer,
-            "retrieve": DummyTestDetailSerializer,
-            "update": DummyTestDetailSerializer,
-            "partial_update": DummyTestDetailSerializer,
+    def test_config_with_custom_actions(self):
+        serializers_config: SerializersConfig = {
+            **crud_config(
+                list=DummyTestSerializer,
+                detail=DummyTestDetailSerializer,
+                write=DummyTestWriteSerializer,
+            ),
+            "custom_action": ActionConfig(
+                response=DummyTestSerializer,
+                operation_id="customAction",
+                summary="Custom action",
+                tags=["Custom"],
+            ),
         }
 
         config = create_schema_view_config(
@@ -241,8 +219,7 @@ class TestCreateSchemaViewConfig(TestCase):
             display_config={
                 "tag": "Test Models",
             },
-            request_serializers=req_serializers,
-            response_serializers=res_serializers,
+            serializers_config=serializers_config,
         )
 
         crud_operations = [
@@ -257,19 +234,16 @@ class TestCreateSchemaViewConfig(TestCase):
             assert operation in config
             assert callable(config[operation])
 
-    def test_config_function_returns_decorator(self):
-        req_serializers: RequestSerializersConfig = {
-            "create": DummyTestWriteSerializer,
-            "update": DummyTestWriteSerializer,
-            "partial_update": DummyTestWriteSerializer,
-        }
+        assert "custom_action" in config
+        assert callable(config["custom_action"])
 
-        res_serializers: ResponseSerializersConfig = {
-            "create": DummyTestDetailSerializer,
-            "list": DummyTestSerializer,
-            "retrieve": DummyTestDetailSerializer,
-            "update": DummyTestDetailSerializer,
-            "partial_update": DummyTestDetailSerializer,
+    def test_config_function_returns_decorator(self):
+        serializers_config: SerializersConfig = {
+            **crud_config(
+                list=DummyTestSerializer,
+                detail=DummyTestDetailSerializer,
+                write=DummyTestWriteSerializer,
+            ),
         }
 
         config = create_schema_view_config(
@@ -277,8 +251,7 @@ class TestCreateSchemaViewConfig(TestCase):
             display_config={
                 "tag": "Test Models",
             },
-            request_serializers=req_serializers,
-            response_serializers=res_serializers,
+            serializers_config=serializers_config,
         )
 
         @config["list"]

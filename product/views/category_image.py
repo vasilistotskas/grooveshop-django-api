@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
 
@@ -13,9 +13,10 @@ from rest_framework.response import Response
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
+    ActionConfig,
+    SerializersConfig,
     create_schema_view_config,
-    RequestSerializersConfig,
-    ResponseSerializersConfig,
+    crud_config,
 )
 from core.utils.views import cache_methods
 from product.models.category_image import ProductCategoryImage
@@ -30,40 +31,57 @@ from product.serializers.category_image import (
 if TYPE_CHECKING:
     from django.db.models import QuerySet
 
-req_serializers: RequestSerializersConfig = {
-    "create": ProductCategoryImageWriteSerializer,
-    "update": ProductCategoryImageWriteSerializer,
-    "partial_update": ProductCategoryImageWriteSerializer,
-    "bulk_update": ProductCategoryImageBulkUpdateSerializer,
+serializers_config: SerializersConfig = {
+    **crud_config(
+        list=ProductCategoryImageSerializer,
+        detail=ProductCategoryImageDetailSerializer,
+        write=ProductCategoryImageWriteSerializer,
+    ),
+    "bulk_update": ActionConfig(
+        request=ProductCategoryImageBulkUpdateSerializer,
+        response=ProductCategoryImageBulkResponseSerializer,
+        operation_id="bulkUpdateProductCategoryImages",
+        summary=_("Bulk update category images"),
+        description=_(
+            "Update multiple category images at once. Can update active status and sort order."
+        ),
+        tags=["Product Category Images"],
+    ),
+    "by_category": ActionConfig(
+        response=ProductCategoryImageSerializer,
+        many=True,
+        operation_id="getProductCategoryImagesByCategory",
+        summary=_("Get images by category"),
+        description=_("Retrieve all images for a specific category."),
+        tags=["Product Category Images"],
+    ),
+    "by_type": ActionConfig(
+        response=ProductCategoryImageSerializer,
+        many=True,
+        operation_id="getProductCategoryImagesByType",
+        summary=_("Get images by type"),
+        description=_(
+            "Retrieve all images of a specific type (main, banner, icon, etc.)."
+        ),
+        tags=["Product Category Images"],
+    ),
 }
 
-res_serializers: ResponseSerializersConfig = {
-    "create": ProductCategoryImageDetailSerializer,
-    "list": ProductCategoryImageSerializer,
-    "retrieve": ProductCategoryImageDetailSerializer,
-    "update": ProductCategoryImageDetailSerializer,
-    "partial_update": ProductCategoryImageDetailSerializer,
-    "bulk_update": ProductCategoryImageBulkResponseSerializer,
-    "by_category": ProductCategoryImageSerializer,
-    "by_type": ProductCategoryImageSerializer,
-}
 
-schema_config = create_schema_view_config(
-    model_class=ProductCategoryImage,
-    display_config={
-        "tag": "Product Category Images",
-    },
-    request_serializers=req_serializers,
-    response_serializers=res_serializers,
+@extend_schema_view(
+    **create_schema_view_config(
+        model_class=ProductCategoryImage,
+        display_config={
+            "tag": "Product Category Images",
+        },
+        serializers_config=serializers_config,
+        error_serializer=ErrorResponseSerializer,
+    )
 )
-
-
-@extend_schema_view(**schema_config)
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class ProductCategoryImageViewSet(BaseModelViewSet):
     queryset = ProductCategoryImage.objects.select_related("category")
-    request_serializers = req_serializers
-    response_serializers = res_serializers
+    serializers_config = serializers_config
     filterset_fields = ["id", "category", "image_type", "active"]
     ordering_fields = ["created_at", "image_type", "sort_order"]
     ordering = ["sort_order", "-created_at"]
@@ -86,20 +104,6 @@ class ProductCategoryImageViewSet(BaseModelViewSet):
 
         return queryset.distinct()
 
-    @extend_schema(
-        operation_id="bulkUpdateProductCategoryImages",
-        summary=_("Bulk update category images"),
-        description=_(
-            "Update multiple category images at once. Can update active status and sort order."
-        ),
-        tags=["Product Category Images"],
-        request=ProductCategoryImageBulkUpdateSerializer,
-        responses={
-            200: ProductCategoryImageBulkResponseSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-        },
-    )
     @action(detail=False, methods=["patch"])
     def bulk_update(self, request):
         request_serializer_class = self.get_request_serializer()
@@ -137,20 +141,7 @@ class ProductCategoryImageViewSet(BaseModelViewSet):
         response_serializer = response_serializer_class(response_data)
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 
-    @extend_schema(
-        operation_id="getProductCategoryImagesByCategory",
-        summary=_("Get images by category"),
-        description=_("Retrieve all images for a specific category."),
-        tags=["Product Category Images"],
-        responses={
-            200: {
-                "type": "array",
-                "items": {"$ref": "#/components/schemas/ProductCategoryImage"},
-            },
-            404: ErrorResponseSerializer,
-        },
-    )
-    @action(detail=False, methods=["get"])
+    @action(detail=False, methods=["get"], pagination_class=None)
     def by_category(self, request):
         category_id = request.query_params.get("category_id")
         if not category_id:
@@ -175,21 +166,7 @@ class ProductCategoryImageViewSet(BaseModelViewSet):
         )
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 
-    @extend_schema(
-        operation_id="getProductCategoryImagesByType",
-        summary=_("Get images by type"),
-        description=_(
-            "Retrieve all images of a specific type (main, banner, icon, etc.)."
-        ),
-        tags=["Product Category Images"],
-        responses={
-            200: {
-                "type": "array",
-                "items": {"$ref": "#/components/schemas/ProductCategoryImage"},
-            },
-        },
-    )
-    @action(detail=False, methods=["get"])
+    @action(detail=False, methods=["get"], pagination_class=None)
     def by_type(self, request):
         image_type = request.query_params.get("image_type")
         if not image_type:

@@ -4,12 +4,13 @@ from django.conf import settings
 from drf_spectacular.utils import extend_schema_view
 
 
+from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
+    SerializersConfig,
     create_schema_view_config,
-    RequestSerializersConfig,
-    ResponseSerializersConfig,
+    crud_config,
 )
 from core.utils.views import cache_methods
 from country.filters import CountryFilter
@@ -20,18 +21,12 @@ from country.serializers import (
     CountryWriteSerializer,
 )
 
-req_serializers: RequestSerializersConfig = {
-    "create": CountryWriteSerializer,
-    "update": CountryWriteSerializer,
-    "partial_update": CountryWriteSerializer,
-}
-
-res_serializers: ResponseSerializersConfig = {
-    "create": CountryDetailSerializer,
-    "list": CountrySerializer,
-    "retrieve": CountryDetailSerializer,
-    "update": CountryDetailSerializer,
-    "partial_update": CountryDetailSerializer,
+serializers_config: SerializersConfig = {
+    **crud_config(
+        list=CountrySerializer,
+        detail=CountryDetailSerializer,
+        write=CountryWriteSerializer,
+    ),
 }
 
 
@@ -41,15 +36,14 @@ res_serializers: ResponseSerializersConfig = {
         display_config={
             "tag": "Countries",
         },
-        request_serializers=req_serializers,
-        response_serializers=res_serializers,
+        serializers_config=serializers_config,
+        error_serializer=ErrorResponseSerializer,
     )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class CountryViewSet(BaseModelViewSet):
     queryset = Country.objects.all()
-    response_serializers = res_serializers
-    request_serializers = req_serializers
+    serializers_config = serializers_config
     filterset_class = CountryFilter
     ordering_fields = [
         "alpha_2",

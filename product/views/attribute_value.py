@@ -4,22 +4,24 @@ from django.conf import settings
 from drf_spectacular.utils import extend_schema_view
 from rest_framework.permissions import IsAdminUser
 
+from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
+    ActionConfig,
+    SerializersConfig,
     create_schema_view_config,
-    ResponseSerializersConfig,
 )
 from core.utils.views import cache_methods
 from product.filters.attribute_value import AttributeValueFilter
 from product.models.attribute_value import AttributeValue
 from product.serializers.attribute_value import AttributeValueSerializer
 
-res_serializers: ResponseSerializersConfig = {
-    "create": AttributeValueSerializer,
-    "list": AttributeValueSerializer,
-    "retrieve": AttributeValueSerializer,
-    "update": AttributeValueSerializer,
-    "partial_update": AttributeValueSerializer,
+serializers_config: SerializersConfig = {
+    "list": ActionConfig(response=AttributeValueSerializer),
+    "retrieve": ActionConfig(response=AttributeValueSerializer),
+    "create": ActionConfig(response=AttributeValueSerializer),
+    "update": ActionConfig(response=AttributeValueSerializer),
+    "partial_update": ActionConfig(response=AttributeValueSerializer),
 }
 
 
@@ -29,7 +31,8 @@ res_serializers: ResponseSerializersConfig = {
         display_config={
             "tag": "Product Attributes",
         },
-        response_serializers=res_serializers,
+        serializers_config=serializers_config,
+        error_serializer=ErrorResponseSerializer,
     )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
@@ -45,7 +48,7 @@ class AttributeValueViewSet(BaseModelViewSet):
     queryset = AttributeValue.objects.all()
     serializer_class = AttributeValueSerializer
     filterset_class = AttributeValueFilter
-    response_serializers = res_serializers
+    serializers_config = serializers_config
     ordering_fields = [
         "id",
         "attribute",

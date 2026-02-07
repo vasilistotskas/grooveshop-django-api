@@ -2,10 +2,7 @@ from __future__ import annotations
 
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.utils import (
-    extend_schema,
-    extend_schema_view,
-)
+from drf_spectacular.utils import extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
 
@@ -25,9 +22,10 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
+    ActionConfig,
+    SerializersConfig,
     create_schema_view_config,
-    RequestSerializersConfig,
-    ResponseSerializersConfig,
+    crud_config,
 )
 from notification.filters import NotificationUserFilter
 from notification.serializers.user import NotificationUserSerializer
@@ -51,30 +49,91 @@ from user.utils.subscription import get_user_subscription_summary
 
 User = get_user_model()
 
-req_serializers: RequestSerializersConfig = {
-    "create": UserWriteSerializer,
-    "update": UserWriteSerializer,
-    "partial_update": UserWriteSerializer,
-    "change_username": UsernameUpdateSerializer,
-    "subscriptions": None,
-}
-
-res_serializers: ResponseSerializersConfig = {
-    "create": UserDetailsSerializer,
-    "list": UserDetailsSerializer,
-    "retrieve": UserDetailsSerializer,
-    "update": UserDetailsSerializer,
-    "partial_update": UserDetailsSerializer,
-    "favourite_products": ProductFavouriteSerializer,
-    "orders": OrderSerializer,
-    "product_reviews": ProductReviewSerializer,
-    "addresses": UserAddressSerializer,
-    "blog_post_comments": BlogCommentSerializer,
-    "liked_blog_posts": BlogPostSerializer,
-    "notifications": NotificationUserSerializer,
-    "subscriptions": UserSubscriptionSerializer,
-    "change_username": UsernameUpdateResponseSerializer,
-    "subscription_summary": UserSubscriptionSummaryResponseSerializer,
+serializers_config: SerializersConfig = {
+    **crud_config(
+        list=UserDetailsSerializer,
+        detail=UserDetailsSerializer,
+        write=UserWriteSerializer,
+    ),
+    "favourite_products": ActionConfig(
+        response=ProductFavouriteSerializer,
+        many=True,
+        operation_id="getUserAccountFavouriteProducts",
+        summary=_("Get user's favourite products"),
+        description=_("Get all favourite products for a specific user."),
+        tags=["User Accounts"],
+    ),
+    "orders": ActionConfig(
+        response=OrderSerializer,
+        many=True,
+        operation_id="getUserAccountOrders",
+        summary=_("Get user's orders"),
+        description=_("Get all orders for a specific user."),
+        tags=["User Accounts"],
+    ),
+    "product_reviews": ActionConfig(
+        response=ProductReviewSerializer,
+        many=True,
+        operation_id="getUserAccountProductReviews",
+        summary=_("Get user's product reviews"),
+        description=_("Get all product reviews written by a specific user."),
+        tags=["User Accounts"],
+    ),
+    "addresses": ActionConfig(
+        response=UserAddressSerializer,
+        many=True,
+        operation_id="getUserAccountAddresses",
+        summary=_("Get user's addresses"),
+        description=_("Get all addresses for a specific user."),
+        tags=["User Accounts"],
+    ),
+    "blog_post_comments": ActionConfig(
+        response=BlogCommentSerializer,
+        many=True,
+        operation_id="getUserAccountBlogPostComments",
+        summary=_("Get user's blog comments"),
+        description=_("Get all blog post comments written by a specific user."),
+        tags=["User Accounts"],
+    ),
+    "liked_blog_posts": ActionConfig(
+        response=BlogPostSerializer,
+        many=True,
+        operation_id="getUserAccountLikedBlogPosts",
+        summary=_("Get user's liked blog posts"),
+        description=_("Get all blog posts liked by a specific user."),
+        tags=["User Accounts"],
+    ),
+    "notifications": ActionConfig(
+        response=NotificationUserSerializer,
+        many=True,
+        operation_id="getUserAccountNotifications",
+        summary=_("Get user's notifications"),
+        description=_("Get all notifications for a specific user."),
+        tags=["User Accounts"],
+    ),
+    "subscriptions": ActionConfig(
+        response=UserSubscriptionSerializer,
+        many=True,
+        operation_id="getUserAccountSubscriptions",
+        summary=_("Get user's subscriptions"),
+        description=_("Get all subscriptions for a specific user."),
+        tags=["User Accounts"],
+    ),
+    "change_username": ActionConfig(
+        request=UsernameUpdateSerializer,
+        response=UsernameUpdateResponseSerializer,
+        operation_id="changeUserAccountUsername",
+        summary=_("Change username"),
+        description=_("Change the username for a specific user."),
+        tags=["User Accounts"],
+    ),
+    "subscription_summary": ActionConfig(
+        response=UserSubscriptionSummaryResponseSerializer,
+        operation_id="getUserAccountSubscriptionSummary",
+        summary=_("Get user's subscription summary"),
+        description=_("Get a summary of subscriptions for a specific user."),
+        tags=["User Accounts"],
+    ),
 }
 
 
@@ -84,137 +143,13 @@ res_serializers: ResponseSerializersConfig = {
         display_config={
             "tag": "User Accounts",
         },
-        request_serializers=req_serializers,
-        response_serializers=res_serializers,
+        serializers_config=serializers_config,
         error_serializer=ErrorResponseSerializer,
-    ),
-    favourite_products=extend_schema(
-        operation_id="getUserAccountFavouriteProducts",
-        summary=_("Get user's favourite products"),
-        description=_("Get all favourite products for a specific user."),
-        tags=["User Accounts"],
-        responses={
-            200: ProductFavouriteSerializer(many=True),
-            401: ErrorResponseSerializer,
-            403: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    orders=extend_schema(
-        operation_id="getUserAccountOrders",
-        summary=_("Get user's orders"),
-        description=_("Get all orders for a specific user."),
-        tags=["User Accounts"],
-        responses={
-            200: OrderSerializer(many=True),
-            401: ErrorResponseSerializer,
-            403: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    product_reviews=extend_schema(
-        operation_id="getUserAccountProductReviews",
-        summary=_("Get user's product reviews"),
-        description=_("Get all product reviews written by a specific user."),
-        tags=["User Accounts"],
-        responses={
-            200: ProductReviewSerializer(many=True),
-            401: ErrorResponseSerializer,
-            403: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    addresses=extend_schema(
-        operation_id="getUserAccountAddresses",
-        summary=_("Get user's addresses"),
-        description=_("Get all addresses for a specific user."),
-        tags=["User Accounts"],
-        responses={
-            200: UserAddressSerializer(many=True),
-            401: ErrorResponseSerializer,
-            403: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    blog_post_comments=extend_schema(
-        operation_id="getUserAccountBlogPostComments",
-        summary=_("Get user's blog comments"),
-        description=_("Get all blog post comments written by a specific user."),
-        tags=["User Accounts"],
-        responses={
-            200: BlogCommentSerializer(many=True),
-            401: ErrorResponseSerializer,
-            403: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    liked_blog_posts=extend_schema(
-        operation_id="getUserAccountLikedBlogPosts",
-        summary=_("Get user's liked blog posts"),
-        description=_("Get all blog posts liked by a specific user."),
-        tags=["User Accounts"],
-        responses={
-            200: BlogPostSerializer(many=True),
-            401: ErrorResponseSerializer,
-            403: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    notifications=extend_schema(
-        operation_id="getUserAccountNotifications",
-        summary=_("Get user's notifications"),
-        description=_("Get all notifications for a specific user."),
-        tags=["User Accounts"],
-        responses={
-            200: NotificationUserSerializer(many=True),
-            401: ErrorResponseSerializer,
-            403: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    subscriptions=extend_schema(
-        operation_id="getUserAccountSubscriptions",
-        summary=_("Get user's subscriptions"),
-        description=_("Get all subscriptions for a specific user."),
-        tags=["User Accounts"],
-        responses={
-            200: UserSubscriptionSerializer(many=True),
-            401: ErrorResponseSerializer,
-            403: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    change_username=extend_schema(
-        operation_id="changeUserAccountUsername",
-        summary=_("Change username"),
-        description=_("Change the username for a specific user."),
-        tags=["User Accounts"],
-        request=UsernameUpdateSerializer,
-        responses={
-            200: UsernameUpdateResponseSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            403: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
-    subscription_summary=extend_schema(
-        operation_id="getUserAccountSubscriptionSummary",
-        summary=_("Get user's subscription summary"),
-        description=_("Get a summary of subscriptions for a specific user."),
-        tags=["User Accounts"],
-        responses={
-            200: UserSubscriptionSummaryResponseSerializer,
-            401: ErrorResponseSerializer,
-            403: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
     ),
 )
 class UserAccountViewSet(BaseModelViewSet):
     queryset = User.objects.none()
-    request_serializers = req_serializers
-    response_serializers = res_serializers
+    serializers_config = serializers_config
     permission_classes = [IsOwnerOrAdmin]
     ordering_fields = ["id", "email", "username", "created_at", "updated_at"]
     ordering = ["-created_at"]

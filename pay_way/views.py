@@ -7,9 +7,9 @@ from drf_spectacular.utils import extend_schema_view
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
+    SerializersConfig,
     create_schema_view_config,
-    RequestSerializersConfig,
-    ResponseSerializersConfig,
+    crud_config,
 )
 from core.utils.views import cache_methods
 from pay_way.filters import PayWayFilter
@@ -20,18 +20,12 @@ from pay_way.serializers import (
     PayWayWriteSerializer,
 )
 
-req_serializers: RequestSerializersConfig = {
-    "create": PayWayWriteSerializer,
-    "update": PayWayWriteSerializer,
-    "partial_update": PayWayWriteSerializer,
-}
-
-res_serializers: ResponseSerializersConfig = {
-    "create": PayWayDetailSerializer,
-    "list": PayWaySerializer,
-    "retrieve": PayWayDetailSerializer,
-    "update": PayWayDetailSerializer,
-    "partial_update": PayWayDetailSerializer,
+serializers_config: SerializersConfig = {
+    **crud_config(
+        list=PayWaySerializer,
+        detail=PayWayDetailSerializer,
+        write=PayWayWriteSerializer,
+    ),
 }
 
 
@@ -41,16 +35,14 @@ res_serializers: ResponseSerializersConfig = {
         display_config={
             "tag": "Payment methods",
         },
-        request_serializers=req_serializers,
-        response_serializers=res_serializers,
+        serializers_config=serializers_config,
         error_serializer=ErrorResponseSerializer,
     )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class PayWayViewSet(BaseModelViewSet):
     queryset = PayWay.objects.all()
-    response_serializers = res_serializers
-    request_serializers = req_serializers
+    serializers_config = serializers_config
     filterset_class = PayWayFilter
     ordering_fields = [
         "id",

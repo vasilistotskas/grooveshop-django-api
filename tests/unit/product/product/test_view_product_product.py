@@ -112,7 +112,7 @@ class ProductViewSetTestCase(TestCase):
         self.assertEqual(self.viewset.filterset_class, ProductFilter)
 
     def test_response_serializers_configuration(self):
-        expected_response_serializers = {
+        expected_responses = {
             "create": ProductDetailSerializer,
             "list": ProductSerializer,
             "retrieve": ProductDetailSerializer,
@@ -123,10 +123,17 @@ class ProductViewSetTestCase(TestCase):
             "images": ProductImageSerializer,
             "tags": TagSerializer,
         }
-        print("")
-        self.assertEqual(
-            self.viewset.response_serializers, expected_response_serializers
-        )
+        for action, expected_serializer in expected_responses.items():
+            cfg = self.viewset.serializers_config.get(action)
+            self.assertIsNotNone(
+                cfg,
+                f"Action '{action}' should have a serializers_config entry",
+            )
+            self.assertEqual(
+                cfg.response,
+                expected_serializer,
+                f"Action '{action}' should use {expected_serializer.__name__}",
+            )
 
     def test_queryset_optimization(self):
         queryset = self.viewset.get_queryset()

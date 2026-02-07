@@ -4,11 +4,12 @@ from django.conf import settings
 from drf_spectacular.utils import extend_schema_view
 
 
+from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
+    SerializersConfig,
     create_schema_view_config,
-    RequestSerializersConfig,
-    ResponseSerializersConfig,
+    crud_config,
 )
 from core.utils.views import cache_methods
 from product.models.image import ProductImage
@@ -18,18 +19,12 @@ from product.serializers.image import (
     ProductImageWriteSerializer,
 )
 
-req_serializers: RequestSerializersConfig = {
-    "create": ProductImageWriteSerializer,
-    "update": ProductImageWriteSerializer,
-    "partial_update": ProductImageWriteSerializer,
-}
-
-res_serializers: ResponseSerializersConfig = {
-    "create": ProductImageDetailSerializer,
-    "list": ProductImageSerializer,
-    "retrieve": ProductImageDetailSerializer,
-    "update": ProductImageDetailSerializer,
-    "partial_update": ProductImageDetailSerializer,
+serializers_config: SerializersConfig = {
+    **crud_config(
+        list=ProductImageSerializer,
+        detail=ProductImageDetailSerializer,
+        write=ProductImageWriteSerializer,
+    ),
 }
 
 
@@ -39,15 +34,14 @@ res_serializers: ResponseSerializersConfig = {
         display_config={
             "tag": "Product Images",
         },
-        request_serializers=req_serializers,
-        response_serializers=res_serializers,
+        serializers_config=serializers_config,
+        error_serializer=ErrorResponseSerializer,
     )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class ProductImageViewSet(BaseModelViewSet):
     queryset = ProductImage.objects.all()
-    response_serializers = res_serializers
-    request_serializers = req_serializers
+    serializers_config = serializers_config
     filterset_fields = [
         "id",
         "product",

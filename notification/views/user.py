@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
 
@@ -12,9 +12,10 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
+    ActionConfig,
+    SerializersConfig,
     create_schema_view_config,
-    RequestSerializersConfig,
-    ResponseSerializersConfig,
+    crud_config,
 )
 from core.utils.views import cache_methods
 from notification.filters import NotificationUserFilter
@@ -28,25 +29,59 @@ from notification.serializers.user import (
     NotificationUserWriteSerializer,
 )
 
-req_serializers: RequestSerializersConfig = {
-    "create": NotificationUserWriteSerializer,
-    "update": NotificationUserWriteSerializer,
-    "partial_update": NotificationUserWriteSerializer,
-    "mark_as_seen": NotificationUserActionSerializer,
-    "mark_as_unseen": NotificationUserActionSerializer,
-}
-
-res_serializers: ResponseSerializersConfig = {
-    "create": NotificationUserDetailSerializer,
-    "list": NotificationUserSerializer,
-    "retrieve": NotificationUserDetailSerializer,
-    "update": NotificationUserDetailSerializer,
-    "partial_update": NotificationUserDetailSerializer,
-    "unseen_count": NotificationCountResponseSerializer,
-    "mark_all_as_seen": NotificationSuccessResponseSerializer,
-    "mark_all_as_unseen": NotificationSuccessResponseSerializer,
-    "mark_as_seen": NotificationSuccessResponseSerializer,
-    "mark_as_unseen": NotificationSuccessResponseSerializer,
+serializers_config: SerializersConfig = {
+    **crud_config(
+        list=NotificationUserSerializer,
+        detail=NotificationUserDetailSerializer,
+        write=NotificationUserWriteSerializer,
+    ),
+    "unseen_count": ActionConfig(
+        response=NotificationCountResponseSerializer,
+        operation_id="getNotificationUserUnseenCount",
+        summary=_("Get unseen notifications count"),
+        description=_(
+            "Get the count of unseen notifications for the authenticated user."
+        ),
+        tags=["Notification Users"],
+    ),
+    "mark_all_as_seen": ActionConfig(
+        response=NotificationSuccessResponseSerializer,
+        operation_id="markAllNotificationUsersAsSeen",
+        summary=_("Mark all notifications as seen"),
+        description=_(
+            "Mark all of the authenticated user's notifications as seen."
+        ),
+        tags=["Notification Users"],
+    ),
+    "mark_all_as_unseen": ActionConfig(
+        response=NotificationSuccessResponseSerializer,
+        operation_id="markAllNotificationUsersAsUnseen",
+        summary=_("Mark all notifications as unseen"),
+        description=_(
+            "Mark all of the authenticated user's notifications as unseen."
+        ),
+        tags=["Notification Users"],
+    ),
+    "mark_as_seen": ActionConfig(
+        request=NotificationUserActionSerializer,
+        response=NotificationSuccessResponseSerializer,
+        operation_id="markNotificationUsersAsSeen",
+        summary=_("Mark specific notifications as seen"),
+        description=_(
+            "Mark specific notifications as seen for the authenticated user."
+        ),
+        tags=["Notification Users"],
+    ),
+    "mark_as_unseen": ActionConfig(
+        request=NotificationUserActionSerializer,
+        response=NotificationSuccessResponseSerializer,
+        operation_id="markNotificationUsersAsUnseen",
+        summary=_("Mark specific notifications as unseen"),
+        description=_(
+            "Mark specific notifications as unseen for the authenticated user."
+        ),
+        tags=["Notification Users"],
+    ),
 }
 
 
@@ -56,79 +91,14 @@ res_serializers: ResponseSerializersConfig = {
         display_config={
             "tag": "Notification Users",
         },
-        request_serializers=req_serializers,
-        response_serializers=res_serializers,
-    ),
-    unseen_count=extend_schema(
-        operation_id="getNotificationUserUnseenCount",
-        summary=_("Get unseen notifications count"),
-        description=_(
-            "Get the count of unseen notifications for the authenticated user."
-        ),
-        tags=["Notification Users"],
-        responses={
-            200: NotificationCountResponseSerializer,
-            401: ErrorResponseSerializer,
-        },
-    ),
-    mark_all_as_seen=extend_schema(
-        operation_id="markAllNotificationUsersAsSeen",
-        summary=_("Mark all notifications as seen"),
-        description=_(
-            "Mark all of the authenticated user's notifications as seen."
-        ),
-        tags=["Notification Users"],
-        responses={
-            200: NotificationSuccessResponseSerializer,
-            401: ErrorResponseSerializer,
-        },
-    ),
-    mark_all_as_unseen=extend_schema(
-        operation_id="markAllNotificationUsersAsUnseen",
-        summary=_("Mark all notifications as unseen"),
-        description=_(
-            "Mark all of the authenticated user's notifications as unseen."
-        ),
-        tags=["Notification Users"],
-        responses={
-            200: NotificationSuccessResponseSerializer,
-            401: ErrorResponseSerializer,
-        },
-    ),
-    mark_as_seen=extend_schema(
-        operation_id="markNotificationUsersAsSeen",
-        summary=_("Mark specific notifications as seen"),
-        description=_(
-            "Mark specific notifications as seen for the authenticated user."
-        ),
-        tags=["Notification Users"],
-        request=NotificationUserActionSerializer,
-        responses={
-            200: NotificationSuccessResponseSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-        },
-    ),
-    mark_as_unseen=extend_schema(
-        operation_id="markNotificationUsersAsUnseen",
-        summary=_("Mark specific notifications as unseen"),
-        description=_(
-            "Mark specific notifications as unseen for the authenticated user."
-        ),
-        tags=["Notification Users"],
-        request=NotificationUserActionSerializer,
-        responses={
-            200: NotificationSuccessResponseSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-        },
-    ),
+        serializers_config=serializers_config,
+        error_serializer=ErrorResponseSerializer,
+    )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class NotificationUserViewSet(BaseModelViewSet):
     queryset = NotificationUser.objects.for_list()
-    request_serializers = req_serializers
-    response_serializers = res_serializers
+    serializers_config = serializers_config
 
     filterset_class = NotificationUserFilter
     ordering_fields = [

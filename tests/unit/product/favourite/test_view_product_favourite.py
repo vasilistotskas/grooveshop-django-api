@@ -101,28 +101,24 @@ class ProductFavouriteViewSetTestCase(TestCase):
         self.assertEqual(serializer_class, ProductFavouriteDetailSerializer)
 
     def test_response_serializers_configuration(self):
-        response_serializers = {
+        expected_responses = {
             "list": ProductFavouriteSerializer,
             "retrieve": ProductFavouriteDetailSerializer,
-            "create": ProductFavouriteDetailSerializer,
-            "update": ProductFavouriteDetailSerializer,
-            "partial_update": ProductFavouriteDetailSerializer,
+            "create": ProductFavouriteWriteSerializer,
+            "update": ProductFavouriteWriteSerializer,
+            "partial_update": ProductFavouriteWriteSerializer,
             "product": ProductDetailResponseSerializer,
             "favourites_by_products": ProductFavouriteByProductsResponseSerializer,
         }
 
-        for action, expected_serializer in response_serializers.items():
-            self.viewset.action = action
-            if action in ["create", "update", "partial_update"]:
-                actual_serializer = self.viewset.response_serializers.get(
-                    "default", ProductFavouriteDetailSerializer
-                )
-            else:
-                actual_serializer = self.viewset.get_serializer_class()
-
-            if action not in ["create", "update", "partial_update"]:
-                self.assertEqual(
-                    actual_serializer,
-                    expected_serializer,
-                    f"Action '{action}' should use {expected_serializer.__name__}",
-                )
+        for action, expected_serializer in expected_responses.items():
+            cfg = self.viewset.serializers_config.get(action)
+            self.assertIsNotNone(
+                cfg,
+                f"Action '{action}' should have a serializers_config entry",
+            )
+            self.assertEqual(
+                cfg.response,
+                expected_serializer,
+                f"Action '{action}' should use {expected_serializer.__name__}",
+            )

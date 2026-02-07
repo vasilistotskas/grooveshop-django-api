@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import extend_schema_view
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.exceptions import ValidationError as DRFValidationError
@@ -16,9 +16,10 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
+    ActionConfig,
+    SerializersConfig,
     create_schema_view_config,
-    RequestSerializersConfig,
-    ResponseSerializersConfig,
+    crud_config,
 )
 from core.utils.views import cache_methods
 from order.enum.status import OrderStatus
@@ -32,20 +33,20 @@ from order.serializers.item import (
     OrderItemRefundResponseSerializer,
 )
 
-req_serializers: RequestSerializersConfig = {
-    "create": OrderItemWriteSerializer,
-    "update": OrderItemWriteSerializer,
-    "partial_update": OrderItemWriteSerializer,
-    "refund": OrderItemRefundSerializer,
-}
-
-res_serializers: ResponseSerializersConfig = {
-    "create": OrderItemDetailSerializer,
-    "list": OrderItemSerializer,
-    "retrieve": OrderItemDetailSerializer,
-    "update": OrderItemDetailSerializer,
-    "partial_update": OrderItemDetailSerializer,
-    "refund": OrderItemRefundResponseSerializer,
+serializers_config: SerializersConfig = {
+    **crud_config(
+        list=OrderItemSerializer,
+        detail=OrderItemDetailSerializer,
+        write=OrderItemWriteSerializer,
+    ),
+    "refund": ActionConfig(
+        request=OrderItemRefundSerializer,
+        response=OrderItemRefundResponseSerializer,
+        operation_id="refundOrderItem",
+        summary=_("Process a refund for an order item"),
+        description=_("Process a refund for an order item."),
+        tags=["Order Items"],
+    ),
 }
 
 
@@ -55,29 +56,14 @@ res_serializers: ResponseSerializersConfig = {
         display_config={
             "tag": "Order Items",
         },
-        request_serializers=req_serializers,
-        response_serializers=res_serializers,
-    ),
-    refund=extend_schema(
-        operation_id="refundOrderItem",
-        summary=_("Process a refund for an order item"),
-        description=_("Process a refund for an order item."),
-        tags=["Order Items"],
-        request=OrderItemRefundSerializer,
-        responses={
-            200: OrderItemRefundResponseSerializer,
-            400: ErrorResponseSerializer,
-            401: ErrorResponseSerializer,
-            403: ErrorResponseSerializer,
-            404: ErrorResponseSerializer,
-        },
-    ),
+        serializers_config=serializers_config,
+        error_serializer=ErrorResponseSerializer,
+    )
 )
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class OrderItemViewSet(BaseModelViewSet):
     queryset = OrderItem.objects.none()
-    request_serializers = req_serializers
-    response_serializers = res_serializers
+    serializers_config = serializers_config
     permission_classes = [IsAuthenticated]
     filterset_class = OrderItemFilter
     ordering_fields = [

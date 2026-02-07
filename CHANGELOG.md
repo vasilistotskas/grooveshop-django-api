@@ -3,6 +3,12 @@
 
 
 
+## v1.77.0 (2026-02-07)
+
+### Features
+
+* feat: rewrite open api schema generation methods ([`c012062`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c0120628f559db5356e97eaba8ac152f8c61aea9))
+
 ## v1.76.1 (2026-02-07)
 
 ### Bug fixes

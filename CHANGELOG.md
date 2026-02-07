@@ -3,6 +3,12 @@
 
 
 
+## v1.76.1 (2026-02-07)
+
+### Bug fixes
+
+* fix: settings permissions ([`2b895d9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b895d9df7c1daf1e42a4c96412e177a5ce07086))
+
 ## v1.76.0 (2026-02-07)
 
 ### Bug fixes

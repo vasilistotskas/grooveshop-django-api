@@ -23,7 +23,7 @@ from order.stock import StockManager
 from product.factories.product import ProductFactory
 
 
-@pytest.mark.django_db(transaction=True)
+@pytest.mark.django_db
 class TestCustomExceptionsNotReraisedAsValueError:
     """
     Test that custom exceptions are NOT caught and re-raised as ValueError.

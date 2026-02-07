@@ -76,7 +76,7 @@ class SortableModel(models.Model):
         return model_class._default_manager.all()
 
     @staticmethod
-    def get_max_sort_order(qs: models.QuerySet[SortableModel]) -> int:
+    def get_max_sort_order(qs: models.QuerySet[SortableModel]) -> int | None:
         """
         Get the maximum sort_order value from a queryset.
 
@@ -84,9 +84,9 @@ class SortableModel(models.Model):
             qs: QuerySet to check for maximum sort_order
 
         Returns:
-            Maximum sort_order value, or 0 if queryset is empty
+            Maximum sort_order value, or None if queryset is empty
         """
-        return qs.aggregate(Max("sort_order"))["sort_order__max"] or 0
+        return qs.aggregate(Max("sort_order"))["sort_order__max"]
 
     def move_up(self) -> None:
         """
@@ -255,7 +255,7 @@ class MetaDataModel(models.Model):
             for key, value in items.items():
                 self.private_metadata[key] = value
             self.save(update_fields=["private_metadata"])
-        self.refresh_from_db(fields=["private_metadata"])
+            self.refresh_from_db(fields=["private_metadata"])
 
     def clear_private_metadata(self):
         self.private_metadata = {}
@@ -272,7 +272,7 @@ class MetaDataModel(models.Model):
             for key, value in items.items():
                 self.metadata[key] = value
             self.save(update_fields=["metadata"])
-        self.refresh_from_db(fields=["metadata"])
+            self.refresh_from_db(fields=["metadata"])
 
     def clear_metadata(self):
         self.metadata = {}
@@ -309,12 +309,12 @@ class SoftDeleteMixin(models.Model):
             keep_parents: Whether to keep parent records (unused in soft delete)
 
         Returns:
-            Tuple of (0, {}) to match Django's delete signature
+            Tuple of (count, {model_label: count}) to match Django's delete signature
         """
         self.deleted_at = timezone.now()
         self.is_deleted = True
         self.save(update_fields=["deleted_at", "is_deleted"])
-        return (0, {})
+        return (1, {self._meta.label: 1})
 
     def restore(self) -> None:
         """

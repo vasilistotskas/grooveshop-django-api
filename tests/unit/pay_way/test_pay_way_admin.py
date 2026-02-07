@@ -469,7 +469,7 @@ class PayWayAdminTestCase(TestCase):
     def test_sort_order_display(self):
         result = self.admin.sort_order_display(self.payway)
 
-        self.assertIn("#1", result)
+        self.assertIn("#0", result)
         self.assertIn("inline-flex", result)
 
     def test_icon_preview(self):

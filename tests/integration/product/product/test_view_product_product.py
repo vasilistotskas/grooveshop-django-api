@@ -301,19 +301,16 @@ class ProductViewSetTestCase(APITestCase):
         self.assertNotIn(inactive_product.id, active_ids)
 
     def test_search_functionality(self):
-        import time
-
         searchable_product = ProductFactory(
-            category=self.category, vat=self.vat, slug="searchable-product"
+            category=self.category,
+            vat=self.vat,
+            slug="searchable-product",
+            active=True,
         )
         searchable_product.set_current_language(default_language)
         searchable_product.name = "Unique Searchable Product Name"
         searchable_product.description = "Special description content"
         searchable_product.save()
-
-        # Give Meilisearch a moment to index the document when running in parallel
-        # This is necessary because pytest-xdist runs tests in parallel workers
-        time.sleep(0.1)
 
         url = self.get_product_list_url()
 

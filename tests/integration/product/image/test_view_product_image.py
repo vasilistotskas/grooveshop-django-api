@@ -124,7 +124,7 @@ class ProductImageViewSetTestCase(APITestCase):
         image = ProductImage.objects.get(id=response.data["id"])
         self.assertEqual(image.product.id, self.product.id)
         self.assertEqual(image.is_main, False)
-        self.assertEqual(image.sort_order, 3)
+        self.assertEqual(image.sort_order, 2)
 
     def test_update_request_response_serializers(self):
         payload = {
@@ -163,7 +163,7 @@ class ProductImageViewSetTestCase(APITestCase):
 
         image = ProductImage.objects.get(id=response.data["id"])
         self.assertEqual(image.is_main, True)
-        self.assertEqual(image.sort_order, 1)
+        self.assertEqual(image.sort_order, 0)
 
     def test_partial_update_request_response_serializers(self):
         payload = {
@@ -193,7 +193,7 @@ class ProductImageViewSetTestCase(APITestCase):
 
         image = ProductImage.objects.get(id=response.data["id"])
         self.assertEqual(image.is_main, True)
-        self.assertEqual(image.sort_order, 1)
+        self.assertEqual(image.sort_order, 0)
 
     def test_delete_endpoint(self):
         url = self.get_product_image_detail_url(self.product_image.id)

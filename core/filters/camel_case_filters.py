@@ -155,7 +155,6 @@ class CamelCaseFilterExtension(OpenApiFilterExtension):
         parameters = []
 
         for camel_name, filter_field in self.target.base_filters.items():
-            getattr(filter_field, "field_name", camel_name)
             help_text = getattr(filter_field, "help_text", "")
 
             if isinstance(filter_field, filters.DateTimeFilter):

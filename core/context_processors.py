@@ -51,7 +51,11 @@ def metadata(request: HttpRequest) -> dict[str, Any]:
     site_author = os.getenv("SITE_AUTHOR", "Grooveshop Author")
 
     request_details: dict[str, Any] = {}
-    if request.user and request.user.is_superuser:
+    if (
+        request.user
+        and request.user.is_authenticated
+        and request.user.is_superuser
+    ):
         request_details = {
             "headers": dict(request.headers),
             "cookies": request.COOKIES,

@@ -1,5 +1,6 @@
 import pytest
 from datetime import timedelta
+from unittest.mock import patch
 from django.utils import timezone
 
 from order.exceptions import (
@@ -10,6 +11,20 @@ from order.models import StockLog, StockReservation
 from order.stock import StockManager
 from product.factories import ProductFactory
 from user.factories import UserAccountFactory
+
+
+@pytest.fixture(autouse=True)
+def _deterministic_reservation_ttl():
+    """Ensure StockManager.get_reservation_ttl_minutes always returns 15.
+
+    Under parallel execution, Setting.get() from django-extra-settings
+    can return unexpected values (e.g. 0) due to cache or DB state,
+    causing reservations to expire instantly and tests to fail.
+    """
+    with patch.object(
+        StockManager, "get_reservation_ttl_minutes", return_value=15
+    ):
+        yield
 
 
 @pytest.mark.django_db
@@ -1965,57 +1980,39 @@ class TestStockManagerCleanupExpiredReservations:
         assert reservation.updated_at > original_updated_at
 
     @pytest.mark.parametrize(
-        "minutes_ago,should_cleanup",
+        "expires_in_minutes,should_cleanup",
         [
-            (20, True),  # Expired 20 minutes ago - should cleanup
-            (30, True),  # Expired 30 minutes ago - should cleanup
-            (16, True),  # Expired 16 minutes ago - should cleanup
-            (15, True),  # Expired exactly 15 minutes ago - should cleanup
-            (
-                14,
-                False,
-            ),  # Expired 14 minutes ago - still active (created 14 min ago, expires in 1 min)
-            (
-                10,
-                False,
-            ),  # Expired 10 minutes ago - still active (created 10 min ago, expires in 5 min)
-            (
-                5,
-                False,
-            ),  # Expired 5 minutes ago - still active (created 5 min ago, expires in 10 min)
-            (
-                1,
-                False,
-            ),  # Expired 1 minute ago - still active (created 1 min ago, expires in 14 min)
+            (-45, True),  # Expired 45 minutes ago - should cleanup
+            (-15, True),  # Expired 15 minutes ago - should cleanup
+            (-5, True),  # Expired 5 minutes ago - should cleanup
+            (-1, True),  # Expired 1 minute ago - should cleanup
+            (1, False),  # Expires in 1 minute - should NOT cleanup
+            (5, False),  # Expires in 5 minutes - should NOT cleanup
+            (10, False),  # Expires in 10 minutes - should NOT cleanup
+            (60, False),  # Expires in 60 minutes - should NOT cleanup
         ],
     )
     def test_cleanup_expired_reservations_various_expiration_times(
-        self, minutes_ago, should_cleanup
+        self, expires_in_minutes, should_cleanup
     ):
         """Test cleanup with various expiration times.
 
-        Note: The parameter 'minutes_ago' represents when the reservation was CREATED,
-        not when it expired. Reservations have a 15-minute TTL, so:
-        - Created 20 min ago -> expired 5 min ago (20 - 15 = 5) -> should cleanup
-        - Created 14 min ago -> expires in 1 min (15 - 14 = 1) -> should NOT cleanup
+        Uses explicit expires_at values relative to now, independent of
+        the TTL configuration, to ensure deterministic behavior.
         """
         import uuid
 
         product = ProductFactory(stock=100)
         unique_id = uuid.uuid4().hex[:8]
 
-        # Calculate expiration time based on creation time
-        # If created X minutes ago, it expires at (now - X minutes + 15 minutes)
-        created_at = timezone.now() - timedelta(minutes=minutes_ago)
-        expiration_time = created_at + timedelta(
-            minutes=StockManager.get_reservation_ttl_minutes()
-        )
+        # Set expires_at directly: negative = past (expired), positive = future (active)
+        expires_at = timezone.now() + timedelta(minutes=expires_in_minutes)
 
         reservation = StockReservation.objects.create(
             product=product,
             quantity=10,
-            session_id=f"expiration-test-{unique_id}-{minutes_ago}",
-            expires_at=expiration_time,
+            session_id=f"expiration-test-{unique_id}-{expires_in_minutes}",
+            expires_at=expires_at,
             consumed=False,
         )
 

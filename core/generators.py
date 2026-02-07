@@ -91,7 +91,6 @@ class UserNameGenerator:
         "Ogre",
         "Goblin",
         "Unicorn",
-        "Phoenix",
         "Yeti",
         "Basilisk",
         "Minotaur",

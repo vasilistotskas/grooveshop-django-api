@@ -2,7 +2,10 @@ from io import StringIO
 from unittest.mock import patch
 
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.db.utils import OperationalError
+
+import pytest
 
 from core.management.commands.wait_for_db import Command
 
@@ -17,10 +20,7 @@ class TestWaitForDbCommand:
         mock_check.return_value = None
 
         out = StringIO()
-        command = Command()
-        command.stdout = out
-
-        command.handle()
+        call_command("wait_for_db", stdout=out)
 
         mock_check.assert_called_once_with(databases=["default"])
         output = out.getvalue()
@@ -33,16 +33,13 @@ class TestWaitForDbCommand:
         mock_check.side_effect = [OperationalError("Connection failed"), None]
 
         out = StringIO()
-        command = Command()
-        command.stdout = out
-
-        command.handle()
+        call_command("wait_for_db", "--timeout=0", stdout=out)
 
         assert mock_check.call_count == 2
         mock_sleep.assert_called_once_with(1)
         output = out.getvalue()
         assert "Waiting for database..." in output
-        assert "Database unavailable, waiting 1 second..." in output
+        assert "Database unavailable" in output
         assert "Database available!" in output
 
     @patch("time.sleep")
@@ -56,17 +53,14 @@ class TestWaitForDbCommand:
         ]
 
         out = StringIO()
-        command = Command()
-        command.stdout = out
-
-        command.handle()
+        call_command("wait_for_db", "--timeout=0", stdout=out)
 
         assert mock_check.call_count == 4
         assert mock_sleep.call_count == 3
 
         output = out.getvalue()
         assert "Waiting for database..." in output
-        assert output.count("Database unavailable, waiting 1 second...") == 3
+        assert output.count("Database unavailable") == 3
         assert "Database available!" in output
 
     @patch("time.sleep")
@@ -84,49 +78,41 @@ class TestWaitForDbCommand:
 
     @patch("time.sleep")
     @patch.object(Command, "check")
-    def test_command_with_args_and_options(self, mock_check, mock_sleep):
-        mock_check.return_value = None
+    def test_timeout_raises_command_error(self, mock_check, mock_sleep):
+        mock_check.side_effect = OperationalError("Connection failed")
+
+        with patch("time.monotonic", side_effect=[0.0, 0.0, 31.0]):
+            out = StringIO()
+            with pytest.raises(
+                CommandError, match="Database unavailable after 30 seconds"
+            ):
+                call_command("wait_for_db", "--timeout=30", stdout=out)
+
+    @patch("time.sleep")
+    @patch.object(Command, "check")
+    def test_unlimited_timeout(self, mock_check, mock_sleep):
+        mock_check.side_effect = [
+            OperationalError("fail"),
+            OperationalError("fail"),
+            None,
+        ]
 
         out = StringIO()
-        command = Command()
-        command.stdout = out
+        call_command("wait_for_db", "--timeout=0", stdout=out)
 
-        command.handle("arg1", "arg2", option1="value1", option2="value2")
-
-        mock_check.assert_called_once_with(databases=["default"])
+        assert mock_check.call_count == 3
         output = out.getvalue()
-        assert "Waiting for database..." in output
         assert "Database available!" in output
 
     @patch("time.sleep")
     @patch.object(Command, "check")
-    def test_operational_error_with_message(self, mock_check, mock_sleep):
-        error_message = "FATAL: database 'test_db' does not exist"
-        mock_check.side_effect = [OperationalError(error_message), None]
-
-        out = StringIO()
-        command = Command()
-        command.stdout = out
-
-        command.handle()
-
-        assert mock_check.call_count == 2
-        mock_sleep.assert_called_once_with(1)
-        output = out.getvalue()
-        assert "Database unavailable, waiting 1 second..." in output
-        assert "Database available!" in output
-
-    @patch("time.sleep")
-    @patch.object(Command, "check")
-    def test_sleep_duration_is_one_second(self, mock_check, mock_sleep):
+    def test_custom_interval(self, mock_check, mock_sleep):
         mock_check.side_effect = [OperationalError("Connection failed"), None]
 
-        command = Command()
-        command.stdout = StringIO()
+        out = StringIO()
+        call_command("wait_for_db", "--timeout=0", "--interval=5", stdout=out)
 
-        command.handle()
-
-        mock_sleep.assert_called_once_with(1)
+        mock_sleep.assert_called_once_with(5)
 
     @patch("time.sleep")
     @patch.object(Command, "check")
@@ -136,32 +122,9 @@ class TestWaitForDbCommand:
         command = Command()
         command.stdout = StringIO()
 
-        command.handle()
+        command.handle(timeout=30, interval=1)
 
         mock_check.assert_called_once_with(databases=["default"])
-
-    @patch("time.sleep")
-    @patch.object(Command, "check")
-    def test_database_check_loop_behavior(self, mock_check, mock_sleep):
-        mock_check.side_effect = [
-            OperationalError("First failure"),
-            OperationalError("Second failure"),
-            None,
-        ]
-
-        out = StringIO()
-        command = Command()
-        command.stdout = out
-
-        command.handle()
-
-        assert mock_check.call_count == 3
-        assert mock_sleep.call_count == 2
-
-        output = out.getvalue()
-        assert "Waiting for database..." in output
-        assert output.count("Database unavailable, waiting 1 second...") == 2
-        assert "Database available!" in output
 
     @patch("time.sleep")
     @patch.object(Command, "check")
@@ -174,6 +137,6 @@ class TestWaitForDbCommand:
         with patch.object(command, "style") as mock_style:
             mock_style.SUCCESS.return_value = "STYLED: Database available!"
 
-            command.handle()
+            command.handle(timeout=30, interval=1)
 
             mock_style.SUCCESS.assert_called_once_with("Database available!")

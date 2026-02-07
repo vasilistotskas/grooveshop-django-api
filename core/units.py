@@ -1,4 +1,7 @@
-class DistanceUnits:
+from enum import StrEnum
+
+
+class DistanceUnits(StrEnum):
     MM = "mm"
     CM = "cm"
     DM = "dm"
@@ -8,19 +11,20 @@ class DistanceUnits:
     YD = "yd"
     INCH = "inch"
 
-    CHOICES = [
-        (MM, "Millimeter"),
-        (CM, "Centimeter"),
-        (DM, "Decimeter"),
-        (M, "Meter"),
-        (KM, "Kilometers"),
-        (FT, "Feet"),
-        (YD, "Yard"),
-        (INCH, "Inch"),
-    ]
+
+DistanceUnits.CHOICES = [
+    (DistanceUnits.MM, "Millimeter"),
+    (DistanceUnits.CM, "Centimeter"),
+    (DistanceUnits.DM, "Decimeter"),
+    (DistanceUnits.M, "Meter"),
+    (DistanceUnits.KM, "Kilometers"),
+    (DistanceUnits.FT, "Feet"),
+    (DistanceUnits.YD, "Yard"),
+    (DistanceUnits.INCH, "Inch"),
+]
 
 
-class AreaUnits:
+class AreaUnits(StrEnum):
     SQ_MM = "sq_mm"
     SQ_CM = "sq_cm"
     SQ_DM = "sq_dm"
@@ -30,19 +34,20 @@ class AreaUnits:
     SQ_YD = "sq_yd"
     SQ_INCH = "sq_inch"
 
-    CHOICES = [
-        (SQ_MM, "Square millimeter"),
-        (SQ_CM, "Square centimeters"),
-        (SQ_DM, "Square decimeter"),
-        (SQ_M, "Square meters"),
-        (SQ_KM, "Square kilometers"),
-        (SQ_FT, "Square feet"),
-        (SQ_YD, "Square yards"),
-        (SQ_INCH, "Square inches"),
-    ]
+
+AreaUnits.CHOICES = [
+    (AreaUnits.SQ_MM, "Square millimeter"),
+    (AreaUnits.SQ_CM, "Square centimeters"),
+    (AreaUnits.SQ_DM, "Square decimeter"),
+    (AreaUnits.SQ_M, "Square meters"),
+    (AreaUnits.SQ_KM, "Square kilometers"),
+    (AreaUnits.SQ_FT, "Square feet"),
+    (AreaUnits.SQ_YD, "Square yards"),
+    (AreaUnits.SQ_INCH, "Square inches"),
+]
 
 
-class VolumeUnits:
+class VolumeUnits(StrEnum):
     CUBIC_MILLIMETER = "cubic_millimeter"
     CUBIC_CENTIMETER = "cubic_centimeter"
     CUBIC_DECIMETER = "cubic_decimeter"
@@ -57,37 +62,39 @@ class VolumeUnits:
     ACRE_IN = "acre_in"
     ACRE_FT = "acre_ft"
 
-    CHOICES = [
-        (CUBIC_MILLIMETER, "Cubic millimeter"),
-        (CUBIC_CENTIMETER, "Cubic centimeter"),
-        (CUBIC_DECIMETER, "Cubic decimeter"),
-        (CUBIC_METER, "Cubic meter"),
-        (LITER, "Liter"),
-        (CUBIC_FOOT, "Cubic foot"),
-        (CUBIC_INCH, "Cubic inch"),
-        (CUBIC_YARD, "Cubic yard"),
-        (QT, "Quart"),
-        (PINT, "Pint"),
-        (FL_OZ, "Fluid ounce"),
-        (ACRE_IN, "Acre inch"),
-        (ACRE_FT, "Acre feet"),
-    ]
+
+VolumeUnits.CHOICES = [
+    (VolumeUnits.CUBIC_MILLIMETER, "Cubic millimeter"),
+    (VolumeUnits.CUBIC_CENTIMETER, "Cubic centimeter"),
+    (VolumeUnits.CUBIC_DECIMETER, "Cubic decimeter"),
+    (VolumeUnits.CUBIC_METER, "Cubic meter"),
+    (VolumeUnits.LITER, "Liter"),
+    (VolumeUnits.CUBIC_FOOT, "Cubic foot"),
+    (VolumeUnits.CUBIC_INCH, "Cubic inch"),
+    (VolumeUnits.CUBIC_YARD, "Cubic yard"),
+    (VolumeUnits.QT, "Quart"),
+    (VolumeUnits.PINT, "Pint"),
+    (VolumeUnits.FL_OZ, "Fluid ounce"),
+    (VolumeUnits.ACRE_IN, "Acre inch"),
+    (VolumeUnits.ACRE_FT, "Acre feet"),
+]
 
 
-class WeightUnits:
+class WeightUnits(StrEnum):
     G = "g"
     LB = "lb"
     OZ = "oz"
     KG = "kg"
     TONNE = "tonne"
 
-    CHOICES = [
-        (G, "Gram"),
-        (LB, "Pound"),
-        (OZ, "Ounce"),
-        (KG, "kg"),
-        (TONNE, "Tonne"),
-    ]
+
+WeightUnits.CHOICES = [
+    (WeightUnits.G, "Gram"),
+    (WeightUnits.LB, "Pound"),
+    (WeightUnits.OZ, "Ounce"),
+    (WeightUnits.KG, "kg"),
+    (WeightUnits.TONNE, "Tonne"),
+]
 
 
 def prepare_all_units_dict():

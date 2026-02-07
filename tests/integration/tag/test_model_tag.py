@@ -46,7 +46,7 @@ class TagModelTestCase(TestCase):
 
         ordered_sort_orders = [tag.sort_order for tag in ordered_tags]
 
-        self.assertEqual(ordered_sort_orders, [1, 2, 3])
+        self.assertEqual(ordered_sort_orders, [0, 1, 2])
 
     def test_get_usage_count(self):
         self.assertEqual(self.tag.get_usage_count(), 0)

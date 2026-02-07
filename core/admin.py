@@ -4,9 +4,6 @@ import logging
 import traceback
 import xml.dom.minidom
 import xml.etree.ElementTree as ET
-from xml.etree.ElementTree import (
-    ParseError as ETParseError,
-)
 
 from django.conf import settings
 from django.contrib import admin, messages
@@ -196,35 +193,9 @@ class ExportActionMixin:
                         translation_element, t_field_name
                     )
 
-                    if isinstance(t_value, str) and (
-                        "<" in t_value or ">" in t_value
-                    ):
-                        t_field_element.text = None
-                        try:
-                            cdata = ET.CDATA(str(t_value))
-                            t_field_element.append(cdata)
-                        except (
-                            ETParseError,
-                            TypeError,
-                            ValueError,
-                        ) as markup_err:
-                            logger.warning(
-                                f"Field {t_field_name} for {obj} lang {lang_code} contains invalid markup or cannot create CDATA ({markup_err}), exporting as plain string."
-                            )
-                            t_field_element.text = (
-                                str(t_value) if t_value is not None else ""
-                            )
-                        except Exception as cdata_err:
-                            logger.error(
-                                f"Unexpected error creating CDATA for {t_field_name} ({obj}, {lang_code}): {cdata_err}"
-                            )
-                            t_field_element.text = (
-                                str(t_value) if t_value is not None else ""
-                            )
-                    else:
-                        t_field_element.text = (
-                            str(t_value) if t_value is not None else ""
-                        )
+                    t_field_element.text = (
+                        str(t_value) if t_value is not None else ""
+                    )
 
             except models.ObjectDoesNotExist:
                 continue

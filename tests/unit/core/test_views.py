@@ -337,8 +337,8 @@ class TestUploadImage(TestCase):
                 with self.assertRaises(ValidationError):
                     upload_image(request)
 
-    def test_csrf_exempt_decorator(self):
-        self.assertTrue(hasattr(upload_image, "csrf_exempt"))
+    def test_csrf_protection_enabled(self):
+        self.assertFalse(hasattr(upload_image, "csrf_exempt"))
 
 
 class TestManageTOTPSvgView(TestCase):

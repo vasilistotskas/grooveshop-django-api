@@ -15,10 +15,14 @@ class LimitOffsetPaginator(pagination.LimitOffsetPagination):
                     "previous": self.get_previous_link(),
                 },
                 "count": self.count,
-                "total_pages": math.ceil(self.count / self.limit),
+                "total_pages": math.ceil(self.count / self.limit)
+                if self.limit
+                else 0,
                 "page_size": self.limit,
                 "page_total_results": len(data),
-                "page": math.ceil(self.offset / self.limit) + 1,
+                "page": math.ceil(self.offset / self.limit) + 1
+                if self.limit
+                else 1,
                 "results": data,
             }
         )

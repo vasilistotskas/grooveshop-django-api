@@ -7,7 +7,6 @@ from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import HttpRequest, JsonResponse
 from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.views.generic import TemplateView
 
@@ -79,7 +78,6 @@ class EmailTemplateManagementView(TemplateView):
 
 @staff_member_required
 @require_http_methods(["POST"])
-@csrf_exempt
 def preview_template_ajax(request: HttpRequest) -> JsonResponse:
     """
     AJAX endpoint for template preview.

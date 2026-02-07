@@ -3,8 +3,8 @@ import hashlib
 import logging
 import os
 from django.core.exceptions import ImproperlyConfigured
-from celery import Celery
 from celery.exceptions import CeleryError
+from core.celery import celery_app
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from django.conf import settings
@@ -19,7 +19,12 @@ from drf_spectacular.utils import (
 )
 from redis import Redis, RedisError
 from rest_framework import status
-from rest_framework.decorators import action, api_view
+from rest_framework.decorators import (
+    action,
+    api_view,
+    permission_classes as permission_classes_decorator,
+)
+from rest_framework.permissions import IsAdminUser
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -494,8 +499,7 @@ def health_check(request):
         health_status["redis"] = False
 
     try:
-        celery_app = Celery(broker=settings.CELERY_BROKER_URL)
-        celery_status = celery_app.control.ping()
+        celery_status = celery_app.control.ping(timeout=3)
         health_status["celery"] = bool(celery_status)
     except CeleryError:
         health_status["celery"] = False
@@ -552,6 +556,7 @@ def redirect_to_frontend(request, *args, **kwargs):
     },
 )
 @api_view(["GET"])
+@permission_classes_decorator([IsAdminUser])
 def list_settings(request):
     """List all available settings with their values."""
     try:
@@ -607,6 +612,7 @@ def list_settings(request):
     },
 )
 @api_view(["GET"])
+@permission_classes_decorator([IsAdminUser])
 def get_setting_by_key(request):
     """Get a specific setting by its key name."""
     try:
@@ -638,7 +644,7 @@ def get_setting_by_key(request):
 
         except Setting.DoesNotExist:
             error_data = {
-                "detail": _(f"Setting '{key}' not found"),
+                "detail": _("Setting '%(key)s' not found") % {"key": key},
                 "error": "not_found",
             }
             return Response(

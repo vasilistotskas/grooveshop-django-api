@@ -30,11 +30,25 @@ class EmailTemplateInfo:
 class EmailTemplateRegistry:
     """
     Registry for discovering and managing email templates.
+
+    Uses a class-level cache so the filesystem scan only runs once
+    per process, rather than on every admin page load.
     """
 
+    _cached_templates: dict[str, EmailTemplateInfo] | None = None
+
     def __init__(self):
-        self._templates: dict[str, EmailTemplateInfo] = {}
-        self._discover_templates()
+        if EmailTemplateRegistry._cached_templates is None:
+            EmailTemplateRegistry._cached_templates = {}
+            self._templates = EmailTemplateRegistry._cached_templates
+            self._discover_templates()
+        else:
+            self._templates = EmailTemplateRegistry._cached_templates
+
+    @classmethod
+    def clear_cache(cls):
+        """Clear the template cache, forcing a re-scan on next instantiation."""
+        cls._cached_templates = None
 
     def _discover_templates(self) -> None:
         """Scan template directories and build registry."""

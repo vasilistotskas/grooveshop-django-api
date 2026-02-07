@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 @setup_logging.connect
-def config_loggers(*args, **kwags):
+def config_loggers(*args, **kwargs):
     from django.conf import settings  # noqa: F401, PLC0415
 
 

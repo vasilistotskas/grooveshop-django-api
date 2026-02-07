@@ -21,16 +21,7 @@ User = get_user_model()
 
 
 @database_sync_to_async
-def get_user(user_id: int):
-    try:
-        return User.objects.get(id=user_id)
-    except User.DoesNotExist:
-        return AnonymousUser()
-
-
-@database_sync_to_async
 def authenticate_token(token: str):
-    from django.contrib.auth.models import AnonymousUser  # noqa: PLC0415
     from knox.models import get_token_model  # noqa: PLC0415
 
     logger.debug(
@@ -109,7 +100,6 @@ class TokenAuthMiddleware(BaseMiddleware):
 
         session_token = query_params.get("session_token", [None])[0]
         access_token = query_params.get("access_token", [None])[0]
-        user_id = query_params.get("user_id", [None])[0]
 
         logger.debug(
             f"Session token: {session_token[:10] if session_token else None}..."
@@ -117,7 +107,6 @@ class TokenAuthMiddleware(BaseMiddleware):
         logger.debug(
             f"Access token: {access_token[:10] if access_token else None}..."
         )
-        logger.debug(f"User ID: {user_id}")
 
         token = access_token or session_token
         if token:
@@ -127,17 +116,10 @@ class TokenAuthMiddleware(BaseMiddleware):
             logger.debug(
                 f"User authenticated: {user.username if not user.is_anonymous else 'AnonymousUser'}"
             )
-        elif user_id:
-            logger.debug(f"No token found, but user_id is present: {user_id}")
-            user = await get_user(int(user_id))
-            scope["user"] = user
-            logger.debug(
-                f"User retrieved by ID: {user.username if not user.is_anonymous else 'AnonymousUser'}"
-            )
         else:
             from django.contrib.auth.models import AnonymousUser  # noqa: PLC0415, I001
 
-            logger.debug("TokenAuthMiddleware Token not found and no user_id")
+            logger.debug("TokenAuthMiddleware Token not found")
             scope["user"] = AnonymousUser()
 
         return await super().__call__(scope, receive, send)

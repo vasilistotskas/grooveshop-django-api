@@ -14,7 +14,6 @@ from core.middleware.channels import (
     _cleanup_token,
     _renew_token,
     authenticate_token,
-    get_user,
 )
 
 User = get_user_model()
@@ -45,19 +44,6 @@ class TestChannelsMiddleware(TransactionTestCase):
         )
         token_instance.save()
         return token_instance
-
-    async def test_get_user_exists(self):
-        user = await self.create_test_user()
-        result_user = await get_user(user.id)
-
-        self.assertEqual(result_user.id, user.id)
-        self.assertEqual(result_user.username, "testuser")
-
-    async def test_get_user_not_exists(self):
-        result_user = await get_user(99999)
-
-        self.assertTrue(result_user.is_anonymous)
-        self.assertIsInstance(result_user, AnonymousUser)
 
     @patch("core.middleware.channels.logger")
     async def test_authenticate_token_invalid_input(self, mock_logger):
@@ -330,7 +316,9 @@ class TestChannelsMiddleware(TransactionTestCase):
             self.assertEqual(scope["user"], mock_user)
 
     @patch("core.middleware.channels.logger")
-    async def test_token_auth_middleware_with_user_id(self, mock_logger):
+    async def test_token_auth_middleware_with_user_id_ignored(
+        self, mock_logger
+    ):
         async def mock_inner(scope, receive, send):
             pass
 
@@ -338,20 +326,9 @@ class TestChannelsMiddleware(TransactionTestCase):
 
         scope = {"query_string": b"user_id=123", "user": None}
 
-        with patch("core.middleware.channels.get_user") as mock_get_user:
-            mock_user = MagicMock()
-            mock_user.is_anonymous = False
-            mock_user.username = "testuser"
-            mock_get_user.return_value = mock_user
+        await middleware(scope, AsyncMock(), AsyncMock())
 
-            await middleware(scope, AsyncMock(), AsyncMock())
-
-            mock_get_user.assert_called_once_with(123)
-            self.assertEqual(scope["user"], mock_user)
-            mock_logger.debug.assert_any_call(
-                "No token found, but user_id is present: 123"
-            )
-            mock_logger.debug.assert_any_call("User retrieved by ID: testuser")
+        self.assertIsInstance(scope["user"], AnonymousUser)
 
     @patch("core.middleware.channels.logger")
     async def test_token_auth_middleware_access_token_priority(
@@ -389,9 +366,7 @@ class TestChannelsMiddleware(TransactionTestCase):
         await middleware(scope, AsyncMock(), AsyncMock())
 
         self.assertIsInstance(scope["user"], AnonymousUser)
-        mock_logger.debug.assert_any_call(
-            "TokenAuthMiddleware Token not found and no user_id"
-        )
+        mock_logger.debug.assert_any_call("TokenAuthMiddleware Token not found")
 
     @patch("core.middleware.channels.logger")
     async def test_token_auth_middleware_no_query_string(self, mock_logger):
@@ -460,7 +435,7 @@ class TestChannelsMiddleware(TransactionTestCase):
         middleware = TokenAuthMiddleware(mock_inner)
 
         scope = {
-            "query_string": b"access_token=test_token&session_token=session_token&user_id=123",
+            "query_string": b"access_token=test_token&session_token=session_token",
             "user": None,
         }
 
@@ -474,11 +449,10 @@ class TestChannelsMiddleware(TransactionTestCase):
 
             mock_logger.debug.assert_any_call("TokenAuthMiddleware called")
             mock_logger.debug.assert_any_call(
-                "Query params: {'access_token': ['test_token'], 'session_token': ['session_token'], 'user_id': ['123']}"
+                "Query params: {'access_token': ['test_token'], 'session_token': ['session_token']}"
             )
             mock_logger.debug.assert_any_call("Session token: session_to...")
             mock_logger.debug.assert_any_call("Access token: test_token...")
-            mock_logger.debug.assert_any_call("User ID: 123")
             mock_logger.debug.assert_any_call(
                 "TokenAuthMiddleware Token found, authenticating"
             )

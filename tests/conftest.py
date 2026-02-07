@@ -60,6 +60,37 @@ def reset_db_queries():
     reset_queries()
 
 
+@pytest.fixture(autouse=True)
+def _close_db_connections_after_test(request):
+    """Close database connections after TransactionTestCase-style tests.
+
+    Prevents 'database is being accessed by other users' errors during
+    TransactionTestCase teardown in parallel execution (-n auto).
+    Stale connections from async tests or channels can keep the database
+    locked, causing table truncation to fail and data to leak between tests.
+    """
+    yield
+    is_transaction_test = False
+    marker = request.node.get_closest_marker("django_db")
+    if marker and marker.kwargs.get("transaction", False):
+        is_transaction_test = True
+    elif hasattr(request, "cls") and request.cls:
+        from django.test import TransactionTestCase as DjangoTransactionTestCase
+        from django.test import TestCase as DjangoTestCase
+
+        # Only target actual TransactionTestCase, not TestCase
+        # (TestCase subclasses TransactionTestCase but uses different isolation)
+        if issubclass(
+            request.cls, DjangoTransactionTestCase
+        ) and not issubclass(request.cls, DjangoTestCase):
+            is_transaction_test = True
+
+    if is_transaction_test:
+        for conn in connections.all():
+            if conn.connection is not None and not conn.in_atomic_block:
+                conn.close()
+
+
 @pytest.fixture(scope="session", autouse=True)
 def close_db_connections_on_teardown(request):
     """Close all database connections at the end of the test session to prevent teardown warnings."""

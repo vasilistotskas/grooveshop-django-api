@@ -39,9 +39,12 @@ class TestRegionStatusFilter(TestCase):
         self.region_with_name = Region.objects.create(
             alpha="CA", country=self.country
         )
-        self.region_with_name.set_current_language("en")
-        self.region_with_name.name = "California"
-        self.region_with_name.save()
+        # Set name in ALL configured Parler languages so the "no_name" filter
+        # (which LEFT JOINs on translations) won't match missing translations
+        for lang_code in ("en", "el", "de"):
+            self.region_with_name.set_current_language(lang_code)
+            self.region_with_name.name = "California"
+            self.region_with_name.save()
 
         self.region_without_name = Region.objects.create(
             alpha="TX", country=self.country

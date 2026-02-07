@@ -23,10 +23,6 @@ User = get_user_model()
 
 logger = logging.getLogger(__name__)
 
-languages = [
-    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
-]
-
 
 class MonitoredTask(Task):
     def on_success(self, retval, task_id, args, kwargs):
@@ -875,12 +871,6 @@ def validate_task_configuration():
         )
 
     logger.info("Task configuration validated successfully")
-
-
-try:
-    validate_task_configuration()
-except ImproperlyConfigured as e:
-    logger.error(f"Task configuration error: {e}")
 
 
 @celery_app.task(

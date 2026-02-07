@@ -556,7 +556,6 @@ def redirect_to_frontend(request, *args, **kwargs):
     },
 )
 @api_view(["GET"])
-@permission_classes_decorator([IsAdminUser])
 def list_settings(request):
     """List all available settings with their values."""
     try:
@@ -612,7 +611,6 @@ def list_settings(request):
     },
 )
 @api_view(["GET"])
-@permission_classes_decorator([IsAdminUser])
 def get_setting_by_key(request):
     """Get a specific setting by its key name."""
     try:

@@ -7,6 +7,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import (
     Avg,
@@ -102,6 +103,22 @@ class Product(
     )
     history = HistoricalRecords()
 
+    points_coefficient = models.DecimalField(
+        _("Points Coefficient"),
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("1.0"),
+        validators=[MinValueValidator(Decimal("0.0"))],
+        help_text=_(
+            "Multiplier for loyalty points calculation (0 = no calculated points)"
+        ),
+    )
+    points = models.PositiveIntegerField(
+        _("Bonus Points"),
+        default=0,
+        help_text=_("Fixed bonus points awarded on purchase"),
+    )
+
     objects: ProductManager = ProductManager()
 
     class Meta(MetaDataModel.Meta, TypedModelMeta):
@@ -125,6 +142,9 @@ class Product(
             BTreeIndex(fields=["category"], name="product_category_ix"),
             BTreeIndex(
                 fields=["active", "price"], name="product_active_price_ix"
+            ),
+            BTreeIndex(
+                fields=["points_coefficient"], name="product_points_coeff_ix"
             ),
         ]
 

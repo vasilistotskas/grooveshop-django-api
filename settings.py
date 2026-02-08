@@ -102,6 +102,7 @@ LOCAL_APPS = [
     "contact",
     "tag",
     "meili",
+    "loyalty",
 ]
 
 THIRD_PARTY_APPS = [
@@ -609,6 +610,12 @@ def get_celery_beat_schedule():
             "task": "order.tasks.cleanup_expired_stock_reservations",
             "schedule": SCHEDULE_PRESETS["every_hour"],
         },
+        "process-loyalty-points-expiration": {
+            "task": "loyalty.tasks.process_points_expiration",
+            "schedule": SCHEDULE_PRESETS["daily_3am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
     }
 
     if path.exists("/.dockerenv") and not getenv("KUBERNETES_SERVICE_HOST"):
@@ -811,6 +818,57 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "STOCK_RESERVATION_TTL_MINUTES",
         "type": "int",
         "value": 15,
+    },
+    # Loyalty system settings
+    {
+        "name": "LOYALTY_ENABLED",
+        "type": "bool",
+        "value": False,
+    },
+    {
+        "name": "LOYALTY_POINTS_FACTOR",
+        "type": "decimal",
+        "value": 1.0,
+    },
+    {
+        "name": "LOYALTY_XP_PER_LEVEL",
+        "type": "int",
+        "value": 1000,
+    },
+    {
+        "name": "LOYALTY_NEW_CUSTOMER_BONUS_ENABLED",
+        "type": "bool",
+        "value": False,
+    },
+    {
+        "name": "LOYALTY_NEW_CUSTOMER_BONUS_POINTS",
+        "type": "int",
+        "value": 100,
+    },
+    {
+        "name": "LOYALTY_REDEMPTION_RATIO_EUR",
+        "type": "decimal",
+        "value": 100.0,
+    },
+    {
+        "name": "LOYALTY_REDEMPTION_RATIO_USD",
+        "type": "decimal",
+        "value": 100.0,
+    },
+    {
+        "name": "LOYALTY_PRICE_BASIS",
+        "type": "string",
+        "value": "final_price",
+    },
+    {
+        "name": "LOYALTY_POINTS_EXPIRATION_DAYS",
+        "type": "int",
+        "value": 0,
+    },
+    {
+        "name": "LOYALTY_TIER_MULTIPLIER_ENABLED",
+        "type": "bool",
+        "value": False,
     },
 ]
 
@@ -1338,6 +1396,27 @@ UNFOLD = {
                         "icon": "contact_mail",
                         "link": reverse_lazy(
                             "admin:contact_contact_changelist"
+                        ),
+                    },
+                ],
+            },
+            {
+                "title": _("Loyalty"),
+                "separator": True,
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": _("Loyalty Tiers"),
+                        "icon": "workspace_premium",
+                        "link": reverse_lazy(
+                            "admin:loyalty_loyaltytier_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Points Transactions"),
+                        "icon": "account_balance_wallet",
+                        "link": reverse_lazy(
+                            "admin:loyalty_pointstransaction_changelist"
                         ),
                     },
                 ],

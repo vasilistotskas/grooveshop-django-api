@@ -1305,6 +1305,21 @@ class ProductAdmin(
             },
         ),
         (
+            _("Loyalty Points"),
+            {
+                "fields": (
+                    "points_coefficient",
+                    "points",
+                ),
+                "classes": ("wide",),
+                "description": _(
+                    "Configure loyalty points earning for this product. "
+                    "Points coefficient multiplies the global points factor, "
+                    "and bonus points are awarded as a fixed amount on purchase."
+                ),
+            },
+        ),
+        (
             _("Inventory"),
             {
                 "fields": (

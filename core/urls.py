@@ -68,6 +68,7 @@ urlpatterns += i18n_patterns(
     path("api/v1/", include("cart.urls")),
     path("api/v1/", include("notification.urls")),
     path("api/v1/", include("contact.urls")),
+    path("api/v1/", include("loyalty.urls")),
     path("api/v1/health", health_check, name="api-health"),
     path("api/v1/settings", list_settings, name="api-settings-list"),
     path("api/v1/settings/get", get_setting_by_key, name="api-settings-get"),

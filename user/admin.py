@@ -25,6 +25,9 @@ from unfold.forms import (
     UserCreationForm,
 )
 
+from loyalty.enum import TransactionType
+from loyalty.models.transaction import PointsTransaction
+from loyalty.services import LoyaltyService
 from user.models import UserAccount
 from user.models.address import UserAddress
 from user.models.subscription import SubscriptionTopic, UserSubscription
@@ -247,6 +250,10 @@ class UserAdmin(ModelAdmin):
         "social_links_summary",
         "subscription_summary",
         "address_summary",
+        "loyalty_points_balance",
+        "loyalty_total_xp",
+        "loyalty_level",
+        "loyalty_tier_name",
     ]
 
     ordering = ["-created_at"]
@@ -322,6 +329,18 @@ class UserAdmin(ModelAdmin):
             {
                 "fields": ("subscription_summary", "engagement_metrics"),
                 "classes": ("collapse",),
+            },
+        ),
+        (
+            _("Loyalty & Rewards"),
+            {
+                "fields": (
+                    "loyalty_points_balance",
+                    "loyalty_total_xp",
+                    "loyalty_level",
+                    "loyalty_tier_name",
+                ),
+                "classes": ("wide",),
             },
         ),
         (
@@ -553,6 +572,84 @@ class UserAdmin(ModelAdmin):
         return mark_safe(html)
 
     address_summary.short_description = _("Address Summary")
+
+    def loyalty_points_balance(self, obj):
+        balance = LoyaltyService.get_user_balance(obj)
+        esc_balance = conditional_escape(str(balance))
+        html = (
+            f'<span class="inline-flex items-center px-3 py-1 text-sm font-semibold'
+            f" bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300"
+            f' rounded-full gap-1"><span>🪙</span><span>{esc_balance} pts</span></span>'
+        )
+        return mark_safe(html)
+
+    loyalty_points_balance.short_description = _("Points Balance")
+
+    def loyalty_total_xp(self, obj):
+        esc_xp = conditional_escape(str(obj.total_xp))
+        html = (
+            f'<span class="inline-flex items-center px-3 py-1 text-sm font-semibold'
+            f" bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
+            f' rounded-full gap-1"><span>⭐</span><span>{esc_xp} XP</span></span>'
+        )
+        return mark_safe(html)
+
+    loyalty_total_xp.short_description = _("Total XP")
+
+    def loyalty_level(self, obj):
+        level = LoyaltyService.get_user_level(obj)
+        esc_level = conditional_escape(str(level))
+        html = (
+            f'<span class="inline-flex items-center px-3 py-1 text-sm font-semibold'
+            f" bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300"
+            f' rounded-full gap-1"><span>📊</span><span>Level {esc_level}</span></span>'
+        )
+        return mark_safe(html)
+
+    loyalty_level.short_description = _("Level")
+
+    def loyalty_tier_name(self, obj):
+        tier = LoyaltyService.get_user_tier(obj)
+        if tier:
+            esc_name = conditional_escape(str(tier))
+            html = (
+                f'<span class="inline-flex items-center px-3 py-1 text-sm font-semibold'
+                f" bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-300"
+                f' rounded-full gap-1"><span>🏆</span><span>{esc_name}</span></span>'
+            )
+        else:
+            html = '<span class="text-base-600 dark:text-base-300 italic">No tier</span>'
+        return mark_safe(html)
+
+    loyalty_tier_name.short_description = _("Tier")
+
+    @action(
+        description=_("Adjust loyalty points for selected users"),
+        variant=ActionVariant.INFO,
+        icon="loyalty",
+    )
+    def adjust_loyalty_points(self, request, queryset):
+        points_amount = 100
+        description = "Manual admin adjustment"
+        count = 0
+        for user in queryset:
+            PointsTransaction.objects.create(
+                user=user,
+                points=points_amount,
+                transaction_type=TransactionType.ADJUST,
+                description=description,
+                created_by=request.user,
+            )
+            count += 1
+        self.message_user(
+            request,
+            _(
+                "%(count)d user(s) received %(points)d loyalty points adjustment."
+            )
+            % {"count": count, "points": points_amount},
+        )
+
+    actions_detail = ["adjust_loyalty_points"]
 
 
 @admin.register(UserAddress)

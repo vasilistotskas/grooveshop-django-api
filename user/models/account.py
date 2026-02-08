@@ -89,6 +89,14 @@ class UserAccount(
     youtube = models.URLField(_("Youtube Profile"), blank=True, null=True)
     github = models.URLField(_("Github Profile"), blank=True, null=True)
     bio = models.TextField(_("Bio"), blank=True, default="")
+    total_xp = models.PositiveBigIntegerField(_("Total XP"), default=0)
+    loyalty_tier = models.ForeignKey(
+        "loyalty.LoyaltyTier",
+        related_name="users",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
 
     objects: UserAccountManager = UserAccountManager()
 
@@ -122,6 +130,7 @@ class UserAccount(
                 fields=["city", "zipcode", "address", "place"],
                 opclasses=["gin_trgm_ops"] * 4,
             ),
+            BTreeIndex(fields=["total_xp"], name="user_account_total_xp_ix"),
         ]
 
     def __str__(self):
@@ -147,6 +156,15 @@ class UserAccount(
                 sub.status == UserSubscription.SubscriptionStatus.ACTIVE
             )
         return prefs
+
+    @property
+    def loyalty_level(self) -> int:
+        from extra_settings.models import Setting
+
+        xp_per_level = Setting.get("LOYALTY_XP_PER_LEVEL", default=1000)
+        if xp_per_level <= 0:
+            return 1
+        return 1 + (self.total_xp // xp_per_level)
 
     @property
     def full_name(self):

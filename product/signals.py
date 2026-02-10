@@ -104,6 +104,10 @@ def reindex_product_translations(sender, instance, **kwargs):
     if settings.MEILISEARCH.get("OFFLINE", False):
         return
 
+    update_fields = kwargs.get("update_fields")
+    if update_fields and set(update_fields) <= {"view_count"}:
+        return
+
     # Get all translations for this product using the optimized queryset
     translations = ProductTranslation.get_meilisearch_queryset().filter(
         master=instance

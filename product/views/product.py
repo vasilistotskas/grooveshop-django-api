@@ -202,7 +202,7 @@ class ProductViewSet(BaseModelViewSet):
     def update_view_count(self, request, pk=None):
         product = self.get_object()
         product.view_count += 1
-        product.save()
+        product.save(update_fields=["view_count"])
 
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(

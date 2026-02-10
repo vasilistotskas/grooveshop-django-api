@@ -25,4 +25,9 @@ urlpatterns = [
         LoyaltyViewSet.as_view({"get": "product_points"}),
         name="loyalty-product-points",
     ),
+    path(
+        "loyalty/tiers",
+        LoyaltyViewSet.as_view({"get": "tiers"}),
+        name="loyalty-tiers",
+    ),
 ]

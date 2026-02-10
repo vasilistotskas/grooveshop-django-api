@@ -57,9 +57,7 @@ class UserAddressDetailSerializer(UserAddressSerializer):
 class UserAddressWriteSerializer(serializers.ModelSerializer[UserAddress]):
     user = PrimaryKeyRelatedField(queryset=User.objects.all())
     country = PrimaryKeyRelatedField(queryset=Country.objects.all())
-    region = PrimaryKeyRelatedField(
-        queryset=Region.objects.all(), required=False
-    )
+    region = PrimaryKeyRelatedField(queryset=Region.objects.all())
     phone = PhoneNumberField()
 
     def validate(self, data):

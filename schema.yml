@@ -10215,6 +10215,78 @@ paths:
               schema:
                 $ref: '#/components/schemas/LoyaltySummary'
           description: ''
+  /api/v1/loyalty/tiers:
+    get:
+      operationId: listLoyaltyTiers
+      description: List all loyalty tiers
+      summary: List all loyalty tiers
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+      - name: pageSize
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - Loyalty
+      security:
+      - knoxApiToken: []
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedLoyaltyTierList'
+          description: ''
   /api/v1/loyalty/transactions:
     get:
       operationId: listLoyaltyTransactions
@@ -30478,6 +30550,11 @@ components:
           type: string
           description: Customer notes or special instructions
           maxLength: 500
+        loyaltyPointsToRedeem:
+          type: integer
+          minimum: 0
+          nullable: true
+          description: Number of loyalty points to redeem for discount on this order
       required:
       - city
       - countryId
@@ -31473,6 +31550,44 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Country'
+    PaginatedLoyaltyTierList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        links:
+          type: object
+          properties:
+            next:
+              type: string
+              nullable: true
+              format: uri
+              example: http://api.example.org/accounts/?page=4
+            previous:
+              type: string
+              nullable: true
+              format: uri
+              example: http://api.example.org/accounts/?page=2
+        count:
+          type: integer
+          example: 123
+        totalPages:
+          type: integer
+          example: 123
+        pageSize:
+          type: integer
+          example: 123
+        pageTotalResults:
+          type: integer
+          example: 123
+        page:
+          type: integer
+          example: 123
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/LoyaltyTier'
     PaginatedNotificationUserList:
       type: object
       required:
@@ -36303,6 +36418,7 @@ components:
       - firstName
       - lastName
       - phone
+      - region
       - street
       - streetNumber
       - title

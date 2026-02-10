@@ -344,6 +344,16 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         help_text=_("Customer notes or special instructions"),
     )
 
+    # Loyalty points redemption (optional)
+    loyalty_points_to_redeem = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        min_value=0,
+        help_text=_(
+            "Number of loyalty points to redeem for discount on this order"
+        ),
+    )
+
     def validate_email(self, value: str) -> str:
         """Validate email is not from disposable domain."""
         if not value:

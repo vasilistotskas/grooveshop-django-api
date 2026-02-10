@@ -131,6 +131,7 @@ class OrderService:
         payment_intent_id: str,
         pay_way,
         user=None,
+        loyalty_points_to_redeem: int | None = None,
     ) -> Order:
         """
         Create order from cart after payment confirmation (payment-first flow).
@@ -442,8 +443,55 @@ class OrderService:
             # Store reservation IDs in order metadata
             order.metadata["stock_reservation_ids"] = reservation_ids
 
-            # Calculate and set paid amount
-            order.paid_amount = order.calculate_order_total_amount()
+            # Step 7.5: Apply loyalty points redemption if requested
+            loyalty_discount = Money(0, target_currency)
+            if (
+                loyalty_points_to_redeem
+                and loyalty_points_to_redeem > 0
+                and user
+            ):
+                try:
+                    from loyalty.services import LoyaltyService
+
+                    # Redeem points and get discount amount
+                    discount_amount = LoyaltyService.redeem_points(
+                        user=user,
+                        points_amount=loyalty_points_to_redeem,
+                        currency=str(target_currency),
+                        order=order,
+                    )
+                    loyalty_discount = Money(discount_amount, target_currency)
+
+                    # Store loyalty redemption in order metadata
+                    order.metadata["loyalty_redemption"] = {
+                        "points_redeemed": loyalty_points_to_redeem,
+                        "discount_amount": str(discount_amount),
+                        "currency": str(target_currency),
+                    }
+
+                    logger.info(
+                        "Applied loyalty discount of %s %s (%s points) to order %s",
+                        discount_amount,
+                        target_currency,
+                        loyalty_points_to_redeem,
+                        order.id,
+                    )
+                except Exception as e:
+                    logger.error(
+                        "Failed to apply loyalty discount to order %s: %s",
+                        order.id,
+                        e,
+                        exc_info=True,
+                    )
+                    # Don't fail the order creation, just log the error
+                    # The points won't be redeemed if this fails
+
+            # Calculate and set paid amount (subtract loyalty discount)
+            order_total = order.calculate_order_total_amount()
+            order.paid_amount = Money(
+                max(0, order_total.amount - loyalty_discount.amount),
+                order_total.currency,
+            )
             order.save(update_fields=["paid_amount", "metadata"])
 
             # Step 8: Clear cart
@@ -486,6 +534,7 @@ class OrderService:
         shipping_address: dict[str, Any],
         pay_way,
         user=None,
+        loyalty_points_to_redeem: int | None = None,
     ) -> Order:
         """
         Create order from cart for offline payment methods (order-first flow).
@@ -771,8 +820,55 @@ class OrderService:
             # Store reservation IDs in order metadata
             order.metadata["stock_reservation_ids"] = reservation_ids
 
-            # Calculate and set paid amount
-            order.paid_amount = order.calculate_order_total_amount()
+            # Step 6.5: Apply loyalty points redemption if requested
+            loyalty_discount = Money(0, target_currency)
+            if (
+                loyalty_points_to_redeem
+                and loyalty_points_to_redeem > 0
+                and user
+            ):
+                try:
+                    from loyalty.services import LoyaltyService
+
+                    # Redeem points and get discount amount
+                    discount_amount = LoyaltyService.redeem_points(
+                        user=user,
+                        points_amount=loyalty_points_to_redeem,
+                        currency=str(target_currency),
+                        order=order,
+                    )
+                    loyalty_discount = Money(discount_amount, target_currency)
+
+                    # Store loyalty redemption in order metadata
+                    order.metadata["loyalty_redemption"] = {
+                        "points_redeemed": loyalty_points_to_redeem,
+                        "discount_amount": str(discount_amount),
+                        "currency": str(target_currency),
+                    }
+
+                    logger.info(
+                        "Applied loyalty discount of %s %s (%s points) to order %s",
+                        discount_amount,
+                        target_currency,
+                        loyalty_points_to_redeem,
+                        order.id,
+                    )
+                except Exception as e:
+                    logger.error(
+                        "Failed to apply loyalty discount to order %s: %s",
+                        order.id,
+                        e,
+                        exc_info=True,
+                    )
+                    # Don't fail the order creation, just log the error
+                    # The points won't be redeemed if this fails
+
+            # Calculate and set paid amount (subtract loyalty discount)
+            order_total = order.calculate_order_total_amount()
+            order.paid_amount = Money(
+                max(0, order_total.amount - loyalty_discount.amount),
+                order_total.currency,
+            )
             order.save(update_fields=["paid_amount", "metadata"])
 
             # Step 7: Clear cart

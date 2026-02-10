@@ -29,6 +29,7 @@ from loyalty.serializers.loyalty import (
     RedeemPointsRequestSerializer,
     RedeemPointsResponseSerializer,
 )
+from loyalty.serializers.tier import LoyaltyTierSerializer
 from loyalty.services import LoyaltyService
 from product.models.product import Product
 
@@ -59,6 +60,13 @@ serializers_config: SerializersConfig = {
         response=ProductPointsSerializer,
         operation_id="getProductLoyaltyPoints",
         summary=_("Get product loyalty points preview"),
+        tags=["Loyalty"],
+    ),
+    "tiers": ActionConfig(
+        response=LoyaltyTierSerializer,
+        many=True,
+        operation_id="listLoyaltyTiers",
+        summary=_("List all loyalty tiers"),
         tags=["Loyalty"],
     ),
 }
@@ -217,3 +225,14 @@ class LoyaltyViewSet(BaseModelViewSet):
             response_data, context=self.get_serializer_context()
         )
         return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["GET"])
+    def tiers(self, request):
+        """GET /api/v1/loyalty/tiers - List all loyalty tiers."""
+        queryset = LoyaltyTier.objects.for_list().order_by("required_level")
+
+        response_serializer_class = self.get_response_serializer()
+        serializer = response_serializer_class(
+            queryset, many=True, context=self.get_serializer_context()
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)

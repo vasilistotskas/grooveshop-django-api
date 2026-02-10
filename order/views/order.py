@@ -493,13 +493,17 @@ class OrderViewSet(BaseModelViewSet):
                 else {"detail": str(e)}
             )
 
-        # Step 5: Create order from cart with payment_intent_id
+        # Step 5: Get loyalty points to redeem (if any)
+        loyalty_points_to_redeem = request.data.get("loyalty_points_to_redeem")
+
+        # Step 6: Create order from cart with payment_intent_id
         order = OrderService.create_order_from_cart(
             cart=cart,
             shipping_address=shipping_address,
             payment_intent_id=payment_intent_id,
             pay_way=pay_way,
             user=user,
+            loyalty_points_to_redeem=loyalty_points_to_redeem,
         )
 
         # Return order details
@@ -549,12 +553,16 @@ class OrderViewSet(BaseModelViewSet):
                 else {"detail": str(e)}
             )
 
-        # Step 4: Create order from cart without payment_intent_id
+        # Step 4: Get loyalty points to redeem (if any)
+        loyalty_points_to_redeem = request.data.get("loyalty_points_to_redeem")
+
+        # Step 5: Create order from cart without payment_intent_id
         order = OrderService.create_order_from_cart_offline(
             cart=cart,
             shipping_address=shipping_address,
             pay_way=pay_way,
             user=user,
+            loyalty_points_to_redeem=loyalty_points_to_redeem,
         )
 
         # Return order details

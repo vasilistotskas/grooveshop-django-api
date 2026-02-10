@@ -3,6 +3,12 @@
 
 
 
+## v1.79.0 (2026-02-10)
+
+### Features
+
+* feat: loyalty tiers ([`c2c0419`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c2c0419c3a01cabb44117e709c9f91c08acc8f7a))
+
 ## v1.78.0 (2026-02-08)
 
 ### Features

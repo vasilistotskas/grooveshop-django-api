@@ -24,9 +24,14 @@ class LoyaltyTierSerializer(
             "translations",
             "required_level",
             "points_multiplier",
+            "icon",
+            "main_image_path",
+            "icon_filename",
         )
         read_only_fields = (
             "id",
             "required_level",
             "points_multiplier",
+            "main_image_path",
+            "icon_filename",
         )

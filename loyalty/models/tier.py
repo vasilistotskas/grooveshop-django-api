@@ -1,3 +1,4 @@
+import os
 from decimal import Decimal
 
 from django.contrib.postgres.indexes import BTreeIndex
@@ -7,6 +8,7 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from parler.models import TranslatableModel, TranslatedFieldsModel
 
+from core.fields.image import ImageAndSvgField
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
 from loyalty.managers.tier import LoyaltyTierManager
 
@@ -30,6 +32,9 @@ class LoyaltyTier(
             "Multiplier applied to earned points for users in this tier"
         ),
     )
+    icon = ImageAndSvgField(
+        _("Icon"), upload_to="uploads/loyalty/", blank=True, null=True
+    )
 
     objects: LoyaltyTierManager = LoyaltyTierManager()
 
@@ -51,6 +56,18 @@ class LoyaltyTier(
             self.safe_translation_getter("name")
             or f"Tier (level {self.required_level})"
         )
+
+    @property
+    def main_image_path(self) -> str:
+        if self.icon and hasattr(self.icon, "name"):
+            return f"media/uploads/loyalty/{os.path.basename(self.icon.name)}"
+        return ""
+
+    @property
+    def icon_filename(self) -> str:
+        if self.icon and hasattr(self.icon, "name"):
+            return os.path.basename(self.icon.name)
+        return ""
 
 
 class LoyaltyTierTranslation(TranslatedFieldsModel):

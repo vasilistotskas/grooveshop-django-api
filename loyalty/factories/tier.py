@@ -30,6 +30,7 @@ class LoyaltyTierFactory(CustomDjangoModelFactory):
     auto_translations = False
     required_level = factory.Sequence(lambda n: n + 1)
     points_multiplier = Decimal("1.0")
+    icon = None
 
     class Meta:
         model = LoyaltyTier

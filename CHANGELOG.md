@@ -3,6 +3,14 @@
 
 
 
+## v1.79.1 (2026-02-10)
+
+### Bug fixes
+
+* fix: uv ([`9bb8df0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9bb8df07b1ca48841e8429b5b3c2576c194f7fb0))
+
+* fix: update_view_count ([`5ef3dcc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ef3dcc3ca72c7e5f2de819f95b3548801f2f198))
+
 ## v1.79.0 (2026-02-10)
 
 ### Features

@@ -3,6 +3,12 @@
 
 
 
+## v1.82.0 (2026-02-11)
+
+### Features
+
+* feat: loyalty progress ([`21ef72f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/21ef72fd24ded8c217d612c4525f0911a6996d17))
+
 ## v1.81.0 (2026-02-11)
 
 ### Features

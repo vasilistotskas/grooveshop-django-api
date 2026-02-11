@@ -16,9 +16,13 @@ import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from djmoney.money import Money
+
 from loyalty.enum import TransactionType
 from loyalty.models.tier import LoyaltyTier, LoyaltyTierTranslation
 from loyalty.models.transaction import PointsTransaction
+from order.factories.item import OrderItemFactory
+from order.factories.order import OrderFactory
 from product.factories.product import ProductFactory
 from user.factories.account import UserAccountFactory
 
@@ -301,6 +305,14 @@ class TestRedeemEndpoint:
             description="Test earn",
         )
 
+        # Create an order with a known items total (100 EUR > 2 EUR discount)
+        order = OrderFactory(user=user, num_order_items=0)
+        OrderItemFactory(
+            order=order,
+            price=Money(Decimal("100.00"), "EUR"),
+            quantity=1,
+        )
+
         client = APIClient()
         client.force_authenticate(user=user)
 
@@ -309,7 +321,11 @@ class TestRedeemEndpoint:
         ):
             response = client.post(
                 "/api/v1/loyalty/redeem",
-                {"points_amount": 200, "currency": "EUR"},
+                {
+                    "points_amount": 200,
+                    "currency": "EUR",
+                    "order_id": order.id,
+                },
                 format="json",
             )
 
@@ -330,6 +346,13 @@ class TestRedeemEndpoint:
             description="Test earn",
         )
 
+        order = OrderFactory(user=user, num_order_items=0)
+        OrderItemFactory(
+            order=order,
+            price=Money(Decimal("100.00"), "EUR"),
+            quantity=1,
+        )
+
         client = APIClient()
         client.force_authenticate(user=user)
 
@@ -338,7 +361,11 @@ class TestRedeemEndpoint:
         ):
             response = client.post(
                 "/api/v1/loyalty/redeem",
-                {"points_amount": 100, "currency": "EUR"},
+                {
+                    "points_amount": 100,
+                    "currency": "EUR",
+                    "order_id": order.id,
+                },
                 format="json",
             )
 
@@ -354,6 +381,13 @@ class TestRedeemEndpoint:
             description="Test earn",
         )
 
+        order = OrderFactory(user=user, num_order_items=0)
+        OrderItemFactory(
+            order=order,
+            price=Money(Decimal("100.00"), "EUR"),
+            quantity=1,
+        )
+
         client = APIClient()
         client.force_authenticate(user=user)
 
@@ -362,7 +396,11 @@ class TestRedeemEndpoint:
         ):
             response = client.post(
                 "/api/v1/loyalty/redeem",
-                {"points_amount": 100, "currency": "EUR"},
+                {
+                    "points_amount": 100,
+                    "currency": "EUR",
+                    "order_id": order.id,
+                },
                 format="json",
             )
 
@@ -377,7 +415,7 @@ class TestRedeemEndpoint:
 
         response = client.post(
             "/api/v1/loyalty/redeem",
-            {"points_amount": 100, "currency": "GBP"},
+            {"points_amount": 100, "currency": "GBP", "order_id": 1},
             format="json",
         )
 

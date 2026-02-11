@@ -71,11 +71,9 @@ class RedeemPointsRequestSerializer(serializers.Serializer):
         help_text="Currency for the monetary discount (EUR or USD).",
     )
     order_id = serializers.IntegerField(
-        required=False,
-        allow_null=True,
-        default=None,
-        help_text="Optional order ID to associate the redemption with. "
-        "When provided, loyalty metadata is stored in the order.",
+        min_value=1,
+        help_text="Order ID to associate the redemption with. "
+        "Used to cap the discount to the order's products total.",
     )
 
 

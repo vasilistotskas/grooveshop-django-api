@@ -217,13 +217,19 @@ class LoyaltyService:
     @classmethod
     @transaction.atomic
     def redeem_points(
-        cls, user, points_amount: int, currency: str, order=None
+        cls,
+        user,
+        points_amount: int,
+        currency: str,
+        max_discount: Decimal,
+        order=None,
     ) -> Decimal:
         """Redeem points for a monetary discount.
 
         Returns the discount amount. Validates that the loyalty system is enabled,
-        the points amount is positive, the currency is supported, and the user
-        has sufficient balance.
+        the points amount is positive, the currency is supported, the user
+        has sufficient balance, and the discount does not exceed max_discount
+        (the products total, excluding shipping and payment fees).
 
         If an order is provided, stores loyalty_points_redeemed and loyalty_discount
         in the Order's metadata JSON field and sets reference_order on the transaction.
@@ -253,6 +259,20 @@ class LoyaltyService:
         ratio_key = f"LOYALTY_REDEMPTION_RATIO_{currency}"
         ratio = Decimal(str(Setting.get(ratio_key, default=100.0)))
         discount = Decimal(str(points_amount)) / ratio
+
+        if discount > max_discount:
+            raise ValidationError(
+                _(
+                    "Loyalty discount (%(discount)s %(currency)s) exceeds the "
+                    "maximum allowed amount (%(max)s %(currency)s). Points can "
+                    "only be applied against the products total."
+                )
+                % {
+                    "discount": discount,
+                    "currency": currency,
+                    "max": max_discount,
+                }
+            )
 
         PointsTransaction.objects.create(
             user=user,

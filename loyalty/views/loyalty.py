@@ -158,24 +158,28 @@ class LoyaltyViewSet(BaseModelViewSet):
 
         points_amount = serializer.validated_data["points_amount"]
         currency = serializer.validated_data["currency"]
-        order_id = serializer.validated_data.get("order_id")
+        order_id = serializer.validated_data["order_id"]
 
-        # Look up the order if order_id is provided
-        order = None
-        if order_id is not None:
-            from order.models.order import Order
+        from order.models.order import Order
 
-            try:
-                order = Order.objects.get(id=order_id, user=request.user)
-            except Order.DoesNotExist:
-                return Response(
-                    {"detail": _("Order not found or does not belong to you.")},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
+        try:
+            order = Order.objects.get(id=order_id, user=request.user)
+        except Order.DoesNotExist:
+            return Response(
+                {"detail": _("Order not found or does not belong to you.")},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Cap discount to the products total (excluding shipping/fees)
+        max_discount = order.total_price_items.amount
 
         try:
             discount = LoyaltyService.redeem_points(
-                request.user, points_amount, currency, order=order
+                user=request.user,
+                points_amount=points_amount,
+                currency=currency,
+                max_discount=max_discount,
+                order=order,
             )
         except ValidationError as e:
             return Response(

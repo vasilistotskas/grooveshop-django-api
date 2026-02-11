@@ -297,11 +297,15 @@ class TestRedemptionDiscount:
         with patch(
             "loyalty.services.Setting.get", side_effect=mock_setting_get
         ):
-            discount = LoyaltyService.redeem_points(user, points_amount, "EUR")
-
-        expected_discount = Decimal(str(points_amount)) / Decimal(
-            str(redemption_ratio)
-        )
+            # max_discount must exceed the computed discount
+            # (points_amount / ratio). With points up to 100k and ratio
+            # as low as 0.01, discount can reach 10M.
+            expected_discount = Decimal(str(points_amount)) / Decimal(
+                str(redemption_ratio)
+            )
+            discount = LoyaltyService.redeem_points(
+                user, points_amount, "EUR", max_discount=expected_discount
+            )
 
         assert discount == expected_discount, (
             f"points={points_amount}, ratio={redemption_ratio}: "

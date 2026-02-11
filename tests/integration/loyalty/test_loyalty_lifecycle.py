@@ -377,7 +377,11 @@ class TestOrderCompleteAndRedeemFlow:
         redeem_order = _create_order(user)
         with patch("loyalty.services.Setting.get", side_effect=mock_settings):
             discount = LoyaltyService.redeem_points(
-                user, points_amount=100, currency="EUR", order=redeem_order
+                user,
+                points_amount=100,
+                currency="EUR",
+                max_discount=Decimal("99999"),
+                order=redeem_order,
             )
 
         # 100 / 100.0 = 1.00 EUR discount
@@ -421,7 +425,11 @@ class TestOrderCompleteAndRedeemFlow:
         redeem_order = _create_order(user)
         with patch("loyalty.services.Setting.get", side_effect=mock_settings):
             discount = LoyaltyService.redeem_points(
-                user, points_amount=200, currency="EUR", order=redeem_order
+                user,
+                points_amount=200,
+                currency="EUR",
+                max_discount=Decimal("99999"),
+                order=redeem_order,
             )
 
         # 200 / 50.0 = 4.00 EUR
@@ -455,7 +463,10 @@ class TestOrderCompleteAndRedeemFlow:
                 ValidationError, match="Insufficient points balance"
             ):
                 LoyaltyService.redeem_points(
-                    user, points_amount=100, currency="EUR"
+                    user,
+                    points_amount=100,
+                    currency="EUR",
+                    max_discount=Decimal("99999"),
                 )
 
         # Verify no REDEEM transaction was created
@@ -586,3 +597,144 @@ class TestNewCustomerBonusFlow:
             ).count()
             == 0
         )
+
+
+# ---------------------------------------------------------------------------
+# Test 5: Redeem points capped by products total (max_discount)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+class TestRedeemPointsCappedByProductsTotal:
+    """Test: loyalty discount cannot exceed the products total."""
+
+    def test_redeem_exceeds_products_total_raises_error(self):
+        """Redeeming points worth more than max_discount raises ValidationError."""
+        from django.core.exceptions import ValidationError
+
+        user = UserAccountFactory()
+        product = _create_product(
+            price=Decimal("200.00"), vat_percent=Decimal("0.0")
+        )
+        order = _create_order(user)
+        _create_order_item(order, product, quantity=1)
+
+        mock_settings = _loyalty_settings(
+            enabled=True,
+            points_factor=1.0,
+            redemption_ratio_eur=100.0,
+        )
+
+        # Award 200 points (200 EUR product)
+        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+            LoyaltyService.award_order_points(order.id)
+
+        # Give user extra points via bonus so they have more than products total
+        PointsTransaction.objects.create(
+            user=user,
+            points=20000,
+            transaction_type=TransactionType.BONUS,
+            description="Test bonus for cap validation",
+        )
+
+        # Products total is 150 EUR (e.g. new order with cheaper items)
+        redeem_order = _create_order(user)
+        cheap_product = _create_product(
+            price=Decimal("150.00"), vat_percent=Decimal("0.0")
+        )
+        _create_order_item(redeem_order, cheap_product, quantity=1)
+
+        # Try to redeem 20000 points = 200 EUR, but max_discount = 150
+        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+            with pytest.raises(ValidationError, match="exceeds the maximum"):
+                LoyaltyService.redeem_points(
+                    user,
+                    points_amount=20000,
+                    currency="EUR",
+                    order=redeem_order,
+                    max_discount=Decimal("150.00"),
+                )
+
+        # Verify no REDEEM transaction was created
+        assert (
+            PointsTransaction.objects.filter(
+                user=user, transaction_type=TransactionType.REDEEM
+            ).count()
+            == 0
+        )
+
+    def test_redeem_exactly_at_products_total_succeeds(self):
+        """Redeeming points worth exactly max_discount succeeds."""
+        user = UserAccountFactory()
+        product = _create_product(
+            price=Decimal("100.00"), vat_percent=Decimal("0.0")
+        )
+        order = _create_order(user)
+        _create_order_item(order, product, quantity=1)
+
+        mock_settings = _loyalty_settings(
+            enabled=True,
+            points_factor=1.0,
+            redemption_ratio_eur=100.0,
+        )
+
+        # Award 100 points
+        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+            LoyaltyService.award_order_points(order.id)
+
+        # Give extra points
+        PointsTransaction.objects.create(
+            user=user,
+            points=14900,
+            transaction_type=TransactionType.BONUS,
+            description="Test bonus",
+        )
+
+        # Redeem 15000 points = 150 EUR, max_discount = 150
+        redeem_order = _create_order(user)
+        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+            discount = LoyaltyService.redeem_points(
+                user,
+                points_amount=15000,
+                currency="EUR",
+                order=redeem_order,
+                max_discount=Decimal("150.00"),
+            )
+
+        assert discount == Decimal("150")
+
+        # Verify REDEEM transaction was created
+        assert (
+            PointsTransaction.objects.filter(
+                user=user, transaction_type=TransactionType.REDEEM
+            ).count()
+            == 1
+        )
+
+    def test_redeem_below_products_total_succeeds(self):
+        """Redeeming points worth less than max_discount succeeds."""
+        user = UserAccountFactory()
+
+        # Give user points via bonus
+        PointsTransaction.objects.create(
+            user=user,
+            points=5000,
+            transaction_type=TransactionType.BONUS,
+            description="Test bonus",
+        )
+
+        mock_settings = _loyalty_settings(
+            enabled=True,
+            redemption_ratio_eur=100.0,
+        )
+
+        # Redeem 5000 points = 50 EUR, max_discount = 150 — well within cap
+        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+            discount = LoyaltyService.redeem_points(
+                user,
+                points_amount=5000,
+                currency="EUR",
+                max_discount=Decimal("150.00"),
+            )
+
+        assert discount == Decimal("50")

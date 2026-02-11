@@ -6,6 +6,7 @@ Tests Properties 9, 10, 12 from the design document.
 **Validates: Requirements 4.2, 4.3, 5.3**
 """
 
+from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
@@ -121,7 +122,12 @@ class TestOverRedemptionRejected:
                 side_effect=_loyalty_settings(enabled=True),
             ):
                 with pytest.raises(ValidationError):
-                    LoyaltyService.redeem_points(user, points_to_redeem, "EUR")
+                    LoyaltyService.redeem_points(
+                        user,
+                        points_to_redeem,
+                        "EUR",
+                        max_discount=Decimal("99999"),
+                    )
 
             # Verify no REDEEM transaction was created
             redeem_count = PointsTransaction.objects.filter(
@@ -184,7 +190,9 @@ class TestRedeemTransactionHasNegativePoints:
                 "loyalty.services.Setting.get",
                 side_effect=_loyalty_settings(enabled=True),
             ):
-                LoyaltyService.redeem_points(user, points_to_redeem, "EUR")
+                LoyaltyService.redeem_points(
+                    user, points_to_redeem, "EUR", max_discount=Decimal("99999")
+                )
 
             # Verify the REDEEM transaction
             redeem_txs = PointsTransaction.objects.filter(

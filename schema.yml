@@ -30123,8 +30123,20 @@ components:
           exclusiveMinimum: true
           readOnly: true
           description: Multiplier applied to earned points for users in this tier
+        icon:
+          type: string
+          format: uri
+          nullable: true
+        mainImagePath:
+          type: string
+          readOnly: true
+        iconFilename:
+          type: string
+          readOnly: true
       required:
+      - iconFilename
       - id
+      - mainImagePath
       - pointsMultiplier
       - requiredLevel
       - translations
@@ -35304,11 +35316,12 @@ components:
             * `USD` - USD
         orderId:
           type: integer
-          nullable: true
-          description: Optional order ID to associate the redemption with. When provided,
-            loyalty metadata is stored in the order.
+          minimum: 1
+          description: Order ID to associate the redemption with. Used to cap the
+            discount to the order's products total.
       required:
       - currency
+      - orderId
       - pointsAmount
     RedeemPointsResponse:
       type: object

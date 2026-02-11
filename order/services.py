@@ -453,12 +453,16 @@ class OrderService:
                 try:
                     from loyalty.services import LoyaltyService
 
+                    # Cap discount to products total (excluding shipping/fees)
+                    items_total_amount = order.total_price_items.amount
+
                     # Redeem points and get discount amount
                     discount_amount = LoyaltyService.redeem_points(
                         user=user,
                         points_amount=loyalty_points_to_redeem,
                         currency=str(target_currency),
                         order=order,
+                        max_discount=items_total_amount,
                     )
                     loyalty_discount = Money(discount_amount, target_currency)
 
@@ -476,6 +480,8 @@ class OrderService:
                         loyalty_points_to_redeem,
                         order.id,
                     )
+                except ValidationError:
+                    raise
                 except Exception as e:
                     logger.error(
                         "Failed to apply loyalty discount to order %s: %s",
@@ -830,12 +836,16 @@ class OrderService:
                 try:
                     from loyalty.services import LoyaltyService
 
+                    # Cap discount to products total (excluding shipping/fees)
+                    items_total_amount = order.total_price_items.amount
+
                     # Redeem points and get discount amount
                     discount_amount = LoyaltyService.redeem_points(
                         user=user,
                         points_amount=loyalty_points_to_redeem,
                         currency=str(target_currency),
                         order=order,
+                        max_discount=items_total_amount,
                     )
                     loyalty_discount = Money(discount_amount, target_currency)
 
@@ -853,6 +863,8 @@ class OrderService:
                         loyalty_points_to_redeem,
                         order.id,
                     )
+                except ValidationError:
+                    raise
                 except Exception as e:
                     logger.error(
                         "Failed to apply loyalty discount to order %s: %s",

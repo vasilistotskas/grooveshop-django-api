@@ -3,6 +3,12 @@
 
 
 
+## v1.81.0 (2026-02-11)
+
+### Features
+
+* feat: add loyalty points command ([`27110ec`](https://github.com/vasilistotskas/grooveshop-django-api/commit/27110ecdcff2a8b8b8a3e6af84f90615238d2bdf))
+
 ## v1.80.0 (2026-02-10)
 
 ### Features

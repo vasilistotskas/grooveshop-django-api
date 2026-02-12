@@ -833,14 +833,14 @@ wheels = [
 
 [[package]]
 name = "django-unfold"
-version = "0.78.1"
+version = "0.79.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/47/ca/c1148935fd0753fb70ddad19b7b7180dd94eabd267024dd65611a2c4388f/django_unfold-0.78.1.tar.gz", hash = "sha256:1de8537f0037b48e84d72b30229259060140ac84fc30d79eb69b5c9de6c5e51d", size = 1109404, upload-time = "2026-02-03T10:11:08.838Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f7/29/4070c59b13ef2a22274780390e738d85b583bde3a276056a17689fa8cd18/django_unfold-0.79.0.tar.gz", hash = "sha256:16ef6a097130d54785b5dea03c40b3593bd31039fd13df44b6d9ac3a7897ba46", size = 1110455, upload-time = "2026-02-11T10:37:07.581Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/79/0b/4dd387462f0d7e705c477da8c761303591fccd66f0a6b5d6ba2ddc0f7855/django_unfold-0.78.1-py3-none-any.whl", hash = "sha256:6b557030d3ad6c8275ecacb69260b03a7ed3de972cb2e60ef2dea6d3363d515c", size = 1224742, upload-time = "2026-02-03T10:11:07.057Z" },
+    { url = "https://files.pythonhosted.org/packages/13/e3/022ed3fc8c0d37113871c5319d464ff0196061e4f7d95700a73dc8019095/django_unfold-0.79.0-py3-none-any.whl", hash = "sha256:e1642f43555a7aab7916b3c2d70fa22391b48110971438bc6fb6fc5081c12d97", size = 1225853, upload-time = "2026-02-11T10:37:08.868Z" },
 ]
 
 [[package]]
@@ -1003,7 +1003,7 @@ wheels = [
 
 [[package]]
 name = "grooveshop-django-api"
-version = "1.81.0"
+version = "1.82.0"
 source = { virtual = "." }
 dependencies = [
     { name = "asgiref" },
@@ -1114,7 +1114,7 @@ requires-dist = [
     { name = "django-storages", specifier = "==1.14.6" },
     { name = "django-stubs-ext", specifier = "==5.2.9" },
     { name = "django-tinymce", specifier = "==5.0.0" },
-    { name = "django-unfold", specifier = "==0.78.1" },
+    { name = "django-unfold", specifier = "==0.79.0" },
     { name = "djangorestframework", specifier = "==3.16.1" },
     { name = "djangorestframework-camel-case", specifier = "==1.4.2" },
     { name = "drf-spectacular", specifier = "==0.29.0" },

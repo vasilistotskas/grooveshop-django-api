@@ -28,7 +28,7 @@ dependencies = [
   "django-cors-headers==4.9.0",
   "django-simple-history==3.11.0",
   "django-filter==25.2",
-  "django-unfold==0.78.1",
+  "django-unfold==0.79.0",
   "django-money==3.6.0",
   "django-mptt==0.18.0",
   "django-parler==2.3.0",

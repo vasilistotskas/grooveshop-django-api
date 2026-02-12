@@ -3,6 +3,14 @@
 
 
 
+## v1.82.1 (2026-02-12)
+
+### Bug fixes
+
+* fix: test ([`32befe4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32befe4eac7789a81f7a1e9d4d6d72a747b9967c))
+
+* fix: upload_image ([`905fd5d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/905fd5dbe4b2202a3ee228c49c6bc2b91eb56d50))
+
 ## v1.82.0 (2026-02-11)
 
 ### Features

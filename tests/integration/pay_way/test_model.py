@@ -1,11 +1,11 @@
 from django.conf import settings
-from django.test import TestCase
+from django.test import TransactionTestCase
 from djmoney.money import Money
 
 from pay_way.models import PayWay
 
 
-class PayWayModelTestCase(TestCase):
+class PayWayModelTestCase(TransactionTestCase):
     def setUp(self):
         self.credit_card = PayWay.objects.create(
             active=True,

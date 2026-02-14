@@ -10,47 +10,151 @@
                 {% trans 'Home' as name %}
                 {% include 'unfold/helpers/breadcrumb_item.html' with link=link name=name %}
 
-                {% trans 'Clear Cache' as name %}
+                {% trans 'Cache Management' as name %}
                 {% include 'unfold/helpers/breadcrumb_item.html' with name=name %}
             </ul>
         </div>
     </div>
 {% endblock %}
 
+{% block title %}
+    {% trans "Cache Management" %}
+{% endblock %}
+
 {% block content %}
-    <h1 class="hidden">{% trans "Clear Cache" %}</h1>
-    {% component "unfold/components/container.html" %}
-        <div class="grid gap-2 mt-8 space-y-8">
-            <div class="bg-white shadow-lg rounded-lg p-6 dark:bg-base-800 dark:text-white">
-                {% component "unfold/components/title.html" with class="text-2xl font-bold mb-4" %}
-                    {% trans "Clear Cache by Class" %}
+    <div class="flex flex-col gap-6">
+        <div class="flex flex-col gap-2">
+            <h1 class="text-2xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                {% component "unfold/components/icon.html" with class="text-primary-600 dark:text-primary-400" %}
+                    database
                 {% endcomponent %}
-                <form method="post" class="grid gap-2 space-y-4">
-                    {% csrf_token %}
-                    <div class="grid gap-2">
-                        <label for="id_viewset_class" class="block text-sm font-medium text-base-700 dark:text-base-300">{% trans "Select ViewSet class to clear cache" %}:</label>
-                        <select name="viewset_class" id="id_viewset_class" class="w-full p-2 rounded-md border border-gray-300 dark:bg-base-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500">
-                            {% for value, label in form.viewset_class.field.choices %}
-                                <option value="{{ value }}">{{ label }}</option>
-                            {% endfor %}
-                        </select>
+                {% trans "Cache Management" %}
+            </h1>
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+                {% trans "Selectively clear cached data. Only application cache keys are affected — media, queue, and circuit breaker data remain untouched." %}
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col">
+                <div class="p-6 flex flex-col grow">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/30">
+                            {% component "unfold/components/icon.html" with class="text-blue-600 dark:text-blue-400" %}
+                                filter_alt
+                            {% endcomponent %}
+                        </div>
+                        <div>
+                            <h2 class="text-base font-semibold text-gray-900 dark:text-white">
+                                {% trans "Clear by ViewSet" %}
+                            </h2>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                {% trans "Remove cached responses for a specific API endpoint" %}
+                            </p>
+                        </div>
                     </div>
-                    {% component "unfold/components/button.html" with name="clear_cache_for_class" submit=1 class="w-full py-3 bg-blue-500 text-white rounded-md hover:bg-blue-600 dark:bg-blue-700 dark:hover:bg-blue-600" %}
-                        {% trans "Clear Cache" %}
-                    {% endcomponent %}
-                </form>
+
+                    <form method="post" class="flex flex-col grow mt-4">
+                        {% csrf_token %}
+                        <div class="grow">
+                            <label for="id_viewset_class" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                                {% trans "ViewSet class" %}
+                            </label>
+                            <select name="viewset_class" id="id_viewset_class"
+                                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900
+                                       shadow-sm transition
+                                       focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500
+                                       dark:border-gray-600 dark:bg-gray-800 dark:text-white
+                                       dark:focus:border-primary-400 dark:focus:ring-primary-400">
+                                {% for value, label in form.viewset_class.field.choices %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mt-4">
+                            {% component "unfold/components/button.html" with name="clear_cache_for_class" submit=1 variant="primary" class="w-full justify-center" %}
+                                {% component "unfold/components/icon.html" with class="mr-1" %}
+                                    delete_sweep
+                                {% endcomponent %}
+                                {% trans "Clear ViewSet Cache" %}
+                            {% endcomponent %}
+                        </div>
+                    </form>
+                </div>
             </div>
-            <div class="bg-white shadow-lg rounded-lg p-6 dark:bg-base-800 dark:text-white">
-                {% component "unfold/components/title.html" with class="text-2xl font-bold mb-4" %}
-                    {% trans "Clear Entire Site Cache" %}
-                {% endcomponent %}
-                <form method="post" class="grid gap-2 space-y-4">
-                    {% csrf_token %}
-                    {% component "unfold/components/button.html" with name="clear_site_cache" submit=1 class="w-full py-3 bg-red-500 text-white rounded-md hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-500" %}
-                        {% trans "Clear Entire Site Cache" %}
-                    {% endcomponent %}
-                </form>
+
+            <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col">
+                <div class="p-6 flex flex-col grow">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-red-50 dark:bg-red-900/30">
+                            {% component "unfold/components/icon.html" with class="text-red-600 dark:text-red-400" %}
+                                cleaning_services
+                            {% endcomponent %}
+                        </div>
+                        <div>
+                            <h2 class="text-base font-semibold text-gray-900 dark:text-white">
+                                {% trans "Clear All Application Cache" %}
+                            </h2>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                {% trans "Remove all Django & Nuxt SSR cached data" %}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="grow mt-4">
+                        <div class="rounded-md bg-amber-50 dark:bg-amber-900/20 p-3 border border-amber-200 dark:border-amber-800">
+                            <div class="flex gap-2">
+                                {% component "unfold/components/icon.html" with class="text-amber-500 dark:text-amber-400 flex-shrink-0 text-xl" %}
+                                    info
+                                {% endcomponent %}
+                                <div class="text-xs text-amber-800 dark:text-amber-200 leading-relaxed">
+                                    {% trans "Clears all Django view cache and Nuxt server-side render cache. Active user sessions, media processing, and background job queues are preserved." %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form method="post" class="mt-4">
+                        {% csrf_token %}
+                        {% component "unfold/components/button.html" with name="clear_site_cache" submit=1 class="w-full justify-center border-red-300 bg-red-600 border-transparent text-white dark:border-red-700 dark:bg-red-700 hover:bg-red-700 dark:hover:bg-red-600" %}
+                            {% component "unfold/components/icon.html" with class="mr-1" %}
+                                delete_forever
+                            {% endcomponent %}
+                            {% trans "Clear Django & Nuxt Cache" %}
+                        {% endcomponent %}
+                    </form>
+                </div>
             </div>
         </div>
-    {% endcomponent %}
+
+        <div class="bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-1.5">
+                {% component "unfold/components/icon.html" with class="text-base" %}
+                    shield
+                {% endcomponent %}
+                {% trans "Protected Key Prefixes" %}
+            </h3>
+            <div class="flex flex-wrap gap-2">
+                <span class="inline-flex items-center gap-1 rounded-md bg-green-50 dark:bg-green-900/20 px-2.5 py-1 text-xs font-medium text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800">
+                    {% component "unfold/components/icon.html" with class="text-sm" %}
+                        image
+                    {% endcomponent %}
+                    image:*
+                </span>
+                <span class="inline-flex items-center gap-1 rounded-md bg-green-50 dark:bg-green-900/20 px-2.5 py-1 text-xs font-medium text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800">
+                    {% component "unfold/components/icon.html" with class="text-sm" %}
+                        queue
+                    {% endcomponent %}
+                    bull:*
+                </span>
+                <span class="inline-flex items-center gap-1 rounded-md bg-green-50 dark:bg-green-900/20 px-2.5 py-1 text-xs font-medium text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800">
+                    {% component "unfold/components/icon.html" with class="text-sm" %}
+                        electric_bolt
+                    {% endcomponent %}
+                    circuit_breaker:*
+                </span>
+            </div>
+        </div>
+    </div>
 {% endblock %}

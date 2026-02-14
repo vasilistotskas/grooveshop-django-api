@@ -107,7 +107,7 @@ class TestClearAllCacheTask:
 
         mock_call_command.assert_called_once_with("clear_cache", verbosity=0)
         assert result["status"] == "success"
-        assert result["message"] == "All cache deleted"
+        assert result["message"] == "Cache cleared by prefix"
 
     @patch("core.tasks.management.call_command")
     def test_cache_cleanup_command_error(self, mock_call_command):

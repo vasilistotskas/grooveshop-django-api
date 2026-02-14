@@ -74,7 +74,7 @@ def clear_all_cache_task():
         logger.info("Starting cache cleanup")
         management.call_command("clear_cache", verbosity=0)
 
-        return {"status": "success", "message": "All cache deleted"}
+        return {"status": "success", "message": "Cache cleared by prefix"}
     except management.CommandError as e:
         logger.error(f"Django command error in clear_cache: {e}")
         return {

@@ -154,7 +154,9 @@ class TestMyAdminSite(TestCase):
         messages = FallbackStorage(request)
         setattr(request, "_messages", messages)
 
-        with patch.object(self.admin_site, "clear_site_cache") as mock_clear:
+        with patch.object(
+            self.admin_site, "clear_site_cache", return_value={"redis:1:": 5}
+        ) as mock_clear:
             response = self.admin_site.clear_cache_view(request)
 
             mock_clear.assert_called_once()
@@ -269,18 +271,23 @@ class TestMyAdminSite(TestCase):
         messages = FallbackStorage(request)
         setattr(request, "_messages", messages)
 
-        with patch.object(self.admin_site, "clear_site_cache") as mock_clear:
+        with patch.object(
+            self.admin_site, "clear_site_cache", return_value={"redis:1:": 5}
+        ) as mock_clear:
             response = self.admin_site.clear_site_cache_view(request)
 
             mock_clear.assert_called_once()
             self.assertEqual(response.status_code, 302)
             self.assertIn("clear-cache", response.url)
 
-    @patch("admin.admin.management")
-    def test_clear_site_cache_static_method(self, mock_management):
-        self.admin_site.clear_site_cache()
+    @patch("admin.admin.cache_instance")
+    def test_clear_site_cache_static_method(self, mock_cache):
+        mock_cache.clear_by_prefixes.return_value = {"redis:1:": 5}
 
-        mock_management.call_command.assert_called_once_with("clear_cache")
+        result = self.admin_site.clear_site_cache()
+
+        mock_cache.clear_by_prefixes.assert_called_once()
+        self.assertEqual(result, {"redis:1:": 5})
 
 
 class TestMyAdminSiteIntegration(TestCase):
@@ -337,16 +344,16 @@ class TestMyAdminSiteEdgeCases(TestCase):
         except Exception as e:
             self.assertEqual(str(e), "Cache connection error")
 
-    @patch("admin.admin.management")
-    def test_clear_site_cache_management_exception(self, mock_management):
-        mock_management.call_command.side_effect = Exception(
-            "Management command error"
+    @patch("admin.admin.cache_instance")
+    def test_clear_site_cache_exception(self, mock_cache):
+        mock_cache.clear_by_prefixes.side_effect = Exception(
+            "Cache connection error"
         )
 
         with self.assertRaises(Exception) as context:
             self.admin_site.clear_site_cache()
 
-        self.assertEqual(str(context.exception), "Management command error")
+        self.assertEqual(str(context.exception), "Cache connection error")
 
     def test_clear_cache_view_context_data(self):
         request = self.factory.get("/admin/clear-cache/")

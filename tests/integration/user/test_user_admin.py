@@ -592,7 +592,7 @@ class TestSubscriptionTopicAdmin:
         assert "\u2713" in result or "\U0001f465" in result
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 class TestUserSubscriptionAdmin:
     def test_user_subscription_admin_configuration(self):
         admin = UserSubscriptionAdmin(UserSubscription, AdminSite())

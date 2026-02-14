@@ -2,7 +2,6 @@ import logging
 
 from django import forms
 from django.contrib import messages
-from django.core import management
 from django.shortcuts import redirect, render
 from django.urls import path
 from django.utils.translation import gettext_lazy as _
@@ -50,8 +49,12 @@ class MyAdminSite(UnfoldAdminSite):
                 self.clear_cache_for_class(request, selected_class)
                 return redirect("admin:clear-cache")
         elif request.method == "POST" and "clear_site_cache" in request.POST:
-            self.clear_site_cache()
-            messages.success(request, _("Entire site cache cleared"))
+            results = self.clear_site_cache()
+            total = sum(results.values())
+            messages.success(
+                request,
+                _("Cleared %(total)s cache keys") % {"total": total},
+            )
             return redirect("admin:clear-cache")
         else:
             form = ClearCacheForm()
@@ -94,10 +97,15 @@ class MyAdminSite(UnfoldAdminSite):
             )
 
     def clear_site_cache_view(self, request):
-        self.clear_site_cache()
-        messages.success(request, _("Entire site cache cleared"))
+        results = self.clear_site_cache()
+        total = sum(results.values())
+        messages.success(
+            request,
+            _("Cleared %(total)s cache keys") % {"total": total},
+        )
         return redirect("admin:clear-cache")
 
     @staticmethod
-    def clear_site_cache():
-        management.call_command("clear_cache")
+    def clear_site_cache() -> dict[str, int]:
+        """Clear all safe cache keys (Django + Nuxt) without FLUSHDB."""
+        return cache_instance.clear_by_prefixes()

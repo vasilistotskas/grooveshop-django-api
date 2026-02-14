@@ -145,6 +145,60 @@ class CustomCacheTestCase(TestCase):
         deleted = self.cache_instance.delete_raw_keys([])
         self.assertEqual(deleted, 0)
 
+    def test_clear_by_prefixes(self):
+        """Only keys with matching prefixes are deleted; others survive."""
+        client = self.cache_instance._cache.get_client()
+        unique = uuid.uuid4().hex[:8]
+
+        # Set keys with different prefixes directly in Redis
+        client.set(f"safe:{unique}:key1", "val1")
+        client.set(f"safe:{unique}:key2", "val2")
+        client.set(f"keep:{unique}:key3", "val3")
+
+        try:
+            results = self.cache_instance.clear_by_prefixes([f"safe:{unique}:"])
+
+            self.assertEqual(results[f"safe:{unique}:"], 2)
+
+            # "keep:" prefix key should still exist
+            self.assertIsNotNone(client.get(f"keep:{unique}:key3"))
+        finally:
+            client.delete(f"keep:{unique}:key3")
+
+    def test_clear_by_prefixes_no_matching_keys(self):
+        """Returns 0 when no keys match the prefix."""
+        unique = uuid.uuid4().hex[:8]
+        results = self.cache_instance.clear_by_prefixes(
+            [f"nonexistent:{unique}:"]
+        )
+        self.assertEqual(results[f"nonexistent:{unique}:"], 0)
+
+    def test_clear_by_prefixes_empty_list(self):
+        """Returns empty dict when no prefixes are given."""
+        results = self.cache_instance.clear_by_prefixes([])
+        self.assertEqual(results, {})
+
+    def test_clear_by_prefixes_multiple(self):
+        """Multiple prefixes are cleared independently."""
+        client = self.cache_instance._cache.get_client()
+        unique = uuid.uuid4().hex[:8]
+
+        client.set(f"alpha:{unique}:1", "v")
+        client.set(f"alpha:{unique}:2", "v")
+        client.set(f"beta:{unique}:1", "v")
+        client.set(f"gamma:{unique}:1", "v")
+
+        try:
+            results = self.cache_instance.clear_by_prefixes(
+                [f"alpha:{unique}:", f"beta:{unique}:"]
+            )
+
+            self.assertEqual(results[f"alpha:{unique}:"], 2)
+            self.assertEqual(results[f"beta:{unique}:"], 1)
+            self.assertIsNotNone(client.get(f"gamma:{unique}:1"))
+        finally:
+            client.delete(f"gamma:{unique}:1")
+
     def tearDown(self):
         if hasattr(self, "key"):
             self.cache_instance.delete(self.key)

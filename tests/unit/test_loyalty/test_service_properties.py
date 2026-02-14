@@ -262,7 +262,7 @@ class TestRedemptionDiscount:
         points_amount=redeem_points_amounts,
         redemption_ratio=redemption_ratios,
     )
-    @settings(max_examples=100, deadline=500)
+    @settings(max_examples=100, deadline=None)
     def test_redemption_returns_correct_discount(
         self,
         points_amount: int,

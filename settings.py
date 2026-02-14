@@ -417,6 +417,11 @@ CACHES = {
     },
 }
 
+CACHE_CLEAR_PREFIXES: list[str] = [
+    f"{DEFAULT_CACHE_KEY_PREFIX}:{DEFAULT_CACHE_VERSION}:",  # Django: "redis:1:"
+    "cache:",  # Nuxt SSR cache
+]
+
 if SYSTEM_ENV == "ci":
     CACHES = {
         "default": {

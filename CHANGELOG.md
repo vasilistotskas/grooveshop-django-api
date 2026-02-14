@@ -3,6 +3,12 @@
 
 
 
+## v1.82.2 (2026-02-14)
+
+### Bug fixes
+
+* fix: cache ([`816b4da`](https://github.com/vasilistotskas/grooveshop-django-api/commit/816b4da55051f9f4a3d925f1792617d956a59863))
+
 ## v1.82.1 (2026-02-12)
 
 ### Bug fixes

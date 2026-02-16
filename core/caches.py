@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from os import getenv
+from typing import Any, Awaitable
 
 from django.conf import settings
 from django.core.cache.backends.redis import RedisCache, RedisCacheClient
@@ -56,7 +57,9 @@ class CustomCache(RedisCache):
             logger.warning("Error getting cache keys: %s", str(exc))
             return []
 
-    def delete_raw_keys(self, raw_keys: list[str]) -> int:
+    def delete_raw_keys(
+        self, raw_keys: list[str]
+    ) -> int | Awaitable[Any] | Any:
         """
         Delete keys directly in Redis without ``make_key`` transformation.
 

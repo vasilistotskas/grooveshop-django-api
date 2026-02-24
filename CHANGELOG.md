@@ -3,6 +3,54 @@
 
 
 
+## v1.82.3 (2026-02-24)
+
+### Bug fixes
+
+* fix: harden concurrency and access controls
+
+Add select_for_update() locking for stock reservations, order
+cancellation, loyalty redemption, and sortable model deletion.
+Use F() expression for atomic blog view count increment. Wrap
+cart merge in transaction.atomic. Prevent duplicate loyalty point
+expirations with Exists subquery.
+
+Restrict soft-delete filters, private metadata filter, and search
+analytics endpoint to staff/admin users. Move SecurityMiddleware
+to top of middleware stack. Close Redis connection in health check.
+
+Fix SortableModel.save() skipping super().save() when sort_order
+was already set. Fix Celery lock release in clear_duplicate_history
+to not release on retriable errors. Switch scheduled backup from
+blocking .apply() to .apply_async() with timeout. Enable Celery UTC.
+
+Move social avatar download to Celery task. Convert async product
+price signal to sync. Add retry config to notification task.
+Prefetch main product image to fix N+1 in for_list().
+
+Update deps: psycopg 3.3.3, uvicorn 0.41.0, ruff 0.15.2, and
+others. Refresh README and CLAUDE.md documentation.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com> ([`4a6547a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4a6547ac812f594e1b92107258afbc138b2ae837))
+
+### Chores
+
+* chore: CLAUDE.md ([`f5e9a90`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f5e9a90432ec76e955ec69e10fc19045d06b6391))
+
+### Testing
+
+* test: remove all 14 xfail markers and fix flaky tests
+
+- Replace set_current_language()+save() with update_or_create() in
+  SubscriptionTopicFactory to prevent parler translation PK collisions
+- Convert 3 unimplemented provider xfails (PayPal/FedEx/UPS) to skip
+- Remove unnecessary transaction=True from test_exception_types and
+  test_transaction_rollback (eliminates xdist flush conflicts)
+- Add threading.Barrier to 9 concurrent stock tests for reliable
+  thread synchronization, add missing connection.close() calls
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com> ([`f44c88f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f44c88f7e2881c5cedcd7f183edd7151b522d42b))
+
 ## v1.82.2 (2026-02-14)
 
 ### Bug fixes

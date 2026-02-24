@@ -325,33 +325,31 @@ class TestStockManagerReserveStock:
         assert reservation.quantity == 10
 
     @pytest.mark.django_db(transaction=True)
-    @pytest.mark.xfail(
-        reason="Concurrent reservation test is inherently flaky due to race conditions "
-        "in parallel test execution. The SELECT FOR UPDATE locking may not prevent "
-        "all race conditions when multiple threads query StockReservation simultaneously.",
-        strict=False,
-    )
     def test_reserve_stock_concurrent_reservations(self):
         """
         Test that concurrent reservation attempts prevent overselling.
 
         This test verifies that SELECT FOR UPDATE locking prevents race conditions
         when multiple threads attempt to reserve stock simultaneously.
-
-        Note: This test is marked as xfail because concurrent behavior is difficult
-        to test reliably in a parallel test environment. The test may pass or fail
-        depending on timing and database transaction isolation levels.
         """
         import threading
         import uuid
+
+        from django.db import connection
 
         product = ProductFactory(stock=100)
         test_id = uuid.uuid4().hex[:8]
         results = []
         errors = []
+        num_threads = 5
+        barrier = threading.Barrier(num_threads)
 
         def attempt_reservation(quantity, session_id):
             """Attempt to reserve stock in a separate thread."""
+            connection.close()
+
+            barrier.wait()
+
             try:
                 reservation = StockManager.reserve_stock(
                     product_id=product.id,
@@ -367,7 +365,7 @@ class TestStockManagerReserveStock:
 
         # Create 5 threads trying to reserve 30 units each (total 150 > 100 available)
         threads = []
-        for i in range(5):
+        for i in range(num_threads):
             thread = threading.Thread(
                 target=attempt_reservation,
                 args=(30, f"concurrent-{test_id}-{i}"),

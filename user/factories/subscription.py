@@ -2,6 +2,7 @@ import factory
 from factory import fuzzy
 from faker import Faker
 from django.conf import settings
+from django.db import IntegrityError
 
 from user.models.subscription import SubscriptionTopic, UserSubscription
 
@@ -37,12 +38,24 @@ class SubscriptionTopicFactory(factory.django.DjangoModelFactory):
         name_text = fake.catch_phrase()
         description_text = fake.text(max_nb_chars=200)
 
+        translation_model = obj._parler_meta.root_model
         for lang_code in available_languages:
-            obj.set_current_language(lang_code)
-            obj.name = name_text
-            obj.description = description_text
-
-        obj.save()
+            try:
+                translation_model.objects.update_or_create(
+                    master=obj,
+                    language_code=lang_code,
+                    defaults={
+                        "name": name_text,
+                        "description": description_text,
+                    },
+                )
+            except IntegrityError:
+                translation_model.objects.filter(
+                    master=obj, language_code=lang_code
+                ).update(
+                    name=name_text,
+                    description=description_text,
+                )
 
 
 class UserSubscriptionFactory(factory.django.DjangoModelFactory):

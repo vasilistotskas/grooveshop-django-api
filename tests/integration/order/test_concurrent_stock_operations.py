@@ -17,18 +17,8 @@ class TestConcurrentStockOperationsPreventOverselling:
     multiple threads attempt to reserve or decrement stock simultaneously.
     The SELECT FOR UPDATE locking mechanism should serialize these operations
     and ensure that stock never goes negative.
-
-    Note: These tests are marked as xfail because concurrent behavior is inherently
-    difficult to test reliably in a parallel test environment. The tests may pass
-    or fail depending on timing, database transaction isolation levels, and
-    parallel test execution.
     """
 
-    @pytest.mark.xfail(
-        reason="Concurrent stock decrement test is inherently flaky due to race conditions "
-        "in parallel test execution.",
-        strict=False,
-    )
     def test_concurrent_decrement_prevents_overselling(self):
         """
         Test that concurrent stock decrement operations prevent overselling.
@@ -61,6 +51,9 @@ class TestConcurrentStockOperationsPreventOverselling:
         results = []
         errors = []
         lock = threading.Lock()  # Protect shared lists
+        num_threads = 5
+        quantity_per_thread = 3
+        barrier = threading.Barrier(num_threads)
 
         def attempt_order(thread_id, quantity):
             """
@@ -75,6 +68,8 @@ class TestConcurrentStockOperationsPreventOverselling:
             """
             # Each thread needs its own database connection
             connection.close()
+
+            barrier.wait()
 
             try:
                 # Attempt to decrement stock
@@ -107,8 +102,6 @@ class TestConcurrentStockOperationsPreventOverselling:
         # Available: 10 units
         # Expected: At least 2 threads should fail (since 15 > 10)
         threads = []
-        num_threads = 5
-        quantity_per_thread = 3
 
         for i in range(num_threads):
             thread = threading.Thread(
@@ -181,18 +174,14 @@ class TestConcurrentStockOperationsPreventOverselling:
 
         # Assertion 8: Verify StockLog entries were created for successful operations
         stock_logs = StockLog.objects.filter(
-            product=product, operation_type=StockLog.OPERATION_DECREMENT
+            product=product,
+            operation_type=StockLog.OPERATION_DECREMENT,
         )
         assert stock_logs.count() == len(results), (
             f"StockLog count mismatch. Expected {len(results)} logs, "
             f"got {stock_logs.count()}"
         )
 
-    @pytest.mark.xfail(
-        reason="Concurrent stock reservation test is inherently flaky due to race conditions "
-        "in parallel test execution.",
-        strict=False,
-    )
     def test_concurrent_reservations_prevent_overselling(self):
         """
         Test that concurrent stock reservation operations prevent overselling.
@@ -215,6 +204,9 @@ class TestConcurrentStockOperationsPreventOverselling:
         results = []
         errors = []
         lock = threading.Lock()  # Protect shared lists
+        num_threads = 5
+        quantity_per_thread = 3
+        barrier = threading.Barrier(num_threads)
 
         def attempt_reservation(thread_id, quantity):
             """
@@ -226,6 +218,8 @@ class TestConcurrentStockOperationsPreventOverselling:
             """
             # Each thread needs its own database connection
             connection.close()
+
+            barrier.wait()
 
             try:
                 # Attempt to reserve stock
@@ -256,12 +250,11 @@ class TestConcurrentStockOperationsPreventOverselling:
 
         # Create 5 threads, each attempting to reserve 3 units
         threads = []
-        num_threads = 5
-        quantity_per_thread = 3
 
         for i in range(num_threads):
             thread = threading.Thread(
-                target=attempt_reservation, args=(i, quantity_per_thread)
+                target=attempt_reservation,
+                args=(i, quantity_per_thread),
             )
             threads.append(thread)
 
@@ -312,7 +305,9 @@ class TestConcurrentStockOperationsPreventOverselling:
 
         # Assertion 6: Verify active reservations match successful attempts
         active_reservations = StockReservation.objects.filter(
-            product=product, consumed=False, expires_at__gt=timezone.now()
+            product=product,
+            consumed=False,
+            expires_at__gt=timezone.now(),
         )
         assert active_reservations.count() == len(results), (
             f"Active reservation count mismatch. Expected {len(results)}, "
@@ -334,11 +329,6 @@ class TestConcurrentStockOperationsPreventOverselling:
             f"got {available}"
         )
 
-    @pytest.mark.xfail(
-        reason="Concurrent operations test with various scenarios is inherently flaky "
-        "due to race conditions in parallel test execution.",
-        strict=False,
-    )
     @pytest.mark.parametrize(
         "stock,num_threads,quantity_per_thread",
         [
@@ -382,11 +372,14 @@ class TestConcurrentStockOperationsPreventOverselling:
         results = []
         errors = []
         lock = threading.Lock()
+        barrier = threading.Barrier(num_threads)
 
         def attempt_operation(thread_id, quantity):
             """Attempt stock decrement in a thread."""
             # Each thread needs its own database connection
             connection.close()
+
+            barrier.wait()
 
             try:
                 StockManager.decrement_stock(
@@ -410,7 +403,8 @@ class TestConcurrentStockOperationsPreventOverselling:
         threads = []
         for i in range(num_threads):
             thread = threading.Thread(
-                target=attempt_operation, args=(i, quantity_per_thread)
+                target=attempt_operation,
+                args=(i, quantity_per_thread),
             )
             threads.append(thread)
 
@@ -463,11 +457,6 @@ class TestConcurrentStockOperationsPreventOverselling:
         ]
         assert len(unexpected) == 0, f"Unexpected errors: {unexpected}"
 
-    @pytest.mark.xfail(
-        reason="Concurrent mixed operations test is inherently flaky due to race conditions "
-        "in parallel test execution.",
-        strict=False,
-    )
     def test_mixed_concurrent_operations(self):
         """
         Test concurrent mix of reservations and decrements.
@@ -495,11 +484,15 @@ class TestConcurrentStockOperationsPreventOverselling:
         decrement_results = []
         errors = []
         lock = threading.Lock()
+        num_threads = 4
+        barrier = threading.Barrier(num_threads)
 
         def attempt_reservation(thread_id):
             """Attempt to reserve 3 units."""
             # Each thread needs its own database connection
             connection.close()
+
+            barrier.wait()
 
             try:
                 reservation = StockManager.reserve_stock(
@@ -523,6 +516,8 @@ class TestConcurrentStockOperationsPreventOverselling:
             """Attempt to decrement 4 units."""
             # Each thread needs its own database connection
             connection.close()
+
+            barrier.wait()
 
             try:
                 StockManager.decrement_stock(

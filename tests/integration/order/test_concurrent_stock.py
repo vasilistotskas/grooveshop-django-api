@@ -19,18 +19,8 @@ class TestConcurrentStockOperationsPreventOverselling:
     database-level locking (SELECT FOR UPDATE). Multiple threads attempting
     to purchase the same product should result in at least one failure when
     total requested quantity exceeds available stock.
-
-    Note: These tests are marked as xfail because concurrent behavior is inherently
-    difficult to test reliably in a parallel test environment. The SELECT FOR UPDATE
-    locking may not prevent all race conditions when multiple threads query
-    StockReservation simultaneously before any creates their reservation.
     """
 
-    @pytest.mark.xfail(
-        reason="Concurrent stock reservation test is inherently flaky due to race conditions "
-        "in parallel test execution. SELECT FOR UPDATE on Product doesn't lock StockReservation queries.",
-        strict=False,
-    )
     def test_concurrent_reserve_stock_prevents_overselling(self):
         """
         Test: 5 threads trying to reserve 3 units each from product with stock=10.
@@ -48,6 +38,9 @@ class TestConcurrentStockOperationsPreventOverselling:
         # Track results from each thread
         results = []
         lock = threading.Lock()
+        num_threads = 5
+        quantity_per_thread = 3
+        barrier = threading.Barrier(num_threads)
 
         def reserve_stock_thread(thread_id: int, quantity: int):
             """
@@ -57,9 +50,9 @@ class TestConcurrentStockOperationsPreventOverselling:
             Uses a lock to safely append results from multiple threads.
             """
             # Each thread needs its own database connection
-            # Django's connection is thread-local, so we need to close it
-            # to force a new connection in each thread
             connection.close()
+
+            barrier.wait()
 
             try:
                 # Attempt to reserve stock
@@ -104,12 +97,11 @@ class TestConcurrentStockOperationsPreventOverselling:
 
         # Create 5 threads, each trying to reserve 3 units
         threads = []
-        num_threads = 5
-        quantity_per_thread = 3
 
         for i in range(num_threads):
             thread = threading.Thread(
-                target=reserve_stock_thread, args=(i, quantity_per_thread)
+                target=reserve_stock_thread,
+                args=(i, quantity_per_thread),
             )
             threads.append(thread)
 
@@ -162,11 +154,6 @@ class TestConcurrentStockOperationsPreventOverselling:
             f"Available stock should be {expected_available}, got {available}"
         )
 
-    @pytest.mark.xfail(
-        reason="Concurrent stock decrement test is inherently flaky due to race conditions "
-        "in parallel test execution.",
-        strict=False,
-    )
     def test_concurrent_decrement_stock_prevents_overselling(self):
         """
         threads trying to decrement 3 units each from product with stock=10.
@@ -184,6 +171,9 @@ class TestConcurrentStockOperationsPreventOverselling:
         # Track results from each thread
         results = []
         lock = threading.Lock()
+        num_threads = 5
+        quantity_per_thread = 3
+        barrier = threading.Barrier(num_threads)
 
         def decrement_stock_thread(thread_id: int, quantity: int):
             """
@@ -193,6 +183,8 @@ class TestConcurrentStockOperationsPreventOverselling:
             """
             # Each thread needs its own database connection
             connection.close()
+
+            barrier.wait()
 
             try:
                 # Attempt to decrement stock
@@ -236,12 +228,11 @@ class TestConcurrentStockOperationsPreventOverselling:
 
         # Create 5 threads, each trying to decrement 3 units
         threads = []
-        num_threads = 5
-        quantity_per_thread = 3
 
         for i in range(num_threads):
             thread = threading.Thread(
-                target=decrement_stock_thread, args=(i, quantity_per_thread)
+                target=decrement_stock_thread,
+                args=(i, quantity_per_thread),
             )
             threads.append(thread)
 
@@ -287,11 +278,6 @@ class TestConcurrentStockOperationsPreventOverselling:
             f"Final stock should be {expected_final_stock}, got {product.stock}"
         )
 
-    @pytest.mark.xfail(
-        reason="Concurrent order creation test is inherently flaky due to race conditions "
-        "in parallel test execution.",
-        strict=False,
-    )
     def test_concurrent_order_creation_prevents_overselling(self):
         """
         Test: Multiple threads creating orders simultaneously from same product.
@@ -315,6 +301,9 @@ class TestConcurrentStockOperationsPreventOverselling:
         # Track results from each thread
         results = []
         lock = threading.Lock()
+        num_threads = 5
+        quantity_per_thread = 3
+        barrier = threading.Barrier(num_threads)
 
         def create_order_thread(thread_id: int, quantity: int):
             """
@@ -325,6 +314,8 @@ class TestConcurrentStockOperationsPreventOverselling:
             # Each thread needs its own database connection
             connection.close()
 
+            barrier.wait()
+
             try:
                 # Create user for this thread
                 user = UserAccountFactory(email=f"user{thread_id}@test.com")
@@ -334,8 +325,6 @@ class TestConcurrentStockOperationsPreventOverselling:
                 CartItemFactory(cart=cart, product=product, quantity=quantity)
 
                 # Attempt to create order
-                # Note: In real flow, payment_intent_id would be provided
-                # For this test, we're testing the stock management aspect
                 order = OrderService.create_order_from_cart(
                     cart=cart,
                     shipping_address={
@@ -388,12 +377,11 @@ class TestConcurrentStockOperationsPreventOverselling:
 
         # Create 5 threads, each trying to order 3 units
         threads = []
-        num_threads = 5
-        quantity_per_thread = 3
 
         for i in range(num_threads):
             thread = threading.Thread(
-                target=create_order_thread, args=(i, quantity_per_thread)
+                target=create_order_thread,
+                args=(i, quantity_per_thread),
             )
             threads.append(thread)
 
@@ -439,11 +427,6 @@ class TestConcurrentStockOperationsPreventOverselling:
             f"Final stock should be {expected_final_stock}, got {product.stock}"
         )
 
-    @pytest.mark.xfail(
-        reason="High concurrency stress test is inherently flaky due to race conditions "
-        "in parallel test execution.",
-        strict=False,
-    )
     def test_high_concurrency_stress_test(self):
         """
         Test: High concurrency stress test with many threads.
@@ -463,10 +446,16 @@ class TestConcurrentStockOperationsPreventOverselling:
         # Track results from each thread
         results = []
         lock = threading.Lock()
+        num_threads = 20
+        quantity_per_thread = 4
+        barrier = threading.Barrier(num_threads)
 
         def reserve_thread(thread_id: int, quantity: int):
             """Thread that attempts to reserve stock."""
             connection.close()
+
+            barrier.wait()
+
             try:
                 StockManager.reserve_stock(
                     product_id=product.id,
@@ -506,12 +495,11 @@ class TestConcurrentStockOperationsPreventOverselling:
         # Available: 50 units
         # Expected: ~12-13 successes, ~7-8 failures
         threads = []
-        num_threads = 20
-        quantity_per_thread = 4
 
         for i in range(num_threads):
             thread = threading.Thread(
-                target=reserve_thread, args=(i, quantity_per_thread)
+                target=reserve_thread,
+                args=(i, quantity_per_thread),
             )
             threads.append(thread)
 

@@ -1171,6 +1171,10 @@ class OrderService:
         refund_payment: bool = True,
         canceled_by: int | None = None,
     ) -> tuple[Order, dict[str, Any] | None]:
+        # Lock the order row to prevent concurrent cancellation requests
+        # from both restoring stock
+        order = Order.objects.select_for_update().get(id=order.id)
+
         if not order.can_be_canceled:
             error_message = _(
                 "Order in status {status} cannot be canceled. "

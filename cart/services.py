@@ -3,6 +3,8 @@ from __future__ import annotations
 from enum import Enum, unique
 from typing import TYPE_CHECKING
 
+from django.db import transaction
+
 from cart.models import Cart, CartItem
 
 if TYPE_CHECKING:
@@ -135,6 +137,7 @@ class CartService:
 
             return Cart.objects.create(user=None)
 
+    @transaction.atomic
     def merge_carts(self, source_cart: Cart, target_cart: Cart = None):
         if not target_cart:
             target_cart = self.cart

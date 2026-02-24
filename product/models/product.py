@@ -311,9 +311,15 @@ class Product(
 
     @property
     def main_image_path(self) -> str:
-        product_image = ProductImage.objects.filter(
-            product_id=self.id, is_main=True
-        ).first()
+        # Use prefetched main images if available (from for_list() queryset)
+        # to avoid an N+1 query per product
+        prefetched = getattr(self, "_prefetched_main_images", None)
+        if prefetched is not None:
+            product_image = prefetched[0] if prefetched else None
+        else:
+            product_image = ProductImage.objects.filter(
+                product_id=self.id, is_main=True
+            ).first()
         if not product_image:
             return ""
         return f"media/uploads/products/{os.path.basename(product_image.image.name)}"

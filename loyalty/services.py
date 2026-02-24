@@ -247,6 +247,13 @@ class LoyaltyService:
                 % {"currency": currency}
             )
 
+        # Lock the user row to prevent concurrent redemption requests
+        # from both passing the balance check
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        User.objects.select_for_update().get(pk=user.pk)
+
         balance = cls.get_user_balance(user)
         if points_amount > balance:
             raise ValidationError(

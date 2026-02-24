@@ -114,7 +114,8 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 
 - All API endpoints are under `api/v1/` with DRF ViewSets
 - Request/response bodies use **camelCase** (auto-converted from snake_case via `djangorestframework-camel-case`)
-- Authentication: Knox token auth (`Bearer` prefix) + Django session auth
+- Authentication: Knox token auth (`Bearer` prefix, 20-day TTL) + Django Allauth (account management, social providers: Google/Facebook/GitHub/Discord, MFA/WebAuthn/Passkeys) + Django session auth
+- Payments: Stripe via dj-stripe
 - Default pagination: 12 items per page, max 100
 - OpenAPI docs at `/api/v1/schema/swagger-ui` and `/api/v1/schema/redoc`
 - Health check at `/api/v1/health` (checks DB, Redis, Celery)

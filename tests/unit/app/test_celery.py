@@ -20,7 +20,7 @@ class CeleryConfigTestCase(TestCase):
         app = celery.create_celery_app()
 
         self.assertTrue(mock_celery.called)
-        self.assertEqual(app.conf.enable_utc, False)
+        self.assertEqual(app.conf.enable_utc, True)
         self.assertEqual(app.conf.timezone, mock_celery_instance.conf.timezone)
         self.assertTrue(app.autodiscover_tasks.called)
 

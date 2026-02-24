@@ -127,6 +127,8 @@ def clear_duplicate_history_task(excluded_fields=None, minutes=None):
             management.call_command(*command_args)
 
         logger.info("Successfully cleaned duplicate history entries")
+        # Release lock on success
+        cache.delete(lock_id)
         return {
             "status": "success",
             "message": "Duplicate history entries cleaned",
@@ -138,17 +140,19 @@ def clear_duplicate_history_task(excluded_fields=None, minutes=None):
 
     except management.CommandError as e:
         logger.error(f"Django command error in clear_duplicate_history: {e}")
+        # Release lock on permanent failure (won't be retried)
+        cache.delete(lock_id)
         return {
             "status": "error",
             "message": str(e),
             "error_type": "CommandError",
         }
     except Exception:
+        # Don't release lock here — autoretry will re-raise and the
+        # lock timeout (5 min) ensures it's eventually released if
+        # all retries fail
         logger.exception("Unexpected error in clear_duplicate_history")
         raise
-    finally:
-        # Release lock
-        cache.delete(lock_id)
 
 
 @celery_app.task(
@@ -710,7 +714,9 @@ def scheduled_database_backup():
 
         logger.info("Starting scheduled database backup")
 
-        result = backup_database_task.apply(
+        # Call backup_database_task asynchronously instead of blocking
+        # the current worker with .apply()
+        async_result = backup_database_task.apply_async(
             kwargs={
                 "output_dir": "backups/scheduled",
                 "filename": filename,
@@ -719,12 +725,15 @@ def scheduled_database_backup():
             }
         )
 
-        if result.result.get("status") == "success":
+        # Wait for the result with a timeout to avoid blocking forever
+        result = async_result.get(timeout=300)
+
+        if result.get("status") == "success":
             safe_logging_extra = {
-                "backup_status": result.result.get("status"),
-                "backup_duration": result.result.get("duration"),
-                "backup_file_size": result.result.get("file_size"),
-                "backup_timestamp": result.result.get("timestamp"),
+                "backup_status": result.get("status"),
+                "backup_duration": result.get("duration"),
+                "backup_file_size": result.get("file_size"),
+                "backup_timestamp": result.get("timestamp"),
             }
 
             logger.info(
@@ -733,7 +742,7 @@ def scheduled_database_backup():
             )
 
             # Extract the actual backup directory from the result
-            backup_file = result.result.get("backup_file")
+            backup_file = result.get("backup_file")
             if backup_file:
                 logger.info(f"Backup file: {backup_file}")
                 actual_backup_dir = str(Path(backup_file).parent)
@@ -744,10 +753,10 @@ def scheduled_database_backup():
                     days=7, backup_dir="backups/scheduled"
                 )
 
-            return result.result
+            return result
         else:
             raise Exception(
-                f"Backup failed: {result.result.get('result_message', 'Unknown error')}"
+                f"Backup failed: {result.get('result_message', 'Unknown error')}"
             )
 
     except Exception as e:

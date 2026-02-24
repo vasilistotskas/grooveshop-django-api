@@ -254,8 +254,12 @@ class BlogPostViewSet(BaseModelViewSet):
     @action(detail=True, methods=["POST"])
     def update_view_count(self, request, pk=None):
         post = self.get_object()
-        post.view_count += 1
-        post.save(update_fields=["view_count"])
+        # Use F() expression for atomic increment to prevent lost updates
+        # when multiple requests increment concurrently
+        BlogPost.objects.filter(pk=post.pk).update(
+            view_count=F("view_count") + 1
+        )
+        post.refresh_from_db()
 
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(

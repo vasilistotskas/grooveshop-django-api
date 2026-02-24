@@ -4,68 +4,76 @@
 
 ## Overview
 
-This project delivers a robust headless API using Django and Django REST Framework,
-with support for both synchronous and asynchronous environments facilitated by Uvicorn (ASGI)
-and Gunicorn (WSGI) respectively. It leverages Django Allauth for authentication,
-utilizes Celery with Redis for task management, and employs Postgres for data storage.
-Features include caching, multi-language support, and comprehensive test coverage.
-The API also includes a built-in Django admin panel for efficient administrative operations.
+A headless e-commerce API built with Django 5.2 and Django REST Framework. Supports both
+WSGI (Gunicorn) and ASGI (Daphne/Uvicorn) with real-time WebSocket notifications via
+Django Channels. Uses Knox + Django Allauth for authentication (token API + social/MFA),
+Celery with RabbitMQ broker for background tasks, PostgreSQL 17 for data storage, Redis
+for caching and Channels layer, and Meilisearch for federated search. Features include
+multi-language support (Greek, English, German), Stripe payments via dj-stripe,
+comprehensive test coverage, and a Django Unfold admin panel.
 
 ## Project Structure
 
-The Django applications within this project include:
+All Django apps live at the project root (flat structure, no `src/` directory):
 
-- **Core**: Core functionalities and shared utilities.
-- **User**: User management and authentication.
-- **Product**: Product catalog management.
-- **Order**: Order processing and management.
-- **Search**: Advanced search capabilities.
-- **Slider**: Dynamic UI sliders for promotions and highlights.
-- **Blog**: Content management for blog posts.
-- **SEO**: SEO tools and configurations.
-- **Tip**: User tips and advice sections.
-- **VAT**: VAT calculation and management.
-- **Country**: Country-specific configurations.
-- **Region**: Regional data and settings.
-- **Pay Way**: Payment method configurations.
-- **Session**: User session management.
-- **Cart**: Shopping cart functionalities.
-- **Notification**: User notification mechanisms.
-- **Authentication**: Additional authentication layers.
-- **Contact**: Contact management and communication tools.
+- **core/** — Shared infrastructure: base views, serializers, permissions, middleware, filters, caching, Celery config, URL routing
+- **user/** — User accounts, authentication, and profile management
+- **product/** — Product catalog, categories, reviews, favourites, images, and stock management
+- **order/** — Order processing and management
+- **cart/** — Shopping cart functionalities
+- **blog/** — Blog posts, categories, comments, authors, and tags
+- **search/** — Meilisearch integration with federated search, Greeklish expansion, and analytics
+- **meili/** — Meilisearch model definitions and indexing via `IndexMixin` with `MeiliMeta` config
+- **notification/** — Real-time notifications via WebSocket (Django Channels)
+- **loyalty/** — Points, XP, tiers, and rewards system
+- **country/** — Country-specific configurations
+- **region/** — Regional data and settings
+- **vat/** — VAT calculation and management
+- **pay_way/** — Payment method configurations
+- **tag/** — Tagging system for products and blog posts
+- **contact/** — Contact form and communication
+- **admin/** — Custom admin app with Django Unfold dashboard
+- **devtools/** — `CustomDjangoModelFactory` base class for all test factories
 
 ## Features
 
-- **Authentication and User Management**: Streamlined user account and session management.
-- **Multi-Language Support**: Accommodates various languages enhancing global usability.
-- **Advanced Search and Filtering**: Meilisearch-powered federated search with Greeklish support, instant search, and analytics tracking.
-- **Task Scheduling**: Utilizes Celery for background task management.
-- **Performance Optimization**: Implements caching strategies to improve API responsiveness.
-- **Testing**: Includes comprehensive unit and integration tests.
-- **Admin Panel**: Django's built-in admin panel for straightforward management.
-- **API Documentation**: Well-documented API using Swagger and Redoc.
-- **Containerization**: Docker integration for simplified setup and deployment.
+- **Authentication and User Management**: Knox token auth for API, Django Allauth for account management with social providers (Google, Facebook, GitHub, Discord), MFA/WebAuthn/Passkeys support
+- **Multi-Language Support**: django-parler translations for Greek (default), English, and German
+- **Advanced Search and Filtering**: Meilisearch-powered federated search with Greeklish support, instant search, and analytics tracking
+- **Payments**: Stripe integration via dj-stripe
+- **Loyalty System**: Points, XP, tiers, and rewards
+- **Task Scheduling**: Celery with RabbitMQ for background task management (stock cleanup, cart expiry, notifications, Meilisearch sync)
+- **Real-time Notifications**: WebSocket via Django Channels with per-user and admin groups
+- **Performance Optimization**: Redis caching, optimized querysets with `for_list()`/`for_detail()` patterns
+- **Testing**: Comprehensive unit and integration tests with pytest-xdist parallel execution
+- **Admin Panel**: Django Unfold admin panel with custom dashboard
+- **API Documentation**: OpenAPI 3.0 via drf-spectacular (Swagger UI and Redoc)
+- **Containerization**: Docker Compose for full-stack deployment
 
 ## Technologies
 
-- **Frameworks**: Django, Django REST Framework
-- **Authentication**: Django Allauth
-- **Database**: PostgreSQL
+- **Frameworks**: Django 5.2, Django REST Framework 3.16
+- **Authentication**: Django REST Knox (API tokens), Django Allauth (accounts, social, MFA)
+- **Database**: PostgreSQL 17
+- **Cache / Channels**: Redis
 - **Task Management**: Celery
-- **Message Broker**: Redis
-- **Server Setup**: Uvicorn (ASGI), Gunicorn (WSGI)
+- **Message Broker**: RabbitMQ
+- **Search**: Meilisearch v1.22.3
+- **Payments**: Stripe (dj-stripe)
+- **Server**: Uvicorn (ASGI), Gunicorn (WSGI), Daphne (Channels)
 - **Containerization**: Docker
-- **Package & Project Management**: UV
+- **Package Management**: uv
 
 ## Setup
 
 ### Prerequisites
 
-- Python 3.13 or higher
-- Django 5.0 or higher
-- PostgreSQL
+- Python 3.14 or higher
+- Django 5.2 or higher
+- PostgreSQL 17
 - Redis
-- Meilisearch 1.5 or higher
+- RabbitMQ
+- Meilisearch v1.22.3 or higher
 
 ### Meilisearch Setup
 
@@ -78,14 +86,14 @@ docker run -d \
   -p 7700:7700 \
   -e MEILI_MASTER_KEY=YOUR_MASTER_KEY \
   -v $(pwd)/meili_data:/meili_data \
-  getmeili/meilisearch:v1.5
+  getmeili/meilisearch:v1.22.3
 ```
 
 **Using Docker Compose:**
 ```yaml
 services:
   meilisearch:
-    image: getmeili/meilisearch:v1.5
+    image: getmeili/meilisearch:v1.22.3
     ports:
       - "7700:7700"
     environment:
@@ -175,161 +183,80 @@ uv run python manage.py spectacular --color --file schema.yml
 # See grooveshop-storefront-ui-node-nuxt/README.md for frontend setup
 ```
 
-## License
+## Common Commands
 
-This project is open-sourced under the MIT License. See the [LICENSE](LICENSE.md) file for more details.
+```bash
+# Install dependencies (uses uv, not pip)
+uv sync --locked --all-extras --dev
 
-# Docker Commands for Django Projects
+# Run all tests (parallel by default)
+uv run pytest
 
-## Using Docker Compose
+# Run a single test file
+uv run pytest tests/unit/path/to/test_file.py
 
-### Database Operations
-- **Run DB Migrations**:
-  `docker compose run backend sh -c "python manage.py makemigrations --noinput"`
-- **Apply Migrations**:
-  `docker compose run backend sh -c "python manage.py migrate"`
+# Run tests with coverage (sequential)
+uv run pytest --cov=. --cov-report=term --cov-report=html --cov-config=pyproject.toml -n0
 
-### User Management
-- **Create Superuser**:
-  `docker compose run backend sh -c "python manage.py createsuperuser"`
+# Lint and format
+uv run ruff check --fix
+uv run ruff format
 
-### Static Files
-- **Collect Static Files**:
-  `docker compose run backend sh -c "python manage.py collectstatic --noinput"`
+# Run all pre-commit hooks
+uv run pre-commit run --all-files
 
-### Testing and Coverage
-- **Run Tests**:
-  `docker compose run backend sh -c "python manage.py test tests/"`
-- **Run Tests with Coverage** (excluding specific files and folders):
-  `docker compose run backend sh -c "coverage run --omit=*/migrations/*,*/management/*,*/manage.py,*/setup.py,*/asgi.py,*/wsgi.py --source='.' manage.py test tests/ && coverage report && coverage html"`
-- **Generate Coverage HTML Reports**:
-  `docker compose run backend sh -c "coverage html"`
+# Django management
+uv run python manage.py makemigrations
+uv run python manage.py migrate
+uv run python manage.py runserver
+uv run python manage.py createsuperuser
+uv run python manage.py seed_all
 
-### Data Seeding
-- **Seed Database with Fake Data**:
-  `docker compose run backend sh -c "python manage.py seed_all"`
+# Generate OpenAPI schema (used by Nuxt frontend for types)
+uv run python manage.py spectacular --color --file schema.yml
 
-### Custom Docker Compose Files
-- **Run with Specific Compose File**:
-  `docker compose -f <docker-compose-file.yml> up -d --build`
+# Meilisearch index management
+uv run python manage.py meilisearch_sync_all_indexes
+uv run python manage.py meilisearch_sync_index --model ProductTranslation
 
-## Using Docker Exec
+# Celery (local development)
+celery -A core beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+celery -A core worker -E -l info --pool=solo
+celery -A core flower --broker=amqp://guest:guest@localhost:5672// --broker_api=http://guest:guest@localhost:15672/api// --port=5555
 
-### General Commands
-- **Execute Command in Container**:
-  `docker exec -it <container_id> <command>`
-- **Run Specific Shell Command**:
-  `docker exec -it <container_id> sh -c "<command>"`
+# Docker (full stack)
+docker compose up -d --build
+```
 
-### Localization
-- **Generate Locale Messages**:
-  `docker exec -it <container_id> sh -c "uv run django-admin makemessages -a`
-- **Compile Locale Messages**:
-  `docker exec -it <container_id> sh -c "uv run django-admin compilemessages"`
+## Meilisearch Management
 
-# Additional Configuration for Development Tools
+### Index Management
+```bash
+uv run python manage.py meilisearch_sync_all_indexes
+uv run python manage.py meilisearch_sync_index --model ProductTranslation
+uv run python manage.py meilisearch_clear_index --index ProductTranslation
+uv run python manage.py meilisearch_drop --index ProductTranslation
+uv run python manage.py meilisearch_inspect_index --index ProductTranslation
+```
 
-## Celery
+### Configuration
+```bash
+uv run python manage.py meilisearch_enable_experimental --feature containsFilter
+uv run python manage.py meilisearch_update_index_settings --index ProductTranslation --max-total-hits 50000 --search-cutoff-ms 1500
+uv run python manage.py meilisearch_update_ranking --index ProductTranslation --rules "words,typo,proximity,attribute,sort,stock:desc,discount_percent:desc,exactness"
+```
 
-### Starting Celery Services
-- **Run a local Celery beat scheduler** using the Django database scheduler:
-  `celery -A core beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler`
-- **Run a Celery worker**:
-  `celery -A core worker -E -l info --pool=solo`
-- **Monitor Celery with Flower**:
-  `celery -A core flower --broker=amqp://guest:guest@localhost:5672// --broker_api=http://guest:guest@localhost:15672/api// --port=5555`
-
-## Uvicorn
-
-### Running the Daphne ASGI Application
-- **Start Uvicorn for ASGI applications**:
-  `python manage.py runserver 0.0.0.0:8000`
-
-# Python Development Setup and Utilities
-
-## Python Version 3.14.2
-
-### Django Commands
-- **Install Django**:
-  `pip install django`
-- **Start a New Project**:
-  `django-admin startproject <project_name>`
-- **Start a New App**:
-  `python manage.py startapp <app_name>`
-- **Database Migrations and Management**:
-  - Make migrations: `python manage.py makemigrations`
-  - Apply migrations: `python manage.py migrate`
-  - Flush the database: `python manage.py sqlflush`
-  - Populate database with seed data (All Factories Example): `python manage.py seed_all
-    --model-counts="Country=10,Product=100"`
-- **Manage Users**:
-  - Create superuser: `python manage.py createsuperuser`
-- **Manage Static Files**:
-  `python manage.py collectstatic`
-- **Testing and Debugging**:
-  - Run tests: `python manage.py test`
-  - Access Django shell: `python manage.py shell`
-  - Enhanced shell: `python manage.py shell_plus`
-  - Database shell: `python manage.py dbshell`
-- **Run Development Server**:
-  `python manage.py runserver`
-
-### Code Formatting and Linting
-- **Navigate to Source Directory**:
-  `cd src`
-- **Pre-commit and Ruff Formatting**:
-  - Install pre-commit hooks: `uv run pre-commit install`
-  - Run pre-commit hooks: `uv run pre-commit run --all-files`
-  - Check and Fix code with Ruff: `uv run ruff check --fix`
-  - Format code with Ruff: `uv run ruff format`
-
-### Django REST Framework - Spectacular
-- **Generate API Schema**:
-  `uv run python manage.py spectacular --color --file schema.yml`
-
-### Meilisearch Management Commands
-
-#### Index Management
-- **Sync all indexes**:
-  `python manage.py meilisearch_sync_all_indexes`
-- **Sync specific index**:
-  `python manage.py meilisearch_sync_index --model ProductTranslation`
-- **Clear index**:
-  `python manage.py meilisearch_clear_index --index ProductTranslation`
-- **Drop index**:
-  `python manage.py meilisearch_drop --index ProductTranslation`
-- **Inspect index**:
-  `python manage.py meilisearch_inspect_index --index ProductTranslation`
-
-#### Configuration Commands
-- **Enable experimental features**:
-  `python manage.py meilisearch_enable_experimental --feature containsFilter`
-- **Update index settings**:
-  `python manage.py meilisearch_update_index_settings --index ProductTranslation --max-total-hits 50000 --search-cutoff-ms 1500`
-- **Update ranking rules**:
-  `python manage.py meilisearch_update_ranking --index ProductTranslation --rules "words,typo,proximity,attribute,sort,stock:desc,discount_percent:desc,exactness"`
-
-#### Testing and Analytics
-- **Test federated search**:
-  `python manage.py meilisearch_test_federated --query "laptop" --language-code en --limit 20`
-- **Export search analytics**:
-  `python manage.py meilisearch_export_analytics --start-date 2024-01-01 --end-date 2024-12-31 --output analytics.json`
+### Testing and Analytics
+```bash
+uv run python manage.py meilisearch_test_federated --query "laptop" --language-code en --limit 20
+uv run python manage.py meilisearch_export_analytics --start-date 2024-01-01 --end-date 2024-12-31 --output analytics.json
+```
 
 For detailed documentation, see:
 - [Search API Documentation](docs/api/search.md)
 - [CONTAINS Operator Guide](docs/search/contains-operator.md)
 - [Management Commands Reference](docs/search/management-commands.md)
 
-# Git Command Usage
+## License
 
-## Tag Management
-
-### Deleting Tags
-
-- **Delete Remote Tags**:
-  - Delete all remote tags:
-    `git tag -l | xargs -n 1 git push --delete origin`
-
-- **Delete Local Tags**:
-  - Delete all local tags:
-    `git tag -l | xargs git tag -d`
+This project is open-sourced under the MIT License. See the [LICENSE](LICENSE.md) file for more details.

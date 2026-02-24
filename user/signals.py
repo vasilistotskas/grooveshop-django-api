@@ -1,11 +1,8 @@
 from __future__ import annotations
 
 import logging
-from tempfile import NamedTemporaryFile
 
-import requests
 from allauth.account.signals import user_signed_up
-from django.core.files import File
 from django.dispatch import receiver
 
 from typing import TYPE_CHECKING
@@ -61,20 +58,12 @@ def populate_profile(sociallogin=None, user=None, **kwargs):
             logger.warning(f"Unsupported provider: {provider}")
 
     if picture_url:
-        try:
-            response = requests.get(picture_url, timeout=10)
-            response.raise_for_status()
-        except requests.RequestException as e:
-            logger.error(f"Failed to retrieve image from {picture_url}: {e}")
-            return
+        # Dispatch to Celery task to avoid blocking the HTTP response
+        from user.tasks import download_social_avatar_task
 
-        with NamedTemporaryFile(delete=True) as img_temp:
-            img_temp.write(response.content)
-            img_temp.flush()
-            image_filename = (
-                f"image_{user.first_name}_{user.last_name}_{user.pk}.jpg"
-            )
-            user.image.save(image_filename, File(img_temp))
+        download_social_avatar_task.delay(
+            user_id=user.pk, picture_url=picture_url
+        )
 
 
 @receiver(pre_social_login)

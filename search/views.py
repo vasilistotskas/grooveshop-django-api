@@ -9,7 +9,8 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAdminUser
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
@@ -597,6 +598,7 @@ def federated_search(request):
     ],
 )
 @api_view(["GET"])
+@permission_classes([IsAdminUser])
 def search_analytics(request):
     """
     Aggregate and return search analytics metrics.

@@ -9,6 +9,7 @@ from django.db.models import (
     DecimalField,
     F,
     FloatField,
+    Prefetch,
     Value,
     When,
 )
@@ -67,6 +68,18 @@ class ProductQuerySet(
     def with_category(self) -> Self:
         """Select related category and VAT."""
         return self.select_related("category", "vat")
+
+    def with_main_image(self) -> Self:
+        """Prefetch only the main image to avoid N+1 in main_image_path."""
+        from product.models.image import ProductImage
+
+        return self.prefetch_related(
+            Prefetch(
+                "images",
+                queryset=ProductImage.objects.filter(is_main=True),
+                to_attr="_prefetched_main_images",
+            )
+        )
 
     def with_images(self) -> Self:
         """Prefetch product images with translations."""
@@ -133,7 +146,13 @@ class ProductQuerySet(
         Includes translations, category, and counts but not images/tags.
         Only returns active, non-deleted products.
         """
-        return self.active().with_translations().with_category().with_counts()
+        return (
+            self.active()
+            .with_translations()
+            .with_category()
+            .with_counts()
+            .with_main_image()
+        )
 
     def for_detail(self) -> Self:
         """

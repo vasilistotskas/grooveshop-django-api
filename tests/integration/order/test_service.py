@@ -180,11 +180,17 @@ class OrderServiceTestCase(TestCase):
 
     @patch("order.signals.order_canceled.send")
     def test_cancel_order_not_cancelable(self, mock_signal):
-        self.order.status = OrderStatus.SHIPPED
-        self.order.can_be_canceled = False
+        # Create a real order in the DB since cancel_order uses select_for_update
+        order = OrderService.create_order(
+            self.order_data, self.items_data, user=self.user
+        )
+        # Force status to SHIPPED (not cancelable)
+        Order.objects.filter(id=order.id).update(status=OrderStatus.SHIPPED)
+
+        order.refresh_from_db()
 
         with self.assertRaises(OrderCancellationError) as context:
-            OrderService.cancel_order(self.order)
+            OrderService.cancel_order(order)
 
         self.assertIn("cannot be canceled", str(context.exception))
 

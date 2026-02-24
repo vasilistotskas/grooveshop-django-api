@@ -139,9 +139,9 @@ THIRD_PARTY_APPS = [
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
     "django.middleware.gzip.GZipMiddleware",
     "corsheaders.middleware.CorsMiddleware",
-    "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "core.middleware.translation_reload.TranslationReloadMiddleware",
@@ -459,7 +459,7 @@ CELERY_TASK_RETRY_JITTER = True  # Add randomness to prevent thundering herd
 CELERY_TASK_MAX_RETRIES = 5  # Retry up to 5 times
 
 # Timezone (use UTC)
-CELERY_ENABLE_UTC = False
+CELERY_ENABLE_UTC = True
 CELERY_TIMEZONE = getenv("TIME_ZONE", "Europe/Athens")
 
 # Connection settings

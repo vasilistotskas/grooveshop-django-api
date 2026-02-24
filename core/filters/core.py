@@ -79,12 +79,12 @@ class PublishableFilterMixin:
 
 class SoftDeleteFilterMixin:
     is_deleted = filters.BooleanFilter(
-        field_name="is_deleted",
-        help_text=_("Filter by deleted status"),
+        method="filter_is_deleted",
+        help_text=_("Filter by deleted status (staff only)"),
     )
     include_deleted = filters.BooleanFilter(
         method="filter_include_deleted",
-        help_text=_("Include deleted items in results"),
+        help_text=_("Include deleted items in results (staff only)"),
     )
     deleted_after = filters.DateTimeFilter(
         field_name="deleted_at",
@@ -97,8 +97,15 @@ class SoftDeleteFilterMixin:
         help_text=_("Filter items deleted before this date"),
     )
 
+    def filter_is_deleted(self, queryset, name, value):
+        request = getattr(self, "request", None)
+        if request and getattr(request.user, "is_staff", False):
+            return queryset.filter(is_deleted=value)
+        return queryset
+
     def filter_include_deleted(self, queryset, name, value):
-        if value:
+        request = getattr(self, "request", None)
+        if value and request and getattr(request.user, "is_staff", False):
             return queryset.model.objects.all_with_deleted()
         return queryset
 
@@ -132,12 +139,17 @@ class MetaDataFilterMixin:
         ),
     )
     private_metadata_has_key = filters.CharFilter(
-        field_name="private_metadata",
-        lookup_expr="has_key",
+        method="filter_private_metadata_has_key",
         help_text=_(
-            "Filter items where private metadata contains the specified key"
+            "Filter items where private metadata contains the specified key (staff only)"
         ),
     )
+
+    def filter_private_metadata_has_key(self, queryset, name, value):
+        request = getattr(self, "request", None)
+        if value and request and getattr(request.user, "is_staff", False):
+            return queryset.filter(private_metadata__has_key=value)
+        return queryset
 
     def filter_metadata_has_keys(self, queryset, name, value):
         if value:

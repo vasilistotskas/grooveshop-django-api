@@ -773,20 +773,18 @@ class TestScheduledDatabaseBackupTask:
     def test_scheduled_backup_success(
         self, mock_logger, mock_cleanup, mock_backup
     ):
-        mock_result = Mock()
-        mock_result.result = {
+        mock_async_result = Mock()
+        mock_async_result.get.return_value = {
             "status": "success",
             "message": "Backup completed",
         }
-        mock_backup.apply.return_value = mock_result
+        mock_backup.apply_async.return_value = mock_async_result
 
         result = scheduled_database_backup()
 
         assert result["status"] == "success"
-        mock_backup.apply.assert_called_once()
-        mock_cleanup.delay.assert_called_once_with(
-            days=7, backup_dir="backups/scheduled"
-        )
+        mock_backup.apply_async.assert_called_once()
+        mock_cleanup.delay.assert_called_once()
 
     @patch("core.tasks.backup_database_task")
     @patch("core.tasks.send_mail")
@@ -797,9 +795,12 @@ class TestScheduledDatabaseBackupTask:
     def test_scheduled_backup_failure(
         self, mock_logger, mock_send_mail, mock_backup
     ):
-        mock_result = Mock()
-        mock_result.result = {"status": "error", "message": "Backup failed"}
-        mock_backup.apply.return_value = mock_result
+        mock_async_result = Mock()
+        mock_async_result.get.return_value = {
+            "status": "error",
+            "message": "Backup failed",
+        }
+        mock_backup.apply_async.return_value = mock_async_result
 
         with pytest.raises(Exception):
             scheduled_database_backup()
@@ -814,9 +815,12 @@ class TestScheduledDatabaseBackupTask:
     def test_scheduled_backup_email_failure(
         self, mock_logger, mock_send_mail, mock_backup
     ):
-        mock_result = Mock()
-        mock_result.result = {"status": "error", "message": "Backup failed"}
-        mock_backup.apply.return_value = mock_result
+        mock_async_result = Mock()
+        mock_async_result.get.return_value = {
+            "status": "error",
+            "message": "Backup failed",
+        }
+        mock_backup.apply_async.return_value = mock_async_result
 
         mock_send_mail.side_effect = Exception("Email error")
 

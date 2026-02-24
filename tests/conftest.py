@@ -13,6 +13,7 @@ settings.PASSWORD_HASHERS = [
 
 settings.DISABLE_CACHE = True
 settings.MEILISEARCH["OFFLINE"] = True
+settings.SESSION_ENGINE = "django.contrib.sessions.backends.db"
 
 settings.DATABASES["default"]["ATOMIC_REQUESTS"] = False
 settings.DATABASES["default"]["AUTOCOMMIT"] = True

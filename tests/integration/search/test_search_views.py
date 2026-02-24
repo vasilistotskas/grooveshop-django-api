@@ -30,6 +30,19 @@ def api_client():
 
 
 @pytest.fixture
+def admin_client(db):
+    """Provide Django test client authenticated as admin."""
+    client = Client()
+    admin_user = User.objects.create_superuser(
+        username="admin_user",
+        email="admin@example.com",
+        password="testpass123",
+    )
+    client.force_login(admin_user)
+    return client
+
+
+@pytest.fixture
 def authenticated_user(db):
     """Create an authenticated user for testing."""
     return User.objects.create_user(
@@ -307,7 +320,7 @@ class TestAnalyticsMetricsCompleteness:
     )
     def test_analytics_response_includes_all_required_metrics(
         self,
-        api_client,
+        admin_client,
         start_date,
         end_date,
         content_type,
@@ -348,7 +361,7 @@ class TestAnalyticsMetricsCompleteness:
             params["content_type"] = content_type
 
         # Make request to analytics endpoint
-        response = api_client.get("/api/v1/search/analytics", params)
+        response = admin_client.get("/api/v1/search/analytics", params)
 
         # Verify response is successful
         assert response.status_code == status.HTTP_200_OK, (
@@ -425,7 +438,7 @@ class TestAnalyticsMetricsCompleteness:
             "clickThroughRate should be a number"
         )
 
-    def test_analytics_with_zero_result_queries(self, api_client):
+    def test_analytics_with_zero_result_queries(self, admin_client):
         """Test that zero-result queries are properly included in analytics."""
         # Create queries with zero results
         for i in range(3):
@@ -448,7 +461,7 @@ class TestAnalyticsMetricsCompleteness:
             )
 
         # Make request
-        response = api_client.get("/api/v1/search/analytics")
+        response = admin_client.get("/api/v1/search/analytics")
 
         # Verify response is successful
         assert response.status_code == status.HTTP_200_OK, (
@@ -465,7 +478,7 @@ class TestAnalyticsMetricsCompleteness:
             "Zero-result queries should be included in analytics"
         )
 
-    def test_analytics_calculates_click_through_rate(self, api_client):
+    def test_analytics_calculates_click_through_rate(self, admin_client):
         """Test that click-through rate is calculated correctly."""
         # Create queries with clicks
         for i in range(10):
@@ -487,7 +500,7 @@ class TestAnalyticsMetricsCompleteness:
                 )
 
         # Make request
-        response = api_client.get("/api/v1/search/analytics")
+        response = admin_client.get("/api/v1/search/analytics")
 
         # Verify response is successful
         assert response.status_code == status.HTTP_200_OK, (
@@ -1036,7 +1049,7 @@ class TestOpenAPISchemaGeneration:
         from drf_spectacular.generators import SchemaGenerator
 
         generator = SchemaGenerator()
-        schema = generator.get_schema()
+        schema = generator.get_schema(public=True)
 
         # Check for analytics endpoint
         analytics_paths = [

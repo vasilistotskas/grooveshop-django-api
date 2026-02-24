@@ -61,7 +61,9 @@ class SortableModel(models.Model):
                 self.sort_order = (
                     0 if existing_max is None else existing_max + 1
                 )
-        super().save(*args, **kwargs)
+                super().save(*args, **kwargs)
+        else:
+            super().save(*args, **kwargs)
 
     def get_ordering_queryset(self) -> models.QuerySet[SortableModel]:
         """
@@ -138,7 +140,7 @@ class SortableModel(models.Model):
             Tuple of (number of objects deleted, dict of deletions per type)
         """
         if self.sort_order is not None:
-            qs = self.get_ordering_queryset()
+            qs = self.get_ordering_queryset().select_for_update()
             qs.filter(sort_order__gt=self.sort_order).update(
                 sort_order=F("sort_order") - 1
             )

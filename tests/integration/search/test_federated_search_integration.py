@@ -391,6 +391,13 @@ class TestSearchAnalyticsIntegration:
         """Set up test client and data."""
         self.client = Client()
         self.analytics_url = "/api/v1/search/analytics"
+        # Analytics endpoint requires admin authentication
+        self.admin_user = User.objects.create_superuser(
+            username="analytics_admin",
+            email="admin@example.com",
+            password="testpass123",
+        )
+        self.client.force_login(self.admin_user)
 
     def test_analytics_endpoint_returns_aggregated_metrics(self):
         """

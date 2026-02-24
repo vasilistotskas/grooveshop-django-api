@@ -22,7 +22,9 @@ from rest_framework import status
 from rest_framework.decorators import (
     action,
     api_view,
+    permission_classes,
 )
+from rest_framework.permissions import IsAdminUser
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -439,8 +441,11 @@ def health_check(request):
 
     try:
         redis_conn = Redis(host=settings.REDIS_HOST, port=settings.REDIS_PORT)
-        redis_conn.ping()
-        health_status["redis"] = True
+        try:
+            redis_conn.ping()
+            health_status["redis"] = True
+        finally:
+            redis_conn.close()
     except RedisError:
         health_status["redis"] = False
 

@@ -100,9 +100,13 @@ class StockManager:
 
         # Calculate available stock by excluding active reservations
         # Active = not consumed AND not expired
+        # Lock reservation rows to prevent concurrent requests from
+        # reading the same available stock and double-reserving
         now = timezone.now()
-        active_reservations = StockReservation.objects.filter(
-            product=product, consumed=False, expires_at__gt=now
+        active_reservations = (
+            StockReservation.objects.select_for_update().filter(
+                product=product, consumed=False, expires_at__gt=now
+            )
         )
 
         # Sum up all active reservation quantities

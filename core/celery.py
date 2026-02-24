@@ -16,7 +16,7 @@ def config_loggers(*args, **kwargs):
 
 def create_celery_app():
     tasker = Celery("core")
-    tasker.conf.enable_utc = False
+    tasker.conf.enable_utc = True
     tasker.conf.update(timezone=os.getenv("TIME_ZONE", "Europe/Athens"))
 
     tasker.conf.update(

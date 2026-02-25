@@ -162,17 +162,25 @@ def reindex_product_translations(sender, instance, **kwargs):
                 ).add_documents([document])
 
                 if settings.DEBUG:
-                    finished = _client.wait_for_task(task.task_uid)
-                    if finished.status == "failed":
-                        logger.error(
-                            f"Failed to reindex ProductTranslation pk={translation.pk}: {finished.error}"
+                    try:
+                        finished = _client.client.wait_for_task(
+                            task.task_uid, timeout_in_ms=30000
+                        )
+                        if finished.status == "failed":
+                            logger.error(
+                                f"Failed to reindex ProductTranslation "
+                                f"pk={translation.pk}: {finished.error}"
+                            )
+                    except Exception as wait_err:
+                        logger.warning(
+                            f"Meilisearch wait_for_task timed out "
+                            f"for pk={translation.pk}: {wait_err}"
                         )
             except Exception as e:
                 logger.error(
-                    f"Error reindexing ProductTranslation pk={translation.pk}: {e}"
+                    f"Error reindexing ProductTranslation "
+                    f"pk={translation.pk}: {e}"
                 )
-                if settings.DEBUG:
-                    raise
 
 
 @receiver(product_price_lowered)
@@ -289,14 +297,22 @@ def update_product_search_index_on_attribute_change(sender, instance, **kwargs):
                 ).add_documents([document])
 
                 if settings.DEBUG:
-                    finished = _client.wait_for_task(task.task_uid)
-                    if finished.status == "failed":
-                        logger.error(
-                            f"Failed to reindex ProductTranslation pk={translation.pk}: {finished.error}"
+                    try:
+                        finished = _client.client.wait_for_task(
+                            task.task_uid, timeout_in_ms=30000
+                        )
+                        if finished.status == "failed":
+                            logger.error(
+                                f"Failed to reindex ProductTranslation "
+                                f"pk={translation.pk}: {finished.error}"
+                            )
+                    except Exception as wait_err:
+                        logger.warning(
+                            f"Meilisearch wait_for_task timed out "
+                            f"for pk={translation.pk}: {wait_err}"
                         )
             except Exception as e:
                 logger.error(
-                    f"Error reindexing ProductTranslation pk={translation.pk}: {e}"
+                    f"Error reindexing ProductTranslation "
+                    f"pk={translation.pk}: {e}"
                 )
-                if settings.DEBUG:
-                    raise

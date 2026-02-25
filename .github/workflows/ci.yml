@@ -146,7 +146,7 @@ jobs:
         timeout-minutes: 15
 
       - name: Store Pull Request comment to be posted
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: steps.coverage_comment.outputs.COMMENT_FILE_WRITTEN == 'true'
         with:
           name: python-coverage-comment-action
@@ -199,12 +199,12 @@ jobs:
       - name: Build a binary wheel and a source tarball
         run: uv run -m build --sdist --outdir dist_build/ --installer uv
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: dist_build
           path: dist_build/
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: dist_build
           path: dist_build/

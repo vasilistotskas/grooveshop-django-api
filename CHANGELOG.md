@@ -3,6 +3,12 @@
 
 
 
+## v1.82.4 (2026-02-25)
+
+### Bug fixes
+
+* fix: product signal ([`faaa841`](https://github.com/vasilistotskas/grooveshop-django-api/commit/faaa841f6cb1549138aba516f894f0eae45074a8))
+
 ## v1.82.3 (2026-02-24)
 
 ### Bug fixes

@@ -61,7 +61,8 @@ STATIC_BASE_URL = getenv("STATIC_BASE_URL", "http://localhost:8000")
 
 ALLOWED_HOSTS: list[str] = []
 
-additional_hosts = getenv("ALLOWED_HOSTS", "*").split(",")
+_default_allowed_hosts = "*" if DEBUG else ""
+additional_hosts = getenv("ALLOWED_HOSTS", _default_allowed_hosts).split(",")
 ALLOWED_HOSTS.extend(filter(None, additional_hosts))
 
 if "testserver" not in ALLOWED_HOSTS:
@@ -148,6 +149,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "core.middleware.allauth_ratelimit.AllAuthRateLimitMiddleware",
     "search.middleware.SearchAnalyticsMiddleware",  # Search analytics tracking
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -303,6 +305,7 @@ SOCIALACCOUNT_ADAPTER = "user.adapter.SocialAccountAdapter"
 SOCIALACCOUNT_STORE_TOKENS = True
 SOCIALACCOUNT_QUERY_EMAIL = True
 SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
+SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
 SOCIALACCOUNT_EMAIL_VERIFICATION = "mandatory"
 SOCIALACCOUNT_REQUESTS_TIMEOUT = 10
 SOCIALACCOUNT_PROVIDERS = {
@@ -312,7 +315,7 @@ SOCIALACCOUNT_PROVIDERS = {
             "secret": getenv("SOCIALACCOUNT_GITHUB_SECRET", ""),
             "key": "",
         },
-        "SCOPE": ["read:user", "user:email", "repo"],
+        "SCOPE": ["read:user", "user:email"],
         "VERIFIED_EMAIL": True,
     },
     "google": {
@@ -364,7 +367,7 @@ SOCIALACCOUNT_FORMS = {
     "signup": "allauth.socialaccount.forms.SignupForm",
 }
 
-ACCOUNT_CHANGE_EMAIL = DEBUG
+ACCOUNT_CHANGE_EMAIL = getenv("ACCOUNT_CHANGE_EMAIL", "True") == "True"
 ACCOUNT_USER_MODEL_USERNAME_FIELD = "username"
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
 ACCOUNT_UNIQUE_EMAIL = True
@@ -377,12 +380,12 @@ ACCOUNT_ADAPTER = "user.adapter.UserAccountAdapter"
 ACCOUNT_SIGNUP_REDIRECT_URL = NUXT_BASE_URL + "/account"
 ACCOUNT_LOGIN_BY_CODE_ENABLED = True
 ACCOUNT_EMAIL_VERIFICATION_BY_CODE_ENABLED = True
-ACCOUNT_EMAIL_VERIFICIATION = "mandatory"
+ACCOUNT_EMAIL_VERIFICATION_BY_CODE_TIMEOUT = 300
 ACCOUNT_LOGIN_BY_CODE_MAX_ATTEMPTS = 3
 ACCOUNT_LOGIN_BY_CODE_TIMEOUT = 300
 ACCOUNT_SIGNUP_FORM_HONEYPOT_FIELD = "email_confirm"
 ACCOUNT_DEFAULT_HTTP_PROTOCOL = "http" if DEBUG else "https"
-ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE = False
+ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE = True
 
 LOGIN_REDIRECT_URL = NUXT_BASE_URL + "/account"
 USERSESSIONS_TRACK_ACTIVITY = True
@@ -392,7 +395,7 @@ HEADLESS_FRONTEND_URLS = {
     "account_confirm_email": f"{NUXT_BASE_URL}/account/verify-email/{{key}}",
     "account_reset_password": f"{NUXT_BASE_URL}/account/password/reset",
     "account_reset_password_from_key": f"{NUXT_BASE_URL}/account/password/reset/key/{{key}}",
-    "account_signup": f"{NUXT_BASE_URL}/account/registration",
+    "account_signup": f"{NUXT_BASE_URL}/account/signup",
     "socialaccount_login_error": f"{NUXT_BASE_URL}/account/provider/callback",
 }
 
@@ -724,7 +727,9 @@ if DEBUG:
     )
 
 # Security Settings
-SECURE_SSL_REDIRECT = getenv("SECURE_SSL_REDIRECT", "False") == "True"
+SECURE_SSL_REDIRECT = (
+    getenv("SECURE_SSL_REDIRECT", "False" if DEBUG else "True") == "True"
+)
 SECURE_PROXY_SSL_HEADER = (
     ("HTTP_X_FORWARDED_PROTO", "https") if not DEBUG else None
 )
@@ -890,8 +895,10 @@ ADMIN_EMAIL = getenv("ADMIN_EMAIL", "localhost@gmail.com")
 INFO_EMAIL = getenv("INFO_EMAIL", "localhost@gmail.com")
 
 REST_KNOX = {
-    "TOKEN_TTL": datetime.timedelta(days=20),
+    "TOKEN_TTL": datetime.timedelta(days=7),
     "AUTH_HEADER_PREFIX": "Bearer",
+    "AUTO_REFRESH": True,
+    "MIN_REFRESH_INTERVAL": 86400,  # Only extend TTL if token is >1 day old
 }
 KNOX_TOKEN_MODEL = "knox.AuthToken"
 

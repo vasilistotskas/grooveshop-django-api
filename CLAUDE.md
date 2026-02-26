@@ -114,7 +114,7 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 
 - All API endpoints are under `api/v1/` with DRF ViewSets
 - Request/response bodies use **camelCase** (auto-converted from snake_case via `djangorestframework-camel-case`)
-- Authentication: Knox token auth (`Bearer` prefix, 20-day TTL) + Django Allauth (account management, social providers: Google/Facebook/GitHub/Discord, MFA/WebAuthn/Passkeys) + Django session auth
+- Authentication: Knox token auth (`Bearer` prefix, 7-day TTL, auto-refresh after 1 day) + Django Allauth (account management, social providers: Google/Facebook/GitHub/Discord, MFA/WebAuthn/Passkeys) + Django session auth
 - Payments: Stripe via dj-stripe
 - Default pagination: 12 items per page, max 100
 - OpenAPI docs at `/api/v1/schema/swagger-ui` and `/api/v1/schema/redoc`
@@ -136,7 +136,7 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 ASGI routing in `asgi/__init__.py` with Channels `ProtocolTypeRouter`:
 - HTTP: Django ASGI with CORS handler
 - WebSocket: `ws/notifications/` → `NotificationConsumer`
-- Auth via `TokenAuthMiddleware` (Knox token in query params)
+- Auth via `TokenAuthMiddleware` — only `?access_token=<knox>` in query params; `session_token` is not accepted
 - Groups: `user_{id}` per-user, `admins` for staff
 
 ### Celery
@@ -154,7 +154,7 @@ All factories extend `CustomDjangoModelFactory` from `devtools/factories.py`. Ke
 
 ### Test Configuration
 
-Tests in `tests/` with `unit/` and `integration/` subdirectories. Key `conftest.py` settings:
+Tests in `tests/` with `unit/`, `integration/`, and `utils/` subdirectories. Key `conftest.py` settings:
 - MD5 password hasher (faster than default)
 - `DISABLE_CACHE = True`, `MEILISEARCH["OFFLINE"] = True`
 - `CELERY_TASK_ALWAYS_EAGER = True` (synchronous execution)

@@ -2,17 +2,11 @@ from __future__ import annotations
 
 import logging
 
-from allauth.account.signals import user_signed_up
+from allauth.account.signals import password_changed, user_signed_up
 from django.dispatch import receiver
 
 from typing import TYPE_CHECKING
 
-from allauth.socialaccount.signals import (
-    pre_social_login,
-    social_account_added,
-    social_account_removed,
-    social_account_updated,
-)
 from django.contrib.auth import get_user_model
 from django.db.models.signals import post_save
 from django.utils.crypto import get_random_string
@@ -21,7 +15,7 @@ from user.models.subscription import SubscriptionTopic, UserSubscription
 from user.utils.subscription import send_subscription_confirmation
 
 if TYPE_CHECKING:  # pragma: no cover
-    from allauth.socialaccount.models import SocialAccount, SocialLogin
+    from allauth.socialaccount.models import SocialLogin
 
 User = get_user_model()
 
@@ -29,10 +23,30 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
+@receiver(password_changed)
+def revoke_knox_tokens_on_password_change(request, user, **kwargs):
+    """
+    Revoke all Knox access tokens when the user changes their password.
+    ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE = True handles allauth sessions;
+    this ensures Knox tokens (used for REST API + WebSocket) are also
+    invalidated so any active API clients lose access immediately.
+    """
+    from knox.models import get_token_model  # noqa: PLC0415
+
+    revoked = get_token_model().objects.filter(user=user).delete()
+    logger.info(
+        "Revoked Knox tokens after password change",
+        extra={"user_id": user.pk, "revoked_count": revoked[0]},
+    )
+
+
 @receiver(user_signed_up)
-def populate_profile(sociallogin=None, user=None, **kwargs):
+def populate_profile(
+    sociallogin: SocialLogin | None = None, user=None, **kwargs
+):
+    """Download the provider avatar for new social account signups."""
     if not sociallogin or not user:
-        logger.warning("No sociallogin or user passed to populate_profile")
+        # Email/password signups have no sociallogin — nothing to do.
         return
 
     provider = sociallogin.account.provider
@@ -55,7 +69,7 @@ def populate_profile(sociallogin=None, user=None, **kwargs):
         case "github":
             picture_url = sociallogin.account.extra_data.get("avatar_url")
         case _:
-            logger.warning(f"Unsupported provider: {provider}")
+            logger.warning("Unsupported social provider: %s", provider)
 
     if picture_url:
         # Dispatch to Celery task to avoid blocking the HTTP response
@@ -64,32 +78,6 @@ def populate_profile(sociallogin=None, user=None, **kwargs):
         download_social_avatar_task.delay(
             user_id=user.pk, picture_url=picture_url
         )
-
-
-@receiver(pre_social_login)
-def pre_social_login_signal(
-    sender, request, sociallogin: SocialLogin, **kwargs
-):
-    pass
-
-
-@receiver(social_account_added)
-def social_account_added_signal(sender, **kwargs):
-    pass
-
-
-@receiver(social_account_updated)
-def social_account_updated_signal(
-    sender, request, sociallogin: SocialLogin, **kwargs
-):
-    pass
-
-
-@receiver(social_account_removed)
-def social_account_removed_signal(
-    sender, request, socialaccount: SocialAccount, **kwargs
-):
-    pass
 
 
 @receiver(post_save, sender=User)

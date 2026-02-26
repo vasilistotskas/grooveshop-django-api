@@ -1,62 +1,51 @@
 from unittest import mock
 
-from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
-from allauth.socialaccount.models import SocialLogin
-from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from user.adapter import SocialAccountAdapter
-
-User = get_user_model()
 
 
 class TestSocialAccountAdapter(TestCase):
     def setUp(self):
         self.adapter = SocialAccountAdapter()
 
-    @mock.patch.object(DefaultSocialAccountAdapter, "pre_social_login")
-    @mock.patch.object(
-        SocialLogin, "is_existing", new_callable=mock.PropertyMock
-    )
-    def test_pre_social_login_existent(
-        self, mock_is_existing, mock_pre_social_login
-    ):
+    def test_get_connect_redirect_url_with_post_next(self):
         request = mock.Mock()
-        sociallogin = SocialLogin()
-        mock_is_existing.return_value = True
-        self.adapter.pre_social_login(request, sociallogin)
-        mock_pre_social_login.assert_not_called()
+        request.POST.get.return_value = "/account/settings"
+        request.GET.get.return_value = None
+        social_account = mock.Mock()
 
-    @mock.patch.object(DefaultSocialAccountAdapter, "pre_social_login")
-    def test_pre_social_login_nonexistent(self, mock_pre_social_login):
+        url = self.adapter.get_connect_redirect_url(request, social_account)
+
+        self.assertEqual(url, "/account/settings")
+
+    def test_get_connect_redirect_url_with_get_next(self):
         request = mock.Mock()
+        request.POST.get.return_value = None
+        request.GET.get.return_value = "/account/providers"
+        social_account = mock.Mock()
 
-        sociallogin = mock.Mock()
+        url = self.adapter.get_connect_redirect_url(request, social_account)
 
-        is_existing_property = mock.PropertyMock(return_value=False)
-        type(sociallogin).is_existing = is_existing_property
+        self.assertEqual(url, "/account/providers")
 
-        sociallogin.account = mock.Mock()
-        sociallogin.account.extra_data = {"email": "test@example.com"}
+    @override_settings(NUXT_BASE_URL="https://example.com")
+    def test_get_connect_redirect_url_defaults_to_account(self):
+        request = mock.Mock()
+        request.POST.get.return_value = None
+        request.GET.get.return_value = None
+        social_account = mock.Mock()
 
-        email = mock.Mock()
-        email.verified = True
-        email.email = "test@example.com"
-        sociallogin.email_addresses = [email]
+        url = self.adapter.get_connect_redirect_url(request, social_account)
 
-        mock_user = mock.Mock()
+        self.assertEqual(url, "https://example.com/account")
 
-        mock_filter = mock.Mock()
-        mock_filter.first.return_value = mock_user
+    def test_post_next_takes_priority_over_get_next(self):
+        request = mock.Mock()
+        request.POST.get.return_value = "/from-post"
+        request.GET.get.return_value = "/from-get"
+        social_account = mock.Mock()
 
-        def side_effect(req, user):
-            pass
+        url = self.adapter.get_connect_redirect_url(request, social_account)
 
-        sociallogin.connect.side_effect = side_effect
-
-        with mock.patch.object(
-            User.objects, "filter", return_value=mock_filter
-        ):
-            self.adapter.pre_social_login(request, sociallogin)
-
-            sociallogin.connect.assert_called_once_with(request, mock_user)
+        self.assertEqual(url, "/from-post")

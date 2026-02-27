@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from os import getenv
-from typing import Any, Awaitable
+from typing import Any, Awaitable, cast
 
 from django.conf import settings
 from django.core.cache.backends.redis import RedisCache, RedisCacheClient
@@ -114,11 +114,11 @@ class CustomCache(RedisCache):
             for key in client.scan_iter(match=pattern, count=_SCAN_BATCH_SIZE):
                 batch.append(key)
                 if len(batch) >= _SCAN_BATCH_SIZE:
-                    deleted += client.unlink(*batch)
+                    deleted += cast(int, client.unlink(*batch))
                     batch.clear()
 
             if batch:
-                deleted += client.unlink(*batch)
+                deleted += cast(int, client.unlink(*batch))
 
             results[prefix] = deleted
             logger.info("Cleared %d keys with prefix '%s'", deleted, prefix)

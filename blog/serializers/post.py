@@ -1,3 +1,5 @@
+from typing import cast
+
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.helpers import lazy_serializer
@@ -73,7 +75,7 @@ class BlogPostSerializer(
 
     def get_reading_time(self, obj: BlogPost) -> int:
         if hasattr(obj, "reading_time"):
-            return obj.reading_time
+            return cast(int, obj.reading_time)
         body = obj.safe_translation_getter("body", any_language=True)
         if body:
             return calculate_reading_time(body)

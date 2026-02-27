@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from drf_spectacular.utils import extend_schema_field
@@ -7,7 +9,10 @@ from phonenumber_field.serializerfields import PhoneNumberField
 from rest_framework import serializers
 from django.utils.translation import gettext_lazy as _
 
-User = get_user_model()
+if TYPE_CHECKING:
+    from user.models.account import UserAccount as User
+else:
+    User = get_user_model()
 
 
 class UserSerializer(serializers.ModelSerializer[User]):

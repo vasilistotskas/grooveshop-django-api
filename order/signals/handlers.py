@@ -168,7 +168,7 @@ def handle_order_status_changed(
         and not hasattr(order, "_paid_signal_sent")
     ):
         order_paid.send(sender=sender, order=order)
-        order._paid_signal_sent = True
+        order._paid_signal_sent = True  # type: ignore[invalid-assignment]
         logger.debug("Sent order_paid signal for order %s", order.id)
 
     logger.info(
@@ -459,7 +459,7 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
     logger.debug("Processing payment_intent.succeeded webhook")
 
     try:
-        event: Event = kwargs.get("event")
+        event: Event = kwargs["event"]
         payment_intent_id = event.data["object"]["id"]
         event_id = event.id
 
@@ -508,7 +508,7 @@ def handle_stripe_payment_failed(sender, **kwargs):
     logger.debug("Processing payment_intent.payment_failed webhook")
 
     try:
-        event: Event = kwargs.get("event")
+        event: Event = kwargs["event"]
         payment_intent_id = event.data["object"]["id"]
 
         logger.info("Stripe payment failed: %s", payment_intent_id)
@@ -537,7 +537,7 @@ def handle_stripe_payment_requires_action(sender, **kwargs):
     logger.debug("Processing payment_intent.requires_action webhook")
 
     try:
-        event: Event = kwargs.get("event")
+        event: Event = kwargs["event"]
         payment_intent_id = event.data["object"]["id"]
 
         logger.info("Stripe payment requires action: %s", payment_intent_id)
@@ -572,7 +572,7 @@ def handle_stripe_dispute_created(sender, **kwargs):
     logger.debug("Processing charge.dispute.created webhook")
 
     try:
-        event: Event = kwargs.get("event")
+        event: Event = kwargs["event"]
         dispute_data = event.data["object"]
         charge_id = dispute_data["charge"]
 
@@ -590,7 +590,7 @@ def handle_stripe_checkout_completed(sender, **kwargs):
     logger.debug("Processing checkout.session.completed webhook")
 
     try:
-        event: Event = kwargs.get("event")
+        event: Event = kwargs["event"]
         session_data = event.data["object"]
         session_id = session_data["id"]
         payment_intent_id = session_data.get("payment_intent")
@@ -683,7 +683,7 @@ def handle_stripe_checkout_expired(sender, **kwargs):
     logger.debug("Processing checkout.session.expired webhook")
 
     try:
-        event: Event = kwargs.get("event")
+        event: Event = kwargs["event"]
         session_data = event.data["object"]
         session_id = session_data["id"]
         order_id = session_data.get("metadata", {}).get("order_id")

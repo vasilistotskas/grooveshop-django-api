@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from django.conf import settings
 from django.db.models import Count, F, Sum
@@ -74,10 +74,10 @@ class OrderItemManager(OptimizedManager):
     queryset_class = OrderItemQuerySet
 
     def for_list(self) -> OrderItemQuerySet:
-        return self.get_queryset().for_list()
+        return cast(OrderItemQuerySet, self.get_queryset().for_list())
 
     def for_detail(self) -> OrderItemQuerySet:
-        return self.get_queryset().for_detail()
+        return cast(OrderItemQuerySet, self.get_queryset().for_detail())
 
     def get_bestselling_products(self, limit=10, days=30):
         return (

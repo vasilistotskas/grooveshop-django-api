@@ -1,3 +1,5 @@
+from typing import cast
+
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.helpers import lazy_serializer
 from drf_spectacular.utils import extend_schema_field
@@ -28,7 +30,7 @@ class BlogCategorySerializer(
         Uses _post_count annotation from BlogCategoryManager.for_list().
         """
         if hasattr(obj, "_post_count"):
-            return obj._post_count
+            return cast(int, obj._post_count)
         return obj.blog_posts.filter(is_published=True).count()
 
     def get_has_children(self, obj: BlogCategory) -> bool:
@@ -38,7 +40,7 @@ class BlogCategorySerializer(
         Uses _has_children annotation from BlogCategoryManager.for_list().
         """
         if hasattr(obj, "_has_children"):
-            return obj._has_children
+            return cast(bool, obj._has_children)
         return obj.get_children().exists()
 
     class Meta:

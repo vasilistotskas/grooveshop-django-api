@@ -91,7 +91,7 @@ CURSOR_PARAMETER = OpenApiParameter(
 
 
 class RequestResponseSerializerMixin:
-    action = None
+    action: str | None = None
     default_actions = [
         "list",
         "retrieve",
@@ -146,7 +146,7 @@ class RequestResponseSerializerMixin:
         Get the serializer CLASS for request data validation.
         Returns a class, not an instance.
         """
-        cfg = self.serializers_config.get(self.action)
+        cfg = self.serializers_config.get(self.action) if self.action else None
         if cfg and cfg.request is not None:
             return cfg.request
         return self.get_serializer_class()
@@ -156,7 +156,7 @@ class RequestResponseSerializerMixin:
         Get the serializer CLASS for response data formatting.
         Returns a class, not an instance.
         """
-        cfg = self.serializers_config.get(self.action)
+        cfg = self.serializers_config.get(self.action) if self.action else None
         if cfg and cfg.response is not None:
             return cfg.response
         return self.get_serializer_class()
@@ -176,7 +176,11 @@ class RequestResponseSerializerMixin:
             request_serializer_class = None
             response_serializer_class = None
 
-            cfg = self.serializers_config.get(action_name)
+            cfg = (
+                self.serializers_config.get(action_name)
+                if action_name
+                else None
+            )
             if cfg:
                 request_serializer_class = cfg.request
                 response_serializer_class = cfg.response

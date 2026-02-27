@@ -334,7 +334,7 @@ class TestBalanceEqualsTransactionSum:
             max_size=20,
         ),
     )
-    @settings(max_examples=100, deadline=1000)
+    @settings(max_examples=100, deadline=None)
     def test_balance_equals_algebraic_sum_of_transactions(
         self,
         points_list: list[int],

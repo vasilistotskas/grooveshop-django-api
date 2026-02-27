@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from django.utils import timezone
 
@@ -55,11 +55,11 @@ class StockLogManager(OptimizedManager):
 
     def for_list(self) -> StockLogQuerySet:
         """Return optimized queryset for list views."""
-        return self.get_queryset().for_list()
+        return cast(StockLogQuerySet, self.get_queryset().for_list())
 
     def for_detail(self) -> StockLogQuerySet:
         """Return optimized queryset for detail views."""
-        return self.get_queryset().for_detail()
+        return cast(StockLogQuerySet, self.get_queryset().for_detail())
 
 
 class StockReservationQuerySet(OptimizedQuerySet):
@@ -124,8 +124,8 @@ class StockReservationManager(OptimizedManager):
 
     def for_list(self) -> StockReservationQuerySet:
         """Return optimized queryset for list views."""
-        return self.get_queryset().for_list()
+        return cast(StockReservationQuerySet, self.get_queryset().for_list())
 
     def for_detail(self) -> StockReservationQuerySet:
         """Return optimized queryset for detail views."""
-        return self.get_queryset().for_detail()
+        return cast(StockReservationQuerySet, self.get_queryset().for_detail())

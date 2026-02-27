@@ -402,6 +402,7 @@ class RegionAdmin(ModelAdmin, TranslatableAdmin):
             .prefetch_related("country__translations")
         )
 
+    @admin.display(description=_("Region"))
     def region_info(self, obj):
         name = (
             obj.safe_translation_getter("name", any_language=True)
@@ -436,8 +437,7 @@ class RegionAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    region_info.short_description = _("Region")
-
+    @admin.display(description=_("Country"))
     def country_display(self, obj):
         country = obj.country
         country_name = (
@@ -481,8 +481,7 @@ class RegionAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    country_display.short_description = _("Country")
-
+    @admin.display(description=_("Stats"))
     def region_stats(self, obj):
         name_len = len(
             obj.safe_translation_getter("name", any_language=True) or ""
@@ -510,8 +509,7 @@ class RegionAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    region_stats.short_description = _("Stats")
-
+    @admin.display(description=_("Sort Order"))
     def sort_display(self, obj):
         sort = obj.sort_order
         if sort is None:
@@ -546,8 +544,7 @@ class RegionAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    sort_display.short_description = _("Sort Order")
-
+    @admin.display(description=_("Completeness"))
     def completeness_badge(self, obj):
         total = 3
         done = 0
@@ -591,8 +588,7 @@ class RegionAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    completeness_badge.short_description = _("Completeness")
-
+    @admin.display(description=_("Created"))
     def created_display(self, obj):
         date_str = obj.created_at.strftime("%Y-%m-%d")
         time_str = obj.created_at.strftime("%H:%M")
@@ -607,8 +603,7 @@ class RegionAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    created_display.short_description = _("Created")
-
+    @admin.display(description=_("Region Analytics"))
     def region_analytics(self, obj):
         name = obj.safe_translation_getter("name", any_language=True) or ""
         name_len = len(name)
@@ -642,8 +637,7 @@ class RegionAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    region_analytics.short_description = _("Region Analytics")
-
+    @admin.display(description=_("Country Analytics"))
     def country_analytics(self, obj):
         country = obj.country
         cname = (
@@ -677,10 +671,8 @@ class RegionAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    country_analytics.short_description = _("Country Analytics")
-
     @action(
-        description=_("Update sort order"),
+        description=str(_("Update sort order")),
         variant=ActionVariant.INFO,
         icon="sort",
     )

@@ -65,16 +65,18 @@ class OrderService:
 
                 if not product:
                     raise InvalidOrderDataError(
-                        _("Product is required for order items")
+                        str(_("Product is required for order items"))
                     )
 
                 if quantity <= 0:
                     raise InvalidOrderDataError(
-                        _(
-                            "Invalid quantity {quantity} for product {product_id}"
-                        ).format(
-                            quantity=quantity,
-                            product_id=getattr(product, "id", _("unknown")),
+                        str(
+                            _(
+                                "Invalid quantity {quantity} for product {product_id}"
+                            ).format(
+                                quantity=quantity,
+                                product_id=getattr(product, "id", _("unknown")),
+                            )
                         )
                     )
 
@@ -200,7 +202,7 @@ class OrderService:
 
             if not payment_intent_id:
                 raise PaymentNotFoundError(
-                    _("Payment intent ID is required for order creation")
+                    str(_("Payment intent ID is required for order creation"))
                 )
 
             # Get payment provider and verify payment intent exists
@@ -363,14 +365,19 @@ class OrderService:
                 # Validate product still exists and has stock
                 if not product:
                     raise InvalidOrderDataError(
-                        _("Product is required for order items")
+                        str(_("Product is required for order items"))
                     )
 
                 if quantity <= 0:
                     raise InvalidOrderDataError(
-                        _(
-                            "Invalid quantity {quantity} for product {product_id}"
-                        ).format(quantity=quantity, product_id=product.id)
+                        str(
+                            _(
+                                "Invalid quantity {quantity} for product {product_id}"
+                            ).format(
+                                quantity=quantity,
+                                product_id=product.id,
+                            )
+                        )
                     )
 
                 # Get product price and convert to target currency if needed
@@ -747,14 +754,19 @@ class OrderService:
                 # Validate product still exists and has stock
                 if not product:
                     raise InvalidOrderDataError(
-                        _("Product is required for order items")
+                        str(_("Product is required for order items"))
                     )
 
                 if quantity <= 0:
                     raise InvalidOrderDataError(
-                        _(
-                            "Invalid quantity {quantity} for product {product_id}"
-                        ).format(quantity=quantity, product_id=product.id)
+                        str(
+                            _(
+                                "Invalid quantity {quantity} for product {product_id}"
+                            ).format(
+                                quantity=quantity,
+                                product_id=product.id,
+                            )
+                        )
                     )
 
                 # Get product price and convert to target currency if needed
@@ -1086,9 +1098,7 @@ class OrderService:
     def update_order_status(cls, order: Order, new_status: str) -> Order:
         try:
             if not new_status:
-                raise InvalidStatusTransitionError(
-                    _("New status cannot be empty")
-                )
+                raise ValueError("New status cannot be empty")
 
             if order.status == new_status:
                 logger.info(

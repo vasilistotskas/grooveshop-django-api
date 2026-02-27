@@ -284,6 +284,7 @@ class AttributeValueInline(TabularInline):
     tab = True
     show_change_link = True
 
+    @admin.display(description=_("Value"))
     def value_display(self, obj):
         """Display value with translation."""
         if not obj.pk:
@@ -308,8 +309,7 @@ class AttributeValueInline(TabularInline):
         )
         return mark_safe(html)
 
-    value_display.short_description = _("Value")
-
+    @admin.display(description=_("Usage"))
     def usage_count_display(self, obj):
         """Display count of products using this value."""
         if not obj.pk:
@@ -326,8 +326,6 @@ class AttributeValueInline(TabularInline):
             f'<span class="text-sm {color_class}">{safe_count} products</span>'
         )
         return mark_safe(html)
-
-    usage_count_display.short_description = _("Usage")
 
 
 @admin.register(Attribute)
@@ -423,6 +421,7 @@ class AttributeAdmin(TranslatableAdmin, ModelAdmin):
             .prefetch_related("translations", "values")
         )
 
+    @admin.display(description=_("Attribute"))
     def attribute_info(self, obj):
         """Display attribute name with icon."""
         name = (
@@ -439,8 +438,7 @@ class AttributeAdmin(TranslatableAdmin, ModelAdmin):
         )
         return mark_safe(html)
 
-    attribute_info.short_description = _("Attribute")
-
+    @admin.display(description=_("Status"))
     def active_status_badge(self, obj):
         """Display active status with badge."""
         if obj.active:
@@ -459,8 +457,7 @@ class AttributeAdmin(TranslatableAdmin, ModelAdmin):
             )
         return mark_safe(badge)
 
-    active_status_badge.short_description = _("Status")
-
+    @admin.display(description=_("Values"))
     def values_count_display(self, obj):
         """Display count of attribute values."""
         count = getattr(obj, "values_count", 0)
@@ -474,8 +471,7 @@ class AttributeAdmin(TranslatableAdmin, ModelAdmin):
         html = f'<span class="text-sm {color_class}">{safe_count} values</span>'
         return mark_safe(html)
 
-    values_count_display.short_description = _("Values")
-
+    @admin.display(description=_("Usage"))
     def usage_count_display(self, obj):
         """Display count of products using this attribute."""
         count = getattr(obj, "usage_count", 0)
@@ -493,8 +489,7 @@ class AttributeAdmin(TranslatableAdmin, ModelAdmin):
         )
         return mark_safe(html)
 
-    usage_count_display.short_description = _("Usage")
-
+    @admin.display(description=_("Created"))
     def created_display(self, obj):
         """Display creation date with relative time."""
         now = timezone.now()
@@ -521,8 +516,7 @@ class AttributeAdmin(TranslatableAdmin, ModelAdmin):
         )
         return mark_safe(html)
 
-    created_display.short_description = _("Created")
-
+    @admin.display(description=_("Analytics"))
     def attribute_analytics(self, obj):
         """Display detailed analytics for the attribute."""
         if not obj.created_at:
@@ -558,10 +552,8 @@ class AttributeAdmin(TranslatableAdmin, ModelAdmin):
         )
         return mark_safe(html)
 
-    attribute_analytics.short_description = _("Analytics")
-
     @action(
-        description=_("Activate selected attributes"),
+        description=str(_("Activate selected attributes")),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -571,8 +563,8 @@ class AttributeAdmin(TranslatableAdmin, ModelAdmin):
         self.message_user(
             request,
             ngettext(
-                _("%(count)d attribute was successfully activated."),
-                _("%(count)d attributes were successfully activated."),
+                "%(count)d attribute was successfully activated.",
+                "%(count)d attributes were successfully activated.",
                 updated,
             )
             % {"count": updated},
@@ -580,7 +572,7 @@ class AttributeAdmin(TranslatableAdmin, ModelAdmin):
         )
 
     @action(
-        description=_("Deactivate selected attributes"),
+        description=str(_("Deactivate selected attributes")),
         variant=ActionVariant.WARNING,
         icon="cancel",
     )
@@ -590,8 +582,8 @@ class AttributeAdmin(TranslatableAdmin, ModelAdmin):
         self.message_user(
             request,
             ngettext(
-                _("%(count)d attribute was successfully deactivated."),
-                _("%(count)d attributes were successfully deactivated."),
+                "%(count)d attribute was successfully deactivated.",
+                "%(count)d attributes were successfully deactivated.",
                 updated,
             )
             % {"count": updated},
@@ -692,6 +684,7 @@ class AttributeValueAdmin(TranslatableAdmin, ModelAdmin):
             .prefetch_related("translations", "attribute__translations")
         )
 
+    @admin.display(description=_("Value"))
     def value_info(self, obj):
         """Display value with icon."""
         value = (
@@ -708,8 +701,7 @@ class AttributeValueAdmin(TranslatableAdmin, ModelAdmin):
         )
         return mark_safe(html)
 
-    value_info.short_description = _("Value")
-
+    @admin.display(description=_("Attribute"))
     def attribute_display(self, obj):
         """Display parent attribute name."""
         if obj.attribute:
@@ -725,8 +717,7 @@ class AttributeValueAdmin(TranslatableAdmin, ModelAdmin):
             '<span class="text-base-600 dark:text-base-300">No Attribute</span>'
         )
 
-    attribute_display.short_description = _("Attribute")
-
+    @admin.display(description=_("Status"))
     def active_status_badge(self, obj):
         """Display active status with badge."""
         if obj.active:
@@ -745,8 +736,7 @@ class AttributeValueAdmin(TranslatableAdmin, ModelAdmin):
             )
         return mark_safe(badge)
 
-    active_status_badge.short_description = _("Status")
-
+    @admin.display(description=_("Usage"))
     def usage_count_display(self, obj):
         """Display count of products using this value."""
         count = getattr(obj, "usage_count", 0)
@@ -764,8 +754,7 @@ class AttributeValueAdmin(TranslatableAdmin, ModelAdmin):
         )
         return mark_safe(html)
 
-    usage_count_display.short_description = _("Usage")
-
+    @admin.display(description=_("Created"))
     def created_display(self, obj):
         """Display creation date with relative time."""
         now = timezone.now()
@@ -792,8 +781,7 @@ class AttributeValueAdmin(TranslatableAdmin, ModelAdmin):
         )
         return mark_safe(html)
 
-    created_display.short_description = _("Created")
-
+    @admin.display(description=_("Analytics"))
     def value_analytics(self, obj):
         """Display detailed analytics for the value."""
         if not obj.created_at:
@@ -827,10 +815,8 @@ class AttributeValueAdmin(TranslatableAdmin, ModelAdmin):
         )
         return mark_safe(html)
 
-    value_analytics.short_description = _("Analytics")
-
     @action(
-        description=_("Activate selected values"),
+        description=str(_("Activate selected values")),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -840,8 +826,8 @@ class AttributeValueAdmin(TranslatableAdmin, ModelAdmin):
         self.message_user(
             request,
             ngettext(
-                _("%(count)d attribute value was successfully activated."),
-                _("%(count)d attribute values were successfully activated."),
+                "%(count)d attribute value was successfully activated.",
+                "%(count)d attribute values were successfully activated.",
                 updated,
             )
             % {"count": updated},
@@ -849,7 +835,7 @@ class AttributeValueAdmin(TranslatableAdmin, ModelAdmin):
         )
 
     @action(
-        description=_("Deactivate selected values"),
+        description=str(_("Deactivate selected values")),
         variant=ActionVariant.WARNING,
         icon="cancel",
     )
@@ -859,8 +845,8 @@ class AttributeValueAdmin(TranslatableAdmin, ModelAdmin):
         self.message_user(
             request,
             ngettext(
-                _("%(count)d attribute value was successfully deactivated."),
-                _("%(count)d attribute values were successfully deactivated."),
+                "%(count)d attribute value was successfully deactivated.",
+                "%(count)d attribute values were successfully deactivated.",
                 updated,
             )
             % {"count": updated},
@@ -899,6 +885,7 @@ class ProductImageInline(TabularInline):
     tab = True
     show_change_link = True
 
+    @admin.display(description=_("Preview"))
     def image_preview(self, obj):
         if obj.image:
             safe_url = conditional_escape(obj.image.url)
@@ -910,8 +897,6 @@ class ProductImageInline(TabularInline):
         return mark_safe(
             '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-600 dark:text-base-300 text-xs">No Image</div>'
         )
-
-    image_preview.short_description = _("Preview")
 
 
 class StockReservationInline(TabularInline):
@@ -955,6 +940,7 @@ class StockReservationInline(TabularInline):
     def has_add_permission(self, request, obj=None):
         return False
 
+    @admin.display(description=_("Reservation"))
     def reservation_info(self, obj):
         """Display reservation ID and creation time."""
         created = obj.created_at.strftime("%Y-%m-%d %H:%M")
@@ -969,8 +955,7 @@ class StockReservationInline(TabularInline):
         )
         return mark_safe(html)
 
-    reservation_info.short_description = _("Reservation")
-
+    @admin.display(description=_("Reserved By"))
     def session_info(self, obj):
         """Display user or session information."""
         if obj.reserved_by:
@@ -995,8 +980,7 @@ class StockReservationInline(TabularInline):
             )
         return mark_safe(html)
 
-    session_info.short_description = _("Reserved By")
-
+    @admin.display(description=_("Expires In"))
     def expires_display(self, obj):
         """Display expiration time with countdown."""
         now = timezone.now()
@@ -1022,8 +1006,7 @@ class StockReservationInline(TabularInline):
         )
         return mark_safe(html)
 
-    expires_display.short_description = _("Expires In")
-
+    @admin.display(description=_("Status"))
     def status_badge(self, obj):
         """Display reservation status badge."""
         if obj.order:
@@ -1043,8 +1026,6 @@ class StockReservationInline(TabularInline):
                 "</span>"
             )
         return mark_safe(badge)
-
-    status_badge.short_description = _("Status")
 
 
 class StockLogInline(TabularInline):
@@ -1088,6 +1069,7 @@ class StockLogInline(TabularInline):
     def has_add_permission(self, request, obj=None):
         return False
 
+    @admin.display(description=_("Operation"))
     def operation_display(self, obj):
         """Display operation type with icon."""
         operation_icons = {
@@ -1116,8 +1098,7 @@ class StockLogInline(TabularInline):
         )
         return mark_safe(html)
 
-    operation_display.short_description = _("Operation")
-
+    @admin.display(description=_("Change"))
     def quantity_change(self, obj):
         """Display quantity delta with +/- indicator."""
         delta = obj.quantity_delta
@@ -1140,8 +1121,7 @@ class StockLogInline(TabularInline):
 
         return mark_safe(html)
 
-    quantity_change.short_description = _("Change")
-
+    @admin.display(description=_("Stock Level"))
     def stock_levels(self, obj):
         """Display before/after stock levels."""
         safe_before = conditional_escape(str(obj.stock_before))
@@ -1154,8 +1134,7 @@ class StockLogInline(TabularInline):
         )
         return mark_safe(html)
 
-    stock_levels.short_description = _("Stock Level")
-
+    @admin.display(description=_("Related Order"))
     def order_link(self, obj):
         """Display linked order if any."""
         if obj.order:
@@ -1178,8 +1157,7 @@ class StockLogInline(TabularInline):
             f'<span class="text-sm text-base-600 dark:text-base-300">{safe_reason}</span>'
         )
 
-    order_link.short_description = _("Related Order")
-
+    @admin.display(description=_("By"))
     def performed_by_display(self, obj):
         """Display who performed the operation."""
         if obj.performed_by:
@@ -1191,8 +1169,7 @@ class StockLogInline(TabularInline):
 
         return mark_safe(html)
 
-    performed_by_display.short_description = _("By")
-
+    @admin.display(description=_("Time"))
     def timestamp_display(self, obj):
         """Display operation timestamp."""
         timestamp = obj.created_at.strftime("%m/%d %H:%M")
@@ -1200,8 +1177,6 @@ class StockLogInline(TabularInline):
 
         html = f'<span class="text-sm text-base-600 dark:text-base-300">{safe_timestamp}</span>'
         return mark_safe(html)
-
-    timestamp_display.short_description = _("Time")
 
 
 @admin.register(Product)
@@ -1468,6 +1443,7 @@ class ProductAdmin(
     def get_prepopulated_fields(self, request, obj=None):
         return {"slug": ("name",)}
 
+    @admin.display(description=_("Product"))
     def product_info(self, obj):
         name = (
             obj.safe_translation_getter("name", any_language=True)
@@ -1500,8 +1476,7 @@ class ProductAdmin(
         )
         return mark_safe(html)
 
-    product_info.short_description = _("Product")
-
+    @admin.display(description=_("Category"))
     def category_display(self, obj):
         if obj.category:
             category_name = (
@@ -1532,8 +1507,7 @@ class ProductAdmin(
             '<span class="text-base-600 dark:text-base-300">No Category</span>'
         )
 
-    category_display.short_description = _("Category")
-
+    @admin.display(description=_("Pricing"))
     def pricing_info(self, obj):
         price = obj.price
         final_price = obj.final_price
@@ -1565,8 +1539,7 @@ class ProductAdmin(
             )
         return mark_safe(html)
 
-    pricing_info.short_description = _("Pricing")
-
+    @admin.display(description=_("Stock"))
     def stock_info(self, obj):
         stock = obj.stock
         safe_stock = conditional_escape(str(stock))
@@ -1627,8 +1600,7 @@ class ProductAdmin(
             f'<div class="text-sm">{stock_badge}{reservation_info}</div>'
         )
 
-    stock_info.short_description = _("Stock")
-
+    @admin.display(description=_("Performance"))
     def performance_metrics(self, obj):
         views = obj.view_count
         likes = obj.likes_count
@@ -1648,8 +1620,7 @@ class ProductAdmin(
         )
         return mark_safe(html)
 
-    performance_metrics.short_description = _("Performance")
-
+    @admin.display(description=_("Status"))
     def status_badges(self, obj):
         badges = []
 
@@ -1718,8 +1689,7 @@ class ProductAdmin(
             '<div class="flex flex-wrap gap-1">' + "".join(badges) + "</div>"
         )
 
-    status_badges.short_description = _("Status")
-
+    @admin.display(description=_("Created"))
     def created_display(self, obj):
         now = timezone.now()
         diff = now - obj.created_at
@@ -1745,8 +1715,7 @@ class ProductAdmin(
         )
         return mark_safe(html)
 
-    created_display.short_description = _("Created")
-
+    @admin.display(description=_("Pricing Summary"))
     def pricing_summary(self, obj):
         price = obj.price
         discount = obj.discount_percent
@@ -1776,8 +1745,7 @@ class ProductAdmin(
         )
         return mark_safe(html)
 
-    pricing_summary.short_description = _("Pricing Summary")
-
+    @admin.display(description=_("Performance Summary"))
     def performance_summary(self, obj):
         views = obj.view_count
         likes = obj.likes_count
@@ -1811,8 +1779,7 @@ class ProductAdmin(
         )
         return mark_safe(html)
 
-    performance_summary.short_description = _("Performance Summary")
-
+    @admin.display(description=_("Stock Reservation Summary"))
     def stock_reservation_summary(self, obj):
         """Display stock reservation statistics and recent activity."""
         from order.models.stock_reservation import StockReservation
@@ -1901,8 +1868,7 @@ class ProductAdmin(
         )
         return mark_safe(html)
 
-    stock_reservation_summary.short_description = _("Stock Reservation Summary")
-
+    @admin.display(description=_("Product Analytics"))
     def product_analytics(self, obj):
         if not obj.created_at:
             return "Available after creation."
@@ -1945,10 +1911,8 @@ class ProductAdmin(
         )
         return mark_safe(html)
 
-    product_analytics.short_description = _("Product Analytics")
-
     @action(
-        description=_("Activate selected products"),
+        description=str(_("Activate selected products")),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -1957,8 +1921,8 @@ class ProductAdmin(
         self.message_user(
             request,
             ngettext(
-                _("%(count)d product was successfully activated."),
-                _("%(count)d products were successfully activated."),
+                "%(count)d product was successfully activated.",
+                "%(count)d products were successfully activated.",
                 updated,
             )
             % {"count": updated},
@@ -1966,7 +1930,7 @@ class ProductAdmin(
         )
 
     @action(
-        description=_("Deactivate selected products"),
+        description=str(_("Deactivate selected products")),
         variant=ActionVariant.WARNING,
         icon="cancel",
     )
@@ -1975,8 +1939,8 @@ class ProductAdmin(
         self.message_user(
             request,
             ngettext(
-                _("%(count)d product was successfully deactivated."),
-                _("%(count)d products were successfully deactivated."),
+                "%(count)d product was successfully deactivated.",
+                "%(count)d products were successfully deactivated.",
                 updated,
             )
             % {"count": updated},
@@ -1984,7 +1948,7 @@ class ProductAdmin(
         )
 
     @action(
-        description=_("Apply custom discount to selected products"),
+        description=str(_("Apply custom discount to selected products")),
         variant=ActionVariant.INFO,
         icon="local_offer",
         permissions=["change"],
@@ -2056,12 +2020,8 @@ class ProductAdmin(
                 self.message_user(
                     request,
                     ngettext(
-                        _(
-                            "Applied %(discount)s%% discount to %(count)d product."
-                        ),
-                        _(
-                            "Applied %(discount)s%% discount to %(count)d products."
-                        ),
+                        "Applied %(discount)s%% discount to %(count)d product.",
+                        "Applied %(discount)s%% discount to %(count)d products.",
                         updated,
                     )
                     % {"count": updated, "discount": discount_percent},
@@ -2108,7 +2068,7 @@ class ProductAdmin(
         )
 
     @action(
-        description=_("Clear discount from selected products"),
+        description=str(_("Clear discount from selected products")),
         variant=ActionVariant.DANGER,
         icon="cancel",
     )
@@ -2117,8 +2077,8 @@ class ProductAdmin(
         self.message_user(
             request,
             ngettext(
-                _("%(count)d product's discount was cleared."),
-                _("%(count)d products' discounts were cleared."),
+                "%(count)d product's discount was cleared.",
+                "%(count)d products' discounts were cleared.",
                 updated,
             )
             % {"count": updated},
@@ -2136,6 +2096,7 @@ class ProductCategoryImageInline(TabularInline):
     tab = True
     show_change_link = True
 
+    @admin.display(description=_("Preview"))
     def image_preview(self, obj):
         if obj.image:
             safe_url = conditional_escape(obj.image.url)
@@ -2147,8 +2108,6 @@ class ProductCategoryImageInline(TabularInline):
         return mark_safe(
             '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-600 dark:text-base-300 text-xs">No Image</div>'
         )
-
-    image_preview.short_description = _("Preview")
 
 
 @admin.register(ProductCategory)
@@ -2249,6 +2208,7 @@ class ProductCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
     def get_prepopulated_fields(self, request, obj=None):
         return {"slug": ("name",)}
 
+    @admin.display(description=_("Category"))
     def category_info(self, instance):
         name = (
             instance.safe_translation_getter("name", any_language=True)
@@ -2276,8 +2236,7 @@ class ProductCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
         )
         return mark_safe(html)
 
-    category_info.short_description = _("Category")
-
+    @admin.display(description=_("Product Stats"))
     def category_stats(self, instance):
         direct_count = getattr(instance, "products_count", 0)
         total_count = getattr(instance, "products_cumulative_count", 0)
@@ -2296,8 +2255,7 @@ class ProductCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
         )
         return mark_safe(html)
 
-    category_stats.short_description = _("Product Stats")
-
+    @admin.display(description=_("Status"))
     def category_status(self, instance):
         if instance.active:
             status_badge = (
@@ -2316,8 +2274,7 @@ class ProductCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
 
         return mark_safe(status_badge)
 
-    category_status.short_description = _("Status")
-
+    @admin.display(description=_("Image"))
     def image_preview(self, instance):
         main_image = instance.main_image
         if main_image and main_image.image:
@@ -2333,15 +2290,13 @@ class ProductCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
             "</div>"
         )
 
-    image_preview.short_description = _("Image")
-
+    @admin.display(description=_("Created"))
     def created_display(self, instance):
         safe_date = conditional_escape(instance.created_at.strftime("%Y-%m-%d"))
         html = f'<div class="text-sm text-base-600 dark:text-base-400">{safe_date}</div>'
         return mark_safe(html)
 
-    created_display.short_description = _("Created")
-
+    @admin.display(description=_("Category Analytics"))
     def category_analytics(self, instance):
         ancestors_count = instance.get_ancestors().count()
         descendants_count = instance.get_descendants().count()
@@ -2372,8 +2327,7 @@ class ProductCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
         )
         return mark_safe(html)
 
-    category_analytics.short_description = _("Category Analytics")
-
+    @admin.display(description=_("Direct Products"))
     def products_count_display(self, instance):
         count = getattr(instance, "products_count", 0)
         safe_count = conditional_escape(str(count))
@@ -2385,8 +2339,7 @@ class ProductCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
         )
         return mark_safe(html)
 
-    products_count_display.short_description = _("Direct Products")
-
+    @admin.display(description=_("Total Products"))
     def recursive_products_display(self, instance):
         count = getattr(instance, "products_cumulative_count", 0)
         safe_count = conditional_escape(str(count))
@@ -2397,8 +2350,6 @@ class ProductCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
             "</span>"
         )
         return mark_safe(html)
-
-    recursive_products_display.short_description = _("Total Products")
 
 
 @admin.register(ProductReview)
@@ -2484,6 +2435,7 @@ class ProductReviewAdmin(ModelAdmin, TranslatableAdmin):
         ),
     )
 
+    @admin.display(description=_("Review"))
     def review_info(self, obj):
         comment = (
             obj.safe_translation_getter("comment", any_language=True)
@@ -2504,8 +2456,7 @@ class ProductReviewAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    review_info.short_description = _("Review")
-
+    @admin.display(description=_("Product"))
     def product_link(self, obj):
         if obj.product:
             name = obj.product.safe_translation_getter(
@@ -2526,8 +2477,7 @@ class ProductReviewAdmin(ModelAdmin, TranslatableAdmin):
             return mark_safe(html)
         return "-"
 
-    product_link.short_description = _("Product")
-
+    @admin.display(description=_("User"))
     def user_link(self, obj):
         if obj.user:
             safe_url = conditional_escape(
@@ -2545,8 +2495,7 @@ class ProductReviewAdmin(ModelAdmin, TranslatableAdmin):
             return mark_safe(html)
         return "-"
 
-    user_link.short_description = _("User")
-
+    @admin.display(description=_("Rating"))
     def rating_display(self, obj):
         rate = obj.rate
         stars = "⭐" * rate + "☆" * (10 - rate)
@@ -2569,8 +2518,7 @@ class ProductReviewAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    rating_display.short_description = _("Rating")
-
+    @admin.display(description=_("Status"))
     def status_badge(self, obj):
         status_config = {
             ReviewStatus.NEW: {
@@ -2610,8 +2558,7 @@ class ProductReviewAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    status_badge.short_description = _("Status")
-
+    @admin.display(description=_("Created"))
     def created_display(self, obj):
         safe_date = conditional_escape(
             obj.created_at.strftime("%Y-%m-%d %H:%M")
@@ -2619,10 +2566,8 @@ class ProductReviewAdmin(ModelAdmin, TranslatableAdmin):
         html = f'<div class="text-sm text-base-600 dark:text-base-400">{safe_date}</div>'
         return mark_safe(html)
 
-    created_display.short_description = _("Created")
-
     @action(
-        description=_("Approve selected reviews"),
+        description=str(_("Approve selected reviews")),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -2631,8 +2576,8 @@ class ProductReviewAdmin(ModelAdmin, TranslatableAdmin):
         self.message_user(
             request,
             ngettext(
-                _("%(count)d review was approved."),
-                _("%(count)d reviews were approved."),
+                "%(count)d review was approved.",
+                "%(count)d reviews were approved.",
                 updated,
             )
             % {"count": updated},
@@ -2640,7 +2585,7 @@ class ProductReviewAdmin(ModelAdmin, TranslatableAdmin):
         )
 
     @action(
-        description=_("Reject selected reviews"),
+        description=str(_("Reject selected reviews")),
         variant=ActionVariant.DANGER,
         icon="cancel",
     )
@@ -2649,8 +2594,8 @@ class ProductReviewAdmin(ModelAdmin, TranslatableAdmin):
         self.message_user(
             request,
             ngettext(
-                _("%(count)d review was rejected."),
-                _("%(count)d reviews were rejected."),
+                "%(count)d review was rejected.",
+                "%(count)d reviews were rejected.",
                 updated,
             )
             % {"count": updated},
@@ -2662,8 +2607,8 @@ class ProductReviewAdmin(ModelAdmin, TranslatableAdmin):
         self.message_user(
             request,
             ngettext(
-                _("%(count)d comment was successfully marked as published."),
-                _("%(count)d comments were successfully marked as published."),
+                "%(count)d comment was successfully marked as published.",
+                "%(count)d comments were successfully marked as published.",
                 updated,
             )
             % {"count": updated},
@@ -2675,10 +2620,8 @@ class ProductReviewAdmin(ModelAdmin, TranslatableAdmin):
         self.message_user(
             request,
             ngettext(
-                _("%(count)d comment was successfully marked as unpublished."),
-                _(
-                    "%(count)d comments were successfully marked as unpublished."
-                ),
+                "%(count)d comment was successfully marked as unpublished.",
+                "%(count)d comments were successfully marked as unpublished.",
                 updated,
             )
             % {"count": updated},
@@ -2711,6 +2654,7 @@ class ProductFavouriteAdmin(ModelAdmin):
     list_select_related = ["user", "product"]
     readonly_fields = ("created_at", "updated_at", "uuid")
 
+    @admin.display(description=_("User"))
     def user_display(self, obj):
         safe_email = conditional_escape(obj.user.email)
         safe_id = conditional_escape(str(obj.user.id))
@@ -2723,8 +2667,7 @@ class ProductFavouriteAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    user_display.short_description = _("User")
-
+    @admin.display(description=_("Product"))
     def product_display(self, obj):
         name = (
             obj.product.safe_translation_getter("name", any_language=True)
@@ -2741,16 +2684,13 @@ class ProductFavouriteAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    product_display.short_description = _("Product")
-
+    @admin.display(description=_("Created"))
     def created_display(self, obj):
         safe_date = conditional_escape(
             obj.created_at.strftime("%Y-%m-%d %H:%M")
         )
         html = f'<div class="text-sm text-base-600 dark:text-base-400">{safe_date}</div>'
         return mark_safe(html)
-
-    created_display.short_description = _("Created")
 
 
 @admin.register(ProductCategoryImage)
@@ -2812,6 +2752,7 @@ class ProductCategoryImageAdmin(ModelAdmin, TranslatableAdmin):
         ),
     )
 
+    @admin.display(description=_("Preview"))
     def image_preview(self, obj):
         if obj.image:
             safe_url = conditional_escape(obj.image.url)
@@ -2824,8 +2765,7 @@ class ProductCategoryImageAdmin(ModelAdmin, TranslatableAdmin):
             '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-600 dark:text-base-300 text-xs">No Image</div>'
         )
 
-    image_preview.short_description = _("Preview")
-
+    @admin.display(description=_("Category"))
     def category_name(self, obj):
         name = (
             obj.category.safe_translation_getter("name", any_language=True)
@@ -2835,8 +2775,7 @@ class ProductCategoryImageAdmin(ModelAdmin, TranslatableAdmin):
         html = f'<div class="text-sm font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
         return mark_safe(html)
 
-    category_name.short_description = _("Category")
-
+    @admin.display(description=_("Type"))
     def image_type_badge(self, obj):
         type_config = {
             "MAIN": {
@@ -2876,8 +2815,7 @@ class ProductCategoryImageAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    image_type_badge.short_description = _("Type")
-
+    @admin.display(description=_("Status"))
     def status_badge(self, obj):
         if obj.active:
             html = (
@@ -2894,8 +2832,6 @@ class ProductCategoryImageAdmin(ModelAdmin, TranslatableAdmin):
                 "</span>"
             )
         return mark_safe(html)
-
-    status_badge.short_description = _("Status")
 
 
 @admin.register(ProductImage)
@@ -2955,6 +2891,7 @@ class ProductImageAdmin(ModelAdmin, TranslatableAdmin):
         ),
     )
 
+    @admin.display(description=_("Preview"))
     def image_preview(self, obj):
         if obj.image:
             safe_url = conditional_escape(obj.image.url)
@@ -2967,8 +2904,7 @@ class ProductImageAdmin(ModelAdmin, TranslatableAdmin):
             '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-600 dark:text-base-300 text-xs">No Image</div>'
         )
 
-    image_preview.short_description = _("Preview")
-
+    @admin.display(description=_("Product"))
     def product_name(self, obj):
         name = (
             obj.product.safe_translation_getter("name", any_language=True)
@@ -2985,8 +2921,7 @@ class ProductImageAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    product_name.short_description = _("Product")
-
+    @admin.display(description=_("Type"))
     def main_badge(self, obj):
         if obj.is_main:
             html = (
@@ -3003,5 +2938,3 @@ class ProductImageAdmin(ModelAdmin, TranslatableAdmin):
                 "</span>"
             )
         return mark_safe(html)
-
-    main_badge.short_description = _("Type")

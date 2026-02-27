@@ -230,7 +230,7 @@ class Command(BaseCommand):
                     self.style.WARNING(f"Updated PayWay: {provider_code}")
                 )
 
-            translations = provider_data["translations"]
+            translations: dict = provider_data["translations"]  # type: ignore[invalid-assignment]
             for language_code in language_codes:
                 if language_code in translations:
                     lang_data = translations[language_code]

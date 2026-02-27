@@ -222,9 +222,11 @@ class RegionFilterTestCase(TestURLFixerMixin, APITestCase):
         self.assertIn(str(new_region.uuid), uuids)
 
     def test_filter_by_created_at_before(self):
+        from datetime import timedelta
+
         from django.utils import timezone
 
-        future_date = timezone.now() + timezone.timedelta(days=1)
+        future_date = timezone.now() + timedelta(days=1)
 
         response = self.client.get(
             self.get_region_list_url(),

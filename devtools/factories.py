@@ -1,7 +1,7 @@
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass
-from typing import Any, TypeVar
+from dataclasses import dataclass, field
+from typing import Any, TypeVar, cast
 
 import factory
 from django.conf import settings
@@ -23,11 +23,7 @@ class SeedingResult:
 
     created_count: int
     skipped_count: int = 0
-    errors: list[str] = None
-
-    def __post_init__(self):
-        if self.errors is None:
-            self.errors = []
+    errors: list[str] = field(default_factory=list)
 
     @property
     def total_processed(self) -> int:
@@ -91,7 +87,7 @@ class TranslationUtilities:
         if hasattr(factory_class, "master"):
             master_field = factory_class.master
             if hasattr(master_field, "_factory"):
-                return master_field._factory
+                return cast(type[factory.Factory], master_field._factory)
 
         return None
 
@@ -527,9 +523,9 @@ class CustomDjangoModelFactory(
 
 
 def custom_seeding(
-    description: str = None,
-    settings_key: str = None,
-    dependencies: list[str] = None,
+    description: str | None = None,
+    settings_key: str | None = None,
+    dependencies: list[str] | None = None,
 ):
     """
     Decorator to mark a factory as using custom seeding.

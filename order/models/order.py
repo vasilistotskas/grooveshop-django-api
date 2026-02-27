@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import Any
+from typing import Any, cast
 
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex, GinIndex
@@ -273,7 +273,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         self._original_status = self.status
 
     def clean(self) -> None:
-        errors: dict[str, list[str]] = {}
+        errors: dict[str, list] = {}
 
         if self.email:
             try:
@@ -436,7 +436,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         otherwise queries the database.
         """
         if hasattr(self, "_items_count"):
-            return self._items_count or 0
+            return cast(int, self._items_count) or 0
         return self.items.count()
 
     @property
@@ -448,5 +448,5 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         otherwise queries the database.
         """
         if hasattr(self, "_total_quantity"):
-            return self._total_quantity or 0
+            return cast(int, self._total_quantity) or 0
         return self.items.aggregate(total=Sum("quantity"))["total"] or 0

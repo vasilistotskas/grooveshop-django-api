@@ -377,6 +377,7 @@ class UserAdmin(ModelAdmin):
             ),
         )
 
+    @admin.display(description=_("Profile"))
     def user_profile_display(self, obj):
         html = '<div class="flex items-center gap-3">'
         if obj.image:
@@ -395,8 +396,7 @@ class UserAdmin(ModelAdmin):
         html += f'<div class="text-sm text-base-600 dark:text-base-300">{esc_email}</div></div></div>'
         return mark_safe(html)
 
-    user_profile_display.short_description = _("Profile")
-
+    @admin.display(description=_("Contact"))
     def contact_info_display(self, obj):
         parts = []
         if obj.phone:
@@ -420,8 +420,7 @@ class UserAdmin(ModelAdmin):
             '<span class="text-base-600 dark:text-base-300">No contact info</span>'
         )
 
-    contact_info_display.short_description = _("Contact")
-
+    @admin.display(description=_("Location"))
     def location_display(self, obj):
         loc = []
         if obj.city:
@@ -436,8 +435,7 @@ class UserAdmin(ModelAdmin):
             '<span class="text-base-600 dark:text-base-300">No location</span>'
         )
 
-    location_display.short_description = _("Location")
-
+    @admin.display(description=_("Status"))
     def user_status_badges(self, obj):
         badges = []
         if obj.is_superuser:
@@ -460,8 +458,7 @@ class UserAdmin(ModelAdmin):
             '<div class="flex flex-wrap gap-1">' + "".join(badges) + "</div>"
         )
 
-    user_status_badges.short_description = _("Status")
-
+    @admin.display(description=_("Social"))
     def social_links_display(self, obj):
         icons = []
         for field, (icon, icon_name) in {
@@ -481,8 +478,7 @@ class UserAdmin(ModelAdmin):
             '<span class="text-base-600 dark:text-base-300">-</span>'
         )
 
-    social_links_display.short_description = _("Social")
-
+    @admin.display(description=_("Engagement"))
     def engagement_metrics(self, obj):
         subs = getattr(obj, "subscription_count", 0)
         active = getattr(obj, "active_subscription_count", 0)
@@ -498,8 +494,7 @@ class UserAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    engagement_metrics.short_description = _("Engagement")
-
+    @admin.display(description=_("Last Activity"))
     def last_activity(self, obj):
         ts = (
             obj.updated_at.strftime("%Y-%m-%d %H:%M")
@@ -510,8 +505,7 @@ class UserAdmin(ModelAdmin):
         html = f'<div class="text-sm text-base-600 dark:text-base-400"><div>Updated: {esc_ts}</div></div>'
         return mark_safe(html)
 
-    last_activity.short_description = _("Last Activity")
-
+    @admin.display(description=_("Social Links Summary"))
     def social_links_summary(self, obj):
         links = []
         fields = {
@@ -538,8 +532,7 @@ class UserAdmin(ModelAdmin):
             '<span class="text-base-600 dark:text-base-300 italic">No social media links</span>'
         )
 
-    social_links_summary.short_description = _("Social Links Summary")
-
+    @admin.display(description=_("Subscription Summary"))
     def subscription_summary(self, obj):
         subs = list(obj.subscriptions.select_related("topic").all())
         if not subs:
@@ -557,8 +550,7 @@ class UserAdmin(ModelAdmin):
         html = f'<div class="text-sm"><div class="font-medium text-base-700 dark:text-base-300">Active: {esc_active}/{esc_total}</div></div>'
         return mark_safe(html)
 
-    subscription_summary.short_description = _("Subscription Summary")
-
+    @admin.display(description=_("Address Summary"))
     def address_summary(self, obj):
         addrs = list(obj.addresses.all())
         if not addrs:
@@ -571,8 +563,7 @@ class UserAdmin(ModelAdmin):
         html = f'<div class="text-sm"><div class="font-medium text-base-700 dark:text-base-300">Total: {esc_total}</div><div class="text-base-600 dark:text-base-300">Main: {main_text}</div></div>'
         return mark_safe(html)
 
-    address_summary.short_description = _("Address Summary")
-
+    @admin.display(description=_("Points Balance"))
     def loyalty_points_balance(self, obj):
         balance = LoyaltyService.get_user_balance(obj)
         esc_balance = conditional_escape(str(balance))
@@ -583,8 +574,7 @@ class UserAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    loyalty_points_balance.short_description = _("Points Balance")
-
+    @admin.display(description=_("Total XP"))
     def loyalty_total_xp(self, obj):
         esc_xp = conditional_escape(str(obj.total_xp))
         html = (
@@ -594,8 +584,7 @@ class UserAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    loyalty_total_xp.short_description = _("Total XP")
-
+    @admin.display(description=_("Level"))
     def loyalty_level(self, obj):
         level = LoyaltyService.get_user_level(obj)
         esc_level = conditional_escape(str(level))
@@ -606,8 +595,7 @@ class UserAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    loyalty_level.short_description = _("Level")
-
+    @admin.display(description=_("Tier"))
     def loyalty_tier_name(self, obj):
         tier = LoyaltyService.get_user_tier(obj)
         if tier:
@@ -621,10 +609,8 @@ class UserAdmin(ModelAdmin):
             html = '<span class="text-base-600 dark:text-base-300 italic">No tier</span>'
         return mark_safe(html)
 
-    loyalty_tier_name.short_description = _("Tier")
-
     @action(
-        description=_("Adjust loyalty points for selected users"),
+        description=str(_("Adjust loyalty points for selected users")),
         variant=ActionVariant.INFO,
         icon="loyalty",
     )
@@ -734,6 +720,7 @@ class UserAddressAdmin(ModelAdmin):
         ),
     )
 
+    @admin.display(description=_("Address"))
     def address_display(self, obj):
         esc_title = conditional_escape(obj.title)
         addr = f"{obj.street} {obj.street_number}, {obj.city}"
@@ -741,16 +728,14 @@ class UserAddressAdmin(ModelAdmin):
         html = f'<div class="text-sm"><div class="font-medium text-base-900 dark:text-base-100">{esc_title}</div><div class="text-base-600 dark:text-base-300">{esc_addr}</div></div>'
         return mark_safe(html)
 
-    address_display.short_description = _("Address")
-
+    @admin.display(description=_("Contact Person"))
     def contact_person(self, obj):
         esc_name = conditional_escape(f"{obj.first_name} {obj.last_name}")
         esc_email = conditional_escape(obj.user.email)
         html = f'<div class="text-sm"><div class="font-medium text-base-700 dark:text-base-300">{esc_name}</div><div class="text-base-600 dark:text-base-300">{esc_email}</div></div>'
         return mark_safe(html)
 
-    contact_person.short_description = _("Contact Person")
-
+    @admin.display(description=_("Location"))
     def location_info(self, obj):
         parts = [conditional_escape(obj.city)]
         if obj.country:
@@ -761,8 +746,7 @@ class UserAddressAdmin(ModelAdmin):
         html = f'<div class="text-sm text-base-700 dark:text-base-300">{text}</div>'
         return mark_safe(html)
 
-    location_info.short_description = _("Location")
-
+    @admin.display(description=_("Main"))
     def main_address_badge(self, obj):
         if obj.is_main:
             return mark_safe(
@@ -770,8 +754,7 @@ class UserAddressAdmin(ModelAdmin):
             )
         return ""
 
-    main_address_badge.short_description = _("Main")
-
+    @admin.display(description=_("Contact Numbers"))
     def contact_numbers(self, obj):
         nums = []
         if obj.phone:
@@ -789,8 +772,6 @@ class UserAddressAdmin(ModelAdmin):
         return mark_safe(
             '<span class="text-base-600 dark:text-base-300">No phone</span>'
         )
-
-    contact_numbers.short_description = _("Contact Numbers")
 
 
 @admin.register(SubscriptionTopic)
@@ -861,6 +842,7 @@ class SubscriptionTopicAdmin(ModelAdmin, TranslatableAdmin):
             total_subscribers=Count("subscribers"),
         )
 
+    @admin.display(description=_("Topic"))
     def name_display(self, obj):
         name = (
             obj.safe_translation_getter("name", any_language=True)
@@ -871,8 +853,7 @@ class SubscriptionTopicAdmin(ModelAdmin, TranslatableAdmin):
         html = f'<div class="text-sm"><div class="font-medium text-base-900 dark:text-base-100">{esc_name}</div><div class="text-base-600 dark:text-base-300">{esc_slug}</div></div>'
         return mark_safe(html)
 
-    name_display.short_description = _("Topic")
-
+    @admin.display(description=_("Category"))
     def category_badge(self, obj):
         colors = {
             "MARKETING": "bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-300",
@@ -887,8 +868,7 @@ class SubscriptionTopicAdmin(ModelAdmin, TranslatableAdmin):
         html = f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium {cls} rounded-full">{disp}</span>'
         return mark_safe(html)
 
-    category_badge.short_description = _("Category")
-
+    @admin.display(description=_("Status"))
     def active_status(self, obj):
         if obj.is_active:
             html = '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1"><span>✓</span><span>Active</span></span>'
@@ -896,8 +876,7 @@ class SubscriptionTopicAdmin(ModelAdmin, TranslatableAdmin):
             html = '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1"><span>✗</span><span>Inactive</span></span>'
         return mark_safe(html)
 
-    active_status.short_description = _("Status")
-
+    @admin.display(description=_("Settings"))
     def settings_badges(self, obj):
         badges = []
         if obj.is_default:
@@ -918,15 +897,12 @@ class SubscriptionTopicAdmin(ModelAdmin, TranslatableAdmin):
             else ""
         )
 
-    settings_badges.short_description = _("Settings")
-
+    @admin.display(description=_("Subscribers"))
     def subscriber_metrics(self, obj):
         active = conditional_escape(str(getattr(obj, "active_subscribers", 0)))
         total = conditional_escape(str(getattr(obj, "total_subscribers", 0)))
         html = f'<div class="text-sm text-base-700 dark:text-base-300 flex items-center gap-3"><span class="flex items-center gap-1 text-green-600 dark:text-green-400"><span>✓</span><span>{active}</span></span><span class="flex items-center gap-1 text-blue-600 dark:text-blue-400"><span>👥</span><span>{total}</span></span></div>'
         return mark_safe(html)
-
-    subscriber_metrics.short_description = _("Subscribers")
 
 
 @admin.register(UserSubscription)
@@ -999,14 +975,14 @@ class UserSubscriptionAdmin(ModelAdmin):
         ),
     )
 
+    @admin.display(description=_("Subscription"))
     def subscription_info(self, obj):
         esc_id = conditional_escape(str(obj.id))
         date = conditional_escape(obj.created_at.strftime("%Y-%m-%d"))
         html = f'<div class="text-sm"><div class="font-medium text-base-900 dark:text-base-100">Subscription #{esc_id}</div><div class="text-base-600 dark:text-base-300">{date}</div></div>'
         return mark_safe(html)
 
-    subscription_info.short_description = _("Subscription")
-
+    @admin.display(description=_("User"))
     def user_info(self, obj):
         name = obj.user.full_name or obj.user.username or "Anonymous"
         esc_name = conditional_escape(name)
@@ -1014,8 +990,7 @@ class UserSubscriptionAdmin(ModelAdmin):
         html = f'<div class="text-sm"><div class="font-medium text-base-700 dark:text-base-300">{esc_name}</div><div class="text-base-600 dark:text-base-300">{esc_email}</div></div>'
         return mark_safe(html)
 
-    user_info.short_description = _("User")
-
+    @admin.display(description=_("Topic"))
     def topic_info(self, obj):
         topic = (
             obj.topic.safe_translation_getter("name", any_language=True)
@@ -1026,8 +1001,7 @@ class UserSubscriptionAdmin(ModelAdmin):
         html = f'<div class="text-sm"><div class="font-medium text-base-700 dark:text-base-300">{esc_topic}</div><div class="text-base-600 dark:text-base-300">{esc_cat}</div></div>'
         return mark_safe(html)
 
-    topic_info.short_description = _("Topic")
-
+    @admin.display(description=_("Status"))
     def status_display(self, obj):
         colors = {
             UserSubscription.SubscriptionStatus.ACTIVE: "bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300",
@@ -1051,8 +1025,7 @@ class UserSubscriptionAdmin(ModelAdmin):
         html = f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium {cls} rounded-full gap-1"><span>{icon}</span><span>{label}</span></span>'
         return mark_safe(html)
 
-    status_display.short_description = _("Status")
-
+    @admin.display(description=_("Dates"))
     def subscription_dates(self, obj):
         sub = conditional_escape(obj.subscribed_at.strftime("%Y-%m-%d %H:%M"))
         html = f'<div class="text-sm text-base-600 dark:text-base-400"><div>Subscribed: {sub}</div>'
@@ -1064,10 +1037,8 @@ class UserSubscriptionAdmin(ModelAdmin):
         html += "</div>"
         return mark_safe(html)
 
-    subscription_dates.short_description = _("Dates")
-
     @action(
-        description=_("Activate selected subscriptions"),
+        description=str(_("Activate selected subscriptions")),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -1087,7 +1058,7 @@ class UserSubscriptionAdmin(ModelAdmin):
         )
 
     @action(
-        description=_("Deactivate selected subscriptions"),
+        description=str(_("Deactivate selected subscriptions")),
         variant=ActionVariant.WARNING,
         icon="cancel",
     )

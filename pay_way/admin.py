@@ -227,6 +227,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
         ),
     )
 
+    @admin.display(description=_("Name"))
     def name_display(self, obj):
         name = (
             obj.safe_translation_getter("name", any_language=True)
@@ -236,8 +237,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
         html = f'<strong class="text-base-900 dark:text-base-100">{safe_name}</strong>'
         return mark_safe(html)
 
-    name_display.short_description = _("Name")
-
+    @admin.display(description=_("Provider"))
     def provider_code_badge(self, obj):
         if obj.provider_code:
             safe_code = conditional_escape(obj.provider_code)
@@ -254,8 +254,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
             "</span>"
         )
 
-    provider_code_badge.short_description = _("Provider")
-
+    @admin.display(description=_("Status"))
     def active_status(self, obj):
         if obj.active:
             return mark_safe(
@@ -271,8 +270,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
             "</span>"
         )
 
-    active_status.short_description = _("Status")
-
+    @admin.display(description=_("Type"))
     def payment_type_display(self, obj):
         if obj.is_online_payment:
             return mark_safe(
@@ -295,8 +293,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
             "</span>"
         )
 
-    payment_type_display.short_description = _("Type")
-
+    @admin.display(description=_("Cost"))
     def cost_display(self, obj):
         if obj.cost and obj.cost.amount > 0:
             safe_amount = conditional_escape(str(obj.cost.amount))
@@ -315,8 +312,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
             "</span>"
         )
 
-    cost_display.short_description = _("Cost")
-
+    @admin.display(description=_("Free Threshold"))
     def free_threshold_display(self, obj):
         if obj.free_threshold and obj.free_threshold.amount > 0:
             safe_amount = conditional_escape(str(obj.free_threshold.amount))
@@ -331,8 +327,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
             '<span class="text-base-600 dark:text-base-300">No threshold</span>'
         )
 
-    free_threshold_display.short_description = _("Free Threshold")
-
+    @admin.display(description=_("Configuration"))
     def configuration_status(self, obj):
         if not obj.is_online_payment:
             return mark_safe(
@@ -355,8 +350,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
             "</span>"
         )
 
-    configuration_status.short_description = _("Configuration")
-
+    @admin.display(description=_("Order"))
     def sort_order_display(self, obj):
         if obj.sort_order is not None:
             safe_order = conditional_escape(str(obj.sort_order))
@@ -371,8 +365,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
             '<span class="text-base-600 dark:text-base-300">-</span>'
         )
 
-    sort_order_display.short_description = _("Order")
-
+    @admin.display(description=_("Icon"))
     def icon_preview(self, obj):
         if obj.icon:
             safe_url = conditional_escape(obj.icon.url)
@@ -385,8 +378,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
             '<span class="text-base-600 dark:text-base-300">No icon</span>'
         )
 
-    icon_preview.short_description = _("Icon")
-
+    @admin.display(description=_("Configuration Preview"))
     def configuration_preview(self, obj):
         if not obj.configuration:
             return mark_safe(
@@ -406,8 +398,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    configuration_preview.short_description = _("Configuration Preview")
-
+    @admin.display(description=_("Effective Cost"))
     def effective_cost_display(self, obj):
         if obj.cost:
             formatted = f"{obj.effective_cost} {obj.cost.currency}"
@@ -421,8 +412,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    effective_cost_display.short_description = _("Effective Cost")
-
+    @admin.display(description=_("Ready Status"))
     def is_configured_status(self, obj):
         if obj.is_configured:
             return mark_safe(
@@ -438,10 +428,8 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
             "</span>"
         )
 
-    is_configured_status.short_description = _("Ready Status")
-
     @action(
-        description=_("Activate selected payment methods"),
+        description=str(_("Activate selected payment methods")),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -454,7 +442,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
         )
 
     @action(
-        description=_("Deactivate selected payment methods"),
+        description=str(_("Deactivate selected payment methods")),
         variant=ActionVariant.WARNING,
         icon="cancel",
     )
@@ -467,7 +455,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
         )
 
     @action(
-        description=_("Move selected items up in sort order"),
+        description=str(_("Move selected items up in sort order")),
         variant=ActionVariant.INFO,
         icon="keyboard_arrow_up",
     )
@@ -484,7 +472,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
         )
 
     @action(
-        description=_("Move selected items down in sort order"),
+        description=str(_("Move selected items down in sort order")),
         variant=ActionVariant.INFO,
         icon="keyboard_arrow_down",
     )
@@ -500,7 +488,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
         )
 
     @action(
-        description=_("Reset sort order to default"),
+        description=str(_("Reset sort order to default")),
         variant=ActionVariant.INFO,
         icon="sort",
     )

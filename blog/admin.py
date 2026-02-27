@@ -180,13 +180,12 @@ class BlogCommentInline(TabularInline):
 
     tab = True
 
+    @admin.display(description=_("Content Preview"))
     def content_preview(self, obj):
         content = (
             obj.safe_translation_getter("content", any_language=True) or ""
         )
         return content[:50] + "..." if len(content) > 50 else content
-
-    content_preview.short_description = _("Content Preview")
 
 
 @admin.register(BlogAuthor)
@@ -238,6 +237,7 @@ class BlogAuthorAdmin(ModelAdmin, TranslatableAdmin):
         ),
     )
 
+    @admin.display(description=_("User"))
     def user_display(self, obj):
         safe_name = conditional_escape(obj.user.full_name or obj.user.username)
         safe_email = conditional_escape(obj.user.email)
@@ -250,16 +250,14 @@ class BlogAuthorAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    user_display.short_description = _("User")
-
+    @admin.display(description=_("Bio"))
     def bio_preview(self, obj):
         bio = obj.safe_translation_getter("bio", any_language=True) or ""
         if len(bio) > 50:
             return f"{bio[:50]}..."
         return bio
 
-    bio_preview.short_description = _("Bio")
-
+    @admin.display(description=_("Posts"))
     def posts_count(self, obj):
         count = obj.blog_posts.count()
         safe_count = conditional_escape(str(count))
@@ -272,8 +270,7 @@ class BlogAuthorAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    posts_count.short_description = _("Posts")
-
+    @admin.display(description=_("Total Likes"))
     def total_likes_display(self, obj):
         total = obj.total_likes_received
         safe_total = conditional_escape(str(total))
@@ -287,8 +284,7 @@ class BlogAuthorAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    total_likes_display.short_description = _("Total Likes")
-
+    @admin.display(description=_("Website"))
     def website_link(self, obj):
         if obj.website:
             safe_url = conditional_escape(obj.website)
@@ -300,8 +296,6 @@ class BlogAuthorAdmin(ModelAdmin, TranslatableAdmin):
             )
             return mark_safe(html)
         return "-"
-
-    website_link.short_description = _("Website")
 
 
 @admin.register(BlogTag)
@@ -344,6 +338,7 @@ class BlogTagAdmin(ModelAdmin, TranslatableAdmin):
         ),
     )
 
+    @admin.display(description=_("Name"))
     def name_display(self, obj):
         name = (
             obj.safe_translation_getter("name", any_language=True)
@@ -354,8 +349,7 @@ class BlogTagAdmin(ModelAdmin, TranslatableAdmin):
         html = f'<strong class="text-base-900 dark:text-base-100">{safe_name}</strong>'
         return mark_safe(html)
 
-    name_display.short_description = _("Name")
-
+    @admin.display(description=_("Status"))
     def active_badge(self, obj):
         if obj.active:
             html = (
@@ -375,8 +369,7 @@ class BlogTagAdmin(ModelAdmin, TranslatableAdmin):
             )
         return mark_safe(html)
 
-    active_badge.short_description = _("Status")
-
+    @admin.display(description=_("Posts"))
     def posts_count_badge(self, obj):
         count = obj.blog_posts.count()
         safe_count = conditional_escape(str(count))
@@ -388,8 +381,6 @@ class BlogTagAdmin(ModelAdmin, TranslatableAdmin):
             "</span>"
         )
         return mark_safe(html)
-
-    posts_count_badge.short_description = _("Posts")
 
 
 @admin.register(BlogCategory)
@@ -471,6 +462,7 @@ class BlogCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
             "slug": ("name",),
         }
 
+    @admin.display(description=_("Image"))
     def category_image(self, obj):
         if obj.image:
             safe_url = conditional_escape(obj.image.url)
@@ -483,8 +475,7 @@ class BlogCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
             '<span class="text-base-600 dark:text-base-300">No image</span>'
         )
 
-    category_image.short_description = _("Image")
-
+    @admin.display(description=_("Direct Posts"))
     def posts_count_display(self, instance):
         count = getattr(instance, "posts_count", 0)
         safe_count = conditional_escape(str(count))
@@ -497,8 +488,7 @@ class BlogCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
         )
         return mark_safe(html)
 
-    posts_count_display.short_description = _("Direct Posts")
-
+    @admin.display(description=_("Total Posts (Tree)"))
     def recursive_posts_display(self, instance):
         count = getattr(instance, "posts_cumulative_count", 0)
         safe_count = conditional_escape(str(count))
@@ -510,8 +500,6 @@ class BlogCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
             "</span>"
         )
         return mark_safe(html)
-
-    recursive_posts_display.short_description = _("Total Posts (Tree)")
 
 
 @admin.register(BlogPost)
@@ -662,6 +650,7 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
             .with_tags_count()
         )
 
+    @admin.display(description=_("Title"))
     def title_display(self, obj):
         title = (
             obj.safe_translation_getter("title", any_language=True)
@@ -672,8 +661,7 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         html = f'<strong class="text-base-900 dark:text-base-100">{safe_title}</strong>'
         return mark_safe(html)
 
-    title_display.short_description = _("Title")
-
+    @admin.display(description=_("Category"))
     def category_badge(self, obj):
         if obj.category:
             category_name = (
@@ -693,8 +681,7 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
             '<span class="text-base-600 dark:text-base-300">No category</span>'
         )
 
-    category_badge.short_description = _("Category")
-
+    @admin.display(description=_("Author"))
     def author_display(self, obj):
         if obj.author:
             author_name = obj.author.user.full_name or obj.author.user.username
@@ -706,8 +693,7 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
             '<span class="text-base-600 dark:text-base-300">No author</span>'
         )
 
-    author_display.short_description = _("Author")
-
+    @admin.display(description=_("Featured"))
     def featured_badge(self, obj):
         if obj.featured:
             html = (
@@ -720,8 +706,7 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
             return mark_safe(html)
         return ""
 
-    featured_badge.short_description = _("Featured")
-
+    @admin.display(description=_("Status"))
     def publish_status_badge(self, obj):
         if obj.is_published and obj.published_at:
             if obj.published_at <= timezone.now():
@@ -750,8 +735,7 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
             )
         return mark_safe(html)
 
-    publish_status_badge.short_description = _("Status")
-
+    @admin.display(description=_("Engagement"))
     def engagement_metrics(self, obj):
         likes = obj.likes_count
         comments = obj.comments_count
@@ -776,8 +760,7 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    engagement_metrics.short_description = _("Engagement")
-
+    @admin.display(description=_("SEO Score"))
     def seo_score(self, obj):
         score = 0
         title = obj.safe_translation_getter("title", any_language=True) or ""
@@ -814,8 +797,7 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    seo_score.short_description = _("SEO Score")
-
+    @admin.display(description="")
     def image_preview(self, obj):
         if obj.image:
             safe_url = conditional_escape(obj.image.url)
@@ -828,15 +810,13 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
             '<span class="text-base-600 dark:text-base-300">No image</span>'
         )
 
-    image_preview.short_description = ""
-
     def get_prepopulated_fields(self, request, obj=None):
         return {
             "slug": ("title",),
         }
 
     @action(
-        description=_("Mark selected posts as featured"),
+        description=str(_("Mark selected posts as featured")),
         variant=ActionVariant.PRIMARY,
         icon="star",
     )
@@ -849,7 +829,7 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         )
 
     @action(
-        description=_("Remove featured mark from selected posts"),
+        description=str(_("Remove featured mark from selected posts")),
         variant=ActionVariant.WARNING,
         icon="star_border",
     )
@@ -862,7 +842,7 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         )
 
     @action(
-        description=_("Publish selected posts"),
+        description=str(_("Publish selected posts")),
         variant=ActionVariant.SUCCESS,
         icon="publish",
     )
@@ -877,7 +857,7 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         )
 
     @action(
-        description=_("Unpublish selected posts"),
+        description=str(_("Unpublish selected posts")),
         variant=ActionVariant.WARNING,
         icon="unpublished",
     )
@@ -890,7 +870,7 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         )
 
     @action(
-        description=_("Increment view count by 100"),
+        description=str(_("Increment view count by 100")),
         variant=ActionVariant.INFO,
         icon="visibility",
     )
@@ -906,7 +886,7 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         )
 
     @action(
-        description=_("Reset view count to zero"),
+        description=str(_("Reset view count to zero")),
         variant=ActionVariant.WARNING,
         icon="visibility_off",
     )
@@ -1004,6 +984,7 @@ class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
             .select_related("post", "user", "parent")
         )
 
+    @admin.display(description=_("User"))
     def user_display(self, obj):
         if obj.user:
             full_name = obj.user.full_name
@@ -1025,8 +1006,7 @@ class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
             '<span class="text-base-600 dark:text-base-300 italic">Anonymous</span>'
         )
 
-    user_display.short_description = _("User")
-
+    @admin.display(description=_("Post"))
     def post_link(self, obj):
         if obj.post:
             title = (
@@ -1050,8 +1030,7 @@ class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
             '<span class="text-base-600 dark:text-base-300">No post</span>'
         )
 
-    post_link.short_description = _("Post")
-
+    @admin.display(description=_("Status"))
     def approval_badge(self, obj):
         if obj.approved:
             html = (
@@ -1071,8 +1050,7 @@ class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
             )
         return mark_safe(html)
 
-    approval_badge.short_description = _("Status")
-
+    @admin.display(description=_("Engagement"))
     def engagement_display(self, obj):
         likes = obj.likes_count
         replies = obj.replies_count
@@ -1092,10 +1070,8 @@ class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
         )
         return mark_safe(html)
 
-    engagement_display.short_description = _("Engagement")
-
     @action(
-        description=_("Approve selected comments"),
+        description=str(_("Approve selected comments")),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -1108,7 +1084,7 @@ class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
         )
 
     @action(
-        description=_("Unapprove selected comments"),
+        description=str(_("Unapprove selected comments")),
         variant=ActionVariant.WARNING,
         icon="cancel",
     )
@@ -1121,7 +1097,7 @@ class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
         )
 
     @action(
-        description=_("Mark as spam and delete"),
+        description=str(_("Mark as spam and delete")),
         variant=ActionVariant.DANGER,
         icon="report",
     )

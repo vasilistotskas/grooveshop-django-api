@@ -195,6 +195,7 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
             .prefetch_related("taggeditem_set__content_type")
         )
 
+    @admin.display(description=_("Tag"))
     def tag_info(self, obj):
         label = obj.safe_translation_getter("label", any_language=True) or _(
             "Unnamed Tag"
@@ -225,8 +226,7 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    tag_info.short_description = _("Tag")
-
+    @admin.display(description=_("Status"))
     def status_badge(self, obj):
         if obj.active:
             status = mark_safe(
@@ -275,8 +275,7 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    status_badge.short_description = _("Status")
-
+    @admin.display(description=_("Usage"))
     def usage_stats(self, obj):
         usage = getattr(obj, "usage_count", 0)
         if usage == 0:
@@ -324,8 +323,7 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    usage_stats.short_description = _("Usage")
-
+    @admin.display(description=_("Content Types"))
     def content_distribution(self, obj):
         ct_count = getattr(obj, "content_types_count", 0)
         top_map = {}
@@ -374,8 +372,7 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    content_distribution.short_description = _("Content Types")
-
+    @admin.display(description=_("Sort Order"))
     def sort_display(self, obj):
         order = obj.sort_order
         if order is None:
@@ -405,8 +402,7 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    sort_display.short_description = _("Sort Order")
-
+    @admin.display(description=_("Created"))
     def created_display(self, obj):
         d = obj.created_at.strftime("%Y-%m-%d")
         t = obj.created_at.strftime("%H:%M")
@@ -420,8 +416,7 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    created_display.short_description = _("Created")
-
+    @admin.display(description=_("Tag Analytics"))
     def tag_analytics(self, obj):
         label = obj.safe_translation_getter("label", any_language=True) or ""
         chars = len(label)
@@ -452,8 +447,7 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    tag_analytics.short_description = _("Tag Analytics")
-
+    @admin.display(description=_("Usage Analytics"))
     def usage_analytics(self, obj):
         items = TaggedItem.objects.filter(tag=obj)
         total = items.count()
@@ -480,8 +474,7 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    usage_analytics.short_description = _("Usage Analytics")
-
+    @admin.display(description=_("Content Analytics"))
     def content_analytics(self, obj):
         items = TaggedItem.objects.filter(tag=obj).select_related(
             "content_type"
@@ -492,7 +485,7 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
             stats[m] = stats.get(m, 0) + 1
 
         diversity = len(stats)
-        top = max(stats, key=stats.get) if stats else _("None")
+        top = max(stats, key=lambda k: stats[k]) if stats else _("None")
         top_count = stats.get(top, 0)
         spec = (
             _("Specialized")
@@ -519,10 +512,8 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    content_analytics.short_description = _("Content Analytics")
-
     @action(
-        description=_("Activate selected tags"),
+        description=str(_("Activate selected tags")),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -531,8 +522,8 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
         self.message_user(
             request,
             ngettext(
-                _("%(count)d tag was activated."),
-                _("%(count)d tags were activated."),
+                "%(count)d tag was activated.",
+                "%(count)d tags were activated.",
                 updated,
             )
             % {"count": updated},
@@ -540,7 +531,7 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
         )
 
     @action(
-        description=_("Deactivate selected tags"),
+        description=str(_("Deactivate selected tags")),
         variant=ActionVariant.WARNING,
         icon="cancel",
     )
@@ -549,8 +540,8 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
         self.message_user(
             request,
             ngettext(
-                _("%(count)d tag was deactivated."),
-                _("%(count)d tags were deactivated."),
+                "%(count)d tag was deactivated.",
+                "%(count)d tags were deactivated.",
                 updated,
             )
             % {"count": updated},
@@ -558,7 +549,7 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
         )
 
     @action(
-        description=_("Update sort order"),
+        description=str(_("Update sort order")),
         variant=ActionVariant.INFO,
         icon="sort",
     )
@@ -578,7 +569,7 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
         )
 
     @action(
-        description=_("Analyze tag usage"),
+        description=str(_("Analyze tag usage")),
         variant=ActionVariant.PRIMARY,
         icon="analytics",
     )
@@ -649,6 +640,7 @@ class TaggedItemAdmin(ModelAdmin):
             .prefetch_related("tag__translations")
         )
 
+    @admin.display(description=_("Tagged Item"))
     def tagged_item_info(self, obj):
         esc_id = conditional_escape(str(obj.id))
         esc_obj = conditional_escape(str(obj.object_id))
@@ -662,8 +654,7 @@ class TaggedItemAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    tagged_item_info.short_description = _("Tagged Item")
-
+    @admin.display(description=_("Tag"))
     def tag_display(self, obj):
         t = obj.tag
         label = t.safe_translation_getter("label", any_language=True) or _(
@@ -689,8 +680,7 @@ class TaggedItemAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    tag_display.short_description = _("Tag")
-
+    @admin.display(description=_("Content Object"))
     def content_object_display(self, obj):
         try:
             co = obj.content_object
@@ -714,8 +704,7 @@ class TaggedItemAdmin(ModelAdmin):
                 '<div class="text-sm text-red-600 dark:text-red-400">Error loading object</div>'
             )
 
-    content_object_display.short_description = _("Content Object")
-
+    @admin.display(description=_("Content Type"))
     def content_type_badge(self, obj):
         name = obj.content_type.model
         cfg = {
@@ -760,8 +749,7 @@ class TaggedItemAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    content_type_badge.short_description = _("Content Type")
-
+    @admin.display(description=_("Created"))
     def created_display(self, obj):
         d = obj.created_at.strftime("%Y-%m-%d")
         t = obj.created_at.strftime("%H:%M")
@@ -774,8 +762,6 @@ class TaggedItemAdmin(ModelAdmin):
             "</div>"
         )
         return mark_safe(html)
-
-    created_display.short_description = _("Created")
 
 
 class TaggedItemInline(GenericTabularInline):

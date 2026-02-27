@@ -221,6 +221,7 @@ class OrderItemInline(TabularInline):
     tab = True
     show_change_link = True
 
+    @admin.display(description=_("Product"))
     def product_display(self, obj):
         if obj.product:
             product_name = (
@@ -239,22 +240,19 @@ class OrderItemInline(TabularInline):
             return mark_safe(html)
         return "-"
 
-    product_display.short_description = _("Product")
-
+    @admin.display(description=_("Unit Price"))
     def price_display(self, obj):
         safe_price = conditional_escape(str(obj.price))
         html = f'<div class="text-sm font-medium text-base-900 dark:text-base-100">{safe_price}</div>'
         return mark_safe(html)
 
-    price_display.short_description = _("Unit Price")
-
+    @admin.display(description=_("Total"))
     def total_display(self, obj):
         safe_total = conditional_escape(str(obj.total_price))
         html = f'<div class="text-sm font-bold text-base-900 dark:text-base-100">{safe_total}</div>'
         return mark_safe(html)
 
-    total_display.short_description = _("Total")
-
+    @admin.display(description=_("Refund Status"))
     def refund_status(self, obj):
         if obj.is_refunded:
             html = (
@@ -273,8 +271,6 @@ class OrderItemInline(TabularInline):
             )
             return mark_safe(html)
         return ""
-
-    refund_status.short_description = _("Refund Status")
 
 
 class OrderHistoryInline(TabularInline):
@@ -296,6 +292,7 @@ class OrderHistoryInline(TabularInline):
 
     tab = True
 
+    @admin.display(description=_("Description"))
     def description_display(self, obj):
         description = (
             obj.safe_translation_getter("description", any_language=True)
@@ -309,8 +306,7 @@ class OrderHistoryInline(TabularInline):
         html = f'<div class="text-sm text-base-700 dark:text-base-300">{safe_desc}</div>'
         return mark_safe(html)
 
-    description_display.short_description = _("Description")
-
+    @admin.display(description=_("Changed By"))
     def user_display(self, obj):
         if obj.user:
             safe_name = conditional_escape(
@@ -321,8 +317,6 @@ class OrderHistoryInline(TabularInline):
         return mark_safe(
             '<span class="text-base-600 dark:text-base-300">System</span>'
         )
-
-    user_display.short_description = _("Changed By")
 
 
 @admin.register(Order)
@@ -494,6 +488,7 @@ class OrderAdmin(ModelAdmin):
             .select_related("user", "country", "region", "pay_way")
         )
 
+    @admin.display(description=_("Customer"))
     def customer_info(self, obj):
         full_name = f"{obj.first_name} {obj.last_name}"
         safe_name = conditional_escape(full_name)
@@ -509,8 +504,7 @@ class OrderAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    customer_info.short_description = _("Customer")
-
+    @admin.display(description=_("Order Summary"))
     def order_summary(self, obj):
         item_count = getattr(obj, "item_count", 0)
         total_qty = getattr(obj, "total_items_quantity", 0)
@@ -543,8 +537,7 @@ class OrderAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    order_summary.short_description = _("Order Summary")
-
+    @admin.display(description=_("Payment"))
     def payment_info(self, obj):
         payment_badge = self.payment_status_badge(obj)
         paid_amount = obj.paid_amount or obj.total_price
@@ -560,8 +553,7 @@ class OrderAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    payment_info.short_description = _("Payment")
-
+    @admin.display(description=_("Shipping"))
     def shipping_info(self, obj):
         safe_city = conditional_escape(obj.city)
 
@@ -587,8 +579,7 @@ class OrderAdmin(ModelAdmin):
             )
         return mark_safe(html)
 
-    shipping_info.short_description = _("Shipping")
-
+    @admin.display(description=_("Created"))
     def created_display(self, obj):
         now = timezone.now()
         diff = now - obj.created_at
@@ -616,8 +607,7 @@ class OrderAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    created_display.short_description = _("Created")
-
+    @admin.display(description=_("Priority"))
     def urgency_indicator(self, obj):
         if not obj.created_at:
             return "Available after creation."
@@ -651,8 +641,7 @@ class OrderAdmin(ModelAdmin):
             return mark_safe(html)
         return ""
 
-    urgency_indicator.short_description = _("Priority")
-
+    @admin.display(description=_("Status"))
     def status_badge(self, obj):
         status_config = {
             OrderStatus.PENDING: {
@@ -717,8 +706,6 @@ class OrderAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    status_badge.short_description = _("Status")
-
     def payment_status_badge(self, obj):
         payment_config = {
             PaymentStatus.COMPLETED: {
@@ -778,6 +765,7 @@ class OrderAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
+    @admin.display(description=_("Document Type"))
     def document_type_badge(self, obj):
         document_config = {
             OrderDocumentTypeEnum.RECEIPT: {
@@ -832,8 +820,7 @@ class OrderAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    document_type_badge.short_description = _("Document Type")
-
+    @admin.display(description=_("Currency"))
     def currency_status(self, obj):
         try:
             items_currency = obj.total_price_items.currency
@@ -863,8 +850,7 @@ class OrderAdmin(ModelAdmin):
             )
         return mark_safe(html)
 
-    currency_status.short_description = _("Currency")
-
+    @admin.display(description=_("Customer Summary"))
     def customer_summary(self, obj):
         safe_name = conditional_escape(obj.customer_full_name)
         safe_email = conditional_escape(obj.email)
@@ -883,8 +869,7 @@ class OrderAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    customer_summary.short_description = _("Customer Summary")
-
+    @admin.display(description=_("Financial Summary"))
     def financial_summary(self, obj):
         shipping = obj.shipping_price
         items_total = obj.total_price_items
@@ -929,8 +914,7 @@ class OrderAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    financial_summary.short_description = _("Financial Summary")
-
+    @admin.display(description=_("Shipping Summary"))
     def shipping_summary(self, obj):
         safe_address = conditional_escape(obj.full_address)
         safe_tracking = conditional_escape(
@@ -953,8 +937,7 @@ class OrderAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    shipping_summary.short_description = _("Shipping Summary")
-
+    @admin.display(description=_("Order Analytics"))
     def order_analytics(self, obj):
         if not obj.created_at:
             return "Available after creation."
@@ -1013,10 +996,8 @@ class OrderAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    order_analytics.short_description = _("Order Analytics")
-
     @action(
-        description=_("Mark selected orders as processing"),
+        description=str(_("Mark selected orders as processing")),
         variant=ActionVariant.PRIMARY,
         icon="play_arrow",
     )
@@ -1033,7 +1014,7 @@ class OrderAdmin(ModelAdmin):
                 self.message_user(request, f"Error: {e!s}", level="error")
 
     @action(
-        description=_("Mark selected orders as shipped"),
+        description=str(_("Mark selected orders as shipped")),
         variant=ActionVariant.INFO,
         icon="local_shipping",
     )
@@ -1050,7 +1031,7 @@ class OrderAdmin(ModelAdmin):
                 self.message_user(request, f"Error: {e!s}", level="error")
 
     @action(
-        description=_("Mark selected orders as delivered"),
+        description=str(_("Mark selected orders as delivered")),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
@@ -1067,7 +1048,7 @@ class OrderAdmin(ModelAdmin):
                 self.message_user(request, f"Error: {e!s}", level="error")
 
     @action(
-        description=_("Mark selected orders as completed"),
+        description=str(_("Mark selected orders as completed")),
         variant=ActionVariant.SUCCESS,
         icon="task_alt",
     )
@@ -1084,7 +1065,7 @@ class OrderAdmin(ModelAdmin):
                 self.message_user(request, f"Error: {e!s}", level="error")
 
     @action(
-        description=_("Cancel selected orders and restore stock"),
+        description=str(_("Cancel selected orders and restore stock")),
         variant=ActionVariant.DANGER,
         icon="cancel",
     )
@@ -1187,6 +1168,7 @@ class OrderItemAdmin(ModelAdmin):
         ),
     )
 
+    @admin.display(description=_("Order"))
     def order_link(self, obj):
         safe_url = conditional_escape(
             f"/admin/order/order/{obj.order.id}/change/"
@@ -1201,8 +1183,6 @@ class OrderItemAdmin(ModelAdmin):
             "</div>"
         )
         return mark_safe(html)
-
-    order_link.short_description = _("Order")
 
     def order_status_mini(self, order):
         status_colors = {
@@ -1223,6 +1203,7 @@ class OrderItemAdmin(ModelAdmin):
         html = f'<span class="{color}">{safe_status}</span>'
         return mark_safe(html)
 
+    @admin.display(description=_("Product"))
     def product_display(self, obj):
         product_name = (
             obj.product.safe_translation_getter("name", any_language=True)
@@ -1239,8 +1220,7 @@ class OrderItemAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    product_display.short_description = _("Product")
-
+    @admin.display(description=_("Quantity"))
     def quantity_display(self, obj):
         if obj.refunded_quantity > 0:
             safe_qty = conditional_escape(str(obj.quantity))
@@ -1264,8 +1244,7 @@ class OrderItemAdmin(ModelAdmin):
             )
         return mark_safe(html)
 
-    quantity_display.short_description = _("Quantity")
-
+    @admin.display(description=_("Pricing"))
     def pricing_info(self, obj):
         safe_price = conditional_escape(str(obj.price))
         safe_total = conditional_escape(str(obj.total_price))
@@ -1280,8 +1259,7 @@ class OrderItemAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    pricing_info.short_description = _("Pricing")
-
+    @admin.display(description=_("Refund Status"))
     def refund_status_display(self, obj):
         if obj.is_refunded:
             html = (
@@ -1308,8 +1286,7 @@ class OrderItemAdmin(ModelAdmin):
             )
         return mark_safe(html)
 
-    refund_status_display.short_description = _("Refund Status")
-
+    @admin.display(description=_("Item Analytics"))
     def item_analytics(self, obj):
         safe_original = conditional_escape(
             str(obj.original_quantity or obj.quantity)
@@ -1333,8 +1310,6 @@ class OrderItemAdmin(ModelAdmin):
             "</div>"
         )
         return mark_safe(html)
-
-    item_analytics.short_description = _("Item Analytics")
 
 
 @admin.register(OrderHistory)
@@ -1377,6 +1352,7 @@ class OrderHistoryAdmin(ModelAdmin):
     ]
     list_select_related = ["order", "user"]
 
+    @admin.display(description=_("Order"))
     def order_link(self, obj):
         safe_url = conditional_escape(
             f"/admin/order/order/{obj.order.id}/change/"
@@ -1389,8 +1365,7 @@ class OrderHistoryAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    order_link.short_description = _("Order")
-
+    @admin.display(description=_("Change Type"))
     def change_type_badge(self, obj):
         type_config = {
             "STATUS": {
@@ -1455,8 +1430,7 @@ class OrderHistoryAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    change_type_badge.short_description = _("Change Type")
-
+    @admin.display(description=_("Description"))
     def description_display(self, obj):
         description = (
             obj.safe_translation_getter("description", any_language=True)
@@ -1475,8 +1449,7 @@ class OrderHistoryAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    description_display.short_description = _("Description")
-
+    @admin.display(description=_("Changed By"))
     def user_display(self, obj):
         if obj.user:
             safe_name = conditional_escape(
@@ -1487,8 +1460,6 @@ class OrderHistoryAdmin(ModelAdmin):
         return mark_safe(
             '<span class="text-base-600 dark:text-base-300 italic">System</span>'
         )
-
-    user_display.short_description = _("Changed By")
 
 
 @admin.register(OrderItemHistory)
@@ -1527,6 +1498,7 @@ class OrderItemHistoryAdmin(ModelAdmin):
     ]
     list_select_related = ["order_item", "order_item__order", "user"]
 
+    @admin.display(description=_("Order Item"))
     def order_item_link(self, obj):
         safe_url = conditional_escape(
             f"/admin/order/orderitem/{obj.order_item.id}/change/"
@@ -1542,8 +1514,7 @@ class OrderItemHistoryAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    order_item_link.short_description = _("Order Item")
-
+    @admin.display(description=_("Change Type"))
     def change_type_badge(self, obj):
         type_config = {
             "QUANTITY": {
@@ -1580,8 +1551,7 @@ class OrderItemHistoryAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    change_type_badge.short_description = _("Change Type")
-
+    @admin.display(description=_("Description"))
     def description_display(self, obj):
         description = (
             obj.safe_translation_getter("description", any_language=True)
@@ -1595,8 +1565,7 @@ class OrderItemHistoryAdmin(ModelAdmin):
         html = f'<div class="text-sm text-base-700 dark:text-base-300">{safe_desc}</div>'
         return mark_safe(html)
 
-    description_display.short_description = _("Description")
-
+    @admin.display(description=_("Changed By"))
     def user_display(self, obj):
         if obj.user:
             safe_name = conditional_escape(
@@ -1607,8 +1576,6 @@ class OrderItemHistoryAdmin(ModelAdmin):
         return mark_safe(
             '<span class="text-base-600 dark:text-base-300 italic">System</span>'
         )
-
-    user_display.short_description = _("Changed By")
 
 
 @admin.register(StockLog)

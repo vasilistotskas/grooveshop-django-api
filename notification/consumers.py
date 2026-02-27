@@ -3,6 +3,7 @@ import logging
 
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.contrib.auth import get_user_model
+from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
 
 logger = logging.getLogger(__name__)
@@ -11,7 +12,7 @@ User = get_user_model()
 
 
 class NotificationConsumer(AsyncWebsocketConsumer):
-    user: User | AnonymousUser | None = None
+    user: AbstractBaseUser | AnonymousUser | None = None
     group_name: str | None = None
 
     async def connect(self):
@@ -79,7 +80,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data=None, bytes_data=None):
         logger.debug(f"Received message: {text_data}")
         try:
-            data = json.loads(text_data)
+            data = json.loads(text_data or "")
             await self.send(
                 text_data=json.dumps(
                     {

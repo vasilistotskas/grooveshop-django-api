@@ -10,10 +10,12 @@ from typing import Any, Protocol
 
 from django.db import connection
 
+psutil: Any = None
+
 try:
     import psutil
 except ImportError:
-    psutil = None
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -386,7 +388,7 @@ class FactoryProfiler:
 
     def __init__(
         self,
-        config: ProfilerConfig = None,
+        config: ProfilerConfig | None = None,
     ):
         if config is None:
             config = ProfilerConfig()
@@ -861,9 +863,11 @@ def profile_factory_execution(
 ) -> FactoryExecutionMetrics:
     """Profile a single factory execution"""
     profiler = FactoryProfiler(
-        profile_level=profile_level,
-        enable_query_profiling=enable_query_profiling,
-        enable_memory_profiling=enable_memory_profiling,
+        config=ProfilerConfig(
+            profile_level=profile_level,
+            enable_query_profiling=enable_query_profiling,
+            enable_memory_profiling=enable_memory_profiling,
+        ),
     )
     profiler.start_session()
 
@@ -885,7 +889,9 @@ def benchmark_factories(
     profile_level: ProfileLevel = ProfileLevel.DETAILED,
 ) -> str:
     """Benchmark multiple factories and generate comparison report"""
-    profiler = FactoryProfiler(profile_level=profile_level)
+    profiler = FactoryProfiler(
+        config=ProfilerConfig(profile_level=profile_level),
+    )
     profiler.start_session()
 
     for factory_class in factory_classes:

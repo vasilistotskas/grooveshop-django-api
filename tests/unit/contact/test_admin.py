@@ -154,7 +154,7 @@ class TestRecentContactFilter(TestCase):
         self.week_contact = Contact.objects.create(
             name="Week User", email="week@example.com", message="Week message"
         )
-        self.week_contact.created_at = now - timezone.timedelta(days=3)
+        self.week_contact.created_at = now - datetime.timedelta(days=3)
         self.week_contact.save()
 
         self.month_contact = Contact.objects.create(
@@ -162,7 +162,7 @@ class TestRecentContactFilter(TestCase):
             email="month@example.com",
             message="Month message",
         )
-        self.month_contact.created_at = now - timezone.timedelta(days=15)
+        self.month_contact.created_at = now - datetime.timedelta(days=15)
         self.month_contact.save()
 
         self.quarter_contact = Contact.objects.create(
@@ -170,13 +170,13 @@ class TestRecentContactFilter(TestCase):
             email="quarter@example.com",
             message="Quarter message",
         )
-        self.quarter_contact.created_at = now - timezone.timedelta(days=60)
+        self.quarter_contact.created_at = now - datetime.timedelta(days=60)
         self.quarter_contact.save()
 
         self.old_contact = Contact.objects.create(
             name="Old User", email="old@example.com", message="Old message"
         )
-        self.old_contact.created_at = now - timezone.timedelta(days=200)
+        self.old_contact.created_at = now - datetime.timedelta(days=200)
         self.old_contact.save()
 
     def test_filter_title_and_parameter(self):
@@ -431,7 +431,7 @@ class TestContactAdmin(TestCase):
         now = datetime.datetime(2023, 12, 15, 14, 30, 0, tzinfo=ZoneInfo("UTC"))
         mock_timezone.now.return_value = now
 
-        self.contact.created_at = now - timezone.timedelta(minutes=5)
+        self.contact.created_at = now - datetime.timedelta(minutes=5)
         self.contact.save()
 
         result = self.admin.contact_timing(self.contact)
@@ -443,7 +443,7 @@ class TestContactAdmin(TestCase):
         now = datetime.datetime(2023, 12, 15, 14, 30, 0, tzinfo=ZoneInfo("UTC"))
         mock_timezone.now.return_value = now
 
-        self.contact.created_at = now - timezone.timedelta(hours=3)
+        self.contact.created_at = now - datetime.timedelta(hours=3)
         self.contact.save()
 
         result = self.admin.contact_timing(self.contact)
@@ -455,7 +455,7 @@ class TestContactAdmin(TestCase):
         now = datetime.datetime(2023, 12, 15, 14, 30, 0, tzinfo=ZoneInfo("UTC"))
         mock_timezone.now.return_value = now
 
-        self.contact.created_at = now - timezone.timedelta(days=2)
+        self.contact.created_at = now - datetime.timedelta(days=2)
         self.contact.save()
 
         result = self.admin.contact_timing(self.contact)
@@ -466,7 +466,7 @@ class TestContactAdmin(TestCase):
         now = datetime.datetime(2023, 12, 15, 14, 30, 0, tzinfo=ZoneInfo("UTC"))
         mock_timezone.now.return_value = now
 
-        self.contact.created_at = now - timezone.timedelta(days=10)
+        self.contact.created_at = now - datetime.timedelta(days=10)
         self.contact.save()
 
         result = self.admin.contact_timing(self.contact)
@@ -483,7 +483,7 @@ class TestContactAdmin(TestCase):
             email="urgent@example.com",
             message="URGENT: Need immediate help with billing issue!",
         )
-        urgent_contact.created_at = now - timezone.timedelta(minutes=5)
+        urgent_contact.created_at = now - datetime.timedelta(minutes=5)
         urgent_contact.save()
 
         result = self.admin.priority_badge(urgent_contact)
@@ -500,7 +500,7 @@ class TestContactAdmin(TestCase):
             email="high@example.com",
             message="A" * 600,
         )
-        high_contact.created_at = now - timezone.timedelta(hours=2)
+        high_contact.created_at = now - datetime.timedelta(hours=2)
         high_contact.save()
 
         result = self.admin.priority_badge(high_contact)
@@ -517,7 +517,7 @@ class TestContactAdmin(TestCase):
             email="medium@example.com",
             message="General inquiry about services",
         )
-        medium_contact.created_at = now - timezone.timedelta(hours=12)
+        medium_contact.created_at = now - datetime.timedelta(hours=12)
         medium_contact.save()
 
         result = self.admin.priority_badge(medium_contact)
@@ -534,7 +534,7 @@ class TestContactAdmin(TestCase):
             email="low@example.com",
             message="Just wanted to say thanks",
         )
-        low_contact.created_at = now - timezone.timedelta(days=10)
+        low_contact.created_at = now - datetime.timedelta(days=10)
         low_contact.save()
 
         result = self.admin.priority_badge(low_contact)
@@ -546,7 +546,7 @@ class TestContactAdmin(TestCase):
         now = datetime.datetime(2023, 12, 15, 14, 30, 0, tzinfo=ZoneInfo("UTC"))
         mock_timezone.now.return_value = now
 
-        self.contact.created_at = now - timezone.timedelta(hours=3)
+        self.contact.created_at = now - datetime.timedelta(hours=3)
         self.contact.save()
 
         result = self.admin.contact_analytics(self.contact)

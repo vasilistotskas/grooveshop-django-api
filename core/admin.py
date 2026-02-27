@@ -89,7 +89,7 @@ class ExportActionMixin:
         header = [str(field.verbose_name) for field in base_fields]
 
         translated_field_names = []
-        is_translatable = issubclass(self.model, TranslatableModel) and hasattr(
+        is_translatable = issubclass(self.model, TranslatableModel) and hasattr(  # type: ignore[invalid-argument-type]
             self.model, "_parler_meta"
         )
         if is_translatable:
@@ -259,7 +259,8 @@ class ExportActionMixin:
 
             translated_field_names = []
             is_translatable = issubclass(
-                self.model, TranslatableModel
+                self.model,  # type: ignore[invalid-argument-type]
+                TranslatableModel,
             ) and hasattr(self.model, "_parler_meta")
             if is_translatable:
                 translated_field_names = list(
@@ -399,6 +400,7 @@ class SettingAdmin(ModelAdmin):
 
         return [base_fieldset, value_fieldset, validator_fieldset]
 
+    @admin.display(description=_("Name"))
     def name_display(self, obj):
         from django.utils.html import conditional_escape
         from django.utils.safestring import mark_safe
@@ -407,8 +409,7 @@ class SettingAdmin(ModelAdmin):
         html = f'<strong style="font-weight: 600;">{safe_name}</strong>'
         return mark_safe(html)
 
-    name_display.short_description = _("Name")
-
+    @admin.display(description=_("Type"))
     def value_type_badge(self, obj):
         from django.utils.html import conditional_escape
         from django.utils.safestring import mark_safe
@@ -417,8 +418,7 @@ class SettingAdmin(ModelAdmin):
         html = f'<span class="setting-type-badge" data-type="{safe_type}">{safe_type}</span>'
         return mark_safe(html)
 
-    value_type_badge.short_description = _("Type")
-
+    @admin.display(description=_("Current Value"))
     def value_preview(self, obj):
         from django.utils.html import conditional_escape
         from django.utils.safestring import mark_safe
@@ -436,8 +436,7 @@ class SettingAdmin(ModelAdmin):
                 '<span style="font-style: italic; opacity: 0.6;">-</span>'
             )
 
-    value_preview.short_description = _("Current Value")
-
+    @admin.display(description=_("Description"))
     def description_preview(self, obj):
         from django.utils.html import conditional_escape
         from django.utils.safestring import mark_safe
@@ -453,8 +452,6 @@ class SettingAdmin(ModelAdmin):
         return mark_safe(
             '<span style="font-style: italic; opacity: 0.6;">-</span>'
         )
-
-    description_preview.short_description = _("Description")
 
 
 @admin.register(PeriodicTask)

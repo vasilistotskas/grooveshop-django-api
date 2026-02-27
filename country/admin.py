@@ -120,6 +120,7 @@ class CountryAdmin(ModelAdmin, TranslatableAdmin):
         ),
     )
 
+    @admin.display(description=_("Country"))
     def country_info(self, obj):
         name = (
             obj.safe_translation_getter("name", any_language=True)
@@ -151,8 +152,7 @@ class CountryAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    country_info.short_description = _("Country")
-
+    @admin.display(description=_("Flag"))
     def flag_display(self, obj):
         if obj.image_flag:
             safe_url = conditional_escape(obj.image_flag.url)
@@ -178,8 +178,7 @@ class CountryAdmin(ModelAdmin, TranslatableAdmin):
             )
             return mark_safe(html)
 
-    flag_display.short_description = _("Flag")
-
+    @admin.display(description=_("Codes"))
     def codes_display(self, obj):
         safe_a2 = conditional_escape(obj.alpha_2)
         safe_a3 = conditional_escape(obj.alpha_3)
@@ -211,8 +210,7 @@ class CountryAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    codes_display.short_description = _("Codes")
-
+    @admin.display(description=_("Contact"))
     def contact_info(self, obj):
         if obj.phone_code:
             code_str = str(obj.phone_code)
@@ -241,8 +239,7 @@ class CountryAdmin(ModelAdmin, TranslatableAdmin):
         html = f'<div class="text-sm"><div>{phone_badge}</div></div>'
         return mark_safe(html)
 
-    contact_info.short_description = _("Contact")
-
+    @admin.display(description=_("Completeness"))
     def completeness_badge(self, obj):
         total_fields = 4
         completed_fields = 0
@@ -291,8 +288,7 @@ class CountryAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    completeness_badge.short_description = _("Completeness")
-
+    @admin.display(description=_("Created"))
     def created_display(self, obj):
         date_str = obj.created_at.strftime("%Y-%m-%d")
         time_str = obj.created_at.strftime("%H:%M")
@@ -307,10 +303,8 @@ class CountryAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    created_display.short_description = _("Created")
-
     @action(
-        description=_("Update sort order"),
+        description=str(_("Update sort order")),
         variant=ActionVariant.INFO,
         icon="sort",
     )

@@ -2315,7 +2315,7 @@ class Command(BaseCommand):
         return random.choice(lang_variations)
 
     def _enhance_description(
-        self, base_desc: str, lang_code: str, category_id: int = None
+        self, base_desc: str, lang_code: str, category_id: int | None = None
     ) -> str:
         """Enhance description with additional language-specific details."""
         extras = {

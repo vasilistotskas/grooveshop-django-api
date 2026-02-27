@@ -1,3 +1,4 @@
+from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import Mock, patch
 
@@ -216,14 +217,14 @@ class TestOrderServiceCreateOrderFromCart:
             quantity=2,
             session_id=str(self.cart.uuid),
             reserved_by=self.user,
-            expires_at=timezone.now() + timezone.timedelta(minutes=15),
+            expires_at=timezone.now() + timedelta(minutes=15),
         )
         reservation2 = StockReservation.objects.create(
             product=self.product2,
             quantity=1,
             session_id=str(self.cart.uuid),
             reserved_by=self.user,
-            expires_at=timezone.now() + timezone.timedelta(minutes=15),
+            expires_at=timezone.now() + timedelta(minutes=15),
         )
 
         # Create order
@@ -748,7 +749,7 @@ class TestOrderServiceHandlePaymentFailed:
             quantity=2,
             session_id=str(self.order.uuid),
             reserved_by=self.user,
-            expires_at=timezone.now() + timezone.timedelta(minutes=15),
+            expires_at=timezone.now() + timedelta(minutes=15),
             consumed=False,
         )
         reservation2 = StockReservation.objects.create(
@@ -756,7 +757,7 @@ class TestOrderServiceHandlePaymentFailed:
             quantity=1,
             session_id=str(self.order.uuid),
             reserved_by=self.user,
-            expires_at=timezone.now() + timezone.timedelta(minutes=15),
+            expires_at=timezone.now() + timedelta(minutes=15),
             consumed=False,
         )
 
@@ -806,7 +807,7 @@ class TestOrderServiceHandlePaymentFailed:
             quantity=3,
             session_id=str(self.order.uuid),
             reserved_by=self.user,
-            expires_at=timezone.now() + timezone.timedelta(minutes=15),
+            expires_at=timezone.now() + timedelta(minutes=15),
             consumed=False,
         )
 
@@ -1045,7 +1046,7 @@ class TestOrderServiceHandlePaymentFailed:
                 quantity=2,
                 session_id=str(self.order.uuid),
                 reserved_by=self.user,
-                expires_at=timezone.now() + timezone.timedelta(minutes=15),
+                expires_at=timezone.now() + timedelta(minutes=15),
                 consumed=False,
             )
             reservations.append(reservation)

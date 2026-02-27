@@ -27,7 +27,7 @@ class TemplateConfig:
     subject_template: str  # Subject line template with {variables}
     is_used: bool  # Whether template is actively used
     context_keys: list[str]  # Required context keys for validation
-    order_statuses: list[OrderStatus] = (
+    order_statuses: list[OrderStatus] | None = (
         None  # Associated order statuses (optional, only for order templates)
     )
 

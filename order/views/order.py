@@ -283,7 +283,7 @@ class OrderViewSet(BaseModelViewSet):
 
     def get_object(self):
         lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
-        order_id = self.kwargs.get(lookup_url_kwarg)
+        order_id: str = self.kwargs[lookup_url_kwarg]
         max_order_id_length = 8
 
         try:

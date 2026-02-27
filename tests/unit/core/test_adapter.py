@@ -9,15 +9,13 @@ class TestMFAAdapter(unittest.TestCase):
         self.adapter = MFAAdapter()
         self.adapter._get_site_name = MagicMock(return_value="Test Site")
 
-    @patch("core.adapter.getenv")
+    @patch("core.adapter.settings")
     def test_get_public_key_credential_rp_entity_with_env_var(
-        self, mock_getenv
+        self, mock_settings
     ):
-        mock_getenv.return_value = "example.com"
+        mock_settings.APP_MAIN_HOST_NAME = "example.com"
 
         result = self.adapter.get_public_key_credential_rp_entity()
-
-        mock_getenv.assert_called_once_with("APP_MAIN_HOST_NAME", "localhost")
 
         self.assertEqual(
             result,
@@ -29,20 +27,18 @@ class TestMFAAdapter(unittest.TestCase):
 
         self.adapter._get_site_name.assert_called_once()
 
-    @patch("core.adapter.getenv")
+    @patch("core.adapter.settings")
     def test_get_public_key_credential_rp_entity_with_default(
-        self, mock_getenv
+        self, mock_settings
     ):
-        mock_getenv.return_value = None
+        del mock_settings.APP_MAIN_HOST_NAME
 
         result = self.adapter.get_public_key_credential_rp_entity()
-
-        mock_getenv.assert_called_once_with("APP_MAIN_HOST_NAME", "localhost")
 
         self.assertEqual(
             result,
             {
-                "id": None,
+                "id": "localhost",
                 "name": "Test Site",
             },
         )

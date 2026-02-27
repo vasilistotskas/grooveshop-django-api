@@ -7,6 +7,7 @@ following Meilisearch best practices for larger HTTP payloads.
 
 import logging
 from contextlib import contextmanager
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Generator
 
 from django.conf import settings
@@ -297,7 +298,7 @@ def batch_index_context(
 def bulk_index_queryset(
     queryset,
     batch_size: int | None = None,
-    progress_callback: callable | None = None,
+    progress_callback: Callable[..., None] | None = None,
 ) -> dict:
     """
     Bulk index a Django queryset to Meilisearch.

@@ -146,6 +146,7 @@ class VatAdmin(ModelAdmin):
         qs = super().get_queryset(request)
         return qs.annotate(products_count=Count("products", distinct=True))
 
+    @admin.display(description=_("VAT Rate"))
     def vat_display(self, obj):
         value = obj.value
         formatted_value = f"{value:g}%"
@@ -178,8 +179,7 @@ class VatAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    vat_display.short_description = _("VAT Rate")
-
+    @admin.display(description=_("Category"))
     def vat_category_badge(self, obj):
         value = obj.value
 
@@ -232,8 +232,7 @@ class VatAdmin(ModelAdmin):
                 "</span>"
             )
 
-    vat_category_badge.short_description = _("Category")
-
+    @admin.display(description=_("Usage"))
     def usage_metrics(self, obj):
         products_count = getattr(obj, "products_count", 0)
 
@@ -275,8 +274,7 @@ class VatAdmin(ModelAdmin):
 
         return mark_safe(html)
 
-    usage_metrics.short_description = _("Usage")
-
+    @admin.display(description=_("Price Examples"))
     def calculation_preview(self, obj):
         base_prices = [10, 50, 100]
         examples = []
@@ -293,8 +291,7 @@ class VatAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    calculation_preview.short_description = _("Price Examples")
-
+    @admin.display(description=_("Created"))
     def created_display(self, obj):
         date_str = obj.created_at.strftime("%Y-%m-%d")
         safe_date = conditional_escape(date_str)
@@ -302,8 +299,7 @@ class VatAdmin(ModelAdmin):
             f'<div class="text-sm text-gray-600 dark:text-gray-400">{safe_date}</div>'
         )
 
-    created_display.short_description = _("Created")
-
+    @admin.display(description=_("Updated"))
     def updated_display(self, obj):
         date_str = obj.updated_at.strftime("%Y-%m-%d")
         safe_date = conditional_escape(date_str)
@@ -311,8 +307,7 @@ class VatAdmin(ModelAdmin):
             f'<div class="text-sm text-gray-600 dark:text-gray-400">{safe_date}</div>'
         )
 
-    updated_display.short_description = _("Updated")
-
+    @admin.display(description=_("Usage Analytics"))
     def usage_analytics(self, obj):
         try:
             products_count = getattr(obj, "products_count", 0)
@@ -351,8 +346,7 @@ class VatAdmin(ModelAdmin):
                 '<span class="text-gray-500">Data unavailable</span>'
             )
 
-    usage_analytics.short_description = _("Usage Analytics")
-
+    @admin.display(description=_("Calculation Examples"))
     def calculation_examples(self, obj):
         examples = []
         base_amounts = [10, 25, 50, 100, 250, 500, 1000]
@@ -374,8 +368,7 @@ class VatAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    calculation_examples.short_description = _("Calculation Examples")
-
+    @admin.display(description=_("Products Using This VAT"))
     def products_using_vat(self, obj):
         try:
             products_count = getattr(obj, "products_count", 0)
@@ -403,8 +396,6 @@ class VatAdmin(ModelAdmin):
             return mark_safe(
                 '<span class="text-gray-500">Data unavailable</span>'
             )
-
-    products_using_vat.short_description = _("Products Using This VAT")
 
     def _get_vat_category_text(self, value):
         if value == 0:

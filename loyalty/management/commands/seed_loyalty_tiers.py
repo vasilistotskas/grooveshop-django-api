@@ -154,7 +154,7 @@ class Command(BaseCommand):
                     )
                 )
 
-            translations = tier_data["translations"]
+            translations: dict = tier_data["translations"]  # type: ignore[invalid-assignment]
             for language_code in language_codes:
                 if language_code in translations:
                     lang_data = translations[language_code]

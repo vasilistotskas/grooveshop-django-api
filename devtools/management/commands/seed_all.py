@@ -3,7 +3,7 @@ import logging
 import time
 import traceback
 from collections import defaultdict, deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dataclass_field
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -71,11 +71,7 @@ class FactoryResult:
     model_name: str
     created: int
     requested: int
-    errors: list[str] = None
-
-    def __post_init__(self):
-        if self.errors is None:
-            self.errors = []
+    errors: list[str] = dataclass_field(default_factory=list)
 
     @property
     def success_rate(self) -> float:
@@ -860,7 +856,7 @@ class Command(BaseCommand):
         ):
             return True
 
-        from core.factories import SeedingStrategyRegistry
+        from devtools.factories import SeedingStrategyRegistry
 
         if SeedingStrategyRegistry.has_strategy(factory_class.__name__):
             return True
@@ -905,7 +901,7 @@ class Command(BaseCommand):
                     )
 
             else:
-                from core.factories import SeedingStrategyRegistry
+                from devtools.factories import SeedingStrategyRegistry
 
                 strategy = SeedingStrategyRegistry.get_strategy(
                     factory_class.__name__

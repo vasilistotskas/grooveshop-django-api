@@ -206,7 +206,7 @@ class PublishableModel(models.Model):
     )
     is_published = models.BooleanField(_("Is Published"), default=False)
 
-    objects: PublishableManager = PublishableManager()
+    objects = PublishableManager()
 
     class Meta(TypedModelMeta):
         abstract = True

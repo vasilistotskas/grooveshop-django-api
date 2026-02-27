@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Callable
+from typing import Callable, cast
 
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponseBase
 from django.utils.deprecation import MiddlewareMixin
 
 from search.models import SearchQuery
@@ -36,15 +36,15 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
     Requirements: 2.1, 2.2, 2.7, 2.8
     """
 
-    def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]):
+    def __init__(self, get_response: Callable[[HttpRequest], HttpResponseBase]):
         """Initialize middleware with response handler."""
         self.get_response = get_response
         super().__init__(get_response)
 
-    def __call__(self, request: HttpRequest) -> HttpResponse:
+    def __call__(self, request: HttpRequest) -> HttpResponseBase:
         """Process request and track search analytics."""
         # Get response first
-        response = self.get_response(request)
+        response = cast(HttpResponseBase, self.get_response(request))
 
         # Track search if this is a search endpoint
         if self._is_search_endpoint(request):
@@ -65,7 +65,7 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
         return "/search/" in request.path
 
     def _track_search_async(
-        self, request: HttpRequest, response: HttpResponse
+        self, request: HttpRequest, response: HttpResponseBase
     ) -> None:
         """
         Track search query asynchronously.

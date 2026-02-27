@@ -109,6 +109,7 @@ class CartItemInline(TabularInline):
     tab = True
     show_change_link = True
 
+    @admin.display(description=_("Product"))
     def product_display(self, obj):
         if obj.product:
             product_name = (
@@ -126,8 +127,7 @@ class CartItemInline(TabularInline):
             return mark_safe(html)
         return "-"
 
-    product_display.short_description = _("Product")
-
+    @admin.display(description=_("Unit Price"))
     def unit_price_display(self, obj):
         if hasattr(obj, "price") and hasattr(obj, "final_price"):
             if obj.price != obj.final_price:
@@ -149,8 +149,7 @@ class CartItemInline(TabularInline):
             return mark_safe(html)
         return "-"
 
-    unit_price_display.short_description = _("Unit Price")
-
+    @admin.display(description=_("Total"))
     def total_price_display(self, obj):
         if hasattr(obj, "total_price"):
             safe_total = conditional_escape(str(obj.total_price))
@@ -162,8 +161,7 @@ class CartItemInline(TabularInline):
             return mark_safe(html)
         return "-"
 
-    total_price_display.short_description = _("Total")
-
+    @admin.display(description=_("Discount"))
     def discount_info(self, obj):
         if hasattr(obj, "discount_percent") and obj.discount_percent > 0:
             safe_percent = conditional_escape(str(obj.discount_percent))
@@ -175,8 +173,6 @@ class CartItemInline(TabularInline):
             )
             return mark_safe(html)
         return ""
-
-    discount_info.short_description = _("Discount")
 
 
 @admin.register(Cart)
@@ -251,6 +247,7 @@ class CartAdmin(ModelAdmin):
     def get_queryset(self, request):
         return super().get_queryset(request).prefetch_related("items__product")
 
+    @admin.display(description=_("Cart Owner"))
     def cart_owner_display(self, obj):
         if obj.user:
             display_name = obj.user.full_name or obj.user.username
@@ -271,8 +268,7 @@ class CartAdmin(ModelAdmin):
                 "</div>"
             )
 
-    cart_owner_display.short_description = _("Cart Owner")
-
+    @admin.display(description=_("Type"))
     def cart_type_badge(self, obj):
         if obj.user:
             return mark_safe(
@@ -289,8 +285,7 @@ class CartAdmin(ModelAdmin):
                 "</span>"
             )
 
-    cart_type_badge.short_description = _("Type")
-
+    @admin.display(description=_("Activity"))
     def activity_status_badge(self, obj):
         now = timezone.now()
         delta = now - obj.last_activity
@@ -326,8 +321,7 @@ class CartAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    activity_status_badge.short_description = _("Activity")
-
+    @admin.display(description=_("Items"))
     def items_summary(self, obj):
         safe_total = conditional_escape(str(obj.total_items))
         safe_unique = conditional_escape(str(obj.total_items_unique))
@@ -339,8 +333,7 @@ class CartAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    items_summary.short_description = _("Items")
-
+    @admin.display(description=_("Total"))
     def price_summary(self, obj):
         total_price = obj.total_price
         total_discount = obj.total_discount_value
@@ -362,8 +355,7 @@ class CartAdmin(ModelAdmin):
             )
         return mark_safe(html)
 
-    price_summary.short_description = _("Total")
-
+    @admin.display(description=_("Cart Summary"))
     def cart_summary(self, obj):
         safe_items = conditional_escape(str(obj.total_items))
         safe_unique = conditional_escape(str(obj.total_items_unique))
@@ -393,8 +385,7 @@ class CartAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    cart_summary.short_description = _("Cart Summary")
-
+    @admin.display(description=_("Financial Summary"))
     def financial_summary(self, obj):
         savings_percent = 0.0
         if (
@@ -421,8 +412,6 @@ class CartAdmin(ModelAdmin):
             f"</div>"
         )
         return mark_safe(html)
-
-    financial_summary.short_description = _("Financial Summary")
 
 
 @admin.register(CartItem)
@@ -492,6 +481,7 @@ class CartItemAdmin(ModelAdmin):
         "remove_from_cart",
     ]
 
+    @admin.display(description=_("Cart"))
     def cart_info(self, obj):
         owner = (
             "Guest"
@@ -508,8 +498,7 @@ class CartItemAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    cart_info.short_description = _("Cart")
-
+    @admin.display(description=_("Product"))
     def product_display(self, obj):
         product_name = (
             obj.product.safe_translation_getter("name", any_language=True)
@@ -525,8 +514,7 @@ class CartItemAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    product_display.short_description = _("Product")
-
+    @admin.display(description=_("Qty"))
     def quantity_display(self, obj):
         safe_qty = conditional_escape(str(obj.quantity))
         html = (
@@ -537,8 +525,7 @@ class CartItemAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    quantity_display.short_description = _("Qty")
-
+    @admin.display(description=_("Pricing"))
     def pricing_info(self, obj):
         if (
             hasattr(obj, "price")
@@ -568,8 +555,7 @@ class CartItemAdmin(ModelAdmin):
             return mark_safe(html)
         return "-"
 
-    pricing_info.short_description = _("Pricing")
-
+    @admin.display(description=_("Discount"))
     def discount_badge(self, obj):
         if hasattr(obj, "discount_percent") and obj.discount_percent > 0:
             safe_percent = conditional_escape(str(obj.discount_percent))
@@ -582,8 +568,7 @@ class CartItemAdmin(ModelAdmin):
             return mark_safe(html)
         return ""
 
-    discount_badge.short_description = _("Discount")
-
+    @admin.display(description=_("Pricing Breakdown"))
     def pricing_breakdown(self, obj):
         safe_price = conditional_escape(str(getattr(obj, "price", "N/A")))
         safe_final = conditional_escape(str(getattr(obj, "final_price", "N/A")))
@@ -601,8 +586,7 @@ class CartItemAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    pricing_breakdown.short_description = _("Pricing Breakdown")
-
+    @admin.display(description=_("Savings"))
     def savings_info(self, obj):
         if hasattr(obj, "discount_percent") and obj.discount_percent > 0:
             safe_percent = conditional_escape(
@@ -626,10 +610,8 @@ class CartItemAdmin(ModelAdmin):
             '<div class="text-sm text-base-600 dark:text-base-300">No discounts applied</div>'
         )
 
-    savings_info.short_description = _("Savings")
-
     @action(
-        description=_("Increase quantity by 1"),
+        description=str(_("Increase quantity by 1")),
         variant=ActionVariant.PRIMARY,
         icon="add",
     )
@@ -644,7 +626,7 @@ class CartItemAdmin(ModelAdmin):
         )
 
     @action(
-        description=_("Decrease quantity by 1"),
+        description=str(_("Decrease quantity by 1")),
         variant=ActionVariant.WARNING,
         icon="remove",
     )
@@ -662,7 +644,7 @@ class CartItemAdmin(ModelAdmin):
         )
 
     @action(
-        description=_("Remove from cart"),
+        description=str(_("Remove from cart")),
         variant=ActionVariant.DANGER,
         icon="delete",
     )

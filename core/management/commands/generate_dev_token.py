@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.base_user import AbstractBaseUser
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from knox.models import AuthToken
@@ -14,7 +15,7 @@ User = get_user_model()
 @dataclass
 class TokenContext:
     token: str
-    user: User
+    user: AbstractBaseUser
     created: str
     digest: str
     expiry_str: str
@@ -90,7 +91,7 @@ class Command(BaseCommand):
         return User.objects.get(**lookup)
 
     def _create_token(
-        self, user: User, ttl_hours: int | None
+        self, user: AbstractBaseUser, ttl_hours: int | None
     ) -> tuple[AuthToken, str]:
         delta = timedelta(hours=ttl_hours) if ttl_hours else None
         return AuthToken.objects.create(user=user, expiry=delta)
@@ -141,7 +142,7 @@ class Command(BaseCommand):
 
     def _print_summary(
         self,
-        user: User,
+        user: AbstractBaseUser,
         token: str,
         expiry_str: str,
         expires_in: float | None,

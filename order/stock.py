@@ -101,7 +101,10 @@ class StockManager:
         # Calculate available stock by excluding active reservations
         # Active = not consumed AND not expired
         # Lock reservation rows to prevent concurrent requests from
-        # reading the same available stock and double-reserving
+        # reading the same available stock and double-reserving.
+        # NOTE: We iterate and sum in Python instead of using aggregate()
+        # because PostgreSQL does not support FOR UPDATE with aggregates,
+        # causing Django to silently drop the lock clause.
         now = timezone.now()
         active_reservations = (
             StockReservation.objects.select_for_update().filter(
@@ -110,11 +113,7 @@ class StockManager:
         )
 
         # Sum up all active reservation quantities
-        from django.db.models import Sum
-
-        reserved_quantity = (
-            active_reservations.aggregate(total=Sum("quantity"))["total"] or 0
-        )
+        reserved_quantity = sum(r.quantity for r in active_reservations)
 
         # Calculate available stock
         available_stock = product.stock - reserved_quantity

@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.base_user import AbstractBaseUser
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.helpers import lazy_serializer
@@ -113,7 +114,7 @@ class BlogAuthorWriteSerializer(
             "website",
         )
 
-    def validate_user(self, value: User) -> User:
+    def validate_user(self, value: AbstractBaseUser) -> AbstractBaseUser:
         if (
             self.instance is None
             and BlogAuthor.objects.filter(user=value).exists()

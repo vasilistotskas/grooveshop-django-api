@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from django.utils import timezone
 
@@ -57,10 +57,10 @@ class OrderHistoryManager(TranslatableOptimizedManager):
     queryset_class = OrderHistoryQuerySet
 
     def for_list(self) -> OrderHistoryQuerySet:
-        return self.get_queryset().for_list()
+        return cast(OrderHistoryQuerySet, self.get_queryset().for_list())
 
     def for_detail(self) -> OrderHistoryQuerySet:
-        return self.get_queryset().for_detail()
+        return cast(OrderHistoryQuerySet, self.get_queryset().for_detail())
 
 
 class OrderItemHistoryQuerySet(TranslatableOptimizedQuerySet):
@@ -101,7 +101,7 @@ class OrderItemHistoryManager(TranslatableOptimizedManager):
     queryset_class = OrderItemHistoryQuerySet
 
     def for_list(self) -> OrderItemHistoryQuerySet:
-        return self.get_queryset().for_list()
+        return cast(OrderItemHistoryQuerySet, self.get_queryset().for_list())
 
     def for_detail(self) -> OrderItemHistoryQuerySet:
-        return self.get_queryset().for_detail()
+        return cast(OrderItemHistoryQuerySet, self.get_queryset().for_detail())

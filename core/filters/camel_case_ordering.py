@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 from drf_spectacular.extensions import OpenApiFilterExtension
 from rest_framework.filters import OrderingFilter
 from rest_framework.request import Request
@@ -14,7 +16,7 @@ class CamelCaseOrderingFilter(OrderingFilter):
 
     def get_ordering(
         self, request: Request, queryset, view: APIView
-    ) -> list[str] | None:
+    ) -> Sequence[str] | None:
         ordering_params = self.get_ordering_param(request)
         if not ordering_params:
             return self.get_default_ordering(view)

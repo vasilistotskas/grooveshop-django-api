@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
 from extra_settings.models import Setting
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -14,7 +17,11 @@ from django.utils.translation import gettext as _
 from user.models.subscription import SubscriptionTopic, UserSubscription
 
 logger = logging.getLogger(__name__)
-User = get_user_model()
+
+if TYPE_CHECKING:
+    from user.models.account import UserAccount as User
+else:
+    User = get_user_model()
 
 
 def send_subscription_confirmation(

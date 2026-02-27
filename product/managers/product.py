@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from django.db.models import (
     Avg,
@@ -190,8 +190,8 @@ class ProductManager(TranslatableOptimizedManager):
 
     def for_list(self) -> ProductQuerySet:
         """Return optimized queryset for list views."""
-        return self.get_queryset().for_list()
+        return cast(ProductQuerySet, self.get_queryset().for_list())
 
     def for_detail(self) -> ProductQuerySet:
         """Return optimized queryset for detail views."""
-        return self.get_queryset().for_detail()
+        return cast(ProductQuerySet, self.get_queryset().for_detail())

@@ -162,14 +162,16 @@ class CartItemViewSet(BaseModelViewSet):
             if obj.cart != self.cart_service.cart:
                 self.permission_denied(
                     self.request,
-                    message=_(
-                        "You do not have permission to access this cart item."
+                    message=str(
+                        _(
+                            "You do not have permission to access this cart item."
+                        )
                     ),
                 )
 
             return obj
         except CartItem.DoesNotExist:
-            raise Http404(_("No CartItem matches the given query."))
+            raise Http404(str(_("No CartItem matches the given query.")))
 
     def get_serializer_context(self):
         context = super().get_serializer_context()

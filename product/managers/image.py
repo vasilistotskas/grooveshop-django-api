@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from django.db import models
@@ -80,7 +81,7 @@ class ProductImageQuerySet(TranslatableOptimizedQuerySet):
         )
 
     def recent(self, days=7):
-        cutoff = timezone.now() - timezone.timedelta(days=days)
+        cutoff = timezone.now() - timedelta(days=days)
         return self.filter(created_at__gte=cutoff)
 
     def ordered_by_position(self):

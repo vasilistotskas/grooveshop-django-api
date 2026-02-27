@@ -29,6 +29,7 @@ class LoyaltyTierAdmin(ModelAdmin, TranslatableAdmin):
     search_fields = ("translations__name",)
     ordering = ("required_level",)
 
+    @admin.display(description=_("Icon"))
     def icon_preview(self, obj):
         if obj.icon:
             safe_url = conditional_escape(obj.icon.url)
@@ -40,8 +41,6 @@ class LoyaltyTierAdmin(ModelAdmin, TranslatableAdmin):
         return mark_safe(
             '<span class="text-base-600 dark:text-base-300">No icon</span>'
         )
-
-    icon_preview.short_description = _("Icon")
 
 
 @admin.register(PointsTransaction)

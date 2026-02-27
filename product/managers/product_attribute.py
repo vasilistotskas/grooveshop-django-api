@@ -41,7 +41,7 @@ class ProductAttributeQuerySet(models.QuerySet):
 
 
 class ProductAttributeManager(
-    models.Manager.from_queryset(ProductAttributeQuerySet)
+    models.Manager.from_queryset(ProductAttributeQuerySet)  # type: ignore[unsupported-base]
 ):
     """Custom manager for ProductAttribute model with optimized queries."""
 

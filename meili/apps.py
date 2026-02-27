@@ -18,14 +18,14 @@ class MeiliConfig(AppConfig):
         from .models import IndexMixin  # noqa: PLC0415
 
         # Try to import tasks, but don't fail if Celery isn't configured
+        index_document_task = None
+        delete_document_task = None
         try:
             from .tasks import index_document_task, delete_document_task  # noqa: PLC0415
 
             celery_available = True
         except ImportError:
             celery_available = False
-            index_document_task = None
-            delete_document_task = None
 
         def add_model(**kwargs):
             """Signal handler for indexing documents on save."""
@@ -215,9 +215,7 @@ class MeiliConfig(AppConfig):
                 )
 
                 # Store tasks for reference
-                model._meilisearch = _Meili(
-                    **{**model._meilisearch, "tasks": list(_client.tasks)}
-                )
+                model._meilisearch["tasks"] = list(_client.tasks)
                 _client.flush_tasks()
 
             except Exception as e:

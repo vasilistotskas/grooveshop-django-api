@@ -138,7 +138,7 @@ class CartService:
             return Cart.objects.create(user=None)
 
     @transaction.atomic
-    def merge_carts(self, source_cart: Cart, target_cart: Cart = None):
+    def merge_carts(self, source_cart: Cart, target_cart: Cart | None = None):
         if not target_cart:
             target_cart = self.cart
 

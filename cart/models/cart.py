@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, cast
 
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
@@ -103,7 +103,7 @@ class Cart(TimeStampMixinModel, UUIDModel):
         otherwise calculates from items.
         """
         if hasattr(self, "_total_quantity"):
-            return self._total_quantity or 0
+            return cast(int, self._total_quantity) or 0
         # Use prefetched items if available
         items = (
             self.items.all()
@@ -121,5 +121,5 @@ class Cart(TimeStampMixinModel, UUIDModel):
         otherwise queries the database.
         """
         if hasattr(self, "_items_count"):
-            return self._items_count or 0
+            return cast(int, self._items_count) or 0
         return self.items.count()

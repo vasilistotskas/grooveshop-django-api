@@ -81,7 +81,7 @@ class ImageAndSvgField(ImageField):
 
             f = data
             if hasattr(f, "content_type"):
-                f.content_type = "image/svg+xml"  # type: ignore[attr-defined]
+                f.content_type = "image/svg+xml"
 
             if hasattr(f, "seek") and callable(f.seek):
                 f.seek(0)

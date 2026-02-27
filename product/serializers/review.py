@@ -98,7 +98,7 @@ class ProductReviewWriteSerializer(
         )
 
     def validate_rate(self, value: int) -> int:
-        valid_rates = [choice[0] for choice in ProductReview.rate.field.choices]
+        valid_rates = [choice[0] for choice in ProductReview.rate.field.choices]  # type: ignore[not-iterable]
         if value not in valid_rates:
             raise serializers.ValidationError(_("Invalid rate value."))
         return value

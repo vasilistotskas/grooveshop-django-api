@@ -40,8 +40,8 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         """Execute the command."""
         index_name = options.get("index")
-        show_synonyms = options.get("show_synonyms")
-        show_settings = options.get("show_settings")
+        show_synonyms: bool = options.get("show_synonyms", False)
+        show_settings: bool = options.get("show_settings", False)
 
         if index_name == "product" or not index_name:
             self.inspect_product_index(show_synonyms, show_settings)
@@ -52,7 +52,9 @@ class Command(BaseCommand):
     def inspect_product_index(self, show_synonyms: bool, show_settings: bool):
         """Inspect product index."""
         self.stdout.write(self.style.HTTP_INFO("\n" + "=" * 60))
-        self.stdout.write(self.style.HTTP_INFO(_("PRODUCT INDEX INSPECTION")))
+        self.stdout.write(
+            self.style.HTTP_INFO(str(_("PRODUCT INDEX INSPECTION")))
+        )
         self.stdout.write(self.style.HTTP_INFO("=" * 60))
 
         index_name = ProductTranslation._meilisearch["index_name"]
@@ -109,7 +111,9 @@ class Command(BaseCommand):
     def inspect_blog_index(self, show_synonyms: bool, show_settings: bool):
         """Inspect blog post index."""
         self.stdout.write(self.style.HTTP_INFO("\n" + "=" * 60))
-        self.stdout.write(self.style.HTTP_INFO(_("BLOG POST INDEX INSPECTION")))
+        self.stdout.write(
+            self.style.HTTP_INFO(str(_("BLOG POST INDEX INSPECTION")))
+        )
         self.stdout.write(self.style.HTTP_INFO("=" * 60))
 
         index_name = BlogPostTranslation._meilisearch["index_name"]

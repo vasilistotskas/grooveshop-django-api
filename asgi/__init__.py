@@ -12,7 +12,9 @@ from core.middleware.channels import TokenAuthMiddlewareStack
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
 django_asgi_app = get_asgi_application()
-django_asgi_app = health_check(django_asgi_app, "/health/")  # type: ignore[arg-type] # Django's ASGI app is less strict than the spec
+django_asgi_app = health_check(
+    django_asgi_app, "/health/"
+)  # Django's ASGI app is less strict than the spec
 
 from notification.consumers import NotificationConsumer  # noqa: E402
 

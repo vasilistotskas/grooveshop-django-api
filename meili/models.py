@@ -6,7 +6,7 @@ to be automatically indexed in Meilisearch.
 """
 
 import logging
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from typing import Any, TypedDict
 
 from django.conf import settings
@@ -232,9 +232,7 @@ class IndexMixin(models.Model):
             )
 
             # Store tasks for reference
-            cls._meilisearch = _Meili(
-                **{**cls._meilisearch, "tasks": list(_client.tasks)}
-            )
+            cls._meilisearch["tasks"] = list(_client.tasks)
             _client.flush_tasks()
 
         except Exception as e:
@@ -285,7 +283,7 @@ class IndexMixin(models.Model):
         return True
 
     @classmethod
-    def get_additional_meili_fields(cls) -> dict[str, callable]:
+    def get_additional_meili_fields(cls) -> dict[str, Callable]:
         """
         Return additional fields to include in the indexed document.
 

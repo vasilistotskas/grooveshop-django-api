@@ -147,6 +147,7 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
     def get_ordering(self, request):
         return ["-created_at", "name"]
 
+    @admin.display(description=_("Contact"))
     def contact_info(self, obj):
         name = obj.name[:30] + ("..." if len(obj.name) > 30 else "")
         is_suspicious = (
@@ -174,8 +175,7 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
         )
         return mark_safe(html)
 
-    contact_info.short_description = _("Contact")
-
+    @admin.display(description=_("Message"))
     def message_preview(self, obj):
         full = obj.message or ""
         preview = full[:100] + ("..." if len(full) > 100 else "")
@@ -192,8 +192,7 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
         )
         return mark_safe(html)
 
-    message_preview.short_description = _("Message")
-
+    @admin.display(description=_("Message Stats"))
     def message_stats(self, obj):
         msg = obj.message or ""
         char_count = len(msg)
@@ -237,8 +236,7 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
         )
         return mark_safe(html)
 
-    message_stats.short_description = _("Message Stats")
-
+    @admin.display(description=_("Timing"))
     def contact_timing(self, obj):
         now = timezone.now()
         diff = now - obj.created_at
@@ -286,8 +284,7 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
         )
         return mark_safe(html)
 
-    contact_timing.short_description = _("Timing")
-
+    @admin.display(description=_("Priority"))
     def priority_badge(self, obj):
         now = timezone.now()
         diff = now - obj.created_at
@@ -342,8 +339,7 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
         )
         return mark_safe(html)
 
-    priority_badge.short_description = _("Priority")
-
+    @admin.display(description=_("Contact Analytics"))
     def contact_analytics(self, obj):
         if not obj.created_at:
             return "Available after creation."
@@ -391,8 +387,7 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
         )
         return mark_safe(html)
 
-    contact_analytics.short_description = _("Contact Analytics")
-
+    @admin.display(description=_("Message Analytics"))
     def message_analytics(self, obj):
         msg = obj.message or ""
         chars = len(msg)
@@ -443,8 +438,7 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
         )
         return mark_safe(html)
 
-    message_analytics.short_description = _("Message Analytics")
-
+    @admin.display(description=_("Timing Information"))
     def timing_info(self, obj):
         now = timezone.now()
         created_age = now - obj.created_at
@@ -478,8 +472,6 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
             f"</div></div>"
         )
         return mark_safe(html)
-
-    timing_info.short_description = _("Timing Information")
 
     def _get_season(self, month_or_date):
         if isinstance(month_or_date, (datetime.date, datetime.datetime)):

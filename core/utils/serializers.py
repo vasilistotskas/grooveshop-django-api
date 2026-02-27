@@ -7,10 +7,16 @@ from typing import Any, NotRequired, TypedDict
 from django.db import models
 from django.utils.functional import Promise
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from parler_rest.fields import TranslatedFieldsField
 from rest_framework import serializers
-from drf_spectacular.utils import OpenApiParameter
+
+
+class _CrudTemplate(TypedDict):
+    op_prefix: str
+    summary: str | Promise
+    description: str | Promise
+    use_plural: bool
 
 
 class TranslatedFieldExtended(TranslatedFieldsField):
@@ -54,9 +60,9 @@ def camel_to_words(name):
 
 
 class DisplayConfig(TypedDict):
-    tag: NotRequired[str]
-    display_name: NotRequired[str]
-    display_name_plural: NotRequired[str]
+    tag: NotRequired[str | Promise]
+    display_name: NotRequired[str | Promise]
+    display_name_plural: NotRequired[str | Promise]
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,10 +71,12 @@ class ActionConfig:
 
     request: type[serializers.Serializer] | None = None
     response: type[serializers.Serializer] | None = None
-    responses: dict[int, type[serializers.Serializer] | None] | None = None
+    responses: dict[int, type[serializers.Serializer] | dict | None] | None = (
+        None
+    )
     operation_id: str | None = None
-    summary: str | None = None
-    description: str | None = None
+    summary: str | Promise | None = None
+    description: str | Promise | None = None
     tags: list[str] | None = None
     parameters: list | None = None
     deprecated: bool = False
@@ -208,7 +216,7 @@ _CRUD_DEFAULT_STATUS = {
 }
 
 # Default summaries/descriptions per CRUD action
-_CRUD_TEMPLATES = {
+_CRUD_TEMPLATES: dict[str, _CrudTemplate] = {
     "list": {
         "op_prefix": "list",
         "summary": _("List %(name)s"),
@@ -370,8 +378,8 @@ def create_schema_view_config(
 
         config[action_name] = extend_schema(
             operation_id=operation_id,
-            summary=summary,
-            description=description,
+            summary=str(summary) if summary else None,
+            description=str(description) if description else None,
             tags=tags,
             parameters=parameters,
             request=request_body,

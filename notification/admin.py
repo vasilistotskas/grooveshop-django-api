@@ -198,6 +198,7 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
     def get_queryset(self, request):
         return super().get_queryset(request).prefetch_related("user__user")
 
+    @admin.display(description=_("Notification"))
     def notification_info(self, obj):
         title = (
             obj.safe_translation_getter("title", any_language=True)
@@ -228,8 +229,7 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    notification_info.short_description = _("Notification")
-
+    @admin.display(description=_("Priority"))
     def priority_badge(self, obj):
         priority_config = {
             "LOW": {
@@ -271,8 +271,7 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    priority_badge.short_description = _("Priority")
-
+    @admin.display(description=_("Category"))
     def category_badge(self, obj):
         category_config = {
             "ORDER": {
@@ -359,8 +358,7 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    category_badge.short_description = _("Category")
-
+    @admin.display(description=_("Status"))
     def status_display(self, obj):
         now = timezone.now()
         is_expired = obj.expiry_date and now > obj.expiry_date
@@ -408,8 +406,7 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    status_display.short_description = _("Status")
-
+    @admin.display(description=_("Engagement"))
     def engagement_stats(self, obj):
         total_users = obj.user.count()
         seen_users = obj.user.filter(seen=True).count()
@@ -443,8 +440,7 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    engagement_stats.short_description = _("Engagement")
-
+    @admin.display(description=_("Timing"))
     def timing_info(self, obj):
         if not obj.created_at:
             return "Available after creation."
@@ -478,8 +474,7 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    timing_info.short_description = _("Timing")
-
+    @admin.display(description=_("Analytics"))
     def notification_analytics(self, obj):
         if not obj.created_at:
             return "Available after creation."
@@ -523,8 +518,7 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    notification_analytics.short_description = _("Analytics")
-
+    @admin.display(description=_("Engagement Summary"))
     def engagement_summary(self, obj):
         total_users = obj.user.count()
         seen_users = obj.user.filter(seen=True).count()
@@ -565,8 +559,7 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
-    engagement_summary.short_description = _("Engagement Summary")
-
+    @admin.display(description=_("Timing Summary"))
     def timing_summary(self, obj):
         now = timezone.now()
         created_age = now - obj.created_at
@@ -603,8 +596,6 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
             "</div>"
         )
         return mark_safe(html)
-
-    timing_summary.short_description = _("Timing Summary")
 
 
 @admin.register(NotificationUser)
@@ -682,6 +673,7 @@ class NotificationUserAdmin(ModelAdmin):
             .prefetch_related("notification__translations")
         )
 
+    @admin.display(description=_("User"))
     def user_info(self, obj):
         user = obj.user
         safe_name = conditional_escape(user.full_name or user.username)
@@ -697,8 +689,7 @@ class NotificationUserAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    user_info.short_description = _("User")
-
+    @admin.display(description=_("Notification"))
     def notification_info(self, obj):
         notification = obj.notification
         title = (
@@ -720,8 +711,7 @@ class NotificationUserAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    notification_info.short_description = _("Notification")
-
+    @admin.display(description=_("Status"))
     def seen_status(self, obj):
         if not obj.created_at:
             return "Available after creation."
@@ -769,8 +759,7 @@ class NotificationUserAdmin(ModelAdmin):
             )
             return mark_safe(html)
 
-    seen_status.short_description = _("Status")
-
+    @admin.display(description=_("Priority"))
     def priority_indicator(self, obj):
         priority = obj.notification.priority
 
@@ -801,8 +790,7 @@ class NotificationUserAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    priority_indicator.short_description = _("Priority")
-
+    @admin.display(description=_("Timing"))
     def timing_display(self, obj):
         if not obj.created_at:
             return "Available after creation."
@@ -835,8 +823,7 @@ class NotificationUserAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    timing_display.short_description = _("Timing")
-
+    @admin.display(description=_("Analytics"))
     def user_notification_analytics(self, obj):
         if not obj.created_at:
             return "Available after creation."
@@ -882,5 +869,3 @@ class NotificationUserAdmin(ModelAdmin):
             "</div>"
         )
         return mark_safe(html)
-
-    user_notification_analytics.short_description = _("Analytics")

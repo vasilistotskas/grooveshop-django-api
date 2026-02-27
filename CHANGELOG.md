@@ -3,6 +3,37 @@
 
 
 
+## v1.84.0 (2026-02-27)
+
+### Features
+
+* feat(auth): add rate limiting and tighten Knox token security
+
+- Add AllAuthRateLimitMiddleware for /_allauth/ headless endpoints
+  using Redis sliding-window counters (login: 10/min, signup: 5/min)
+- Reduce Knox TTL from 20d to 7d; enable AUTO_REFRESH (1-day min)
+- Revoke all Knox tokens on password change via password_changed signal
+- WebSocket auth now only accepts ?access_token= (drop session_token)
+- Delegate social email auto-connect to allauth settings instead of
+  custom pre_social_login implementation
+- Fix ALLOWED_HOSTS wildcard only in DEBUG; SSL redirect on in prod
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com> ([`51c6f9a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51c6f9acef3e8c1fd2702e5fd847126fe2dd91f7))
+
+### Refactoring
+
+* refactor: add ty type checker and modernize codebase
+
+- Add ty 0.0.19 as dev dependency with project-wide config,
+  suppressing rules for Django ORM, DRF, and test patterns
+- Fix type annotations across core, admin, and domain modules
+  for ty compatibility (null guards, Promise types, etc.)
+- Modernize admin display methods to use @admin.display()
+  decorator pattern throughout all admin modules
+- Bump ruff 0.15.2→0.15.4, phonenumbers 9.0.24→9.0.25
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com> ([`da56ffc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/da56ffc921d2cb09e6955574fb94ab99b5dbc4b2))
+
 ## v1.83.0 (2026-02-25)
 
 ### Bug fixes

@@ -3,6 +3,35 @@
 
 
 
+## v1.85.2 (2026-02-28)
+
+### Bug fixes
+
+* fix: test ([`3bddfb8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3bddfb85b36018667b467c6b6555ef13829e6a07))
+
+* fix(security): remove all sensitive data sources from webhook logging
+
+Remove reads of HTTP_STRIPE_SIGNATURE and DJSTRIPE_WEBHOOK_SECRET
+entirely from the logging method so CodeQL taint analysis cannot
+trace any sensitive data flow to the logger. Also remove response
+body preview from failure logs.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com> ([`b718530`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b718530cac0b79c113542d1eaf3c7d6481b16a72))
+
+* fix(security): resolve 22 CodeQL code scanning alerts
+
+- Replace xml.etree.ElementTree with defusedxml to prevent XML bomb
+  and path injection attacks in SVG validation (HIGH)
+- Remove sensitive data (signature values, secret prefix, IPs, body
+  preview) from Stripe webhook debug logging (HIGH)
+- Replace str(e) in HTTP error responses with generic messages across
+  order views, email admin views, core settings views, and subscription
+  views to prevent stack trace information exposure (MEDIUM, 19 alerts)
+- Add proper logger.error() calls where missing before returning
+  generic error responses
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com> ([`b9aa54e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b9aa54e99efbfca32f799042d001b83340f2e18b))
+
 ## v1.85.1 (2026-02-28)
 
 ### Bug fixes

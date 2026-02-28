@@ -3,6 +3,29 @@
 
 
 
+## v1.85.0 (2026-02-28)
+
+### Bug fixes
+
+* fix(tests): test_stock_manager.py ([`765d4e2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/765d4e2b01611b78c050c6ee27c50bb23cb7b999))
+
+* fix: test_stock_manager.py remove duplicate @pytest.mark.django_db(transaction=True) ([`83f88d8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/83f88d881aedb44a678e857622b87820e7812a18))
+
+### Features
+
+* feat(rosetta): sync translation files via Redis across K8s pods
+
+Add a Rosetta post_save signal handler that stores .po/.mo file
+contents in Redis after each translation save. The translation
+reload middleware now writes these files from Redis to disk before
+reloading gettext catalogs, solving NFS attribute cache staleness
+in multi-replica deployments.
+
+Also skip version bump for Rosetta health-check keys and fix
+duplicate transaction marker in stock manager test.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com> ([`bcb1026`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bcb1026a6fdc4cbfe3973a58124900d34d48c2b0))
+
 ## v1.84.0 (2026-02-27)
 
 ### Features

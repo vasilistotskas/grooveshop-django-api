@@ -1,15 +1,13 @@
 """
-Custom Rosetta storage backend that clears translation cache on save.
+Custom Rosetta storage backend.
 
-Sets a version key in Redis so that all pods in a multi-replica deployment
-can detect when translations have changed and reload them.
+The actual translation version bumping and cross-pod sync happens in
+core.signals.rosetta (connected to Rosetta's post_save signal), not here.
 """
 
 from __future__ import annotations
 
 import logging
-import time
-from typing import Any
 
 from rosetta.storage import CacheRosettaStorage
 
@@ -20,37 +18,12 @@ TRANSLATION_VERSION_CACHE_KEY = "rosetta:translation_version"
 
 class CacheClearingRosettaStorage(CacheRosettaStorage):
     """
-    Custom Rosetta storage that bumps a shared translation version in
-    the cache (Redis) whenever translations are saved.
+    Custom Rosetta storage that extends CacheRosettaStorage.
 
-    A companion middleware (TranslationReloadMiddleware) checks this
-    version on each request and reloads the gettext catalogs when it
-    detects a change, ensuring all replicas serve fresh translations.
+    Translation version bumping and reload are handled by the
+    post_save signal handler in core.signals.rosetta, which fires
+    when Rosetta actually saves .po files to disk.
     """
-
-    def set(self, key: str, val: Any) -> Any:
-        result = super().set(key, val)
-
-        # CacheRosettaStorage.__init__ calls self.set("rosetta_cache_test", ...)
-        # as a health check on every Rosetta page load. Skip the version bump
-        # and reload for this key to avoid unnecessary translation reloads.
-        if key == "rosetta_cache_test":
-            return result
-
-        try:
-            from django.core.cache import cache
-
-            # Bump the shared translation version so all pods pick it up
-            cache.set(TRANSLATION_VERSION_CACHE_KEY, time.time(), timeout=None)
-
-            # Also reload translations on this pod immediately
-            _reload_translations()
-
-            logger.info("Translation version bumped after Rosetta save")
-        except Exception as e:
-            logger.error(f"Failed to bump translation version: {e}")
-
-        return result
 
 
 def _reload_translations():

@@ -12,12 +12,16 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import time
 from pathlib import Path
 
 from django.core.cache import cache
 from django.dispatch import receiver
 from rosetta.poutil import find_pos
 from rosetta.signals import post_save as rosetta_post_save
+
+from core.rosetta_storage import TRANSLATION_VERSION_CACHE_KEY
+from core.rosetta_storage import _reload_translations
 
 logger = logging.getLogger(__name__)
 
@@ -95,3 +99,11 @@ def sync_translation_files_to_redis(sender, language_code, request, **kwargs):
     file_paths = cache.get(ROSETTA_FILE_PATHS_KEY) or {}
     file_paths[ph] = po_path
     cache.set(ROSETTA_FILE_PATHS_KEY, file_paths, timeout=None)
+
+    # Bump the shared translation version so all pods pick up the change.
+    # This must happen here (not in CacheClearingRosettaStorage.set()) because
+    # Rosetta writes .po files directly to disk — storage.set() is only called
+    # for internal cache state, not during the actual translation save.
+    cache.set(TRANSLATION_VERSION_CACHE_KEY, time.time(), timeout=None)
+    _reload_translations()
+    logger.info("Translation version bumped after Rosetta save")

@@ -3,6 +3,24 @@
 
 
 
+## v1.85.1 (2026-02-28)
+
+### Bug fixes
+
+* fix: update lock ([`87b4963`](https://github.com/vasilistotskas/grooveshop-django-api/commit/87b4963d166842ec1c4db16b5cf597aaad98c487))
+
+### Refactoring
+
+* refactor(rosetta): move translation version bump to signal handler
+
+The translation version should be bumped when Rosetta actually saves
+.po files to disk, not in CacheClearingRosettaStorage.set(). The
+storage backend's set() method is only called for internal cache
+operations, not during the actual translation save. This moves the
+logic to the post_save signal handler where it belongs.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com> ([`139e8ec`](https://github.com/vasilistotskas/grooveshop-django-api/commit/139e8ec2ba0573ac697e16bd241c3c65c6dc4dd6))
+
 ## v1.85.0 (2026-02-28)
 
 ### Bug fixes

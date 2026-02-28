@@ -9,7 +9,6 @@ import hashlib
 import logging
 from typing import Callable
 
-from django.conf import settings
 from django.http import HttpRequest, HttpResponse
 
 logger = logging.getLogger(__name__)
@@ -26,9 +25,6 @@ class StripeWebhookDebugMiddleware:
 
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]):
         self.get_response = get_response
-        self.debug_enabled = getattr(settings, "DEBUG", False) or getattr(
-            settings, "STRIPE_WEBHOOK_DEBUG", False
-        )
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
         # Only process Stripe webhook paths
@@ -46,16 +42,9 @@ class StripeWebhookDebugMiddleware:
     def _log_webhook_request(self, request: HttpRequest) -> None:
         """Log webhook request diagnostic information."""
         try:
-            stripe_signature = request.META.get("HTTP_STRIPE_SIGNATURE", "")
-
             body = request.body
             body_hash = hashlib.sha256(body).hexdigest()[:16]
             body_length = len(body)
-
-            webhook_secret = getattr(settings, "DJSTRIPE_WEBHOOK_SECRET", "")
-            secret_configured = bool(
-                webhook_secret and webhook_secret != "whsec_..."
-            )
 
             logger.info(
                 "Stripe webhook request received",
@@ -63,8 +52,6 @@ class StripeWebhookDebugMiddleware:
                     "path": request.path,
                     "body_length": body_length,
                     "body_hash": body_hash,
-                    "signature_present": bool(stripe_signature),
-                    "secret_configured": secret_configured,
                     "content_type": request.content_type,
                 },
             )
@@ -85,9 +72,6 @@ class StripeWebhookDebugMiddleware:
                 extra={
                     "path": request.path,
                     "status_code": response.status_code,
-                    "response_preview": getattr(response, "content", b"")[
-                        :200
-                    ].decode("utf-8", errors="replace"),
                 },
             )
         else:

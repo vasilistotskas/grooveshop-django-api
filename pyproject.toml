@@ -59,6 +59,7 @@ dependencies = [
   "django-stubs-ext==5.2.9",
   "twisted[http2,tls]==25.5.0",
   "dj-stripe==2.10.3",
+  "defusedxml>=0.7.1",
 ]
 
 [project.urls]

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import contextlib
-import xml.etree.ElementTree as ET
 from typing import TYPE_CHECKING, Any
+
+import defusedxml.ElementTree as ET
 
 from django.conf import settings
 from django.core import validators
@@ -104,8 +105,7 @@ class ImageAndSvgField(ImageField):
             f.seek(0)
 
         try:
-            parser = ET.XMLParser()
-            doc = ET.parse(f, parser=parser)
+            doc = ET.parse(f)
             root = doc.getroot()
 
             if root.tag not in SVG_TAGS:

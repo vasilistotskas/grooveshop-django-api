@@ -409,8 +409,14 @@ class UserSubscriptionViewSet(BaseModelViewSet):
             )
             return Response(response_serializer.data)
         except Exception as e:
+            logger.error("Error confirming subscription: %s", e, exc_info=True)
             return Response(
-                {"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST
+                {
+                    "detail": _(
+                        "An error occurred while confirming the subscription."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
 

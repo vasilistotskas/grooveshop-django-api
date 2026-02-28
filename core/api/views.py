@@ -534,12 +534,8 @@ def list_settings(request):
     except Exception as e:
         logger.error(f"Error listing settings: {e}", exc_info=True)
 
-        error_data = {
-            "detail": _("Failed to retrieve settings"),
-            "error": str(e),
-        }
         return Response(
-            error_data,
+            {"detail": _("Failed to retrieve settings")},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
@@ -606,11 +602,7 @@ def get_setting_by_key(request):
     except Exception as e:
         logger.error(f"Error retrieving setting: {e}", exc_info=True)
 
-        error_data = {
-            "detail": _("Failed to retrieve setting"),
-            "error": str(e),
-        }
         return Response(
-            error_data,
+            {"detail": _("Failed to retrieve setting")},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )

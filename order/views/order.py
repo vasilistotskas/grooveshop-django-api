@@ -393,7 +393,7 @@ class OrderViewSet(BaseModelViewSet):
         except InvalidOrderDataError as e:
             logger.warning("Invalid order data: %s", e)
             error_response = {
-                "detail": str(e),
+                "detail": _("Invalid order data"),
                 "error": {
                     "type": "invalid_order_data",
                 },
@@ -409,12 +409,9 @@ class OrderViewSet(BaseModelViewSet):
             logger.warning("Payment not found: %s", e)
             return Response(
                 {
-                    "detail": str(e),
+                    "detail": _("Payment not found"),
                     "error": {
                         "type": "payment_not_found",
-                        "payment_id": e.payment_id
-                        if hasattr(e, "payment_id")
-                        else None,
                     },
                 },
                 status=status.HTTP_400_BAD_REQUEST,
@@ -422,20 +419,23 @@ class OrderViewSet(BaseModelViewSet):
 
         except ValidationError as e:
             logger.warning("Validation error: %s", e)
-            # DRF ValidationError has a detail attribute
-            # Return the error detail directly for proper field-level errors
             error_detail = (
-                e.detail if hasattr(e, "detail") else {"detail": str(e)}
+                e.detail
+                if hasattr(e, "detail")
+                else {"detail": _("Validation error")}
             )
             return Response(
                 error_detail,
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        except PermissionDenied as e:
-            logger.warning("Permission denied: %s", e)
+        except PermissionDenied:
             return Response(
-                {"detail": str(e)},
+                {
+                    "detail": _(
+                        "You do not have permission to perform this action."
+                    )
+                },
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -444,10 +444,7 @@ class OrderViewSet(BaseModelViewSet):
                 "Unexpected error creating order: %s", e, exc_info=True
             )
             return Response(
-                {
-                    "detail": _("An unexpected error occurred"),
-                    "error": str(e),
-                },
+                {"detail": _("An unexpected error occurred")},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -486,11 +483,10 @@ class OrderViewSet(BaseModelViewSet):
         try:
             OrderService.validate_shipping_address(shipping_address)
         except DjangoValidationError as e:
-            # Convert Django ValidationError to DRF ValidationError
             raise ValidationError(
                 e.message_dict
                 if hasattr(e, "message_dict")
-                else {"detail": str(e)}
+                else {"detail": _("Invalid shipping address")}
             )
 
         # Step 5: Get loyalty points to redeem (if any)
@@ -546,11 +542,10 @@ class OrderViewSet(BaseModelViewSet):
         try:
             OrderService.validate_shipping_address(shipping_address)
         except DjangoValidationError as e:
-            # Convert Django ValidationError to DRF ValidationError
             raise ValidationError(
                 e.message_dict
                 if hasattr(e, "message_dict")
-                else {"detail": str(e)}
+                else {"detail": _("Invalid shipping address")}
             )
 
         # Step 4: Get loyalty points to redeem (if any)
@@ -849,7 +844,10 @@ class OrderViewSet(BaseModelViewSet):
             return Response(response_data)
 
         except ValueError as e:
-            raise ValidationError({"detail": str(e)}) from e
+            logger.warning("Error canceling order: %s", e)
+            raise ValidationError(
+                {"detail": _("Unable to cancel this order.")}
+            ) from e
         except Exception as e:
             logger.error("Error canceling order: %s", e, exc_info=True)
             return Response(
@@ -945,10 +943,10 @@ class OrderViewSet(BaseModelViewSet):
             return Response(response_serializer.data)
 
         except InvalidStatusTransitionError as e:
-            logger.error("Invalid status transition: %s", e)
+            logger.warning("Invalid status transition: %s", e)
             raise ValidationError(
                 {
-                    "detail": str(e),
+                    "detail": _("Invalid status transition."),
                     "current_status": e.current_status,
                     "new_status": e.new_status,
                     "allowed_transitions": e.allowed,
@@ -1017,8 +1015,14 @@ class OrderViewSet(BaseModelViewSet):
             return Response(response_serializer.validated_data)
 
         except ValueError as e:
+            logger.warning(
+                "Refund validation error for order %s: %s",
+                order.id,
+                e,
+            )
             return Response(
-                {"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST
+                {"detail": _("Unable to process refund for this order.")},
+                status=status.HTTP_400_BAD_REQUEST,
             )
         except Exception as e:
             logger.error(
@@ -1032,7 +1036,6 @@ class OrderViewSet(BaseModelViewSet):
                     "detail": _(
                         "An error occurred while processing the refund."
                     ),
-                    "error": str(e),
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
@@ -1056,8 +1059,14 @@ class OrderViewSet(BaseModelViewSet):
             return Response(response_serializer.validated_data)
 
         except ValueError as e:
+            logger.warning(
+                "Payment status error for order %s: %s",
+                order.id,
+                e,
+            )
             return Response(
-                {"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST
+                {"detail": _("Unable to retrieve payment status.")},
+                status=status.HTTP_400_BAD_REQUEST,
             )
         except Exception as e:
             logger.error(
@@ -1071,7 +1080,6 @@ class OrderViewSet(BaseModelViewSet):
                     "detail": _(
                         "An error occurred while fetching payment status."
                     ),
-                    "error": str(e),
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )

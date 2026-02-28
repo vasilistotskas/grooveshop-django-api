@@ -1,6 +1,7 @@
 """Admin views for email template management."""
 
 import json
+import logging
 from typing import Any
 
 from django.conf import settings
@@ -12,6 +13,8 @@ from django.views.generic import TemplateView
 
 from order.models import Order
 from .preview_service import EmailTemplatePreviewService
+
+logger = logging.getLogger(__name__)
 
 
 @method_decorator(staff_member_required, name="dispatch")
@@ -132,7 +135,10 @@ def preview_template_ajax(request: HttpRequest) -> JsonResponse:
     except json.JSONDecodeError:
         return JsonResponse({"success": False, "error": "Invalid JSON data"})
     except Exception as e:
-        return JsonResponse({"success": False, "error": str(e)})
+        logger.error("Error previewing template: %s", e, exc_info=True)
+        return JsonResponse(
+            {"success": False, "error": "An unexpected error occurred"}
+        )
 
 
 @staff_member_required
@@ -182,7 +188,15 @@ def get_template_info(request: HttpRequest, template_name: str) -> JsonResponse:
         )
 
     except Exception as e:
-        return JsonResponse({"success": False, "error": str(e)})
+        logger.error(
+            "Error getting template info for %s: %s",
+            template_name,
+            e,
+            exc_info=True,
+        )
+        return JsonResponse(
+            {"success": False, "error": "An unexpected error occurred"}
+        )
 
 
 @staff_member_required
@@ -223,4 +237,12 @@ def get_order_data(request: HttpRequest, order_id: int) -> JsonResponse:
             {"success": False, "error": f"Order {order_id} not found"}
         )
     except Exception as e:
-        return JsonResponse({"success": False, "error": str(e)})
+        logger.error(
+            "Error getting order data for %s: %s",
+            order_id,
+            e,
+            exc_info=True,
+        )
+        return JsonResponse(
+            {"success": False, "error": "An unexpected error occurred"}
+        )

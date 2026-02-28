@@ -13,6 +13,8 @@ class CoreConfig(AppConfig):
 
         from core.tasks import validate_task_configuration
 
+        import core.signals.rosetta  # noqa: F401
+
         try:
             validate_task_configuration()
         except ImproperlyConfigured as e:

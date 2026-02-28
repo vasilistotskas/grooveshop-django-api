@@ -325,12 +325,16 @@ class TestStockManagerReserveStock:
         assert reservation.quantity == 10
 
     @pytest.mark.django_db(transaction=True)
+    @pytest.mark.django_db(transaction=True)
     def test_reserve_stock_concurrent_reservations(self):
         """
         Test that concurrent reservation attempts prevent overselling.
 
         This test verifies that SELECT FOR UPDATE locking prevents race conditions
         when multiple threads attempt to reserve stock simultaneously.
+
+        Requires transaction=True so threads (which use separate DB connections)
+        can see the product created in the main thread.
         """
         import threading
         import uuid

@@ -31,6 +31,12 @@ class CacheClearingRosettaStorage(CacheRosettaStorage):
     def set(self, key: str, val: Any) -> Any:
         result = super().set(key, val)
 
+        # CacheRosettaStorage.__init__ calls self.set("rosetta_cache_test", ...)
+        # as a health check on every Rosetta page load. Skip the version bump
+        # and reload for this key to avoid unnecessary translation reloads.
+        if key == "rosetta_cache_test":
+            return result
+
         try:
             from django.core.cache import cache
 

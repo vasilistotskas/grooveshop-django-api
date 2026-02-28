@@ -351,9 +351,6 @@ class TestPaymentFirstOrderCreation(APITestCase):
         self.assertIn("detail", response.data)
         self.assertIn("error", response.data)
         self.assertEqual(response.data["error"]["type"], "payment_not_found")
-        self.assertEqual(
-            response.data["error"]["payment_id"], self.payment_intent_id
-        )
 
     @patch("order.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")

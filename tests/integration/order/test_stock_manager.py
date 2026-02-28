@@ -325,7 +325,6 @@ class TestStockManagerReserveStock:
         assert reservation.quantity == 10
 
     @pytest.mark.django_db(transaction=True)
-    @pytest.mark.django_db(transaction=True)
     def test_reserve_stock_concurrent_reservations(self):
         """
         Test that concurrent reservation attempts prevent overselling.

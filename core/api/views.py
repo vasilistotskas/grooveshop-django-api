@@ -442,7 +442,7 @@ def health_check(request):
         health_status["database"] = False
 
     try:
-        redis_conn = Redis(host=settings.REDIS_HOST, port=settings.REDIS_PORT)
+        redis_conn = Redis.from_url(settings.REDIS_URL)
         try:
             redis_conn.ping()
             health_status["redis"] = True

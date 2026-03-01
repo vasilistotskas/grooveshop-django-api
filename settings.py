@@ -403,7 +403,12 @@ USE_AWS = getenv("USE_AWS", "False") == "True"
 
 REDIS_HOST = getenv("REDIS_HOST", "localhost")
 REDIS_PORT = getenv("REDIS_PORT", "6379")
-REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
+REDIS_PASSWORD = getenv("REDIS_PASSWORD", "")
+REDIS_URL = (
+    f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/0"
+    if REDIS_PASSWORD
+    else f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
+)
 
 DEFAULT_CACHE_KEY_PREFIX = getenv("DEFAULT_CACHE_KEY_PREFIX", "default")
 DEFAULT_CACHE_VERSION = int(getenv("DEFAULT_CACHE_VERSION", "1"))
@@ -647,7 +652,7 @@ CELERY_BEAT_SCHEDULE = get_celery_beat_schedule()
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {"hosts": [(REDIS_HOST, int(REDIS_PORT))]},
+        "CONFIG": {"hosts": [REDIS_URL]},
     },
 }
 
@@ -1788,7 +1793,9 @@ VIVA_WALLET_API_KEY = getenv("VIVA_WALLET_API_KEY", "")
 VIVA_WALLET_CLIENT_ID = getenv("VIVA_WALLET_CLIENT_ID", "")
 VIVA_WALLET_CLIENT_SECRET = getenv("VIVA_WALLET_CLIENT_SECRET", "")
 VIVA_WALLET_SOURCE_CODE = getenv("VIVA_WALLET_SOURCE_CODE", "Default")
-VIVA_WALLET_LIVE_MODE = getenv("VIVA_WALLET_LIVE_MODE", str(not DEBUG)).lower() in (
+VIVA_WALLET_LIVE_MODE = getenv(
+    "VIVA_WALLET_LIVE_MODE", str(not DEBUG)
+).lower() in (
     "true",
     "1",
     "yes",

@@ -15,6 +15,18 @@ settings.DISABLE_CACHE = True
 settings.MEILISEARCH["OFFLINE"] = True
 settings.SESSION_ENGINE = "django.contrib.sessions.backends.db"
 
+# Use process-local in-memory cache instead of Redis for test isolation.
+# With pytest-xdist (-n auto), each worker is a separate process with its own
+# LocMemCache. This prevents cache.clear() in one worker from doing FLUSHDB
+# on shared Redis and wiping keys that other workers depend on (e.g.
+# django-extra-settings cached values).
+settings.CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "test-cache",
+    }
+}
+
 settings.DATABASES["default"]["ATOMIC_REQUESTS"] = False
 settings.DATABASES["default"]["AUTOCOMMIT"] = True
 settings.DATABASES["default"]["CONN_MAX_AGE"] = 0
@@ -122,8 +134,7 @@ def debug_query_count():
 def _django_clear_cache(request):
     """Clear default cache before tests that use the DB.
 
-    Uses delete_pattern instead of clear() to avoid FLUSHDB which
-    would wipe keys that parallel xdist workers are using.
+    Safe in parallel execution because tests use LocMemCache (process-local).
     """
     if request.node.get_closest_marker("django_db"):
         try:

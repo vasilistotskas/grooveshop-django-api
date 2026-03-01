@@ -783,9 +783,7 @@ class OrderViewSet(BaseModelViewSet):
             order.metadata = {}
 
         if provider_code == "viva_wallet":
-            order.metadata["viva_order_code"] = checkout_response[
-                "session_id"
-            ]
+            order.metadata["viva_order_code"] = checkout_response["session_id"]
         else:
             order.metadata["stripe_checkout_session_id"] = checkout_response[
                 "session_id"

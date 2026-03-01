@@ -30,6 +30,8 @@ class StockManager:
     race conditions and ensure atomicity.
     """
 
+    RESERVATION_TTL_MINUTES_DEFAULT = 15
+
     @classmethod
     def get_reservation_ttl_minutes(cls) -> int:
         """
@@ -38,7 +40,13 @@ class StockManager:
         Returns:
             int: Reservation TTL in minutes (default: 15)
         """
-        return Setting.get("STOCK_RESERVATION_TTL_MINUTES", default=15)
+        ttl = Setting.get(
+            "STOCK_RESERVATION_TTL_MINUTES",
+            default=cls.RESERVATION_TTL_MINUTES_DEFAULT,
+        )
+        if not isinstance(ttl, int) or ttl <= 0:
+            return cls.RESERVATION_TTL_MINUTES_DEFAULT
+        return ttl
 
     @classmethod
     @transaction.atomic

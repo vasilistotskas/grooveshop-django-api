@@ -3,6 +3,16 @@
 
 
 
+## v1.86.1 (2026-03-01)
+
+### Bug fixes
+
+* fix: update uv.lock ([`c84558c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c84558ce23b26afae3182f87ea48d4dc5aed38dd))
+
+* fix: redits
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com> ([`03d708f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/03d708fa436d8700c8ee13d8094c1d2533c54620))
+
 ## v1.86.0 (2026-03-01)
 
 ### Build system

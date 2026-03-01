@@ -23,6 +23,8 @@ from core.views import (
     robots_txt,
     upload_image,
 )
+from order.views.viva_webhook import viva_wallet_webhook
+
 import core.filters.camel_case_filters  # noqa
 import core.filters.camel_case_ordering  # noqa
 
@@ -32,6 +34,11 @@ urlpatterns = [
     path("robots.txt", robots_txt, name="robots-txt"),
     path("i18n/", include("django.conf.urls.i18n")),
     path("stripe/", include("djstripe.urls", namespace="djstripe")),
+    path(
+        "viva-wallet/webhook/",
+        viva_wallet_webhook,
+        name="viva-wallet-webhook",
+    ),
 ]
 
 urlpatterns += i18n_patterns(

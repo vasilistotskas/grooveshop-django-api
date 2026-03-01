@@ -127,10 +127,10 @@ serializers_config: SerializersConfig = {
         request=CreateCheckoutSessionRequestSerializer,
         response=CreateCheckoutSessionResponseSerializer,
         operation_id="createOrderCheckoutSession",
-        summary=_("Create a Stripe Checkout Session for an order"),
+        summary=_("Create a hosted checkout session for an order"),
         description=_(
-            "Create a Stripe Checkout Session for hosted payment page. "
-            "The customer will be redirected to Stripe's checkout page to complete payment."
+            "Create a hosted checkout session (Stripe or Viva Wallet). "
+            "The customer will be redirected to the provider's checkout page to complete payment."
         ),
         tags=["Orders"],
     ),
@@ -317,15 +317,15 @@ class OrderViewSet(BaseModelViewSet):
 
         This endpoint supports two payment flows based on payment method type:
 
-        **Online Payments (is_online_payment=True):**
-        - Payment-first flow: Requires payment_intent_id
+        **Payment-first (online, intent-based):**
+        - Requires payment_intent_id
         - Flow: Payment confirmed → Order created
-        - Examples: Stripe, PayPal
+        - Examples: Stripe
 
-        **Offline Payments (is_online_payment=False):**
-        - Order-first flow: No payment_intent_id required
-        - Flow: Order created → Payment pending
-        - Examples: Cash on Delivery, Bank Transfer
+        **Order-first (offline + redirect-based online):**
+        - No payment_intent_id required
+        - Flow: Order created → Payment pending (redirect to hosted checkout or pay later)
+        - Examples: Cash on Delivery, Bank Transfer, Viva Wallet
 
         Required request data:
         - cart_id: Cart ID or UUID to create order from
@@ -363,11 +363,18 @@ class OrderViewSet(BaseModelViewSet):
                 )
 
             # Step 2: Route to appropriate flow based on payment type
-            if pay_way.is_online_payment:
-                # Online payment: Require payment_intent_id (payment-first)
+            # Providers that use hosted redirect checkout (order-first, no payment intent)
+            redirect_checkout_providers = {"viva_wallet"}
+
+            if (
+                pay_way.is_online_payment
+                and pay_way.provider_code not in redirect_checkout_providers
+            ):
+                # Payment-first flow: Requires payment_intent_id (e.g. Stripe)
                 return self._create_with_payment_intent(request, pay_way)
             else:
-                # Offline payment: No payment_intent_id required (order-first)
+                # Order-first flow: No payment_intent_id required
+                # (offline payments + redirect-based online providers like Viva Wallet)
                 return self._create_without_payment_intent(request, pay_way)
 
         except InsufficientStockError as e:
@@ -706,7 +713,7 @@ class OrderViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["POST"])
     def create_checkout_session(self, request, *args, **kwargs):
-        """Create a Stripe Checkout Session for an order."""
+        """Create a hosted checkout session for an order."""
         order = self.get_object()
 
         if order.is_paid:
@@ -715,11 +722,15 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if not order.pay_way or order.pay_way.provider_code != "stripe":
+        supported_providers = {"stripe", "viva_wallet"}
+        if (
+            not order.pay_way
+            or order.pay_way.provider_code not in supported_providers
+        ):
             return Response(
                 {
                     "detail": _(
-                        "This order is not configured for Stripe payments."
+                        "This order is not configured for online payments."
                     )
                 },
                 status=status.HTTP_400_BAD_REQUEST,
@@ -743,11 +754,18 @@ class OrderViewSet(BaseModelViewSet):
         if request.user.is_authenticated:
             checkout_params["subscriber_id"] = request.user.id
 
-        provider = get_payment_provider(order.pay_way.provider_code)
+        provider_code = order.pay_way.provider_code
+        provider = get_payment_provider(provider_code)
 
-        # Pass only items total (without shipping) so Stripe can add shipping separately
+        # For Stripe, pass only items total so Stripe can add shipping separately
+        # For Viva Wallet, pass the full order total (shipping included)
+        if provider_code == "stripe":
+            amount = order.total_price_items
+        else:
+            amount = order.total_price
+
         success, checkout_response = provider.create_checkout_session(
-            amount=order.total_price_items,
+            amount=amount,
             order_id=str(order.id),
             **checkout_params,
         )
@@ -763,9 +781,15 @@ class OrderViewSet(BaseModelViewSet):
 
         if not order.metadata:
             order.metadata = {}
-        order.metadata["stripe_checkout_session_id"] = checkout_response[
-            "session_id"
-        ]
+
+        if provider_code == "viva_wallet":
+            order.metadata["viva_order_code"] = checkout_response[
+                "session_id"
+            ]
+        else:
+            order.metadata["stripe_checkout_session_id"] = checkout_response[
+                "session_id"
+            ]
         order.save(update_fields=["metadata"])
 
         response_serializer_class = self.get_response_serializer()

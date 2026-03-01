@@ -1,9 +1,10 @@
 import logging
 from abc import ABC, abstractmethod
 from typing import Any
-from django.utils.translation import gettext_lazy as _
+
 import stripe
 from django.conf import settings
+from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
 from djstripe.models import PaymentIntent, Refund
 
@@ -460,6 +461,333 @@ class StripePaymentProvider(PaymentProvider):
             return PaymentStatus.FAILED, {"error": str(e)}
 
 
+class VivaWalletPaymentProvider(PaymentProvider):
+    DEMO_AUTH_URL = "https://demo-accounts.vivapayments.com/connect/token"
+    LIVE_AUTH_URL = "https://accounts.vivapayments.com/connect/token"
+    DEMO_API_URL = "https://demo-api.vivapayments.com"
+    LIVE_API_URL = "https://api.vivapayments.com"
+    DEMO_CHECKOUT_URL = "https://demo.vivapayments.com"
+    LIVE_CHECKOUT_URL = "https://www.vivapayments.com"
+    DEMO_TRANSACTIONS_URL = "https://demo.vivapayments.com"
+    LIVE_TRANSACTIONS_URL = "https://www.vivapayments.com"
+    TOKEN_CACHE_KEY = "viva_wallet_access_token"
+
+    def __init__(self):
+        self.merchant_id = getattr(settings, "VIVA_WALLET_MERCHANT_ID", "")
+        self.api_key = getattr(settings, "VIVA_WALLET_API_KEY", "")
+        self.client_id = getattr(settings, "VIVA_WALLET_CLIENT_ID", "")
+        self.client_secret = getattr(settings, "VIVA_WALLET_CLIENT_SECRET", "")
+        self.source_code = getattr(
+            settings, "VIVA_WALLET_SOURCE_CODE", "Default"
+        )
+        self.live_mode = getattr(settings, "VIVA_WALLET_LIVE_MODE", False)
+
+        if self.live_mode:
+            self.auth_url = self.LIVE_AUTH_URL
+            self.api_url = self.LIVE_API_URL
+            self.checkout_url = self.LIVE_CHECKOUT_URL
+            self.transactions_url = self.LIVE_TRANSACTIONS_URL
+        else:
+            self.auth_url = self.DEMO_AUTH_URL
+            self.api_url = self.DEMO_API_URL
+            self.checkout_url = self.DEMO_CHECKOUT_URL
+            self.transactions_url = self.DEMO_TRANSACTIONS_URL
+
+    def _get_access_token(self) -> str:
+        from base64 import b64encode
+
+        import requests
+        from django.core.cache import cache
+
+        cached_token = cache.get(self.TOKEN_CACHE_KEY)
+        if cached_token:
+            return cached_token
+
+        credentials = b64encode(
+            f"{self.client_id}:{self.client_secret}".encode()
+        ).decode()
+
+        response = requests.post(
+            self.auth_url,
+            headers={
+                "Authorization": f"Basic {credentials}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            data={
+                "grant_type": "client_credentials",
+            },
+            timeout=30,
+        )
+        response.raise_for_status()
+        token_data = response.json()
+
+        access_token = token_data["access_token"]
+        expires_in = token_data.get("expires_in", 3600)
+        cache.set(
+            self.TOKEN_CACHE_KEY,
+            access_token,
+            timeout=max(expires_in - 60, 60),
+        )
+
+        return access_token
+
+    def _get_basic_auth_header(self) -> str:
+        from base64 import b64encode
+
+        credentials = b64encode(
+            f"{self.merchant_id}:{self.api_key}".encode()
+        ).decode()
+        return f"Basic {credentials}"
+
+    def _map_viva_status(self, status_id: str) -> PaymentStatus:
+        status_mapping = {
+            "F": PaymentStatus.COMPLETED,
+            "A": PaymentStatus.PENDING,
+            "C": PaymentStatus.COMPLETED,
+            "E": PaymentStatus.FAILED,
+            "R": PaymentStatus.REFUNDED,
+            "X": PaymentStatus.CANCELED,
+            "M": PaymentStatus.PROCESSING,
+            "MA": PaymentStatus.PROCESSING,
+            "MI": PaymentStatus.PROCESSING,
+            "ML": PaymentStatus.REFUNDED,
+            "MW": PaymentStatus.COMPLETED,
+            "MS": PaymentStatus.PROCESSING,
+        }
+        return status_mapping.get(status_id, PaymentStatus.FAILED)
+
+    def create_checkout_session(
+        self, amount: Money, order_id: str, **kwargs
+    ) -> tuple[bool, dict[str, Any]]:
+        import requests
+
+        try:
+            logger.info(
+                "Creating Viva Wallet payment order",
+                extra={
+                    "amount": str(amount.amount),
+                    "currency": str(amount.currency),
+                    "order_id": order_id,
+                },
+            )
+
+            access_token = self._get_access_token()
+            viva_amount = int(amount.amount * 100)
+
+            payload = {
+                "amount": viva_amount,
+                "customerTrns": kwargs.get("description", f"Order #{order_id}"),
+                "merchantTrns": str(order_id),
+                "sourceCode": self.source_code,
+                "currencyCode": 978,
+                "disableCash": True,
+            }
+
+            customer_email = kwargs.get("customer_email")
+            if customer_email:
+                payload["customer"] = {"email": customer_email}
+
+            response = requests.post(
+                f"{self.api_url}/checkout/v2/orders",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+                timeout=30,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            order_code = data["orderCode"]
+            checkout_url = f"{self.checkout_url}/web/checkout?ref={order_code}"
+
+            logger.info(
+                "Viva Wallet payment order created",
+                extra={
+                    "order_code": order_code,
+                    "order_id": order_id,
+                },
+            )
+
+            return True, {
+                "session_id": str(order_code),
+                "checkout_url": checkout_url,
+                "status": "created",
+                "amount": str(amount.amount),
+                "currency": str(amount.currency),
+                "provider": "viva_wallet",
+                "viva_order_code": order_code,
+            }
+
+        except requests.HTTPError as e:
+            error_body = ""
+            if e.response is not None:
+                try:
+                    error_body = e.response.json()
+                except Exception:
+                    error_body = e.response.text
+            logger.error(
+                "Viva Wallet payment order creation failed: %s %s",
+                e,
+                error_body,
+                extra={"order_id": order_id},
+                exc_info=True,
+            )
+            return False, {
+                "error": str(e),
+                "viva_error": True,
+                "details": error_body,
+            }
+        except Exception as e:
+            logger.error(
+                "Viva Wallet payment order creation failed: %s",
+                e,
+                extra={"order_id": order_id},
+                exc_info=True,
+            )
+            return False, {"error": str(e)}
+
+    def process_payment(
+        self, amount: Money, order_id: str, **kwargs
+    ) -> tuple[bool, dict[str, Any]]:
+        return self.create_checkout_session(amount, order_id, **kwargs)
+
+    def refund_payment(
+        self, payment_id: str, amount: Money | None = None
+    ) -> tuple[bool, dict[str, Any]]:
+        import requests
+
+        try:
+            logger.info(
+                "Processing Viva Wallet refund",
+                extra={
+                    "payment_id": payment_id,
+                    "amount": str(amount.amount) if amount else "full",
+                },
+            )
+
+            params = {}
+            if amount:
+                params["amount"] = int(amount.amount * 100)
+
+            response = requests.delete(
+                f"{self.transactions_url}/api/transactions/{payment_id}",
+                headers={
+                    "Authorization": self._get_basic_auth_header(),
+                },
+                params=params,
+                timeout=30,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            refund_data = {
+                "refund_id": data.get("TransactionId", ""),
+                "status": PaymentStatus.REFUNDED,
+                "amount": str(amount.amount) if amount else "full refund",
+                "payment_id": payment_id,
+                "viva_status": "refunded",
+            }
+
+            return True, refund_data
+
+        except requests.HTTPError as e:
+            error_body = ""
+            if e.response is not None:
+                try:
+                    error_body = e.response.json()
+                except Exception:
+                    error_body = e.response.text
+            logger.error(
+                "Viva Wallet refund failed: %s %s",
+                e,
+                error_body,
+                extra={"payment_id": payment_id},
+                exc_info=True,
+            )
+            return False, {
+                "error": str(e),
+                "viva_error": True,
+                "details": error_body,
+            }
+        except Exception as e:
+            logger.error(
+                "Viva Wallet refund failed: %s",
+                e,
+                extra={"payment_id": payment_id},
+                exc_info=True,
+            )
+            return False, {"error": str(e)}
+
+    def get_payment_status(
+        self, payment_id: str
+    ) -> tuple[PaymentStatus, dict[str, Any]]:
+        import requests
+
+        try:
+            logger.info(
+                "Getting Viva Wallet payment status",
+                extra={"payment_id": payment_id},
+            )
+
+            access_token = self._get_access_token()
+
+            response = requests.get(
+                f"{self.api_url}/checkout/v2/transactions/{payment_id}",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                },
+                timeout=30,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            status_id = data.get("statusId", "")
+            status = self._map_viva_status(status_id)
+
+            status_data = {
+                "payment_id": payment_id,
+                "raw_status": status_id,
+                "provider": "viva_wallet",
+                "amount": data.get("amount"),
+                "currency": data.get("currencyCode", "EUR"),
+                "order_code": data.get("orderCode"),
+                "card_number": data.get("cardNumber"),
+                "created": data.get("insDate"),
+            }
+
+            return status, status_data
+
+        except requests.HTTPError as e:
+            error_body = ""
+            if e.response is not None:
+                try:
+                    error_body = e.response.json()
+                except Exception:
+                    error_body = e.response.text
+            logger.error(
+                "Failed to get Viva Wallet payment status: %s %s",
+                e,
+                error_body,
+                extra={"payment_id": payment_id},
+                exc_info=True,
+            )
+            return PaymentStatus.FAILED, {
+                "error": str(e),
+                "viva_error": True,
+                "details": error_body,
+            }
+        except Exception as e:
+            logger.error(
+                "Failed to get Viva Wallet payment status: %s",
+                e,
+                extra={"payment_id": payment_id},
+                exc_info=True,
+            )
+            return PaymentStatus.FAILED, {"error": str(e)}
+
+
 class PayPalPaymentProvider(PaymentProvider):
     def __init__(self):
         self.client_id = getattr(settings, "PAYPAL_CLIENT_ID", "")
@@ -561,6 +889,7 @@ def get_payment_provider(provider_name: str) -> PaymentProvider:
     providers = {
         "stripe": StripePaymentProvider,
         "paypal": PayPalPaymentProvider,
+        "viva_wallet": VivaWalletPaymentProvider,
     }
 
     provider_class = providers.get(provider_name.lower())

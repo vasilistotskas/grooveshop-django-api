@@ -3,6 +3,26 @@
 
 
 
+## v1.86.0 (2026-03-01)
+
+### Build system
+
+* build: upgrade django to 6.0 and update deps
+
+- Upgrade Django 5.2.9 → 6.0.2, boto3, django-celery-beat,
+  django-unfold, pillow, urllib3, disposable-email-domains
+- Add Redis password support in settings (REDIS_PASSWORD env var)
+- Use REDIS_URL for channel layers config
+- Improve StockManager TTL validation with type/range check
+- Switch test cache to LocMemCache for xdist isolation
+- Minor formatting in order views and Viva Wallet settings
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com> ([`bf5252a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bf5252ae07ffaf762e680a59e5340f9846e0dabd))
+
+### Features
+
+* feat(payment): Viva Wallet ([`cd8089d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cd8089de3112bfe978db4c75e5df32ddb7cbd676))
+
 ## v1.85.2 (2026-02-28)
 
 ### Bug fixes

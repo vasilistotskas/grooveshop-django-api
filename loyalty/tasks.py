@@ -1,11 +1,14 @@
 import logging
 
-from celery import shared_task
+from core import celery_app
+from core.tasks import MonitoredTask
 
 logger = logging.getLogger(__name__)
 
 
-@shared_task(bind=True, max_retries=5, default_retry_delay=300)
+@celery_app.task(
+    base=MonitoredTask, bind=True, max_retries=5, default_retry_delay=300
+)
 def process_order_points(self, order_id: int) -> dict:
     """Award points for completed order. Idempotent — checks for existing EARN transactions."""
     from loyalty.services import LoyaltyService
@@ -45,7 +48,9 @@ def process_order_points(self, order_id: int) -> dict:
         return {"status": "error", "reason": str(e)}
 
 
-@shared_task(bind=True, max_retries=5, default_retry_delay=300)
+@celery_app.task(
+    base=MonitoredTask, bind=True, max_retries=5, default_retry_delay=300
+)
 def reverse_order_points(self, order_id: int) -> dict:
     """Reverse points for canceled/refunded order."""
     from loyalty.services import LoyaltyService
@@ -80,7 +85,7 @@ def reverse_order_points(self, order_id: int) -> dict:
         return {"status": "error", "reason": str(e)}
 
 
-@shared_task
+@celery_app.task(base=MonitoredTask)
 def process_points_expiration() -> dict:
     """Daily periodic task to expire old points."""
     from loyalty.services import LoyaltyService
@@ -101,7 +106,9 @@ def process_points_expiration() -> dict:
         return {"status": "error", "reason": str(e)}
 
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+@celery_app.task(
+    base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=60
+)
 def recalculate_user_tier(self, user_id: int) -> dict:
     """Recalculate user tier after XP change."""
     from loyalty.services import LoyaltyService

@@ -127,9 +127,10 @@ class TestClearMeiliSearchCommand(TestCase):
         mock_model.__mro__ = (IndexMixin, object)
         mock_model.__name__ = "TestModel"
         mock_model._meilisearch = {
-            "index_name": "test_index",
+            "base_index_name": "test_index",
             "primary_key": "pk",
         }
+        mock_model.get_meili_index_name.return_value = "test_index"
 
         mock_app_config = MagicMock()
         mock_app_config.get_models.return_value = [mock_model]

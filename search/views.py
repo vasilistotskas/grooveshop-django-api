@@ -451,7 +451,7 @@ def federated_search(request):
             },
             "queries": [
                 {
-                    "indexUid": ProductTranslation._meilisearch["index_name"],
+                    "indexUid": ProductTranslation.get_meili_index_name(),
                     "q": decoded_query,
                     "filter": product_filters,
                     "showMatchesPosition": True,
@@ -460,7 +460,7 @@ def federated_search(request):
                     "federationOptions": {"weight": 1.0},
                 },
                 {
-                    "indexUid": BlogPostTranslation._meilisearch["index_name"],
+                    "indexUid": BlogPostTranslation.get_meili_index_name(),
                     "q": decoded_query,
                     "filter": blog_filters,
                     "showMatchesPosition": True,

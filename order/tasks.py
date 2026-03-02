@@ -1,7 +1,8 @@
 import logging
 from datetime import timedelta
 
-from celery import shared_task
+from core import celery_app
+from core.tasks import MonitoredTask
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
@@ -16,7 +17,9 @@ from order.shipping import ShippingService
 logger = logging.getLogger(__name__)
 
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=300)
+@celery_app.task(
+    base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=300
+)
 def send_order_confirmation_email(self, order_id: int) -> bool:
     try:
         order = Order.objects.get(id=order_id)
@@ -92,7 +95,9 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
         return False
 
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=300)
+@celery_app.task(
+    base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=300
+)
 def send_order_status_update_email(
     self, order_id: int, status: OrderStatus
 ) -> bool:
@@ -188,7 +193,9 @@ def send_order_status_update_email(
         return False
 
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=300)
+@celery_app.task(
+    base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=300
+)
 def send_shipping_notification_email(self, order_id: int) -> bool:
     try:
         order = Order.objects.get(id=order_id)
@@ -271,7 +278,7 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
         return False
 
 
-@shared_task
+@celery_app.task(base=MonitoredTask)
 def generate_order_invoice(order_id: int) -> bool:
     try:
         order = Order.objects.get(id=order_id)
@@ -308,7 +315,7 @@ def generate_order_invoice(order_id: int) -> bool:
         return False
 
 
-@shared_task
+@celery_app.task(base=MonitoredTask)
 def check_pending_orders() -> int:
     try:
         one_day_ago = timezone.now() - timedelta(days=1)
@@ -374,7 +381,7 @@ def check_pending_orders() -> int:
         return 0
 
 
-@shared_task
+@celery_app.task(base=MonitoredTask)
 def update_order_statuses_from_shipping() -> int:
     try:
         shipped_orders = Order.objects.filter(
@@ -419,7 +426,7 @@ def update_order_statuses_from_shipping() -> int:
         return 0
 
 
-@shared_task
+@celery_app.task(base=MonitoredTask)
 def cleanup_expired_stock_reservations() -> int:
     """
     Cleanup expired stock reservations.

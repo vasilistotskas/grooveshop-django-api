@@ -1,4 +1,5 @@
 import time
+from contextlib import nullcontext as _nullcontext
 
 from django.apps import apps
 from django.conf import settings
@@ -6,6 +7,7 @@ from django.core.management.base import BaseCommand
 from django.db import close_old_connections
 
 from meili._client import client as _client
+from meili.management.tenant_mixin import TenantCommandMixin
 from meili.models import IndexMixin
 
 DEFAULT_BATCH_SIZE = settings.MEILISEARCH.get("DEFAULT_BATCH_SIZE", 1000)
@@ -22,7 +24,7 @@ def batch_qs(qs, batch_size=DEFAULT_BATCH_SIZE):
             yield batch
 
 
-class Command(BaseCommand):
+class Command(TenantCommandMixin, BaseCommand):
     help = (
         "Syncs all MeiliSearch indexes for models that inherit from IndexMixin."
     )
@@ -47,8 +49,20 @@ class Command(BaseCommand):
             default=[],
             help="Exclude specific models (format: app_label.ModelName)",
         )
+        self.add_tenant_arguments(parser)
 
     def handle(self, *args, **options):
+        from django_tenants.utils import schema_context
+
+        for schema in self.get_tenant_schemas(options):
+            if schema:
+                self.stdout.write(
+                    self.style.MIGRATE_HEADING(f"\n>>> Tenant: {schema}")
+                )
+            with schema_context(schema) if schema else _nullcontext():
+                self._handle_for_schema(*args, **options)
+
+    def _handle_for_schema(self, *args, **options):
         start_time = time.perf_counter()
         close_old_connections()
 
@@ -283,7 +297,7 @@ class Command(BaseCommand):
 
                     if documents:
                         task = _client.get_index(
-                            Model._meilisearch["index_name"]
+                            Model.get_meili_index_name()
                         ).add_documents(documents)
                         tasks.append(task)
 
@@ -428,7 +442,25 @@ class Command(BaseCommand):
             raise Exception(f"Failed to sync model: {e}")
 
     def _update_settings(self, Model):
-        """Update settings for a single model's index using the model's method."""
+        """Update settings for a single model's index using the model's method.
+
+        Ensures the index exists with the correct primary key before applying
+        settings. This is needed for tenant-prefixed indexes, which are not
+        created at class-definition time (only the base index is).
+        """
+        index_name = Model.get_meili_index_name()
+        primary_key = getattr(
+            getattr(Model, "MeiliMeta", None), "primary_key", "pk"
+        )
+        _client.create_index(index_name, primary_key)
+        if _client.tasks:
+            for task in _client.tasks:
+                task_uid = getattr(task, "task_uid", None) or getattr(
+                    task, "uid", None
+                )
+                if task_uid:
+                    _client.wait_for_task(task_uid)
+            _client.flush_tasks()
         Model.update_meili_settings()
 
     def _serialize(self, model: IndexMixin) -> dict:

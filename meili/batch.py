@@ -73,7 +73,7 @@ class BatchIndexer:
             self._stats["total_filtered"] += 1
             return False
 
-        index_name = instance._meilisearch["index_name"]
+        index_name = type(instance).get_meili_index_name()
         document = self._serialize_instance(instance)
 
         if index_name not in self._documents:
@@ -112,7 +112,7 @@ class BatchIndexer:
         """
         from meili._client import client as _client  # noqa: PLC0415
 
-        index_name = instance._meilisearch["index_name"]
+        index_name = type(instance).get_meili_index_name()
         pk = self._get_document_pk(instance)
 
         task = _client.get_index(index_name).delete_document(pk)

@@ -1,6 +1,7 @@
 """Management command to inspect Meilisearch index details."""
 
 import json
+from contextlib import nullcontext as _nullcontext
 
 from django.core.management.base import BaseCommand
 from django.utils.translation import gettext_lazy as _
@@ -8,10 +9,11 @@ from meilisearch.errors import MeilisearchApiError
 
 from blog.models.post import BlogPostTranslation
 from meili._client import client
+from meili.management.tenant_mixin import TenantCommandMixin
 from product.models.product import ProductTranslation
 
 
-class Command(BaseCommand):
+class Command(TenantCommandMixin, BaseCommand):
     """Inspect Meilisearch index settings, statistics, and configuration."""
 
     help = _(
@@ -36,8 +38,20 @@ class Command(BaseCommand):
             action="store_true",
             help=_("Show detailed index settings"),
         )
+        self.add_tenant_arguments(parser)
 
     def handle(self, *args, **options):
+        from django_tenants.utils import schema_context
+
+        for schema in self.get_tenant_schemas(options):
+            if schema:
+                self.stdout.write(
+                    self.style.MIGRATE_HEADING(f"\n>>> Tenant: {schema}")
+                )
+            with schema_context(schema) if schema else _nullcontext():
+                self._handle_for_schema(*args, **options)
+
+    def _handle_for_schema(self, *args, **options):
         """Execute the command."""
         index_name = options.get("index")
         show_synonyms: bool = options.get("show_synonyms", False)
@@ -57,7 +71,7 @@ class Command(BaseCommand):
         )
         self.stdout.write(self.style.HTTP_INFO("=" * 60))
 
-        index_name = ProductTranslation._meilisearch["index_name"]
+        index_name = ProductTranslation.get_meili_index_name()
 
         try:
             index = client.get_index(index_name)
@@ -116,7 +130,7 @@ class Command(BaseCommand):
         )
         self.stdout.write(self.style.HTTP_INFO("=" * 60))
 
-        index_name = BlogPostTranslation._meilisearch["index_name"]
+        index_name = BlogPostTranslation.get_meili_index_name()
 
         try:
             index = client.get_index(index_name)

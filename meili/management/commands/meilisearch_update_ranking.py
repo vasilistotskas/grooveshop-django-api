@@ -5,16 +5,19 @@ This command allows updating ranking rules for specific indexes to customize
 result ordering based on business metrics.
 """
 
+from contextlib import nullcontext as _nullcontext
+
 from django.core.management.base import BaseCommand
 from django.utils.translation import gettext as _
 
 from blog.models.post import BlogPostTranslation
 from meili._client import client as meili_client
 from meili.dataclasses import MeiliIndexSettings
+from meili.management.tenant_mixin import TenantCommandMixin
 from product.models.product import ProductTranslation
 
 
-class Command(BaseCommand):
+class Command(TenantCommandMixin, BaseCommand):
     help = _("Update Meilisearch ranking rules for specific index")
 
     AVAILABLE_INDEXES = {
@@ -50,8 +53,20 @@ class Command(BaseCommand):
             ),
             required=True,
         )
+        self.add_tenant_arguments(parser)
 
     def handle(self, *args, **options):
+        from django_tenants.utils import schema_context
+
+        for schema in self.get_tenant_schemas(options):
+            if schema:
+                self.stdout.write(
+                    self.style.MIGRATE_HEADING(f"\n>>> Tenant: {schema}")
+                )
+            with schema_context(schema) if schema else _nullcontext():
+                self._handle_for_schema(*args, **options)
+
+    def _handle_for_schema(self, *args, **options):
         index_name = options["index"]
         rules_str = options["rules"]
 
@@ -104,7 +119,7 @@ class Command(BaseCommand):
             index_settings = MeiliIndexSettings(ranking_rules=rules)
 
             # Get index name from model
-            meili_index_name = model_class._meilisearch["index_name"]
+            meili_index_name = model_class.get_meili_index_name()
 
             # Apply settings
             meili_client.with_settings(meili_index_name, index_settings)

@@ -17,12 +17,16 @@ class MockModel:
 
     __name__ = "MockModel"
     _meilisearch = {
-        "index_name": "test_index",
+        "base_index_name": "test_index",
         "supports_geo": False,
     }
 
     class MeiliMeta:
         primary_key = "id"
+
+    @classmethod
+    def get_meili_index_name(cls):
+        return "test_index"
 
     class objects:
         @staticmethod

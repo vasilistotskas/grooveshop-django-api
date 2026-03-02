@@ -16,8 +16,8 @@ from search.views import federated_search
 
 
 # Mock _meilisearch attribute for models
-MOCK_PRODUCT_MEILISEARCH = {"index_name": "ProductTranslation"}
-MOCK_BLOG_MEILISEARCH = {"index_name": "BlogPostTranslation"}
+MOCK_PRODUCT_MEILISEARCH = {"base_index_name": "ProductTranslation"}
+MOCK_BLOG_MEILISEARCH = {"base_index_name": "BlogPostTranslation"}
 
 
 @pytest.fixture
@@ -28,7 +28,9 @@ def mock_models():
         patch("search.views.BlogPostTranslation") as mock_blog,
     ):
         mock_product._meilisearch = MOCK_PRODUCT_MEILISEARCH
+        mock_product.get_meili_index_name.return_value = "ProductTranslation"
         mock_blog._meilisearch = MOCK_BLOG_MEILISEARCH
+        mock_blog.get_meili_index_name.return_value = "BlogPostTranslation"
         mock_product.DoesNotExist = Exception
         mock_blog.DoesNotExist = Exception
         yield mock_product, mock_blog

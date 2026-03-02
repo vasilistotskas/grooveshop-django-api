@@ -158,7 +158,7 @@ def reindex_product_translations(sender, instance, **kwargs):
                 }
 
                 task = _client.get_index(
-                    translation._meilisearch["index_name"]
+                    type(translation).get_meili_index_name()
                 ).add_documents([document])
 
                 if settings.DEBUG:
@@ -293,7 +293,7 @@ def update_product_search_index_on_attribute_change(sender, instance, **kwargs):
                 }
 
                 task = _client.get_index(
-                    translation._meilisearch["index_name"]
+                    type(translation).get_meili_index_name()
                 ).add_documents([document])
 
                 if settings.DEBUG:

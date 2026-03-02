@@ -5,14 +5,17 @@ This command updates Meilisearch index settings for ProductTranslation and
 BlogPostTranslation indexes based on their MeiliMeta configuration.
 """
 
+from contextlib import nullcontext as _nullcontext
+
 from django.core.management.base import BaseCommand
 from django.utils.translation import gettext as _
 
 from blog.models.post import BlogPostTranslation
+from meili.management.tenant_mixin import TenantCommandMixin
 from product.models.product import ProductTranslation
 
 
-class Command(BaseCommand):
+class Command(TenantCommandMixin, BaseCommand):
     help = _("Apply index settings updates to Meilisearch without reindexing")
 
     def add_arguments(self, parser):
@@ -24,8 +27,20 @@ class Command(BaseCommand):
             ),
             required=False,
         )
+        self.add_tenant_arguments(parser)
 
     def handle(self, *args, **options):
+        from django_tenants.utils import schema_context
+
+        for schema in self.get_tenant_schemas(options):
+            if schema:
+                self.stdout.write(
+                    self.style.MIGRATE_HEADING(f"\n>>> Tenant: {schema}")
+                )
+            with schema_context(schema) if schema else _nullcontext():
+                self._handle_for_schema(*args, **options)
+
+    def _handle_for_schema(self, *args, **options):
         index_name = options.get("index")
 
         if index_name:

@@ -1,11 +1,14 @@
+from contextlib import nullcontext as _nullcontext
+
 from django.apps import apps
 from django.core.management.base import BaseCommand
 
 from meili._client import client as _client
+from meili.management.tenant_mixin import TenantCommandMixin
 from meili.models import IndexMixin
 
 
-class Command(BaseCommand):
+class Command(TenantCommandMixin, BaseCommand):
     help = "Clears all MeiliSearch indexes and data (equivalent to clearing the MeiliSearch database)"
 
     def add_arguments(self, parser):
@@ -19,8 +22,20 @@ class Command(BaseCommand):
             action="store_true",
             help="Skip confirmation prompt",
         )
+        self.add_tenant_arguments(parser)
 
     def handle(self, *args, **options):
+        from django_tenants.utils import schema_context
+
+        for schema in self.get_tenant_schemas(options):
+            if schema:
+                self.stdout.write(
+                    self.style.MIGRATE_HEADING(f"\n>>> Tenant: {schema}")
+                )
+            with schema_context(schema) if schema else _nullcontext():
+                self._handle_for_schema(*args, **options)
+
+    def _handle_for_schema(self, *args, **options):
         if not options["force"]:
             confirm = input(
                 "This will delete ALL MeiliSearch indexes and data. "
@@ -95,7 +110,7 @@ class Command(BaseCommand):
             for model in app_config.get_models():
                 if IndexMixin in model.__mro__:
                     try:
-                        index_name = model._meilisearch["index_name"]
+                        index_name = model.get_meili_index_name()
                         primary_key = model._meilisearch["primary_key"]
 
                         _client.create_index(index_name, primary_key)

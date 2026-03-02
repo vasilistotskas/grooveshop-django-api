@@ -582,18 +582,16 @@ def get_celery_beat_schedule():
             "kwargs": {"days": 30, "backup_dir": "backups"},
         },
         "clear-duplicate-history": {
-            "task": "core.tasks.clear_duplicate_history_task",
+            "task": "tenant.tasks.fanout_clear_duplicate_history",
             "schedule": SCHEDULE_PRESETS["daily_5am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
-            "kwargs": {"excluded_fields": [], "minutes": None},
         },
         "clear-old-history": {
-            "task": "core.tasks.clear_old_history_task",
+            "task": "tenant.tasks.fanout_clear_old_history",
             "schedule": SCHEDULE_PRESETS["weekly_sunday_3am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
-            "kwargs": {"days": 365},
         },
         "clear-expired-sessions": {
             "task": "core.tasks.clear_expired_sessions_task",
@@ -602,7 +600,7 @@ def get_celery_beat_schedule():
             else SCHEDULE_PRESETS["every_hour"],
         },
         "send-inactive-user-notifications": {
-            "task": "core.tasks.send_inactive_user_notifications",
+            "task": "tenant.tasks.fanout_send_inactive_user_notifications",
             "schedule": SCHEDULE_PRESETS["monthly_first_6am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
@@ -614,36 +612,35 @@ def get_celery_beat_schedule():
             else SCHEDULE_PRESETS["monthly_first_4am"],
         },
         "cleanup-abandoned-carts": {
-            "task": "core.tasks.cleanup_abandoned_carts",
+            "task": "tenant.tasks.fanout_cleanup_abandoned_carts",
             "schedule": SCHEDULE_PRESETS["daily_4am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
         "cleanup-old-guest-carts": {
-            "task": "core.tasks.cleanup_old_guest_carts",
+            "task": "tenant.tasks.fanout_cleanup_old_guest_carts",
             "schedule": SCHEDULE_PRESETS["daily_6am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
         "clear-expired-notifications": {
-            "task": "core.tasks.clear_expired_notifications_task",
+            "task": "tenant.tasks.fanout_clear_expired_notifications",
             "schedule": SCHEDULE_PRESETS["bimonthly_6am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
-            "kwargs": {"days": 365},
         },
         "sync-meilisearch-indexes": {
-            "task": "core.tasks.sync_meilisearch_indexes",
+            "task": "tenant.tasks.fanout_sync_meilisearch_indexes",
             "schedule": SCHEDULE_PRESETS["daily_2am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
         "cleanup-expired-stock-reservations": {
-            "task": "order.tasks.cleanup_expired_stock_reservations",
+            "task": "tenant.tasks.fanout_cleanup_expired_stock_reservations",
             "schedule": SCHEDULE_PRESETS["every_hour"],
         },
         "process-loyalty-points-expiration": {
-            "task": "loyalty.tasks.process_points_expiration",
+            "task": "tenant.tasks.fanout_process_points_expiration",
             "schedule": SCHEDULE_PRESETS["daily_3am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],

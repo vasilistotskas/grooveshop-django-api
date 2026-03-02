@@ -6,17 +6,19 @@ that multi-index search with federation is working correctly.
 """
 
 import json
+from contextlib import nullcontext as _nullcontext
 
 from django.core.management.base import BaseCommand
 from django.utils.translation import gettext as _
 
 from blog.models.post import BlogPostTranslation
-from search.greeklish import expand_greeklish_query
 from meili._client import client as meili_client
+from meili.management.tenant_mixin import TenantCommandMixin
 from product.models.product import ProductTranslation
+from search.greeklish import expand_greeklish_query
 
 
-class Command(BaseCommand):
+class Command(TenantCommandMixin, BaseCommand):
     help = _("Test federated search functionality with sample queries")
 
     def add_arguments(self, parser):
@@ -38,8 +40,20 @@ class Command(BaseCommand):
             help=_("Maximum number of results to return"),
             default=10,
         )
+        self.add_tenant_arguments(parser)
 
     def handle(self, *args, **options):
+        from django_tenants.utils import schema_context
+
+        for schema in self.get_tenant_schemas(options):
+            if schema:
+                self.stdout.write(
+                    self.style.MIGRATE_HEADING(f"\n>>> Tenant: {schema}")
+                )
+            with schema_context(schema) if schema else _nullcontext():
+                self._handle_for_schema(*args, **options)
+
+    def _handle_for_schema(self, *args, **options):
         query = options["query"]
         language_code = options.get("language_code")
         limit = options["limit"]
@@ -89,7 +103,7 @@ class Command(BaseCommand):
             "federation": {},
             "queries": [
                 {
-                    "indexUid": ProductTranslation._meilisearch["index_name"],
+                    "indexUid": ProductTranslation.get_meili_index_name(),
                     "q": decoded_query,
                     "filter": product_filters,
                     "limit": product_limit,
@@ -98,7 +112,7 @@ class Command(BaseCommand):
                     "federationOptions": {"weight": 1.0},
                 },
                 {
-                    "indexUid": BlogPostTranslation._meilisearch["index_name"],
+                    "indexUid": BlogPostTranslation.get_meili_index_name(),
                     "q": decoded_query,
                     "filter": blog_filters,
                     "limit": blog_limit,

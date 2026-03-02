@@ -13,17 +13,25 @@ from meili.querysets import BoundingBox, IndexQuerySet, Point, Radius
 
 class MockModel:
     __name__ = "MockModel"
-    _meilisearch = {"index_name": "test_index", "supports_geo": False}
+    _meilisearch = {"base_index_name": "test_index", "supports_geo": False}
 
     class MeiliMeta:
         primary_key = "id"
 
     objects = MagicMock()
 
+    @classmethod
+    def get_meili_index_name(cls):
+        return "test_index"
+
 
 class MockGeoModel:
     __name__ = "MockGeoModel"
-    _meilisearch = {"index_name": "test_geo_index", "supports_geo": True}
+    _meilisearch = {"base_index_name": "test_geo_index", "supports_geo": True}
+
+    @classmethod
+    def get_meili_index_name(cls):
+        return "test_geo_index"
 
     class MeiliMeta:
         primary_key = "id"

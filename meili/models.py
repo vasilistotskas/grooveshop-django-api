@@ -32,7 +32,7 @@ class _Meili(TypedDict):
     """Internal Meilisearch configuration for a model."""
 
     primary_key: str
-    index_name: str
+    base_index_name: str
     displayed_fields: Iterable[str] | None
     searchable_fields: Iterable[str] | None
     filterable_fields: Iterable[str] | None
@@ -116,8 +116,11 @@ class IndexMixin(models.Model):
         """Return tenant-prefixed Meilisearch index name."""
         from django.db import connection
 
-        meta = cls.MeiliMeta
-        base_name = getattr(meta, "index_name", None) or cls.__name__
+        base_name = (
+            cls._meilisearch["base_index_name"]
+            if hasattr(cls, "_meilisearch")
+            else getattr(cls.MeiliMeta, "index_name", None) or cls.__name__
+        )
         schema = getattr(connection, "schema_name", "public")
         if schema and schema != "public":
             return f"{schema}__{base_name}"
@@ -222,7 +225,7 @@ class IndexMixin(models.Model):
         # Initialize _meilisearch configuration
         cls._meilisearch = _Meili(
             primary_key=primary_key,
-            index_name=index_name,
+            base_index_name=index_name,
             displayed_fields=index_settings.displayed_fields,
             searchable_fields=index_settings.searchable_fields,
             filterable_fields=index_settings.filterable_fields,

@@ -72,7 +72,7 @@ class MeiliConfig(AppConfig):
                     document["_geo"] = geo
 
                 task = _client.get_index(
-                    model._meilisearch["index_name"]
+                    type(model).get_meili_index_name()
                 ).add_documents([document])
 
                 if settings.DEBUG:
@@ -108,7 +108,7 @@ class MeiliConfig(AppConfig):
             if use_async:
                 logger.debug("Deleting Document Async")
                 delete_document_task.delay(
-                    index_name=model._meilisearch["index_name"],
+                    index_name=type(model).get_meili_index_name(),
                     document_pk=_get_document_pk(model),
                 )
                 return
@@ -118,7 +118,7 @@ class MeiliConfig(AppConfig):
                 logger.debug("Deleting Document Sync")
                 pk = _get_document_pk(model)
                 task = _client.get_index(
-                    model._meilisearch["index_name"]
+                    type(model).get_meili_index_name()
                 ).delete_document(pk)
 
                 if settings.DEBUG:
@@ -191,7 +191,7 @@ class MeiliConfig(AppConfig):
             # Initialize _meilisearch configuration
             model._meilisearch = _Meili(
                 primary_key=primary_key,
-                index_name=index_name,
+                base_index_name=index_name,
                 displayed_fields=index_settings.displayed_fields,
                 searchable_fields=index_settings.searchable_fields,
                 filterable_fields=index_settings.filterable_fields,

@@ -16,13 +16,34 @@ logger = logging.getLogger(__name__)
 
 
 class MeiliTask(Task):
-    """Base task class with retry configuration for Meilisearch operations."""
+    """Base task class with retry configuration and tenant schema propagation."""
 
     autoretry_for = (Exception,)
     retry_backoff = True
     retry_backoff_max = 600  # 10 minutes max backoff
     retry_jitter = True
     max_retries = 5
+
+    def apply_async(self, args=None, kwargs=None, **options):
+        from django.db import connection
+
+        headers = options.pop("headers", {}) or {}
+        headers.setdefault(
+            "_schema_name",
+            getattr(connection, "schema_name", "public"),
+        )
+        options["headers"] = headers
+        return super().apply_async(args=args, kwargs=kwargs, **options)
+
+    def __call__(self, *args, **kwargs):
+        schema_name = (
+            self.request.get("_schema_name") if self.request else None
+        ) or "public"
+
+        from django_tenants.utils import schema_context
+
+        with schema_context(schema_name):
+            return super().__call__(*args, **kwargs)
 
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         logger.error(
@@ -96,7 +117,7 @@ def index_document_task(
         if geo:
             document["_geo"] = geo
 
-        index_name = instance._meilisearch["index_name"]
+        index_name = type(instance).get_meili_index_name()
         task = _client.get_index(index_name).add_documents([document])
 
         # Wait for task completion
@@ -208,7 +229,7 @@ def bulk_index_task(
 
     try:
         model_class = apps.get_model(app_label, model_name)
-        index_name = model_class._meilisearch["index_name"]
+        index_name = model_class.get_meili_index_name()
 
         # Fetch all instances
         if hasattr(model_class, "get_meilisearch_queryset"):
@@ -321,7 +342,7 @@ def reindex_model_task(
 
     try:
         model_class = apps.get_model(app_label, model_name)
-        index_name = model_class._meilisearch["index_name"]
+        index_name = model_class.get_meili_index_name()
 
         # Optionally clear the index first
         if clear_first:

@@ -102,7 +102,7 @@ class IndexQuerySet[T: Model]:
     @property
     def index(self):
         """Return the Meilisearch index for this model."""
-        return client.get_index(self._model._meilisearch["index_name"])
+        return client.get_index(self._model.get_meili_index_name())
 
     @property
     def filters(self) -> list[str]:

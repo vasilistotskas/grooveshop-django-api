@@ -23,14 +23,17 @@ from django.core.management.base import CommandError
 
 
 # Mock _meilisearch attribute for models
-MOCK_PRODUCT_MEILISEARCH = {"index_name": "ProductTranslation"}
-MOCK_BLOG_MEILISEARCH = {"index_name": "BlogPostTranslation"}
+MOCK_PRODUCT_MEILISEARCH = {"base_index_name": "ProductTranslation"}
+MOCK_BLOG_MEILISEARCH = {"base_index_name": "BlogPostTranslation"}
 
 
 def create_mock_model(meilisearch_config):
     """Create a mock model with _meilisearch attribute."""
     mock = MagicMock()
     mock._meilisearch = meilisearch_config
+    mock.get_meili_index_name.return_value = meilisearch_config[
+        "base_index_name"
+    ]
     return mock
 
 

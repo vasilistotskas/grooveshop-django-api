@@ -11,7 +11,7 @@ class MockTranslationModel:
 
     __name__ = "MockTranslationModel"
     _meilisearch = {
-        "index_name": "test_translation_index",
+        "base_index_name": "test_translation_index",
         "supports_geo": False,
     }
 
@@ -19,6 +19,10 @@ class MockTranslationModel:
         primary_key = "id"
 
     objects = MagicMock()
+
+    @classmethod
+    def get_meili_index_name(cls):
+        return "test_translation_index"
 
 
 class TestMultilanguageSearch:

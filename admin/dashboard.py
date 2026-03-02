@@ -741,7 +741,8 @@ def _get_stock_badge(stock):
     """Generate HTML badge for stock level."""
     if stock == 0:
         return format_html(
-            '<span class="px-2 py-1 text-xs font-bold rounded-full bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">Out of Stock</span>'
+            '<span class="px-2 py-1 text-xs font-bold rounded-full bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">{}</span>',
+            "Out of Stock",
         )
     elif stock < 10:
         return format_html(

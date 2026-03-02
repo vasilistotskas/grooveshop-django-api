@@ -3,6 +3,14 @@
 
 
 
+## v1.86.2 (2026-03-02)
+
+### Bug fixes
+
+* fix: uv lock ([`5396e55`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5396e5552eb125503c84885eb3fa808668aac4b6))
+
+* fix: dashboard ([`55bde03`](https://github.com/vasilistotskas/grooveshop-django-api/commit/55bde030758f5db56f7fc89a0734d7f0d97e366d))
+
 ## v1.86.1 (2026-03-01)
 
 ### Bug fixes

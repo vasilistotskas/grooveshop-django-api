@@ -14,6 +14,13 @@ User = get_user_model()
 class NotificationConsumer(AsyncWebsocketConsumer):
     user: AbstractBaseUser | AnonymousUser | None = None
     group_name: str | None = None
+    admin_group_name: str | None = None
+
+    def _get_tenant_prefix(self) -> str:
+        tenant = self.scope.get("tenant")
+        if tenant:
+            return tenant.schema_name
+        return "public"
 
     async def connect(self):
         try:
@@ -27,10 +34,11 @@ class NotificationConsumer(AsyncWebsocketConsumer):
                 logger.warning("Anonymous user, closing connection")
                 await self.close(code=4003)
             else:
+                prefix = self._get_tenant_prefix()
                 logger.debug(
                     f"Authenticated user: {self.user.username} (ID: {self.user.id})"
                 )
-                self.group_name = f"user_{self.user.id}"
+                self.group_name = f"tenant_{prefix}_user_{self.user.id}"
 
                 logger.debug(f"Adding user to group: {self.group_name}")
                 await self.channel_layer.group_add(
@@ -38,9 +46,10 @@ class NotificationConsumer(AsyncWebsocketConsumer):
                 )
 
                 if self.user.is_staff:
+                    self.admin_group_name = f"tenant_{prefix}_admins"
                     logger.debug("User is staff, adding to admins group")
                     await self.channel_layer.group_add(
-                        "admins", self.channel_name
+                        self.admin_group_name, self.channel_name
                     )
 
                 logger.debug("Accepting connection")
@@ -67,10 +76,10 @@ class NotificationConsumer(AsyncWebsocketConsumer):
                 self.group_name, self.channel_name
             )
 
-            if self.user.is_staff:
+            if self.user.is_staff and self.admin_group_name:
                 logger.debug("User is staff, removing from admins group")
                 await self.channel_layer.group_discard(
-                    "admins", self.channel_name
+                    self.admin_group_name, self.channel_name
                 )
 
     async def send_notification(self, event):

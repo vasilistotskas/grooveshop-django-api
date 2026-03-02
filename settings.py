@@ -59,66 +59,59 @@ NUXT_BASE_DOMAIN = getenv("NUXT_BASE_DOMAIN", "localhost:3000")
 MEDIA_STREAM_BASE_URL = getenv("MEDIA_STREAM_BASE_URL", "http://localhost:3003")
 STATIC_BASE_URL = getenv("STATIC_BASE_URL", "http://localhost:8000")
 
-ALLOWED_HOSTS: list[str] = []
+# django-tenants rejects unregistered domains before Django's host
+# validation, so ALLOWED_HOSTS=["*"] is safe. Dynamic tenant domains
+# can't be statically listed.
+ALLOWED_HOSTS: list[str] = ["*"]
 
-_default_allowed_hosts = "*" if DEBUG else ""
-additional_hosts = getenv("ALLOWED_HOSTS", _default_allowed_hosts).split(",")
-ALLOWED_HOSTS.extend(filter(None, additional_hosts))
+USE_X_FORWARDED_HOST = getenv("USE_X_FORWARDED_HOST", "True") == "True"
 
-if "testserver" not in ALLOWED_HOSTS:
-    ALLOWED_HOSTS.append("testserver")
+# ─── Multi-tenancy: SHARED vs TENANT apps ──────────────────
+# SHARED_APPS live in the public schema (platform infrastructure + global data).
+# TENANT_APPS live in each tenant schema (store-specific data).
+# Apps in BOTH must appear in both lists (e.g. contenttypes, auth).
 
-USE_X_FORWARDED_HOST = getenv("USE_X_FORWARDED_HOST", "False") == "True"
-
-DJANGO_APPS = [
+SHARED_APPS = [
+    "django_tenants",
+    "tenant",
+    # Django core (platform admin in public schema)
     "daphne",
-    "unfold.apps.BasicAppConfig",
-    "unfold.contrib.filters",
-    "unfold.contrib.forms",
-    "unfold.contrib.simple_history",
-    "admin.apps.MyAdminConfig",
-    "django.contrib.auth",
     "django.contrib.contenttypes",
+    "django.contrib.auth",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.sites",
     "django.contrib.postgres",
-]
-
-LOCAL_APPS = [
-    "core",
-    "devtools",
-    "user",
-    "product",
-    "order",
-    "search",
-    "blog",
-    "vat",
-    "country",
-    "region",
-    "pay_way",
-    "cart",
-    "notification",
-    "contact",
-    "tag",
-    "meili",
-    "loyalty",
-]
-
-THIRD_PARTY_APPS = [
+    # Admin UI
+    "unfold.apps.BasicAppConfig",
+    "unfold.contrib.filters",
+    "unfold.contrib.forms",
+    "unfold.contrib.simple_history",
+    "admin.apps.MyAdminConfig",
+    # Infrastructure (framework-level, no per-tenant data)
+    "corsheaders",
     "rest_framework",
     "rest_framework.authtoken",
-    "corsheaders",
-    "mptt",
-    "tinymce",
-    "rosetta",
-    "parler",
-    "storages",
-    "django_filters",
     "drf_spectacular",
-    "djmoney",
-    "phonenumber_field",
+    "rosetta",
+    "storages",
+    "core",
+    "devtools",
+    # Global reference data (identical across ALL tenants)
+    "country",
+    "region",
+    # User model must be in SHARED for AUTH_USER_MODEL FK resolution
+    # in public-schema auth migrations. Tenant schemas have their own copy.
+    "user",
+]
+
+TENANT_APPS = [
+    # Required in BOTH by django-tenants
+    "django.contrib.contenttypes",
+    "django.contrib.auth",
+    # User & Auth (isolated per-tenant)
+    "user",
     "allauth",
     "allauth.account",
     "allauth.headless",
@@ -129,17 +122,42 @@ THIRD_PARTY_APPS = [
     "allauth.socialaccount.providers.google",
     "allauth.socialaccount.providers.discord",
     "allauth.socialaccount.providers.github",
+    "knox",
+    # Domain apps (store-specific data)
+    "product",
+    "order",
+    "cart",
+    "blog",
+    "search",
+    "notification",
+    "contact",
+    "loyalty",
+    "page_config",
+    # Per-tenant reference data
+    "vat",
+    "pay_way",
+    "tag",
+    # Third-party per-tenant
+    "mptt",
+    "parler",
+    "django_filters",
+    "djmoney",
+    "phonenumber_field",
+    "tinymce",
     "django_celery_beat",
     "django_celery_results",
     "extra_settings",
-    "knox",
     "simple_history",
     "djstripe",
+    "meili",
 ]
 
-INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
+INSTALLED_APPS = list(SHARED_APPS) + [
+    app for app in TENANT_APPS if app not in SHARED_APPS
+]
 
 MIDDLEWARE = [
+    "django_tenants.middleware.main.TenantMainMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.gzip.GZipMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -147,7 +165,7 @@ MIDDLEWARE = [
     "django.middleware.locale.LocaleMiddleware",
     "core.middleware.translation_reload.TranslationReloadMiddleware",
     "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
+    "tenant.middleware.TenantCsrfMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "core.middleware.allauth_ratelimit.AllAuthRateLimitMiddleware",
     "search.middleware.SearchAnalyticsMiddleware",  # Search analytics tracking
@@ -376,7 +394,7 @@ ACCOUNT_EMAIL_NOTIFICATIONS = True
 ACCOUNT_USERNAME_MIN_LENGTH = 2
 ACCOUNT_USERNAME_MAX_LENGTH = 30
 ACCOUNT_LOGIN_METHODS = {"email"}
-ACCOUNT_ADAPTER = "user.adapter.UserAccountAdapter"
+ACCOUNT_ADAPTER = "tenant.allauth_adapter.TenantAccountAdapter"
 ACCOUNT_SIGNUP_REDIRECT_URL = NUXT_BASE_URL + "/account"
 ACCOUNT_LOGIN_BY_CODE_ENABLED = True
 ACCOUNT_EMAIL_VERIFICATION_BY_CODE_ENABLED = True
@@ -422,6 +440,7 @@ CACHES = {
         "KEY_PREFIX": DEFAULT_CACHE_KEY_PREFIX,
         "VERSION": DEFAULT_CACHE_VERSION,
         "TIMEOUT": DEFAULT_CACHE_TTL,
+        "KEY_FUNCTION": "tenant.cache.make_tenant_key",
     },
 }
 
@@ -679,7 +698,9 @@ CORS_ALLOWED_ORIGINS = [
     "http://media-stream-service:80",
     "http://localhost:1337",
 ]
-CORS_ALLOW_ALL_ORIGINS = DEBUG
+# All origins allowed — django-tenants validates domains at middleware level.
+# Each tenant domain is a distinct origin; static CORS list can't cover them.
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = [
     "DELETE",
@@ -699,7 +720,7 @@ CORS_ALLOW_HEADERS = (
 CSRF_USE_SESSIONS = False
 CSRF_COOKIE_NAME = "csrftoken"
 CSRF_COOKIE_AGE = 60 * 60 * 24 * 7 * 52  # 1 year
-CSRF_COOKIE_DOMAIN = getenv("CSRF_COOKIE_DOMAIN", "localhost")
+CSRF_COOKIE_DOMAIN = getenv("CSRF_COOKIE_DOMAIN") or None
 CSRF_COOKIE_PATH = "/"
 CSRF_COOKIE_SECURE = (
     not DEBUG
@@ -760,7 +781,7 @@ DATABASES = {
         "CONN_HEALTH_CHECKS": True,
         "CONN_MAX_AGE": 0,
         "TIME_ZONE": getenv("TIME_ZONE", "Europe/Athens"),
-        "ENGINE": "django.db.backends.postgresql",
+        "ENGINE": "django_tenants.postgresql_backend",
         "HOST": getenv("DB_HOST", "db"),
         "NAME": getenv("DB_NAME", "postgres"),
         "USER": getenv("DB_USER", "postgres"),
@@ -773,10 +794,15 @@ DATABASES = {
     },
 }
 
+DATABASE_ROUTERS = ["django_tenants.routers.TenantSyncRouter"]
+TENANT_MODEL = "tenant.Tenant"
+TENANT_DOMAIN_MODEL = "tenant.TenantDomain"
+PUBLIC_SCHEMA_URLCONF = "tenant.urls_public"
+
 if SYSTEM_ENV == "ci":
     DATABASES = {
         "default": {
-            "ENGINE": "django.db.backends.postgresql",
+            "ENGINE": "django_tenants.postgresql_backend",
             "NAME": "postgres",
             "USER": getenv("DB_USER", "postgres"),
             "PASSWORD": getenv("DB_PASSWORD", "postgres"),
@@ -919,21 +945,23 @@ MFA_WEBAUTHN_ALLOW_INSECURE_ORIGIN = DEBUG
 MFA_PASSKEY_SIGNUP_ENABLED = True
 
 PARLER_DEFAULT_LANGUAGE_CODE = "el"
+_PARLER_LANG_TUPLE = (
+    {
+        "code": "el",
+        "name": "greek",
+    },
+    {
+        "code": "en",
+        "name": "english",
+    },
+    {
+        "code": "de",
+        "name": "german",
+    },
+)
 PARLER_LANGUAGES = {
-    SITE_ID: (
-        {
-            "code": "el",
-            "name": "greek",
-        },
-        {
-            "code": "en",
-            "name": "english",
-        },
-        {
-            "code": "de",
-            "name": "german",
-        },
-    ),
+    SITE_ID: _PARLER_LANG_TUPLE,
+    None: _PARLER_LANG_TUPLE,
     "default": {
         "fallbacks": ["en"],
         "hide_untranslated": False,
@@ -1493,7 +1521,7 @@ UNFOLD = {
 SESSION_CACHE_ALIAS = "default"
 SESSION_COOKIE_NAME = "sessionid"
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 7 * 2
-SESSION_COOKIE_DOMAIN = getenv("SESSION_COOKIE_DOMAIN", "localhost")
+SESSION_COOKIE_DOMAIN = getenv("SESSION_COOKIE_DOMAIN") or None
 SESSION_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_PATH = "/"
 SESSION_COOKIE_HTTPONLY = True
@@ -1513,7 +1541,9 @@ SPECTACULAR_SETTINGS = {
     "COMPONENT_NO_READ_ONLY_REQUIRED": False,
     "ENFORCE_NON_BLANK_FIELDS": False,
     "ENUM_ADD_EXPLICIT_BLANK_NULL_CHOICE": True,
-    "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAuthenticated"],
+    "SERVE_PERMISSIONS": ["rest_framework.permissions.AllowAny"]
+    if DEBUG
+    else ["rest_framework.permissions.IsAuthenticated"],
     "AUTHENTICATION_WHITELIST": [
         "knox.auth.TokenAuthentication",
         "rest_framework.authentication.TokenAuthentication",
@@ -1585,7 +1615,7 @@ elif not DEBUG:
     MEDIA_ROOT = path.join(BASE_DIR, "web", "mediafiles")
     STORAGES = {
         "default": {
-            "BACKEND": "django.core.files.storage.FileSystemStorage",
+            "BACKEND": "tenant.storage.TenantFileSystemStorage",
         },
         "staticfiles": {
             "BACKEND": "django.contrib.staticfiles.storage.ManifestStaticFilesStorage",
@@ -1598,7 +1628,7 @@ else:
     MEDIA_ROOT = path.join(BASE_DIR, "mediafiles")
     STORAGES = {
         "default": {
-            "BACKEND": "django.core.files.storage.FileSystemStorage",
+            "BACKEND": "tenant.storage.TenantFileSystemStorage",
         },
         "staticfiles": {
             "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",

@@ -49,7 +49,21 @@
       "Bash(grep:*)",
       "Bash(head:*)",
       "Bash(sqlite3:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(DJANGO_SETTINGS_MODULE=settings uv run:*)",
+      "Bash(docker ps:*)",
+      "Bash(PGCONNECT_TIMEOUT=3 uv run:*)",
+      "WebFetch(domain:docs.astral.sh)",
+      "Bash(git checkout:*)",
+      "Bash(cut:*)",
+      "Bash(SYSTEM_ENV=ci uv run:*)",
+      "Bash(do echo:*)",
+      "Bash(gh api:*)",
+      "Bash(uv add:*)",
+      "WebFetch(domain:developer.viva.com)",
+      "Bash(uv pip:*)"
     ],
     "deny": [],
     "ask": []

@@ -36,7 +36,7 @@ class TestNotificationConsumer(TransactionTestCase):
         await consumer.connect()
 
         consumer.channel_layer.group_add.assert_called_with(
-            f"user_{user.id}", consumer.channel_name
+            f"tenant_public_user_{user.id}", consumer.channel_name
         )
 
         consumer.accept.assert_called_once()
@@ -66,7 +66,7 @@ class TestNotificationConsumer(TransactionTestCase):
         await consumer.disconnect(1000)
 
         consumer.channel_layer.group_discard.assert_any_call(
-            f"user_{user.id}", consumer.channel_name
+            f"tenant_public_user_{user.id}", consumer.channel_name
         )
 
     @database_sync_to_async
@@ -99,19 +99,19 @@ class TestNotificationConsumer(TransactionTestCase):
         await consumer.connect()
 
         consumer.channel_layer.group_add.assert_any_call(
-            f"user_{staff_user.id}", consumer.channel_name
+            f"tenant_public_user_{staff_user.id}", consumer.channel_name
         )
         consumer.channel_layer.group_add.assert_any_call(
-            "admins", consumer.channel_name
+            "tenant_public_admins", consumer.channel_name
         )
 
         await consumer.disconnect(1000)
 
         consumer.channel_layer.group_discard.assert_any_call(
-            f"user_{staff_user.id}", consumer.channel_name
+            f"tenant_public_user_{staff_user.id}", consumer.channel_name
         )
         consumer.channel_layer.group_discard.assert_any_call(
-            "admins", consumer.channel_name
+            "tenant_public_admins", consumer.channel_name
         )
 
     async def test_send_notification(self):
@@ -162,13 +162,13 @@ class TestNotificationConsumer(TransactionTestCase):
             f"Authenticated user: {user.username} (ID: {user.id})"
         )
         mock_logger.debug.assert_any_call(
-            f"Adding user to group: user_{user.id}"
+            f"Adding user to group: tenant_public_user_{user.id}"
         )
         mock_logger.debug.assert_any_call("Accepting connection")
         mock_logger.debug.assert_any_call("Connection accepted")
 
         self.assertEqual(consumer.user, user)
-        self.assertEqual(consumer.group_name, f"user_{user.id}")
+        self.assertEqual(consumer.group_name, f"tenant_public_user_{user.id}")
 
     @patch("notification.consumers.logger")
     async def test_connect_with_logging_anonymous_user(self, mock_logger):
@@ -206,10 +206,10 @@ class TestNotificationConsumer(TransactionTestCase):
         )
 
         consumer.channel_layer.group_add.assert_any_call(
-            f"user_{staff_user.id}", "test_channel"
+            f"tenant_public_user_{staff_user.id}", "test_channel"
         )
         consumer.channel_layer.group_add.assert_any_call(
-            "admins", "test_channel"
+            "tenant_public_admins", "test_channel"
         )
 
     @patch("notification.consumers.logger")
@@ -254,7 +254,7 @@ class TestNotificationConsumer(TransactionTestCase):
 
         consumer = NotificationConsumer()
         consumer.user = user
-        consumer.group_name = f"user_{user.id}"
+        consumer.group_name = f"tenant_public_user_{user.id}"
         consumer.channel_layer = MagicMock()
         consumer.channel_layer.group_discard = AsyncMock()
         consumer.channel_name = "test_channel"
@@ -265,11 +265,11 @@ class TestNotificationConsumer(TransactionTestCase):
             "NotificationConsumer disconnect called with code: 1000"
         )
         mock_logger.debug.assert_any_call(
-            f"Removing user from group: user_{user.id}"
+            f"Removing user from group: tenant_public_user_{user.id}"
         )
 
         consumer.channel_layer.group_discard.assert_called_with(
-            f"user_{user.id}", "test_channel"
+            f"tenant_public_user_{user.id}", "test_channel"
         )
 
     @patch("notification.consumers.logger")
@@ -278,7 +278,8 @@ class TestNotificationConsumer(TransactionTestCase):
 
         consumer = NotificationConsumer()
         consumer.user = staff_user
-        consumer.group_name = f"user_{staff_user.id}"
+        consumer.group_name = f"tenant_public_user_{staff_user.id}"
+        consumer.admin_group_name = "tenant_public_admins"
         consumer.channel_layer = MagicMock()
         consumer.channel_layer.group_discard = AsyncMock()
         consumer.channel_name = "test_channel"
@@ -290,10 +291,10 @@ class TestNotificationConsumer(TransactionTestCase):
         )
 
         consumer.channel_layer.group_discard.assert_any_call(
-            f"user_{staff_user.id}", "test_channel"
+            f"tenant_public_user_{staff_user.id}", "test_channel"
         )
         consumer.channel_layer.group_discard.assert_any_call(
-            "admins", "test_channel"
+            "tenant_public_admins", "test_channel"
         )
 
     @patch("notification.consumers.logger")

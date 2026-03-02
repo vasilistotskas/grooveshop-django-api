@@ -17,6 +17,7 @@ django_asgi_app = health_check(
 )  # Django's ASGI app is less strict than the spec
 
 from notification.consumers import NotificationConsumer  # noqa: E402
+from tenant.middleware_ws import TenantWebsocketMiddleware  # noqa: E402
 
 websocket_urlpatterns = [
     path("ws/notifications/", NotificationConsumer.as_asgi())
@@ -26,7 +27,9 @@ application = ProtocolTypeRouter(
     {
         "http": cors_handler(django_asgi_app),
         "websocket": AllowedHostsOriginValidator(
-            TokenAuthMiddlewareStack(URLRouter(websocket_urlpatterns))
+            TenantWebsocketMiddleware(
+                TokenAuthMiddlewareStack(URLRouter(websocket_urlpatterns))
+            )
         ),
     }
 )

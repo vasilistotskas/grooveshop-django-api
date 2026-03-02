@@ -37,31 +37,48 @@ from unfold.widgets import UnfoldAdminSelectWidget, UnfoldAdminTextInputWidget
 
 logger = logging.getLogger(__name__)
 
-admin.site.unregister(Setting)
-admin.site.unregister(PeriodicTask)
-admin.site.unregister(IntervalSchedule)
-admin.site.unregister(CrontabSchedule)
-admin.site.unregister(SolarSchedule)
-admin.site.unregister(ClockedSchedule)
 
-for model, model_admin in dict(admin.site._registry).items():
-    if model._meta.app_label not in [
-        "djstripe",
-        "knox",
-        "socialaccount",
-        "mfa",
+def override_third_party_admins():
+    """Re-register third-party admin classes with Unfold ModelAdmin.
+
+    Must be called from CoreConfig.ready(), not at module level,
+    because SHARED_APPS/TENANT_APPS ordering means third-party
+    admin modules may not have been imported yet during autodiscover.
+    """
+    from django.contrib.admin.exceptions import NotRegistered
+
+    for model_class, admin_class in [
+        (Setting, SettingAdmin),
+        (PeriodicTask, PeriodicTaskAdmin),
+        (IntervalSchedule, IntervalScheduleAdmin),
+        (CrontabSchedule, CrontabScheduleAdmin),
+        (SolarSchedule, SolarScheduleAdmin),
+        (ClockedSchedule, ClockedScheduleAdmin),
     ]:
-        continue
+        try:
+            admin.site.unregister(model_class)
+        except NotRegistered:
+            pass
+        admin.site.register(model_class, admin_class)
 
-    admin.site.unregister(model)
+    for model, model_admin in dict(admin.site._registry).items():
+        if model._meta.app_label not in [
+            "djstripe",
+            "knox",
+            "socialaccount",
+            "mfa",
+        ]:
+            continue
 
-    new_admin_class = type(
-        f"{model.__name__}AdminOverride",
-        (model_admin.__class__, ModelAdmin),
-        {},
-    )
+        admin.site.unregister(model)
 
-    admin.site.register(model, new_admin_class)
+        new_admin_class = type(
+            f"{model.__name__}AdminOverride",
+            (model_admin.__class__, ModelAdmin),
+            {},
+        )
+
+        admin.site.register(model, new_admin_class)
 
 
 class ExportActionMixin:
@@ -324,7 +341,6 @@ class UnfoldPeriodicTaskForm(PeriodicTaskForm):
         self.fields["regtask"].widget = UnfoldTaskSelectWidget()
 
 
-@admin.register(Setting)
 class SettingAdmin(ModelAdmin):
     from core.forms.settings import SettingAdminForm
 
@@ -454,26 +470,21 @@ class SettingAdmin(ModelAdmin):
         )
 
 
-@admin.register(PeriodicTask)
 class PeriodicTaskAdmin(BasePeriodicTaskAdmin, ModelAdmin):
     form = UnfoldPeriodicTaskForm
 
 
-@admin.register(IntervalSchedule)
 class IntervalScheduleAdmin(ModelAdmin):
     pass
 
 
-@admin.register(CrontabSchedule)
 class CrontabScheduleAdmin(BaseCrontabScheduleAdmin, ModelAdmin):
     pass
 
 
-@admin.register(SolarSchedule)
 class SolarScheduleAdmin(ModelAdmin):
     pass
 
 
-@admin.register(ClockedSchedule)
 class ClockedScheduleAdmin(BaseClockedScheduleAdmin, ModelAdmin):
     pass

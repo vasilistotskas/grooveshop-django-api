@@ -1,0 +1,2777 @@
+<!DOCTYPE html>
+<!-- saved from url=(0042)https://developer.viva.com/smart-checkout/ -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title itemprop="name">
+  
+   Smart Checkout | Viva.com Developer Portal 
+</title>
+<meta name="description" content="
+
+Technical documentation to help you integrate with our checkouts, plugins and APIs. Start accepting payments through Viva.com now!
+">
+    
+      
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="revised" content="2026-02-18T17:48:26 UTC">
+<meta property="og:title" content="Smart Checkout">
+<meta property="og:description" content="Technical documentation to help you integrate with our checkouts, plugins and APIs. Start accepting payments through Viva now!">
+<meta property="og:image" content="/images/thumbnail.png">
+<meta name="google-site-verification" content="PzJ5nv5LrDAy1DqkF_oCFpN30AZtf6PPbAemzkFIRNM">
+<link rel="shortcut icon" href="https://developer.viva.com/images/favicon.png" type="image/x-icon">
+<link href="./Smart Checkout _ Viva.com Developer Portal_files/font-awesome.min.css" rel="stylesheet">
+<link href="./Smart Checkout _ Viva.com Developer Portal_files/nucleus.css" rel="stylesheet">
+<link href="./Smart Checkout _ Viva.com Developer Portal_files/style.css" rel="stylesheet">
+
+<link href="./Smart Checkout _ Viva.com Developer Portal_files/tam.css" rel="stylesheet">
+<script async="" src="./Smart Checkout _ Viva.com Developer Portal_files/analytics.js.download"></script><script async="" src="./Smart Checkout _ Viva.com Developer Portal_files/gtm.js.download"></script><script src="./Smart Checkout _ Viva.com Developer Portal_files/jquery-2.x.min.js.download"></script>
+<script src="./Smart Checkout _ Viva.com Developer Portal_files/bootstrap.min.js.download"></script>
+<script type="text/javascript">
+      var baseurl = "https:\/\/developer.viva.com\/";
+</script>
+
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-NL4JPQ46');</script>
+
+<script>
+  window.intercomSettings = {
+    app_id: "gs2wnztc",
+    language_override: "en",
+    current_app: "developer_portal"
+  };
+</script>
+<script>
+
+
+</script>
+
+
+<script defer="" src="./Smart Checkout _ Viva.com Developer Portal_files/script.js.download"></script>
+
+<script>
+  
+  const messages = [
+    "Hi there! I'm your Developer Experience Assistant. I'm here to help you with technical questions, guide you through the documentation, and provide insights from our knowledge base.How can I assist you today ? ",
+    'Welcome to Viva.com Developer Portal! How can I assist you today?',
+    "Hello! I'm here to help you with any questions about integrating Viva's payment solutions. What can I do for you today?",
+    "Experiencing issues with your integration? Describe your problem, and I'll help you troubleshoot",
+    "Need support with a specific payment method or tool? Let me know the details, and I'll guide you through it.",
+  ];
+
+  
+  const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+
+  
+  const options = {
+    token: '6ebef191c88fdf58e6e1fa3c98faf086',
+    screens: {
+      chat: {
+        height: '100vh',
+        width: 'clamp(525px, 33vw, 100vw)',
+      },
+    },
+    anchorTarget: '_blank',
+    bot: {
+      name: 'Nico',
+      avatar: 'https://assets.vivawallet.com/bot-avatars/nico.png',
+    },
+    initialMessages: [randomMessage],
+    
+    openAfterNSeconds: 10, 
+    assets: {
+      widgetTrigger: {
+        openIcon:
+          'https://cdn.brandfetch.io/idxsbjzcXQ/theme/light/symbol.svg?c=1bxid64Mup7aczewSAYMX&t=1690368644932', 
+      },
+    },
+    theme: {
+      widgetTrigger: {
+        size: {
+          
+          button: 64,
+          icon: 40,
+        },
+      },
+      primaryColor: '#1F2439',
+      palette: 'zinc',
+    },
+  };
+
+  window.addEventListener('DOMContentLoaded', () => {
+    initOpenScript(options);
+  });
+</script>
+
+    
+  </head>
+  <body data-url="/smart-checkout/"><span data-radix-focus-guard="" tabindex="0" style="outline: none; opacity: 0; position: fixed; pointer-events: none;"></span>
+    
+      <header>
+  <div class="logo">
+   <img src="./Smart Checkout _ Viva.com Developer Portal_files/viva_logo_main.png" style="width:200px; height: auto;">
+  </div>
+  <div class="burger"><a href="javascript:void(0);" style="font-size:14px;">☰</a></div>
+  <div class="searchboxwrapper" style="display: none;">
+        <div class="searchbox">
+          <input data-search-input="" id="search-by" type="text" placeholder="Start searching..." autocomplete="off">
+        </div>
+        <script type="text/javascript" src="./Smart Checkout _ Viva.com Developer Portal_files/lunr.min.js.download"></script>
+        <script type="text/javascript" src="./Smart Checkout _ Viva.com Developer Portal_files/auto-complete.js.download"></script>
+        <link href="./Smart Checkout _ Viva.com Developer Portal_files/auto-complete.css" rel="stylesheet">
+        <script type="text/javascript">
+          
+              var baseurl = "https:\/\/developer.viva.com\/";
+          
+        </script>
+        <script type="text/javascript" src="./Smart Checkout _ Viva.com Developer Portal_files/search.js.download"></script>
+</div>
+    <nav class="shortcuts">
+            <li class="" role="">
+                <a href="https://developer.viva.com/iris/" rel="noopener">
+                  <i class="fa fa-credit-card"></i><label>IRIS Payment</label>
+                </a>
+            </li>
+            <li class="" role="">
+                <a href="https://developer.viva.com/aade" rel="noopener">
+                  <i class="fa fa-institution"></i><label>AADE</label>
+                </a>
+            </li>
+            <li class="" role="">
+                <a href="https://demo.vivapayments.com/en/signup" rel="noopener">
+                  <i class="fa fa-key"></i><label>Demo Account</label>
+                </a>
+            </li>
+            <li class="" role="">
+                <a href="https://developer.viva.com/api-docs/" rel="noopener">
+                  <i class="fa fa-file-code-o"></i><label>API Docs</label>
+                </a>
+            </li>
+            <li class="" role="">
+                <a href="https://developer.viva.com/releasenotes/" rel="noopener">
+                  <i class="fa fa-newspaper-o"></i><label>Releases</label>
+                </a>
+            </li>
+            <li class="" role="">
+                <a href="https://status.vivawallet.com/" rel="noopener">
+                  <i class="fa fa-heartbeat"></i><label>Status</label>
+                </a>
+            </li>
+    </nav>
+</header>
+<article>
+  <aside>
+    <ul class="menu">
+          <li data-nav-id="/" class="dd-item">
+          <a href="https://developer.viva.com/" class="highlight">
+            <i class="fa fa-fw fa-home"></i>
+          </a>
+          </li>
+    <li data-nav-id="/about-viva/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/about-viva/" class="highlight">About Viva</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/about-viva/security-technology/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/about-viva/security-technology/" class="highlight">Security &amp; Technology</a>
+      </div>
+    </li>
+    <li data-nav-id="/about-viva/psd2-compliance/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/about-viva/psd2-compliance/" class="highlight">PSD2 Compliance</a>
+      </div>
+    </li>
+    <li data-nav-id="/about-viva/payment-processing-fee/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/about-viva/payment-processing-fee/" class="highlight">Pricing Model</a>
+      </div>
+    </li>
+    <li data-nav-id="/about-viva/zero-percent/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/about-viva/zero-percent/" class="highlight">Acceptance Fees to 0%</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/getting-started/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/getting-started/" class="highlight">Getting started</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/getting-started/account-registration-sign-in/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/getting-started/account-registration-sign-in/" class="highlight">Account registration &amp; sign-in</a>
+      </div>
+    </li>
+    <li data-nav-id="/getting-started/download-demo-pos-app/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/getting-started/download-demo-pos-app/" class="highlight">Download 'Viva.com Terminal' application DEMO</a>
+      </div>
+    </li>
+    <li data-nav-id="/getting-started/find-your-account-credentials/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/getting-started/find-your-account-credentials/" class="highlight">Find your account credentials</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/getting-started/find-your-account-credentials/merchant-id-and-api-key/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/getting-started/find-your-account-credentials/merchant-id-and-api-key/" class="highlight">Merchant ID and API Key</a>
+      </div>
+    </li>
+    <li data-nav-id="/getting-started/find-your-account-credentials/client-smart-checkout-credentials/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/getting-started/find-your-account-credentials/client-smart-checkout-credentials/" class="highlight">Client (Smart Checkout) credentials</a>
+      </div>
+    </li>
+    <li data-nav-id="/getting-started/find-your-account-credentials/woocommerce-credentials/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/getting-started/find-your-account-credentials/woocommerce-credentials/" class="highlight">WooCommerce credentials</a>
+      </div>
+    </li>
+    <li data-nav-id="/getting-started/find-your-account-credentials/isv-credentials/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/getting-started/find-your-account-credentials/isv-credentials/" class="highlight">ISV credentials</a>
+      </div>
+    </li>
+    <li data-nav-id="/getting-started/find-your-account-credentials/shopware-credentials/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/getting-started/find-your-account-credentials/shopware-credentials/" class="highlight">Shopware credentials</a>
+      </div>
+    </li>
+    <li data-nav-id="/getting-started/find-your-account-credentials/reseller-api-credentials/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/getting-started/find-your-account-credentials/reseller-api-credentials/" class="highlight">Reseller API credentials</a>
+      </div>
+    </li>
+    <li data-nav-id="/getting-started/find-your-account-credentials/shopify-credentials/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/getting-started/find-your-account-credentials/shopify-credentials/" class="highlight">Shopify credentials</a>
+      </div>
+    </li>
+    <li data-nav-id="/getting-started/find-your-account-credentials/pos-apis-credentials/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/getting-started/find-your-account-credentials/pos-apis-credentials/" class="highlight">POS APIs credentials</a>
+      </div>
+    </li>
+    <li data-nav-id="/getting-started/find-your-account-credentials/prestashop-credentials/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/getting-started/find-your-account-credentials/prestashop-credentials/" class="highlight">Prestashop credentials</a>
+      </div>
+    </li>
+    <li data-nav-id="/getting-started/find-your-account-credentials/account-transactions-credentials/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/getting-started/find-your-account-credentials/account-transactions-credentials/" class="highlight">Account Transactions credentials</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/getting-started/create-a-payment-source/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/getting-started/create-a-payment-source/" class="highlight">Create a payment source</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/getting-started/create-a-payment-source/payment-source-for-online-payments/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/getting-started/create-a-payment-source/payment-source-for-online-payments/" class="highlight">Source for Online payments</a>
+      </div>
+    </li>
+    <li data-nav-id="/getting-started/create-a-payment-source/payment-source-for-stores/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/getting-started/create-a-payment-source/payment-source-for-stores/" class="highlight">Source for stores</a>
+      </div>
+    </li>
+    <li data-nav-id="/getting-started/create-a-payment-source/payment-source-for-isv/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/getting-started/create-a-payment-source/payment-source-for-isv/" class="highlight">Source for ISV</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/payment-methods/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/" class="highlight">Payment methods</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/payment-methods/digital-wallets/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/digital-wallets/" class="highlight">Digital wallets</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/payment-methods/digital-wallets/apple-pay/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/digital-wallets/apple-pay/" class="highlight">Apple Pay</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/digital-wallets/google-pay/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/digital-wallets/google-pay/" class="highlight">Google Pay</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/digital-wallets/samsung-pay/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/digital-wallets/samsung-pay/" class="highlight">Samsung Pay</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/digital-wallets/paypal/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/digital-wallets/paypal/" class="highlight">PayPal</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/digital-wallets/viva-wallet/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/digital-wallets/viva-wallet/" class="highlight">Viva.com Wallet</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/digital-wallets/mobilepay-online/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/digital-wallets/mobilepay-online/" class="highlight">MobilePay Online</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/payment-methods/local-payment-methods/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/local-payment-methods/" class="highlight">Local payment methods</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/payment-methods/local-payment-methods/bancomatpay/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/local-payment-methods/bancomatpay/" class="highlight">BANCOMAT Pay</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/local-payment-methods/bancontactqr/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/local-payment-methods/bancontactqr/" class="highlight">Bancontact QR</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/local-payment-methods/bitpay/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/local-payment-methods/bitpay/" class="highlight">BitPay</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/local-payment-methods/blik/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/local-payment-methods/blik/" class="highlight">BLIK</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/local-payment-methods/bluecode/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/local-payment-methods/bluecode/" class="highlight">Bluecode</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/local-payment-methods/conecs-meal-vouchers/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/local-payment-methods/conecs-meal-vouchers/" class="highlight">Conecs Meal Vouchers</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/local-payment-methods/eps/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/local-payment-methods/eps/" class="highlight">EPS</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/local-payment-methods/ideal/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/local-payment-methods/ideal/" class="highlight">iDEAL</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/local-payment-methods/iris/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/local-payment-methods/iris/" class="highlight">IRIS</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/local-payment-methods/klarna/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/local-payment-methods/klarna/" class="highlight">Klarna</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/local-payment-methods/mastercardclick/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/local-payment-methods/mastercardclick/" class="highlight">Mastercard Click to Pay</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/local-payment-methods/multibanco/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/local-payment-methods/multibanco/" class="highlight">MULTIBANCO</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/local-payment-methods/mbway/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/local-payment-methods/mbway/" class="highlight">MB WAY</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/local-payment-methods/p24/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/local-payment-methods/p24/" class="highlight">P24</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/local-payment-methods/payu/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/local-payment-methods/payu/" class="highlight">PayU</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/local-payment-methods/satispay/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/local-payment-methods/satispay/" class="highlight">Satispay</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/local-payment-methods/swish/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/local-payment-methods/swish/" class="highlight">Swish</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/local-payment-methods/tbi/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/local-payment-methods/tbi/" class="highlight">tbi bank</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/local-payment-methods/trustly/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/local-payment-methods/trustly/" class="highlight">Trustly</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/local-payment-methods/wechatpay/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/local-payment-methods/wechatpay/" class="highlight">WeChat Pay</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/payment-methods/direct-debit-other/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/direct-debit-other/" class="highlight">Direct Debit &amp; other</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/payment-methods/direct-debit-other/pay-by-bank/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/direct-debit-other/pay-by-bank/" class="highlight">Pay By Bank</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/direct-debit-other/cash/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/direct-debit-other/cash/" class="highlight">Cash Σημεία Εξυπηρέτησης Otro Pay (πρώην Viva Spot)</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/direct-debit-other/ebanking/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/direct-debit-other/ebanking/" class="highlight">e-banking (ΔΙΑΣ/DIAS)</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/direct-debit-other/pay-on-delivery/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/direct-debit-other/pay-on-delivery/" class="highlight">Pay on Delivery</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/payment-methods/native-pos-payment-methods/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/native-pos-payment-methods/" class="highlight">Native POS payment methods</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/payment-methods/native-pos-payment-methods/alipay-for-pos/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/native-pos-payment-methods/alipay-for-pos/" class="highlight">Alipay+</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/native-pos-payment-methods/blik-for-pos/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/native-pos-payment-methods/blik-for-pos/" class="highlight">BLIK (for POS)</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/native-pos-payment-methods/bancomat-for-pos/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/native-pos-payment-methods/bancomat-for-pos/" class="highlight">BANCOMAT Pay (For POS)</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/native-pos-payment-methods/iris-for-pos/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/native-pos-payment-methods/iris-for-pos/" class="highlight">IRIS (for POS)</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/native-pos-payment-methods/klarna-for-pos/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/native-pos-payment-methods/klarna-for-pos/" class="highlight">Klarna (for POS)</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-methods/native-pos-payment-methods/satispay-for-pos/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/native-pos-payment-methods/satispay-for-pos/" class="highlight">Satispay (for POS)</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/payment-methods/payment-methods-icons/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-methods/payment-methods-icons/" class="highlight">Payment methods icons</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/integration-reference/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/integration-reference/" class="highlight">Integration reference</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/integration-reference/basic-auth/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/integration-reference/basic-auth/" class="highlight">Basic Auth authentication</a>
+      </div>
+    </li>
+    <li data-nav-id="/integration-reference/oauth2-authentication/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/integration-reference/oauth2-authentication/" class="highlight">OAuth 2.0 authentication</a>
+      </div>
+    </li>
+    <li data-nav-id="/integration-reference/test-cards-and-environments/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/integration-reference/test-cards-and-environments/" class="highlight">Test cards and environments</a>
+      </div>
+    </li>
+    <li data-nav-id="/integration-reference/response-codes/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/integration-reference/response-codes/" class="highlight">Response information</a>
+      </div>
+    </li>
+    <li data-nav-id="/integration-reference/debugging-errors/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/integration-reference/debugging-errors/" class="highlight">Debugging errors</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/plugins/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/plugins/" class="highlight">Plugins</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/plugins/shopify/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/plugins/shopify/" class="highlight">
+            Shopify Smart Checkout
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/plugins/woocommerce-standard-checkout/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/plugins/woocommerce-standard-checkout/" class="highlight">
+            WooCommerce Standard Checkout
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/plugins/woocommerce-smart-checkout/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/plugins/woocommerce-smart-checkout/" class="highlight">
+            WooCommerce Smart Checkout
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/plugins/prestashop-smart-checkout/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/plugins/prestashop-smart-checkout/" class="highlight">
+            PrestaShop Smart Checkout
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/plugins/opencart/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/plugins/opencart/" class="highlight">
+            OpenCart Smart Checkout
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/plugins/magento/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/plugins/magento/" class="highlight">
+            Magento Smart Checkout
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/plugins/shopware6/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/plugins/shopware6/" class="highlight">
+            Shopware 6 Smart Checkout
+          </a>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/smart-checkout/" class="dd-item parent active haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/smart-checkout/" class="highlight">Smart Checkout</a>
+            <i class="fa fa-angle-down fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/smart-checkout/smart-checkout-integration/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/smart-checkout/smart-checkout-integration/" class="highlight">Smart Checkout Integration</a>
+      </div>
+    </li>
+    <li data-nav-id="/smart-checkout/smart-checkout-functionality-options/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/smart-checkout/smart-checkout-functionality-options/" class="highlight">Functionality &amp; Options</a>
+      </div>
+    </li>
+      <li data-nav-id="/smart-checkout/dynamic_descriptor/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/smart-checkout/dynamic_descriptor/" class="highlight">
+            Dynamic Descriptor
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/smart-checkout/smart-checkout-multicurrency/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/smart-checkout/smart-checkout-multicurrency/" class="highlight">
+            Multicurrency
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/smart-checkout/payment-method-ordering/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/smart-checkout/payment-method-ordering/" class="highlight">
+            Payment Methods Ordering
+          </a>
+        </div>
+    </li>
+    <li data-nav-id="/smart-checkout/smart-checkout-faqs/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/smart-checkout/smart-checkout-faqs/" class="highlight">FAQs</a>
+      </div>
+    </li>
+    <li data-nav-id="/smart-checkout/edcc/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/smart-checkout/edcc/" class="highlight">E-DCC</a>
+      </div>
+    </li>
+    <li data-nav-id="/smart-checkout/esurcharge/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/smart-checkout/esurcharge/" class="highlight">E-Surcharge</a>
+      </div>
+    </li>
+    <li data-nav-id="/smart-checkout/color/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/smart-checkout/color/" class="highlight">Brand Color</a>
+      </div>
+    </li>
+    <li data-nav-id="/smart-checkout/pre-select-payment-method/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/smart-checkout/pre-select-payment-method/" class="highlight">Pre-selected Payment Method</a>
+      </div>
+    </li>
+    <li data-nav-id="/smart-checkout/display-cancel-button/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/smart-checkout/display-cancel-button/" class="highlight">Display a cancel button</a>
+      </div>
+    </li>
+    <li data-nav-id="/smart-checkout/specify-languages/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/smart-checkout/specify-languages/" class="highlight">Specify languages</a>
+      </div>
+    </li>
+    <li data-nav-id="/smart-checkout/save-payment/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/smart-checkout/save-payment/" class="highlight">Save Payment Cards</a>
+      </div>
+    </li>
+    <li data-nav-id="/smart-checkout/decline-recovery/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/smart-checkout/decline-recovery/" class="highlight">Decline Recovery</a>
+      </div>
+    </li>
+    <li data-nav-id="/smart-checkout/validation/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/smart-checkout/validation/" class="highlight">Field validation</a>
+      </div>
+    </li>
+    <li data-nav-id="/smart-checkout/pay-by-card-instalments/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/smart-checkout/pay-by-card-instalments/" class="highlight">Installments</a>
+      </div>
+    </li>
+    <li data-nav-id="/smart-checkout/pre-authorization/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/smart-checkout/pre-authorization/" class="highlight">Pre-authorizations</a>
+      </div>
+    </li>
+    <li data-nav-id="/smart-checkout/recurring-payments/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/smart-checkout/recurring-payments/" class="highlight">Recurring payments</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/marketplaces/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/marketplaces/" class="highlight">Marketplaces</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-tools/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-tools/" class="highlight">Payment tools</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/payment-tools/quick-pay/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-tools/quick-pay/" class="highlight">Quick Pay</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-tools/payment-notifications/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-tools/payment-notifications/" class="highlight">Payment notifications</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-tools/subscriptions/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-tools/subscriptions/" class="highlight">Subscriptions</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-tools/virtual-terminal/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-tools/virtual-terminal/" class="highlight">Virtual Terminal</a>
+      </div>
+    </li>
+    <li data-nav-id="/payment-tools/rf-code-payments/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/payment-tools/rf-code-payments/" class="highlight">RF Code Payments</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/isv-partner-program/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/isv-partner-program/" class="highlight">ISV Partner program</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/isv-partner-program/payment-isv-api/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/isv-partner-program/payment-isv-api/" class="highlight">ISV Payment API</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/apis-for-payments/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-payments/" class="highlight">APIs for payments</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/apis-for-payments/payment-api/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-payments/payment-api/" class="highlight">Payment API</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-payments/wallet-api/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-payments/wallet-api/" class="highlight">Wallet API</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-payments/bank-transfer-api/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-payments/bank-transfer-api/" class="highlight">Bank transfer API</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-payments/bank-transfer-api-deprecated/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-payments/bank-transfer-api-deprecated/" class="highlight">Bank transfer API (Deprecated)</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-payments/account-api/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-payments/account-api/" class="highlight">Account API</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-payments/data-services/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-payments/data-services/" class="highlight">Data Services API</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-payments/marketplace-api/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-payments/marketplace-api/" class="highlight">Marketplace API</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-payments/native-mbway-mbref-api/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-payments/native-mbway-mbref-api/" class="highlight">MB WAY and MB REF Native Integration</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-payments/native-apple-pay-api/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-payments/native-apple-pay-api/" class="highlight">Native Apple Pay API</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-payments/native-google-pay-api/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-payments/native-google-pay-api/" class="highlight">Native Google Pay API</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/webhooks-for-payments/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/webhooks-for-payments/" class="highlight">Webhooks for payments</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/webhooks-for-payments/transaction-payment-created/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/webhooks-for-payments/transaction-payment-created/" class="highlight">Transaction Payment Created</a>
+      </div>
+    </li>
+    <li data-nav-id="/webhooks-for-payments/transaction-failed/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/webhooks-for-payments/transaction-failed/" class="highlight">Transaction Failed</a>
+      </div>
+    </li>
+    <li data-nav-id="/webhooks-for-payments/transaction-pos-ecr-session-created/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/webhooks-for-payments/transaction-pos-ecr-session-created/" class="highlight">Transaction Pos Ecr Session Created</a>
+      </div>
+    </li>
+    <li data-nav-id="/webhooks-for-payments/transaction-pos-ecr-session-failed/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/webhooks-for-payments/transaction-pos-ecr-session-failed/" class="highlight">Transaction Pos Ecr Session Failed</a>
+      </div>
+    </li>
+    <li data-nav-id="/webhooks-for-payments/transaction-price-calculated/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/webhooks-for-payments/transaction-price-calculated/" class="highlight">Transaction Price Calculated</a>
+      </div>
+    </li>
+    <li data-nav-id="/webhooks-for-payments/transaction-reversal-created/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/webhooks-for-payments/transaction-reversal-created/" class="highlight">Transaction Reversal Created</a>
+      </div>
+    </li>
+    <li data-nav-id="/webhooks-for-payments/account-transaction-created/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/webhooks-for-payments/account-transaction-created/" class="highlight">Account Transaction Created</a>
+      </div>
+    </li>
+    <li data-nav-id="/webhooks-for-payments/command-bank-transfer-created/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/webhooks-for-payments/command-bank-transfer-created/" class="highlight">Command Bank Transfer Created</a>
+      </div>
+    </li>
+    <li data-nav-id="/webhooks-for-payments/command-bank-transfer-executed/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/webhooks-for-payments/command-bank-transfer-executed/" class="highlight">Command Bank Transfer Executed</a>
+      </div>
+    </li>
+    <li data-nav-id="/webhooks-for-payments/account-connected/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/webhooks-for-payments/account-connected/" class="highlight">Account Connected</a>
+      </div>
+    </li>
+    <li data-nav-id="/webhooks-for-payments/account-verification-status-changed/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/webhooks-for-payments/account-verification-status-changed/" class="highlight">Account Verification Status Changed</a>
+      </div>
+    </li>
+    <li data-nav-id="/webhooks-for-payments/sale-transactions/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/webhooks-for-payments/sale-transactions/" class="highlight">Sale Transactions</a>
+      </div>
+    </li>
+    <li data-nav-id="/webhooks-for-payments/transfer-created/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/webhooks-for-payments/transfer-created/" class="highlight">Transfer Created</a>
+      </div>
+    </li>
+    <li data-nav-id="/webhooks-for-payments/obligation-created/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/webhooks-for-payments/obligation-created/" class="highlight">Obligation Created</a>
+      </div>
+    </li>
+    <li data-nav-id="/webhooks-for-payments/obligation-captured/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/webhooks-for-payments/obligation-captured/" class="highlight">Obligation Captured</a>
+      </div>
+    </li>
+    <li data-nav-id="/webhooks-for-payments/order-updated/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/webhooks-for-payments/order-updated/" class="highlight">Order Updated</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/tutorials/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/" class="highlight">Tutorials</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/tutorials/general/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/general/" class="highlight">General</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/tutorials/general/configure-user-roles/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/general/configure-user-roles/" class="highlight">Configure User Roles</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/general/allow-transfers-between-accounts/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/general/allow-transfers-between-accounts/" class="highlight">Allow transfers between accounts</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/general/find-transaction-ids/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/general/find-transaction-ids/" class="highlight">Find transaction IDs</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/general/find-wallet-ids/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/general/find-wallet-ids/" class="highlight">Find wallet IDs</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/tutorials/vw-e-banking/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/vw-e-banking/" class="highlight">Web e-Banking</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/tutorials/vw-e-banking/configure-account-debit-cards/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/vw-e-banking/configure-account-debit-cards/" class="highlight">Configure Account Debit Cards</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/vw-e-banking/account-top-up-functionality/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/vw-e-banking/account-top-up-functionality/" class="highlight">Account Top-Up Functionality</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/vw-e-banking/beneficiaries/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/vw-e-banking/beneficiaries/" class="highlight">Beneficiaries</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/vw-e-banking/configure-payout-settings/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/vw-e-banking/configure-payout-settings/" class="highlight">Configure Payout Settings</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/vw-e-banking/create-new-bank-account/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/vw-e-banking/create-new-bank-account/" class="highlight">Create a new bank account</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/vw-e-banking/make-a-bank-transfer/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/vw-e-banking/make-a-bank-transfer/" class="highlight">Outgoing bank transfer</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/vw-e-banking/reporting/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/vw-e-banking/reporting/" class="highlight">Reporting</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/vw-e-banking/see-my-sales-transactions/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/vw-e-banking/see-my-sales-transactions/" class="highlight">Sales transactions</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/vw-e-banking/settings/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/vw-e-banking/settings/" class="highlight">Settings</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/tutorials/vw-e-banking/settings/api-access/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/vw-e-banking/settings/api-access/" class="highlight">API Access</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/vw-e-banking/settings/addresses/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/vw-e-banking/settings/addresses/" class="highlight">Addresses</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/vw-e-banking/settings/pricing/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/vw-e-banking/settings/pricing/" class="highlight">Pricing</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/vw-e-banking/settings/profile/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/vw-e-banking/settings/profile/" class="highlight">Profile</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/vw-e-banking/settings/subscription-plans/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/vw-e-banking/settings/subscription-plans/" class="highlight">Subscription Plans</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/vw-e-banking/settings/users/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/vw-e-banking/settings/users/" class="highlight">Users</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/tutorials/vw-e-banking/transfer-money-between-accounts/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/vw-e-banking/transfer-money-between-accounts/" class="highlight">VW to VW transfer</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/tutorials/e-banking-app/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/e-banking-app/" class="highlight">e-Banking App</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/tutorials/e-banking-app/home/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/e-banking-app/home/" class="highlight">Home</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/e-banking-app/accounts/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/e-banking-app/accounts/" class="highlight">Accounts</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/e-banking-app/sales/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/e-banking-app/sales/" class="highlight">Sales</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/e-banking-app/transfers/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/e-banking-app/transfers/" class="highlight">Transfers</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/e-banking-app/preferences/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/e-banking-app/preferences/" class="highlight">Preferences</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/tutorials/payments/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/payments/" class="highlight">Payments</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/tutorials/payments/create-a-payment-order/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/payments/create-a-payment-order/" class="highlight">Create a payment order</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/payments/set-your-desired-payment-method/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/payments/set-your-desired-payment-method/" class="highlight">Set your desired payment method</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/payments/create-a-payment-notification/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/payments/create-a-payment-notification/" class="highlight">Create a payment notification</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/payments/verify-a-payment/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/payments/verify-a-payment/" class="highlight">Verify a payment</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/payments/issue-a-refund/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/payments/issue-a-refund/" class="highlight">Issue a refund</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/payments/create-a-recurring-payment/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/payments/create-a-recurring-payment/" class="highlight">Create a recurring payment</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/payments/handle-card-tokens/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/payments/handle-card-tokens/" class="highlight">Handle Card Tokens</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/payments/handle-pre-authorizations/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/payments/handle-pre-authorizations/" class="highlight">Handle pre-authorizations</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/payments/handle-payments-with-card-installments/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/payments/handle-payments-with-card-installments/" class="highlight">Handle payments with card installments</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/payments/collect-payments-with-qr-code/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/payments/collect-payments-with-qr-code/" class="highlight">Collect Payments with QR Codes</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/payments/card-verification/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/payments/card-verification/" class="highlight">Card Verification</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/tutorials/smart-checkout-configuration/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/smart-checkout-configuration/" class="highlight">Smart Checkout Configuration</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/tutorials/smart-checkout-configuration/add-your-brand-logo/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/smart-checkout-configuration/add-your-brand-logo/" class="highlight">Add your brand logo</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/smart-checkout-configuration/integrate-with-a-mobile-app/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/smart-checkout-configuration/integrate-with-a-mobile-app/" class="highlight">Integrate with a mobile app</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/tutorials/pos-terminals/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/pos-terminals/" class="highlight">POS &amp; Terminals</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/tutorials/pos-terminals/tap-on-phone/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/pos-terminals/tap-on-phone/" class="highlight">Tap On Phone</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/tutorials/pos-terminals/tap-on-phone/connect-card-reader/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/tap-on-phone/connect-card-reader/" class="highlight">
+            Connect Card Reader
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/tap-on-phone/card-reader-timeout/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/tap-on-phone/card-reader-timeout/" class="highlight">
+            Card Reader - Sleep Timeout
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/tap-on-phone/sound-configuration/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/tap-on-phone/sound-configuration/" class="highlight">
+            Sound Configuration
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/tap-on-phone/enable-disable-notifications/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/tap-on-phone/enable-disable-notifications/" class="highlight">
+            Notifications
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/tap-on-phone/enable-disable-references/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/tap-on-phone/enable-disable-references/" class="highlight">
+            Payment Reference
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/tap-on-phone/receipt-options/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/tap-on-phone/receipt-options/" class="highlight">
+            Receipt Options
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/tap-on-phone/locate-nfc/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/tap-on-phone/locate-nfc/" class="highlight">
+            Locate NFC reader
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/tap-on-phone/pin-protection/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/tap-on-phone/pin-protection/" class="highlight">
+            PIN Protection
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/tap-on-phone/payment-methods/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/tap-on-phone/payment-methods/" class="highlight">
+            ToP Payment Methods
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/tap-on-phone/cancel-refund-transaction/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/tap-on-phone/cancel-refund-transaction/" class="highlight">
+            Cancel/Refund a Transaction
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/tap-on-phone/create-preauth-transaction/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/tap-on-phone/create-preauth-transaction/" class="highlight">
+            Create a Preauth Transaction
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/tap-on-phone/kiosk-mode/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/tap-on-phone/kiosk-mode/" class="highlight">
+            Kiosk Mode
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/tap-on-phone/qr-code-payments/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/tap-on-phone/qr-code-payments/" class="highlight">
+            QR Code payments
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/tap-on-phone/transaction-history/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/tap-on-phone/transaction-history/" class="highlight">
+            Transaction history
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/tap-on-phone/install-a-printer/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/tap-on-phone/install-a-printer/" class="highlight">
+            Install a printer
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/tap-on-phone/integrations/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/tap-on-phone/integrations/" class="highlight">
+            Integrations
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/tap-on-phone/user-logout/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/tap-on-phone/user-logout/" class="highlight">
+            User Logout
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/tap-on-phone/reset/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/tap-on-phone/reset/" class="highlight">
+            Reset App &amp; Settings
+          </a>
+        </div>
+    </li>
+        </ul>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/activate-pos-devices/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/activate-pos-devices/" class="highlight">
+            Activate POS Devices
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/devices-management/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/devices-management/" class="highlight">
+            Devices Management
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/dual-screen-pin-entry/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/dual-screen-pin-entry/" class="highlight">
+            Dual-screen PIN Entry
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/source-assignment-logic/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/source-assignment-logic/" class="highlight">
+            Source assignment logic
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/change-pos-language/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/change-pos-language/" class="highlight">
+            Change POS Language
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/connect-to-wifi/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/connect-to-wifi/" class="highlight">
+            Connect to WiFi
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/lock-settings/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/lock-settings/" class="highlight">
+            Lock Settings
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/set-pinpad/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/set-pinpad/" class="highlight">
+            Set PINpad
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/batch-management/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/batch-management/" class="highlight">
+            Batch Management
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/vw-app-update/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/vw-app-update/" class="highlight">
+            'Viva.com Terminal' application Update
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/multipath/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/multipath/" class="highlight">
+            MultiPath functionality
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/autostart/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/autostart/" class="highlight">
+            'Viva.com Terminal' application Autostart
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/sleepmode/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/sleepmode/" class="highlight">
+            Sleep settings
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/decimal-amount-support/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/decimal-amount-support/" class="highlight">
+            Decimal Amount Support
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/orientation-mode/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/orientation-mode/" class="highlight">
+            Orientation mode
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/tutorials/pos-terminals/floating-pin/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/tutorials/pos-terminals/floating-pin/" class="highlight">
+            Floating PIN
+          </a>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/tutorials/marketplace/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/marketplace/" class="highlight">Marketplace</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/tutorials/marketplace/create-a-connected-account/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/marketplace/create-a-connected-account/" class="highlight">Create a connected account</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/marketplace/manage-transfer-fees-and-payouts/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/marketplace/manage-transfer-fees-and-payouts/" class="highlight">Manage transfer fees and payouts</a>
+      </div>
+    </li>
+    <li data-nav-id="/tutorials/marketplace/issue-a-marketplace-refund/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/tutorials/marketplace/issue-a-marketplace-refund/" class="highlight">Issue a marketplace refund</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/" class="highlight">In-person payments</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/" class="highlight">Softpos Apps</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/android-app/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/android-app/" class="highlight">Tap on Any Device on Android</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/android-app/sale/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/android-app/sale/" class="highlight">Sale request</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/android-app/sale/multimerchant/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/android-app/sale/multimerchant/" class="highlight">Multimerchant Sale request</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/android-app/preauth/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/android-app/preauth/" class="highlight">Pre-auth request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/android-app/capturepreauth/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/android-app/capturepreauth/" class="highlight">Capture Pre-auth request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/android-app/cancel/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/android-app/cancel/" class="highlight">Cancel/Refund request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/android-app/rebate/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/android-app/rebate/" class="highlight">Rebate request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/android-app/fast_refund/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/android-app/fast_refund/" class="highlight">Fast Refund request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/android-app/unreferenced_refund/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/android-app/unreferenced_refund/" class="highlight">Unreferenced Refund</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/android-app/abort/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/android-app/abort/" class="highlight">Abort request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/android-app/batch/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/android-app/batch/" class="highlight">Batch request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/android-app/reprint-transaction/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/android-app/reprint-transaction/" class="highlight">Reprint request</a>
+      </div>
+    </li>
+      <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/android-app/set-mode/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/android-app/set-mode/" class="highlight">
+            Set Mode request
+          </a>
+        </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/android-app/transaction-details/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/android-app/transaction-details/" class="highlight">Transaction Details request</a>
+      </div>
+    </li>
+      <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/android-app/toggleprotocol/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/android-app/toggleprotocol/" class="highlight">
+            P2P Protocol Activation
+          </a>
+        </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/android-app/foreground/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/android-app/foreground/" class="highlight">Foreground request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/android-app/printing/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/android-app/printing/" class="highlight">Set Printing Settings request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/android-app/get-printing/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/android-app/get-printing/" class="highlight">Get Printing Settings request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/android-app/sendlogs/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/android-app/sendlogs/" class="highlight">Send Logs request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/android-app/pos_activation/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/android-app/pos_activation/" class="highlight">POS Activation request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/android-app/get_activation_code/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/android-app/get_activation_code/" class="highlight">Get Activation Code request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/android-app/decimal-amount-mode/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/android-app/decimal-amount-mode/" class="highlight">Decimal Amount Mode request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/android-app/reset/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/android-app/reset/" class="highlight">Reset request</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/ios-app/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/ios-app/" class="highlight">Tap on Any Device on iOS</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/ios-app/sale/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/ios-app/sale/" class="highlight">Sale request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/ios-app/preauth/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/ios-app/preauth/" class="highlight">Pre-auth request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/ios-app/capturepreauth/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/ios-app/capturepreauth/" class="highlight">Capture Pre-auth request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/ios-app/cancel/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/ios-app/cancel/" class="highlight">Cancel/Refund request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/ios-app/unreferenced_refund/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/ios-app/unreferenced_refund/" class="highlight">Unreferenced Refund</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/ios-app/abort/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/ios-app/abort/" class="highlight">Abort request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/ios-app/batch/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/ios-app/batch/" class="highlight">Batch request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/ios-app/reprint_transaction/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/ios-app/reprint_transaction/" class="highlight">Reprint request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/ios-app/foreground/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/ios-app/foreground/" class="highlight">Foreground request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/ios-app/printing/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/ios-app/printing/" class="highlight">Set Printing Settings request</a>
+      </div>
+    </li>
+      <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/ios-app/get_printing/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/ios-app/get_printing/" class="highlight">
+            Get Printing Settings request
+          </a>
+        </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/ios-app/sendlogs/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/ios-app/sendlogs/" class="highlight">Send Logs request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/ios-app/pos_activation/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/ios-app/pos_activation/" class="highlight">POS Activation request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/ios-app/get_activation_code/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/ios-app/get_activation_code/" class="highlight">Get Activation Code request</a>
+      </div>
+    </li>
+      <li data-nav-id="/apis-for-point-of-sale/card-terminal-apps/ios-app/get_reports/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminal-apps/ios-app/get_reports/" class="highlight">
+            Get Reports request
+          </a>
+        </div>
+    </li>
+        </ul>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminals-devices/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminals-devices/" class="highlight">Payment Terminal API</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminals-devices/rest-api/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminals-devices/rest-api/" class="highlight">Cloud Terminal API</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminals-devices/rest-api/eft-pos-api-documentation/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminals-devices/rest-api/eft-pos-api-documentation/" class="highlight">Cloud Terminal API</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminals-devices/peer-to-peer-communication/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminals-devices/peer-to-peer-communication/" class="highlight">Local Terminal API</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminals-devices/peer-to-peer-communication/point-to-point-protocol-rest-api/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminals-devices/peer-to-peer-communication/point-to-point-protocol-rest-api/" class="highlight">Local Terminal API</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminals-devices/vivawallet-api-cl/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminals-devices/vivawallet-api-cl/" class="highlight">ECR Protocol</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminals-devices/vivawallet-api-cl/ready/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminals-devices/vivawallet-api-cl/ready/" class="highlight">Ready</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminals-devices/vivawallet-api-cl/sale/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminals-devices/vivawallet-api-cl/sale/" class="highlight">Sale Request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminals-devices/vivawallet-api-cl/preauth/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminals-devices/vivawallet-api-cl/preauth/" class="highlight">Preauth Request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminals-devices/vivawallet-api-cl/cancel/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminals-devices/vivawallet-api-cl/cancel/" class="highlight">Cancel Request</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminals-devices/vivawallet-api-cl/abort/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminals-devices/vivawallet-api-cl/abort/" class="highlight">Abort</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminals-devices/vivawallet-api-cl/batchmanagement/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminals-devices/vivawallet-api-cl/batchmanagement/" class="highlight">Batch Management</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminals-devices/vivawallet-api-cl/getlastreceipt/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminals-devices/vivawallet-api-cl/getlastreceipt/" class="highlight">Get Last Receipt</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminals-devices/vivawallet-api-cl/reprint/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminals-devices/vivawallet-api-cl/reprint/" class="highlight">Reprint</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminals-devices/vivawallet-api-cl/setprintingsettings/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminals-devices/vivawallet-api-cl/setprintingsettings/" class="highlight">Set Printing Settings</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminals-devices/oracle-opi/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminals-devices/oracle-opi/" class="highlight">Oracle OPI Integration</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminals-devices/frob-protocol/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminals-devices/frob-protocol/" class="highlight">FROB Protocol </a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminals-devices/-ap-concert-ecr-integration-protocol/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminals-devices/-ap-concert-ecr-integration-protocol/" class="highlight">AP Concert Protocol</a>
+      </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/card-terminals-devices/mdb-protocol/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/card-terminals-devices/mdb-protocol/" class="highlight">MDB Protocol</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+      <li data-nav-id="/apis-for-point-of-sale/dcc/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/apis-for-point-of-sale/dcc/" class="highlight">
+            Dynamic Currency Conversion
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/apis-for-point-of-sale/multimerchant/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/apis-for-point-of-sale/multimerchant/" class="highlight">
+            Multi-Merchant
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/apis-for-point-of-sale/surcharge/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/apis-for-point-of-sale/surcharge/" class="highlight">
+            Surcharge
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/apis-for-point-of-sale/dynamicdescriptor/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/apis-for-point-of-sale/dynamicdescriptor/" class="highlight">
+            Dynamic Descriptor
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/apis-for-point-of-sale/instalments/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/apis-for-point-of-sale/instalments/" class="highlight">
+            Instalments &amp; Tips
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/apis-for-point-of-sale/fastrefundrebate/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/apis-for-point-of-sale/fastrefundrebate/" class="highlight">
+            Rebate and Fast Refund
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/apis-for-point-of-sale/tokencp/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/apis-for-point-of-sale/tokencp/" class="highlight">
+            Card Present Tokenization
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/apis-for-point-of-sale/moto/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/apis-for-point-of-sale/moto/" class="highlight">
+            MOTO payments
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/apis-for-point-of-sale/saf/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/apis-for-point-of-sale/saf/" class="highlight">
+            Offline Payments
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/apis-for-point-of-sale/receipts/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/apis-for-point-of-sale/receipts/" class="highlight">
+            Sample Receipts
+          </a>
+        </div>
+    </li>
+    <li data-nav-id="/apis-for-point-of-sale/sdks/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/apis-for-point-of-sale/sdks/" class="highlight">SDKs</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/apis-for-point-of-sale/sdks/vw-one-sdk/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/apis-for-point-of-sale/sdks/vw-one-sdk/" class="highlight">
+            Ciontek CS30
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/apis-for-point-of-sale/sdks/vw-next-sdk/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/apis-for-point-of-sale/sdks/vw-next-sdk/" class="highlight">
+            Ciontek CS50C
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/apis-for-point-of-sale/sdks/vw-cm30-sdk/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/apis-for-point-of-sale/sdks/vw-cm30-sdk/" class="highlight">
+            Ciontek CM30C
+          </a>
+        </div>
+    </li>
+        </ul>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/releasenotes/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/releasenotes/" class="highlight">Release Notes</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/releasenotes/2026/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/releasenotes/2026/" class="highlight">
+            2026
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/releasenotes/2025/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/releasenotes/2025/" class="highlight">
+            2025
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/releasenotes/2024/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/releasenotes/2024/" class="highlight">
+            2024
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/releasenotes/2023/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/releasenotes/2023/" class="highlight">
+            2023
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/releasenotes/2022/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/releasenotes/2022/" class="highlight">
+            2022
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/releasenotes/2021/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/releasenotes/2021/" class="highlight">
+            2021
+          </a>
+        </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/get-support/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/get-support/" class="highlight">Contact &amp; Support</a>
+      </div>
+    </li>
+    <li data-nav-id="/viva-fiscalisation/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/viva-fiscalisation/" class="highlight">Fiscalisation</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/viva-fiscalisation/core/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/viva-fiscalisation/core/" class="highlight">
+            Fiscalisation
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/viva-fiscalisation/chargeitemcase/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/viva-fiscalisation/chargeitemcase/" class="highlight">
+            ChargeItemCase
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/viva-fiscalisation/payitemcase/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/viva-fiscalisation/payitemcase/" class="highlight">
+            PayItemCase
+          </a>
+        </div>
+    </li>
+      <li data-nav-id="/viva-fiscalisation/receiptcase/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/viva-fiscalisation/receiptcase/" class="highlight">
+            ftReceiptCase
+          </a>
+        </div>
+    </li>
+    <li data-nav-id="/viva-fiscalisation/greece/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/viva-fiscalisation/greece/" class="highlight">Greece</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+      <li data-nav-id="/viva-fiscalisation/greece/faq/" class="dd-item">
+        <div>
+          <a href="https://developer.viva.com/viva-fiscalisation/greece/faq/" class="highlight">
+            FAQs
+          </a>
+        </div>
+    </li>
+    <li data-nav-id="/viva-fiscalisation/greece/samples/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/viva-fiscalisation/greece/samples/" class="highlight">Business Tutorials</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/viva-fiscalisation/austria/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/viva-fiscalisation/austria/" class="highlight">Austria</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/viva-fiscalisation/austria/samples/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/viva-fiscalisation/austria/samples/" class="highlight">Business Tutorials</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/viva-fiscalisation/france/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/viva-fiscalisation/france/" class="highlight">France</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/viva-fiscalisation/france/samples/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/viva-fiscalisation/france/samples/" class="highlight">Business Tutorials</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/viva-fiscalisation/germany/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/viva-fiscalisation/germany/" class="highlight">Germany</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/viva-fiscalisation/germany/samples/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/viva-fiscalisation/germany/samples/" class="highlight">Business Tutorials</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/viva-fiscalisation/italy/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/viva-fiscalisation/italy/" class="highlight">Italy</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/viva-fiscalisation/italy/samples/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/viva-fiscalisation/italy/samples/" class="highlight">Business Case Samples for Italy</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/viva-fiscalisation/portugal/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/viva-fiscalisation/portugal/" class="highlight">Portugal</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/viva-fiscalisation/portugal/samples/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/viva-fiscalisation/portugal/samples/" class="highlight">Business Tutorials</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+    <li data-nav-id="/viva-fiscalisation/spain/" class="dd-item haschildren
+        ">
+      <div>
+      <a href="https://developer.viva.com/viva-fiscalisation/spain/" class="highlight">Spain</a><i class="fa fa-angle-right fa-lg category-icon"></i>
+      </div>
+        <ul>
+    <li data-nav-id="/viva-fiscalisation/spain/samples/" class="dd-item
+        ">
+      <div>
+      <a href="https://developer.viva.com/viva-fiscalisation/spain/samples/" class="highlight">Business Tutorials</a>
+      </div>
+    </li>
+        </ul>
+    </li>
+        </ul>
+    </li>
+
+
+
+
+    </ul>
+    <section>
+    </section>
+  </aside>
+  <section class="page">
+
+    <div class="nav-select"><br>
+      <center>Navigation:
+        <select onchange="javascript:location.href = this.value;">
+          
+    <option value="/aade/">
+   AADE Protocol</option>
+    <option value="/native-checkout-v2/">
+   Native Checkout v2</option>
+    <option value="/about-viva/">
+   About Viva</option>
+    <option value="/getting-started/">
+   Getting started</option>
+    <option value="/payment-methods/">
+   Payment methods</option>
+    <option value="/integration-reference/">
+   Integration reference</option>
+    <option value="/plugins/">
+   Plugins</option>
+    <option value="/smart-checkout/" selected="">
+   Smart Checkout</option> 
+    <option value="/smart-checkout/smart-checkout-integration/">
+  - 
+   Smart Checkout Integration</option>
+    <option value="/smart-checkout/smart-checkout-functionality-options/">
+  - 
+   Functionality &amp; Options</option>
+      <option value="/smart-checkout/dynamic_descriptor/">- Dynamic Descriptor</option>
+      <option value="/smart-checkout/smart-checkout-multicurrency/">- Multicurrency</option>
+      <option value="/smart-checkout/payment-method-ordering/">- Payment Methods Ordering</option>
+    <option value="/smart-checkout/smart-checkout-faqs/">
+  - 
+   FAQs</option>
+    <option value="/smart-checkout/edcc/">
+  - 
+   E-DCC</option>
+    <option value="/smart-checkout/esurcharge/">
+  - 
+   E-Surcharge</option>
+    <option value="/smart-checkout/color/">
+  - 
+   Brand Color</option>
+    <option value="/smart-checkout/pre-select-payment-method/">
+  - 
+   Pre-selected Payment Method</option>
+    <option value="/smart-checkout/display-cancel-button/">
+  - 
+   Display a cancel button</option>
+    <option value="/smart-checkout/specify-languages/">
+  - 
+   Specify languages</option>
+    <option value="/smart-checkout/save-payment/">
+  - 
+   Save Payment Cards</option>
+    <option value="/smart-checkout/decline-recovery/">
+  - 
+   Decline Recovery</option>
+    <option value="/smart-checkout/validation/">
+  - 
+   Field validation</option>
+    <option value="/smart-checkout/pay-by-card-instalments/">
+  - 
+   Installments</option>
+    <option value="/smart-checkout/pre-authorization/">
+  - 
+   Pre-authorizations</option>
+    <option value="/smart-checkout/recurring-payments/">
+  - 
+   Recurring payments</option>
+  
+    <option value="/marketplaces/">
+   Marketplaces</option>
+    <option value="/marketplaces-old/">
+   Marketplaces - OLD</option>
+    <option value="/payment-tools/">
+   Payment tools</option>
+    <option value="/isv-partner-program/">
+   ISV Partner program</option>
+    <option value="/apis-for-payments/">
+   APIs for payments</option>
+    <option value="/webhooks-for-payments/">
+   Webhooks for payments</option>
+    <option value="/tutorials/">
+   Tutorials</option>
+    <option value="/code-samples-for-payments/">
+   Code samples for payments</option>
+    <option value="/issuing/">
+   Issuing</option>
+    <option value="/apis-for-apm-provisioning/">
+   APIs for APM provisioning</option>
+    <option value="/apis-for-point-of-sale/">
+   In-person payments</option>
+    <option value="/client-case-studies/">
+   Client case studies</option>
+    <option value="/releasenotes/">
+   Release Notes</option>
+    <option value="/get-support/">
+   Contact &amp; Support</option>
+    <option value="/viva-fiscalisation/">
+   Fiscalisation</option>
+    <option value="/iris/">
+   iris</option>
+
+
+
+        </select>
+      </center>
+    </div><br>
+    <div class="searchboxwrappermobile">
+        <div class="searchbox">
+          <input data-search-input="" id="search-by2" type="text" placeholder="Start searching..." autocomplete="off">
+        </div>
+      </div>
+
+
+    <h1>Smart Checkout</h1>
+
+    
+
+    
+
+
+
+<h5>Smart Checkout is a <strong>hosted payment page</strong> which gets <strong>smarter over time</strong>. It is fast to integrate, offers increased conversion, and is continually self-updated. <span class="anchor" data-clipboard-text="https://developer.viva.com/smart-checkout/#"><i class="fa fa-link fa-lg"></i></span></h5>
+
+<ul>
+<li><a href="https://developer.viva.com/smart-checkout/#overview" class="highlight">Overview</a>
+
+<ul>
+<li><a href="https://developer.viva.com/smart-checkout/#features" class="highlight">Features</a></li>
+<li><a href="https://developer.viva.com/smart-checkout/#user-experience" class="highlight">User experience</a>
+
+<ul>
+<li><a href="https://developer.viva.com/smart-checkout/#screenshots" class="highlight">Screenshots</a></li>
+<li><a href="https://developer.viva.com/smart-checkout/#videos" class="highlight">Videos</a></li>
+</ul></li>
+<li><a href="https://developer.viva.com/smart-checkout/#supported-payment-methods" class="highlight">Supported payment methods</a></li>
+</ul></li>
+<li><a href="https://developer.viva.com/smart-checkout/#integration-guide" class="highlight">Integration guide</a></li>
+<li><a href="https://developer.viva.com/smart-checkout/#functionality-options" class="highlight">Functionality &amp; options</a></li>
+<li><a href="https://developer.viva.com/smart-checkout/#frequently-asked-questions" class="highlight">Frequently Asked Questions</a></li>
+<li><a href="https://developer.viva.com/smart-checkout/#demo-payment-pages" class="highlight">Demo payment pages</a></li>
+<li><a href="https://developer.viva.com/smart-checkout/#get-support" class="highlight">Get Support</a></li>
+</ul>
+
+<h3 id="overview">Overview <span class="anchor" data-clipboard-text="https://developer.viva.com/smart-checkout/#overview"><i class="fa fa-link fa-lg"></i></span></h3>
+
+<p>Smart Checkout is a turn-key solution for merchants to integrate with Viva to accept payments via an online store. It involves minimal effort on your side and offers the widest variety of payment options and overall features.
+When your customer is ready to make a payment, you direct them to a payment page hosted by Viva, where the customer provides their payment details and makes the payment. When the payment is completed, they are redirected back to a success (thank you) page of your choice.</p>
+
+<p><strong>Please see our video overview of Smart Checkout’s main features and benefits:</strong><br><br>
+<video width="600" controls="">
+  <source src="/downloads/other-videos/smart-checkout-payment-gateway.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+<br></p>
+
+<div class="alert 
+alert-success" role="alert"><p>Smart Checkout exhibits <strong>high performance</strong>: the customers of our merchant clients that use Smart Checkout proceed to pay on an average rate of <strong>87.6% across Europe</strong> (that number is even higher in certain countries, like the UK, where it sits at 91.1%). That number climbs even higher, to <strong>97.2% for customers that have saved their card on Smart Checkout</strong>.</p>
+</div>
+
+
+<div class="alert 
+alert-success" role="alert"><p>Smart Checkout <strong>future-proofs your payments</strong> as it is constantly self-updated, with no coding required from you, to offer a) additional payment methods as they grow in popularity, b) constant improvements to customer experience and thus conversion, and c) constant regulatory compliance to ever-changing regulatory requirements</p>
+</div>
+
+
+<h4 id="features">Features <span class="anchor" data-clipboard-text="https://developer.viva.com/smart-checkout/#features"><i class="fa fa-link fa-lg"></i></span></h4>
+
+<p>Smart Checkout offers the widest variety of <strong>overall features:</strong></p>
+
+<div class="alert 
+alert-success" role="alert"><ul>
+<li><strong>Simple integration</strong>: minimal effort required to integrate, with all features enabled out of the box without additional coding from you</li>
+<li><strong>Increased conversion</strong>: dynamically orders payment methods based on the location of the customer, prioritising the most popular local options, thereby increasing conversion rates</li>
+<li><strong>Customer preferences</strong>: remembers past payment behavior and preferences of the customer across merchants and countries</li>
+<li><strong>Saved cards (customer-side)</strong>: customers can pay using cards they have saved during past purchases, even from other merchants; thus, saved cards are available even to first-time customers. The customer does not need to create an account to save a card or re-use saved cards. New merchants take advantage of the pool of already saved cards across the Viva ecosystem</li>
+<li><strong>Card tokenization (merchant-side)</strong>: the merchant can save the card tokens of their customers in the merchant backend, and then use the saved card tokens when the merchant will redirect their customers to Smart Checkout again in the future. The saved card tokens provided by the merchant will then be presented to the customer on Smart Checkout to use and pay with</li>
+<li><strong>Decline recovery:</strong> based on the customer’s past payment behavior, we prompt the customer to re-try a declined payment</li>
+<li><strong>Recurring payments</strong>: charge the customer automatically, for a fixed or variable amount, on a regular or non-regular schedule</li>
+<li><strong>Dynamic descriptor</strong>: Employ dynamic descriptior for payments, so the buyers can recognize transactions clearly on both bank statements and 3DS verification pages.
+
+<ul>
+<li><strong>Dynamic Currency Conversion</strong>: <a href="https://developer.viva.com/smart-checkout/smart-checkout-dynamic-currency-conversion/" class="highlight">This service</a> lets your international customers see prices in their own home currency right at the checkout.</li>
+</ul></li>
+<li><strong>Pre-authorizations</strong>: the merchant can reserve funds now and conclude the payment later (i.e. ‘authorize’ now and ‘capture’ later)</li>
+<li><strong>Payment method customization</strong>: switch payment methods on/off at any time, specify order of appearance of payment methods, and specify preferred payment method</li>
+<li><strong>Mobile-optimized</strong>: offer an optimized browsing experience on any device (mobile, tablet, laptop, or desktop)</li>
+<li><strong>Local languages &amp; currencies</strong>: current support for 17 languages (English, German, French, Italian, Spanish, Polish, Romanian, Dutch, Greek, Czech, Portuguese, Swedish, Hungarian, Bulgarian, Danish, Finnish, and Croatian), and 8 currencies (CZK (Czech koruna), DKK (Danish krone), EUR (Euro), GBP (Pound sterling),HUF (Hungarian forint), PLN (Polish złoty), RON (Romanian leu) &amp; SEK (Swedish krona))</li>
+<li><strong>Cross-border payments</strong>: Supported for all payment methods; you can accept payments from international customers for all payment methods, provided you indicate the country of the customer (use the countryCode parameter of the Create payment order API call)</li>
+<li><strong>Cross-currency payments</strong>: Merchants can provide product prices in <a href="https://developer.viva.com/smart-checkout/smart-checkout-multicurrency/" class="highlight">different currencies</a> than the currency of the country to which they are registered</li>
+<li><strong>Branding</strong>: allow customization of the look and feel of your checkout page through a graphical user interface</li>
+<li><strong>Compliance &amp; security</strong>: full PCI &amp; SCA/<a href="https://www.emvco.com/processes-forms/product-approval/authentication/3ds/" class="highlight">3DS</a> support utilizing SCA exemptions, along with advanced fraud protection using Machine Learning algorithms</li>
+<li><strong>Constantly self-updated</strong>: regular self-updates with no coding required from you, to; a) offer new payment methods, b) offer new conversion-improving features, and c) comply with all the latest regulatory and security requirements</li>
+<li><strong>Card Verification</strong>: the ability to create zero-amount payment orders for the purposes of verifying a customer’s card without needing to take any payment</li>
+</ul>
+</div>
+
+
+<p><strong>Smart Checkout is preferable to an API-based checkout</strong> (i.e. a checkout you need to build yourself for your online store by integrating with APIs offered by several different payment providers in order to offer all payment methods) for multiple reasons:</p>
+
+<div class="alert 
+alert-success" role="alert"><ol>
+<li><p>It requires <strong>minimal effort</strong> to integrate and offer all out-of-the-box features &amp; payment methods, such as:<br>
+a. Handling of SCA/ 3DS, including soft declines when low-risk exemptions are enabled<br>
+b. Support for saved cards across merchants, even for first-time customers, with no customer account required<br>
+c. Support for merchant-side card tokenization, so that merchants can save the card tokens of their customers<br>
+d. Performs decline recovery to further improve conversion <strong>+1.6% to conversion rate</strong><br>
+e. Multiple payment methods, e.g. Apple Pay, PayPal, Klarna, via a single integration<br>
+f. Enhanced user experience, boosting conversion rates and customer satisfaction<br>
+g. Support for 17 local languages<br></p></li>
+
+<li><p>It requires <strong>no effort to always have updated</strong>, as Viva deals on an ongoing basis with enhancements to:<br>
+a. Offer new features that further enhance customer experience and conversion rates<br>
+b. Provide additional payment methods as they are introduced and grow in popularity<br>
+c. Continuously comply with ever-changing regulatory requirements<br></p></li>
+
+<li><p>It offers <strong>unique features that an API-based checkout cannot offer across merchants &amp; countries</strong>:<br>
+a. Customers can use cards they have saved during past purchases from other merchants <strong>+6% to conversion rate</strong><br>
+b. Customers are presented payment methods most likely to convert based on past overall behavior (considering all purchases from all merchants across countries) (coming soon)</p></li>
+
+<li><p>It offers <strong>payment methods not available via an API-based checkout</strong>, such as PayPal (wallet), Klarna, and others</p></li>
+
+<li><p>Nowadays, <strong>55% of consumers in Europe pay with a method other than card</strong>, and this continues to grow</p></li>
+
+<li><p>It offers <strong>out-of-the-box PCI-DSS &amp; SCA/3DS compliance</strong> as Viva (not the merchant) manages sensitive customer data and adherence to industry security standards</p></li>
+</ol>
+</div>
+
+
+<h4 id="user-experience">User experience <span class="anchor" data-clipboard-text="https://developer.viva.com/smart-checkout/#user-experience"><i class="fa fa-link fa-lg"></i></span></h4>
+
+<h5 id="screenshots">Screenshots <span class="anchor" data-clipboard-text="https://developer.viva.com/smart-checkout/#screenshots"><i class="fa fa-link fa-lg"></i></span></h5>
+
+<p>With our Smart Checkout solution, customers are redirected to the Viva Smart Checkout payment page to make a payment. The below image shows how a Smart Checkout payment page displays to your customers:<br></p>
+
+<p><a href="./Smart Checkout _ Viva.com Developer Portal_files/sc-new-general.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/sc-new-general.png" alt="Smart Checkout" class="border" style="width: 600px; height: auto;"></a></p>
+
+<h5 id="videos">Videos <span class="anchor" data-clipboard-text="https://developer.viva.com/smart-checkout/#videos"><i class="fa fa-link fa-lg"></i></span></h5>
+
+<p>The below video shows some features of <strong>Smart Checkout</strong> payment page:</p>
+
+<p><video width="600" controls="">
+    <source src="/downloads/user-experience-videos/smart-checkout-video.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+  </video></p>
+
+<h4 id="supported-payment-methods">Supported payment methods <span class="anchor" data-clipboard-text="https://developer.viva.com/smart-checkout/#supported-payment-methods"><i class="fa fa-link fa-lg"></i></span></h4>
+
+<p>Smart Checkout supports a wide variety of payment methods, including:</p>
+
+<ul>
+<li><a href="https://developer.viva.com/payment-methods/#cards" class="highlight"><strong>Cards</strong></a> (Visa, Mastercard, American Express, Maestro, Bancontact, JCB, Discover &amp; Diners Club)</li>
+<li><a href="https://developer.viva.com/payment-methods/#digital-wallets" class="highlight"><strong>Digital wallets</strong></a> (Apple Pay, Google Pay, Samsung Pay, PayPal, PayPal Pay Later, Viva Wallet &amp; MobilePay Online)</li>
+<li><a href="https://developer.viva.com/payment-methods/#local-payment-methods" class="highlight"><strong>Local payment methods</strong></a> (BANCOMAT Pay, Bancontact QR, BitPay, BLIK, Bluecode, EPS, iDEAL, IRIS, Klarna, MULTIBANCO, MB WAY, P24, PayU, Satispay, Swish, tbi bank, Trustly &amp; WeChat Pay)</li>
+<li><a href="https://developer.viva.com/payment-methods/#direct-debit-other" class="highlight"><strong>Direct Debit &amp; other payment methods</strong></a> (Pay By Bank, Cash (Viva Spot) &amp; e-banking (ΔΙΑΣ/DIAS))</li>
+</ul>
+
+<p></p><table class="pmtable">
+    <tbody><tr>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/visa_updated_1.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/visa_updated_1.svg" alt="Visa" style="width: 50px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/mastercard.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/mastercard.svg" alt="Mastercard" style="width: 50px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/american-express.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/american-express.svg" alt="American Express" style="width: 45px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/maestro.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/maestro.svg" alt="Maestro" style="width: 50px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/bancontact.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/bancontact.svg" alt="Bancontact" style="width: 50px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/jcb.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/jcb.svg" alt="JCB" style="width: 50px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/discover.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/discover.svg" alt="Discover" style="width: 50px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/diners-club.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/diners-club.svg" alt="Diners Club" style="width: 50px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/applepay.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/applepay.svg" alt="Apple Pay" style="width: 50px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/googlepay.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/googlepay.svg" alt="Google Pay" style="width: 55px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/samsungpay.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/samsungpay.svg" alt="Samsung Pay" style="width: 55px; height: auto;"></a></center></td>
+    </tr>
+    <tr>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/paypal.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/paypal.svg" alt="PayPal" style="width: 55px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/paypalpaylater.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/paypalpaylater.png" alt="PayPal Pay Later" style="width: 50px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/pay-with-viva-wallet-logo.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/pay-with-viva-wallet-logo.png" alt="Viva Wallet" style="width: 45px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/mobilepay-online.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/mobilepay-online.svg" alt="MobilePay Online" style="width: 70px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/bancomatpay.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/bancomatpay.png" alt="BANCOMAT Pay" style="width: 70px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/bitpay_updated_1.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/bitpay_updated_1.svg" alt="BitPay" style="width: 50px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/blik.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/blik.svg" alt="BLIK" style="width: 50px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/bluecode_logo_web_blue.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/bluecode_logo_web_blue.svg" alt="Bluecode" style="width: 50px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/eps.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/eps.svg" alt="EPS" style="width: 50px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/payondelivery.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/payondelivery.svg" alt="Pay on Delivery" style="width: 45px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/ideal.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/ideal.svg" alt="iDEAL" style="width: 50px; height: auto;"></a></center></td>
+    </tr>
+    <tr>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/iris.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/iris.svg" alt="IRIS" style="width: 50px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/klarna.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/klarna.svg" alt="Klarna" style="width: 50px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/multibanco.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/multibanco.svg" alt="MULTIBANCO" style="width: 50px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/mbway.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/mbway.svg" alt="MB WAY" style="width: 50px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/p24_updated_1.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/p24_updated_1.svg" alt="P24" style="width: 50px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/payu.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/payu.svg" alt="PayU" style="width: 50px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/swish.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/swish.svg" alt="Swish" style="width: 55px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/tbibank.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/tbibank.svg" alt="tbi bank" style="width: 50px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/trustly.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/trustly.svg" alt="Trustly" style="width: 50px; height: auto;"></a></center></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/satispay.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/satispay.svg" alt="Satispay" style="width: 45px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/wechatpay.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/wechatpay.svg" alt="WeChat Pay" style="width: 55px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/onlinebanking.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/onlinebanking.svg" alt="Pay By Bank" style="width: 45px; height: auto;"></a></center></td>
+      <td><center><a href="./Smart Checkout _ Viva.com Developer Portal_files/cash.svg" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/cash.svg" alt="Cash (Viva Spot)" style="width: 45px; height: auto;"></a></center></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td></td>
+    </tr>
+  </tbody></table><p></p>
+
+<style>
+.pmtable tr {border-style : hidden!important;}
+</style>
+
+<style>
+.pmtable td {border-style : hidden!important;}
+</style>
+
+<div class="notices note"><p>Please see our <a href="https://developer.viva.com/payment-methods/" class="highlight"><strong>Payment Methods</strong></a> page for further information on <strong>all</strong> of our payment methods</p>
+</div>
+
+
+<div class="notices note"><p><strong>Cross-border payments</strong>: Supported for all payment methods; you can accept payments from international customers for all payment methods, provided you indicate the country of the customer (use the countryCode parameter of the <a href="https://developer.viva.com/apis-for-payments/payment-api/#tag/Payments/paths/~1checkout~1v2~1orders/post" class="highlight"><strong>Create payment order</strong></a> API call)</p>
+</div>
+
+
+<h3 id="integration-guide">Integration guide <span class="anchor" data-clipboard-text="https://developer.viva.com/smart-checkout/#integration-guide"><i class="fa fa-link fa-lg"></i></span></h3>
+
+<p>Here is our <a href="https://developer.viva.com/smart-checkout/smart-checkout-integration" class="highlight"><strong>integration guide</strong></a> covering the process to integrate Smart Checkout with your online store.</p>
+
+<h3 id="functionality-options">Functionality &amp; options <span class="anchor" data-clipboard-text="https://developer.viva.com/smart-checkout/#functionality-options"><i class="fa fa-link fa-lg"></i></span></h3>
+
+<p>Here are details of the <a href="https://developer.viva.com/smart-checkout/smart-checkout-functionality-options" class="highlight"><strong>functionality &amp; options</strong></a> offered by Smart Checkout, including the additional configuration choices available.</p>
+
+<h3 id="frequently-asked-questions">Frequently Asked Questions <span class="anchor" data-clipboard-text="https://developer.viva.com/smart-checkout/#frequently-asked-questions"><i class="fa fa-link fa-lg"></i></span></h3>
+
+<p>Here are our <a href="https://developer.viva.com/smart-checkout/smart-checkout-faqs" class="highlight"><strong>frequently asked questions (<em>FAQs</em>)</strong></a> surrounding the integration, configuration, and use of Smart Checkout.</p>
+
+<h3 id="demo-payment-pages">Demo payment pages <span class="anchor" data-clipboard-text="https://developer.viva.com/smart-checkout/#demo-payment-pages"><i class="fa fa-link fa-lg"></i></span></h3>
+
+<p>Please find, below, demo pages for each available country. You can use these as illustrations of how the Smart Checkout payment page looks and functions.</p>
+
+<div class="notices tip"><p>You can use our <a href="https://developer.viva.com/integration-reference/test-cards-and-environments/#test-cards" class="highlight">test payment cards</a> in order to test making payments.</p>
+</div>
+
+
+<table>
+  <thead>
+    </thead><colgroup><col style="width:10%">
+    <col style="width:40%">
+    <col style="width:10%">
+    <col style="width:40%">
+    </colgroup><tbody><tr>
+      <th>Country</th>
+      <th>Demo Payment Page</th>
+      <th>Country</th>
+      <th>Demo Payment Page</th>
+    </tr>
+  
+  </tbody><tbody>
+    <tr>
+      <td><a href="./Smart Checkout _ Viva.com Developer Portal_files/austria.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/austria.png" alt="Austria" width="30" height="30"></a></td>
+      <td><a href="https://demo.vivapayments.com/web/checkout?ref=5622260841912453&amp;color=ed2939" class="highlight"><b>Austria</b></a></td>
+      <td><a href="./Smart Checkout _ Viva.com Developer Portal_files/belgium.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/belgium.png" alt="Belgium" width="30" height="30"></a></td>
+      <td><a href="https://demo.vivapayments.com/web/checkout?ref=4914898586096999&amp;color=a31510" class="highlight"><b>Belgium</b></a></td>
+    </tr>
+    <tr>
+      <td><a href="./Smart Checkout _ Viva.com Developer Portal_files/bulgaria.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/bulgaria.png" alt="Bulgaria" width="30" height="30"></a></td>
+      <td><a href="https://demo.vivapayments.com/web/checkout?ref=7714947981000453&amp;color=48956d" class="highlight"><b>Bulgaria</b></a></td>
+      <td><a href="./Smart Checkout _ Viva.com Developer Portal_files/croatia.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/croatia.png" alt="Croatia" width="30" height="30"></a></td>
+      <td><a href="https://demo.vivapayments.com/web/checkout?ref=9364222139576597&amp;color=ff0000" class="highlight"><b>Croatia</b></a></td>
+    </tr>
+    <tr>
+      <td><a href="./Smart Checkout _ Viva.com Developer Portal_files/cyprus.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/cyprus.png" alt="Cyprus" width="30" height="30"></a></td>
+      <td><a href="https://demo.vivapayments.com/web/checkout?ref=5522243373579129&amp;color=d5791a" class="highlight"><b>Cyprus</b></a></td>
+      <td><a href="./Smart Checkout _ Viva.com Developer Portal_files/czechrepublic.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/czechrepublic.png" alt="Czech Republic" width="30" height="30"></a></td>
+      <td><a href="https://demo.vivapayments.com/web/checkout?ref=9914976727974380&amp;color=3bb82e" class="highlight"><b>Czech Republic</b></a></td>
+    </tr>
+    <tr>
+      <td><a href="./Smart Checkout _ Viva.com Developer Portal_files/denmark.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/denmark.png" alt="Denmark" width="30" height="30"></a></td>
+      <td><a href="https://demo.vivapayments.com/web/checkout?ref=6608758359360693&amp;color=c60c2f" class="highlight"><b>Denmark</b></a></td>
+      <td><a href="./Smart Checkout _ Viva.com Developer Portal_files/finland.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/finland.png" alt="Finland" width="30" height="30"></a></td>
+      <td><a href="https://demo.vivapayments.com/web/checkout?ref=8108774203812002&amp;color=003580" class="highlight"><b>Finland</b></a></td>
+    </tr>
+    <tr>
+      <td><a href="./Smart Checkout _ Viva.com Developer Portal_files/france.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/france.png" alt="France" width="30" height="30"></a></td>
+      <td><a href="https://demo.vivapayments.com/web/checkout?ref=6514958079168217&amp;color=043295" class="highlight"><b>France</b></a></td>
+      <td><a href="./Smart Checkout _ Viva.com Developer Portal_files/germany.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/germany.png" alt="Germany" width="30" height="30"></a></td>
+      <td><a href="https://demo.vivapayments.com/web/checkout?ref=8789281975921273&amp;color=de3b30" class="highlight"><b>Germany</b></a></td>
+    </tr>
+    <tr>
+      <td><a href="./Smart Checkout _ Viva.com Developer Portal_files/greece.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/greece.png" alt="Greece" width="30" height="30"></a></td>
+      <td><a href="https://demo.vivapayments.com/web/checkout?ref=5617245978572605&amp;color=3171b8" class="highlight"><b>Greece</b></a></td>
+      <td><a href="./Smart Checkout _ Viva.com Developer Portal_files/hungary.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/hungary.png" alt="Hungary" width="30" height="30"></a></td>
+      <td><a href="https://demo.vivapayments.com/web/checkout?ref=3109879395972644&amp;color=477050" class="highlight"><b>Hungary</b></a></td>
+    </tr>
+    <tr>
+      <td><a href="./Smart Checkout _ Viva.com Developer Portal_files/ireland.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/ireland.png" alt="Ireland" width="30" height="30"></a></td>
+      <td><a href="https://demo.vivapayments.com/web/checkout?ref=9122279503285679&amp;color=169b62" class="highlight"><b>Ireland</b></a></td>
+      <td><a href="./Smart Checkout _ Viva.com Developer Portal_files/italy.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/italy.png" alt="Italy" width="30" height="30"></a></td>
+      <td><a href="https://demo.vivapayments.com/web/checkout?ref=8314903723444436&amp;color=ce3737" class="highlight"><b>Italy</b></a></td>
+    </tr>
+    <tr>
+      <td><a href="./Smart Checkout _ Viva.com Developer Portal_files/luxembourg.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/luxembourg.png" alt="Luxembourg" width="30" height="30"></a></td>
+      <td><a href="https://demo.vivapayments.com/web/checkout?ref=1122286012049472&amp;color=01a1de" class="highlight"><b>Luxembourg</b></a></td>
+      <td><a href="./Smart Checkout _ Viva.com Developer Portal_files/malta.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/malta.png" alt="Malta" width="30" height="30"></a></td>
+      <td><a href="https://demo.vivapayments.com/web/checkout?ref=9528022556172607&amp;color=ce132a" class="highlight"><b>Malta</b></a></td>
+    </tr>
+    <tr>
+      <td><a href="./Smart Checkout _ Viva.com Developer Portal_files/netherlands.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/netherlands.png" alt="Netherlands" width="30" height="30"></a></td>
+      <td><a href="https://demo.vivapayments.com/web/checkout?ref=9014967057693398&amp;color=ae1c28" class="highlight"><b>Netherlands</b></a></td>
+      <td><a href="./Smart Checkout _ Viva.com Developer Portal_files/norway.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/norway.png" alt="Norway" width="30" height="30"></a></td>
+      <td><a href="https://demo.vivapayments.com/web/checkout?ref=4236213867752170&amp;color=dc4139" class="highlight"><b>Norway</b></a></td>
+    </tr>
+    <tr>
+      <td><a href="./Smart Checkout _ Viva.com Developer Portal_files/poland.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/poland.png" alt="Poland" width="30" height="30"></a></td>
+      <td><a href="https://demo.vivapayments.com/web/checkout?ref=8514887648364679&amp;color=dc143c" class="highlight"><b>Poland</b></a></td>
+      <td><a href="./Smart Checkout _ Viva.com Developer Portal_files/portugal.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/portugal.png" alt="Portugal" width="30" height="30"></a></td>
+      <td><a href="https://demo.vivapayments.com/web/checkout?ref=6214934910622109&amp;color=336704" class="highlight"><b>Portugal</b></a></td>
+    </tr>
+    <tr>
+      <td><a href="./Smart Checkout _ Viva.com Developer Portal_files/romania.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/romania.png" alt="Romania" width="30" height="30"></a></td>
+      <td><a href="https://demo.vivapayments.com/web/checkout?ref=5614954144471036&amp;color=002b7f" class="highlight"><b>Romania</b></a></td>
+      <td><a href="./Smart Checkout _ Viva.com Developer Portal_files/spain.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/spain.png" alt="Spain" width="30" height="30"></a></td>
+      <td><a href="https://demo.vivapayments.com/web/checkout?ref=2014980504588535&amp;color=c7342a" class="highlight"><b>Spain</b></a></td>
+    </tr>
+    <tr>
+      <td><a href="./Smart Checkout _ Viva.com Developer Portal_files/sweden.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/sweden.png" alt="Sweden" width="30" height="30"></a></td>
+      <td><a href="https://demo.vivapayments.com/web/checkout?ref=3789230317198565&amp;color=2167a2" class="highlight"><b>Sweden</b></a></td>
+      <td><a href="./Smart Checkout _ Viva.com Developer Portal_files/unitedkingdom.png" data-featherlight="image"><img src="./Smart Checkout _ Viva.com Developer Portal_files/unitedkingdom.png" alt="United Kingdom" width="30" height="30"></a></td>
+      <td><a href="https://demo.vivapayments.com/web/checkout?ref=3114853442385879&amp;color=c50c26" class="highlight"><b>United Kingdom</b></a></td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="get-support">Get Support <span class="anchor" data-clipboard-text="https://developer.viva.com/smart-checkout/#get-support"><i class="fa fa-link fa-lg"></i></span></h3>
+
+<p>If you would like to integrate with Viva, or if you have any queries about our products and solutions, please see our <a href="https://developer.viva.com/get-support" class="highlight"><strong>Contact &amp; Support</strong></a> page to see how we can help!</p>
+
+
+
+
+    
+        <div class="chevrons">
+    <div id="navigation">
+<a class="nav nav-prev highlight" href="https://developer.viva.com/plugins/shopware6/" title="Shopware 6 Smart Checkout plugin"> <i class="fa fa-chevron-left"></i><label>Shopware 6 Smart Checkout plugin</label></a>
+    <a class="nav nav-next highlight" href="https://developer.viva.com/smart-checkout/smart-checkout-integration/" title="Smart Checkout Integration" style="margin-right: 0px;"><label>Smart Checkout Integration</label><i class="fa fa-chevron-right"></i></a></div>
+  </div>
+
+  </section>
+</article>
+
+<footer>
+
+<div class="footline">
+    
+
+    
+
+    
+
+    
+  </div>
+
+
+	<div>
+
+
+  
+    <p>© Viva.com 2025 (v5.6.1)</p>
+
+  
+
+
+
+	</div>
+</footer>
+
+<script src="./Smart Checkout _ Viva.com Developer Portal_files/clipboard.min.js.download"></script>
+
+<link href="./Smart Checkout _ Viva.com Developer Portal_files/featherlight.min.css" rel="stylesheet">
+<script src="./Smart Checkout _ Viva.com Developer Portal_files/featherlight.min.js.download"></script>
+
+
+
+<script src="./Smart Checkout _ Viva.com Developer Portal_files/script(1).js.download"></script>
+
+
+    
+
+    
+    
+
+    <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+  ga('create', 'UA-138974051-1', 'auto');
+  ga('send', 'pageview');
+</script>
+
+  
+<script async="" id="netlify-rum-container" src="./Smart Checkout _ Viva.com Developer Portal_files/rum" data-netlify-rum-site-id="67f5365a-a2b7-4774-b159-56864e264e86" data-netlify-deploy-branch="master" data-netlify-deploy-context="production" data-netlify-cwv-token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzaXRlX2lkIjoiNjdmNTM2NWEtYTJiNy00Nzc0LWIxNTktNTY4NjRlMjY0ZTg2IiwiYWNjb3VudF9pZCI6IjVkOGRlMDk4MGRmOTEyYzYxYjVjZjcyNSIsImRlcGxveV9pZCI6IjY5OTVmYjI5OTM0MTNmMDAwODcxMjNlNiIsImlzc3VlciI6Im5mc2VydmVyIn0.DaSGRW2z6P6i1xJ9lOlGf0gVyihmqOaXOiPE2pqFyhI"></script>
+
+<div class="autocomplete-suggestions "></div><div class="autocomplete-suggestions "></div><div id="opencx-root"><div style="position: fixed; bottom: 0px; right: 0px;"></div><iframe title="OpenCX Live Chat Trigger" style="height: calc(68px); width: calc(68px); font-size: 16px; position: fixed; z-index: 10000000; right: 20px; bottom: 20px; left: initial; box-sizing: border-box; border-width: 0px; border-radius: 100%;" src="./Smart Checkout _ Viva.com Developer Portal_files/saved_resource.html"></iframe><div data-radix-popper-content-wrapper="" style="position: fixed; left: 0px; top: 0px; transform: translate(1722.73px, 730px); min-width: max-content; --radix-popper-transform-origin: 100% 0px; z-index: 10000001; --radix-popper-available-width: 1722.7271728515625px; --radix-popper-available-height: 730.1817626953125px; --radix-popper-anchor-width: 0px; --radix-popper-anchor-height: 0px;"><div data-side="top" data-align="end" data-state="closed" role="dialog" id="radix-«r0»" aria-modal="false" aria-label="Support chat" tabindex="-1" style="z-index: 10000001; font-size: 16px; --radix-popover-content-transform-origin: var(--radix-popper-transform-origin); --radix-popover-content-available-width: var(--radix-popper-available-width); --radix-popover-content-available-height: var(--radix-popper-available-height); --radix-popover-trigger-width: var(--radix-popper-anchor-width); --radix-popover-trigger-height: var(--radix-popper-anchor-height);"><div style="opacity: 0; display: none; transform: translateY(8px);"><iframe title="OpenCX Live Chat" allowfullscreen="" style="--opencx-widget-width: 525px; --opencx-widget-height: 700px; min-width: calc(400px); width: var(--opencx-widget-width); max-width: calc(-40px + 100vw); min-height: calc(1px); height: var(--opencx-widget-height); max-height: calc(-122px + 100vh); overflow: hidden; outline: rgba(128, 128, 128, 0.5) none; border-radius: 32px; box-shadow: rgba(0, 0, 0, 0.25) 0px 0px 100px 0px; transition-property: all; transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1); transition-duration: 1000ms; box-sizing: border-box; border-width: 0px;" src="./Smart Checkout _ Viva.com Developer Portal_files/saved_resource(1).html"></iframe></div></div></div></div><browser-mcp-container data-wxt-shadow-root=""><template shadowrootmode="open">
+<!-- saved from url=(0042)https://developer.viva.com/smart-checkout/ -->
+<html><head><style>/*! tailwindcss v4.0.17 | MIT License | https://tailwindcss.com */@layer theme{:host,:host{--font-sans:ui-sans-serif,system-ui,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";--font-mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;--color-red-700:oklch(.505 .213 27.518);--color-blue-300:oklch(.809 .105 251.813);--color-blue-700:oklch(.488 .243 264.376);--color-gray-50:oklch(.985 .002 247.839);--color-gray-100:oklch(.967 .003 264.542);--color-gray-300:oklch(.872 .01 258.338);--color-gray-400:oklch(.707 .022 261.325);--color-gray-500:oklch(.551 .027 264.364);--color-gray-700:oklch(.373 .034 259.733);--color-gray-800:oklch(.278 .033 256.848);--color-gray-900:oklch(.21 .034 264.665);--color-black:#000;--color-white:#fff;--spacing:4px;--container-lg:512px;--text-xs:12px;--text-xs--line-height:calc(1/.75);--text-sm:14px;--text-sm--line-height:calc(1.25/.875);--text-base:16px;--text-base--line-height: 1.5 ;--text-lg:18px;--text-lg--line-height:calc(1.75/1.125);--font-weight-medium:500;--font-weight-semibold:600;--tracking-tight:-.025em;--tracking-widest:.1em;--leading-relaxed:1.625;--radius-xs:2px;--ease-in:cubic-bezier(.4,0,1,1);--animate-spin:spin 1s linear infinite;--animate-pulse:pulse 2s cubic-bezier(.4,0,.6,1)infinite;--default-transition-duration:.15s;--default-transition-timing-function:cubic-bezier(.4,0,.2,1)}}@layer base{*,:after,:before,::backdrop{box-sizing:border-box;border:0 solid;margin:0;padding:0}::file-selector-button{box-sizing:border-box;border:0 solid;margin:0;padding:0}html,:host{-webkit-text-size-adjust:100%;-moz-tab-size:4;tab-size:4;font-feature-settings:initial;font-variation-settings:initial;-webkit-tap-highlight-color:transparent;font-family:ui-sans-serif,system-ui,sans-serif,Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol,Noto Color Emoji;line-height:1.5}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;-webkit-text-decoration:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,samp,pre{font-feature-settings:initial;font-variation-settings:initial;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace;font-size:1em}small{font-size:80%}sub,sup{vertical-align:baseline;font-size:75%;line-height:0;position:relative}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}:-moz-focusring{outline:auto}progress{vertical-align:baseline}summary{display:list-item}ol,ul,menu{list-style:none}img,svg,video,canvas,audio,iframe,embed,object{vertical-align:middle;display:block}img,video{max-width:100%;height:auto}button,input,select,optgroup,textarea{font:inherit;font-feature-settings:inherit;font-variation-settings:inherit;letter-spacing:inherit;color:inherit;opacity:1;background-color:#0000;border-radius:0}::file-selector-button{font:inherit;font-feature-settings:inherit;font-variation-settings:inherit;letter-spacing:inherit;color:inherit;opacity:1;background-color:#0000;border-radius:0}:where(select:is([multiple],[size])) optgroup{font-weight:bolder}:where(select:is([multiple],[size])) optgroup option{padding-inline-start:20px}::file-selector-button{margin-inline-end:4px}::placeholder{opacity:1}@supports (not ((-webkit-appearance:-apple-pay-button))) or (contain-intrinsic-size:1px){::placeholder{color:color-mix(in oklab,currentColor 50%,transparent)}}textarea{resize:vertical}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-date-and-time-value{min-height:1lh;text-align:inherit}::-webkit-datetime-edit{padding-block:0}::-webkit-datetime-edit-year-field{padding-block:0}::-webkit-datetime-edit-month-field{padding-block:0}::-webkit-datetime-edit-day-field{padding-block:0}::-webkit-datetime-edit-hour-field{padding-block:0}::-webkit-datetime-edit-minute-field{padding-block:0}::-webkit-datetime-edit-second-field{padding-block:0}::-webkit-datetime-edit-millisecond-field{padding-block:0}::-webkit-datetime-edit-meridiem-field{padding-block:0}:-moz-ui-invalid{box-shadow:none}button,input:where([type=button],[type=reset],[type=submit]){-webkit-appearance:button;-moz-appearance:button;appearance:button}::file-selector-button{-webkit-appearance:button;-moz-appearance:button;appearance:button}::-webkit-inner-spin-button{height:auto}::-webkit-outer-spin-button{height:auto}[hidden]:where(:not([hidden=until-found])){display:none!important}*{border-color:var(--border);outline-color:color-mix(in oklab,var(--ring)50%,transparent)}body{background-color:var(--background);color:var(--foreground)}button:not(:disabled),[role=button]:not(:disabled){cursor:pointer}:host{all:initial!important;font-family:var(--font-sans)!important;font-size:var(--text-base)!important;line-height:var(--tw-leading,var(--text-base--line-height))!important}:host,:host *{border-color:var(--border)}:host{background-color:var(--background)!important;color:var(--foreground)!important}[type=text],input:where(:not([type])),[type=email],[type=url],[type=password],[type=number],[type=date],[type=datetime-local],[type=month],[type=search],[type=tel],[type=time],[type=week],[multiple],textarea,select{-webkit-appearance:none;-moz-appearance:none;appearance:none;border-color:#6a7282;--tw-shadow:0 0 #0000;background-color:#fff;border-width:1px;border-radius:0;padding:8px 12px;font-size:16px;line-height:24px}:is([type=text],input:where(:not([type])),[type=email],[type=url],[type=password],[type=number],[type=date],[type=datetime-local],[type=month],[type=search],[type=tel],[type=time],[type=week],[multiple],textarea,select):focus{outline-offset:2px;--tw-ring-inset:var(--tw-empty, );--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:oklch(.546 .245 262.881);--tw-ring-offset-shadow:var(--tw-ring-inset)0 0 0 var(--tw-ring-offset-width)var(--tw-ring-offset-color);--tw-ring-shadow:var(--tw-ring-inset)0 0 0 calc(1px + var(--tw-ring-offset-width))var(--tw-ring-color);box-shadow:var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow);border-color:#155dfc;outline:2px solid #0000}input::placeholder,textarea::placeholder{color:#6a7282;opacity:1}::-webkit-datetime-edit-fields-wrapper{padding:0}::-webkit-date-and-time-value{min-height:1.5em}::-webkit-date-and-time-value{text-align:inherit}::-webkit-datetime-edit{display:inline-flex}::-webkit-datetime-edit{padding-top:0;padding-bottom:0}::-webkit-datetime-edit-year-field{padding-top:0;padding-bottom:0}::-webkit-datetime-edit-month-field{padding-top:0;padding-bottom:0}::-webkit-datetime-edit-day-field{padding-top:0;padding-bottom:0}::-webkit-datetime-edit-hour-field{padding-top:0;padding-bottom:0}::-webkit-datetime-edit-minute-field{padding-top:0;padding-bottom:0}::-webkit-datetime-edit-second-field{padding-top:0;padding-bottom:0}::-webkit-datetime-edit-millisecond-field{padding-top:0;padding-bottom:0}::-webkit-datetime-edit-meridiem-field{padding-top:0;padding-bottom:0}select{-webkit-print-color-adjust:exact;print-color-adjust:exact;background-image:url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='oklch(0.551 0.027 264.364)' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");background-position:right 8px center;background-repeat:no-repeat;background-size:1.5em 1.5em;padding-right:40px}[multiple],[size]:where(select:not([size="1"])){background-image:initial;background-position:initial;background-repeat:unset;background-size:initial;-webkit-print-color-adjust:unset;print-color-adjust:unset;padding-right:12px}[type=checkbox],[type=radio]{-webkit-appearance:none;-moz-appearance:none;appearance:none;-webkit-print-color-adjust:exact;print-color-adjust:exact;vertical-align:middle;-webkit-user-select:none;user-select:none;width:16px;height:16px;color:#155dfc;border-color:#6a7282;--tw-shadow:0 0 #0000;background-color:#fff;background-origin:border-box;border-width:1px;flex-shrink:0;padding:0;display:inline-block}[type=checkbox]{border-radius:0}[type=radio]{border-radius:100%}[type=checkbox]:focus,[type=radio]:focus{outline-offset:2px;--tw-ring-inset:var(--tw-empty, );--tw-ring-offset-width:2px;--tw-ring-offset-color:#fff;--tw-ring-color:oklch(.546 .245 262.881);--tw-ring-offset-shadow:var(--tw-ring-inset)0 0 0 var(--tw-ring-offset-width)var(--tw-ring-offset-color);--tw-ring-shadow:var(--tw-ring-inset)0 0 0 calc(2px + var(--tw-ring-offset-width))var(--tw-ring-color);box-shadow:var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow);outline:2px solid #0000}[type=checkbox]:checked,[type=radio]:checked{background-color:currentColor;background-position:50%;background-repeat:no-repeat;background-size:100% 100%;border-color:#0000}[type=checkbox]:checked{background-image:url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e")}@media (forced-colors:active){[type=checkbox]:checked{-webkit-appearance:auto;-moz-appearance:auto;appearance:auto}}[type=radio]:checked{background-image:url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3ccircle cx='8' cy='8' r='3'/%3e%3c/svg%3e")}@media (forced-colors:active){[type=radio]:checked{-webkit-appearance:auto;-moz-appearance:auto;appearance:auto}}[type=checkbox]:checked:hover,[type=checkbox]:checked:focus,[type=radio]:checked:hover,[type=radio]:checked:focus{background-color:currentColor;border-color:#0000}[type=checkbox]:indeterminate{background-color:currentColor;background-image:url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 16 16'%3e%3cpath stroke='white' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M4 8h8'/%3e%3c/svg%3e");background-position:50%;background-repeat:no-repeat;background-size:100% 100%;border-color:#0000}@media (forced-colors:active){[type=checkbox]:indeterminate{-webkit-appearance:auto;-moz-appearance:auto;appearance:auto}}[type=checkbox]:indeterminate:hover,[type=checkbox]:indeterminate:focus{background-color:currentColor;border-color:#0000}[type=file]{background:unset;border-color:inherit;font-size:unset;line-height:inherit;border-width:0;border-radius:0;padding:0}[type=file]:focus{outline:1px solid buttontext;outline:1px auto -webkit-focus-ring-color}}@layer components;@layer utilities{.pointer-events-none{pointer-events:none}.visible{visibility:visible}.sr-only{clip:rect(0,0,0,0);white-space:nowrap;border-width:0;width:1px;height:1px;margin:-1px;padding:0;position:absolute;overflow:hidden}.absolute{position:absolute}.fixed{position:fixed}.relative{position:relative}.static{position:static}.sticky{position:sticky}.inset-0{inset:calc(var(--spacing)*0)}.-top-1{top:calc(var(--spacing)*-1)}.top-\(--line-offset\){top:var(--line-offset)}.top-\(--terminal-radius\){top:var(--terminal-radius)}.top-0{top:calc(var(--spacing)*0)}.top-2{top:calc(var(--spacing)*2)}.top-4{top:calc(var(--spacing)*4)}.top-\[50\%\]{top:50%}.right-\(--line-offset\){right:var(--line-offset)}.right-0{right:calc(var(--spacing)*0)}.right-2{right:calc(var(--spacing)*2)}.right-4{right:calc(var(--spacing)*4)}.bottom-\(--line-offset\){bottom:var(--line-offset)}.bottom-0{bottom:calc(var(--spacing)*0)}.-left-1{left:calc(var(--spacing)*-1)}.left-\(--line-offset\){left:var(--line-offset)}.left-\(--terminal-radius\){left:var(--terminal-radius)}.left-0{left:calc(var(--spacing)*0)}.left-2{left:calc(var(--spacing)*2)}.left-\[50\%\]{left:50%}.z-10{z-index:10}.z-20{z-index:20}.z-30{z-index:30}.z-50{z-index:50}.z-2147483647{z-index:2147483647}.col-start-2{grid-column-start:2}.container{width:100%}@media (width>=40rem){.container{max-width:640px}}@media (width>=48rem){.container{max-width:768px}}@media (width>=64rem){.container{max-width:1024px}}@media (width>=80rem){.container{max-width:1280px}}@media (width>=96rem){.container{max-width:1536px}}.-mx-1{margin-inline:calc(var(--spacing)*-1)}.mx-4{margin-inline:calc(var(--spacing)*4)}.my-1{margin-block:calc(var(--spacing)*1)}.my-4{margin-block:calc(var(--spacing)*4)}.mt-2{margin-top:calc(var(--spacing)*2)}.mt-4{margin-top:calc(var(--spacing)*4)}.mr-1{margin-right:calc(var(--spacing)*1)}.mr-2{margin-right:calc(var(--spacing)*2)}.mb-0{margin-bottom:calc(var(--spacing)*0)}.ml-auto{margin-left:auto}.box-border{box-sizing:border-box}.line-clamp-1{-webkit-line-clamp:1;-webkit-box-orient:vertical;display:-webkit-box;overflow:hidden}.block{display:block}.contents{display:contents}.flex{display:flex}.grid{display:grid}.inline{display:inline}.inline-flex{display:inline-flex}.table{display:table}.table-caption{display:table-caption}.table-cell{display:table-cell}.table-row{display:table-row}.field-sizing-content{field-sizing:content}.size-2{width:calc(var(--spacing)*2);height:calc(var(--spacing)*2)}.size-2\.5{width:calc(var(--spacing)*2.5);height:calc(var(--spacing)*2.5)}.size-3\.5{width:calc(var(--spacing)*3.5);height:calc(var(--spacing)*3.5)}.size-4{width:calc(var(--spacing)*4);height:calc(var(--spacing)*4)}.size-5{width:calc(var(--spacing)*5);height:calc(var(--spacing)*5)}.size-6{width:calc(var(--spacing)*6);height:calc(var(--spacing)*6)}.size-8{width:calc(var(--spacing)*8);height:calc(var(--spacing)*8)}.size-9{width:calc(var(--spacing)*9);height:calc(var(--spacing)*9)}.size-full{width:100%;height:100%}.h-\(--line-thickness\){height:var(--line-thickness)}.h-4{height:calc(var(--spacing)*4)}.h-5{height:calc(var(--spacing)*5)}.h-6{height:calc(var(--spacing)*6)}.h-8{height:calc(var(--spacing)*8)}.h-9{height:calc(var(--spacing)*9)}.h-10{height:calc(var(--spacing)*10)}.h-\[22px\]{height:22px}.h-\[var\(--radix-select-trigger-height\)\]{height:var(--radix-select-trigger-height)}.h-full{height:100%}.h-px{height:1px}.h-screen{height:100vh}.max-h-\(--radix-dropdown-menu-content-available-height\){max-height:var(--radix-dropdown-menu-content-available-height)}.max-h-80{max-height:calc(var(--spacing)*80)}.max-h-96{max-height:calc(var(--spacing)*96)}.min-h-4{min-height:calc(var(--spacing)*4)}.min-h-16{min-height:calc(var(--spacing)*16)}.w-\(--line-thickness\){width:var(--line-thickness)}.w-3\/4{width:75%}.w-9{width:calc(var(--spacing)*9)}.w-72{width:calc(var(--spacing)*72)}.w-fit{width:fit-content}.w-full{width:100%}.w-px{width:1px}.max-w-\[calc\(100\%-2rem\)\]{max-width:calc(100% - 32px)}.min-w-0{min-width:calc(var(--spacing)*0)}.min-w-\[8rem\]{min-width:128px}.min-w-\[300px\]{min-width:300px}.min-w-\[var\(--radix-select-trigger-width\)\]{min-width:var(--radix-select-trigger-width)}.flex-1{flex:1}.shrink-0{flex-shrink:0}.grow{flex-grow:1}.caption-bottom{caption-side:bottom}.translate-x-\[-50\%\]{--tw-translate-x:-50%;translate:var(--tw-translate-x)var(--tw-translate-y)}.translate-y-0\.5{--tw-translate-y:calc(var(--spacing)*.5);translate:var(--tw-translate-x)var(--tw-translate-y)}.translate-y-\[-50\%\]{--tw-translate-y:-50%;translate:var(--tw-translate-x)var(--tw-translate-y)}.translate-y-\[calc\(-50\%_-_2px\)\]{--tw-translate-y: calc(-50% - 2px) ;translate:var(--tw-translate-x)var(--tw-translate-y)}.rotate-45{rotate:45deg}.transform{transform:var(--tw-rotate-x)var(--tw-rotate-y)var(--tw-rotate-z)var(--tw-skew-x)var(--tw-skew-y)}.animate-caret-blink{animation:1.25s ease-out infinite caret-blink}.animate-pulse{animation:var(--animate-pulse)}.animate-spin{animation:var(--animate-spin)}.cursor-col-resize{cursor:col-resize}.cursor-default{cursor:default}.resize-none{resize:none}.scroll-my-1{scroll-margin-block:calc(var(--spacing)*1)}.grid-cols-\[0_1fr\]{grid-template-columns:0 1fr}.flex-col{flex-direction:column}.flex-col-reverse{flex-direction:column-reverse}.flex-wrap{flex-wrap:wrap}.items-center{align-items:center}.items-start{align-items:flex-start}.justify-between{justify-content:space-between}.justify-center{justify-content:center}.justify-items-start{justify-items:start}.gap-1{gap:calc(var(--spacing)*1)}.gap-1\.5{gap:calc(var(--spacing)*1.5)}.gap-2{gap:calc(var(--spacing)*2)}.gap-4{gap:calc(var(--spacing)*4)}.gap-6{gap:calc(var(--spacing)*6)}:where(.space-y-1>:not(:last-child)){--tw-space-y-reverse:0;margin-block-start:calc(calc(var(--spacing)*1)*var(--tw-space-y-reverse));margin-block-end:calc(calc(var(--spacing)*1)*calc(1 - var(--tw-space-y-reverse)))}:where(.space-y-2>:not(:last-child)){--tw-space-y-reverse:0;margin-block-start:calc(calc(var(--spacing)*2)*var(--tw-space-y-reverse));margin-block-end:calc(calc(var(--spacing)*2)*calc(1 - var(--tw-space-y-reverse)))}:where(.space-y-4>:not(:last-child)){--tw-space-y-reverse:0;margin-block-start:calc(calc(var(--spacing)*4)*var(--tw-space-y-reverse));margin-block-end:calc(calc(var(--spacing)*4)*calc(1 - var(--tw-space-y-reverse)))}:where(.space-x-0\.5>:not(:last-child)){--tw-space-x-reverse:0;margin-inline-start:calc(calc(var(--spacing)*.5)*var(--tw-space-x-reverse));margin-inline-end:calc(calc(var(--spacing)*.5)*calc(1 - var(--tw-space-x-reverse)))}:where(.space-x-2>:not(:last-child)){--tw-space-x-reverse:0;margin-inline-start:calc(calc(var(--spacing)*2)*var(--tw-space-x-reverse));margin-inline-end:calc(calc(var(--spacing)*2)*calc(1 - var(--tw-space-x-reverse)))}:where(.space-x-4>:not(:last-child)){--tw-space-x-reverse:0;margin-inline-start:calc(calc(var(--spacing)*4)*var(--tw-space-x-reverse));margin-inline-end:calc(calc(var(--spacing)*4)*calc(1 - var(--tw-space-x-reverse)))}.gap-y-0\.5{row-gap:calc(var(--spacing)*.5)}.overflow-auto{overflow:auto}.overflow-hidden{overflow:hidden}.overflow-x-auto{overflow-x:auto}.overflow-x-hidden{overflow-x:hidden}.overflow-y-auto{overflow-y:auto}.rounded-\[2px\]{border-radius:2px}.rounded-\[4px\]{border-radius:4px}.rounded-full{border-radius:3.40282e38px}.rounded-lg{border-radius:var(--radius)}.rounded-md{border-radius:calc(var(--radius) - 2px)}.rounded-sm{border-radius:calc(var(--radius) - 4px)}.rounded-xl{border-radius:calc(var(--radius) + 4px)}.rounded-xs{border-radius:var(--radius-xs)}.border{border-style:var(--tw-border-style);border-width:1px}.border-0{border-style:var(--tw-border-style);border-width:0}.border-2{border-style:var(--tw-border-style);border-width:2px}.border-y{border-block-style:var(--tw-border-style);border-block-width:1px}.border-t{border-top-style:var(--tw-border-style);border-top-width:1px}.border-r{border-right-style:var(--tw-border-style);border-right-width:1px}.border-b{border-bottom-style:var(--tw-border-style);border-bottom-width:1px}.border-l{border-left-style:var(--tw-border-style);border-left-width:1px}.border-gray-300{border-color:var(--color-gray-300)}.border-input{border-color:var(--input)}.border-transparent{border-color:#0000}.bg-background{background-color:var(--background)}.bg-background\/80{background-color:color-mix(in oklab,var(--background)80%,transparent)}.bg-black\/80{background-color:color-mix(in oklab,var(--color-black)80%,transparent)}.bg-blue-700{background-color:var(--color-blue-700)}.bg-border{background-color:var(--border)}.bg-card{background-color:var(--card)}.bg-destructive{background-color:var(--destructive)}.bg-foreground{background-color:var(--foreground)}.bg-gray-50{background-color:var(--color-gray-50)}.bg-gray-100{background-color:var(--color-gray-100)}.bg-gray-500{background-color:var(--color-gray-500)}.bg-gray-700{background-color:var(--color-gray-700)}.bg-muted{background-color:var(--muted)}.bg-muted\/50{background-color:color-mix(in oklab,var(--muted)50%,transparent)}.bg-popover{background-color:var(--popover)}.bg-primary{background-color:var(--primary)}.bg-primary\/10{background-color:color-mix(in oklab,var(--primary)10%,transparent)}.bg-secondary{background-color:var(--secondary)}.bg-transparent{background-color:#0000}.bg-white{background-color:var(--color-white)}.fill-black{fill:var(--color-black)}.fill-current{fill:currentColor}.fill-primary{fill:var(--primary)}.stroke-white{stroke:var(--color-white)}.stroke-\[1\.5\]{stroke-width:1.5px}.p-0{padding:calc(var(--spacing)*0)}.p-0\.5{padding:calc(var(--spacing)*.5)}.p-1{padding:calc(var(--spacing)*1)}.p-1\.5{padding:calc(var(--spacing)*1.5)}.p-2{padding:calc(var(--spacing)*2)}.p-3{padding:calc(var(--spacing)*3)}.p-4{padding:calc(var(--spacing)*4)}.p-6{padding:calc(var(--spacing)*6)}.px-1{padding-inline:calc(var(--spacing)*1)}.px-2{padding-inline:calc(var(--spacing)*2)}.px-3{padding-inline:calc(var(--spacing)*3)}.px-4{padding-inline:calc(var(--spacing)*4)}.px-6{padding-inline:calc(var(--spacing)*6)}.py-0{padding-block:calc(var(--spacing)*0)}.py-0\.5{padding-block:calc(var(--spacing)*.5)}.py-1{padding-block:calc(var(--spacing)*1)}.py-1\.5{padding-block:calc(var(--spacing)*1.5)}.py-2{padding-block:calc(var(--spacing)*2)}.py-3{padding-block:calc(var(--spacing)*3)}.py-4{padding-block:calc(var(--spacing)*4)}.py-6{padding-block:calc(var(--spacing)*6)}.py-\[1px\]{padding-block:1px}.pt-0{padding-top:calc(var(--spacing)*0)}.pt-2{padding-top:calc(var(--spacing)*2)}.pr-2{padding-right:calc(var(--spacing)*2)}.pr-8{padding-right:calc(var(--spacing)*8)}.pb-4{padding-bottom:calc(var(--spacing)*4)}.pl-2{padding-left:calc(var(--spacing)*2)}.pl-8{padding-left:calc(var(--spacing)*8)}.text-center{text-align:center}.text-left{text-align:left}.align-middle{vertical-align:middle}.font-mono{font-family:var(--font-mono)}.text-base{font-size:var(--text-base);line-height:var(--tw-leading,var(--text-base--line-height))}.text-lg{font-size:var(--text-lg);line-height:var(--tw-leading,var(--text-lg--line-height))}.text-sm{font-size:var(--text-sm);line-height:var(--tw-leading,var(--text-sm--line-height))}.text-xs{font-size:var(--text-xs);line-height:var(--tw-leading,var(--text-xs--line-height))}.leading-none{--tw-leading:1;line-height:1}.font-medium{--tw-font-weight:var(--font-weight-medium);font-weight:var(--font-weight-medium)}.font-semibold{--tw-font-weight:var(--font-weight-semibold);font-weight:var(--font-weight-semibold)}.tracking-tight{--tw-tracking:var(--tracking-tight);letter-spacing:var(--tracking-tight)}.tracking-widest{--tw-tracking:var(--tracking-widest);letter-spacing:var(--tracking-widest)}.text-balance{text-wrap:balance}.break-all{word-break:break-all}.whitespace-nowrap{white-space:nowrap}.whitespace-pre-wrap{white-space:pre-wrap}.text-black{color:var(--color-black)}.text-card-foreground{color:var(--card-foreground)}.text-current{color:currentColor}.text-destructive-foreground{color:var(--destructive-foreground)}.text-foreground{color:var(--foreground)}.text-gray-500{color:var(--color-gray-500)}.text-gray-700{color:var(--color-gray-700)}.text-gray-900{color:var(--color-gray-900)}.text-muted-foreground{color:var(--muted-foreground)}.text-popover-foreground{color:var(--popover-foreground)}.text-primary{color:var(--primary)}.text-primary-foreground{color:var(--primary-foreground)}.text-red-700{color:var(--color-red-700)}.text-secondary-foreground{color:var(--secondary-foreground)}.text-white{color:var(--color-white)}.underline-offset-4{text-underline-offset:4px}.opacity-0{opacity:0}.opacity-25{opacity:.25}.opacity-50{opacity:.5}.opacity-70{opacity:.7}.opacity-75{opacity:.75}.shadow-lg{--tw-shadow:0 10px 15px -3px var(--tw-shadow-color,#0000001a),0 4px 6px -4px var(--tw-shadow-color,#0000001a);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}.shadow-md{--tw-shadow:0 4px 6px -1px var(--tw-shadow-color,#0000001a),0 2px 4px -2px var(--tw-shadow-color,#0000001a);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}.shadow-sm{--tw-shadow:0 1px 3px 0 var(--tw-shadow-color,#0000001a),0 1px 2px -1px var(--tw-shadow-color,#0000001a);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}.shadow-xs{--tw-shadow:0 1px 2px 0 var(--tw-shadow-color,#0000000d);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}.ring-0{--tw-ring-shadow:var(--tw-ring-inset,)0 0 0 calc(0px + var(--tw-ring-offset-width))var(--tw-ring-color,currentColor);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}.ring-1{--tw-ring-shadow:var(--tw-ring-inset,)0 0 0 calc(1px + var(--tw-ring-offset-width))var(--tw-ring-color,currentColor);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}.ring-gray-500\/10{--tw-ring-color:color-mix(in oklab,var(--color-gray-500)10%,transparent)}.ring-offset-background{--tw-ring-offset-color:var(--background)}.outline-hidden{--tw-outline-style:none;outline-style:none}@media (forced-colors:active){.outline-hidden{outline-offset:2px;outline:2px solid #0000}}.outline{outline-style:var(--tw-outline-style);outline-width:1px}.transition-\[color\,box-shadow\]{transition-property:color,box-shadow;transition-timing-function:var(--tw-ease,var(--default-transition-timing-function));transition-duration:var(--tw-duration,var(--default-transition-duration))}.transition-all{transition-property:all;transition-timing-function:var(--tw-ease,var(--default-transition-timing-function));transition-duration:var(--tw-duration,var(--default-transition-duration))}.transition-colors{transition-property:color,background-color,border-color,outline-color,text-decoration-color,fill,stroke,--tw-gradient-from,--tw-gradient-via,--tw-gradient-to;transition-timing-function:var(--tw-ease,var(--default-transition-timing-function));transition-duration:var(--tw-duration,var(--default-transition-duration))}.transition-opacity{transition-property:opacity;transition-timing-function:var(--tw-ease,var(--default-transition-timing-function));transition-duration:var(--tw-duration,var(--default-transition-duration))}.transition-shadow{transition-property:box-shadow;transition-timing-function:var(--tw-ease,var(--default-transition-timing-function));transition-duration:var(--tw-duration,var(--default-transition-duration))}.transition-transform{transition-property:transform,translate,scale,rotate;transition-timing-function:var(--tw-ease,var(--default-transition-timing-function));transition-duration:var(--tw-duration,var(--default-transition-duration))}.transition-none{transition-property:none}.duration-200{--tw-duration:.2s;transition-duration:.2s}.duration-500{--tw-duration:.5s;transition-duration:.5s}.duration-1000{--tw-duration:1s;transition-duration:1s}.ease-in{--tw-ease:var(--ease-in);transition-timing-function:var(--ease-in)}.animate-in{--tw-enter-opacity:initial;--tw-enter-scale:initial;--tw-enter-rotate:initial;--tw-enter-translate-x:initial;--tw-enter-translate-y:initial;animation-name:enter;animation-duration:.15s}.outline-none{--tw-outline-style:none;outline-style:none}.select-none{-webkit-user-select:none;user-select:none}.duration-200{animation-duration:.2s}.duration-500{animation-duration:.5s}.duration-1000{animation-duration:1s}.ease-in{animation-timing-function:cubic-bezier(.4,0,1,1)}.fade-in-0{--tw-enter-opacity:0}.ring-inset{--tw-ring-inset:inset}.running{animation-play-state:running}.zoom-in-95{--tw-enter-scale:.95}@media (hover:hover){.group-hover\:opacity-100:is(:where(.group):hover *){opacity:1}}.group-data-\[disabled\=true\]\:pointer-events-none:is(:where(.group)[data-disabled=true] *){pointer-events:none}.group-data-\[disabled\=true\]\:opacity-50:is(:where(.group)[data-disabled=true] *){opacity:.5}.group-\[\.toast\]\:bg-muted:is(:where(.group).toast *){background-color:var(--muted)}.group-\[\.toast\]\:bg-primary:is(:where(.group).toast *){background-color:var(--primary)}.group-\[\.toast\]\:text-muted-foreground:is(:where(.group).toast *){color:var(--muted-foreground)}.group-\[\.toast\]\:text-primary-foreground:is(:where(.group).toast *){color:var(--primary-foreground)}.group-\[\.toaster\]\:border-border:is(:where(.group).toaster *){border-color:var(--border)}.group-\[\.toaster\]\:bg-background:is(:where(.group).toaster *){background-color:var(--background)}.group-\[\.toaster\]\:text-foreground:is(:where(.group).toaster *){color:var(--foreground)}.group-\[\.toaster\]\:shadow-lg:is(:where(.group).toaster *){--tw-shadow:0 10px 15px -3px var(--tw-shadow-color,#0000001a),0 4px 6px -4px var(--tw-shadow-color,#0000001a);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}.peer-disabled\:cursor-not-allowed:is(:where(.peer):disabled~*){cursor:not-allowed}.peer-disabled\:opacity-50:is(:where(.peer):disabled~*){opacity:.5}.selection\:bg-primary ::selection{background-color:var(--primary)}.selection\:bg-primary::selection{background-color:var(--primary)}.selection\:text-primary-foreground ::selection{color:var(--primary-foreground)}.selection\:text-primary-foreground::selection{color:var(--primary-foreground)}.file\:inline-flex::file-selector-button{display:inline-flex}.file\:h-7::file-selector-button{height:calc(var(--spacing)*7)}.file\:border-0::file-selector-button{border-style:var(--tw-border-style);border-width:0}.file\:bg-transparent::file-selector-button{background-color:#0000}.file\:text-sm::file-selector-button{font-size:var(--text-sm);line-height:var(--tw-leading,var(--text-sm--line-height))}.file\:font-medium::file-selector-button{--tw-font-weight:var(--font-weight-medium);font-weight:var(--font-weight-medium)}.file\:text-foreground::file-selector-button{color:var(--foreground)}.placeholder\:text-muted-foreground::placeholder{color:var(--muted-foreground)}.before\:absolute:before{content:var(--tw-content);position:absolute}.before\:top-\(--negative-terminal-size\):before{content:var(--tw-content);top:var(--negative-terminal-size)}.before\:top-\(--offset-terminal\):before{content:var(--tw-content);top:var(--offset-terminal)}.before\:right-\(--offset-terminal\):before{content:var(--tw-content);right:var(--offset-terminal)}.before\:bottom-\(--offset-terminal\):before{content:var(--tw-content);bottom:var(--offset-terminal)}.before\:left-\(--negative-terminal-size\):before{content:var(--tw-content);left:var(--negative-terminal-size)}.before\:left-\(--offset-terminal\):before{content:var(--tw-content);left:var(--offset-terminal)}.before\:h-\(--terminal-size\):before{content:var(--tw-content);height:var(--terminal-size)}.before\:w-\(--terminal-size\):before{content:var(--tw-content);width:var(--terminal-size)}.before\:rounded-full:before{content:var(--tw-content);border-radius:3.40282e38px}.before\:border-\(length\:--line-thickness\):before{content:var(--tw-content);border-style:var(--tw-border-style);border-width:var(--line-thickness)}.before\:border-solid:before{content:var(--tw-content);--tw-border-style:solid;border-style:solid}.before\:border-blue-700:before{content:var(--tw-content);border-color:var(--color-blue-700)}.before\:content-\[\'\'\]:before{--tw-content:"";content:var(--tw-content)}.first\:rounded-l-md:first-child{border-top-left-radius:calc(var(--radius) - 2px);border-bottom-left-radius:calc(var(--radius) - 2px)}.first\:border-l:first-child{border-left-style:var(--tw-border-style);border-left-width:1px}.last\:rounded-r-md:last-child{border-top-right-radius:calc(var(--radius) - 2px);border-bottom-right-radius:calc(var(--radius) - 2px)}.last\:border-b-0:last-child{border-bottom-style:var(--tw-border-style);border-bottom-width:0}@media (hover:hover){.hover\:bg-accent:hover{background-color:var(--accent)}.hover\:bg-background:hover{background-color:var(--background)}.hover\:bg-destructive\/90:hover{background-color:color-mix(in oklab,var(--destructive)90%,transparent)}.hover\:bg-gray-500:hover{background-color:var(--color-gray-500)}.hover\:bg-gray-800:hover{background-color:var(--color-gray-800)}.hover\:bg-muted\/50:hover{background-color:color-mix(in oklab,var(--muted)50%,transparent)}.hover\:bg-primary\/90:hover{background-color:color-mix(in oklab,var(--primary)90%,transparent)}.hover\:bg-secondary\/80:hover{background-color:color-mix(in oklab,var(--secondary)80%,transparent)}.hover\:text-accent-foreground:hover{color:var(--accent-foreground)}.hover\:text-gray-400:hover{color:var(--color-gray-400)}.hover\:underline:hover{text-decoration-line:underline}.hover\:opacity-100:hover{opacity:1}}.focus\:bg-accent:focus{background-color:var(--accent)}.focus\:bg-white:focus{background-color:var(--color-white)}.focus\:text-accent-foreground:focus{color:var(--accent-foreground)}.focus\:ring-2:focus{--tw-ring-shadow:var(--tw-ring-inset,)0 0 0 calc(2px + var(--tw-ring-offset-width))var(--tw-ring-color,currentColor);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}.focus\:ring-blue-300:focus{--tw-ring-color:var(--color-blue-300)}.focus\:ring-ring:focus{--tw-ring-color:var(--ring)}.focus\:ring-offset-2:focus{--tw-ring-offset-width:2px;--tw-ring-offset-shadow:var(--tw-ring-inset,)0 0 0 var(--tw-ring-offset-width)var(--tw-ring-offset-color)}.focus\:outline-hidden:focus{--tw-outline-style:none;outline-style:none}@media (forced-colors:active){.focus\:outline-hidden:focus{outline-offset:2px;outline:2px solid #0000}}.focus\:ring-inset:focus{--tw-ring-inset:inset}.focus-visible\:border-ring:focus-visible{border-color:var(--ring)}.focus-visible\:ring-\[3px\]:focus-visible{--tw-ring-shadow:var(--tw-ring-inset,)0 0 0 calc(3px + var(--tw-ring-offset-width))var(--tw-ring-color,currentColor);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}.focus-visible\:ring-destructive\/20:focus-visible{--tw-ring-color:color-mix(in oklab,var(--destructive)20%,transparent)}.focus-visible\:ring-ring\/50:focus-visible{--tw-ring-color:color-mix(in oklab,var(--ring)50%,transparent)}.focus-visible\:outline-1:focus-visible{outline-style:var(--tw-outline-style);outline-width:1px}.focus-visible\:outline-ring:focus-visible{outline-color:var(--ring)}.disabled\:pointer-events-none:disabled{pointer-events:none}.disabled\:cursor-not-allowed:disabled{cursor:not-allowed}.disabled\:opacity-50:disabled,.has-disabled\:opacity-50:has(:disabled){opacity:.5}.has-\[\>svg\]\:grid-cols-\[calc\(var\(--spacing\)\*4\)_1fr\]:has(>svg){grid-template-columns:calc(var(--spacing)*4)1fr}.has-\[\>svg\]\:gap-x-3:has(>svg){column-gap:calc(var(--spacing)*3)}.has-\[\>svg\]\:px-2\.5:has(>svg){padding-inline:calc(var(--spacing)*2.5)}.has-\[\>svg\]\:px-3:has(>svg){padding-inline:calc(var(--spacing)*3)}.has-\[\>svg\]\:px-4:has(>svg){padding-inline:calc(var(--spacing)*4)}.aria-invalid\:border-destructive[aria-invalid=true]{border-color:var(--destructive)}.aria-invalid\:ring-destructive\/20[aria-invalid=true]{--tw-ring-color:color-mix(in oklab,var(--destructive)20%,transparent)}.data-\[active\=true\]\:z-10[data-active=true]{z-index:10}.data-\[active\=true\]\:border-ring[data-active=true]{border-color:var(--ring)}.data-\[active\=true\]\:ring-\[3px\][data-active=true]{--tw-ring-shadow:var(--tw-ring-inset,)0 0 0 calc(3px + var(--tw-ring-offset-width))var(--tw-ring-color,currentColor);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}.data-\[active\=true\]\:ring-ring\/50[data-active=true]{--tw-ring-color:color-mix(in oklab,var(--ring)50%,transparent)}.data-\[active\=true\]\:aria-invalid\:border-destructive[data-active=true][aria-invalid=true]{border-color:var(--destructive)}.data-\[active\=true\]\:aria-invalid\:ring-destructive\/20[data-active=true][aria-invalid=true]{--tw-ring-color:color-mix(in oklab,var(--destructive)20%,transparent)}.data-\[disabled\]\:pointer-events-none[data-disabled]{pointer-events:none}.data-\[disabled\]\:opacity-50[data-disabled]{opacity:.5}.data-\[error\=true\]\:text-destructive-foreground[data-error=true]{color:var(--destructive-foreground)}.data-\[inset\]\:pl-8[data-inset]{padding-left:calc(var(--spacing)*8)}.data-\[orientation\=horizontal\]\:h-px[data-orientation=horizontal]{height:1px}.data-\[orientation\=horizontal\]\:w-full[data-orientation=horizontal]{width:100%}.data-\[orientation\=vertical\]\:h-full[data-orientation=vertical]{height:100%}.data-\[orientation\=vertical\]\:w-px[data-orientation=vertical]{width:1px}.data-\[placeholder\]\:text-muted-foreground[data-placeholder]{color:var(--muted-foreground)}.data-\[side\=bottom\]\:translate-y-1[data-side=bottom]{--tw-translate-y:calc(var(--spacing)*1);translate:var(--tw-translate-x)var(--tw-translate-y)}.data-\[side\=bottom\]\:slide-in-from-top-2[data-side=bottom]{--tw-enter-translate-y:-8px}.data-\[side\=left\]\:-translate-x-1[data-side=left]{--tw-translate-x:calc(var(--spacing)*-1);translate:var(--tw-translate-x)var(--tw-translate-y)}.data-\[side\=left\]\:slide-in-from-right-2[data-side=left]{--tw-enter-translate-x:8px}.data-\[side\=right\]\:translate-x-1[data-side=right]{--tw-translate-x:calc(var(--spacing)*1);translate:var(--tw-translate-x)var(--tw-translate-y)}.data-\[side\=right\]\:slide-in-from-left-2[data-side=right]{--tw-enter-translate-x:-8px}.data-\[side\=top\]\:-translate-y-1[data-side=top]{--tw-translate-y:calc(var(--spacing)*-1);translate:var(--tw-translate-x)var(--tw-translate-y)}.data-\[side\=top\]\:slide-in-from-bottom-2[data-side=top]{--tw-enter-translate-y:8px}:is(.\*\:data-\[slot\=alert-description\]\:text-destructive-foreground\/80>*)[data-slot=alert-description]{color:color-mix(in oklab,var(--destructive-foreground)80%,transparent)}:is(.\*\:data-\[slot\=select-value\]\:line-clamp-1>*)[data-slot=select-value]{-webkit-line-clamp:1;-webkit-box-orient:vertical;display:-webkit-box;overflow:hidden}:is(.\*\:data-\[slot\=select-value\]\:flex>*)[data-slot=select-value]{display:flex}:is(.\*\:data-\[slot\=select-value\]\:items-center>*)[data-slot=select-value]{align-items:center}:is(.\*\:data-\[slot\=select-value\]\:gap-2>*)[data-slot=select-value]{gap:calc(var(--spacing)*2)}.data-\[state\=active\]\:bg-background[data-state=active]{background-color:var(--background)}.data-\[state\=active\]\:text-foreground[data-state=active]{color:var(--foreground)}.data-\[state\=active\]\:shadow-sm[data-state=active]{--tw-shadow:0 1px 3px 0 var(--tw-shadow-color,#0000001a),0 1px 2px -1px var(--tw-shadow-color,#0000001a);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}.data-\[state\=checked\]\:translate-x-4[data-state=checked]{--tw-translate-x:calc(var(--spacing)*4);translate:var(--tw-translate-x)var(--tw-translate-y)}.data-\[state\=checked\]\:border-primary[data-state=checked]{border-color:var(--primary)}.data-\[state\=checked\]\:bg-primary[data-state=checked]{background-color:var(--primary)}.data-\[state\=checked\]\:text-primary-foreground[data-state=checked]{color:var(--primary-foreground)}.data-\[state\=closed\]\:animate-accordion-up[data-state=closed]{animation:.2s ease-out accordion-up}.data-\[state\=closed\]\:animate-out[data-state=closed]{--tw-exit-opacity:initial;--tw-exit-scale:initial;--tw-exit-rotate:initial;--tw-exit-translate-x:initial;--tw-exit-translate-y:initial;animation-name:exit;animation-duration:.15s}.data-\[state\=closed\]\:fade-out-0[data-state=closed]{--tw-exit-opacity:0}.data-\[state\=closed\]\:zoom-out-95[data-state=closed]{--tw-exit-scale:.95}.data-\[state\=open\]\:animate-accordion-down[data-state=open]{animation:.2s ease-out accordion-down}.data-\[state\=open\]\:bg-accent[data-state=open]{background-color:var(--accent)}.data-\[state\=open\]\:text-accent-foreground[data-state=open]{color:var(--accent-foreground)}.data-\[state\=open\]\:text-muted-foreground[data-state=open]{color:var(--muted-foreground)}.data-\[state\=open\]\:animate-in[data-state=open]{--tw-enter-opacity:initial;--tw-enter-scale:initial;--tw-enter-rotate:initial;--tw-enter-translate-x:initial;--tw-enter-translate-y:initial;animation-name:enter;animation-duration:.15s}.data-\[state\=open\]\:fade-in-0[data-state=open]{--tw-enter-opacity:0}.data-\[state\=open\]\:zoom-in-95[data-state=open]{--tw-enter-scale:.95}.data-\[state\=selected\]\:bg-muted[data-state=selected]{background-color:var(--muted)}.data-\[state\=unchecked\]\:translate-x-0[data-state=unchecked]{--tw-translate-x:calc(var(--spacing)*0);translate:var(--tw-translate-x)var(--tw-translate-y)}.data-\[state\=unchecked\]\:bg-input[data-state=unchecked]{background-color:var(--input)}.data-\[variant\=destructive\]\:text-destructive-foreground[data-variant=destructive]{color:var(--destructive-foreground)}.data-\[variant\=destructive\]\:focus\:bg-destructive\/10[data-variant=destructive]:focus{background-color:color-mix(in oklab,var(--destructive)10%,transparent)}.data-\[variant\=destructive\]\:focus\:text-destructive-foreground[data-variant=destructive]:focus{color:var(--destructive-foreground)}@media (width>=40rem){.sm\:max-w-lg{max-width:var(--container-lg)}.sm\:flex-row{flex-direction:row}.sm\:justify-end{justify-content:flex-end}.sm\:text-left{text-align:left}}@media (width>=48rem){.md\:text-sm{font-size:var(--text-sm);line-height:var(--tw-leading,var(--text-sm--line-height))}}.dark\:focus-visible\:ring-destructive\/40:is(.dark *):focus-visible,.dark\:aria-invalid\:ring-destructive\/40:is(.dark *)[aria-invalid=true],.dark\:data-\[active\=true\]\:aria-invalid\:ring-destructive\/40:is(.dark *)[data-active=true][aria-invalid=true]{--tw-ring-color:color-mix(in oklab,var(--destructive)40%,transparent)}.dark\:data-\[variant\=destructive\]\:focus\:bg-destructive\/40:is(.dark *)[data-variant=destructive]:focus{background-color:color-mix(in oklab,var(--destructive)40%,transparent)}.\[\&_p\]\:leading-relaxed p{--tw-leading:var(--leading-relaxed);line-height:var(--leading-relaxed)}.\[\&_svg\]\:pointer-events-none svg{pointer-events:none}.\[\&_svg\]\:shrink-0 svg{flex-shrink:0}.\[\&_svg\:not\(\[class\*\=\'size-\'\]\)\]\:size-4 svg:not([class*=size-]){width:calc(var(--spacing)*4);height:calc(var(--spacing)*4)}.\[\&_svg\:not\(\[class\*\=\'text-\'\]\)\]\:text-muted-foreground svg:not([class*=text-]){color:var(--muted-foreground)}.\[\&_tr\]\:border-b tr{border-bottom-style:var(--tw-border-style);border-bottom-width:1px}.\[\&_tr\:last-child\]\:border-0 tr:last-child{border-style:var(--tw-border-style);border-width:0}.\[\&\:has\(\[role\=checkbox\]\)\]\:pr-0:has([role=checkbox]){padding-right:calc(var(--spacing)*0)}:is(.\*\:\[span\]\:last\:flex>*):is(span):last-child{display:flex}:is(.\*\:\[span\]\:last\:items-center>*):is(span):last-child{align-items:center}:is(.\*\:\[span\]\:last\:gap-2>*):is(span):last-child{gap:calc(var(--spacing)*2)}:is(.data-\[variant\=destructive\]\:\*\:\[svg\]\:\!text-destructive-foreground[data-variant=destructive]>*):is(svg){color:var(--destructive-foreground)!important}.\[\&\>\[role\=checkbox\]\]\:translate-y-\[2px\]>[role=checkbox]{--tw-translate-y:2px;translate:var(--tw-translate-x)var(--tw-translate-y)}.\[\&\>svg\]\:pointer-events-none>svg{pointer-events:none}.\[\&\>svg\]\:size-3>svg{width:calc(var(--spacing)*3);height:calc(var(--spacing)*3)}.\[\&\>svg\]\:size-4>svg{width:calc(var(--spacing)*4);height:calc(var(--spacing)*4)}.\[\&\>svg\]\:translate-y-0\.5>svg{--tw-translate-y:calc(var(--spacing)*.5);translate:var(--tw-translate-x)var(--tw-translate-y)}.\[\&\>svg\]\:text-current>svg{color:currentColor}.\[\&\>tr\]\:last\:border-b-0>tr:last-child{border-bottom-style:var(--tw-border-style);border-bottom-width:0}.\[\&\[data-state\=open\]\>svg\]\:rotate-180[data-state=open]>svg{rotate:180deg}@media (hover:hover){a.\[a\&\]\:hover\:bg-accent:hover{background-color:var(--accent)}a.\[a\&\]\:hover\:bg-destructive\/90:hover{background-color:color-mix(in oklab,var(--destructive)90%,transparent)}a.\[a\&\]\:hover\:bg-primary\/90:hover{background-color:color-mix(in oklab,var(--primary)90%,transparent)}a.\[a\&\]\:hover\:bg-secondary\/90:hover{background-color:color-mix(in oklab,var(--secondary)90%,transparent)}a.\[a\&\]\:hover\:text-accent-foreground:hover{color:var(--accent-foreground)}}}:host{--background:oklch(1 0 0);--foreground:oklch(.145 0 0);--card:oklch(1 0 0);--card-foreground:oklch(.145 0 0);--popover:oklch(1 0 0);--popover-foreground:oklch(.145 0 0);--primary:oklch(.205 0 0);--primary-foreground:oklch(.985 0 0);--secondary:oklch(.97 0 0);--secondary-foreground:oklch(.205 0 0);--muted:oklch(.97 0 0);--muted-foreground:oklch(.556 0 0);--accent:oklch(.97 0 0);--accent-foreground:oklch(.205 0 0);--destructive:oklch(.577 .245 27.325);--destructive-foreground:oklch(.577 .245 27.325);--border:oklch(.922 0 0);--input:oklch(.922 0 0);--ring:oklch(.708 0 0);--chart-1:oklch(.646 .222 41.116);--chart-2:oklch(.6 .118 184.704);--chart-3:oklch(.398 .07 227.392);--chart-4:oklch(.828 .189 84.429);--chart-5:oklch(.769 .188 70.08);--radius:10px;--sidebar:oklch(.985 0 0);--sidebar-foreground:oklch(.145 0 0);--sidebar-primary:oklch(.205 0 0);--sidebar-primary-foreground:oklch(.985 0 0);--sidebar-accent:oklch(.97 0 0);--sidebar-accent-foreground:oklch(.205 0 0);--sidebar-border:oklch(.922 0 0);--sidebar-ring:oklch(.708 0 0)}.dark{--background:oklch(.145 0 0);--foreground:oklch(.985 0 0);--card:oklch(.145 0 0);--card-foreground:oklch(.985 0 0);--popover:oklch(.145 0 0);--popover-foreground:oklch(.985 0 0);--primary:oklch(.985 0 0);--primary-foreground:oklch(.205 0 0);--secondary:oklch(.269 0 0);--secondary-foreground:oklch(.985 0 0);--muted:oklch(.269 0 0);--muted-foreground:oklch(.708 0 0);--accent:oklch(.269 0 0);--accent-foreground:oklch(.985 0 0);--destructive:oklch(.396 .141 25.723);--destructive-foreground:oklch(.637 .237 25.331);--border:oklch(.269 0 0);--input:oklch(.269 0 0);--ring:oklch(.556 0 0);--chart-1:oklch(.488 .243 264.376);--chart-2:oklch(.696 .17 162.48);--chart-3:oklch(.769 .188 70.08);--chart-4:oklch(.627 .265 303.9);--chart-5:oklch(.645 .246 16.439);--sidebar:oklch(.205 0 0);--sidebar-foreground:oklch(.985 0 0);--sidebar-primary:oklch(.488 .243 264.376);--sidebar-primary-foreground:oklch(.985 0 0);--sidebar-accent:oklch(.269 0 0);--sidebar-accent-foreground:oklch(.985 0 0);--sidebar-border:oklch(.269 0 0);--sidebar-ring:oklch(.439 0 0)}@keyframes enter{0%{opacity:var(--tw-enter-opacity,1);transform:translate3d(var(--tw-enter-translate-x,0),var(--tw-enter-translate-y,0),0)scale3d(var(--tw-enter-scale,1),var(--tw-enter-scale,1),var(--tw-enter-scale,1))rotate(var(--tw-enter-rotate,0))}}@keyframes exit{to{opacity:var(--tw-exit-opacity,1);transform:translate3d(var(--tw-exit-translate-x,0),var(--tw-exit-translate-y,0),0)scale3d(var(--tw-exit-scale,1),var(--tw-exit-scale,1),var(--tw-exit-scale,1))rotate(var(--tw-exit-rotate,0))}}@property --tw-translate-x{syntax:"*";inherits:false;initial-value:0}@property --tw-translate-y{syntax:"*";inherits:false;initial-value:0}@property --tw-translate-z{syntax:"*";inherits:false;initial-value:0}@property --tw-rotate-x{syntax:"*";inherits:false;initial-value:rotateX(0)}@property --tw-rotate-y{syntax:"*";inherits:false;initial-value:rotateY(0)}@property --tw-rotate-z{syntax:"*";inherits:false;initial-value:rotateZ(0)}@property --tw-skew-x{syntax:"*";inherits:false;initial-value:skewX(0)}@property --tw-skew-y{syntax:"*";inherits:false;initial-value:skewY(0)}@property --tw-space-y-reverse{syntax:"*";inherits:false;initial-value:0}@property --tw-space-x-reverse{syntax:"*";inherits:false;initial-value:0}@property --tw-border-style{syntax:"*";inherits:false;initial-value:solid}@property --tw-leading{syntax:"*";inherits:false}@property --tw-font-weight{syntax:"*";inherits:false}@property --tw-tracking{syntax:"*";inherits:false}@property --tw-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}@property --tw-shadow-color{syntax:"*";inherits:false}@property --tw-inset-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}@property --tw-inset-shadow-color{syntax:"*";inherits:false}@property --tw-ring-color{syntax:"*";inherits:false}@property --tw-ring-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}@property --tw-inset-ring-color{syntax:"*";inherits:false}@property --tw-inset-ring-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}@property --tw-ring-inset{syntax:"*";inherits:false}@property --tw-ring-offset-width{syntax:"<length>";inherits:false;initial-value:0}@property --tw-ring-offset-color{syntax:"*";inherits:false;initial-value:#fff}@property --tw-ring-offset-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}@property --tw-outline-style{syntax:"*";inherits:false;initial-value:solid}@property --tw-duration{syntax:"*";inherits:false}@property --tw-ease{syntax:"*";inherits:false}@property --tw-content{syntax:"*";inherits:false;initial-value:""}@keyframes spin{to{transform:rotate(360deg)}}@keyframes pulse{50%{opacity:.5}}@keyframes accordion-down{0%{height:0}to{height:var(--radix-accordion-content-height)}}@keyframes accordion-up{0%{height:var(--radix-accordion-content-height)}to{height:0}}@keyframes caret-blink{0%,70%,to{opacity:1}20%,50%{opacity:0}}</style></head><body><div></div></body></html></template></browser-mcp-container><span data-radix-focus-guard="" tabindex="0" style="outline: none; opacity: 0; position: fixed; pointer-events: none;"></span></body></html>

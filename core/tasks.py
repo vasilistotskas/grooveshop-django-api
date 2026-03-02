@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from celery import Task
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import management
@@ -18,13 +17,16 @@ from django.utils.translation import gettext_lazy as _
 
 from cart.models import Cart
 from core import celery_app
+from tenant.celery import TenantTask
 
 User = get_user_model()
 
 logger = logging.getLogger(__name__)
 
 
-class MonitoredTask(Task):
+class MonitoredTask(TenantTask):
+    """Base task with tenant context propagation and monitoring."""
+
     def on_success(self, retval, task_id, args, kwargs):
         logger.info(
             f"Task {self.name} completed successfully. Task ID: {task_id}"

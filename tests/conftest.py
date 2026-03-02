@@ -31,6 +31,22 @@ settings.DATABASES["default"]["ATOMIC_REQUESTS"] = False
 settings.DATABASES["default"]["AUTOCOMMIT"] = True
 settings.DATABASES["default"]["CONN_MAX_AGE"] = 0
 
+# Disable multi-tenancy for tests — all tables in public schema.
+# Multi-tenancy schema isolation is tested separately; unit/integration
+# tests don't need per-schema separation.
+settings.DATABASE_ROUTERS = []
+
+# Remove TenantMainMiddleware so tests don't need a TenantDomain for "testserver"
+settings.MIDDLEWARE = [
+    m
+    for m in settings.MIDDLEWARE
+    if m != "django_tenants.middleware.main.TenantMainMiddleware"
+]
+
+# Use ROOT_URLCONF directly (not PUBLIC_SCHEMA_URLCONF) for tests
+if hasattr(settings, "PUBLIC_SCHEMA_URLCONF"):
+    del settings.PUBLIC_SCHEMA_URLCONF
+
 settings.CELERY_TASK_ALWAYS_EAGER = True
 settings.CELERY_TASK_EAGER_PROPAGATES = True
 settings.DEBUG = False

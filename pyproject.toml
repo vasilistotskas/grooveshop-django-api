@@ -50,7 +50,7 @@ dependencies = [
   "phonenumbers==9.0.25",
   "pillow==12.1.1",
   "psycopg[binary,pool] == 3.3.3",
-  "python-dotenv==1.2.1",
+  "python-dotenv==1.2.2",
   "qrcode==8.2",
   "urllib3==2.6.3",
   "uvicorn==0.41.0",
@@ -60,6 +60,7 @@ dependencies = [
   "twisted[http2,tls]==25.5.0",
   "dj-stripe==2.10.3",
   "defusedxml>=0.7.1",
+  "django-tenants>=3.7.0,<4.0.0",
 ]
 
 [project.urls]

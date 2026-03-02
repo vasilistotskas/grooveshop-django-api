@@ -112,6 +112,18 @@ class IndexMixin(models.Model):
         search_cutoff_ms: int | None = None
 
     @classmethod
+    def get_meili_index_name(cls) -> str:
+        """Return tenant-prefixed Meilisearch index name."""
+        from django.db import connection
+
+        meta = cls.MeiliMeta
+        base_name = getattr(meta, "index_name", None) or cls.__name__
+        schema = getattr(connection, "schema_name", "public")
+        if schema and schema != "public":
+            return f"{schema}__{base_name}"
+        return base_name
+
+    @classmethod
     def get_meili_settings(cls) -> MeiliIndexSettings:
         """Extract MeiliIndexSettings from the model's MeiliMeta configuration."""
         meta = cls.MeiliMeta
@@ -159,7 +171,7 @@ class IndexMixin(models.Model):
     @classmethod
     def update_meili_settings(cls) -> None:
         """Update Meilisearch index settings from the model's MeiliMeta configuration."""
-        index_name = cls._meilisearch["index_name"]
+        index_name = cls.get_meili_index_name()
         index_settings = cls.get_meili_settings()
 
         _client.with_settings(

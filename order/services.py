@@ -550,24 +550,24 @@ class OrderService:
         loyalty_points_to_redeem: int | None = None,
     ) -> Order:
         """
-        Create order from cart for offline payment methods (order-first flow).
+        Create order from cart using the order-first flow.
 
-        This method implements the order-first approach for offline payment methods
-        like Cash on Delivery and Bank Transfer. It performs the following steps:
+        Used for offline payments (COD, Bank Transfer) and redirect-based
+        online providers (Viva Wallet). It performs the following steps:
         1. Validates cart items still exist and prices match
         2. Validates shipping address completeness
         3. Gets or creates stock reservations for cart session
         4. Creates Order with status=PENDING, payment_status=PENDING
         5. Creates OrderItems from CartItems
         6. Converts stock reservations to decrements via StockManager
-        7. Sets payment_id = f"offline_{order.uuid}"
+        7. Sets payment_id for offline payments (skipped for online providers)
         8. Clears cart
         9. Returns order in PENDING status
 
         Args:
             cart: Cart object containing items to order
             shipping_address: Dictionary with shipping address fields
-            pay_way: PayWay object for payment method (must have is_online_payment=False)
+            pay_way: PayWay object for payment method
             user: Optional UserAccount (None for guest orders)
 
         Returns:
@@ -727,9 +727,12 @@ class OrderService:
             # Create the order
             order = Order.objects.create(**order_data)
 
-            # Set payment_id for offline payments
-            order.payment_id = f"offline_{order.uuid}"
-            order.save(update_fields=["payment_id"])
+            # Set payment_id for offline payments only.
+            # Online redirect providers (Viva Wallet) get payment_id
+            # from the webhook after payment completes.
+            if not pay_way.is_online_payment:
+                order.payment_id = f"offline_{order.uuid}"
+                order.save(update_fields=["payment_id"])
 
             # Initialize metadata with cart snapshot
             order.metadata = {
@@ -819,7 +822,7 @@ class OrderService:
                             product_id=order_item.product.id,
                             quantity=order_item.quantity,
                             order_id=order.id,
-                            reason=f"Order {order.id} created from cart {cart.uuid} (offline payment)",
+                            reason=f"Order {order.id} created from cart {cart.uuid}",
                         )
                         logger.info(
                             "Decremented stock for product %s by %s units",
@@ -901,9 +904,10 @@ class OrderService:
 
             # Step 8: Return order in PENDING status
             logger.info(
-                "Order %s created successfully from cart %s (offline payment)",
+                "Order %s created successfully from cart %s (order-first, %s)",
                 order.id,
                 cart.uuid,
+                pay_way.provider_code or "offline",
             )
 
             return order
@@ -916,7 +920,7 @@ class OrderService:
             raise
         except Exception as e:
             logger.error(
-                "Unexpected error creating order from cart (offline): %s",
+                "Unexpected error creating order from cart (order-first): %s",
                 e,
                 exc_info=True,
             )

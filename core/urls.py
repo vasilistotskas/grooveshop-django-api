@@ -23,7 +23,7 @@ from core.views import (
     robots_txt,
     upload_image,
 )
-from order.views.viva_webhook import viva_wallet_webhook
+from order.views.viva_webhook import resolve_viva_order_code, viva_wallet_webhook
 
 import core.filters.camel_case_filters  # noqa
 import core.filters.camel_case_ordering  # noqa
@@ -38,6 +38,11 @@ urlpatterns = [
         "viva-wallet/webhook/",
         viva_wallet_webhook,
         name="viva-wallet-webhook",
+    ),
+    path(
+        "viva-wallet/resolve-order",
+        resolve_viva_order_code,
+        name="viva-wallet-resolve-order",
     ),
 ]
 

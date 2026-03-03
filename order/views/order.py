@@ -530,9 +530,11 @@ class OrderViewSet(BaseModelViewSet):
         self, request, pay_way: PayWay
     ) -> Response:
         """
-        Create order with order-first flow (offline payments).
+        Create order with order-first flow.
 
-        No payment_intent_id required. Order created with PENDING status.
+        Used for offline payments and redirect-based online providers
+        (e.g. Viva Wallet). No payment_intent_id required.
+        Order created with PENDING status.
         """
 
         # Step 1: Get cart from request
@@ -574,8 +576,9 @@ class OrderViewSet(BaseModelViewSet):
         )
 
         logger.info(
-            "Order %s created successfully (offline payment) for user %s",
+            "Order %s created successfully (order-first, %s) for user %s",
             order.id,
+            pay_way.provider_code or "offline",
             user.id if user else "guest",
         )
 

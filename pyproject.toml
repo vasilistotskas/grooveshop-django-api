@@ -50,7 +50,7 @@ dependencies = [
   "phonenumbers==9.0.25",
   "pillow==12.1.1",
   "psycopg[binary,pool] == 3.3.3",
-  "python-dotenv==1.2.1",
+  "python-dotenv==1.2.2",
   "qrcode==8.2",
   "urllib3==2.6.3",
   "uvicorn==0.41.0",
@@ -96,7 +96,7 @@ dev = [
     "psutil==7.2.2",
     "msgpack==1.1.2",
     "hypothesis==6.151.9",
-    "ty==0.0.19",
+    "ty==0.0.20",
 ]
 
 # ─────────────────────────────────────────────────────────

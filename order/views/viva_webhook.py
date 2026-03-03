@@ -11,9 +11,31 @@ from django.views.decorators.http import require_http_methods
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models.history import OrderHistory
 from order.models.order import Order
-from order.services import OrderService
 
 logger = logging.getLogger(__name__)
+
+
+@require_http_methods(["GET"])
+def resolve_viva_order_code(request):
+    """Resolve a Viva Wallet order code to an order UUID.
+
+    Used by the frontend to redirect from Viva's payment page
+    to the order success page.
+    """
+    order_code = request.GET.get("order_code", "")
+    if not order_code:
+        return JsonResponse({"error": "order_code required"}, status=400)
+
+    order = (
+        Order.objects.filter(metadata__viva_order_code=str(order_code))
+        .values("uuid")
+        .first()
+    )
+
+    if not order:
+        return JsonResponse({"error": "not found"}, status=404)
+
+    return JsonResponse({"uuid": str(order["uuid"])})
 
 
 @csrf_exempt
@@ -113,12 +135,9 @@ def _handle_webhook_event(request):
         logger.warning("No OrderCode in Viva Wallet webhook")
         return JsonResponse({"status": "ok"})
 
-    order = Order.objects.filter(metadata__viva_order_code=order_code).first()
-
-    if not order:
-        order = Order.objects.filter(
-            metadata__viva_order_code=str(order_code)
-        ).first()
+    order = Order.objects.filter(
+        metadata__viva_order_code=str(order_code)
+    ).first()
 
     if not order:
         logger.error(
@@ -160,6 +179,8 @@ def _handle_webhook_event(request):
 
 
 def _handle_payment_created(order, event_data, transaction_id):
+    from django.utils import timezone
+
     logger.info(
         "Viva Wallet payment created for order %s",
         order.id,
@@ -174,17 +195,28 @@ def _handle_payment_created(order, event_data, transaction_id):
                 verified_status,
             )
 
+    # Set all fields at once to avoid multiple DB writes
     order.metadata["viva_transaction_id"] = transaction_id
     order.payment_id = transaction_id
-    order.mark_as_paid(
-        payment_id=transaction_id,
-        payment_method="viva_wallet",
-    )
+    order.payment_status = PaymentStatus.COMPLETED
+    order.payment_method = "viva_wallet"
+    if not order.paid_amount or order.paid_amount.amount == 0:
+        order.paid_amount = order.calculate_order_total_amount()
+
+    update_fields = [
+        "metadata",
+        "payment_id",
+        "payment_status",
+        "payment_method",
+        "paid_amount",
+    ]
 
     if order.status == OrderStatus.PENDING:
-        OrderService.update_order_status(order, OrderStatus.PROCESSING)
+        order.status = OrderStatus.PROCESSING
+        order.status_updated_at = timezone.now()
+        update_fields += ["status", "status_updated_at"]
 
-    order.save(update_fields=["metadata"])
+    order.save(update_fields=update_fields)
 
     OrderHistory.log_payment_update(
         order=order,

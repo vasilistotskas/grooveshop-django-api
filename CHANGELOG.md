@@ -3,6 +3,21 @@
 
 
 
+## v1.87.0 (2026-03-06)
+
+### Features
+
+* feat: Bump Versions, type fixes ([`74d339d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/74d339d51bf3121d2f844aca9dede0a3666c0fcc))
+
+* feat(order): add viva wallet payment support
+
+Extend order-first flow to handle redirect-based online providers
+(Viva Wallet) alongside offline payments. Add resolve-order endpoint
+for frontend redirect after payment. Refactor webhook handler to
+batch field updates in a single save. Bump python-dotenv and ty.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com> ([`50d797d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/50d797d98600dcf3f92cc8b20ae28cb317886591))
+
 ## v1.86.2 (2026-03-02)
 
 ### Bug fixes

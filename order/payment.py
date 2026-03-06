@@ -375,7 +375,7 @@ class StripePaymentProvider(PaymentProvider):
                 },
             )
 
-            refund_params = {"payment_intent": payment_id}
+            refund_params: dict[str, str | int] = {"payment_intent": payment_id}
             if amount:
                 refund_params["amount"] = int(amount.amount * 100)
             stripe_refund = stripe.Refund.create(**refund_params)

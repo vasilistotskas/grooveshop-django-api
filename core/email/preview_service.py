@@ -132,7 +132,9 @@ class EmailTemplatePreviewService:
             ),
         }
 
-        generator = generator_map.get(generator_name)
+        generator = (
+            generator_map.get(generator_name) if generator_name else None
+        )
         if generator:
             result = generator()
             # Handle both tuple and single dict returns

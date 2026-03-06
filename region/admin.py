@@ -311,7 +311,8 @@ class CountryGroupFilter(DropdownFilter):
                 "WS",
             ],
         }
-        codes = continent_mappings.get(self.value())
+        value = self.value()
+        codes = continent_mappings.get(value) if value else None
         if codes:
             return queryset.filter(country__alpha_2__in=codes)
         return queryset

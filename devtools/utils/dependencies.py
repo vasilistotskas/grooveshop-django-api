@@ -125,7 +125,9 @@ class DependencyAnalyzer:
 
     def __init__(self):
         self.nodes: dict[str, DependencyNode] = {}
-        self.model_to_factory: dict[type[models.Model], type[F]] = {}
+        self.model_to_factory: dict[
+            type[models.Model], type[factory.django.DjangoModelFactory]
+        ] = {}
 
     def analyze_factory_dependencies(
         self,

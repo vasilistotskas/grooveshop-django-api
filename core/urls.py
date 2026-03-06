@@ -23,7 +23,10 @@ from core.views import (
     robots_txt,
     upload_image,
 )
-from order.views.viva_webhook import resolve_viva_order_code, viva_wallet_webhook
+from order.views.viva_webhook import (
+    resolve_viva_order_code,
+    viva_wallet_webhook,
+)
 
 import core.filters.camel_case_filters  # noqa
 import core.filters.camel_case_ordering  # noqa

@@ -383,7 +383,7 @@ class CartViewSet(BaseModelViewSet):
 
         # Return success even if some releases failed
         # (they may have already been released or expired)
-        response_data = {
+        response_data: dict[str, str | int | list] = {
             "message": f"Released {released_count} of {len(reservation_ids)} reservations",
             "released_count": released_count,
         }

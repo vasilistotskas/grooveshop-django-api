@@ -448,7 +448,7 @@ class OrderService:
                         raise
 
             # Store reservation IDs in order metadata
-            order.metadata["stock_reservation_ids"] = reservation_ids
+            order.metadata["stock_reservation_ids"] = reservation_ids  # type: ignore[invalid-assignment]
 
             # Step 7.5: Apply loyalty points redemption if requested
             loyalty_discount = Money(0, target_currency)
@@ -839,7 +839,7 @@ class OrderService:
                         raise
 
             # Store reservation IDs in order metadata
-            order.metadata["stock_reservation_ids"] = reservation_ids
+            order.metadata["stock_reservation_ids"] = reservation_ids  # type: ignore[invalid-assignment]
 
             # Step 6.5: Apply loyalty points redemption if requested
             loyalty_discount = Money(0, target_currency)
@@ -1143,7 +1143,10 @@ class OrderService:
                 raise InvalidStatusTransitionError(
                     current_status=order.status,
                     new_status=new_status,
-                    allowed=allowed_transitions.get(order.status, []),
+                    allowed=[
+                        str(s)
+                        for s in allowed_transitions.get(order.status, [])
+                    ],
                 )
 
             old_status = order.status

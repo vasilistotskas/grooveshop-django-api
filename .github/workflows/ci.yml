@@ -216,10 +216,12 @@ jobs:
 
       - name: Publish package distributions 📦 to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        continue-on-error: true
         with:
           repository-url: https://test.pypi.org/legacy/
           packages-dir: dist_build/
           skip-existing: true
+          verbose: true
           attestations: false
         if: steps.release.outputs.released == 'true'
 

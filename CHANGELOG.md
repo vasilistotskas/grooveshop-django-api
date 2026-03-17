@@ -3,6 +3,14 @@
 
 
 
+## v1.88.2 (2026-03-17)
+
+### Bug fixes
+
+* fix: uv lock ([`9690b22`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9690b225eae47dce0e4ce5b0e47b5875206e375f))
+
+* fix: ci ([`9383c0b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9383c0b2c4da2f1ac8be7bcc946691ca55158451))
+
 ## v1.88.1 (2026-03-17)
 
 ### Bug fixes

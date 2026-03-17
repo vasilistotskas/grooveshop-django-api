@@ -117,10 +117,16 @@ jobs:
           uv sync --locked --all-extras
           uv add apprise braintree coverage coveralls
 
+      - name: Check for missing migrations
+        run: uv run python manage.py makemigrations --check --dry-run
+        env:
+          DB: ${{ matrix.db }}
+          DB_PORT: ${{ matrix.db_port }}
+          DB_USER: ${{ matrix.db_user }}
+          DB_PASSWORD: ${{ matrix.db_password }}
+
       - name: Run migrations
-        run: |
-          uv run python manage.py makemigrations
-          uv run python manage.py migrate
+        run: uv run python manage.py migrate
         env:
           DB: ${{ matrix.db }}
           DB_PORT: ${{ matrix.db_port }}
@@ -142,7 +148,7 @@ jobs:
           MEILI_MASTER_KEY: ${{ secrets.MEILI_MASTER_KEY }}
           MEILI_ENV: production
         run: |
-          uv run pytest --cov=. --cov-report=term --cov-report=html --cov-config=pyproject.toml
+          uv run pytest --cov=. --cov-report=term --cov-report=html --cov-config=pyproject.toml -n0
         timeout-minutes: 15
 
       - name: Store Pull Request comment to be posted
@@ -189,7 +195,7 @@ jobs:
 
       - name: Python Semantic Release
         id: release
-        uses: python-semantic-release/python-semantic-release@master
+        uses: python-semantic-release/python-semantic-release@v10.5.3
         with:
           github_token: ${{ secrets.DJANGO_TOKEN }}
 
@@ -199,31 +205,27 @@ jobs:
       - name: Build a binary wheel and a source tarball
         run: uv run -m build --sdist --outdir dist_build/ --installer uv
 
+      - name: Remove non-distribution files
+        run: |
+          find dist_build/ -type f ! -name '*.whl' ! -name '*.tar.gz' -delete
+
       - uses: actions/upload-artifact@v6
         with:
           name: dist_build
           path: dist_build/
-
-      - uses: actions/download-artifact@v7
-        with:
-          name: dist_build
-          path: dist_build/
-
-      - name: Remove non-distribution files
-        run: |
-          find dist_build/ -type f ! -name '*.whl' ! -name '*.tar.gz' -delete
 
       - name: Publish package distributions 📦 to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
           packages-dir: dist_build/
-          attestations: false  # Added this line
+          skip-existing: true
+          attestations: false
         if: steps.release.outputs.released == 'true'
 
       - name: Publish distribution 📦 to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist_build/
-          attestations: false  # Added this line
+          attestations: false
         if: steps.release.outputs.released == 'true'

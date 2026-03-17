@@ -109,13 +109,15 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     @property
     def main_image_path(self) -> str:
         if self.icon and hasattr(self.icon, "name"):
-            return f"media/uploads/pay_way/{os.path.basename(self.icon.name)}"
+            return (
+                f"media/uploads/pay_way/{os.path.basename(str(self.icon.name))}"
+            )
         return ""
 
     @property
     def icon_filename(self) -> str:
         if self.icon and hasattr(self.icon, "name"):
-            return os.path.basename(self.icon.name)
+            return os.path.basename(str(self.icon.name))
         else:
             return ""
 

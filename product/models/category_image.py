@@ -80,9 +80,7 @@ class ProductCategoryImage(
     @property
     def image_path(self) -> str:
         if self.image and hasattr(self.image, "name"):
-            return (
-                f"media/uploads/categories/{os.path.basename(self.image.name)}"
-            )
+            return f"media/uploads/categories/{os.path.basename(str(self.image.name))}"
         return ""
 
     @property

@@ -84,7 +84,9 @@ class BlogPost(
     @property
     def main_image_path(self) -> str:
         if self.image and hasattr(self.image, "name"):
-            return f"media/uploads/blog/{os.path.basename(self.image.name)}"
+            return (
+                f"media/uploads/blog/{os.path.basename(str(self.image.name))}"
+            )
         return ""
 
     @property

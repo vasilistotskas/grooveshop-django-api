@@ -137,7 +137,11 @@ class ProductImageDetailSerializer(ProductImageSerializer):
 
     def get_image_format(self, obj: ProductImage) -> str:
         if obj.image and hasattr(obj.image, "name"):
-            return os.path.splitext(obj.image.name)[1].lower().replace(".", "")
+            return (
+                os.path.splitext(str(obj.image.name))[1]
+                .lower()
+                .replace(".", "")
+            )
         return ""
 
     @extend_schema_field(

@@ -3,6 +3,12 @@
 
 
 
+## v1.88.1 (2026-03-17)
+
+### Bug fixes
+
+* fix: ci ([`8b9096b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8b9096b7f30007403235ee7ca1d20f41e935a5a7))
+
 ## v1.88.0 (2026-03-17)
 
 ### Features

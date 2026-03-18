@@ -15,6 +15,14 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 class PayWayViewSetTestCase(APITestCase):
     def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        self.staff_user = User.objects.create_user(
+            email="staff@test.com",
+            password="testpass123",
+            is_staff=True,
+        )
         self.pay_way = PayWayFactory(
             active=True,
             cost=10.00,
@@ -57,6 +65,7 @@ class PayWayViewSetTestCase(APITestCase):
         self.assertTrue(found, "Could not find the created pay_way in response")
 
     def test_create_valid(self):
+        self.client.force_authenticate(user=self.staff_user)
         payload = {
             "active": True,
             "cost": 10.00,
@@ -79,6 +88,7 @@ class PayWayViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_create_invalid(self):
+        self.client.force_authenticate(user=self.staff_user)
         payload = {
             "active": "invalid_active",
             "cost": "invalid_cost",
@@ -139,6 +149,7 @@ class PayWayViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_update_valid(self):
+        self.client.force_authenticate(user=self.staff_user)
         payload = {
             "active": False,
             "cost": 20.00,
@@ -161,6 +172,7 @@ class PayWayViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_update_invalid(self):
+        self.client.force_authenticate(user=self.staff_user)
         payload = {
             "active": "invalid_active",
             "cost": "invalid_cost",
@@ -178,6 +190,7 @@ class PayWayViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_partial_update_valid(self):
+        self.client.force_authenticate(user=self.staff_user)
         payload = {
             "active": False,
             "translations": {
@@ -193,6 +206,7 @@ class PayWayViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_partial_update_invalid(self):
+        self.client.force_authenticate(user=self.staff_user)
         payload = {
             "cost": "invalid_cost",
             "translations": {
@@ -208,6 +222,7 @@ class PayWayViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_destroy_valid(self):
+        self.client.force_authenticate(user=self.staff_user)
         url = self.get_pay_way_detail_url(self.pay_way.pk)
         response = self.client.delete(url)
 
@@ -215,6 +230,7 @@ class PayWayViewSetTestCase(APITestCase):
         self.assertFalse(PayWay.objects.filter(pk=self.pay_way.pk).exists())
 
     def test_destroy_invalid(self):
+        self.client.force_authenticate(user=self.staff_user)
         invalid_pay_way_id = 9999
         url = self.get_pay_way_detail_url(invalid_pay_way_id)
         response = self.client.delete(url)

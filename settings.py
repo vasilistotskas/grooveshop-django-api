@@ -199,9 +199,6 @@ TIME_ZONE = getenv("TIME_ZONE", "Europe/Athens")
 USE_I18N = getenv("USE_I18N", "True") == "True"
 USE_TZ = getenv("USE_TZ", "True") == "True"
 
-# Forms URL field configuration (Django 6.0 compatibility)
-FORMS_URLFIELD_ASSUME_HTTPS = not DEBUG
-
 SITE_ID = int(getenv("SITE_ID", "1"))
 
 LANGUAGES = (
@@ -209,8 +206,6 @@ LANGUAGES = (
     ("en", _("English")),
     ("de", _("German")),
 )
-
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_PASSWORD_VALIDATORS = [
     {

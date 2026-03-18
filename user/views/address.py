@@ -89,6 +89,9 @@ class UserAddressViewSet(BaseModelViewSet):
             return UserAddress.objects.for_list().filter(user=self.request.user)
         return UserAddress.objects.for_detail().filter(user=self.request.user)
 
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
     @action(detail=True, methods=["POST"])
     def set_main(self, request, pk=None):
         address = self.get_object()

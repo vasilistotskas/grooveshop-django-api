@@ -37,6 +37,7 @@ def download_social_avatar_task(self, user_id: int, picture_url: str):
     with NamedTemporaryFile(delete=True) as img_temp:
         img_temp.write(response.content)
         img_temp.flush()
+        img_temp.seek(0)
         image_filename = (
             f"image_{user.first_name}_{user.last_name}_{user.pk}.jpg"
         )

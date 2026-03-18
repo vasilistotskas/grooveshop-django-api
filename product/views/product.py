@@ -200,9 +200,13 @@ class ProductViewSet(BaseModelViewSet):
         methods=["POST"],
     )
     def update_view_count(self, request, pk=None):
+        from django.db.models import F
+
         product = self.get_object()
-        product.view_count += 1
-        product.save(update_fields=["view_count"])
+        Product.objects.filter(pk=product.pk).update(
+            view_count=F("view_count") + 1
+        )
+        product.refresh_from_db(fields=["view_count"])
 
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(

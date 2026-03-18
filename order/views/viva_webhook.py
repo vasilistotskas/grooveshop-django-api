@@ -108,6 +108,8 @@ def _verify_transaction(transaction_id):
 
 
 def _handle_webhook_event(request):
+    from django.db import transaction
+
     try:
         body = json.loads(request.body)
     except (json.JSONDecodeError, ValueError):
@@ -154,26 +156,34 @@ def _handle_webhook_event(request):
         )
         return JsonResponse({"status": "ok"})
 
-    if not order.metadata:
-        order.metadata = {}
-    order.metadata[event_key] = True
+    with transaction.atomic():
+        # Re-fetch with row lock to prevent race conditions
+        order = Order.objects.select_for_update().get(pk=order.pk)
 
-    # Event type IDs per Viva documentation:
-    # 1796 = Transaction Payment Created
-    # 1797 = Transaction Reversal Created
-    # 1798 = Transaction Failed
-    if event_type_id == 1796:
-        _handle_payment_created(order, event_data, transaction_id)
-    elif event_type_id == 1797:
-        _handle_reversal_created(order, event_data, transaction_id)
-    elif event_type_id == 1798:
-        _handle_payment_failed(order, event_data, transaction_id)
-    else:
-        logger.info(
-            "Unhandled Viva Wallet event type: %s",
-            event_type_id,
-        )
-        order.save(update_fields=["metadata"])
+        # Double-check idempotency after acquiring lock
+        if order.metadata and order.metadata.get(event_key):
+            return JsonResponse({"status": "ok"})
+
+        if not order.metadata:
+            order.metadata = {}
+        order.metadata[event_key] = True
+
+        # Event type IDs per Viva documentation:
+        # 1796 = Transaction Payment Created
+        # 1797 = Transaction Reversal Created
+        # 1798 = Transaction Failed
+        if event_type_id == 1796:
+            _handle_payment_created(order, event_data, transaction_id)
+        elif event_type_id == 1797:
+            _handle_reversal_created(order, event_data, transaction_id)
+        elif event_type_id == 1798:
+            _handle_payment_failed(order, event_data, transaction_id)
+        else:
+            logger.info(
+                "Unhandled Viva Wallet event type: %s",
+                event_type_id,
+            )
+            order.save(update_fields=["metadata"])
 
     return JsonResponse({"status": "ok"})
 

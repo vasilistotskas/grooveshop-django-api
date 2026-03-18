@@ -186,7 +186,11 @@ def handle_order_pre_save(
     """Store previous order status before save."""
     try:
         if instance.pk:
-            instance._previous_status = Order.objects.get(pk=instance.pk).status
+            instance._previous_status = (
+                Order.objects.filter(pk=instance.pk)
+                .values_list("status", flat=True)
+                .first()
+            )
         else:
             instance._previous_status = None
     except Order.DoesNotExist:
@@ -248,11 +252,14 @@ def handle_order_item_post_save(
         hasattr(instance, "_original_quantity")
         and instance._original_quantity != instance.quantity
     ):
+        from django.db.models import F, Value
+        from django.db.models.functions import Greatest
+
         product = instance.product
         stock_difference = instance._original_quantity - instance.quantity
-        new_stock = product.stock + stock_difference
-        product.stock = max(0, new_stock)
-        product.save(update_fields=["stock"])
+        type(product).objects.filter(pk=product.pk).update(
+            stock=Greatest(F("stock") + stock_difference, Value(0))
+        )
 
         OrderItemHistory.log_quantity_change(
             order_item=instance,

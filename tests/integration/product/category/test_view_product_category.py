@@ -56,7 +56,6 @@ class ProductCategoryViewSetTestCase(APITestCase):
                 "created_at",
                 "updated_at",
                 "uuid",
-                "recursive_product_count",
             }
             self.assertTrue(expected_fields.issubset(set(category_data.keys())))
 

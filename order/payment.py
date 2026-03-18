@@ -314,7 +314,7 @@ class StripePaymentProvider(PaymentProvider):
                 )
             else:
                 stripe_pi = stripe.PaymentIntent.create(**payment_intent_data)
-            print("Stripe PaymentIntent created successfully", stripe_pi)
+            logger.info("Stripe PaymentIntent created: %s", stripe_pi.id)
 
             try:
                 djstripe_pi = PaymentIntent.sync_from_stripe_data(stripe_pi)

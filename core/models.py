@@ -257,7 +257,6 @@ class MetaDataModel(models.Model):
             for key, value in items.items():
                 self.private_metadata[key] = value
             self.save(update_fields=["private_metadata"])
-            self.refresh_from_db(fields=["private_metadata"])
 
     def clear_private_metadata(self):
         self.private_metadata = {}
@@ -274,7 +273,6 @@ class MetaDataModel(models.Model):
             for key, value in items.items():
                 self.metadata[key] = value
             self.save(update_fields=["metadata"])
-            self.refresh_from_db(fields=["metadata"])
 
     def clear_metadata(self):
         self.metadata = {}
@@ -293,7 +291,7 @@ class SoftDeleteMixin(models.Model):
     """
 
     deleted_at = models.DateTimeField(null=True, blank=True)
-    is_deleted = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False, db_index=True)
 
     class Meta(TypedModelMeta):
         abstract = True

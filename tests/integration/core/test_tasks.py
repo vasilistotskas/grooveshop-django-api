@@ -773,63 +773,31 @@ class TestScheduledDatabaseBackupTask:
     def test_scheduled_backup_success(
         self, mock_logger, mock_cleanup, mock_backup
     ):
-        mock_async_result = Mock()
-        mock_async_result.get.return_value = {
-            "status": "success",
-            "message": "Backup completed",
-        }
-        mock_backup.apply_async.return_value = mock_async_result
+        mock_chain = Mock()
+        with patch("celery.chain", return_value=mock_chain):
+            result = scheduled_database_backup()
 
-        result = scheduled_database_backup()
-
-        assert result["status"] == "success"
-        mock_backup.apply_async.assert_called_once()
-        mock_cleanup.delay.assert_called_once()
+        assert result["status"] == "dispatched"
+        mock_chain.apply_async.assert_called_once()
 
     @patch("core.tasks.backup_database_task")
+    @patch("core.tasks.cleanup_old_backups")
     @patch("core.tasks.send_mail")
     @patch("core.tasks.logger")
     @override_settings(
         DEFAULT_FROM_EMAIL="admin@example.com", ADMIN_EMAIL="admin@example.com"
     )
-    def test_scheduled_backup_failure(
-        self, mock_logger, mock_send_mail, mock_backup
+    def test_scheduled_backup_chain_failure(
+        self, mock_logger, mock_send_mail, mock_cleanup, mock_backup
     ):
-        mock_async_result = Mock()
-        mock_async_result.get.return_value = {
-            "status": "error",
-            "message": "Backup failed",
-        }
-        mock_backup.apply_async.return_value = mock_async_result
+        mock_chain = Mock()
+        mock_chain.apply_async.side_effect = Exception("Broker unreachable")
 
-        with pytest.raises(Exception):
-            scheduled_database_backup()
+        with patch("celery.chain", return_value=mock_chain):
+            with pytest.raises(Exception, match="Broker unreachable"):
+                scheduled_database_backup()
 
         mock_send_mail.assert_called_once()
-        call_args = mock_send_mail.call_args[1]
-        assert "ALERT: Scheduled Database Backup Failed" in call_args["subject"]
-
-    @patch("core.tasks.backup_database_task")
-    @patch("core.tasks.send_mail")
-    @patch("core.tasks.logger")
-    def test_scheduled_backup_email_failure(
-        self, mock_logger, mock_send_mail, mock_backup
-    ):
-        mock_async_result = Mock()
-        mock_async_result.get.return_value = {
-            "status": "error",
-            "message": "Backup failed",
-        }
-        mock_backup.apply_async.return_value = mock_async_result
-
-        mock_send_mail.side_effect = Exception("Email error")
-
-        with pytest.raises(Exception):
-            scheduled_database_backup()
-
-        mock_logger.error.assert_any_call(
-            "Failed to send backup failure alert email: Email error"
-        )
 
 
 @pytest.mark.django_db

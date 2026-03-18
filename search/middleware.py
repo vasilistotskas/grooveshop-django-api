@@ -120,7 +120,7 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
             ip_address = self._get_client_ip(request)
             user_agent = request.META.get("HTTP_USER_AGENT", "")
 
-            # Create SearchQuery record
+            # Create SearchQuery record (non-blocking — errors are caught)
             SearchQuery.objects.create(
                 query=query,
                 language_code=language_code,
@@ -135,8 +135,10 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
             )
 
             logger.debug(
-                f"Tracked search query: '{query}' ({content_type}) - "
-                f"{results_count} results"
+                "Tracked search query: '%s' (%s) - %s results",
+                query,
+                content_type,
+                results_count,
             )
 
         except Exception as e:

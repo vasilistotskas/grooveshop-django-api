@@ -13697,9 +13697,9 @@ paths:
   /api/v1/order/{id}/create_checkout_session:
     post:
       operationId: createOrderCheckoutSession
-      description: Create a Stripe Checkout Session for hosted payment page. The customer
-        will be redirected to Stripe's checkout page to complete payment.
-      summary: Create a Stripe Checkout Session for an order
+      description: Create a hosted checkout session (Stripe or Viva Wallet). The customer
+        will be redirected to the provider's checkout page to complete payment.
+      summary: Create a hosted checkout session for an order
       parameters:
       - in: path
         name: id
@@ -15024,7 +15024,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '400':
           content:
@@ -15157,7 +15156,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '400':
           content:
@@ -15231,7 +15229,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '400':
           content:
@@ -15284,7 +15281,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '204':
           description: No response body
@@ -22359,7 +22355,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '200':
           content:
@@ -30028,7 +30023,7 @@ components:
       - DANGER
       type: string
       description: |-
-        * `ERROR` - Error
+        * `ERROR` - Σφάλμα
         * `SUCCESS` - Success
         * `INFO` - Info
         * `WARNING` - Warning
@@ -30352,6 +30347,7 @@ components:
           maxLength: 255
         payWay:
           type: integer
+          nullable: true
         status:
           allOf:
           - $ref: '#/components/schemas/OrderStatus'
@@ -30608,6 +30604,7 @@ components:
           maxLength: 255
         payWay:
           type: integer
+          nullable: true
         status:
           allOf:
           - $ref: '#/components/schemas/OrderStatus'
@@ -33136,8 +33133,6 @@ components:
         isMain:
           type: boolean
           default: false
-        user:
-          type: integer
         country:
           type: string
           minLength: 1
@@ -33452,10 +33447,9 @@ components:
           description: Whether this payment method requires manual confirmation (e.g.,
             bank transfer)
         configuration:
-          nullable: true
-          title: Provider Configuration
-          description: Provider-specific configuration (API keys, webhooks, etc.)
+          readOnly: true
       required:
+      - configuration
       - cost
       - createdAt
       - freeThreshold
@@ -33687,18 +33681,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-        createdAt:
-          type: string
-          format: date-time
-          readOnly: true
-        updatedAt:
-          type: string
-          format: date-time
-          readOnly: true
-        uuid:
-          type: string
-          format: uuid
-          readOnly: true
         discountValue:
           type: number
           format: double
@@ -33746,6 +33728,18 @@ components:
         likesCount:
           type: integer
           description: Return the number of likes/favourites for this product.
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
           readOnly: true
         attributes:
           type: array
@@ -33863,14 +33857,10 @@ components:
           type: string
           format: uuid
           readOnly: true
-        recursiveProductCount:
-          type: integer
-          readOnly: true
       required:
       - createdAt
       - id
       - level
-      - recursiveProductCount
       - slug
       - translations
       - treeId
@@ -33934,13 +33924,13 @@ components:
           type: string
           format: uuid
           readOnly: true
-        recursiveProductCount:
-          type: integer
-          readOnly: true
         children:
           type: array
           items:
             $ref: '#/components/schemas/ProductCategory'
+          readOnly: true
+        recursiveProductCount:
+          type: integer
           readOnly: true
         seoTitle:
           type: string
@@ -34311,18 +34301,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-        createdAt:
-          type: string
-          format: date-time
-          readOnly: true
-        updatedAt:
-          type: string
-          format: date-time
-          readOnly: true
-        uuid:
-          type: string
-          format: uuid
-          readOnly: true
         discountValue:
           type: number
           format: double
@@ -34370,6 +34348,18 @@ components:
         likesCount:
           type: integer
           description: Return the number of likes/favourites for this product.
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
           readOnly: true
         attributes:
           type: array
@@ -34479,18 +34469,6 @@ components:
           minimum: -1000000000
           exclusiveMaximum: true
           exclusiveMinimum: true
-        createdAt:
-          type: string
-          format: date-time
-          readOnly: true
-        updatedAt:
-          type: string
-          format: date-time
-          readOnly: true
-        uuid:
-          type: string
-          format: uuid
-          readOnly: true
         discountValue:
           type: number
           format: double
@@ -34538,6 +34516,18 @@ components:
         likesCount:
           type: integer
           description: Return the number of likes/favourites for this product.
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
           readOnly: true
         attributes:
           type: array
@@ -36415,8 +36405,6 @@ components:
         isMain:
           type: boolean
           default: false
-        user:
-          type: integer
         country:
           type: string
           minLength: 1
@@ -36435,7 +36423,6 @@ components:
       - street
       - streetNumber
       - title
-      - user
       - zipcode
     UserDetails:
       type: object

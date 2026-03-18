@@ -127,8 +127,6 @@ def clear_duplicate_history_task(excluded_fields=None, minutes=None):
             management.call_command(*command_args)
 
         logger.info("Successfully cleaned duplicate history entries")
-        # Release lock on success
-        cache.delete(lock_id)
         return {
             "status": "success",
             "message": "Duplicate history entries cleaned",
@@ -140,19 +138,16 @@ def clear_duplicate_history_task(excluded_fields=None, minutes=None):
 
     except management.CommandError as e:
         logger.error(f"Django command error in clear_duplicate_history: {e}")
-        # Release lock on permanent failure (won't be retried)
-        cache.delete(lock_id)
         return {
             "status": "error",
             "message": str(e),
             "error_type": "CommandError",
         }
     except Exception:
-        # Don't release lock here — autoretry will re-raise and the
-        # lock timeout (5 min) ensures it's eventually released if
-        # all retries fail
         logger.exception("Unexpected error in clear_duplicate_history")
         raise
+    finally:
+        cache.delete(lock_id)
 
 
 @celery_app.task(
@@ -714,50 +709,25 @@ def scheduled_database_backup():
 
         logger.info("Starting scheduled database backup")
 
-        # Call backup_database_task asynchronously instead of blocking
-        # the current worker with .apply()
-        async_result = backup_database_task.apply_async(
-            kwargs={
-                "output_dir": "backups/scheduled",
-                "filename": filename,
-                "compress": True,
-                "format_type": "custom",
-            }
-        )
+        # Use Celery chain to avoid blocking the worker with .get()
+        from celery import chain
 
-        # Wait for the result with a timeout to avoid blocking forever
-        result = async_result.get(timeout=300)
+        chain(
+            backup_database_task.s(
+                output_dir="backups/scheduled",
+                filename=filename,
+                compress=True,
+                format_type="custom",
+            ),
+            cleanup_old_backups.si(days=7, backup_dir="backups/scheduled"),
+        ).apply_async()
 
-        if result.get("status") == "success":
-            safe_logging_extra = {
-                "backup_status": result.get("status"),
-                "backup_duration": result.get("duration"),
-                "backup_file_size": result.get("file_size"),
-                "backup_timestamp": result.get("timestamp"),
-            }
-
-            logger.info(
-                "Scheduled database backup completed successfully",
-                extra=safe_logging_extra,
-            )
-
-            # Extract the actual backup directory from the result
-            backup_file = result.get("backup_file")
-            if backup_file:
-                logger.info(f"Backup file: {backup_file}")
-                actual_backup_dir = str(Path(backup_file).parent)
-                cleanup_old_backups.delay(days=7, backup_dir=actual_backup_dir)
-            else:
-                # Fallback to relative path
-                cleanup_old_backups.delay(
-                    days=7, backup_dir="backups/scheduled"
-                )
-
-            return result
-        else:
-            raise Exception(
-                f"Backup failed: {result.get('result_message', 'Unknown error')}"
-            )
+        logger.info("Scheduled database backup chain dispatched")
+        return {
+            "status": "dispatched",
+            "message": "Backup task chain started",
+            "filename": filename,
+        }
 
     except Exception as e:
         logger.error(f"Scheduled backup failed: {e}")

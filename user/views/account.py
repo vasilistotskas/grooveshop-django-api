@@ -171,45 +171,51 @@ class UserAccountViewSet(BaseModelViewSet):
             return action_filter_map[self.action]
         return UserAccountFilter
 
+    def _get_checked_user(self):
+        """Get the target user with ownership/admin permission check."""
+        user = get_object_or_404(User, id=self.kwargs["pk"])
+        self.check_object_permissions(self.request, user)
+        return user
+
     def get_queryset(self):
         match self.action:
             case "favourite_products":
                 from product.models.favourite import ProductFavourite
 
-                user = get_object_or_404(User, id=self.kwargs["pk"])
+                user = self._get_checked_user()
                 queryset = ProductFavourite.objects.for_list().filter(user=user)
             case "orders":
                 from order.models.order import Order
 
-                user = get_object_or_404(User, id=self.kwargs["pk"])
+                user = self._get_checked_user()
                 queryset = Order.objects.for_list().filter(user=user)
             case "product_reviews":
                 from product.models.review import ProductReview
 
-                user = get_object_or_404(User, id=self.kwargs["pk"])
+                user = self._get_checked_user()
                 queryset = ProductReview.objects.for_list().filter(user=user)
             case "addresses":
                 from user.models.address import UserAddress
 
-                user = get_object_or_404(User, id=self.kwargs["pk"])
+                user = self._get_checked_user()
                 queryset = UserAddress.objects.for_list().filter(user=user)
             case "blog_post_comments":
                 from blog.models.comment import BlogComment
 
-                user = get_object_or_404(User, id=self.kwargs["pk"])
+                user = self._get_checked_user()
                 queryset = BlogComment.objects.for_list().filter(user=user)
             case "liked_blog_posts":
                 from blog.models.post import BlogPost
 
-                user = get_object_or_404(User, id=self.kwargs["pk"])
+                user = self._get_checked_user()
                 queryset = BlogPost.objects.for_list().filter(likes=user)
             case "notifications":
                 from notification.models import NotificationUser
 
-                user = get_object_or_404(User, id=self.kwargs["pk"])
+                user = self._get_checked_user()
                 queryset = NotificationUser.objects.for_list().filter(user=user)
             case "subscriptions":
-                user = get_object_or_404(User, id=self.kwargs["pk"])
+                user = self._get_checked_user()
                 queryset = user.subscriptions.select_related("topic")
             case _:
                 queryset = (

@@ -123,6 +123,18 @@ class PayWayService:
     def refund_payment(
         pay_way: PayWay, order: Order, amount: Money | None = None
     ) -> tuple[bool, dict[str, Any]]:
+        if order.payment_status not in (
+            PaymentStatus.COMPLETED,
+            PaymentStatus.PROCESSING,
+        ):
+            return False, {
+                "error": _(
+                    "Cannot refund an order that has not been paid. "
+                    "Current status: %(status)s"
+                )
+                % {"status": order.payment_status}
+            }
+
         if not order.payment_id:
             return False, {"error": _("No payment ID found for order")}
 

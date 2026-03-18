@@ -49,7 +49,9 @@
       "Bash(grep:*)",
       "Bash(head:*)",
       "Bash(sqlite3:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(gh run:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,4 +1,3 @@
-from functools import cached_property
 from typing import Any, cast
 
 from django.conf import settings
@@ -301,22 +300,20 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
 
     @property
     def total_price_items(self) -> Money:
-        items_total = self.items.aggregate(
-            total=Sum(F("price") * F("quantity"))
-        ).get("total")
+        default_currency = getattr(settings, "DEFAULT_CURRENCY", "EUR")
+        result = self.items.aggregate(total=Sum(F("price") * F("quantity")))
+        items_total = result.get("total")
 
         if not items_total:
-            default_currency = getattr(settings, "DEFAULT_CURRENCY", "EUR")
             if self.shipping_price:
                 return Money(0, self.shipping_price.currency)
             return Money(0, default_currency)
 
-        first_item = self.items.first()
-        currency = (
-            first_item.price.currency
-            if first_item
-            else getattr(settings, "DEFAULT_CURRENCY", "EUR")
-        )
+        # Get currency from the price_currency field via a single query
+        currency_row = self.items.values_list(
+            "price_currency", flat=True
+        ).first()
+        currency = currency_row or default_currency
 
         return Money(amount=items_total, currency=currency)
 
@@ -380,7 +377,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     def is_canceled(self) -> bool:
         return self.status == OrderStatus.CANCELED
 
-    @cached_property
+    @property
     def total_price(self) -> Money:
         items_total = self.total_price_items
         extras_total = self.total_price_extra

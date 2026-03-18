@@ -244,21 +244,37 @@ def suspend_indexing() -> Generator[None, None, None]:
     original_delete_receivers = post_delete.receivers.copy()
 
     # Disconnect all meili signal handlers
-    meili_save_uids = [
-        uid
-        for uid in [r[0] for r in post_save.receivers]
-        if isinstance(uid, str) and uid.startswith("meili_")
+    # Each receiver entry is ((dispatch_uid_hash, sender_hash), receiver_func)
+    # The dispatch_uid_hash is a numeric hash, so we need to match by receiver name
+    meili_save_indices = [
+        i
+        for i, (key, receiver_func) in enumerate(post_save.receivers)
+        if hasattr(receiver_func, "__self__")
+        and "meili" in type(receiver_func.__self__).__module__
+        or (
+            callable(receiver_func)
+            and "meili" in getattr(receiver_func, "__module__", "")
+        )
     ]
-    meili_delete_uids = [
-        uid
-        for uid in [r[0] for r in post_delete.receivers]
-        if isinstance(uid, str) and uid.startswith("meili_")
+    meili_delete_indices = [
+        i
+        for i, (key, receiver_func) in enumerate(post_delete.receivers)
+        if hasattr(receiver_func, "__self__")
+        and "meili" in type(receiver_func.__self__).__module__
+        or (
+            callable(receiver_func)
+            and "meili" in getattr(receiver_func, "__module__", "")
+        )
     ]
 
-    for uid in meili_save_uids:
-        post_save.disconnect(dispatch_uid=uid)
-    for uid in meili_delete_uids:
-        post_delete.disconnect(dispatch_uid=uid)
+    # Remove meili receivers in reverse order to preserve indices
+    for i in reversed(meili_save_indices):
+        post_save.receivers.pop(i)
+    for i in reversed(meili_delete_indices):
+        post_delete.receivers.pop(i)
+    # Clear sender caches so Django re-evaluates receivers
+    post_save.sender_receivers_cache.clear()
+    post_delete.sender_receivers_cache.clear()
 
     try:
         yield

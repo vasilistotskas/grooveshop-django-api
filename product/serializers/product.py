@@ -55,9 +55,6 @@ class ProductSerializer(
             "seo_description",
             "seo_keywords",
             "discount_percent",
-            "created_at",
-            "updated_at",
-            "uuid",
             "discount_value",
             "price_save_percent",
             "vat_percent",
@@ -75,7 +72,6 @@ class ProductSerializer(
 
         read_only_fields = (
             "id",
-            "final_price",
             "discount_value",
             "price_save_percent",
             "vat_percent",

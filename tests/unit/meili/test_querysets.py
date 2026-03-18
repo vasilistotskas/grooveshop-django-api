@@ -181,13 +181,16 @@ class TestIndexQuerySet:
 
         queryset = IndexQuerySet(MockModel)
 
-        with pytest.raises(
-            TypeError, match="list.append\\(\\) takes exactly one argument"
-        ):
-            queryset.attributes_to_search_on("title", "content")
-
-        result = queryset.attributes_to_search_on("title")
+        # Multiple attributes should work
+        result = queryset.attributes_to_search_on("title", "content")
         assert result == queryset
+        assert "title" in queryset._state.attributes_to_search_on
+        assert "content" in queryset._state.attributes_to_search_on
+
+        # Single attribute should also work
+        queryset2 = IndexQuerySet(MockModel)
+        result2 = queryset2.attributes_to_search_on("title")
+        assert result2 == queryset2
 
     @patch("meili.querysets.client")
     def test_filter_regular_exact_string(self, mock_client):

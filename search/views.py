@@ -424,8 +424,7 @@ def federated_search(request):
         decoded_query = expand_greeklish_query(decoded_query, max_variants=5)
 
     # Calculate result allocation (70% products, 30% blog posts)
-    product_limit = int(limit * 0.7)
-    limit - product_limit
+    product_limit = int(limit * 0.7)  # noqa: F841
 
     # Build filters for language and content filtering
     product_filters = []
@@ -487,56 +486,71 @@ def federated_search(request):
     hits = results.get("hits", [])
     estimated_total_hits = results.get("estimatedTotalHits", 0)
 
-    # Enrich results with Django ORM objects and add content_type
-    enriched_results = []
+    # Collect IDs by model type for bulk fetching
+    product_ids = []
+    blog_ids = []
+    hit_metadata = []  # Parallel list of (index_type, obj_id, hit)
 
     for hit in hits:
+        federation_metadata = hit.get("_federation", {})
+        index_uid = federation_metadata.get("indexUid", "")
+        obj_id = hit.get("id")
+        if not obj_id:
+            continue
+
+        if "ProductTranslation" in index_uid:
+            product_ids.append(obj_id)
+            hit_metadata.append(("product", obj_id, hit))
+        elif "BlogPostTranslation" in index_uid:
+            blog_ids.append(obj_id)
+            hit_metadata.append(("blog", obj_id, hit))
+        else:
+            logger.warning("Unknown index UID: %s", index_uid)
+
+    # Bulk fetch all objects (2 queries instead of N)
+    product_map = {}
+    blog_map = {}
+    if product_ids:
+        product_map = {
+            obj.pk: obj
+            for obj in ProductTranslation.objects.filter(
+                pk__in=product_ids
+            ).select_related("master__category", "master__vat")
+        }
+    if blog_ids:
+        blog_map = {
+            obj.pk: obj
+            for obj in BlogPostTranslation.objects.filter(
+                pk__in=blog_ids
+            ).select_related("master")
+        }
+
+    # Enrich results preserving original order
+    enriched_results = []
+    for index_type, obj_id, hit in hit_metadata:
         try:
-            # Get federation metadata
-            federation_metadata = hit.get("_federation", {})
-            index_uid = federation_metadata.get("indexUid", "")
-
-            # Determine content type from index
-            if "ProductTranslation" in index_uid:
-                model = ProductTranslation
+            if index_type == "product":
+                obj = product_map.get(obj_id)
                 serializer_class = ProductTranslationSerializer
-            elif "BlogPostTranslation" in index_uid:
-                model = BlogPostTranslation
-                serializer_class = BlogPostTranslationSerializer
             else:
-                logger.warning(f"Unknown index UID: {index_uid}")
+                obj = blog_map.get(obj_id)
+                serializer_class = BlogPostTranslationSerializer
+
+            if not obj:
                 continue
 
-            # Fetch Django object
-            obj_id = hit.get("id")
-            if not obj_id:
-                continue
-
-            try:
-                obj = model.objects.get(pk=obj_id)
-            except model.DoesNotExist:
-                logger.warning(
-                    f"{model.__name__} with id {obj_id} not found in database"
-                )
-                continue
-
-            # Prepare context with Meilisearch metadata
             context = {
                 "_formatted": hit.get("_formatted", {}),
                 "_matchesPosition": hit.get("_matchesPosition", {}),
                 "_rankingScore": hit.get("_rankingScore", None),
             }
 
-            # Serialize object
             obj_data = serializer_class(obj, context=context).data
-
-            # Add federation metadata
-            obj_data["_federation"] = federation_metadata
-
+            obj_data["_federation"] = hit.get("_federation", {})
             enriched_results.append(obj_data)
 
         except Exception as e:
-            logger.error(f"Error enriching result: {str(e)}")
+            logger.error("Error enriching result: %s", e)
             continue
 
     # Return response
@@ -671,31 +685,27 @@ def search_analytics(request):
     # Calculate total search count
     total_searches = queries_qs.count()
 
-    # Aggregate top queries (top 20 by frequency)
-    top_queries_data = (
+    # Calculate click-through rate for each top query (single annotated query)
+    top_queries_with_clicks = (
         queries_qs.values("query")
-        .annotate(count=Count("id"), avg_results=Avg("results_count"))
+        .annotate(
+            count=Count("id"),
+            avg_results=Avg("results_count"),
+            clicks_count=Count("clicks"),
+        )
         .order_by("-count")[:20]
     )
 
-    # Calculate click-through rate for each top query
     top_queries = []
-    for query_data in top_queries_data:
-        query_text = query_data["query"]
+    for query_data in top_queries_with_clicks:
         query_count = query_data["count"]
         avg_results = query_data["avg_results"]
-
-        # Count clicks for this query
-        clicks_count = SearchClick.objects.filter(
-            search_query__query=query_text
-        ).count()
-
-        # Calculate CTR (clicks / searches)
+        clicks_count = query_data["clicks_count"]
         ctr = (clicks_count / query_count) if query_count > 0 else 0.0
 
         top_queries.append(
             {
-                "query": query_text,
+                "query": query_data["query"],
                 "count": query_count,
                 "avg_results": round(avg_results, 2) if avg_results else 0.0,
                 "click_through_rate": round(ctr, 4),

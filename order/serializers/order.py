@@ -24,7 +24,9 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
     items = OrderItemDetailSerializer(many=True)
     country = PrimaryKeyRelatedField(queryset=Country.objects.all())
     region = PrimaryKeyRelatedField(queryset=Region.objects.all())
-    pay_way = PrimaryKeyRelatedField(queryset=PayWay.objects.all())
+    pay_way = PrimaryKeyRelatedField(
+        queryset=PayWay.objects.all(), allow_null=True
+    )
     paid_amount = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     shipping_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     payment_method_fee = MoneyField(

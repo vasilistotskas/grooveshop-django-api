@@ -19,7 +19,11 @@ logger = logging.getLogger(__name__)
 @shared_task(bind=True, max_retries=3, default_retry_delay=300)
 def send_order_confirmation_email(self, order_id: int) -> bool:
     try:
-        order = Order.objects.get(id=order_id)
+        order = (
+            Order.objects.select_related("user", "country", "region", "pay_way")
+            .prefetch_related("items__product__translations")
+            .get(id=order_id)
+        )
         context = {
             "order": order,
             "items": order.items.all(),
@@ -97,7 +101,11 @@ def send_order_status_update_email(
     self, order_id: int, status: OrderStatus
 ) -> bool:
     try:
-        order = Order.objects.get(id=order_id)
+        order = (
+            Order.objects.select_related("user", "country", "region", "pay_way")
+            .prefetch_related("items__product__translations")
+            .get(id=order_id)
+        )
 
         if status in [OrderStatus.PENDING]:
             return True
@@ -191,7 +199,11 @@ def send_order_status_update_email(
 @shared_task(bind=True, max_retries=3, default_retry_delay=300)
 def send_shipping_notification_email(self, order_id: int) -> bool:
     try:
-        order = Order.objects.get(id=order_id)
+        order = (
+            Order.objects.select_related("user", "country", "region", "pay_way")
+            .prefetch_related("items__product__translations")
+            .get(id=order_id)
+        )
 
         if not order.tracking_number or not order.shipping_carrier:
             logger.warning(

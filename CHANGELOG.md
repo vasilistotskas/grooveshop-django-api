@@ -3,6 +3,28 @@
 
 
 
+## v1.88.3 (2026-03-18)
+
+### Bug fixes
+
+* fix: Remove viva-payment-api.yaml ([`6d92314`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6d923144bfb8ee9df8019858b24dd535d13f2310))
+
+### Refactoring
+
+* refactor: optimize task execution and database queries
+
+- Replace blocking async_result.get() calls with Celery chains
+  to improve worker concurrency
+- Add select_related/prefetch_related to order task queries to
+  reduce N+1 queries
+- Move cache lock cleanup to finally block for reliable cleanup
+- Add db_index=True to is_deleted field for soft delete queries
+- Replace f-string logging with parameterized logging in search
+  middleware
+- Remove unnecessary refresh_from_db() calls from metadata methods
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`691041d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/691041defc57ec4c36215321bcabf84e43c0ac04))
+
 ## v1.88.2 (2026-03-17)
 
 ### Bug fixes

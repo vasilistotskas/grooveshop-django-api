@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from django.utils.translation import gettext_lazy as _
+from djmoney.money import Money
 from drf_spectacular.openapi import OpenApiTypes
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -34,6 +35,7 @@ from core.utils.serializers import (
     create_schema_view_config,
 )
 from order.exceptions import InsufficientStockError, StockReservationError
+from order.services import OrderService
 from order.stock import StockManager
 
 logger = logging.getLogger(__name__)
@@ -463,9 +465,21 @@ class CartViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Calculate cart total (this will include shipping and fees when order is created)
-        # For now, use cart total as base amount
+        # Calculate cart total including shipping and payment method fee
+        # to match the final order total that will be created later
         cart_total = cart.total_price
+        shipping_cost = OrderService.calculate_shipping_cost(cart_total)
+        order_subtotal = Money(
+            cart_total.amount + shipping_cost.amount,
+            cart_total.currency,
+        )
+        payment_fee = OrderService.calculate_payment_method_fee(
+            pay_way, order_subtotal
+        )
+        cart_total = Money(
+            order_subtotal.amount + payment_fee.amount,
+            cart_total.currency,
+        )
 
         # Get Stripe payment provider
         provider = PayWayService.get_provider_for_pay_way(pay_way)

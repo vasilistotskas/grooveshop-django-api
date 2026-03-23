@@ -760,12 +760,13 @@ class OrderViewSet(BaseModelViewSet):
         provider_code = order.pay_way.provider_code
         provider = get_payment_provider(provider_code)
 
-        # For Stripe, pass only items total so Stripe can add shipping separately
-        # For Viva Wallet, pass the full order total (shipping included)
+        # Pass the full order total for all providers.
+        # Stripe also receives shipping_price separately for
+        # a proper line-item breakdown on the checkout page.
+        amount = order.total_price
+
         if provider_code == "stripe":
-            amount = order.total_price_items
-        else:
-            amount = order.total_price
+            checkout_params["shipping_price"] = order.shipping_price
 
         success, checkout_response = provider.create_checkout_session(
             amount=amount,

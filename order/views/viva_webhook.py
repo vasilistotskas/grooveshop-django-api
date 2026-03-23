@@ -58,7 +58,10 @@ def _handle_verification(request):
         logger.error("Viva Wallet webhook verification key unavailable")
         return JsonResponse({"error": "Not configured"}, status=500)
 
-    return JsonResponse({"Key": verification_key})
+    return JsonResponse(
+        {"Key": verification_key},
+        json_dumps_params={"separators": (",", ":")},
+    )
 
 
 def _fetch_verification_key():

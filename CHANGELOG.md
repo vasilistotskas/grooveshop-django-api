@@ -3,6 +3,12 @@
 
 
 
+## v1.89.2 (2026-03-23)
+
+### Bug fixes
+
+* fix: viva webhook ([`673a706`](https://github.com/vasilistotskas/grooveshop-django-api/commit/673a70667969a4e81ac875dac26a2b7159f777c8))
+
 ## v1.89.1 (2026-03-23)
 
 ### Bug fixes

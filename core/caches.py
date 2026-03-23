@@ -134,5 +134,10 @@ class CustomCache(RedisCache):
 
 REDIS_HOST = getenv("REDIS_HOST", "localhost")
 REDIS_PORT = getenv("REDIS_PORT", "6379")
-REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
+REDIS_PASSWORD = getenv("REDIS_PASSWORD", "")
+REDIS_URL = (
+    f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/0"
+    if REDIS_PASSWORD
+    else f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
+)
 cache_instance = CustomCache(server=REDIS_URL, params={})

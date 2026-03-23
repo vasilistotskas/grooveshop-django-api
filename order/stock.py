@@ -521,7 +521,11 @@ class StockManager:
         )
 
     @classmethod
-    def get_available_stock(cls, product_id: int) -> int:
+    def get_available_stock(
+        cls,
+        product_id: int,
+        exclude_session_id: Optional[str] = None,
+    ) -> int:
         """
         Calculate available stock for a product.
 
@@ -547,25 +551,15 @@ class StockManager:
 
         Args:
             product_id: ID of the product to check
+            exclude_session_id: Optional session ID whose reservations should
+                be excluded from the calculation. Used during order creation
+                to avoid counting the cart's own reservations against itself.
 
         Returns:
             int: Number of units available for reservation or purchase
 
         Raises:
             ProductNotFoundError: If product doesn't exist
-
-        Example:
-            >>> # Product has 100 units in stock
-            >>> # 20 units are reserved (active reservations)
-            >>> # 10 units are in expired reservations (not counted)
-            >>> available = StockManager.get_available_stock(product_id=123)
-            >>> print(available)
-            80  # 100 - 20 = 80 units available
-
-            >>> # Check before attempting to reserve
-            >>> if StockManager.get_available_stock(product_id) >= quantity:
-            ...     # Proceed with reservation
-            ...     reservation = StockManager.reserve_stock(...)
         """
         # Fetch the product to get total stock
         # We don't use select_for_update here because this is a read-only operation
@@ -584,6 +578,13 @@ class StockManager:
         active_reservations = StockReservation.objects.filter(
             product=product, consumed=False, expires_at__gt=now
         )
+
+        # Exclude reservations belonging to a specific session (e.g. the
+        # cart that already reserved this stock during checkout)
+        if exclude_session_id:
+            active_reservations = active_reservations.exclude(
+                session_id=exclude_session_id
+            )
 
         # Sum up all active reservation quantities
         # If no active reservations exist, sum returns 0

@@ -980,8 +980,12 @@ class OrderService:
                 errors.append(_("Product in cart no longer exists"))
                 continue
 
-            # Check product is in stock
-            available_stock = StockManager.get_available_stock(product.id)
+            # Check product is in stock (exclude this cart's own
+            # reservations so they don't count against itself)
+            available_stock = StockManager.get_available_stock(
+                product.id,
+                exclude_session_id=str(cart.uuid),
+            )
             if available_stock < cart_item.quantity:
                 errors.append(
                     _(

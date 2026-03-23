@@ -3,6 +3,19 @@
 
 
 
+## v1.89.3 (2026-03-23)
+
+### Bug fixes
+
+* fix(checkout): include shipping and fees in payment amount
+
+Cart checkout now calculates shipping cost and payment method fee
+before initiating Stripe/Viva checkout, ensuring the payment amount
+matches the final order total. Stripe receives shipping as a separate
+line item for proper breakdown on the checkout page.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`577e078`](https://github.com/vasilistotskas/grooveshop-django-api/commit/577e078761ed9944bf0b3c8279e9b37e2f1610ae))
+
 ## v1.89.2 (2026-03-23)
 
 ### Bug fixes

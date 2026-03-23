@@ -3,6 +3,12 @@
 
 
 
+## v1.89.1 (2026-03-23)
+
+### Bug fixes
+
+* fix: redis cache and exclude_session_id from get_available_stock ([`7a7d58c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7a7d58c52bc58f6454d4d59441da5a16f45c950b))
+
 ## v1.89.0 (2026-03-22)
 
 ### Features

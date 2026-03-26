@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import TypedDict
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
@@ -6,7 +7,15 @@ from parler.utils.context import switch_language
 
 from loyalty.models.tier import LoyaltyTier
 
-DEFAULT_TIERS = [
+
+class TierConfig(TypedDict):
+    required_level: int
+    points_multiplier: Decimal
+    sort_order: int
+    translations: dict[str, dict[str, str]]
+
+
+DEFAULT_TIERS: list[TierConfig] = [
     {
         "required_level": 1,
         "points_multiplier": Decimal("1.0"),
@@ -154,7 +163,7 @@ class Command(BaseCommand):
                     )
                 )
 
-            translations: dict = tier_data["translations"]  # type: ignore[invalid-assignment]
+            translations = tier_data["translations"]
             for language_code in language_codes:
                 if language_code in translations:
                     lang_data = translations[language_code]

@@ -168,7 +168,7 @@ def handle_order_status_changed(
         and not hasattr(order, "_paid_signal_sent")
     ):
         order_paid.send(sender=sender, order=order)
-        order._paid_signal_sent = True  # type: ignore[invalid-assignment]
+        object.__setattr__(order, "_paid_signal_sent", True)
         logger.debug("Sent order_paid signal for order %s", order.id)
 
     logger.info(

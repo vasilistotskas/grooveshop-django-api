@@ -156,5 +156,5 @@ except ImportError:
         TranslatableOptimizedQuerySet,
     )
 
-    TreeTranslatableQuerySet = TranslatableOptimizedQuerySet  # type: ignore[misc]
-    TreeTranslatableManager = TranslatableOptimizedManager  # type: ignore[misc]
+    TreeTranslatableQuerySet = TranslatableOptimizedQuerySet  # type: ignore[misc]  # ty: ignore[invalid-assignment]
+    TreeTranslatableManager = TranslatableOptimizedManager  # type: ignore[misc]  # ty: ignore[invalid-assignment]

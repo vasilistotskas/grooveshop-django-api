@@ -1,9 +1,23 @@
+from typing import TypedDict
+
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from djmoney.money import Money
 from parler.utils.context import switch_language
 
 from pay_way.models import PayWay
+
+
+class ProviderConfig(TypedDict):
+    provider_code: str
+    cost: Money
+    free_threshold: Money
+    is_online_payment: bool
+    requires_confirmation: bool
+    active: bool
+    sort_order: int
+    configuration: dict[str, object]
+    translations: dict[str, dict[str, str]]
 
 
 class Command(BaseCommand):
@@ -38,7 +52,7 @@ class Command(BaseCommand):
             )
         )
 
-        providers_config = {
+        providers_config: dict[str, ProviderConfig] = {
             "stripe": {
                 "provider_code": "stripe",
                 "cost": Money(0, default_currency),
@@ -230,7 +244,7 @@ class Command(BaseCommand):
                     self.style.WARNING(f"Updated PayWay: {provider_code}")
                 )
 
-            translations: dict = provider_data["translations"]  # type: ignore[invalid-assignment]
+            translations = provider_data["translations"]
             for language_code in language_codes:
                 if language_code in translations:
                     lang_data = translations[language_code]

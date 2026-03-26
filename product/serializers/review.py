@@ -7,6 +7,7 @@ from rest_framework import serializers
 from user.serializers.account import UserDetailsSerializer
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
+from product.enum.review import RateEnum
 from product.models.product import Product
 from product.models.review import ProductReview
 from product.serializers.product import ProductSerializer
@@ -98,7 +99,7 @@ class ProductReviewWriteSerializer(
         )
 
     def validate_rate(self, value: int) -> int:
-        valid_rates = [choice[0] for choice in ProductReview.rate.field.choices]  # type: ignore[not-iterable]
+        valid_rates = [choice[0] for choice in RateEnum.choices]
         if value not in valid_rates:
             raise serializers.ValidationError(_("Invalid rate value."))
         return value

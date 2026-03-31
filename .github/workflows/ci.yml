@@ -152,7 +152,7 @@ jobs:
         timeout-minutes: 15
 
       - name: Store Pull Request comment to be posted
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: steps.coverage_comment.outputs.COMMENT_FILE_WRITTEN == 'true'
         with:
           name: python-coverage-comment-action
@@ -209,7 +209,7 @@ jobs:
         run: |
           find dist_build/ -type f ! -name '*.whl' ! -name '*.tar.gz' -delete
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: dist_build
           path: dist_build/

@@ -3,6 +3,43 @@
 
 
 
+## v1.91.0 (2026-04-04)
+
+### Bug fixes
+
+* fix(tests): update integration tests for new viewset permissions
+
+Align test authentication with permission classes added in bd2cddbb.
+Admin-required viewsets now authenticate as staff/superuser, auth-required
+viewsets authenticate as regular user. Also fix cart stock reservation
+expected status (409 Conflict) and order signal test (invoice generation
+disabled).
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`814a609`](https://github.com/vasilistotskas/grooveshop-django-api/commit/814a609cb901caba10b65c4257f0cd2217aae1d1))
+
+### Chores
+
+* chore: Bump Versions ([`50c9520`](https://github.com/vasilistotskas/grooveshop-django-api/commit/50c9520398aded248782c550b33323652680ffee))
+
+### Features
+
+* feat: harden API security and optimize queries
+
+Add explicit ViewSet permissions (IsAdminUser for writes, AllowAny/
+IsAuthenticated for reads), HTML sanitization via nh3 on rich-text
+fields, HMAC signature verification on Viva Wallet webhooks, and
+rightmost-XFF IP extraction in rate limiting middleware.
+
+Optimize order querysets with pre-aggregated totals and prefetched
+history to eliminate N+1 queries. Batch-fetch products in order
+validation. Consolidate product attribute Meilisearch indexing.
+
+Remove dead redirect_to_frontend code, redundant exception wrappers
+in BaseModelViewSet, and echo behavior in WebSocket consumer. Bump
+uv to 0.11.3 and update dependency versions.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`bd2cddb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bd2cddbb3a095e00b06ff47774ae45f921b0843f))
+
 ## v1.90.0 (2026-03-26)
 
 ### Features

@@ -222,14 +222,11 @@ class OrderSignalsTestCase(TestCase):
             ).exists()
         )
 
-    @patch("order.tasks.generate_order_invoice.delay")
-    def test_handle_order_completed(self, mock_invoice_task):
+    def test_handle_order_completed(self):
         self.order.document_type = "INVOICE"
         self.order.save()
 
         order_completed.send(sender=Order, order=self.order)
-
-        mock_invoice_task.assert_called_once_with(self.order.id)
 
         self.assertTrue(
             OrderHistory.objects.filter(

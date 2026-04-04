@@ -7,6 +7,7 @@ from country.factories import CountryFactory
 from region.factories import RegionFactory
 from region.models import Region
 from region.serializers import RegionDetailSerializer
+from user.factories.account import UserAccountFactory
 
 languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
@@ -16,6 +17,10 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 class RegionViewSetTestCase(APITestCase):
     def setUp(self):
+        self.admin_user = UserAccountFactory(
+            num_addresses=0, is_superuser=True, is_staff=True
+        )
+        self.client.force_authenticate(user=self.admin_user)
         self.country = CountryFactory(num_regions=0)
         self.region = RegionFactory(
             alpha="GRC",

@@ -29,6 +29,12 @@ class ProductCategoryViewSetTestCase(APITestCase):
             username=f"testuser-{self.test_id}",
             password="testpass123",
         )
+        self.admin_user = User.objects.create_superuser(
+            email=f"admin-{self.test_id}@example.com",
+            username=f"adminuser-{self.test_id}",
+            password="testpass123",
+        )
+        self.client.force_authenticate(user=self.admin_user)
 
     def get_product_category_detail_url(self, pk):
         return reverse("product-category-detail", args=[pk])

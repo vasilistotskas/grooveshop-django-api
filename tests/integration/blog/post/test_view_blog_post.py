@@ -23,6 +23,9 @@ class BlogPostViewSetTestCase(TestURLFixerMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = UserAccountFactory()
+        cls.admin_user = UserAccountFactory(
+            num_addresses=0, is_superuser=True, is_staff=True
+        )
         cls.author = BlogAuthorFactory(user=cls.user)
         cls.category = BlogCategoryFactory()
         cls.tag1 = BlogTagFactory(active=True)
@@ -173,7 +176,7 @@ class BlogPostViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_create_valid(self):
-        self.client.force_authenticate(user=self.user)
+        self.client.force_authenticate(user=self.admin_user)
         payload = {
             "slug": "new-test-post",
             "category": self.category.id,
@@ -225,7 +228,7 @@ class BlogPostViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertTrue(expected_fields.issubset(set(response.data.keys())))
 
     def test_create_invalid(self):
-        self.client.force_authenticate(user=self.user)
+        self.client.force_authenticate(user=self.admin_user)
         payload = {
             "author": "invalid_author_id",
             "translations": {
@@ -240,7 +243,7 @@ class BlogPostViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_update_valid(self):
-        self.client.force_authenticate(user=self.user)
+        self.client.force_authenticate(user=self.admin_user)
         payload = {
             "slug": "updated-test-post",
             "category": self.category.id,
@@ -291,7 +294,7 @@ class BlogPostViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertTrue(expected_fields.issubset(set(response.data.keys())))
 
     def test_update_invalid(self):
-        self.client.force_authenticate(user=self.user)
+        self.client.force_authenticate(user=self.admin_user)
         payload = {
             "author": "invalid_author_id",
             "translations": {
@@ -306,7 +309,7 @@ class BlogPostViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_partial_update_valid(self):
-        self.client.force_authenticate(user=self.user)
+        self.client.force_authenticate(user=self.admin_user)
         payload = {
             "translations": {
                 default_language: {"title": "Partially Updated Post Title"}
@@ -346,7 +349,7 @@ class BlogPostViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertTrue(expected_fields.issubset(set(response.data.keys())))
 
     def test_partial_update_invalid(self):
-        self.client.force_authenticate(user=self.user)
+        self.client.force_authenticate(user=self.admin_user)
         payload = {
             "slug": "",
             "translations": {default_language: {"title": "Test Post"}},
@@ -357,7 +360,7 @@ class BlogPostViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_destroy_valid(self):
-        self.client.force_authenticate(user=self.user)
+        self.client.force_authenticate(user=self.admin_user)
         post_to_delete = BlogPostFactory(author=self.author)
 
         url = self.get_post_detail_url(post_to_delete.id)
@@ -367,7 +370,7 @@ class BlogPostViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertFalse(BlogPost.objects.filter(id=post_to_delete.id).exists())
 
     def test_destroy_invalid(self):
-        self.client.force_authenticate(user=self.user)
+        self.client.force_authenticate(user=self.admin_user)
         invalid_post_id = 9999
 
         url = self.get_post_detail_url(invalid_post_id)

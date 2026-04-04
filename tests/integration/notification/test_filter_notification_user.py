@@ -21,6 +21,15 @@ class NotificationUserFilterTest(APITestCase):
     def setUp(self):
         NotificationUser.objects.all().delete()
 
+        self.auth_user = UserAccountFactory(
+            email="auth@example.com",
+            first_name="Auth",
+            last_name="User",
+            is_active=True,
+            is_staff=True,
+        )
+        self.client.force_authenticate(user=self.auth_user)
+
         self.user1 = UserAccountFactory(
             email="user1@example.com",
             first_name="John",

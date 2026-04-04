@@ -11,6 +11,7 @@ jobs:
   push_to_registries:
     name: Push Docker image to multiple registries
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       packages: write
       contents: read
@@ -52,3 +53,5 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          sbom: true
+          provenance: mode=max

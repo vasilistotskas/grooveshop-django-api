@@ -3,6 +3,39 @@
 
 
 
+## v1.91.1 (2026-04-04)
+
+### Bug fixes
+
+* fix(ci): use full semver tag for setup-uv v8 (immutable releases)
+
+setup-uv v8 removed major/minor tags (@v8, @v8.0) for supply chain
+security. Must use full semver @v8.0.0 per GitHub immutable releases.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`b5c1476`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5c1476a6b46a915beae04354521f05fb31b0ede))
+
+* fix(ci): revert setup-uv to v7 (v8 does not exist yet)
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`10990ee`](https://github.com/vasilistotskas/grooveshop-django-api/commit/10990ee1174fe483c4374644119963d362e1a795))
+
+* fix: uv lock ([`a6e5b03`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a6e5b03a63020adc29e7b6416c3eea9525ca55a2))
+
+### Continuous integration
+
+* ci: optimize CI/CD workflows for speed and best practices
+
+- Add concurrency groups to cancel stale runs on new pushes
+- Add paths-ignore to skip CI on docs-only changes
+- Run quality and testing jobs in parallel (was sequential)
+- Bump astral-sh/setup-uv v7 → v8
+- Consolidate env vars at job level (remove per-step repetition)
+- Add timeout-minutes to all jobs
+- Remove broken coverage comment artifact upload
+- Remove single-entry matrix strategy
+- Add SBOM and provenance attestations to Docker builds
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`b4467e8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b4467e8ec7892e8f80b592522b1bbc6c9f2eb224))
+
 ## v1.91.0 (2026-04-04)
 
 ### Bug fixes

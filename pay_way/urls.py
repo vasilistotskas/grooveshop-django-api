@@ -1,4 +1,5 @@
 from django.urls import path
+from rest_framework.urlpatterns import format_suffix_patterns
 
 from pay_way.views import PayWayViewSet
 
@@ -21,3 +22,5 @@ urlpatterns = [
         name="payway-detail",
     ),
 ]
+
+urlpatterns = format_suffix_patterns(urlpatterns)

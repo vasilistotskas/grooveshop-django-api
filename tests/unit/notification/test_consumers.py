@@ -41,27 +41,13 @@ class TestNotificationConsumer(TransactionTestCase):
 
         consumer.accept.assert_called_once()
 
+        # receive is a no-op (server-push only) — messages are discarded
         test_message = {"text": "Hello, world!"}
         await consumer.receive(text_data=json.dumps(test_message))
+        consumer.send.assert_not_called()
 
-        consumer.send.assert_called_with(
-            text_data=json.dumps(
-                {
-                    "type": "echo.message",
-                    "message": test_message,
-                    "from": user.username,
-                }
-            )
-        )
-
-        consumer.send.reset_mock()
         await consumer.receive(text_data="not json")
-
-        consumer.send.assert_called_with(
-            text_data=json.dumps(
-                {"type": "error", "message": "Invalid JSON format"}
-            )
-        )
+        consumer.send.assert_not_called()
 
         await consumer.disconnect(1000)
 
@@ -319,81 +305,13 @@ class TestNotificationConsumer(TransactionTestCase):
         consumer.send.assert_called_with(text_data=json.dumps(event))
 
     @patch("notification.consumers.logger")
-    async def test_receive_with_logging_valid_json(self, mock_logger):
-        user = await self.create_test_user()
-
+    async def test_receive_discards_message_and_logs(self, mock_logger):
         consumer = NotificationConsumer()
-        consumer.user = user
         consumer.send = AsyncMock()
 
-        test_data = {"message": "test"}
-        await consumer.receive(text_data=json.dumps(test_data))
+        await consumer.receive(text_data=json.dumps({"message": "test"}))
 
         mock_logger.debug.assert_called_with(
-            f"Received message: {json.dumps(test_data)}"
+            "Client message received and discarded (server-push only)"
         )
-
-        expected_response = {
-            "type": "echo.message",
-            "message": test_data,
-            "from": user.username,
-        }
-        consumer.send.assert_called_with(
-            text_data=json.dumps(expected_response)
-        )
-
-    @patch("notification.consumers.logger")
-    async def test_receive_with_logging_invalid_json(self, mock_logger):
-        consumer = NotificationConsumer()
-        consumer.send = AsyncMock()
-
-        invalid_json = "not valid json"
-        await consumer.receive(text_data=invalid_json)
-
-        mock_logger.debug.assert_called_with(
-            f"Received message: {invalid_json}"
-        )
-        mock_logger.error.assert_called_with(
-            f"Invalid JSON received: {invalid_json}"
-        )
-
-        expected_response = {"type": "error", "message": "Invalid JSON format"}
-        consumer.send.assert_called_with(
-            text_data=json.dumps(expected_response)
-        )
-
-    @patch("notification.consumers.logger")
-    async def test_receive_with_anonymous_user(self, mock_logger):
-        consumer = NotificationConsumer()
-        consumer.user = None
-        consumer.send = AsyncMock()
-
-        test_data = {"message": "test"}
-        await consumer.receive(text_data=json.dumps(test_data))
-
-        expected_response = {
-            "type": "echo.message",
-            "message": test_data,
-            "from": "anonymous",
-        }
-        consumer.send.assert_called_with(
-            text_data=json.dumps(expected_response)
-        )
-
-    @patch("notification.consumers.logger")
-    async def test_receive_with_anonymous_user_object(self, mock_logger):
-        consumer = NotificationConsumer()
-        consumer.user = AnonymousUser()
-        consumer.send = AsyncMock()
-
-        test_data = {"message": "test"}
-        await consumer.receive(text_data=json.dumps(test_data))
-
-        expected_response = {
-            "type": "echo.message",
-            "message": test_data,
-            "from": "anonymous",
-        }
-        consumer.send.assert_called_with(
-            text_data=json.dumps(expected_response)
-        )
+        consumer.send.assert_not_called()

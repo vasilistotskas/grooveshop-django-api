@@ -8,7 +8,6 @@ from rest_framework.relations import PrimaryKeyRelatedField
 from core.utils.email import is_disposable_domain
 from country.models import Country
 from order.enum.status import OrderStatus
-from order.models.history import OrderHistory
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.serializers.item import (
@@ -145,9 +144,8 @@ class OrderDetailSerializer(OrderSerializer):
             }
         )
 
-        history_records = OrderHistory.objects.filter(order=obj).order_by(
-            "created_at"
-        )
+        # Uses prefetched data from for_detail() — no extra query
+        history_records = obj.history.all()
 
         for history in history_records:
             timeline.append(
@@ -414,45 +412,55 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
 
     def validate(self, data):
         items_data = data.get("items", [])
+
+        # Batch-fetch all products in a single query to avoid N+1.
+        product_ids = []
         for item_data in items_data:
-            product_id = item_data.get("product")
+            product = item_data.get("product")
+            pid = product.id if hasattr(product, "id") else product
+            product_ids.append(pid)
+
+        products_map = {
+            p.pk: p for p in Product.objects.filter(pk__in=product_ids)
+        }
+
+        for item_data in items_data:
+            raw = item_data.get("product")
+            product_id = raw.id if hasattr(raw, "id") else raw
             quantity = item_data.get("quantity", 0)
 
-            try:
-                if hasattr(product_id, "id"):
-                    product = product_id
-                else:
-                    product = Product.objects.get(id=product_id)
-
-                if not product.active:
-                    raise serializers.ValidationError(
-                        _(
-                            "Product with id '{product_name}' is not available."
-                        ).format(
-                            product_name=product.safe_translation_getter(
-                                "name", any_language=True
-                            )
-                        )
-                    )
-
-                if product.stock < quantity:
-                    raise serializers.ValidationError(
-                        _(
-                            "Not enough stock for '{product_name}'. Available: {product_stock}, Requested: {quantity}"
-                        ).format(
-                            product_name=product.safe_translation_getter(
-                                "name", any_language=True
-                            ),
-                            product_stock=product.stock,
-                            quantity=quantity,
-                        )
-                    )
-            except Product.DoesNotExist:
+            product = products_map.get(product_id)
+            if product is None:
                 raise serializers.ValidationError(
                     _("Product with id '{product_id}' does not exist.").format(
                         product_id=product_id
                     )
-                ) from None
+                )
+
+            if not product.active:
+                raise serializers.ValidationError(
+                    _(
+                        "Product with id '{product_name}' is not available."
+                    ).format(
+                        product_name=product.safe_translation_getter(
+                            "name", any_language=True
+                        )
+                    )
+                )
+
+            if product.stock < quantity:
+                raise serializers.ValidationError(
+                    _(
+                        "Not enough stock for '{product_name}'."
+                        " Available: {product_stock}, Requested: {quantity}"
+                    ).format(
+                        product_name=product.safe_translation_getter(
+                            "name", any_language=True
+                        ),
+                        product_stock=product.stock,
+                        quantity=quantity,
+                    )
+                )
 
         return data
 
@@ -632,6 +640,7 @@ class CreatePaymentIntentRequestSerializer(serializers.Serializer):
     payment_data = serializers.DictField(
         required=False,
         default=dict,
+        child=serializers.CharField(max_length=500),
         help_text=_("Additional payment data required by the payment provider"),
     )
 

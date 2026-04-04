@@ -29,7 +29,6 @@ from order.signals import (
     order_status_changed,
 )
 from order.tasks import (
-    generate_order_invoice,
     send_order_confirmation_email,
     send_order_status_update_email,
     send_shipping_notification_email,
@@ -383,12 +382,9 @@ def handle_order_completed(
     """Handle order completed signal."""
     try:
         if order.document_type == OrderDocumentTypeEnum.INVOICE.value:
-            task = generate_order_invoice.delay(order.id)
-            logger.info(
-                "Invoice generation queued for order %s (task_id: %s)",
-                order.id,
-                task.id,
-            )
+            # TODO: Re-enable when generate_order_invoice is implemented
+            # (currently raises NotImplementedError)
+            pass
 
         OrderHistory.log_note(order=order, note="Order completed")
 

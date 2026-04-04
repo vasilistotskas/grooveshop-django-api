@@ -27,6 +27,14 @@ class StripeWebhookDebugMiddleware:
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
+        from django.conf import settings as django_settings
+
+        debug_active = django_settings.DEBUG or getattr(
+            django_settings, "STRIPE_WEBHOOK_DEBUG", False
+        )
+        if not debug_active:
+            return self.get_response(request)
+
         # Only process Stripe webhook paths
         if "/stripe/" in request.path and request.method == "POST":
             self._log_webhook_request(request)

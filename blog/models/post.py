@@ -146,6 +146,13 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
     )
     body = HTMLField(_("Body"), blank=True, null=True)
 
+    def save(self, *args, **kwargs):
+        from core.utils.sanitize import sanitize_html
+
+        if self.body:
+            self.body = sanitize_html(self.body)
+        super().save(*args, **kwargs)
+
     class Meta:
         app_label = "blog"
         db_table = "blog_blogpost_translation"

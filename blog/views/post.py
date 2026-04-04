@@ -14,7 +14,7 @@ from drf_spectacular.utils import (
 )
 from rest_framework import status
 from rest_framework.decorators import action
-
+from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.response import Response
 
 from blog.filters.comment import BlogCommentFilter
@@ -180,6 +180,17 @@ class BlogPostViewSet(BaseModelViewSet):
         "featured",
     ]
     ordering = ["-created_at"]
+
+    def get_permissions(self):
+        if self.action in (
+            "create",
+            "update",
+            "partial_update",
+            "destroy",
+        ):
+            return [IsAdminUser()]
+        return [AllowAny()]
+
     search_fields = [
         "translations__title",
         "translations__subtitle",

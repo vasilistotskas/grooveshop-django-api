@@ -326,7 +326,7 @@ class CartViewSet(BaseModelViewSet):
                     "detail": "Insufficient stock for one or more items",
                     "failed_items": failed_items,
                 },
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_409_CONFLICT,
             )
 
         # Return success with reservation IDs

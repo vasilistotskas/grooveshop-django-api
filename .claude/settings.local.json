@@ -51,7 +51,10 @@
       "Bash(sqlite3:*)",
       "Bash(cd:*)",
       "Bash(gh run:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "WebFetch(domain:developer.viva.com)",
+      "Bash(docker compose:*)"
     ],
     "deny": [],
     "ask": []

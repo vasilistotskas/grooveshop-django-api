@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from django.conf import settings
 from drf_spectacular.utils import extend_schema_view
-
+from rest_framework.permissions import AllowAny, IsAdminUser
 
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
@@ -45,6 +45,17 @@ class CountryViewSet(BaseModelViewSet):
     queryset = Country.objects.all()
     serializers_config = serializers_config
     filterset_class = CountryFilter
+
+    def get_permissions(self):
+        if self.action in (
+            "create",
+            "update",
+            "partial_update",
+            "destroy",
+        ):
+            return [IsAdminUser()]
+        return [AllowAny()]
+
     ordering_fields = [
         "alpha_2",
         "alpha_3",

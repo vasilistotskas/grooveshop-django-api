@@ -283,27 +283,14 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
         return False
 
 
-@shared_task
-def generate_order_invoice(order_id: int) -> bool:
+@shared_task(bind=True, max_retries=3, default_retry_delay=300)
+def generate_order_invoice(self, order_id: int) -> bool:
     try:
-        order = Order.objects.get(id=order_id)
+        Order.objects.get(id=order_id)
 
-        # @TODO - In a real implementation, you would generate a PDF using a library
-        # like weasyprint or reportlab, and store it in a file field on the Order model
-        # or in a separate Invoice model
-
-        # For this example, we'll just log the action
-        logger.info(
-            f"Invoice generated for order #{order.id}",
-            extra={"order_id": order.id},
-        )
-
-        OrderHistory.log_note(
-            order=order,
-            note=f"Invoice generated for order #{order.id}",
-        )
-
-        return True
+        # TODO: Generate a PDF invoice using weasyprint or reportlab,
+        # store it in a file field on the Order model or a separate Invoice model.
+        raise NotImplementedError("Invoice generation not yet implemented")
 
     except Order.DoesNotExist:
         logger.error(
@@ -312,11 +299,18 @@ def generate_order_invoice(order_id: int) -> bool:
         )
         return False
 
+    except NotImplementedError:
+        raise
+
     except Exception as e:
         logger.error(
             f"Error generating invoice for order #{order_id}: {e!s}",
             extra={"order_id": order_id, "error": str(e)},
         )
+
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=e) from e
+
         return False
 
 

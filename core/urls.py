@@ -15,7 +15,6 @@ from core.api.views import (
     get_setting_by_key,
     health_check,
     list_settings,
-    redirect_to_frontend,
 )
 from core.views import (
     HomeView,
@@ -58,11 +57,6 @@ urlpatterns += i18n_patterns(
     path(_("admin/"), admin.site.urls),
     path("upload_image", upload_image, name="upload_image"),
     path("accounts/", include("allauth.urls")),
-    path(
-        "account/provider/callback",
-        redirect_to_frontend,
-        name="provider-callback",
-    ),
     path("_allauth/", include("allauth.headless.urls")),
     path(
         "_allauth/app/v1/account/authenticators/totp/svg",

@@ -8,7 +8,6 @@ from django.utils import timezone
 
 from order.enum.status import OrderStatus
 from order.factories.order import OrderFactory
-from order.models import OrderHistory
 from order.models.order import Order
 from order.tasks import (
     check_pending_orders,
@@ -189,16 +188,9 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         self.assertFalse(result)
         mock_logger.assert_called_once()
 
-    @patch("order.tasks.OrderHistory.log_note")
-    @patch("order.tasks.logger.info")
-    def test_generate_order_invoice_success(
-        self, mock_logger_info, mock_log_note
-    ):
-        result = generate_order_invoice(self.order.id)
-
-        self.assertTrue(result)
-        mock_logger_info.assert_called_once()
-        mock_log_note.assert_called_once()
+    def test_generate_order_invoice_not_implemented(self):
+        with self.assertRaises(NotImplementedError):
+            generate_order_invoice(self.order.id)
 
     @patch("order.tasks.logger.error")
     def test_generate_order_invoice_order_not_found(self, mock_logger):
@@ -206,18 +198,6 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
         self.assertFalse(result)
         mock_logger.assert_called_once()
-
-    @patch("order.tasks.OrderHistory.log_note")
-    @patch("order.tasks.logger.error")
-    def test_generate_order_invoice_exception(
-        self, mock_logger_error, mock_log_note
-    ):
-        mock_log_note.side_effect = Exception("Database error")
-
-        result = generate_order_invoice(self.order.id)
-
-        self.assertFalse(result)
-        mock_logger_error.assert_called_once()
 
     @patch("order.tasks.OrderHistory.log_note")
     @patch("order.tasks.EmailMultiAlternatives")
@@ -364,16 +344,11 @@ class OrderTasksIntegrationTestCase(DjangoTestCase):
         self.assertTrue(Order.objects.filter(id=self.order.id).exists())
 
         original_status = self.order.status
-        result = generate_order_invoice(self.order.id)
 
-        self.assertTrue(result)
+        # generate_order_invoice raises NotImplementedError (stub)
+        with self.assertRaises(NotImplementedError):
+            generate_order_invoice(self.order.id)
+
+        # Order status should not be modified by the failed invoice task
         self.order.refresh_from_db()
         self.assertEqual(self.order.status, original_status)
-
-        history_count = OrderHistory.objects.filter(order=self.order).count()
-
-        generate_order_invoice(self.order.id)
-        new_history_count = OrderHistory.objects.filter(
-            order=self.order
-        ).count()
-        self.assertGreater(new_history_count, history_count)

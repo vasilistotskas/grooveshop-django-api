@@ -615,7 +615,19 @@ def get_celery_beat_schedule():
         },
         "cleanup-expired-stock-reservations": {
             "task": "order.tasks.cleanup_expired_stock_reservations",
-            "schedule": SCHEDULE_PRESETS["every_hour"],
+            "schedule": crontab(minute="*/5"),
+        },
+        "check-pending-orders": {
+            "task": "order.tasks.check_pending_orders",
+            "schedule": SCHEDULE_PRESETS["daily_7am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
+        "update-order-statuses-from-shipping": {
+            "task": "order.tasks.update_order_statuses_from_shipping",
+            "schedule": crontab(hour="*/6", minute="0")
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
         },
         "process-loyalty-points-expiration": {
             "task": "loyalty.tasks.process_points_expiration",
@@ -1797,10 +1809,11 @@ VIVA_WALLET_LIVE_MODE = getenv(
 VIVA_WALLET_WEBHOOK_VERIFICATION_KEY = getenv(
     "VIVA_WALLET_WEBHOOK_VERIFICATION_KEY", ""
 )
+VIVA_WALLET_WEBHOOK_SECRET = getenv("VIVA_WALLET_WEBHOOK_SECRET", "")
 
 
 # SHIPPING SETTINGS
-FEDEX_API_KEY = "fedex_api_key_example"
-FEDEX_ACCOUNT_NUMBER = "fedex_account_number_example"
-UPS_API_KEY = "ups_api_key_example"
-UPS_ACCOUNT_NUMBER = "ups_account_number_example"
+FEDEX_API_KEY = getenv("FEDEX_API_KEY", "")
+FEDEX_ACCOUNT_NUMBER = getenv("FEDEX_ACCOUNT_NUMBER", "")
+UPS_API_KEY = getenv("UPS_API_KEY", "")
+UPS_ACCOUNT_NUMBER = getenv("UPS_ACCOUNT_NUMBER", "")

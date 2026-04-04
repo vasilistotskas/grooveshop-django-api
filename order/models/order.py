@@ -300,7 +300,27 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
 
     @property
     def total_price_items(self) -> Money:
+        """
+        Return the sum of (price * quantity) for all order items.
+
+        Uses the ``items_total`` annotation from ``with_total_amounts()``
+        when available (set by ``for_list()`` and related querysets) to
+        avoid issuing extra DB queries.  Falls back to an aggregation query
+        only when the annotation is absent (e.g. ad-hoc lookups).
+        """
         default_currency = getattr(settings, "DEFAULT_CURRENCY", "EUR")
+
+        # Use pre-computed annotation when present (avoids 2 extra queries).
+        annotated = self.__dict__.get("items_total")
+        if annotated is not None:
+            currency = (
+                self.shipping_price.currency
+                if self.shipping_price
+                else default_currency
+            )
+            return Money(amount=annotated, currency=currency)
+
+        # Fallback: aggregate from the related manager (2 queries).
         result = self.items.aggregate(total=Sum(F("price") * F("quantity")))
         items_total = result.get("total")
 
@@ -309,7 +329,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
                 return Money(0, self.shipping_price.currency)
             return Money(0, default_currency)
 
-        # Get currency from the price_currency field via a single query
+        # Get currency from the price_currency field via a single query.
         currency_row = self.items.values_list(
             "price_currency", flat=True
         ).first()

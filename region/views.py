@@ -5,7 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
-
+from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
@@ -62,6 +62,17 @@ serializers_config: SerializersConfig = {
 class RegionViewSet(BaseModelViewSet):
     queryset = Region.objects.all()
     filterset_class = RegionFilter
+
+    def get_permissions(self):
+        if self.action in (
+            "create",
+            "update",
+            "partial_update",
+            "destroy",
+        ):
+            return [IsAdminUser()]
+        return [AllowAny()]
+
     ordering_fields = ["created_at", "alpha", "sort_order"]
     ordering = ["-created_at"]
     search_fields = ["alpha", "translations__name", "country__alpha_2"]

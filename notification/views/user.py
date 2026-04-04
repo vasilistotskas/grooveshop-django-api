@@ -5,7 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
-
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
@@ -99,6 +99,9 @@ serializers_config: SerializersConfig = {
 class NotificationUserViewSet(BaseModelViewSet):
     queryset = NotificationUser.objects.for_list()
     serializers_config = serializers_config
+
+    def get_permissions(self):
+        return [IsAuthenticated()]
 
     filterset_class = NotificationUserFilter
     ordering_fields = [

@@ -4,6 +4,7 @@ from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_view
 from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny, IsAdminUser
 
 from blog.filters.author import BlogAuthorFilter
 from blog.filters.post import BlogPostFilter
@@ -60,6 +61,16 @@ serializers_config: SerializersConfig = {
 class BlogAuthorViewSet(BaseModelViewSet):
     queryset = BlogAuthor.objects.none()
     serializers_config = serializers_config
+
+    def get_permissions(self):
+        if self.action in (
+            "create",
+            "update",
+            "partial_update",
+            "destroy",
+        ):
+            return [IsAdminUser()]
+        return [AllowAny()]
 
     def get_filterset_class(self):
         if self.action == "posts":

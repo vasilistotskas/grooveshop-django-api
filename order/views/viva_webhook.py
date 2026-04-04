@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 import json
 import logging
 from base64 import b64encode
@@ -95,6 +97,45 @@ def _fetch_verification_key():
         return ""
 
 
+def _verify_hmac_signature(request) -> bool:
+    """Verify the HMAC-SHA256 signature on an incoming Viva Wallet webhook.
+
+    Returns True when verification passes or is skipped (unconfigured secret).
+    Returns False when a secret is configured but the signature does not match.
+    """
+    secret = getattr(settings, "VIVA_WALLET_WEBHOOK_SECRET", "")
+
+    if not secret:
+        logger.warning(
+            "VIVA_WALLET_WEBHOOK_SECRET is not configured — "
+            "rejecting webhook request"
+        )
+        return False
+
+    received_sig = request.headers.get("X-Viva-Signature", "")
+    if not received_sig:
+        logger.warning(
+            "Viva Wallet webhook received without X-Viva-Signature header"
+        )
+        return False
+
+    expected_sig = hmac.new(
+        secret.encode(), request.body, hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(expected_sig, received_sig):
+        logger.warning(
+            "Viva Wallet webhook HMAC signature mismatch",
+            extra={
+                "expected": expected_sig[:8] + "...",
+                "received": received_sig[:8] + "...",
+            },
+        )
+        return False
+
+    return True
+
+
 def _verify_transaction(transaction_id):
     from order.payment import VivaWalletPaymentProvider
 
@@ -112,6 +153,9 @@ def _verify_transaction(transaction_id):
 
 def _handle_webhook_event(request):
     from django.db import transaction
+
+    if not _verify_hmac_signature(request):
+        return JsonResponse({"error": "Invalid signature"}, status=403)
 
     try:
         body = json.loads(request.body)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from django.db.models import Count, ExpressionWrapper, F, Sum
+from django.db.models import Count, ExpressionWrapper, F, Prefetch, Sum
 from djmoney.models.fields import MoneyField
 
 from core.managers import OptimizedManager, OptimizedQuerySet
@@ -62,7 +62,8 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
         """
         Optimized queryset for list views.
 
-        Includes user, payment info, and counts but not full item details.
+        Includes user, payment info, counts, and pre-aggregated item totals
+        so that Order.total_price_items avoids extra DB queries.
         """
         return (
             self.exclude_deleted()
@@ -70,6 +71,7 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
             .with_payment_info()
             .with_items_basic()
             .with_counts()
+            .with_total_amounts()
         )
 
     def for_detail(self) -> Self:
@@ -78,12 +80,22 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
 
         Includes everything from for_list() plus full item details.
         """
+        from order.models.history import OrderHistory
+
         return (
             self.exclude_deleted()
             .with_user()
             .with_payment_info()
             .with_items()
             .with_counts()
+            .prefetch_related(
+                Prefetch(
+                    "history",
+                    queryset=OrderHistory.objects.select_related(
+                        "user"
+                    ).order_by("created_at"),
+                )
+            )
         )
 
     # Status filter methods

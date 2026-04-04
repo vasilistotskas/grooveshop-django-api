@@ -70,15 +70,19 @@ class Representation(TypedDict):
     }
 )
 class ContentObjectRelatedField(serializers.RelatedField):
-    def to_representation(self, value):
-        if isinstance(value, Product):
-            serializer = importlib.import_module(
-                "product.serializers.product"
-            ).ProductSerializer(value)
-        else:
-            raise Exception("Unexpected type of object")
+    SERIALIZER_REGISTRY: dict[type, str] = {
+        Product: "product.serializers.product.ProductSerializer",
+    }
 
-        return serializer.data
+    def to_representation(self, value):
+        for model_cls, serializer_path in self.SERIALIZER_REGISTRY.items():
+            if isinstance(value, model_cls):
+                module_path, cls_name = serializer_path.rsplit(".", 1)
+                module = importlib.import_module(module_path)
+                serializer_cls = getattr(module, cls_name)
+                return serializer_cls(value).data
+
+        raise ValueError(f"Unexpected type of object: {type(value).__name__}")
 
 
 @extend_schema_field(

@@ -3,6 +3,18 @@
 
 
 
+## v1.92.1 (2026-04-05)
+
+### Bug fixes
+
+* fix(deps): move pyjwt from dev to production dependencies
+
+allauth's Facebook provider imports jwt at runtime (jwtkit module),
+but pyjwt was only in dev dependencies. Production Docker images built
+with --no-dev crash with ModuleNotFoundError: No module named 'jwt'.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`fca792a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fca792aa5532c3c51d0413b94f79288574611a03))
+
 ## v1.92.0 (2026-04-05)
 
 ### Bug fixes

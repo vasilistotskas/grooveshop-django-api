@@ -3,6 +3,91 @@
 
 
 
+## v1.92.0 (2026-04-05)
+
+### Bug fixes
+
+* fix(test): update review test for read-only status field
+
+The status field is now read-only in ProductReviewWriteSerializer
+(security fix). Update test to assert the original status is preserved
+when a user sends a status value.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`75b9892`](https://github.com/vasilistotskas/grooveshop-django-api/commit/75b9892ecc4a577c71a9fd2ceab50f1170654fe5))
+
+* fix(ci): set DEBUG=True in CI environment variables
+
+When DEBUG defaults to False (our security fix), SECURE_SSL_REDIRECT
+becomes True and STATIC_URL changes, causing 301 redirects on every
+test request in CI. CI needs DEBUG=True at settings load time —
+conftest.py already overrides it to False for actual test execution.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`61a46ff`](https://github.com/vasilistotskas/grooveshop-django-api/commit/61a46ff323cf48b80f834e9771e2c143f43a8570))
+
+* fix(ci): remove --no-migrations and fix coverage source for parallel
+
+--no-migrations breaks CI because pg_trgm extension is installed via
+migrations. Also fix coverage source from ["*"] to ["."] and add
+thread concurrency for correct parallel coverage collection with xdist.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`b7fc190`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b7fc1906e34fc1f15aa8d542e0a5306ba599e3a6))
+
+* fix(settings): add public whitelist for get_setting_by_key endpoint
+
+The frontend needs access to checkout and loyalty settings without
+admin auth. Instead of making the endpoint fully public, introduce
+a PUBLIC_SETTING_KEYS whitelist — only whitelisted keys are accessible
+without authentication, all other keys require admin access.
+list_settings remains admin-only.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`cbefa22`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cbefa22b8df001343ad52a8b6b2b1031742300a8))
+
+* fix(docker): use daphne instead of uvicorn for production CMD
+
+Daphne is the official recommended ASGI server for Django Channels
+per both Django and Channels documentation. The previous change
+incorrectly used uvicorn which is not the recommended server for
+Channels WebSocket support.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`a542e67`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a542e6706da3ace09c22bc8bd7ec7ce9b65d626b))
+
+* fix: resolve critical security, data integrity, and performance issues
+
+Security:
+- Default DEBUG to False, crash on missing SECRET_KEY in production
+- Add auth to list_settings, get_setting_by_key, notifications_by_ids
+- Make review status/is_published, comment user, paid_amount read-only
+- Validate search language_code to prevent Meilisearch filter injection
+- Fix open redirect in SocialAccountAdapter via URL allowlist
+
+Data integrity:
+- Remove duplicate order_canceled signal (double emails/loyalty reversals)
+- Guard post_create_historical_record for Product instances only
+- Change OrderItem.product on_delete from CASCADE to PROTECT
+- Add paid_amount_currency to all update_fields for django-money
+- Skip pre_save DB query when update_fields excludes status
+- Fix federated search string-to-int ID conversion for result enrichment
+
+Performance & CI:
+- Enable parallel coverage in CI (-n auto instead of -n0)
+- Add --no-migrations, --dist worksteal, hypothesis CI profile
+- Reduce test timeout 600s to 120s, strip test middleware
+- Set CONN_MAX_AGE=600, session backend to cached_db
+- Fix Dockerfile CMD to uvicorn, add --no-dev, fix compose && bug
+
+Correctness:
+- Fix my_orders double-pagination, meilisearch --batch_size arg type
+- Reorder Celery config_from_object before conf.update for time limits
+- Fix LoyaltyTierTranslation to use TranslationsForeignKey
+- Fix NotificationUser related_names and admin references
+- Remove uv add lockfile mutation from CI
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`0182b5c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0182b5cfa5c0e006453d0d6ba70d3b26b4a8b95d))
+
+### Features
+
+* feat: Update schema.yml ([`7c44fec`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7c44feccd8868b79cc6ad54d02f47f29a23e6b27))
+
 ## v1.91.1 (2026-04-04)
 
 ### Bug fixes

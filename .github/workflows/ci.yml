@@ -26,6 +26,7 @@ permissions:
 
 env:
   SYSTEM_ENV: ci
+  DEBUG: 'True'
   MEILI_HOST: 127.0.0.1
   UV_VERSION: '0.11.3'
   FORCE_COLOR: 1

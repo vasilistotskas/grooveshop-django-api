@@ -492,6 +492,22 @@ def list_settings(request):
         )
 
 
+PUBLIC_SETTING_KEYS = frozenset(
+    {
+        "CHECKOUT_SHIPPING_PRICE",
+        "FREE_SHIPPING_THRESHOLD",
+        "LOYALTY_ENABLED",
+        "LOYALTY_REDEMPTION_RATIO_EUR",
+        "LOYALTY_POINTS_FACTOR",
+        "LOYALTY_TIER_MULTIPLIER_ENABLED",
+        "LOYALTY_POINTS_EXPIRATION_DAYS",
+        "LOYALTY_NEW_CUSTOMER_BONUS_ENABLED",
+        "LOYALTY_NEW_CUSTOMER_BONUS_POINTS",
+        "LOYALTY_XP_PER_LEVEL",
+    }
+)
+
+
 @extend_schema(
     summary=_("Get setting by key"),
     description=_("Retrieve a specific setting value by its key name"),
@@ -512,9 +528,12 @@ def list_settings(request):
     },
 )
 @api_view(["GET"])
-@permission_classes([IsAdminUser])
 def get_setting_by_key(request):
-    """Get a specific setting by its key name."""
+    """Get a specific setting by its key name.
+
+    Public (whitelisted) keys are accessible without authentication.
+    All other keys require admin access.
+    """
     try:
         from extra_settings.models import Setting
 
@@ -529,6 +548,17 @@ def get_setting_by_key(request):
                 error_data,
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        if key not in PUBLIC_SETTING_KEYS:
+            if not (
+                request.user
+                and request.user.is_authenticated
+                and request.user.is_staff
+            ):
+                return Response(
+                    {"detail": _("Setting not found or access denied.")},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
 
         try:
             setting_value = Setting.get(key)

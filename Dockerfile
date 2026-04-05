@@ -58,4 +58,4 @@ COPY --from=builder --chown=app:app ${APP_PATH} .
 RUN mkdir -p ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles ${APP_PATH}/backups \
     && chown -R app:app ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles ${APP_PATH}/backups
 
-CMD [".venv/bin/uvicorn", "asgi:application", "--host", "0.0.0.0", "--port", "8000"]
+CMD [".venv/bin/daphne", "-b", "0.0.0.0", "-p", "8000", "asgi:application"]

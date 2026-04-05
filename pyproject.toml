@@ -115,7 +115,7 @@ source = ["."]
 [tool.coverage.run]
 branch = true
 parallel = true
-concurrency = ["multiprocessing"]
+concurrency = ["multiprocessing", "thread"]
 omit = [
     "*/tests/*",
     "*/migrations/*",
@@ -128,7 +128,7 @@ omit = [
     "core/storages.py",
     "*/wsgi/*",
 ]
-source = ["*"]
+source = ["."]
 relative_files = true
 
 [tool.coverage.report]

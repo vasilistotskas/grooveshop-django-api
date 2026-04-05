@@ -3,6 +3,22 @@
 
 
 
+## v1.92.2 (2026-04-05)
+
+### Bug fixes
+
+* fix(deps): sync lockfile with v1.92.1 version bump
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`52cd75a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/52cd75a9f0f3c379bd35665bd58ef75d0f268967))
+
+* fix(asgi): move TokenAuthMiddlewareStack import after django.setup()
+
+The import triggered AnonymousUser model loading before
+get_asgi_application() called django.setup(), causing
+AppRegistryNotReady on daphne startup.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`8fcd225`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8fcd225969a2ac7827422f293b5e44557afeb38d))
+
 ## v1.92.1 (2026-04-05)
 
 ### Bug fixes

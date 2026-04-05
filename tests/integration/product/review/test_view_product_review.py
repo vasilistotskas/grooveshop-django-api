@@ -158,7 +158,8 @@ class ProductReviewViewSetTestCase(APITestCase):
 
         review = ProductReview.objects.get(id=response.data["id"])
         self.assertEqual(review.rate, 3)
-        self.assertEqual(review.status, "TRUE")
+        # status and is_published are read-only — sent values are ignored
+        self.assertEqual(review.status, self.product_review.status)
 
     def test_partial_update_request_response_serializers(self):
         payload = {

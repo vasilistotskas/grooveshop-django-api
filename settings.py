@@ -28,9 +28,17 @@ load_dotenv_file()
 
 SYSTEM_ENV = getenv("SYSTEM_ENV", "dev")
 
-SECRET_KEY = getenv("SECRET_KEY", "changeme")
+SECRET_KEY = getenv("SECRET_KEY", "")
+if not SECRET_KEY:
+    if SYSTEM_ENV == "production":
+        from django.core.exceptions import ImproperlyConfigured
 
-DEBUG = getenv("DEBUG", "True") == "True"
+        raise ImproperlyConfigured(
+            "SECRET_KEY environment variable is required in production."
+        )
+    SECRET_KEY = "insecure-dev-key-do-not-use-in-production"
+
+DEBUG = getenv("DEBUG", "False") == "True"
 
 DJANGO_ADMIN_FORCE_ALLAUTH = (
     getenv("DJANGO_ADMIN_FORCE_ALLAUTH", "True") == "True"
@@ -61,7 +69,7 @@ STATIC_BASE_URL = getenv("STATIC_BASE_URL", "http://localhost:8000")
 
 ALLOWED_HOSTS: list[str] = []
 
-_default_allowed_hosts = "*" if DEBUG else ""
+_default_allowed_hosts = "localhost,127.0.0.1,0.0.0.0" if DEBUG else ""
 additional_hosts = getenv("ALLOWED_HOSTS", _default_allowed_hosts).split(",")
 ALLOWED_HOSTS.extend(filter(None, additional_hosts))
 
@@ -753,9 +761,9 @@ DEFAULT_CURRENCY = getenv("DEFAULT_CURRENCY", "EUR")
 CURRENCIES = ("EUR", "USD")
 CURRENCY_CHOICES = [("EUR", "EUR €"), ("USD", "USD $")]
 
-CONN_HEALTH_CHECKS = False
+CONN_HEALTH_CHECKS = True
 ATOMIC_REQUESTS = False
-CONN_MAX_AGE = 0
+CONN_MAX_AGE = 600
 INDEX_MAXIMUM_EXPR_COUNT = 8000
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
 
@@ -764,7 +772,7 @@ DATABASES = {
         "ATOMIC_REQUESTS": False,
         "AUTOCOMMIT": True,
         "CONN_HEALTH_CHECKS": True,
-        "CONN_MAX_AGE": 0,
+        "CONN_MAX_AGE": 600,
         "TIME_ZONE": getenv("TIME_ZONE", "Europe/Athens"),
         "ENGINE": "django.db.backends.postgresql",
         "HOST": getenv("DB_HOST", "db"),
@@ -1506,7 +1514,7 @@ SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_SAVE_EVERY_REQUEST = False
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
-SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+SESSION_ENGINE = "django.contrib.sessions.backends.cached_db"
 SESSION_FILE_PATH = None
 SESSION_SERIALIZER = "django.contrib.sessions.serializers.JSONSerializer"
 

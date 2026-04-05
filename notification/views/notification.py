@@ -7,7 +7,8 @@ from drf_spectacular.utils import (
     OpenApiParameter,
 )
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from notification.models.notification import Notification
@@ -39,6 +40,7 @@ from notification.serializers.notification import NotificationSerializer
     methods=["POST"],
 )
 @api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def notifications_by_ids(request):
     seen_query = request.query_params.get("seen", None)
     notification_ids = request.data.get("ids", [])

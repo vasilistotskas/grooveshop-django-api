@@ -242,7 +242,7 @@ class BlogCommentDetailSerializer(BlogCommentSerializer):
 class BlogCommentWriteSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[BlogComment]
 ):
-    user = PrimaryKeyRelatedField(queryset=User.objects.all(), required=False)
+    user = PrimaryKeyRelatedField(read_only=True)
     post = PrimaryKeyRelatedField(queryset=BlogPost.objects.all())
     parent = PrimaryKeyRelatedField(
         queryset=BlogComment.objects.all(), required=False, allow_null=True

@@ -29,12 +29,12 @@ COPY pyproject.toml .
 COPY uv.lock .
 
 RUN mkdir -p ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles && \
-    uv sync --frozen --no-install-project --no-editable
+    uv sync --frozen --no-install-project --no-editable --no-dev
 
 COPY . .
 # Copy pre-built Tailwind CSS from tailwind-builder stage
 COPY --from=tailwind-builder ${APP_PATH}/static/css/styles.css ./static/css/styles.css
-RUN uv sync --frozen --no-editable
+RUN uv sync --frozen --no-editable --no-dev
 ENTRYPOINT []
 
 FROM python:${PYTHON_VERSION}-alpine${ALPINE_VERSION} AS production
@@ -58,4 +58,4 @@ COPY --from=builder --chown=app:app ${APP_PATH} .
 RUN mkdir -p ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles ${APP_PATH}/backups \
     && chown -R app:app ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles ${APP_PATH}/backups
 
-CMD [".venv/bin/python", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD [".venv/bin/uvicorn", "asgi:application", "--host", "0.0.0.0", "--port", "8000"]

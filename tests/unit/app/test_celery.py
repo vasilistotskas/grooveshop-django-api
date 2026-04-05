@@ -20,8 +20,11 @@ class CeleryConfigTestCase(TestCase):
         app = celery.create_celery_app()
 
         self.assertTrue(mock_celery.called)
-        self.assertEqual(app.conf.enable_utc, True)
-        self.assertEqual(app.conf.timezone, mock_celery_instance.conf.timezone)
+        # config_from_object is called first, then conf.update overrides
+        mock_celery_instance.config_from_object.assert_called_once_with(
+            "django.conf:settings", namespace="CELERY"
+        )
+        mock_celery_instance.conf.update.assert_called_once()
         self.assertTrue(app.autodiscover_tasks.called)
 
     def tearDown(self):

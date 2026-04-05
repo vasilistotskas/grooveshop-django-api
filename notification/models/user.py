@@ -16,12 +16,12 @@ class UnseenNotificationUserManager(models.Manager):
 class NotificationUser(TimeStampMixinModel, UUIDModel):
     user = models.ForeignKey(
         "user.UserAccount",
-        related_name="notification",
+        related_name="notification_users",
         on_delete=models.CASCADE,
     )
     notification = models.ForeignKey(
         "notification.Notification",
-        related_name="user",
+        related_name="notification_users",
         on_delete=models.CASCADE,
     )
     seen = models.BooleanField(_("Seen"), default=False)

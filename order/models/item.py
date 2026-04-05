@@ -22,7 +22,7 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
     product = models.ForeignKey(
         "product.Product",
         related_name="order_items",
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
     )
     price = MoneyField(_("Price"), max_digits=11, decimal_places=2)
     quantity = models.IntegerField(_("Quantity"), default=1)

@@ -434,6 +434,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
                 "payment_id",
                 "payment_method",
                 "paid_amount",
+                "paid_amount_currency",
             ]
         )
 

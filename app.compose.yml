@@ -36,8 +36,8 @@ services:
       context: .
       dockerfile: ./dev.Dockerfile
     command: >
-      uv run python manage.py migrate &&
-      uv run python manage.py collectstatic --noinput
+      sh -c "uv run python manage.py migrate &&
+      uv run python manage.py collectstatic --noinput"
     env_file:
       - ./.env
     environment:

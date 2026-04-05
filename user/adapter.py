@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from allauth.account.adapter import DefaultAccountAdapter
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from django.conf import settings
+from django.utils.http import url_has_allowed_host_and_scheme
 
 if TYPE_CHECKING:  # pragma: no cover
     from allauth.socialaccount.models import SocialAccount
@@ -21,4 +22,12 @@ class SocialAccountAdapter(DefaultSocialAccountAdapter):
 
     def get_connect_redirect_url(self, request, social_account: SocialAccount):
         url = request.POST.get("next") or request.GET.get("next")
-        return url if url else f"{settings.NUXT_BASE_URL}/account"
+        allowed_hosts = {
+            settings.APP_MAIN_HOST_NAME,
+            settings.NUXT_BASE_DOMAIN,
+        }
+        if url and url_has_allowed_host_and_scheme(
+            url, allowed_hosts=allowed_hosts
+        ):
+            return url
+        return f"{settings.NUXT_BASE_URL}/account"

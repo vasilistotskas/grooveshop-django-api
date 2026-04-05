@@ -369,7 +369,7 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
 
 class OrderWriteSerializer(serializers.ModelSerializer[Order]):
     items = OrderItemCreateSerializer(many=True)
-    paid_amount = MoneyField(max_digits=11, decimal_places=2, required=False)
+    paid_amount = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     shipping_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     payment_method_fee = MoneyField(
         max_digits=11, decimal_places=2, read_only=True
@@ -554,7 +554,7 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
             OrderItem._skip_stock_deduction = False
 
         order.paid_amount = order.calculate_order_total_amount()
-        order.save(update_fields=["paid_amount"])
+        order.save(update_fields=["paid_amount", "paid_amount_currency"])
 
         # Mark order to send signal after transaction commits
         order._send_created_signal = True

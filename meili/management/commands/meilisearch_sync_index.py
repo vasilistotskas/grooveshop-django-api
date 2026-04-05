@@ -28,7 +28,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--batch_size",
-            action="store_true",
+            type=int,
             default=DEFAULT_BATCH_SIZE,
             help="The batch size you want to import in (default: 1000)",
         )

@@ -27,6 +27,9 @@ product_price_increased = django.dispatch.Signal()
 def post_create_historical_record_callback(
     sender, instance, history_instance, **kwargs
 ):
+    if not isinstance(instance, Product):
+        return
+
     from order.models.stock_log import StockLog
 
     prev_record = getattr(history_instance, "prev_record", None)

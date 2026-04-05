@@ -408,8 +408,8 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
 
     @admin.display(description=_("Engagement"))
     def engagement_stats(self, obj):
-        total_users = obj.user.count()
-        seen_users = obj.user.filter(seen=True).count()
+        total_users = obj.notification_users.count()
+        seen_users = obj.notification_users.filter(seen=True).count()
         unseen_users = total_users - seen_users
 
         engagement_rate = (seen_users / max(total_users, 1)) * 100
@@ -520,8 +520,8 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
 
     @admin.display(description=_("Engagement Summary"))
     def engagement_summary(self, obj):
-        total_users = obj.user.count()
-        seen_users = obj.user.filter(seen=True).count()
+        total_users = obj.notification_users.count()
+        seen_users = obj.notification_users.filter(seen=True).count()
         unseen_users = total_users - seen_users
 
         if total_users > 0:

@@ -219,7 +219,7 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 timeout = 600
-addopts = "--tb=short --maxfail=0 -n auto"
+addopts = "--tb=short --maxfail=0 -n auto --dist worksteal"
 
 # ─────────────────────────────────────────────────────────
 # Django-stubs configuration

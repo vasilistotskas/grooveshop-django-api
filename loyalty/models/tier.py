@@ -6,6 +6,7 @@ from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
+from parler.fields import TranslationsForeignKey
 from parler.models import TranslatableModel, TranslatedFieldsModel
 
 from core.fields.image import ImageAndSvgField
@@ -73,7 +74,7 @@ class LoyaltyTier(
 
 
 class LoyaltyTierTranslation(TranslatedFieldsModel):
-    master = models.ForeignKey(
+    master = TranslationsForeignKey(
         LoyaltyTier,
         related_name="translations",
         on_delete=models.CASCADE,

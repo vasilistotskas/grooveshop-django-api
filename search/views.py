@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 from urllib.parse import unquote
 
+from django.conf import settings as django_settings
 from django.db.models import Avg, Count
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -16,9 +17,9 @@ from rest_framework.response import Response
 
 from blog.models.post import BlogPostTranslation
 from core.api.serializers import ErrorResponseSerializer
-from search.greeklish import expand_greeklish_query
 from meili._client import client as meili_client
 from product.models.product import ProductTranslation
+from search.greeklish import expand_greeklish_query
 from search.models import SearchClick, SearchQuery
 from search.serializers import (
     BlogPostMeiliSearchResponseSerializer,
@@ -30,6 +31,26 @@ from search.serializers import (
 )
 
 logger = logging.getLogger(__name__)
+
+_VALID_LANGUAGE_CODES = frozenset(
+    code for code, _name in django_settings.LANGUAGES
+)
+_MAX_SEARCH_LIMIT = 100
+
+
+def _parse_int(value: str | None, default: int, name: str) -> int:
+    if value is None:
+        return default
+    try:
+        return max(0, int(value))
+    except (ValueError, TypeError):
+        raise ValidationError({name: _("Must be a valid integer.")})
+
+
+def _validate_language_code(language_code: str | None) -> str | None:
+    if language_code and language_code not in _VALID_LANGUAGE_CODES:
+        raise ValidationError({"language_code": _("Invalid language code.")})
+    return language_code
 
 
 @extend_schema(
@@ -84,9 +105,14 @@ def blog_post_meili_search(request):
     if not query:
         raise ValidationError({"error": _("A search query is required.")})
 
-    limit = int(request.query_params.get("limit", 10))
-    offset = int(request.query_params.get("offset", 0))
-    language_code = request.query_params.get("language_code")
+    limit = min(
+        _parse_int(request.query_params.get("limit"), 10, "limit"),
+        _MAX_SEARCH_LIMIT,
+    )
+    offset = _parse_int(request.query_params.get("offset"), 0, "offset")
+    language_code = _validate_language_code(
+        request.query_params.get("language_code")
+    )
 
     decoded_query = unquote(query)
 
@@ -243,9 +269,14 @@ def product_meili_search(request):
 
     # Parse query parameters
     query = request.query_params.get("query", "")
-    limit = int(request.query_params.get("limit", 20))
-    offset = int(request.query_params.get("offset", 0))
-    language_code = request.query_params.get("language_code")
+    limit = min(
+        _parse_int(request.query_params.get("limit"), 20, "limit"),
+        _MAX_SEARCH_LIMIT,
+    )
+    offset = _parse_int(request.query_params.get("offset"), 0, "offset")
+    language_code = _validate_language_code(
+        request.query_params.get("language_code")
+    )
 
     # Parse filter parameters
     price_min = request.query_params.get("price_min")
@@ -414,9 +445,14 @@ def federated_search(request):
     if not query:
         raise ValidationError({"error": _("A search query is required.")})
 
-    limit = int(request.query_params.get("limit", 20))
-    offset = int(request.query_params.get("offset", 0))
-    language_code = request.query_params.get("language_code")
+    limit = min(
+        _parse_int(request.query_params.get("limit"), 20, "limit"),
+        _MAX_SEARCH_LIMIT,
+    )
+    offset = _parse_int(request.query_params.get("offset"), 0, "offset")
+    language_code = _validate_language_code(
+        request.query_params.get("language_code")
+    )
 
     # Decode and expand query for Greek language
     decoded_query = unquote(query)
@@ -529,11 +565,13 @@ def federated_search(request):
     enriched_results = []
     for index_type, obj_id, hit in hit_metadata:
         try:
+            # Meilisearch returns string IDs; map keys are int PKs
+            int_id = int(obj_id)
             if index_type == "product":
-                obj = product_map.get(obj_id)
+                obj = product_map.get(int_id)
                 serializer_class = ProductTranslationSerializer
             else:
-                obj = blog_map.get(obj_id)
+                obj = blog_map.get(int_id)
                 serializer_class = BlogPostTranslationSerializer
 
             if not obj:

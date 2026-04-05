@@ -5,7 +5,28 @@ from django.conf import settings
 from django.contrib.sites.models import Site
 from django.core.cache import cache
 from django.db import connection, connections, reset_queries
+from hypothesis import HealthCheck
+from hypothesis import settings as hypothesis_settings
 
+# Hypothesis profiles for different environments
+hypothesis_settings.register_profile(
+    "ci",
+    max_examples=50,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow],
+    derandomize=True,
+)
+hypothesis_settings.register_profile(
+    "dev",
+    max_examples=10,
+    deadline=None,
+)
+hypothesis_settings.register_profile(
+    "default",
+    max_examples=100,
+    deadline=None,
+)
+hypothesis_settings.load_profile(os.getenv("HYPOTHESIS_PROFILE", "default"))
 
 settings.PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.MD5PasswordHasher",
@@ -14,6 +35,18 @@ settings.PASSWORD_HASHERS = [
 settings.DISABLE_CACHE = True
 settings.MEILISEARCH["OFFLINE"] = True
 settings.SESSION_ENGINE = "django.contrib.sessions.backends.db"
+
+# Strip unnecessary middleware for test performance
+settings.MIDDLEWARE = [
+    m
+    for m in settings.MIDDLEWARE
+    if m
+    not in {
+        "django.middleware.gzip.GZipMiddleware",
+        "core.middleware.stripe_webhook.StripeWebhookDebugMiddleware",
+        "core.middleware.asgi_compat.ASGICompatMiddleware",
+    }
+]
 
 # Use process-local in-memory cache instead of Redis for test isolation.
 # With pytest-xdist (-n auto), each worker is a separate process with its own

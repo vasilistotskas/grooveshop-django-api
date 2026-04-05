@@ -183,6 +183,11 @@ def handle_order_pre_save(
     sender: type[Order], instance: Order, **kwargs: Any
 ) -> None:
     """Store previous order status before save."""
+    update_fields = kwargs.get("update_fields")
+    if update_fields and "status" not in update_fields:
+        instance._previous_status = instance.status
+        return
+
     try:
         if instance.pk:
             instance._previous_status = (

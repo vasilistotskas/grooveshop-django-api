@@ -97,6 +97,7 @@ class ProductReviewWriteSerializer(
             "is_published",
             "translations",
         )
+        read_only_fields = ("status", "is_published")
 
     def validate_rate(self, value: int) -> int:
         valid_rates = [choice[0] for choice in RateEnum.choices]

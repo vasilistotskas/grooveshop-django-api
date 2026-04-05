@@ -16,10 +16,15 @@ def config_loggers(*args, **kwargs):
 
 def create_celery_app():
     tasker = Celery("core")
-    tasker.conf.enable_utc = True
-    tasker.conf.update(timezone=os.getenv("TIME_ZONE", "Europe/Athens"))
 
+    # Load Django settings first (CELERY_* namespace)
+    tasker.config_from_object("django.conf:settings", namespace="CELERY")
+
+    # Override with explicit values AFTER config_from_object
+    # so these take precedence over settings.py
     tasker.conf.update(
+        enable_utc=True,
+        timezone=os.getenv("TIME_ZONE", "Europe/Athens"),
         # Close database connections after each task
         worker_pool_restarts=True,
         # Don't store task results in database to avoid connection issues
@@ -33,7 +38,6 @@ def create_celery_app():
         task_time_limit=600,  # 10 minutes
     )
 
-    tasker.config_from_object("django.conf:settings", namespace="CELERY")
     tasker.autodiscover_tasks()
 
     # Minimal connection management - let Django handle most of it

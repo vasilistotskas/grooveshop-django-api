@@ -893,15 +893,12 @@ class OrderViewSet(BaseModelViewSet):
 
         filtered_qs = self.filter_queryset(user_orders)
 
-        page = self.paginate_queryset(filtered_qs)
         response_serializer_class = self.get_response_serializer()
-        if page is not None:
-            return self.paginate_and_serialize(
-                page, request, serializer_class=response_serializer_class
-            )
-
-        serializer = response_serializer_class(filtered_qs, many=True)
-        return Response(serializer.data)
+        return self.paginate_and_serialize(
+            filtered_qs,
+            request,
+            serializer_class=response_serializer_class,
+        )
 
     @action(detail=True, methods=["POST"])
     def add_tracking(self, request, *args, **kwargs):

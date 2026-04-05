@@ -22,7 +22,7 @@ from order.exceptions import (
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.models.stock_reservation import StockReservation
-from order.signals import order_canceled, order_refunded
+from order.signals import order_refunded
 from order.stock import StockManager
 
 logger = logging.getLogger(__name__)
@@ -100,7 +100,7 @@ class OrderService:
                 OrderItem.objects.create(order=order, **item_to_create)
 
             order.paid_amount = order.calculate_order_total_amount()
-            order.save(update_fields=["paid_amount"])
+            order.save(update_fields=["paid_amount", "paid_amount_currency"])
 
             logger.info(
                 "Order %s created successfully with %s items",
@@ -505,7 +505,13 @@ class OrderService:
                 max(0, order_total.amount - loyalty_discount.amount),
                 order_total.currency,
             )
-            order.save(update_fields=["paid_amount", "metadata"])
+            order.save(
+                update_fields=[
+                    "paid_amount",
+                    "paid_amount_currency",
+                    "metadata",
+                ]
+            )
 
             # Step 8: Clear cart
             cart.items.all().delete()
@@ -896,7 +902,13 @@ class OrderService:
                 max(0, order_total.amount - loyalty_discount.amount),
                 order_total.currency,
             )
-            order.save(update_fields=["paid_amount", "metadata"])
+            order.save(
+                update_fields=[
+                    "paid_amount",
+                    "paid_amount_currency",
+                    "metadata",
+                ]
+            )
 
             # Step 7: Clear cart
             cart.items.all().delete()
@@ -1275,12 +1287,9 @@ class OrderService:
                 update_fields=["status", "status_updated_at", "metadata"]
             )
 
-            order_canceled.send(
-                sender=cls,
-                order=order,
-                previous_status=old_status,
-                reason=reason,
-            )
+            # order_canceled signal is dispatched by
+            # handle_order_status_changed via the post_save chain.
+            # Do not send it manually here to avoid double-firing.
 
             logger.info(
                 "Order %s canceled successfully (previous status: %s)",

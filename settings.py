@@ -793,9 +793,10 @@ DATABASES = {
         "ATOMIC_REQUESTS": False,
         "AUTOCOMMIT": True,
         "CONN_HEALTH_CHECKS": True,
-        # CONN_MAX_AGE is ignored when OPTIONS["pool"] is set; the pool
-        # manages connection lifetimes itself.
-        "CONN_MAX_AGE": None if DB_POOL_ENABLED else 600,
+        # When OPTIONS["pool"] is set, the pool manages connection
+        # lifetimes itself; Django requires CONN_MAX_AGE == 0 in this
+        # mode (raises ImproperlyConfigured otherwise).
+        "CONN_MAX_AGE": 0 if DB_POOL_ENABLED else 600,
         "TIME_ZONE": getenv("TIME_ZONE", "Europe/Athens"),
         "ENGINE": "django.db.backends.postgresql",
         "HOST": getenv("DB_HOST", "db"),

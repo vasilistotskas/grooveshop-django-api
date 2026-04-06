@@ -4,7 +4,7 @@
 
 ## Overview
 
-A headless e-commerce API built with Django 5.2 and Django REST Framework. Supports both
+A headless e-commerce API built with Django 6.0 and Django REST Framework. Supports both
 WSGI (Gunicorn) and ASGI (Daphne/Uvicorn) with real-time WebSocket notifications via
 Django Channels. Uses Knox + Django Allauth for authentication (token API + social/MFA),
 Celery with RabbitMQ broker for background tasks, PostgreSQL 17 for data storage, Redis
@@ -52,7 +52,7 @@ All Django apps live at the project root (flat structure, no `src/` directory):
 
 ## Technologies
 
-- **Frameworks**: Django 5.2, Django REST Framework 3.16
+- **Frameworks**: Django 6.0, Django REST Framework 3.16
 - **Authentication**: Django REST Knox (API tokens), Django Allauth (accounts, social, MFA)
 - **Database**: PostgreSQL 17
 - **Cache / Channels**: Redis
@@ -69,7 +69,7 @@ All Django apps live at the project root (flat structure, no `src/` directory):
 ### Prerequisites
 
 - Python 3.14 or higher
-- Django 5.2 or higher
+- Django 6.0 or higher
 - PostgreSQL 17
 - Redis
 - RabbitMQ

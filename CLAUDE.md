@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-GrooveShop Django API — a headless e-commerce API built with Django 5.2 and Django REST Framework. Supports both WSGI (Gunicorn) and ASGI (Daphne/Uvicorn) with WebSocket notifications via Django Channels. Uses PostgreSQL 17, Redis, Celery (RabbitMQ broker), and Meilisearch. Python 3.14.2, managed with uv.
+GrooveShop Django API — a headless e-commerce API built with Django 6.0 and Django REST Framework. Supports both WSGI (Gunicorn) and ASGI (Daphne/Uvicorn) with WebSocket notifications via Django Channels. Uses PostgreSQL 17, Redis, Celery (RabbitMQ broker), and Meilisearch. Python 3.14.2, managed with uv.
 
 ## Common Commands
 

@@ -3,6 +3,34 @@
 
 
 
+## v1.92.3 (2026-04-06)
+
+### Bug fixes
+
+* fix(deps): sync lockfile with v1.92.2 version bump
+
+The v1.92.2 release commit bumped pyproject.toml but not uv.lock,
+causing uv sync --locked to fail in CI.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`3cd79fe`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3cd79fe7e616b46560738aeb38682a9fe2e5a491))
+
+* fix(db): enable psycopg connection pool to bound ASGI DB connections
+
+Django docs explicitly recommend disabling persistent connections
+(CONN_MAX_AGE) when running under ASGI and using the database backend's
+built-in pool instead. Without this, asgiref's per-request
+ThreadPoolExecutor leaks Django thread-local connections that are only
+released when the worker thread is GC'd, exhausting Postgres
+max_connections under load.
+
+Switches DATABASES.default.OPTIONS to use psycopg_pool (Django 5.1+
+native support) with a bounded pool (default min_size=2, max_size=8,
+timeout=10s). All knobs are env-var configurable. CONN_MAX_AGE is set
+to None when the pool is enabled because the pool manages connection
+lifetimes itself.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`8041546`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8041546ce19e73909f61e9bce556c768580c8d76))
+
 ## v1.92.2 (2026-04-05)
 
 ### Bug fixes

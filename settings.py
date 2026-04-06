@@ -763,16 +763,39 @@ CURRENCY_CHOICES = [("EUR", "EUR €"), ("USD", "USD $")]
 
 CONN_HEALTH_CHECKS = True
 ATOMIC_REQUESTS = False
-CONN_MAX_AGE = 600
 INDEX_MAXIMUM_EXPR_COUNT = 8000
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
+
+# Use psycopg connection pool to bound DB connections per process. Each
+# process maintains a pool of <DB_POOL_MAX_SIZE> connections regardless of
+# the number of threads opened by the ASGI handler. Without this, asgiref's
+# per-request ThreadPoolExecutor leaks Django thread-local connections that
+# are only released when the worker thread is GC'd, which can exhaust
+# Postgres max_connections under load.
+DB_POOL_ENABLED = getenv("DB_POOL_ENABLED", "True") == "True"
+DB_POOL_MIN_SIZE = int(getenv("DB_POOL_MIN_SIZE", "2"))
+DB_POOL_MAX_SIZE = int(getenv("DB_POOL_MAX_SIZE", "8"))
+DB_POOL_TIMEOUT = float(getenv("DB_POOL_TIMEOUT", "10"))
+
+_db_options: dict = {
+    "connect_timeout": 5,
+    "options": "-c statement_timeout=30000 -c idle_in_transaction_session_timeout=10000",
+}
+if DB_POOL_ENABLED:
+    _db_options["pool"] = {
+        "min_size": DB_POOL_MIN_SIZE,
+        "max_size": DB_POOL_MAX_SIZE,
+        "timeout": DB_POOL_TIMEOUT,
+    }
 
 DATABASES = {
     "default": {
         "ATOMIC_REQUESTS": False,
         "AUTOCOMMIT": True,
         "CONN_HEALTH_CHECKS": True,
-        "CONN_MAX_AGE": 600,
+        # CONN_MAX_AGE is ignored when OPTIONS["pool"] is set; the pool
+        # manages connection lifetimes itself.
+        "CONN_MAX_AGE": None if DB_POOL_ENABLED else 600,
         "TIME_ZONE": getenv("TIME_ZONE", "Europe/Athens"),
         "ENGINE": "django.db.backends.postgresql",
         "HOST": getenv("DB_HOST", "db"),
@@ -780,10 +803,7 @@ DATABASES = {
         "USER": getenv("DB_USER", "postgres"),
         "PASSWORD": getenv("DB_PASSWORD", "postgres"),
         "PORT": getenv("DB_PORT", "5432"),
-        "OPTIONS": {
-            "connect_timeout": 5,
-            "options": "-c statement_timeout=30000 -c idle_in_transaction_session_timeout=10000",
-        },
+        "OPTIONS": _db_options,
     },
 }
 

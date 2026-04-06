@@ -3,6 +3,23 @@
 
 
 
+## v1.92.4 (2026-04-06)
+
+### Bug fixes
+
+* fix(deps): sync lockfile with v1.92.3 version bump
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`be20ad3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/be20ad31a1a45f2196d6976605aa87277ab3aa81))
+
+* fix(db): set CONN_MAX_AGE to 0 when psycopg pool is enabled
+
+Django's postgresql backend raises ImproperlyConfigured("Pooling
+doesn't support persistent connections.") when CONN_MAX_AGE is
+non-zero AND the pool is enabled. The check is `!= 0`, so None is
+also rejected.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`85cb79e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/85cb79e4d542fb9bda6fa1da3b926827543ef723))
+
 ## v1.92.3 (2026-04-06)
 
 ### Bug fixes

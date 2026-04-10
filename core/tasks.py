@@ -435,19 +435,17 @@ def send_inactive_user_notifications() -> dict[str, Any]:
             mail_subject = _("We miss you!")
 
             context = {
-                "user_id": user_id,
-                "first_name": first_name or username,
+                "user": {
+                    "id": user_id,
+                    "first_name": first_name,
+                    "username": username,
+                    "email": email,
+                },
                 "app_base_url": settings.NUXT_BASE_URL,
-                "SITE_NAME": getattr(settings, "SITE_NAME", "Our Shop"),
-                "INFO_EMAIL": getattr(
-                    settings, "INFO_EMAIL", "support@example.com"
-                ),
-                "SITE_URL": getattr(
-                    settings, "SITE_URL", "https://example.com"
-                ),
-                "STATIC_BASE_URL": getattr(
-                    settings, "STATIC_BASE_URL", "https://example.com"
-                ),
+                "SITE_NAME": settings.SITE_NAME,
+                "INFO_EMAIL": settings.INFO_EMAIL,
+                "SITE_URL": settings.NUXT_BASE_URL,
+                "STATIC_BASE_URL": settings.STATIC_BASE_URL,
             }
 
             message = render_to_string(

@@ -35,7 +35,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
-        SITE_URL="http://example.com",
+        NUXT_BASE_URL="http://example.com",
         STATIC_BASE_URL="http://example.com",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
     )
@@ -68,7 +68,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
-        SITE_URL="http://example.com",
+        NUXT_BASE_URL="http://example.com",
         STATIC_BASE_URL="http://example.com",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
     )
@@ -111,7 +111,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
-        SITE_URL="http://example.com",
+        NUXT_BASE_URL="http://example.com",
         STATIC_BASE_URL="http://example.com",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
     )
@@ -143,7 +143,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
-        SITE_URL="http://example.com",
+        NUXT_BASE_URL="http://example.com",
         STATIC_BASE_URL="http://example.com",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
     )
@@ -205,7 +205,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
-        SITE_URL="http://example.com",
+        NUXT_BASE_URL="http://example.com",
         STATIC_BASE_URL="http://example.com",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
     )
@@ -319,7 +319,7 @@ class OrderTasksIntegrationTestCase(DjangoTestCase):
     @override_settings(
         SITE_NAME="GrooveShop",
         INFO_EMAIL="support@example.com",
-        SITE_URL="http://example.com",
+        NUXT_BASE_URL="http://example.com",
         STATIC_BASE_URL="http://example.com",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
     )

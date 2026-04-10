@@ -57,13 +57,11 @@ def send_subscription_confirmation(
             "confirmation_url": confirmation_url.format(
                 token=subscription.confirmation_token
             ),
-            "SITE_NAME": getattr(settings, "SITE_NAME", "Website"),
-            "SITE_URL": getattr(settings, "SITE_URL", ""),
-            "INFO_EMAIL": getattr(
-                settings, "INFO_EMAIL", settings.DEFAULT_FROM_EMAIL
-            ),
-            "STATIC_BASE_URL": getattr(settings, "STATIC_BASE_URL", ""),
-            "LANGUAGE_CODE": getattr(settings, "LANGUAGE_CODE", "el"),
+            "SITE_NAME": settings.SITE_NAME,
+            "SITE_URL": settings.NUXT_BASE_URL,
+            "INFO_EMAIL": settings.INFO_EMAIL,
+            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+            "LANGUAGE_CODE": settings.LANGUAGE_CODE,
         }
 
         subject = _("Confirm your subscription to {topic}").format(
@@ -109,7 +107,7 @@ def generate_unsubscribe_link(user: "User", topic: SubscriptionTopic) -> str:
     token = default_token_generator.make_token(user)
     uid = urlsafe_base64_encode(force_bytes(user.pk))
 
-    base_url = getattr(settings, "SITE_URL", "https://example.com")
+    base_url = settings.NUXT_BASE_URL
     unsubscribe_url = f"{base_url}/unsubscribe/{uid}/{token}/{topic.slug}/"
 
     return unsubscribe_url
@@ -142,7 +140,7 @@ def send_newsletter(
                 "topic": topic,
                 "subscription": subscription,
                 "unsubscribe_url": generate_unsubscribe_link(user, topic),
-                "preferences_url": f"{getattr(settings, 'SITE_URL', '')}/account/subscriptions/",
+                "preferences_url": f"{settings.NUXT_BASE_URL}/account/subscriptions/",
             }
         )
 

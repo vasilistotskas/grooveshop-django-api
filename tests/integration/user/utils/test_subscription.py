@@ -151,7 +151,7 @@ class TestSubscriptionUtils:
 
         assert result is False
 
-    @override_settings(SITE_URL="https://test-site.com")
+    @override_settings(NUXT_BASE_URL="https://test-site.com")
     @patch("user.utils.subscription.default_token_generator")
     @patch("user.utils.subscription.urlsafe_base64_encode")
     def test_generate_unsubscribe_link(self, mock_encode, mock_token_gen):
@@ -165,7 +165,7 @@ class TestSubscriptionUtils:
         mock_token_gen.make_token.assert_called_once_with(self.user)
         mock_encode.assert_called_once()
 
-    @override_settings(SITE_URL="")
+    @override_settings(NUXT_BASE_URL="")
     @patch("user.utils.subscription.default_token_generator")
     @patch("user.utils.subscription.urlsafe_base64_encode")
     def test_generate_unsubscribe_link_no_site_url(
@@ -180,7 +180,8 @@ class TestSubscriptionUtils:
         assert result == expected_url
 
     @override_settings(
-        DEFAULT_FROM_EMAIL="noreply@test.com", SITE_URL="https://test-site.com"
+        DEFAULT_FROM_EMAIL="noreply@test.com",
+        NUXT_BASE_URL="https://test-site.com",
     )
     @patch("user.utils.subscription.render_to_string")
     @patch("user.utils.subscription.EmailMultiAlternatives")
@@ -221,7 +222,8 @@ class TestSubscriptionUtils:
         assert mock_email.send.call_count == 2
 
     @override_settings(
-        DEFAULT_FROM_EMAIL="noreply@test.com", SITE_URL="https://test-site.com"
+        DEFAULT_FROM_EMAIL="noreply@test.com",
+        NUXT_BASE_URL="https://test-site.com",
     )
     @patch("user.utils.subscription.render_to_string")
     @patch("user.utils.subscription.EmailMultiAlternatives")
@@ -254,7 +256,8 @@ class TestSubscriptionUtils:
         mock_email.send.assert_not_called()
 
     @override_settings(
-        DEFAULT_FROM_EMAIL="noreply@test.com", SITE_URL="https://test-site.com"
+        DEFAULT_FROM_EMAIL="noreply@test.com",
+        NUXT_BASE_URL="https://test-site.com",
     )
     @patch("user.utils.subscription.render_to_string")
     @patch("user.utils.subscription.EmailMultiAlternatives")

@@ -15,7 +15,7 @@
 
 {% trans "We'd love to hear your feedback! How was your shopping experience?" %}
 {% trans "Visit our website to rate your experience." %}
-{{ SITE_URL }}/orders/{{ order.id }}/review
+{{ SITE_URL }}/account/orders/{{ order.id }}
 
 {% trans "Thank you for shopping with us!" %}
 

@@ -89,6 +89,11 @@ class SampleOrderDataGenerator:
         order_data["total_price"] = f"€{total_price:.2f}"
         order_data["paid_amount"] = f"€{total_price:.2f}"
 
+        # Format item prices for template display (after arithmetic)
+        for item in items_data:
+            item["price"] = f"€{item['price']:.2f}"
+            item["total_price"] = f"€{item['total_price']:.2f}"
+
         # Add status and status_display at root level for templates
         current_status = order_data.get("status", "PENDING")
         status_display = self.get_status_display(current_status)
@@ -149,7 +154,6 @@ class SampleOrderDataGenerator:
                     "price_formatted": f"€{price:.2f}",
                     "total_price": total_price,
                     "total_price_formatted": f"€{total_price:.2f}",
-                    "get_total_price": f"€{total_price:.2f}",
                 }
             )
 

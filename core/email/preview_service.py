@@ -189,7 +189,6 @@ class EmailTemplatePreviewService:
                     "quantity": item.quantity,
                     "price": f"€{item_price:.2f}",
                     "total_price": f"€{item_total:.2f}",
-                    "get_total_price": f"€{item_total:.2f}",
                 }
             )
 
@@ -262,14 +261,13 @@ class EmailTemplatePreviewService:
         """Render template with context."""
         from django.template import TemplateDoesNotExist, TemplateSyntaxError
         from django.utils import translation
-        import os
 
         # Add context processor variables that are needed for email templates
         # These match what's provided by core.context_processors.metadata
         context = {
             **context,
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
-            "SITE_NAME": os.getenv("SITE_NAME", "Grooveshop"),
+            "SITE_NAME": settings.SITE_NAME,
             "SITE_URL": settings.NUXT_BASE_URL,
             "INFO_EMAIL": settings.INFO_EMAIL,
             "LANGUAGE_CODE": translation.get_language()
@@ -426,4 +424,4 @@ class EmailTemplatePreviewService:
                 )
 
         # Fallback to generic subject
-        return f"Email from {settings.SITE_NAME if hasattr(settings, 'SITE_NAME') else 'Grooveshop'}"
+        return f"Email from {settings.SITE_NAME}"

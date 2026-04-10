@@ -27,14 +27,10 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
         context = {
             "order": order,
             "items": order.items.all(),
-            "SITE_NAME": getattr(settings, "SITE_NAME", "Our Shop"),
-            "INFO_EMAIL": getattr(
-                settings, "INFO_EMAIL", "support@example.com"
-            ),
-            "SITE_URL": getattr(settings, "SITE_URL", "https://example.com"),
-            "STATIC_BASE_URL": getattr(
-                settings, "STATIC_BASE_URL", "https://example.com"
-            ),
+            "SITE_NAME": settings.SITE_NAME,
+            "INFO_EMAIL": settings.INFO_EMAIL,
+            "SITE_URL": settings.NUXT_BASE_URL,
+            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
 
         subject = _("Order Confirmation - #{order_id}").format(
@@ -50,9 +46,9 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
         msg = EmailMultiAlternatives(
             subject,
             text_content,
-            getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@example.com"),
+            settings.DEFAULT_FROM_EMAIL,
             [order.email],
-            reply_to=[getattr(settings, "INFO_EMAIL", "support@example.com")],
+            reply_to=[settings.INFO_EMAIL],
         )
         msg.attach_alternative(html_content, "text/html")
 
@@ -115,14 +111,10 @@ def send_order_status_update_email(
             "items": order.items.select_related("product").all(),
             "status": status,
             "status_display": OrderStatus(status).label,
-            "SITE_NAME": getattr(settings, "SITE_NAME", "Our Shop"),
-            "INFO_EMAIL": getattr(
-                settings, "INFO_EMAIL", "support@example.com"
-            ),
-            "SITE_URL": getattr(settings, "SITE_URL", "https://example.com"),
-            "STATIC_BASE_URL": getattr(
-                settings, "STATIC_BASE_URL", "https://example.com"
-            ),
+            "SITE_NAME": settings.SITE_NAME,
+            "INFO_EMAIL": settings.INFO_EMAIL,
+            "SITE_URL": settings.NUXT_BASE_URL,
+            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
 
         template_base = f"emails/order/order_{status.lower()}"
@@ -149,9 +141,9 @@ def send_order_status_update_email(
         msg = EmailMultiAlternatives(
             subject,
             text_content,
-            getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@example.com"),
+            settings.DEFAULT_FROM_EMAIL,
             [order.email],
-            reply_to=[getattr(settings, "INFO_EMAIL", "support@example.com")],
+            reply_to=[settings.INFO_EMAIL],
         )
         msg.attach_alternative(html_content, "text/html")
 
@@ -216,14 +208,10 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
             "order": order,
             "tracking_number": order.tracking_number,
             "carrier": order.shipping_carrier,
-            "SITE_NAME": getattr(settings, "SITE_NAME", "Our Shop"),
-            "INFO_EMAIL": getattr(
-                settings, "INFO_EMAIL", "support@example.com"
-            ),
-            "SITE_URL": getattr(settings, "SITE_URL", "https://example.com"),
-            "STATIC_BASE_URL": getattr(
-                settings, "STATIC_BASE_URL", "https://example.com"
-            ),
+            "SITE_NAME": settings.SITE_NAME,
+            "INFO_EMAIL": settings.INFO_EMAIL,
+            "SITE_URL": settings.NUXT_BASE_URL,
+            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
 
         subject = _("Your Order #{order_id} Has Shipped").format(
@@ -239,9 +227,9 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
         msg = EmailMultiAlternatives(
             subject,
             text_content,
-            getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@example.com"),
+            settings.DEFAULT_FROM_EMAIL,
             [order.email],
-            reply_to=[getattr(settings, "INFO_EMAIL", "support@example.com")],
+            reply_to=[settings.INFO_EMAIL],
         )
         msg.attach_alternative(html_content, "text/html")
 
@@ -326,16 +314,10 @@ def check_pending_orders() -> int:
         for order in pending_orders:
             context = {
                 "order": order,
-                "SITE_NAME": getattr(settings, "SITE_NAME", "Our Shop"),
-                "INFO_EMAIL": getattr(
-                    settings, "INFO_EMAIL", "support@example.com"
-                ),
-                "SITE_URL": getattr(
-                    settings, "SITE_URL", "https://example.com"
-                ),
-                "STATIC_BASE_URL": getattr(
-                    settings, "STATIC_BASE_URL", "https://example.com"
-                ),
+                "SITE_NAME": settings.SITE_NAME,
+                "INFO_EMAIL": settings.INFO_EMAIL,
+                "SITE_URL": settings.NUXT_BASE_URL,
+                "STATIC_BASE_URL": settings.STATIC_BASE_URL,
             }
 
             subject = _("Reminder: Complete Your Order #{order_id}").format(

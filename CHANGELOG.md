@@ -3,6 +3,22 @@
 
 
 
+## v1.93.0 (2026-04-10)
+
+### Documentation
+
+* docs: update Django version references from 5.2 to 6.0
+
+The project upgraded to Django 6.0.x but CLAUDE.md and README.md
+still cited 5.2. Migration file headers are auto-generated and left
+as-is (historical record).
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`e272bd4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e272bd40671168882a0a11abbc06e7c5aeb26b8b))
+
+### Features
+
+* feat: Bump Versions ([`701ec00`](https://github.com/vasilistotskas/grooveshop-django-api/commit/701ec002b663979e91c29188e923f8bdeca383ec))
+
 ## v1.92.4 (2026-04-06)
 
 ### Bug fixes

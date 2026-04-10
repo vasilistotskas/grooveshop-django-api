@@ -3,6 +3,41 @@
 
 
 
+## v1.93.1 (2026-04-10)
+
+### Bug fixes
+
+* fix(email): revert item price formatting in sample data generator
+
+The formatting loop added in the previous commit converted Decimal item
+prices to formatted strings, breaking 3 unit tests that assert item
+prices are Decimal values. Item prices must stay as Decimals since tests
+and the total calculation depend on numeric types.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`5c301a6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5c301a63396c1916012b8303e4e19f74e2e15aca))
+
+* fix: update uv lock ([`e2ed438`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e2ed4388eb7ea8f4ae1485400ee345cbde5d00ba))
+
+* fix(email): use correct Django settings for site name, URLs, and email context
+
+SITE_NAME and SITE_URL were never defined in settings.py, so every email
+task/notification always fell back to "Our Shop" and "https://example.com".
+This meant all customer-facing emails had wrong branding and broken links.
+
+- Add SITE_NAME to settings.py (from SITE_NAME env var)
+- Replace all getattr(settings, "SITE_URL", ...) with settings.NUXT_BASE_URL
+- Replace all getattr(settings, "SITE_NAME", "Our Shop") with settings.SITE_NAME
+- Fix order_confirmation template using non-existent item.get_total_price
+  (model property is total_price — item totals were silently empty in real emails)
+- Fix inactive user email task passing scalar fields instead of user dict
+  (template expects user.first_name/user.email which rendered empty)
+- Fix order_pending_reminder dark mode: add inline text color on yellow card
+- Fix order_delivered link from /orders/ID/review to /account/orders/ID
+- Fix email_base.html hardcoded "GrooveShop" title to use {{ SITE_NAME }}
+- Update tests to override NUXT_BASE_URL instead of non-existent SITE_URL
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`26ff724`](https://github.com/vasilistotskas/grooveshop-django-api/commit/26ff7247fc1868a0928eceeb8a877f3bdfbcf5db))
+
 ## v1.93.0 (2026-04-10)
 
 ### Documentation

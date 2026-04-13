@@ -3,6 +3,21 @@
 
 
 
+## v1.93.4 (2026-04-13)
+
+### Bug fixes
+
+* fix: update uv lock ([`cda90d0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cda90d0c290d2927620769a3aacdeac95f6fc4f8))
+
+* fix(cache): remove @cache_methods from BlogCommentViewSet (staff data leak)
+
+BlogCommentViewSet cached list/retrieve responses but its get_queryset
+branches on is_staff — staff users see unapproved comments while non-staff
+only see approved ones. The URL-keyed cache served whichever response was
+cached first to all users, leaking unapproved comments to non-staff.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`40173f8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/40173f83b5d72b9a4660beed945ac74785689bec))
+
 ## v1.93.3 (2026-04-13)
 
 ### Bug fixes

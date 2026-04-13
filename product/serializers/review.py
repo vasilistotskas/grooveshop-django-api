@@ -20,12 +20,26 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
 
 
+class ProductBriefSerializer(serializers.ModelSerializer[Product]):
+    """Minimal product representation for use in list-level review serializer."""
+
+    name = serializers.SerializerMethodField()
+    main_image_path = serializers.ReadOnlyField()
+
+    def get_name(self, obj) -> str | None:
+        return obj.safe_translation_getter("name", any_language=True)
+
+    class Meta:
+        model = Product
+        fields = ("id", "name", "slug", "main_image_path")
+
+
 class ProductReviewSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[ProductReview]
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=ProductReview)
     user = UserDetailsSerializer(read_only=True)
-    product = ProductSerializer(read_only=True)
+    product = ProductBriefSerializer(read_only=True)
 
     class Meta:
         model = ProductReview

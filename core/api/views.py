@@ -424,7 +424,8 @@ def health_check(request):
     }
 
     try:
-        connection.cursor()
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
         health_status["database"] = True
     except DatabaseError:
         health_status["database"] = False

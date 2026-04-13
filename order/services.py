@@ -80,12 +80,14 @@ class OrderService:
                         )
                     )
 
-                if product.stock < quantity:
-                    raise InsufficientStockError(
-                        product_id=product.id,
-                        available=product.stock,
-                        requested=quantity,
-                    )
+                # Atomic stock decrement via StockManager (uses
+                # select_for_update() to prevent race conditions).
+                StockManager.decrement_stock(
+                    product_id=product.id,
+                    quantity=quantity,
+                    order_id=order.id,
+                    reason="order_created",
+                )
 
                 item_to_create = item_data.copy()
 

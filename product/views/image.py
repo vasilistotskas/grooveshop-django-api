@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from django.conf import settings
 from drf_spectacular.utils import extend_schema_view
-
+from rest_framework.permissions import AllowAny, IsAdminUser
 
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
@@ -42,6 +42,12 @@ serializers_config: SerializersConfig = {
 class ProductImageViewSet(BaseModelViewSet):
     queryset = ProductImage.objects.all()
     serializers_config = serializers_config
+
+    def get_permissions(self):
+        if self.action in ("create", "update", "partial_update", "destroy"):
+            return [IsAdminUser()]
+        return [AllowAny()]
+
     filterset_fields = [
         "id",
         "product",

@@ -36,6 +36,8 @@ logger = logging.getLogger(__name__)
 _VALID_LANGUAGE_CODES = frozenset(
     code for code, _name in django_settings.LANGUAGES
 )
+
+
 def _get_max_search_limit() -> int:
     return Setting.get("SEARCH_MAX_LIMIT", default=100)
 

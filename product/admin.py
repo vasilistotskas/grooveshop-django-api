@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import admin_thumbnails
 from django.contrib import admin, messages
-from django.db.models import Q, Sum, Count, Avg, Prefetch
+from django.db.models import F, Q, Sum, Count, Avg, Prefetch
 from django.http import HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse_lazy
@@ -266,9 +266,7 @@ class StockReservationStatusFilter(DropdownFilter):
                     ),
                 )
             )
-            return queryset.filter(reserved_qty__gt=0).extra(
-                where=["reserved_qty > stock * 0.5"]
-            )
+            return queryset.filter(reserved_qty__gt=F("stock") * 0.5)
 
         return queryset
 

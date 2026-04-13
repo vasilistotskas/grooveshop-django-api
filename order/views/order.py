@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import uuid
 
-from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
@@ -28,7 +27,6 @@ from core.utils.serializers import (
     SerializersConfig,
     create_schema_view_config,
 )
-from core.utils.views import cache_methods
 from order.exceptions import (
     InsufficientStockError,
     InvalidOrderDataError,
@@ -166,7 +164,6 @@ serializers_config: SerializersConfig = {
         error_serializer=ErrorResponseSerializer,
     ),
 )
-@cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class OrderViewSet(BaseModelViewSet):
     queryset = Order.objects.all()
     serializers_config = serializers_config

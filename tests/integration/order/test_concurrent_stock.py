@@ -528,9 +528,7 @@ class TestConcurrentStockOperationsPreventOverselling:
 
         # Count successes and failures (excluding connection errors)
         successes = [r for r in business_results if r["success"]]
-        failures = [
-            r for r in business_results if not r["success"]
-        ]
+        failures = [r for r in business_results if not r["success"]]
 
         # Calculate total reserved quantity
         total_reserved = sum(r["quantity"] for r in successes)
@@ -564,8 +562,7 @@ class TestConcurrentStockOperationsPreventOverselling:
         available = StockManager.get_available_stock(product.id)
         expected_available = 50 - total_reserved
         assert available == expected_available, (
-            f"Available stock should be {expected_available}, "
-            f"got {available}"
+            f"Available stock should be {expected_available}, got {available}"
         )
 
         # Verify: No unexpected (non-connection) errors
@@ -573,6 +570,5 @@ class TestConcurrentStockOperationsPreventOverselling:
             r for r in results if "error" in r and r not in conn_errors
         ]
         assert len(unexpected_errors) == 0, (
-            f"No unexpected errors should occur, but got: "
-            f"{unexpected_errors}"
+            f"No unexpected errors should occur, but got: {unexpected_errors}"
         )

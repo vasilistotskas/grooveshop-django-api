@@ -45,6 +45,7 @@ def mock_meili_client():
         yield mock_client
 
 
+@pytest.mark.django_db
 class TestFederatedSearchProperties:
     """Test suite for federated search properties."""
 
@@ -221,6 +222,7 @@ class TestFederatedSearchProperties:
         assert federation["limit"] == total_limit
 
 
+@pytest.mark.django_db
 class TestFederatedSearchEdgeCases:
     """Test suite for federated search edge cases."""
 

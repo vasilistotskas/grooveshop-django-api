@@ -141,7 +141,12 @@ class ProductFavouriteViewSet(BaseModelViewSet):
         )
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=["POST"], pagination_class=None)
+    @action(
+        detail=False,
+        methods=["POST"],
+        pagination_class=None,
+        permission_classes=[IsAuthenticated],
+    )
     def favourites_by_products(self, request, *args, **kwargs):
         user = request.user
         request_serializer_class = self.get_request_serializer()

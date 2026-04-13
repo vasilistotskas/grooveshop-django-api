@@ -2,19 +2,19 @@
 Search analytics middleware for tracking search queries.
 
 This middleware automatically tracks search queries to /api/search/* endpoints
-and creates SearchQuery records asynchronously without blocking the response.
+and creates SearchQuery records without blocking the response.
 """
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import logging
 from typing import Callable, cast
 
+from django.db import transaction
 from django.http import HttpRequest, HttpResponseBase
 from django.utils.deprecation import MiddlewareMixin
-
-from search.models import SearchQuery
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
     Features:
     - Tracks all search endpoints (product, blog, federated)
     - Extracts query parameters and results metadata
-    - Creates SearchQuery records asynchronously
+    - Dispatches a Celery task to persist the record without blocking the response
     - Handles failures gracefully (logs but doesn't break requests)
     - Captures user information (authenticated user, session, IP, user agent)
 
@@ -68,11 +68,10 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
         self, request: HttpRequest, response: HttpResponseBase
     ) -> None:
         """
-        Track search query asynchronously.
+        Track search query without blocking the response.
 
-        This method extracts query parameters and results metadata from
-        the request and response, then creates a SearchQuery record.
-        Failures are logged but don't affect the response.
+        Dispatches a Celery task via on_commit so the DB write is fully
+        decoupled from the request/response cycle.
 
         Args:
             request: The HTTP request
@@ -100,7 +99,7 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
                 if hasattr(response, "content"):
                     response_data = json.loads(response.content.decode("utf-8"))
                     results_count = len(response_data.get("results", []))
-                    # Handle both snake_case and camelCase (DRF middleware converts to camelCase)
+                    # Handle both snake_case and camelCase
                     estimated_total_hits = response_data.get(
                         "estimatedTotalHits"
                     ) or response_data.get("estimated_total_hits", 0)
@@ -120,18 +119,23 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
             ip_address = self._get_client_ip(request)
             user_agent = request.META.get("HTTP_USER_AGENT", "")
 
-            # Create SearchQuery record (non-blocking — errors are caught)
-            SearchQuery.objects.create(
-                query=query,
-                language_code=language_code,
-                content_type=content_type,
-                results_count=results_count,
-                estimated_total_hits=estimated_total_hits,
-                processing_time_ms=processing_time_ms,
-                user=user,
-                session_key=session_key,
-                ip_address=ip_address,
-                user_agent=user_agent,
+            # Dispatch to Celery after the current transaction commits so the
+            # DB write does not block the response path.
+            from search.tasks import save_search_query
+
+            transaction.on_commit(
+                lambda: save_search_query.delay(
+                    query=query,
+                    language_code=language_code,
+                    content_type=content_type,
+                    results_count=results_count,
+                    estimated_total_hits=estimated_total_hits,
+                    processing_time_ms=processing_time_ms,
+                    user_id=user.pk if user else None,
+                    session_key=session_key,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                )
             )
 
             logger.debug(
@@ -176,7 +180,11 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
         """
         Extract client IP address from request.
 
-        Handles proxy headers (X-Forwarded-For) for accurate IP detection.
+        The app runs behind a single trusted reverse proxy (Traefik in K8s).
+        REMOTE_ADDR is the proxy address (a private/loopback IP), so we use
+        the *rightmost* entry in X-Forwarded-For — the one appended by our
+        trusted proxy — rather than the leftmost, which an attacker can spoof.
+        If REMOTE_ADDR is not a private IP we trust it directly.
 
         Args:
             request: The HTTP request
@@ -184,12 +192,19 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
         Returns:
             Client IP address or None if not available
         """
-        # Check for proxy headers first
-        x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
-        if x_forwarded_for:
-            # X-Forwarded-For can contain multiple IPs, take the first one
-            ip = x_forwarded_for.split(",")[0].strip()
-            return ip
+        remote_addr = request.META.get("REMOTE_ADDR", "")
 
-        # Fall back to REMOTE_ADDR
-        return request.META.get("REMOTE_ADDR")
+        try:
+            addr = ipaddress.ip_address(remote_addr)
+            behind_proxy = (
+                addr.is_loopback or addr.is_private or addr.is_link_local
+            )
+        except ValueError:
+            behind_proxy = False
+
+        if behind_proxy:
+            xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
+            entries = [e.strip() for e in xff.split(",") if e.strip()]
+            return entries[-1] if entries else remote_addr or None
+
+        return remote_addr or None

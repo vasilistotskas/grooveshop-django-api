@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+from django.db import transaction
 from django.dispatch import receiver
 
 from order.models.order import Order
@@ -23,7 +24,8 @@ def handle_order_completed_loyalty(
         if order.user_id:
             from loyalty.tasks import process_order_points
 
-            process_order_points.delay_on_commit(order.id)
+            order_id = order.id
+            transaction.on_commit(lambda: process_order_points.delay(order_id))
     except Exception:
         logger.exception(
             "Failed to queue loyalty points for order %s", order.id
@@ -44,7 +46,8 @@ def handle_order_canceled_loyalty(
         if order.user_id:
             from loyalty.tasks import reverse_order_points
 
-            reverse_order_points.delay_on_commit(order.id)
+            order_id = order.id
+            transaction.on_commit(lambda: reverse_order_points.delay(order_id))
     except Exception:
         logger.exception(
             "Failed to queue loyalty reversal for order %s", order.id
@@ -65,7 +68,8 @@ def handle_order_refunded_loyalty(
         if order.user_id:
             from loyalty.tasks import reverse_order_points
 
-            reverse_order_points.delay_on_commit(order.id)
+            order_id = order.id
+            transaction.on_commit(lambda: reverse_order_points.delay(order_id))
     except Exception:
         logger.exception(
             "Failed to queue loyalty reversal for order %s", order.id

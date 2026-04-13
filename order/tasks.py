@@ -337,9 +337,7 @@ def check_pending_orders() -> int:
                     order.reminder_count,
                     len(reminder_intervals) - 1,
                 )
-                cooldown = timedelta(
-                    days=reminder_intervals[interval_index]
-                )
+                cooldown = timedelta(days=reminder_intervals[interval_index])
                 if now - order.last_reminder_sent_at < cooldown:
                     continue
 

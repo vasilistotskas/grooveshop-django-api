@@ -3,6 +3,7 @@ import logging
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics
+from rest_framework.permissions import AllowAny
 
 from contact.models import Contact
 from contact.serializers import ContactWriteSerializer
@@ -14,6 +15,7 @@ logger = logging.getLogger(__name__)
 class ContactCreateView(generics.CreateAPIView):
     queryset = Contact.objects.all()
     serializer_class = ContactWriteSerializer
+    permission_classes = [AllowAny]
 
     @extend_schema(
         operation_id="createContact",

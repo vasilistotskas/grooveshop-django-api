@@ -169,17 +169,11 @@ class SMSNotifier(NotifierInterface):
         if not order.phone:
             return False
 
-        message = _(
-            "Thank you for your order #{order_id}. Your order total is {total_price}. We'll notify you when your order ships."
-        ).format(order_id=order.id, total_price=order.total_price)
-
-        try:
-            # @TODO - Call SMS provider API here
-            print(message)
-            return True
-        except Exception as e:
-            logger.error(f"Failed to send order confirmation SMS: {e!s}")
-            return False
+        logger.warning(
+            "SMS notification not implemented: %s",
+            "send_order_confirmation",
+        )
+        return False
 
     def send_order_shipped(
         self, order: Order, tracking_number: str = "", carrier: str = ""
@@ -187,51 +181,31 @@ class SMSNotifier(NotifierInterface):
         if not order.phone:
             return False
 
-        message = _(
-            "Your order #{order_id} has shipped! Track it with {carrier} using tracking number {tracking_number}."
-        ).format(
-            order_id=order.id, carrier=carrier, tracking_number=tracking_number
+        logger.warning(
+            "SMS notification not implemented: %s",
+            "send_order_shipped",
         )
-
-        try:
-            # @TODO - Call SMS provider API here
-            print(message)
-            return True
-        except Exception as e:
-            logger.error(f"Failed to send order shipped SMS: {e!s}")
-            return False
+        return False
 
     def send_order_delivered(self, order: Order) -> bool:
         if not order.phone:
             return False
 
-        message = _(
-            "Your order #{order_id} has been delivered! Thank you for shopping with us."
-        ).format(order_id=order.id)
-
-        try:
-            # @TODO - Call SMS provider API here
-            print(message)
-            return True
-        except Exception as e:
-            logger.error(f"Failed to send order delivered SMS: {e!s}")
-            return False
+        logger.warning(
+            "SMS notification not implemented: %s",
+            "send_order_delivered",
+        )
+        return False
 
     def send_order_canceled(self, order: Order) -> bool:
         if not order.phone:
             return False
 
-        message = _(
-            "Your order #{order_id} has been canceled. Please contact customer service if you have any questions."
-        ).format(order_id=order.id)
-
-        try:
-            # @TODO - Call SMS provider API here
-            print(message)
-            return True
-        except Exception as e:
-            logger.error(f"Failed to send order canceled SMS: {e!s}")
-            return False
+        logger.warning(
+            "SMS notification not implemented: %s",
+            "send_order_canceled",
+        )
+        return False
 
 
 class OrderNotificationManager:

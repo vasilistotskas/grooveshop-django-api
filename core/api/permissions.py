@@ -51,7 +51,11 @@ class IsOwnerOrAdminOrGuest(IsOwnerMixin, BasePermission):
 
         if hasattr(obj, "user"):
             if obj.user is None:
-                return True
+                # Guest orders require UUID verification
+                request_uuid = request.query_params.get(
+                    "uuid"
+                ) or request.parser_context.get("kwargs", {}).get("uuid")
+                return bool(request_uuid and str(obj.uuid) == str(request_uuid))
 
             if request.user and request.user.is_authenticated:
                 return obj.user == request.user

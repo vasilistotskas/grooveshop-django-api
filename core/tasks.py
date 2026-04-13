@@ -241,12 +241,12 @@ def cleanup_abandoned_carts():
         with transaction.atomic():
             count, _ = Cart.objects.filter(
                 user__isnull=True,
-                items__isnull=True,
                 last_activity__lt=cutoff_date,
+                items__isnull=True,
             ).delete()
 
         message = (
-            f"Cleaned up {count} abandoned empty guest carts"
+            f"Cleaned up {count} abandoned guest carts"
             if count > 0
             else "No abandoned carts to clean up"
         )
@@ -419,26 +419,24 @@ def send_inactive_user_notifications() -> dict[str, Any]:
     """
     now = timezone.now()
     max_emails = Setting.get("REENGAGEMENT_EMAIL_MAX_COUNT", default=3)
-    cooldown_days = Setting.get(
-        "REENGAGEMENT_EMAIL_COOLDOWN_DAYS", default=90
-    )
-    inactive_days = Setting.get(
-        "INACTIVE_USER_THRESHOLD_DAYS", default=60
-    )
+    cooldown_days = Setting.get("REENGAGEMENT_EMAIL_COOLDOWN_DAYS", default=90)
+    inactive_days = Setting.get("INACTIVE_USER_THRESHOLD_DAYS", default=60)
     cutoff_date = now - timedelta(days=inactive_days)
     cooldown_cutoff = now - timedelta(days=cooldown_days)
 
-    inactive_users_qs = User.objects.filter(
-        last_login__lt=cutoff_date,
-        is_active=True,
-        email__isnull=False,
-        email__gt="",
-        reengagement_email_count__lt=max_emails,
-    ).exclude(
-        last_reengagement_email_at__gt=cooldown_cutoff,
-    ).values_list("id", "email", "first_name", "username")[
-        :1000
-    ]
+    inactive_users_qs = (
+        User.objects.filter(
+            last_login__lt=cutoff_date,
+            is_active=True,
+            email__isnull=False,
+            email__gt="",
+            reengagement_email_count__lt=max_emails,
+        )
+        .exclude(
+            last_reengagement_email_at__gt=cooldown_cutoff,
+        )
+        .values_list("id", "email", "first_name", "username")
+    )
 
     success_count = 0
     failed_emails: list[dict[str, Any]] = []
@@ -446,7 +444,9 @@ def send_inactive_user_notifications() -> dict[str, Any]:
 
     logger.info("Starting to send emails to inactive users")
 
-    for user_id, email, first_name, username in inactive_users_qs.iterator():
+    for user_id, email, first_name, username in inactive_users_qs.iterator(
+        chunk_size=200
+    ):
         total_users += 1
 
         try:
@@ -480,10 +480,7 @@ def send_inactive_user_notifications() -> dict[str, Any]:
             )
 
             User.objects.filter(pk=user_id).update(
-                reengagement_email_count=F(
-                    "reengagement_email_count"
-                )
-                + 1,
+                reengagement_email_count=F("reengagement_email_count") + 1,
                 last_reengagement_email_at=now,
             )
 

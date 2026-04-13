@@ -8,6 +8,7 @@ from drf_spectacular.utils import (
     extend_schema_view,
 )
 from rest_framework import status
+from rest_framework.permissions import AllowAny
 
 from rest_framework.response import Response
 
@@ -137,6 +138,13 @@ class CartItemViewSet(BaseModelViewSet):
         "cart__user__email",
     ]
     cart_service: CartService
+
+    def get_permissions(self):
+        # All cart item operations support guest users via X-Cart-Id header.
+        # get_queryset() enforces ownership so non-admin users only see their
+        # own cart's items.
+        self.permission_classes = [AllowAny]
+        return super().get_permissions()
 
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)

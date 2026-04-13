@@ -18,6 +18,14 @@ from pay_way.models import PayWay
 from product.models.product import Product
 from region.models import Region
 
+CARRIER_TRACKING_URLS: dict[str, str] = {
+    "elta": "https://www.elta.gr/en/tracking?code={number}",
+    "acs": "https://www.acscourier.net/el/track-and-trace/?p={number}",
+    "speedex": "https://www.speedex.gr/en/track-and-trace/?p_code={number}",
+    "dhl": "https://www.dhl.com/en/express/tracking.html?AWB={number}",
+    "fedex": "https://www.fedex.com/fedextrack/?trknbr={number}",
+}
+
 
 class OrderSerializer(serializers.ModelSerializer[Order]):
     items = OrderItemDetailSerializer(many=True)
@@ -233,14 +241,18 @@ class OrderDetailSerializer(OrderSerializer):
         }
     )
     def get_tracking_details(self, obj) -> dict | None:
+        tracking_url = None
+        if obj.tracking_number and obj.shipping_carrier:
+            template = CARRIER_TRACKING_URLS.get(obj.shipping_carrier.lower())
+            if template:
+                tracking_url = template.format(number=obj.tracking_number)
+
         return {
             "tracking_number": obj.tracking_number,
             "shipping_carrier": obj.shipping_carrier,
             "has_tracking": bool(obj.tracking_number),
-            "estimated_delivery": "",  # @TODO - Would be calculated based on shipping method
-            "tracking_url": f"https://track.carrier.com/{obj.tracking_number}"
-            if obj.tracking_number
-            else None,
+            "estimated_delivery": None,
+            "tracking_url": tracking_url,
         }
 
     class Meta(OrderSerializer.Meta):

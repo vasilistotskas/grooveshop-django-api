@@ -35,6 +35,7 @@ class ProductCategoryImageViewSetTestCase(APITestCase):
             username="testuser",
             password="testpass123",
         )
+        self.client.force_authenticate(user=self.user)
 
     def get_product_category_image_detail_url(self, pk):
         return reverse("product-category-image-detail", args=[pk])

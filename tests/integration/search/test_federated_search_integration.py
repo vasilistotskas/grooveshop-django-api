@@ -23,7 +23,7 @@ User = get_user_model()
 
 
 @requires_meilisearch
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 class TestFederatedSearchIntegration:
     """Integration tests for federated search endpoint."""
 

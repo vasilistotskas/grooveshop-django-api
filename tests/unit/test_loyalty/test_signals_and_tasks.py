@@ -96,60 +96,84 @@ class TestSignalHandlerExceptionIsolation:
     """Signal handlers catch exceptions so loyalty errors don't break order flow."""
 
     def test_completed_handler_calls_delay_on_commit(self):
-        """Handler calls process_order_points.delay_on_commit with order id."""
+        """Handler queues process_order_points via transaction.on_commit."""
         from order.models.order import Order
         from user.factories.account import UserAccountFactory
 
         user = UserAccountFactory()
         order = _create_order(user=user)
 
-        with patch("loyalty.tasks.process_order_points") as mock_task:
+        with (
+            patch("loyalty.tasks.process_order_points") as mock_task,
+            patch(
+                "loyalty.signals.transaction.on_commit",
+                side_effect=lambda cb: cb(),
+            ),
+        ):
             from loyalty.signals import handle_order_completed_loyalty
 
             handle_order_completed_loyalty(sender=Order, order=order)
 
-            mock_task.delay_on_commit.assert_called_once_with(order.id)
+            mock_task.delay.assert_called_once_with(order.id)
 
     def test_canceled_handler_calls_delay_on_commit(self):
-        """Handler calls reverse_order_points.delay_on_commit with order id."""
+        """Handler queues reverse_order_points via transaction.on_commit."""
         from order.models.order import Order
         from user.factories.account import UserAccountFactory
 
         user = UserAccountFactory()
         order = _create_order(user=user)
 
-        with patch("loyalty.tasks.reverse_order_points") as mock_task:
+        with (
+            patch("loyalty.tasks.reverse_order_points") as mock_task,
+            patch(
+                "loyalty.signals.transaction.on_commit",
+                side_effect=lambda cb: cb(),
+            ),
+        ):
             from loyalty.signals import handle_order_canceled_loyalty
 
             handle_order_canceled_loyalty(sender=Order, order=order)
 
-            mock_task.delay_on_commit.assert_called_once_with(order.id)
+            mock_task.delay.assert_called_once_with(order.id)
 
     def test_refunded_handler_calls_delay_on_commit(self):
-        """Handler calls reverse_order_points.delay_on_commit with order id."""
+        """Handler queues reverse_order_points via transaction.on_commit."""
         from order.models.order import Order
         from user.factories.account import UserAccountFactory
 
         user = UserAccountFactory()
         order = _create_order(user=user)
 
-        with patch("loyalty.tasks.reverse_order_points") as mock_task:
+        with (
+            patch("loyalty.tasks.reverse_order_points") as mock_task,
+            patch(
+                "loyalty.signals.transaction.on_commit",
+                side_effect=lambda cb: cb(),
+            ),
+        ):
             from loyalty.signals import handle_order_refunded_loyalty
 
             handle_order_refunded_loyalty(sender=Order, order=order)
 
-            mock_task.delay_on_commit.assert_called_once_with(order.id)
+            mock_task.delay.assert_called_once_with(order.id)
 
     def test_completed_handler_does_not_raise_on_task_error(self):
-        """When delay_on_commit raises, the handler catches it and doesn't propagate."""
+        """When task.delay raises, the handler catches it and doesn't propagate."""
         from order.models.order import Order
         from user.factories.account import UserAccountFactory
 
         user = UserAccountFactory()
         order = _create_order(user=user)
 
-        with patch("loyalty.tasks.process_order_points") as mock_task:
-            mock_task.delay_on_commit.side_effect = RuntimeError("Celery down")
+        with (
+            patch("loyalty.tasks.process_order_points") as mock_task,
+            patch(
+                "loyalty.signals.transaction.on_commit",
+                side_effect=lambda cb: cb(),
+            ),
+        ):
+            mock_task.delay.side_effect = RuntimeError("Celery down")
 
             from loyalty.signals import handle_order_completed_loyalty
 
@@ -157,15 +181,21 @@ class TestSignalHandlerExceptionIsolation:
             handle_order_completed_loyalty(sender=Order, order=order)
 
     def test_canceled_handler_does_not_raise_on_task_error(self):
-        """When delay_on_commit raises, the canceled handler catches it."""
+        """When task.delay raises, the canceled handler catches it."""
         from order.models.order import Order
         from user.factories.account import UserAccountFactory
 
         user = UserAccountFactory()
         order = _create_order(user=user)
 
-        with patch("loyalty.tasks.reverse_order_points") as mock_task:
-            mock_task.delay_on_commit.side_effect = RuntimeError("Celery down")
+        with (
+            patch("loyalty.tasks.reverse_order_points") as mock_task,
+            patch(
+                "loyalty.signals.transaction.on_commit",
+                side_effect=lambda cb: cb(),
+            ),
+        ):
+            mock_task.delay.side_effect = RuntimeError("Celery down")
 
             from loyalty.signals import handle_order_canceled_loyalty
 
@@ -178,12 +208,16 @@ class TestSignalHandlerExceptionIsolation:
 
         order = _create_order(user=None)
 
-        with patch("loyalty.tasks.process_order_points") as mock_task:
+        with (
+            patch("loyalty.tasks.process_order_points") as mock_task,
+            patch("loyalty.signals.transaction.on_commit") as mock_on_commit,
+        ):
             from loyalty.signals import handle_order_completed_loyalty
 
             handle_order_completed_loyalty(sender=Order, order=order)
 
-            mock_task.delay_on_commit.assert_not_called()
+            mock_on_commit.assert_not_called()
+            mock_task.delay.assert_not_called()
 
 
 # ===========================================================================

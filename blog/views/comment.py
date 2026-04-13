@@ -259,30 +259,22 @@ class BlogCommentViewSet(BaseModelViewSet):
 
     @action(detail=False, methods=["GET"])
     def my_comments(self, request):
-        queryset = self.get_queryset().filter(user=request.user)
-
-        if (
-            hasattr(queryset.query.where, "children")
-            and queryset.query.where.children
-        ):
-            queryset = (
-                BlogComment.objects.select_related(
-                    "user", "post", "parent", "post__category", "post__author"
-                )
-                .prefetch_related(
-                    "likes",
-                    "translations",
-                    "children",
-                    "post__translations",
-                )
-                .annotate(
-                    likes_count_field=Count("likes", distinct=True),
-                )
-                .filter(user=request.user)
-                .order_by("-created_at")
+        queryset = (
+            BlogComment.objects.select_related(
+                "user", "post", "parent", "post__category", "post__author"
             )
-        else:
-            queryset = queryset.order_by("-created_at")
+            .prefetch_related(
+                "likes",
+                "translations",
+                "children",
+                "post__translations",
+            )
+            .annotate(
+                likes_count_field=Count("likes", distinct=True),
+            )
+            .filter(user=request.user)
+            .order_by("-created_at")
+        )
 
         response_serializer_class = self.get_response_serializer()
         return self.paginate_and_serialize(

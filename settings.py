@@ -238,7 +238,7 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.SessionAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.AllowAny",
+        "rest_framework.permissions.IsAuthenticatedOrReadOnly",
     ],
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
@@ -753,9 +753,10 @@ SECURE_SSL_REDIRECT = (
 SECURE_PROXY_SSL_HEADER = (
     ("HTTP_X_FORWARDED_PROTO", "https") if not DEBUG else None
 )
-SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 3600
-SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
-SECURE_HSTS_PRELOAD = not DEBUG
+_default_hsts = 0 if not DEBUG else 3600
+SECURE_HSTS_SECONDS = int(getenv("SECURE_HSTS_SECONDS", str(_default_hsts)))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_HSTS_SECONDS > 0 and not DEBUG
+SECURE_HSTS_PRELOAD = SECURE_HSTS_SECONDS > 0 and not DEBUG
 
 # Currency
 DEFAULT_CURRENCY = getenv("DEFAULT_CURRENCY", "EUR")

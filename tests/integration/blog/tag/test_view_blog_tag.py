@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -10,6 +11,7 @@ languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
 ]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
+User = get_user_model()
 
 
 class BlogTagViewSetTestCase(TestURLFixerMixin, APITestCase):
@@ -17,6 +19,14 @@ class BlogTagViewSetTestCase(TestURLFixerMixin, APITestCase):
     def setUpTestData(cls):
         cls.tag = BlogTagFactory(active=True)
         cls.inactive_tag = BlogTagFactory(active=False)
+        cls.user = User.objects.create_superuser(
+            email="blogtagtest@example.com",
+            username="blogtagtester",
+            password="testpass123",
+        )
+
+    def setUp(self):
+        self.client.force_authenticate(user=self.user)
 
     def get_tag_detail_url(self, pk):
         return reverse("blog-tag-detail", args=[pk])

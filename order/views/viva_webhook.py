@@ -266,6 +266,7 @@ def _handle_payment_created(order, event_data, transaction_id):
         "payment_status",
         "payment_method",
         "paid_amount",
+        "paid_amount_currency",
     ]
 
     if order.status == OrderStatus.PENDING:

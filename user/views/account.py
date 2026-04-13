@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_view
 from rest_framework import status
@@ -388,31 +389,24 @@ class UserAccountViewSet(BaseModelViewSet):
 
         request_serializer_class = self.get_request_serializer()
         request_serializer = request_serializer_class(data=request.data)
-        if request_serializer.is_valid():
-            new_username = request_serializer.validated_data["username"]
+        request_serializer.is_valid(raise_exception=True)
 
-            if (
-                User.objects.filter(username=new_username)
-                .exclude(id=user.id)
-                .exists()
-            ):
-                return Response(
-                    {"detail": _("Username already exists.")},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+        new_username = request_serializer.validated_data["username"]
 
+        try:
             user.username = new_username
-            user.save()
+            user.save(update_fields=["username"])
+        except IntegrityError:
+            return Response(
+                {"detail": _("Username already taken.")},
+                status=status.HTTP_409_CONFLICT,
+            )
 
-            response_data = {"detail": _("Username updated successfully.")}
+        response_data = {"detail": _("Username updated successfully.")}
 
-            response_serializer_class = self.get_response_serializer()
-            response_serializer = response_serializer_class(response_data)
-            return Response(response_serializer.data, status=status.HTTP_200_OK)
-
-        return Response(
-            request_serializer.errors, status=status.HTTP_400_BAD_REQUEST
-        )
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(response_data)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["GET"])
     def subscription_summary(self, request, pk=None):

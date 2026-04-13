@@ -1,12 +1,21 @@
+from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework.test import APITestCase
 
 from cart.factories import CartItemFactory
 from cart.factories.cart import CartFactory
 
+User = get_user_model()
+
 
 class CartItemFilterTest(APITestCase):
     def setUp(self):
+        self.admin = User.objects.create_superuser(
+            email="cartfiltertest@example.com",
+            username="cartfiltertester",
+            password="testpass123",
+        )
+        self.client.force_authenticate(user=self.admin)
         self.cart1 = CartFactory()
         self.cart_item1 = CartItemFactory(cart=self.cart1)
         self.cart_item2 = CartItemFactory()

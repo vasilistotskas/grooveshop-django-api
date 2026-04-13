@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+from django.db import transaction
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from djstripe.event_handlers import djstripe_receiver
@@ -50,19 +51,19 @@ def handle_order_post_save(
         return
 
     if (
-        hasattr(instance, "_previous_status")
-        and instance._previous_status != instance.status
+        hasattr(instance, "_original_status")
+        and instance._original_status != instance.status
     ):
         order_status_changed.send(
             sender=sender,
             order=instance,
-            old_status=instance._previous_status,
+            old_status=instance._original_status,
             new_status=instance.status,
         )
         logger.debug(
             "Sent order_status_changed signal for order %s (%s -> %s)",
             instance.id,
-            instance._previous_status,
+            instance._original_status,
             instance.status,
         )
 
@@ -170,29 +171,6 @@ def handle_order_status_changed(
         old_status,
         new_status,
     )
-
-
-@receiver(pre_save, sender=Order)
-def handle_order_pre_save(
-    sender: type[Order], instance: Order, **kwargs: Any
-) -> None:
-    """Store previous order status before save."""
-    update_fields = kwargs.get("update_fields")
-    if update_fields and "status" not in update_fields:
-        instance._previous_status = instance.status
-        return
-
-    try:
-        if instance.pk:
-            instance._previous_status = (
-                Order.objects.filter(pk=instance.pk)
-                .values_list("status", flat=True)
-                .first()
-            )
-        else:
-            instance._previous_status = None
-    except Order.DoesNotExist:
-        instance._previous_status = None
 
 
 @receiver(pre_save, sender=OrderItem)
@@ -462,24 +440,33 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
 
         logger.info("Stripe payment succeeded: %s", payment_intent_id)
 
-        # Check idempotency to prevent duplicate processing
-        order = Order.objects.filter(payment_id=payment_intent_id).first()
-        if order:
-            if order.metadata and order.metadata.get(
-                f"webhook_processed_{event_id}"
-            ):
-                logger.info(
-                    "Webhook %s already processed for order %s, skipping",
-                    event_id,
-                    order.id,
-                )
-                return
+        # Atomic idempotency check-and-mark with row lock to prevent
+        # duplicate processing from parallel webhook deliveries.
+        already_processed = False
+        with transaction.atomic():
+            order = (
+                Order.objects.select_for_update()
+                .filter(payment_id=payment_intent_id)
+                .first()
+            )
+            if order:
+                if order.metadata and order.metadata.get(
+                    f"webhook_processed_{event_id}"
+                ):
+                    logger.info(
+                        "Webhook %s already processed for order %s, skipping",
+                        event_id,
+                        order.id,
+                    )
+                    already_processed = True
+                else:
+                    if not order.metadata:
+                        order.metadata = {}
+                    order.metadata[f"webhook_processed_{event_id}"] = True
+                    order.save(update_fields=["metadata"])
 
-            # Mark webhook as processed
-            if not order.metadata:
-                order.metadata = {}
-            order.metadata[f"webhook_processed_{event_id}"] = True
-            order.save(update_fields=["metadata"])
+        if already_processed:
+            return
 
         order = OrderService.handle_payment_succeeded(payment_intent_id)
 
@@ -602,71 +589,75 @@ def handle_stripe_checkout_completed(sender, **kwargs):
             logger.warning("No order_id in session metadata: %s", session_id)
             return
 
-        try:
-            order = Order.objects.get(id=order_id)
-        except Order.DoesNotExist:
-            logger.error(
-                "Order %s not found for session %s", order_id, session_id
-            )
-            return
+        # Atomic idempotency check-and-mark with row lock, then perform all
+        # state mutations inside the same transaction to prevent double-save
+        # and parallel duplicate processing.
+        with transaction.atomic():
+            try:
+                order = Order.objects.select_for_update().get(id=order_id)
+            except Order.DoesNotExist:
+                logger.error(
+                    "Order %s not found for session %s", order_id, session_id
+                )
+                return
 
-        # Check idempotency
-        if order.metadata and order.metadata.get(
-            f"webhook_processed_{event_id}"
-        ):
-            logger.info(
-                "Webhook %s already processed for order %s, skipping",
-                event_id,
-                order.id,
-            )
-            return
+            if order.metadata and order.metadata.get(
+                f"webhook_processed_{event_id}"
+            ):
+                logger.info(
+                    "Webhook %s already processed for order %s, skipping",
+                    event_id,
+                    order.id,
+                )
+                return
 
-        # Mark webhook as processed
-        if not order.metadata:
-            order.metadata = {}
-        order.metadata[f"webhook_processed_{event_id}"] = True
+            if not order.metadata:
+                order.metadata = {}
+            order.metadata[f"webhook_processed_{event_id}"] = True
 
-        if payment_status == "paid" and payment_intent_id:
-            order.mark_as_paid(
-                payment_id=payment_intent_id, payment_method="stripe"
-            )
+            if payment_status == "paid" and payment_intent_id:
+                order.mark_as_paid(
+                    payment_id=payment_intent_id, payment_method="stripe"
+                )
 
-            if order.status == OrderStatus.PENDING:
-                OrderService.update_order_status(order, OrderStatus.PROCESSING)
+                if order.status == OrderStatus.PENDING:
+                    OrderService.update_order_status(
+                        order, OrderStatus.PROCESSING
+                    )
 
-            order.metadata["stripe_checkout_session_id"] = session_id
-            order.metadata["stripe_payment_intent_id"] = payment_intent_id
-            order.save(update_fields=["metadata"])
+                order.metadata["stripe_checkout_session_id"] = session_id
+                order.metadata["stripe_payment_intent_id"] = payment_intent_id
+                order.save(update_fields=["metadata"])
 
-            OrderHistory.log_payment_update(
-                order=order,
-                previous_value={"payment_status": "pending"},
-                new_value={
-                    "payment_status": "completed",
-                    "payment_id": payment_intent_id,
-                    "checkout_session_id": session_id,
-                },
-            )
+                OrderHistory.log_payment_update(
+                    order=order,
+                    previous_value={"payment_status": "pending"},
+                    new_value={
+                        "payment_status": "completed",
+                        "payment_id": payment_intent_id,
+                        "checkout_session_id": session_id,
+                    },
+                )
 
-            logger.info(
-                "Order %s marked as paid via checkout session %s",
-                order_id,
-                session_id,
-            )
+                logger.info(
+                    "Order %s marked as paid via checkout session %s",
+                    order_id,
+                    session_id,
+                )
 
-        elif payment_status == "unpaid":
-            order.payment_status = PaymentStatus.PENDING
-            order.save(update_fields=["payment_status", "metadata"])
+            elif payment_status == "unpaid":
+                order.payment_status = PaymentStatus.PENDING
+                order.save(update_fields=["payment_status", "metadata"])
 
-            OrderHistory.log_note(
-                order=order,
-                note=f"Checkout session completed but payment is unpaid: {session_id}",
-            )
+                OrderHistory.log_note(
+                    order=order,
+                    note=f"Checkout session completed but payment is unpaid: {session_id}",
+                )
 
-            logger.warning(
-                "Checkout session completed but payment is unpaid: %s",
-                session_id,
-            )
+                logger.warning(
+                    "Checkout session completed but payment is unpaid: %s",
+                    session_id,
+                )
 
     except Exception as e:
         logger.error(

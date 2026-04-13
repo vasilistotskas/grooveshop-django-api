@@ -1,3 +1,4 @@
+from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
 from rest_framework import status
@@ -7,6 +8,8 @@ from tag.factories.tagged_item import TaggedProductFactory
 from tag.models.tagged_item import TaggedItem
 from product.factories.product import ProductFactory
 from core.utils.testing import TestURLFixerMixin
+
+User = get_user_model()
 
 
 class TaggedItemViewSetTestCase(TestURLFixerMixin, APITestCase):
@@ -18,6 +21,14 @@ class TaggedItemViewSetTestCase(TestURLFixerMixin, APITestCase):
         cls.tagged_item = TaggedProductFactory(
             tag=cls.tag, content_object=cls.product
         )
+        cls.user = User.objects.create_user(
+            email="taggeditemtest@example.com",
+            username="taggeditemtester",
+            password="testpass123",
+        )
+
+    def setUp(self):
+        self.client.force_authenticate(user=self.user)
 
     def get_tagged_item_detail_url(self, pk):
         return reverse("tagged-item-detail", args=[pk])

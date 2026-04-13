@@ -99,9 +99,7 @@ class UserAccount(
         _("Last Re-engagement Email At"),
         null=True,
         blank=True,
-        help_text=_(
-            "Timestamp of the most recent re-engagement email."
-        ),
+        help_text=_("Timestamp of the most recent re-engagement email."),
     )
     loyalty_tier = models.ForeignKey(
         "loyalty.LoyaltyTier",

@@ -56,7 +56,7 @@ def authenticated_user(db):
     )
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 class TestSearchAnalyticsMiddleware:
     """Test suite for SearchAnalyticsMiddleware."""
 
@@ -153,7 +153,11 @@ class TestSearchAnalyticsMiddleware:
         assert search_query.ip_address == "192.168.1.100"
 
     def test_captures_ip_from_proxy_header(self, request_factory, middleware):
-        """Test that IP is extracted from X-Forwarded-For header."""
+        """Test that IP is extracted from X-Forwarded-For header.
+
+        The middleware trusts the rightmost entry added by the local proxy
+        rather than the leftmost (which an attacker can spoof).
+        """
         request = request_factory.get(
             "/api/search/product", {"query": "laptop"}
         )
@@ -165,8 +169,8 @@ class TestSearchAnalyticsMiddleware:
         middleware(request)
 
         search_query = SearchQuery.objects.latest("timestamp")
-        # Should use first IP from X-Forwarded-For
-        assert search_query.ip_address == "203.0.113.1"
+        # Uses rightmost entry (added by our trusted proxy), not leftmost
+        assert search_query.ip_address == "198.51.100.1"
 
     def test_captures_user_agent(self, request_factory, middleware):
         """Test that user agent string is captured."""
@@ -352,7 +356,7 @@ class TestSearchAnalyticsMiddleware:
         assert len(search_query.query) == 500
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 class TestSearchAnalyticsMiddlewareEdgeCases:
     """Test edge cases and error conditions."""
 

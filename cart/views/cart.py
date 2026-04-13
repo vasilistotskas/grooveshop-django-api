@@ -11,7 +11,7 @@ from drf_spectacular.utils import (
 )
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import AllowAny, IsAdminUser
 
 from rest_framework.response import Response
 
@@ -181,10 +181,13 @@ class CartViewSet(BaseModelViewSet):
         self.cart_service = CartService(request=request)
 
     def get_permissions(self):
-        if self.action in [
-            "list",
-        ]:
+        if self.action == "list":
             self.permission_classes = [IsAdminUser]
+        else:
+            # All other cart actions (retrieve, update, destroy, reserve_stock,
+            # release_reservations, create_payment_intent) support guest users
+            # via X-Cart-Id header — anonymous requests must be permitted.
+            self.permission_classes = [AllowAny]
         return super().get_permissions()
 
     def get_queryset(self):

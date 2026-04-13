@@ -6,18 +6,10 @@ from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from simple_history.signals import post_create_historical_record
 
-from notification.enum import NotificationKindEnum
-from notification.models.notification import Notification
-from notification.models.user import NotificationUser
-from product.models.favourite import ProductFavourite
 from product.models.product import Product, ProductTranslation
 from product.models.product_attribute import ProductAttribute
 
 logger = logging.getLogger(__name__)
-
-languages = [
-    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
-]
 
 product_price_lowered = django.dispatch.Signal()
 product_price_increased = django.dispatch.Signal()
@@ -190,43 +182,13 @@ def reindex_product_translations(sender, instance, **kwargs):
 def notify_product_price_lowered(
     sender, instance, old_price, new_price, **kwargs
 ):
-    favorite_users = list(
-        ProductFavourite.objects.filter(product=instance).select_related("user")
+    from product.tasks import send_price_drop_notifications
+
+    send_price_drop_notifications.delay(
+        product_id=instance.id,
+        old_price=float(old_price),
+        new_price=float(new_price),
     )
-
-    product_url = (
-        f"{settings.NUXT_BASE_URL}/products/{instance.id}/{instance.slug}"
-    )
-
-    instance_name = (
-        instance.safe_translation_getter("name", any_language=True)
-        or f"Product {instance.slug or instance.id}"
-    )
-
-    for favorite in favorite_users:
-        user = favorite.user
-
-        notification = Notification.objects.create(
-            kind=NotificationKindEnum.INFO,
-        )
-
-        for language in languages:
-            notification.set_current_language(language)
-            if language == "en":
-                notification.title = "Price Drop!"
-                notification.message = (
-                    f"The price of <a href='{product_url}'>{instance_name}</a> has dropped"
-                    f" from {old_price} to {new_price}. Check it out now!"
-                )
-            elif language == "el":
-                notification.title = "Μείωση Τιμής!"  # noqa: RUF001
-                notification.message = (
-                    f"Η τιμή του <a href='{product_url}'>{instance_name}</a> μειώθηκε"  # noqa: RUF001
-                    f" από {old_price} σε {new_price}. Δείτε το τώρα!"
-                )
-            notification.save()
-
-        NotificationUser.objects.create(user=user, notification=notification)
 
 
 @receiver([post_save, post_delete], sender=ProductAttribute)

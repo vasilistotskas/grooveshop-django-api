@@ -12,9 +12,12 @@ from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
 from django.core.mail import send_mail
 from django.db import connections, transaction
+from django.db.models import F
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+
+from extra_settings.models import Setting
 
 from cart.models import Cart
 from core import celery_app
@@ -232,7 +235,8 @@ def clear_expired_notifications_task(days=365):
 )
 def cleanup_abandoned_carts():
     try:
-        cutoff_date = timezone.now() - timedelta(days=7)
+        days = Setting.get("ABANDONED_CART_CLEANUP_DAYS", default=7)
+        cutoff_date = timezone.now() - timedelta(days=days)
 
         with transaction.atomic():
             count, _ = Cart.objects.filter(
@@ -268,7 +272,8 @@ def cleanup_abandoned_carts():
 )
 def cleanup_old_guest_carts():
     try:
-        cutoff_date = timezone.now() - timedelta(days=30)
+        days = Setting.get("OLD_GUEST_CART_CLEANUP_DAYS", default=30)
+        cutoff_date = timezone.now() - timedelta(days=days)
 
         count, _ = Cart.objects.filter(
             user__isnull=True,
@@ -276,7 +281,7 @@ def cleanup_old_guest_carts():
         ).delete()
 
         message = (
-            f"Cleaned up {count} old guest carts (30+ days inactive)"
+            f"Cleaned up {count} old guest carts ({days}+ days inactive)"
             if count > 0
             else "No old guest carts to clean up"
         )
@@ -406,20 +411,34 @@ def send_inactive_user_notifications() -> dict[str, Any]:
     """
     Send re-engagement emails to inactive users.
 
-    Uses iterator() for memory-efficient processing of large user sets.
+    Limits to MAX_REENGAGEMENT_EMAILS per user with a 90-day cooldown
+    between sends.  Uses iterator() for memory-efficient processing.
 
     Returns:
         Dictionary with task execution statistics
     """
-    cutoff_date = timezone.now() - timedelta(days=60)
+    now = timezone.now()
+    max_emails = Setting.get("REENGAGEMENT_EMAIL_MAX_COUNT", default=3)
+    cooldown_days = Setting.get(
+        "REENGAGEMENT_EMAIL_COOLDOWN_DAYS", default=90
+    )
+    inactive_days = Setting.get(
+        "INACTIVE_USER_THRESHOLD_DAYS", default=60
+    )
+    cutoff_date = now - timedelta(days=inactive_days)
+    cooldown_cutoff = now - timedelta(days=cooldown_days)
 
-    # Use iterator() for memory efficiency instead of list()
     inactive_users_qs = User.objects.filter(
         last_login__lt=cutoff_date,
         is_active=True,
         email__isnull=False,
         email__gt="",
-    ).values_list("id", "email", "first_name", "username")[:1000]
+        reengagement_email_count__lt=max_emails,
+    ).exclude(
+        last_reengagement_email_at__gt=cooldown_cutoff,
+    ).values_list("id", "email", "first_name", "username")[
+        :1000
+    ]
 
     success_count = 0
     failed_emails: list[dict[str, Any]] = []
@@ -427,7 +446,6 @@ def send_inactive_user_notifications() -> dict[str, Any]:
 
     logger.info("Starting to send emails to inactive users")
 
-    # Use iterator() to avoid loading all users into memory
     for user_id, email, first_name, username in inactive_users_qs.iterator():
         total_users += 1
 
@@ -459,6 +477,14 @@ def send_inactive_user_notifications() -> dict[str, Any]:
                 recipient_list=[email],
                 fail_silently=False,
                 html_message=message,
+            )
+
+            User.objects.filter(pk=user_id).update(
+                reengagement_email_count=F(
+                    "reengagement_email_count"
+                )
+                + 1,
+                last_reengagement_email_at=now,
             )
 
             success_count += 1

@@ -6,6 +6,7 @@ from urllib.parse import unquote
 
 from django.conf import settings as django_settings
 from django.db.models import Avg, Count
+from extra_settings.models import Setting
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -35,7 +36,8 @@ logger = logging.getLogger(__name__)
 _VALID_LANGUAGE_CODES = frozenset(
     code for code, _name in django_settings.LANGUAGES
 )
-_MAX_SEARCH_LIMIT = 100
+def _get_max_search_limit() -> int:
+    return Setting.get("SEARCH_MAX_LIMIT", default=100)
 
 
 def _parse_int(value: str | None, default: int, name: str) -> int:
@@ -107,7 +109,7 @@ def blog_post_meili_search(request):
 
     limit = min(
         _parse_int(request.query_params.get("limit"), 10, "limit"),
-        _MAX_SEARCH_LIMIT,
+        _get_max_search_limit(),
     )
     offset = _parse_int(request.query_params.get("offset"), 0, "offset")
     language_code = _validate_language_code(
@@ -271,7 +273,7 @@ def product_meili_search(request):
     query = request.query_params.get("query", "")
     limit = min(
         _parse_int(request.query_params.get("limit"), 20, "limit"),
-        _MAX_SEARCH_LIMIT,
+        _get_max_search_limit(),
     )
     offset = _parse_int(request.query_params.get("offset"), 0, "offset")
     language_code = _validate_language_code(
@@ -447,7 +449,7 @@ def federated_search(request):
 
     limit = min(
         _parse_int(request.query_params.get("limit"), 20, "limit"),
-        _MAX_SEARCH_LIMIT,
+        _get_max_search_limit(),
     )
     offset = _parse_int(request.query_params.get("offset"), 0, "offset")
     language_code = _validate_language_code(

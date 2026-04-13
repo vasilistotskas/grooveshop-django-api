@@ -921,6 +921,66 @@ EXTRA_SETTINGS_DEFAULTS = [
         "type": "bool",
         "value": False,
     },
+    # Order reminder settings
+    {
+        "name": "PENDING_ORDER_REMINDER_MAX_COUNT",
+        "type": "int",
+        "value": 3,
+    },
+    {
+        "name": "PENDING_ORDER_REMINDER_INTERVAL_DAYS_1",
+        "type": "int",
+        "value": 1,
+    },
+    {
+        "name": "PENDING_ORDER_REMINDER_INTERVAL_DAYS_2",
+        "type": "int",
+        "value": 3,
+    },
+    {
+        "name": "PENDING_ORDER_REMINDER_INTERVAL_DAYS_3",
+        "type": "int",
+        "value": 7,
+    },
+    # Re-engagement email settings
+    {
+        "name": "REENGAGEMENT_EMAIL_MAX_COUNT",
+        "type": "int",
+        "value": 3,
+    },
+    {
+        "name": "REENGAGEMENT_EMAIL_COOLDOWN_DAYS",
+        "type": "int",
+        "value": 90,
+    },
+    {
+        "name": "INACTIVE_USER_THRESHOLD_DAYS",
+        "type": "int",
+        "value": 60,
+    },
+    # Cart cleanup settings
+    {
+        "name": "ABANDONED_CART_CLEANUP_DAYS",
+        "type": "int",
+        "value": 7,
+    },
+    {
+        "name": "OLD_GUEST_CART_CLEANUP_DAYS",
+        "type": "int",
+        "value": 30,
+    },
+    # Notification settings
+    {
+        "name": "NOTIFICATION_EXPIRATION_DAYS",
+        "type": "int",
+        "value": 180,
+    },
+    # Search settings
+    {
+        "name": "SEARCH_MAX_LIMIT",
+        "type": "int",
+        "value": 100,
+    },
 ]
 
 EMAIL_BACKEND = getenv(

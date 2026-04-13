@@ -205,16 +205,13 @@ class OrderSignalsTestCase(TestCase):
         )
         self.assertEqual(history.new_value["price"], float(new_price.amount))
 
-    @patch("order.tasks.send_shipping_notification_email.delay")
-    def test_handle_order_shipped(self, mock_email_task):
+    def test_handle_order_shipped(self):
         self.order.tracking_number = "TRACK123"
         self.order.shipping_carrier = "FedEx"
         self.order.status = OrderStatus.PROCESSING.value
         self.order.save()
 
         order_shipped.send(sender=Order, order=self.order)
-
-        mock_email_task.assert_called_with(self.order.id)
 
         self.assertTrue(
             OrderHistory.objects.filter(

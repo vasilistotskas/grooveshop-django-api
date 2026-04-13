@@ -212,7 +212,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
     def test_check_pending_orders_success(
         self, mock_render, mock_email, mock_log_note
     ):
-        _ = OrderFactory.create(
+        pending_order = OrderFactory.create(
             status=OrderStatus.PENDING,
             email="old@example.com",
             created_at=timezone.now() - timedelta(days=2),
@@ -228,6 +228,61 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         if result > 0:
             mock_email_instance.send.assert_called()
             mock_log_note.assert_called()
+            pending_order.refresh_from_db()
+            self.assertEqual(pending_order.reminder_count, 1)
+            self.assertIsNotNone(pending_order.last_reminder_sent_at)
+
+    @patch("order.tasks.OrderHistory.log_note")
+    @patch("order.tasks.EmailMultiAlternatives")
+    @patch("order.tasks.render_to_string")
+    @override_settings(
+        SITE_NAME="GrooveShop",
+        INFO_EMAIL="support@example.com",
+        NUXT_BASE_URL="http://example.com",
+        STATIC_BASE_URL="http://example.com",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    def test_check_pending_orders_skips_max_reminders(
+        self, mock_render, mock_email, mock_log_note
+    ):
+        OrderFactory.create(
+            status=OrderStatus.PENDING,
+            email="maxed@example.com",
+            created_at=timezone.now() - timedelta(days=10),
+            reminder_count=3,
+            last_reminder_sent_at=timezone.now() - timedelta(days=8),
+        )
+
+        result = check_pending_orders()
+
+        self.assertEqual(result, 0)
+        mock_email.assert_not_called()
+
+    @patch("order.tasks.OrderHistory.log_note")
+    @patch("order.tasks.EmailMultiAlternatives")
+    @patch("order.tasks.render_to_string")
+    @override_settings(
+        SITE_NAME="GrooveShop",
+        INFO_EMAIL="support@example.com",
+        NUXT_BASE_URL="http://example.com",
+        STATIC_BASE_URL="http://example.com",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    def test_check_pending_orders_respects_cooldown(
+        self, mock_render, mock_email, mock_log_note
+    ):
+        OrderFactory.create(
+            status=OrderStatus.PENDING,
+            email="cooldown@example.com",
+            created_at=timezone.now() - timedelta(days=5),
+            reminder_count=1,
+            last_reminder_sent_at=timezone.now() - timedelta(hours=12),
+        )
+
+        result = check_pending_orders()
+
+        self.assertEqual(result, 0)
+        mock_email.assert_not_called()
 
     @patch("order.tasks.logger.error")
     def test_check_pending_orders_exception(self, mock_logger):
@@ -239,11 +294,10 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
             self.assertEqual(result, 0)
             mock_logger.assert_called_once()
 
-    @patch("order.tasks.send_order_status_update_email.delay")
     @patch("order.services.OrderService.update_order_status")
     @patch("order.shipping.ShippingService.get_tracking_info")
     def test_update_order_statuses_from_shipping_success(
-        self, mock_tracking, mock_update_status, mock_email_task
+        self, mock_tracking, mock_update_status
     ):
         shipped_order = OrderFactory.create(
             status=OrderStatus.SHIPPED,
@@ -261,9 +315,6 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
             mock_tracking.assert_called_with("TRACK123", "UPS")
             mock_update_status.assert_called_with(
                 shipped_order, OrderStatus.DELIVERED
-            )
-            mock_email_task.assert_called_with(
-                shipped_order.id, OrderStatus.DELIVERED
             )
 
     @patch("order.tasks.logger.error")

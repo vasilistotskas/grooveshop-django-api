@@ -11,11 +11,6 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.models.history import OrderHistory, OrderItemHistory
 from order.models.item import OrderItem
 from order.models.order import Order
-from order.notifications import (
-    send_order_canceled_notification,
-    send_order_delivered_notification,
-    send_order_shipped_notification,
-)
 from order.services import OrderService
 from order.signals import (
     order_canceled,
@@ -31,7 +26,6 @@ from order.signals import (
 from order.tasks import (
     send_order_confirmation_email,
     send_order_status_update_email,
-    send_shipping_notification_email,
 )
 
 logger = logging.getLogger(__name__)
@@ -328,15 +322,8 @@ def handle_order_shipped(
         previous_value={"status": OrderStatus.PENDING.value},
         new_value={"status": OrderStatus.SHIPPED.value},
     )
-
-    send_order_shipped_notification(order)
-
-    task = send_shipping_notification_email.delay(order.id)
-    logger.info(
-        "Order %s shipment notification email queued (task_id: %s)",
-        order.id,
-        task.id,
-    )
+    # Email is sent by handle_order_status_changed via
+    # send_order_status_update_email (uses the shipped template)
 
 
 @receiver(order_delivered)
@@ -344,13 +331,13 @@ def handle_order_delivered(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
     """Handle order delivered signal."""
-    send_order_delivered_notification(order)
-
     OrderHistory.log_shipping_update(
         order=order,
         previous_value={"status": OrderStatus.SHIPPED.value},
         new_value={"status": OrderStatus.DELIVERED.value},
     )
+    # Email is sent by handle_order_status_changed via
+    # send_order_status_update_email (uses the delivered template)
 
 
 @receiver(order_canceled)
@@ -367,11 +354,13 @@ def handle_order_canceled(
                 order=order,
                 note=f"Order canceled. Reason: {cancellation_reason}",
             )
-
-        send_order_canceled_notification(order)
+        # Email is sent by handle_order_status_changed via
+        # send_order_status_update_email (uses the canceled template)
 
         logger.info(
-            "Order %s canceled (previous status: %s)", order.id, previous_status
+            "Order %s canceled (previous status: %s)",
+            order.id,
+            previous_status,
         )
 
     except Exception as e:

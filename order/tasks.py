@@ -4,9 +4,12 @@ from datetime import timedelta
 from celery import shared_task
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
+from django.db.models import F
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+
+from extra_settings.models import Setting
 
 from order.enum.status import OrderStatus
 from order.models import Order, OrderHistory
@@ -116,6 +119,10 @@ def send_order_status_update_email(
             "SITE_URL": settings.NUXT_BASE_URL,
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
+
+        if status in (OrderStatus.SHIPPED, OrderStatus.SHIPPED.value):
+            context["tracking_number"] = order.tracking_number
+            context["carrier"] = order.shipping_carrier
 
         template_base = f"emails/order/order_{status.lower()}"
 
@@ -305,13 +312,37 @@ def generate_order_invoice(self, order_id: int) -> bool:
 @shared_task
 def check_pending_orders() -> int:
     try:
-        one_day_ago = timezone.now() - timedelta(days=1)
+        now = timezone.now()
+        one_day_ago = now - timedelta(days=1)
+        max_reminders = Setting.get(
+            "PENDING_ORDER_REMINDER_MAX_COUNT", default=3
+        )
+        reminder_intervals = [
+            Setting.get(
+                f"PENDING_ORDER_REMINDER_INTERVAL_DAYS_{i}",
+                default=d,
+            )
+            for i, d in [(1, 1), (2, 3), (3, 7)]
+        ]
         pending_orders = Order.objects.filter(
-            status=OrderStatus.PENDING, created_at__lt=one_day_ago
+            status=OrderStatus.PENDING,
+            created_at__lt=one_day_ago,
+            reminder_count__lt=max_reminders,
         )
 
         count = 0
         for order in pending_orders:
+            if order.last_reminder_sent_at:
+                interval_index = min(
+                    order.reminder_count,
+                    len(reminder_intervals) - 1,
+                )
+                cooldown = timedelta(
+                    days=reminder_intervals[interval_index]
+                )
+                if now - order.last_reminder_sent_at < cooldown:
+                    continue
+
             context = {
                 "order": order,
                 "SITE_NAME": settings.SITE_NAME,
@@ -341,14 +372,21 @@ def check_pending_orders() -> int:
 
             msg.send()
 
+            Order.objects.filter(pk=order.pk).update(
+                reminder_count=F("reminder_count") + 1,
+                last_reminder_sent_at=now,
+            )
+
             logger.info(
-                f"Pending order reminder sent for order #{order.id}",
+                f"Pending order reminder sent for order #{order.id} "
+                f"(reminder {order.reminder_count + 1}/{max_reminders})",
                 extra={"order_id": order.id, "email": order.email},
             )
 
             OrderHistory.log_note(
                 order=order,
-                note=f"Pending order reminder email sent to {order.email}",
+                note=f"Pending order reminder email sent to {order.email} "
+                f"({order.reminder_count + 1}/{max_reminders})",
             )
 
             count += 1
@@ -357,7 +395,8 @@ def check_pending_orders() -> int:
 
     except Exception as e:
         logger.error(
-            f"Error checking pending orders: {e!s}", extra={"error": str(e)}
+            f"Error checking pending orders: {e!s}",
+            extra={"error": str(e)},
         )
         return 0
 
@@ -384,11 +423,7 @@ def update_order_statuses_from_shipping() -> int:
                     OrderService.update_order_status(
                         order, OrderStatus.DELIVERED
                     )
-
-                    send_order_status_update_email.delay(
-                        order.id, OrderStatus.DELIVERED
-                    )
-
+                    # Email is sent by handle_order_status_changed signal
                     count += 1
 
             except Exception as inner_e:

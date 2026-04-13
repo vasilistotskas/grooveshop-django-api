@@ -3,6 +3,12 @@
 
 
 
+## v1.93.3 (2026-04-13)
+
+### Bug fixes
+
+* fix: generate schema ([`4f27a6a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4f27a6a676f97bf083fdf22150f5bae7eab77821))
+
 ## v1.93.2 (2026-04-13)
 
 ### Bug fixes

@@ -108,13 +108,14 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 
 **Custom fields**: `ImageAndSvgField` (images + SVG), `MeasurementField` (physical measurements with unit conversion)
 
-**Permissions** (`core/api/permissions.py`): `IsOwnerOrAdmin`, `IsOwnerOrAdminOrGuest` — checks `user`, `owner`, or `created_by` fields
+**Permissions** (`core/api/permissions.py`): `IsOwnerOrAdmin`, `IsOwnerOrAdminOrGuest` — checks `user`, `owner`, or `created_by` fields. `IsOwnerOrAdminOrGuest` additionally handles guest orders: when `obj.user is None`, it verifies `request.query_params.get("uuid") == str(obj.uuid)`.
 
 ### API Conventions
 
 - All API endpoints are under `api/v1/` with DRF ViewSets
 - Request/response bodies use **camelCase** (auto-converted from snake_case via `djangorestframework-camel-case`)
 - Authentication: Knox token auth (`Bearer` prefix, 7-day TTL, auto-refresh after 1 day) + Django Allauth (account management, social providers: Google/Facebook/GitHub/Discord, MFA/WebAuthn/Passkeys) + Django session auth
+- `DEFAULT_PERMISSION_CLASSES` is `IsAuthenticatedOrReadOnly`. Any endpoint that requires anonymous POST access (e.g. guest checkout) must explicitly set `permission_classes = [AllowAny]`.
 - Payments: Stripe via dj-stripe
 - Default pagination: 12 items per page, max 100
 - OpenAPI docs at `/api/v1/schema/swagger-ui` and `/api/v1/schema/redoc`
@@ -127,7 +128,7 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 - **Audit history**: django-simple-history on models
 - **Tree structures**: django-mptt `TreeForeignKey` for ProductCategory, BlogCategory
 - **Monetary fields**: django-money `MoneyField` for prices, totals. Default currency: EUR
-- **Stock management**: `StockManager` with atomic `reserve_stock()`/`release_stock()` using `select_for_update()`. `StockReservation` model with TTL (default 15 min). `StockLog` for audit trail.
+- **Stock management**: `StockManager` with atomic `reserve_stock()`/`release_stock()` using `select_for_update()` to prevent overselling under concurrent requests. The legacy `create_order` path also performs stock checks inside an atomic block. `StockReservation` model with TTL (default 15 min). `StockLog` for audit trail.
 - **Computed properties**: Models check `__dict__` for annotation values before falling back to DB queries (e.g. `likes_count`, `review_average`)
 - **Meilisearch indexing**: Models inherit `IndexMixin` with `MeiliMeta` class defining filterable/searchable/sortable fields, ranking rules, synonyms, typo tolerance. `meili_filter()` controls indexing eligibility. `get_additional_meili_fields()` adds computed fields.
 
@@ -141,7 +142,14 @@ ASGI routing in `asgi/__init__.py` with Channels `ProtocolTypeRouter`:
 
 ### Celery
 
-App configured in `core/celery.py`. Base task class: `MonitoredTask` (logs success/failure). Tasks in `core/tasks.py` include system health monitoring, DB backup, cache clearing, session cleanup, Meilisearch sync, abandoned cart cleanup, loyalty points expiration, inactive user notifications. All tasks use auto-retry with exponential backoff (max 5 retries).
+App configured in `core/celery.py`. Base task class: `MonitoredTask` (logs success/failure). All tasks use `autoretry_for`, `retry_backoff`, and `retry_jitter` with exponential backoff (max 5 retries).
+
+Tasks are split by domain:
+- `core/tasks.py` — system health monitoring, DB backup, cache clearing, session cleanup, Meilisearch sync, abandoned cart cleanup, loyalty points expiration, inactive user notifications
+- `product/tasks.py` — price drop notifications
+- `search/tasks.py` — search analytics
+- `blog/tasks.py` — comment liked notifications
+- `loyalty/tasks.py` — loyalty point award/expiry tasks (all use `MonitoredTask` base class)
 
 ### Factory / Test Data Pattern
 

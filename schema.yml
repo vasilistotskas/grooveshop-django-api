@@ -7258,7 +7258,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '400':
           content:
@@ -7397,7 +7396,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '400':
           content:
@@ -7474,7 +7472,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '400':
           content:
@@ -7530,7 +7527,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '204':
           description: No response body
@@ -18928,7 +18924,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '400':
           content:
@@ -19067,7 +19062,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '400':
           content:
@@ -19144,7 +19138,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '400':
           content:
@@ -19200,7 +19193,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '204':
           description: No response body
@@ -19244,7 +19236,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '400':
           content:
@@ -20434,7 +20425,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '400':
           content:
@@ -20573,7 +20563,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '400':
           content:
@@ -20650,7 +20639,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '400':
           content:
@@ -20706,7 +20694,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '204':
           description: No response body
@@ -23624,7 +23611,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '400':
           content:
@@ -23763,7 +23749,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '400':
           content:
@@ -23840,7 +23825,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '400':
           content:
@@ -23896,7 +23880,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '204':
           description: No response body
@@ -33817,6 +33800,29 @@ components:
       - createdAt
       - id
       - value
+    ProductBrief:
+      type: object
+      description: Minimal product representation for use in list-level review serializer.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          nullable: true
+          readOnly: true
+        slug:
+          type: string
+          maxLength: 255
+          pattern: ^[-a-zA-Z0-9_]+$
+        mainImagePath:
+          type: string
+          readOnly: true
+      required:
+      - id
+      - mainImagePath
+      - name
+      - slug
     ProductCategory:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -35027,7 +35033,7 @@ components:
           readOnly: true
         product:
           allOf:
-          - $ref: '#/components/schemas/Product'
+          - $ref: '#/components/schemas/ProductBrief'
           readOnly: true
         user:
           allOf:

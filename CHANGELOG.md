@@ -3,6 +3,56 @@
 
 
 
+## v1.93.2 (2026-04-13)
+
+### Bug fixes
+
+* fix(security): resolve critical cache leaks, permission gaps, race conditions, and signal performance
+
+- Remove @cache_methods from user-scoped viewsets (Order, Address, Notification, OrderItem)
+  preventing cross-user data leakage via URL-keyed cache
+- Add user-scoped get_queryset to NotificationUserViewSet
+- Add permission_classes to BlogTagViewSet and ProductImageViewSet (admin for writes)
+- Fix IsOwnerOrAdminOrGuest to require UUID verification for guest order access
+- Change DRF default permission from AllowAny to IsAuthenticatedOrReadOnly
+- Fix Stripe webhook TOCTOU with select_for_update + transaction.atomic (both handlers)
+- Fix stock race condition in legacy create_order path
+- Fix username change race with IntegrityError handling
+- Bulk-optimize cleanup_expired_reservations (N+1 → 2 queries)
+- Move price-drop, blog comment, and search analytics to Celery tasks
+- Migrate loyalty tasks to MonitoredTask with autoretry
+- Fix SMSNotifier stubs to return False, carrier-aware tracking URLs
+- Fix SearchAnalyticsMiddleware IP spoofing, deprecated extra() in admin
+- Fix Viva webhook missing paid_amount_currency in update_fields
+- Add explicit AllowAny to cart viewsets for guest checkout
+- Fix health_check to execute SQL, consolidate order status tracking
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`a5eb218`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a5eb2188982767b9a420ea510586d64ad77c0098))
+
+* fix(email): prevent duplicate and unlimited order reminder emails
+
+- Fix daily pending order reminder spam: add reminder_count and
+  last_reminder_sent_at tracking to Order model, cap at 3 reminders
+  with escalating intervals (1, 3, 7 days) via django-extra-settings
+- Fix duplicate emails on SHIPPED (3→1): consolidate to single email
+  path through handle_order_status_changed signal, remove redundant
+  sync notifications.py calls and async task from handle_order_shipped
+- Fix duplicate emails on DELIVERED (2-3→1): remove sync notification
+  from handle_order_delivered, remove explicit email from shipping task
+- Fix duplicate emails on CANCELED (2→1): remove sync notification
+  from handle_order_canceled
+- Fix monthly inactive user "We miss you!" spam: add
+  reengagement_email_count and last_reengagement_email_at to
+  UserAccount, cap at 3 emails with 90-day cooldown
+- Move hardcoded task constants to django-extra-settings for runtime
+  configuration: reminder limits, cart cleanup days, search limits,
+  reengagement thresholds, notification expiration
+- Fix flaky concurrent stock tests: add connection.close() in finally
+  blocks, classify DB pool exhaustion errors separately from business
+  logic failures
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`1d5a1cb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1d5a1cb8770278619752b59c356a5f72e2e9f5f7))
+
 ## v1.93.1 (2026-04-10)
 
 ### Bug fixes

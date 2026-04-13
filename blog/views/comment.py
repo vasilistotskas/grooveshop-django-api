@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from django.conf import settings
 from django.db.models import Count
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_view
@@ -30,7 +29,6 @@ from core.utils.serializers import (
     create_schema_view_config,
     crud_config,
 )
-from core.utils.views import cache_methods
 
 serializers_config: SerializersConfig = {
     **crud_config(
@@ -105,7 +103,6 @@ serializers_config: SerializersConfig = {
         error_serializer=ErrorResponseSerializer,
     )
 )
-@cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class BlogCommentViewSet(BaseModelViewSet):
     queryset = BlogComment.objects.all()
     serializers_config = serializers_config

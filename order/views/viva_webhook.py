@@ -73,17 +73,35 @@ def viva_wallet_webhook(request):
 
 
 def _handle_verification(request):
+    logger.info(
+        "Viva webhook GET verification request | "
+        "remote_addr=%s | x-forwarded-for=%s",
+        request.META.get("REMOTE_ADDR", ""),
+        request.META.get("HTTP_X_FORWARDED_FOR", ""),
+    )
     verification_key = getattr(
         settings, "VIVA_WALLET_WEBHOOK_VERIFICATION_KEY", ""
     )
 
-    if not verification_key:
+    if verification_key:
+        logger.info("Using configured VIVA_WALLET_WEBHOOK_VERIFICATION_KEY")
+    else:
+        logger.info(
+            "VIVA_WALLET_WEBHOOK_VERIFICATION_KEY not set — fetching from Viva"
+        )
         verification_key = _fetch_verification_key()
 
     if not verification_key:
-        logger.error("Viva Wallet webhook verification key unavailable")
+        logger.error(
+            "Viva Wallet webhook verification key unavailable — "
+            "GET verification will fail"
+        )
         return JsonResponse({"error": "Not configured"}, status=500)
 
+    logger.info(
+        "Returning Viva verification key (first 8 chars: %s...)",
+        verification_key[:8],
+    )
     return JsonResponse(
         {"Key": verification_key},
         json_dumps_params={"separators": (",", ":")},
@@ -121,54 +139,54 @@ def _fetch_verification_key():
         return ""
 
 
-def _verify_source_ip(request) -> bool:
-    """Verify the webhook originates from Viva Wallet's IP ranges.
+def _check_source_ip(request) -> tuple[bool, str]:
+    """Best-effort check of the webhook source IP.
 
-    Viva dashboard webhooks (Transaction Payment Created, etc.) do NOT
-    use HMAC signing. The official verification method is IP whitelisting
-    combined with calling the Retrieve Transaction API to confirm details.
-    See: https://developer.viva.com/webhooks-for-payments/
+    Returns (is_viva_ip, observed_ip). Used as a non-blocking signal:
+    when the IP IS in Viva's range we can skip the Retrieve Transaction
+    API call as an optimization. When it ISN'T we MUST fall back to the
+    API call to authenticate the webhook.
+
+    Why this isn't a hard gate: in Kubernetes with Traefik and
+    `externalTrafficPolicy: Cluster` the source IP is SNAT-ed to a node
+    or pod IP (e.g. 10.42.x.x) — so the original Viva IP is lost both
+    in REMOTE_ADDR and in X-Forwarded-For. Hard-rejecting on IP would
+    block every real webhook. The Retrieve Transaction API call is the
+    real authentication: it requires our own OAuth2 credentials and
+    confirms the transaction exists in Viva's system.
     """
     live_mode = getattr(settings, "VIVA_WALLET_LIVE_MODE", False)
     allowed_networks = (
         VIVA_WEBHOOK_IPS_PRODUCTION if live_mode else VIVA_WEBHOOK_IPS_DEMO
     )
 
-    # In production behind Traefik (K3s default: no upstream XFF trust),
-    # Traefik replaces X-Forwarded-For with just the direct sender's IP —
-    # so there is exactly one entry, which is Viva's IP.
-    # Taking the rightmost (= only) entry is therefore correct and
-    # cannot be spoofed by a forged XFF header from the client.
     forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR", "")
     if forwarded_for:
-        # Take the rightmost entry — with Traefik replacing XFF this
-        # is always Viva's own IP as seen by Traefik.
-        client_ip_str = forwarded_for.split(",")[-1].strip()
+        # Try every entry — the original Viva IP may be anywhere in the chain
+        # depending on how many proxies SNAT-ed the request.
+        candidates = [ip.strip() for ip in forwarded_for.split(",")]
     else:
-        client_ip_str = request.META.get(
-            "HTTP_X_REAL_IP",
-            request.META.get("REMOTE_ADDR", ""),
-        )
+        candidates = [
+            request.META.get(
+                "HTTP_X_REAL_IP",
+                request.META.get("REMOTE_ADDR", ""),
+            )
+        ]
 
-    if not client_ip_str:
-        logger.warning("Viva webhook: could not determine client IP")
-        return False
+    observed = candidates[0] if candidates else ""
 
-    try:
-        client_ip = ipaddress.ip_address(client_ip_str)
-    except ValueError:
-        logger.warning("Viva webhook: invalid client IP: %s", client_ip_str)
-        return False
+    for ip_str in candidates:
+        if not ip_str:
+            continue
+        try:
+            client_ip = ipaddress.ip_address(ip_str)
+        except ValueError:
+            continue
+        for network in allowed_networks:
+            if client_ip in network:
+                return True, ip_str
 
-    for network in allowed_networks:
-        if client_ip in network:
-            return True
-
-    logger.warning(
-        "Viva webhook rejected: IP %s not in allowed ranges",
-        client_ip_str,
-    )
-    return False
+    return False, observed
 
 
 def _verify_transaction(transaction_id):
@@ -176,12 +194,27 @@ def _verify_transaction(transaction_id):
 
     try:
         provider = VivaWalletPaymentProvider()
-        status, data = provider.get_payment_status(transaction_id)
-        return status, data
-    except Exception:
-        logger.exception(
-            "Failed to verify Viva Wallet transaction: %s",
+        logger.info(
+            "_verify_transaction: calling provider.get_payment_status(%s) "
+            "live_mode=%s api_url=%s",
             transaction_id,
+            provider.live_mode,
+            provider.api_url,
+        )
+        status, data = provider.get_payment_status(transaction_id)
+        logger.info(
+            "_verify_transaction: success | transaction_id=%s | "
+            "status=%s | raw_status=%s",
+            transaction_id,
+            status,
+            data.get("raw_status") if isinstance(data, dict) else None,
+        )
+        return status, data
+    except Exception as exc:
+        logger.exception(
+            "_verify_transaction: FAILED for %s | error=%s",
+            transaction_id,
+            exc,
         )
         return None, {}
 
@@ -189,14 +222,46 @@ def _verify_transaction(transaction_id):
 def _handle_webhook_event(request):
     from django.db import transaction
 
-    if not _verify_source_ip(request):
-        return JsonResponse({"error": "Forbidden"}, status=403)
+    # === DEBUG: log all request details ===
+    logger.info(
+        "Viva webhook POST received | "
+        "remote_addr=%s | x-forwarded-for=%s | x-real-ip=%s | "
+        "content_type=%s | content_length=%s | host=%s",
+        request.META.get("REMOTE_ADDR", ""),
+        request.META.get("HTTP_X_FORWARDED_FOR", ""),
+        request.META.get("HTTP_X_REAL_IP", ""),
+        request.META.get("CONTENT_TYPE", ""),
+        request.META.get("CONTENT_LENGTH", ""),
+        request.META.get("HTTP_HOST", ""),
+    )
+
+    # Best-effort IP check — informational only. Authentication of the
+    # webhook is done by the Retrieve Transaction API call inside
+    # _handle_payment_created, which uses our OAuth2 credentials and
+    # confirms the transaction exists in Viva's system.
+    ip_match, observed_ip = _check_source_ip(request)
+    if ip_match:
+        logger.info("Viva webhook IP %s matches Viva range", observed_ip)
+    else:
+        logger.info(
+            "Viva webhook from non-Viva IP %s — will rely on transaction API "
+            "verification (expected behind SNAT'd ingress)",
+            observed_ip,
+        )
 
     try:
         body = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
-        logger.error("Invalid JSON in Viva Wallet webhook")
+    except (json.JSONDecodeError, ValueError) as exc:
+        logger.error(
+            "Invalid JSON in Viva Wallet webhook | error=%s | body_len=%d | "
+            "body_preview=%s",
+            exc,
+            len(request.body),
+            request.body[:500].decode("utf-8", errors="replace"),
+        )
         return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    logger.info("Viva webhook full payload: %s", json.dumps(body, default=str))
 
     event_data = body.get("EventData", {})
     event_type_id = body.get("EventTypeId")
@@ -206,7 +271,7 @@ def _handle_webhook_event(request):
     status_id = event_data.get("StatusId", "")
 
     logger.info(
-        "Viva Wallet webhook received",
+        "Viva Wallet webhook parsed",
         extra={
             "event_type_id": event_type_id,
             "transaction_id": transaction_id,
@@ -225,15 +290,25 @@ def _handle_webhook_event(request):
 
     if not order:
         logger.error(
-            "Order not found for Viva Wallet order code: %s",
+            "Order not found for Viva Wallet order code: %s | "
+            "(was searching for metadata.viva_order_code = '%s')",
             order_code,
+            str(order_code),
         )
         return JsonResponse({"status": "ok"})
+
+    logger.info(
+        "Viva webhook matched order #%s (uuid=%s, status=%s, payment_status=%s)",
+        order.id,
+        order.uuid,
+        order.status,
+        order.payment_status,
+    )
 
     event_key = f"viva_webhook_{transaction_id}_{event_type_id}"
     if order.metadata and order.metadata.get(event_key):
         logger.info(
-            "Viva Wallet webhook already processed: %s",
+            "Viva Wallet webhook already processed: %s (idempotency hit)",
             event_key,
         )
         return JsonResponse({"status": "ok"})
@@ -245,6 +320,10 @@ def _handle_webhook_event(request):
 
             # Double-check idempotency after acquiring lock
             if order.metadata and order.metadata.get(event_key):
+                logger.info(
+                    "Viva webhook %s processed by parallel request — skipping",
+                    event_key,
+                )
                 return JsonResponse({"status": "ok"})
 
             if not order.metadata:
@@ -255,6 +334,11 @@ def _handle_webhook_event(request):
             # 1796 = Transaction Payment Created
             # 1797 = Transaction Reversal Created
             # 1798 = Transaction Failed
+            logger.info(
+                "Viva webhook dispatching event_type=%s for order #%s",
+                event_type_id,
+                order.id,
+            )
             if event_type_id == 1796:
                 _handle_payment_created(order, event_data, transaction_id)
             elif event_type_id == 1797:
@@ -285,14 +369,23 @@ def _handle_payment_created(order, event_data, transaction_id):
     from django.utils import timezone
 
     logger.info(
-        "Viva Wallet payment created for order %s",
+        "_handle_payment_created START | order=%s | transaction_id=%s | "
+        "current_payment_status=%s | current_status=%s",
         order.id,
+        transaction_id,
+        order.payment_status,
+        order.status,
     )
 
     # Per Viva docs: check StatusId from the webhook payload first.
     # "F" = Finished (successful). Any other value means the payment
     # is not yet complete.
     status_id = event_data.get("StatusId", "")
+    logger.info(
+        "Viva webhook StatusId for order %s: '%s'",
+        order.id,
+        status_id,
+    )
     if status_id and status_id != "F":
         logger.warning(
             "Viva webhook StatusId is '%s' (not 'F') for order %s — "
@@ -316,7 +409,18 @@ def _handle_payment_created(order, event_data, transaction_id):
         order.save(update_fields=["metadata"])
         return
 
+    logger.info(
+        "Calling Viva Retrieve Transaction API for transaction %s (order %s)",
+        transaction_id,
+        order.id,
+    )
     verified_status, verified_data = _verify_transaction(transaction_id)
+    logger.info(
+        "Viva Retrieve Transaction result for %s: status=%s | data=%s",
+        transaction_id,
+        verified_status,
+        verified_data,
+    )
     if verified_status is None:
         logger.error(
             "Could not verify Viva transaction %s — "
@@ -336,6 +440,12 @@ def _handle_payment_created(order, event_data, transaction_id):
         )
         order.save(update_fields=["metadata"])
         return
+
+    logger.info(
+        "Viva transaction %s VERIFIED COMPLETED — updating order %s",
+        transaction_id,
+        order.id,
+    )
 
     # Capture previous state for audit log before mutating
     previous_payment_status = order.payment_status

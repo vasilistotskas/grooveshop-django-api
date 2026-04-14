@@ -1,5 +1,4 @@
-import hashlib
-import hmac
+import ipaddress
 import json
 import logging
 from base64 import b64encode
@@ -15,6 +14,31 @@ from order.models.history import OrderHistory
 from order.models.order import Order
 
 logger = logging.getLogger(__name__)
+
+# Viva Wallet production webhook source IPs (from official docs).
+# https://developer.viva.com/webhooks-for-payments/
+VIVA_WEBHOOK_IPS_PRODUCTION = [
+    ipaddress.ip_network("51.138.37.238/32"),
+    ipaddress.ip_network("13.80.70.181/32"),
+    ipaddress.ip_network("13.80.71.223/32"),
+    ipaddress.ip_network("13.79.28.70/32"),
+    ipaddress.ip_network("40.127.253.112/28"),
+    ipaddress.ip_network("51.105.129.192/28"),
+    ipaddress.ip_network("20.54.89.16/32"),
+    ipaddress.ip_network("4.223.76.50/32"),
+    ipaddress.ip_network("51.12.157.0/28"),
+]
+
+VIVA_WEBHOOK_IPS_DEMO = [
+    ipaddress.ip_network("20.50.240.57/32"),
+    ipaddress.ip_network("40.74.20.78/32"),
+    ipaddress.ip_network("94.70.170.65/32"),
+    ipaddress.ip_network("94.70.255.73/32"),
+    ipaddress.ip_network("94.70.248.18/32"),
+    ipaddress.ip_network("83.235.24.226/32"),
+    ipaddress.ip_network("20.13.195.185/32"),
+    ipaddress.ip_network("94.70.174.36/32"),
+]
 
 
 @require_http_methods(["GET"])
@@ -97,43 +121,54 @@ def _fetch_verification_key():
         return ""
 
 
-def _verify_hmac_signature(request) -> bool:
-    """Verify the HMAC-SHA256 signature on an incoming Viva Wallet webhook.
+def _verify_source_ip(request) -> bool:
+    """Verify the webhook originates from Viva Wallet's IP ranges.
 
-    Returns True when verification passes or is skipped (unconfigured secret).
-    Returns False when a secret is configured but the signature does not match.
+    Viva dashboard webhooks (Transaction Payment Created, etc.) do NOT
+    use HMAC signing. The official verification method is IP whitelisting
+    combined with calling the Retrieve Transaction API to confirm details.
+    See: https://developer.viva.com/webhooks-for-payments/
     """
-    secret = getattr(settings, "VIVA_WALLET_WEBHOOK_SECRET", "")
+    live_mode = getattr(settings, "VIVA_WALLET_LIVE_MODE", False)
+    allowed_networks = (
+        VIVA_WEBHOOK_IPS_PRODUCTION if live_mode else VIVA_WEBHOOK_IPS_DEMO
+    )
 
-    if not secret:
-        logger.warning(
-            "VIVA_WALLET_WEBHOOK_SECRET is not configured — "
-            "rejecting webhook request"
+    # In production behind Traefik (K3s default: no upstream XFF trust),
+    # Traefik replaces X-Forwarded-For with just the direct sender's IP —
+    # so there is exactly one entry, which is Viva's IP.
+    # Taking the rightmost (= only) entry is therefore correct and
+    # cannot be spoofed by a forged XFF header from the client.
+    forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    if forwarded_for:
+        # Take the rightmost entry — with Traefik replacing XFF this
+        # is always Viva's own IP as seen by Traefik.
+        client_ip_str = forwarded_for.split(",")[-1].strip()
+    else:
+        client_ip_str = request.META.get(
+            "HTTP_X_REAL_IP",
+            request.META.get("REMOTE_ADDR", ""),
         )
+
+    if not client_ip_str:
+        logger.warning("Viva webhook: could not determine client IP")
         return False
 
-    received_sig = request.headers.get("X-Viva-Signature", "")
-    if not received_sig:
-        logger.warning(
-            "Viva Wallet webhook received without X-Viva-Signature header"
-        )
+    try:
+        client_ip = ipaddress.ip_address(client_ip_str)
+    except ValueError:
+        logger.warning("Viva webhook: invalid client IP: %s", client_ip_str)
         return False
 
-    expected_sig = hmac.new(
-        secret.encode(), request.body, hashlib.sha256
-    ).hexdigest()
+    for network in allowed_networks:
+        if client_ip in network:
+            return True
 
-    if not hmac.compare_digest(expected_sig, received_sig):
-        logger.warning(
-            "Viva Wallet webhook HMAC signature mismatch",
-            extra={
-                "expected": expected_sig[:8] + "...",
-                "received": received_sig[:8] + "...",
-            },
-        )
-        return False
-
-    return True
+    logger.warning(
+        "Viva webhook rejected: IP %s not in allowed ranges",
+        client_ip_str,
+    )
+    return False
 
 
 def _verify_transaction(transaction_id):
@@ -154,8 +189,8 @@ def _verify_transaction(transaction_id):
 def _handle_webhook_event(request):
     from django.db import transaction
 
-    if not _verify_hmac_signature(request):
-        return JsonResponse({"error": "Invalid signature"}, status=403)
+    if not _verify_source_ip(request):
+        return JsonResponse({"error": "Forbidden"}, status=403)
 
     try:
         body = json.loads(request.body)
@@ -203,34 +238,45 @@ def _handle_webhook_event(request):
         )
         return JsonResponse({"status": "ok"})
 
-    with transaction.atomic():
-        # Re-fetch with row lock to prevent race conditions
-        order = Order.objects.select_for_update().get(pk=order.pk)
+    try:
+        with transaction.atomic():
+            # Re-fetch with row lock to prevent race conditions
+            order = Order.objects.select_for_update().get(pk=order.pk)
 
-        # Double-check idempotency after acquiring lock
-        if order.metadata and order.metadata.get(event_key):
-            return JsonResponse({"status": "ok"})
+            # Double-check idempotency after acquiring lock
+            if order.metadata and order.metadata.get(event_key):
+                return JsonResponse({"status": "ok"})
 
-        if not order.metadata:
-            order.metadata = {}
-        order.metadata[event_key] = True
+            if not order.metadata:
+                order.metadata = {}
+            order.metadata[event_key] = True
 
-        # Event type IDs per Viva documentation:
-        # 1796 = Transaction Payment Created
-        # 1797 = Transaction Reversal Created
-        # 1798 = Transaction Failed
-        if event_type_id == 1796:
-            _handle_payment_created(order, event_data, transaction_id)
-        elif event_type_id == 1797:
-            _handle_reversal_created(order, event_data, transaction_id)
-        elif event_type_id == 1798:
-            _handle_payment_failed(order, event_data, transaction_id)
-        else:
-            logger.info(
-                "Unhandled Viva Wallet event type: %s",
-                event_type_id,
-            )
-            order.save(update_fields=["metadata"])
+            # Event type IDs per Viva documentation:
+            # 1796 = Transaction Payment Created
+            # 1797 = Transaction Reversal Created
+            # 1798 = Transaction Failed
+            if event_type_id == 1796:
+                _handle_payment_created(order, event_data, transaction_id)
+            elif event_type_id == 1797:
+                _handle_reversal_created(order, event_data, transaction_id)
+            elif event_type_id == 1798:
+                _handle_payment_failed(order, event_data, transaction_id)
+            else:
+                logger.info(
+                    "Unhandled Viva Wallet event type: %s",
+                    event_type_id,
+                )
+                order.save(update_fields=["metadata"])
+    except RuntimeError as exc:
+        # Raised by _handle_payment_created when Viva's verification API
+        # is unreachable. Returning 500 signals Viva to retry the webhook;
+        # the event_key is NOT persisted (transaction rolled back) so the
+        # retry will be processed fresh.
+        logger.error("Viva webhook processing error: %s", exc)
+        return JsonResponse(
+            {"error": "Internal verification error, please retry"},
+            status=500,
+        )
 
     return JsonResponse({"status": "ok"})
 
@@ -243,14 +289,53 @@ def _handle_payment_created(order, event_data, transaction_id):
         order.id,
     )
 
-    if transaction_id:
-        verified_status, verified_data = _verify_transaction(transaction_id)
-        if verified_status and verified_status != PaymentStatus.COMPLETED:
-            logger.warning(
-                "Viva transaction %s status mismatch: %s",
-                transaction_id,
-                verified_status,
-            )
+    # Per Viva docs: check StatusId from the webhook payload first.
+    # "F" = Finished (successful). Any other value means the payment
+    # is not yet complete.
+    status_id = event_data.get("StatusId", "")
+    if status_id and status_id != "F":
+        logger.warning(
+            "Viva webhook StatusId is '%s' (not 'F') for order %s — "
+            "skipping payment update",
+            status_id,
+            order.id,
+        )
+        order.save(update_fields=["metadata"])
+        return
+
+    # Per Viva docs: verify via Retrieve Transaction API as extra
+    # confirmation. Do NOT trust the webhook payload alone.
+    # A payment-created event without a TransactionId is not verifiable
+    # and must be rejected to prevent fake payment completions.
+    if not transaction_id:
+        logger.error(
+            "Viva webhook event 1796 missing TransactionId for order %s "
+            "— cannot verify, skipping payment update",
+            order.id,
+        )
+        order.save(update_fields=["metadata"])
+        return
+
+    verified_status, verified_data = _verify_transaction(transaction_id)
+    if verified_status is None:
+        logger.error(
+            "Could not verify Viva transaction %s — "
+            "leaving event unprocessed so Viva can retry",
+            transaction_id,
+        )
+        # Do NOT save metadata here: we want the event_key to remain
+        # unset so Viva's retry delivers the webhook again.
+        raise RuntimeError(
+            f"Viva transaction verification failed for {transaction_id}"
+        )
+    if verified_status != PaymentStatus.COMPLETED:
+        logger.warning(
+            "Viva transaction %s not completed (status: %s) — skipping",
+            transaction_id,
+            verified_status,
+        )
+        order.save(update_fields=["metadata"])
+        return
 
     # Set all fields at once to avoid multiple DB writes
     order.metadata["viva_transaction_id"] = transaction_id

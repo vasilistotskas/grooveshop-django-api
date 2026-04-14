@@ -474,9 +474,9 @@ class VivaWalletPaymentProvider(PaymentProvider):
     LIVE_API_URL = "https://api.vivapayments.com"
     DEMO_CHECKOUT_URL = "https://demo.vivapayments.com"
     LIVE_CHECKOUT_URL = "https://www.vivapayments.com"
+    # Refund (DELETE /api/transactions/{id}) uses the checkout domain per Viva docs.
     DEMO_TRANSACTIONS_URL = "https://demo.vivapayments.com"
     LIVE_TRANSACTIONS_URL = "https://www.vivapayments.com"
-    TOKEN_CACHE_KEY = "viva_wallet_access_token"
 
     def __init__(self):
         self.merchant_id = getattr(settings, "VIVA_WALLET_MERCHANT_ID", "")
@@ -499,13 +499,20 @@ class VivaWalletPaymentProvider(PaymentProvider):
             self.checkout_url = self.DEMO_CHECKOUT_URL
             self.transactions_url = self.DEMO_TRANSACTIONS_URL
 
+        # Scope the token cache key by environment so switching
+        # VIVA_WALLET_LIVE_MODE does not leak a demo token into live calls
+        # (or vice versa) for the remaining TTL window.
+        self.token_cache_key = (
+            f"viva_wallet_access_token_{'live' if self.live_mode else 'demo'}"
+        )
+
     def _get_access_token(self) -> str:
         from base64 import b64encode
 
         import requests
         from django.core.cache import cache
 
-        cached_token = cache.get(self.TOKEN_CACHE_KEY)
+        cached_token = cache.get(self.token_cache_key)
         if cached_token:
             return cached_token
 
@@ -530,7 +537,7 @@ class VivaWalletPaymentProvider(PaymentProvider):
         access_token = token_data["access_token"]
         expires_in = token_data.get("expires_in", 3600)
         cache.set(
-            self.TOKEN_CACHE_KEY,
+            self.token_cache_key,
             access_token,
             timeout=max(expires_in - 60, 60),
         )
@@ -623,7 +630,6 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 "amount": str(amount.amount),
                 "currency": str(amount.currency),
                 "provider": "viva_wallet",
-                "viva_order_code": order_code,
             }
 
         except requests.HTTPError as e:

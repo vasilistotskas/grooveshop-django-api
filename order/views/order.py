@@ -784,7 +784,17 @@ class OrderViewSet(BaseModelViewSet):
             order.metadata = {}
 
         if provider_code == "viva_wallet":
-            order.metadata["viva_order_code"] = checkout_response["session_id"]
+            existing_code = order.metadata.get("viva_order_code")
+            new_code = checkout_response["session_id"]
+            if existing_code and existing_code != new_code:
+                logger.warning(
+                    "Order %s Viva order code replaced: %s → %s "
+                    "(retry or duplicate checkout session creation)",
+                    order.id,
+                    existing_code,
+                    new_code,
+                )
+            order.metadata["viva_order_code"] = new_code
         else:
             order.metadata["stripe_checkout_session_id"] = checkout_response[
                 "session_id"

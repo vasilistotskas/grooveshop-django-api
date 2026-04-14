@@ -337,6 +337,9 @@ def _handle_payment_created(order, event_data, transaction_id):
         order.save(update_fields=["metadata"])
         return
 
+    # Capture previous state for audit log before mutating
+    previous_payment_status = order.payment_status
+
     # Set all fields at once to avoid multiple DB writes
     order.metadata["viva_transaction_id"] = transaction_id
     order.payment_id = transaction_id
@@ -363,7 +366,7 @@ def _handle_payment_created(order, event_data, transaction_id):
 
     OrderHistory.log_payment_update(
         order=order,
-        previous_value={"payment_status": "pending"},
+        previous_value={"payment_status": previous_payment_status},
         new_value={
             "payment_status": "completed",
             "payment_id": transaction_id,
@@ -378,12 +381,13 @@ def _handle_payment_failed(order, event_data, transaction_id):
         order.id,
     )
 
+    previous_payment_status = order.payment_status
     order.payment_status = PaymentStatus.FAILED
     order.save(update_fields=["payment_status", "metadata"])
 
     OrderHistory.log_payment_update(
         order=order,
-        previous_value={"payment_status": "pending"},
+        previous_value={"payment_status": previous_payment_status},
         new_value={
             "payment_status": "failed",
             "payment_id": transaction_id,
@@ -393,6 +397,8 @@ def _handle_payment_failed(order, event_data, transaction_id):
 
 
 def _handle_reversal_created(order, event_data, transaction_id):
+    from django.utils import timezone
+
     logger.info(
         "Viva Wallet reversal created for order %s",
         order.id,
@@ -402,7 +408,15 @@ def _handle_reversal_created(order, event_data, transaction_id):
 
     order.payment_status = PaymentStatus.REFUNDED
     order.status = OrderStatus.REFUNDED
-    order.save(update_fields=["payment_status", "status", "metadata"])
+    order.status_updated_at = timezone.now()
+    order.save(
+        update_fields=[
+            "payment_status",
+            "status",
+            "status_updated_at",
+            "metadata",
+        ]
+    )
 
     OrderHistory.log_payment_update(
         order=order,

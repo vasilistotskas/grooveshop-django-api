@@ -28,9 +28,19 @@ class CacheClearingRosettaStorage(CacheRosettaStorage):
 
 def _reload_translations():
     """Force Django to reload gettext catalogs from disk."""
+    import gettext
+
     from django.utils.translation import trans_real
 
     if hasattr(trans_real, "_translations"):
         trans_real._translations = {}
     if hasattr(trans_real, "_default"):
         trans_real._default = None
+
+    # Python's gettext caches GNUTranslations objects keyed by absolute .mo
+    # path in a module-level dict. Django's DjangoTranslation delegates to
+    # gettext.translation(), so clearing Django's own cache isn't enough —
+    # without this, a freshly-built DjangoTranslation still wraps the stale
+    # GNUTranslations and serves pre-save strings.
+    if hasattr(gettext, "_translations"):
+        gettext._translations = {}

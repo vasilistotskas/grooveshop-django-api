@@ -3,6 +3,28 @@
 
 
 
+## v1.93.6 (2026-04-14)
+
+### Bug fixes
+
+* fix: update uv lock ([`5a07428`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5a0742896ceff47acae9929c2f3e0644e0e15dfc))
+
+* fix(viva): audit fixes — scoped token cache, accurate audit history, safer reversal
+
+- viva_webhook: H1 — _handle_reversal_created now persists status_updated_at
+  (was mutating in memory but missing from update_fields)
+- viva_webhook: H2/H3 — _handle_payment_failed and _handle_payment_created
+  capture previous_payment_status before mutating so OrderHistory records
+  the actual prior state instead of hardcoded "pending"
+- payment: M2 — scope token cache key by live/demo mode to prevent demo
+  tokens leaking into live API calls (or vice versa) after mode switch
+- payment: M3 — remove dead viva_order_code key from create_checkout_session
+  return dict (was never consumed by caller)
+- order.views.order.create_checkout_session: log warning when an existing
+  viva_order_code is replaced (aids debugging retry/duplicate sessions)
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`8a13169`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8a1316943a05a95ba6b4350652d8d9d64f26ee2b))
+
 ## v1.93.5 (2026-04-14)
 
 ### Bug fixes

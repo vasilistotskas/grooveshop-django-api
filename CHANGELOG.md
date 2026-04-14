@@ -3,6 +3,14 @@
 
 
 
+## v1.93.8 (2026-04-14)
+
+### Bug fixes
+
+* fix: update uv lock ([`7174597`](https://github.com/vasilistotskas/grooveshop-django-api/commit/717459749bce83d7984fc8dda9c0d550d2160f38))
+
+* fix: rosetta ([`503c22b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/503c22b5b0762eca8c0ff69e135d882e2d08552a))
+
 ## v1.93.7 (2026-04-14)
 
 ### Bug fixes

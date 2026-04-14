@@ -3,6 +3,37 @@
 
 
 
+## v1.93.5 (2026-04-14)
+
+### Bug fixes
+
+* fix: update uv.lock ([`164321f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/164321f554d80e52b7b9b884a5636616a990b4c6))
+
+* fix(viva): replace broken HMAC with IP whitelisting, add StatusId + verification guards
+
+Viva dashboard webhooks do NOT use HMAC signing — the old code checked
+for X-Viva-Signature that Viva never sends, rejecting every webhook
+with 403. Payment status never updated from "Pending".
+
+Per https://developer.viva.com/webhooks-for-payments/:
+- Replace _verify_hmac_signature with _verify_source_ip (IP whitelisting
+  against Viva's published production/demo IP ranges)
+- Add StatusId == "F" check from webhook payload before processing
+- Require TransactionId on event 1796 — reject events without it to
+  prevent unverified payment completions
+- On Retrieve Transaction API failure: raise RuntimeError to roll back
+  the event_key and return 500, so Viva retries the webhook fresh
+- Wrap handler in try/except RuntimeError for the retry-on-failure flow
+- Remove unused VIVA_WALLET_WEBHOOK_SECRET setting and hashlib/hmac imports
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`8f3b593`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8f3b59358bd7bef790fc48c13fbd0b4c5db4f238))
+
+### Documentation
+
+* docs: update CLAUDE.md with permission, stock, and Celery task changes
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`be78210`](https://github.com/vasilistotskas/grooveshop-django-api/commit/be782100c0ac52652af2990836063265d2a3f2b0))
+
 ## v1.93.4 (2026-04-13)
 
 ### Bug fixes

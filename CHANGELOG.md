@@ -3,6 +3,41 @@
 
 
 
+## v1.93.7 (2026-04-14)
+
+### Bug fixes
+
+* fix: update uv lock ([`5f907b9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5f907b99cc8da5e879c3e3b89c55f22816c7f970))
+
+* fix(viva): make IP check non-blocking + extensive debug logging
+
+The IP whitelist hard-rejected webhooks because behind K3s Traefik with
+externalTrafficPolicy=Cluster, the source IP is SNAT-ed to a node/pod IP
+(10.42.x.x) and the original Viva IP is lost. Every real webhook was being
+rejected with 403, payment status never updated.
+
+Changes:
+- _verify_source_ip → _check_source_ip: returns (matches, observed_ip)
+  as informational signal. Does NOT block the request.
+- _handle_webhook_event: log IP outcome but always proceed. The Retrieve
+  Transaction API call (which uses our OAuth2 credentials and confirms
+  the transaction exists in Viva's system) is the real authentication.
+- Try every entry in X-Forwarded-For chain (not just rightmost), since
+  proxies can SNAT at multiple levels.
+
+Extensive debug logging added throughout the webhook flow:
+- Request headers (REMOTE_ADDR, X-Forwarded-For, X-Real-IP, host, etc.)
+- Full webhook payload
+- IP check result (matched/observed)
+- Order lookup (matched order id, current status)
+- Idempotency hits
+- Event dispatch
+- Retrieve Transaction API call args + result
+- Payment update success
+- GET verification flow
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`b501a02`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b501a027266dae0375ad41e4ea783200f3a0c313))
+
 ## v1.93.6 (2026-04-14)
 
 ### Bug fixes

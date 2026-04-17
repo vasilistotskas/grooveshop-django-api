@@ -3,6 +3,120 @@
 
 
 
+## v1.96.0 (2026-04-17)
+
+### Bug fixes
+
+* fix(order): close retry-payment race + quiet stale-cancel reservation logs
+
+Three fixes from a follow-up review pass on the stock/payment hardening:
+
+1. **Retry-payment race** — wrap the new-intent write in
+   `transaction.atomic() + select_for_update()`. A late
+   `payment_intent.payment_failed` webhook delivery for the OLD intent
+   could otherwise land in the ~50ms window between our read and save,
+   flip `payment_status` to FAILED, and enqueue a second failure email
+   concurrently with the retry flow.
+2. **Failed-webhook event-level idempotency** — mirror the guard
+   already present on `payment_intent.succeeded`: store
+   `metadata["webhook_processed_<event_id>"]` inside an atomic
+   `select_for_update` check so Stripe redeliveries of the same failed
+   event cannot double-fire the failure email.
+3. **Stale-cancel log noise** — `auto_cancel_stuck_pending_orders`
+   targets orders that are 30 min to 24 h old, by which point the
+   5-minute `cleanup_expired_stock_reservations` task has already
+   flipped their reservations to `consumed=True`.
+   `cancel_order()` now catches `StockReservationError("already
+   consumed")` at DEBUG level instead of emitting a warning per
+   reservation for every legitimate stale cancellation.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`43b7a1b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/43b7a1bc7f78c633275bd947c0219f0077b05fd4))
+
+### Features
+
+* feat(order, product): stock safety nets, retry payment, and stock-history admin view
+
+Broad hardening pass on the order/payment/stock pipeline plus operator
+tooling. Every new moving part is idempotent via row-locked metadata
+flags or per-model booleans so concurrent webhook deliveries, Celery
+retries, and HA beat workers cannot emit duplicates.
+
+Order + payment
+- POST /order/{id}/retry-payment mints a fresh Stripe PaymentIntent on
+  an order whose payment previously failed, preserving stock already
+  decremented at order creation. Clears confirmation/failed-email
+  idempotency flags so the new attempt can re-notify on success/failure.
+  Guests are allowed via UUID.
+- Payment-failed emails now trigger from both Stripe
+  payment_intent.payment_failed and Viva Wallet's failed-event webhook,
+  with a row-locked reserve-before-send pattern that prevents the
+  double-delivery exposed by the code review.
+- Confirmation email picks between order_received.html (offline, with
+  pay_way.instructions) and order_payment_confirmed.html (online post-
+  payment) based on pay_way.is_online_payment + payment_status.
+
+Scheduled cleanup
+- auto_cancel_stuck_pending_orders (every 15 min) cancels PENDING
+  orders with FAILED payment older than 30 min, and PENDING orders
+  older than 24h — but only for pay_way.is_online_payment=True, so
+  COD/bank transfer orders are left alone. Delegates to
+  OrderService.cancel_order which already restores stock atomically.
+- check_low_stock_products (hourly) emits a single consolidated admin
+  alert for products at/under the per-product low_stock_threshold,
+  claiming rows under select_for_update(skip_locked=True) before
+  sending and auto-clearing the flag when stock recovers.
+- send_checkout_abandonment_emails (daily) emails authenticated
+  customers whose StockReservations expired without a sale, gated by
+  the new StockReservation.abandonment_notified flag. The query
+  deliberately ignores `consumed` because the 5-minute cleanup task
+  flips it before this task runs.
+
+Configuration
+- STOCK_RESERVATION_TTL_MINUTES default raised 15 → 30 to reduce
+  false-expiries on slow checkouts.
+- New extra_settings: ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES (30),
+  ORDER_AUTO_CANCEL_PENDING_HOURS (24), LOW_STOCK_THRESHOLD (10),
+  CHECKOUT_ABANDONMENT_HOURS (2).
+
+Stock history admin
+- New per-product view at /admin/product/product/{id}/stock-history/
+  renders a Chart.js stacked bar chart (7/30/60/90/180/365 day
+  windows) of daily StockLog activity, split by
+  RESERVE/RELEASE/DECREMENT/INCREMENT, plus a 50-row recent-activity
+  table. Linked from the stock_reservation_summary card on the
+  product change page.
+
+Schema
+- Product gains low_stock_threshold + low_stock_alert_sent (plus the
+  auto-generated HistoricalProduct mirror).
+- StockReservation gains abandonment_notified.
+- Both migrations are additive with DB defaults; safe under the
+  project's PreSync-hook migration ordering.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`3f78d43`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3f78d4328717b249209ed5a9d6d1de30a00aca8d))
+
+### Testing
+
+* test(order): unpin TTL tests from 15 min + mock email task in failed-webhook history test
+
+Two CI regressions from the stock/email hardening pass:
+
+1. test_stock_reservation_ttl.py hard-coded 15-minute TTL assertions
+   against the new STOCK_RESERVATION_TTL_MINUTES default of 30.
+   Replace the literal `15` with a pytest fixture that reads
+   StockManager.get_reservation_ttl_minutes() at test time, so tuning
+   the extra-setting does not require edits here. The final
+   "constant-backed" test now checks type/positivity rather than an
+   exact value.
+2. test_failed_payment_logs_order_history asserted exactly one new
+   OrderHistory entry, but send_payment_failed_email.delay now runs
+   eagerly under CELERY_TASK_ALWAYS_EAGER and adds its own "email
+   sent" note — pushing the count to +2. Patch the email task in that
+test so the assertion only measures the webhook's own entry
+   (same fix previously applied to the sibling succeeded test).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`4006c89`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4006c894c6bd48a69d11846815a2a0bb42922533))
+
 ## v1.95.0 (2026-04-17)
 
 ### Bug fixes

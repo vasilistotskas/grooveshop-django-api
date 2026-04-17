@@ -1,14 +1,22 @@
-"""Rosetta view override that makes the editor show DB-backed msgstrs.
+"""Rosetta view override that makes the editor DB-backed end-to-end.
 
-Rosetta reads msgstrs off disk. After a fresh deploy the on-disk .po
-file carries only the msgid *schema* from `makemessages` (msgstrs are
-empty). Without this override the Rosetta form would display blank
-textareas and clobber the user's DB translations on the next save.
+Two overrides are load-bearing:
 
-We override the `po_file` property to overlay DB msgstrs onto the
-parsed `polib.POFile` before Rosetta hashes its entries. The md5
-hashes Rosetta uses to pair form inputs with entries are recomputed
-against the DB-overlaid msgstr so the POST round-trip still matches.
+1. `po_file_is_writable` is forced to `False` so Rosetta's view never
+   writes `.po`/`.mo` bytes back to the image-baked locale path on
+   save. Disk writes would (a) fail on the read-only image layer
+   anyway, (b) create cross-pod drift because PVC updates are stale,
+   (c) clobber the DB overlay that our signals already captured.
+   With this flag off, Rosetta routes its edits through its storage
+   cache (Redis) for the editing session only; the durable state
+   lives in `Translation` rows via `persist_rosetta_entry_to_db`.
+
+2. `po_file` overlays current DB msgstrs onto the parsed
+   `polib.POFile` before Rosetta hashes entries, so the form always
+   displays the live DB state (not the empty-msgid shell from the
+   image). The md5 hash Rosetta uses to match form inputs to entries
+   is recomputed against the DB-overlaid msgstr so the POST round-
+   trip still pairs up correctly.
 """
 
 from __future__ import annotations
@@ -23,6 +31,15 @@ logger = logging.getLogger(__name__)
 
 
 class DBBackedTranslationFormView(TranslationFormView):
+    @cached_property
+    def po_file_is_writable(self) -> bool:
+        # Forced False — see module docstring. Rosetta's non-writable
+        # code path uses its storage cache for the edit session and
+        # skips the on-disk save; our entry_changed signal persists
+        # each edit to the Translation table regardless, so nothing
+        # is lost.
+        return False
+
     @cached_property
     def po_file(self):
         po = super().po_file

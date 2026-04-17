@@ -10,7 +10,9 @@ from contact.models import Contact
 logger = logging.getLogger(__name__)
 
 
-@receiver(post_save, sender=Contact)
+@receiver(
+    post_save, sender=Contact, dispatch_uid="contact.send_email_notification"
+)
 def send_email_notification(sender, instance, created, **kwargs):
     if created:
         subject = f"New Contact Form Submission from {instance.name}"

@@ -15,7 +15,9 @@ from django.db import connections, transaction
 from django.db.models import F
 from django.template.loader import render_to_string
 from django.utils import timezone
-from django.utils.translation import gettext_lazy as _
+
+# See order/tasks.py for rationale — eager gettext over lazy for email subjects.
+from django.utils.translation import gettext as _
 
 from extra_settings.models import Setting
 

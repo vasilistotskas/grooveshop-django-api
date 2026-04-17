@@ -15,13 +15,14 @@ product_price_lowered = django.dispatch.Signal()
 product_price_increased = django.dispatch.Signal()
 
 
-@receiver(post_create_historical_record)
+@receiver(
+    post_create_historical_record,
+    sender=Product.history.model,
+    dispatch_uid="product.post_create_historical_record_callback",
+)
 def post_create_historical_record_callback(
     sender, instance, history_instance, **kwargs
 ):
-    if not isinstance(instance, Product):
-        return
-
     from order.models.stock_log import StockLog
 
     prev_record = getattr(history_instance, "prev_record", None)
@@ -87,7 +88,11 @@ def post_create_historical_record_callback(
         )
 
 
-@receiver(post_save, sender=Product)
+@receiver(
+    post_save,
+    sender=Product,
+    dispatch_uid="product.reindex_product_translations",
+)
 def reindex_product_translations(sender, instance, **kwargs):
     """
     Reindex all ProductTranslation instances when the master Product is saved.
@@ -107,9 +112,6 @@ def reindex_product_translations(sender, instance, **kwargs):
         master=instance
     )
 
-    if not translations.exists():
-        return
-
     # Check if async indexing is enabled
     try:
         from meili.tasks import index_document_task
@@ -125,15 +127,22 @@ def reindex_product_translations(sender, instance, **kwargs):
     )
 
     if use_async:
+        # Fetch only PKs — we dispatch by PK, so fully loading each
+        # translation instance is wasted work. The early-return check
+        # and the dispatch loop share a single DB round-trip.
+        translation_pks = list(translations.values_list("pk", flat=True))
+        if not translation_pks:
+            return
         logger.debug("Reindexing ProductTranslation Async")
-        # Queue reindex tasks for each translation
-        for translation in translations:
+        for pk in translation_pks:
             index_document_task.delay(
                 app_label="product",
                 model_name="producttranslation",
-                pk=translation.pk,
+                pk=pk,
             )
     else:
+        if not translations.exists():
+            return
         logger.debug("Reindexing ProductTranslation Sync")
         # Synchronous reindexing for DEBUG mode
         from meili._client import client as _client
@@ -178,7 +187,9 @@ def reindex_product_translations(sender, instance, **kwargs):
                 )
 
 
-@receiver(product_price_lowered)
+@receiver(
+    product_price_lowered, dispatch_uid="product.notify_product_price_lowered"
+)
 def notify_product_price_lowered(
     sender, instance, old_price, new_price, **kwargs
 ):
@@ -191,7 +202,11 @@ def notify_product_price_lowered(
     )
 
 
-@receiver([post_save, post_delete], sender=ProductAttribute)
+@receiver(
+    [post_save, post_delete],
+    sender=ProductAttribute,
+    dispatch_uid="product.update_product_search_index_on_attribute_change",
+)
 def update_product_search_index_on_attribute_change(sender, instance, **kwargs):
     """
     Update search index when product attributes are added, updated, or deleted.
@@ -208,9 +223,6 @@ def update_product_search_index_on_attribute_change(sender, instance, **kwargs):
         master=instance.product
     )
 
-    if not translations.exists():
-        return
-
     # Check if async indexing is enabled
     try:
         from meili.tasks import index_document_task
@@ -226,17 +238,22 @@ def update_product_search_index_on_attribute_change(sender, instance, **kwargs):
     )
 
     if use_async:
+        # Fetch only PKs — see reindex_product_translations above.
+        translation_pks = list(translations.values_list("pk", flat=True))
+        if not translation_pks:
+            return
         logger.debug(
             f"Reindexing ProductTranslation Async due to ProductAttribute change for product {instance.product_id}"
         )
-        # Queue reindex tasks for each translation
-        for translation in translations:
+        for pk in translation_pks:
             index_document_task.delay(
                 app_label="product",
                 model_name="producttranslation",
-                pk=translation.pk,
+                pk=pk,
             )
     else:
+        if not translations.exists():
+            return
         logger.debug(
             f"Reindexing ProductTranslation Sync due to ProductAttribute change for product {instance.product_id}"
         )

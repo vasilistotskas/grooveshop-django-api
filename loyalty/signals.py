@@ -10,7 +10,9 @@ from order.signals import order_canceled, order_completed, order_refunded
 logger = logging.getLogger(__name__)
 
 
-@receiver(order_completed)
+@receiver(
+    order_completed, dispatch_uid="loyalty.handle_order_completed_loyalty"
+)
 def handle_order_completed_loyalty(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
@@ -32,7 +34,7 @@ def handle_order_completed_loyalty(
         )
 
 
-@receiver(order_canceled)
+@receiver(order_canceled, dispatch_uid="loyalty.handle_order_canceled_loyalty")
 def handle_order_canceled_loyalty(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
@@ -54,7 +56,7 @@ def handle_order_canceled_loyalty(
         )
 
 
-@receiver(order_refunded)
+@receiver(order_refunded, dispatch_uid="loyalty.handle_order_refunded_loyalty")
 def handle_order_refunded_loyalty(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:

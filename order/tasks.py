@@ -8,7 +8,13 @@ from django.db import transaction
 from django.db.models import F
 from django.template.loader import render_to_string
 from django.utils import timezone
-from django.utils.translation import gettext_lazy as _
+
+# Eager gettext so email subjects resolve at the call site. Lazy strings
+# would resolve at str() time against the Celery worker's active language,
+# which is effectively LANGUAGE_CODE anyway but with less predictable timing.
+# When a customer-preferred-language field lands on User/Order, wrap each
+# email task body in `with translation.override(customer_lang):` to honor it.
+from django.utils.translation import gettext as _
 
 from extra_settings.models import Setting
 
@@ -512,7 +518,12 @@ def generate_order_invoice(self, order_id: int) -> bool:
         return False
 
 
-@shared_task
+@shared_task(
+    autoretry_for=(Exception,),
+    max_retries=3,
+    retry_backoff=True,
+    retry_jitter=True,
+)
 def check_pending_orders() -> int:
     try:
         now = timezone.now()
@@ -602,7 +613,12 @@ def check_pending_orders() -> int:
         return 0
 
 
-@shared_task
+@shared_task(
+    autoretry_for=(Exception,),
+    max_retries=3,
+    retry_backoff=True,
+    retry_jitter=True,
+)
 def update_order_statuses_from_shipping() -> int:
     try:
         shipped_orders = Order.objects.filter(
@@ -643,7 +659,12 @@ def update_order_statuses_from_shipping() -> int:
         return 0
 
 
-@shared_task
+@shared_task(
+    autoretry_for=(Exception,),
+    max_retries=3,
+    retry_backoff=True,
+    retry_jitter=True,
+)
 def cleanup_expired_stock_reservations() -> int:
     """
     Cleanup expired stock reservations.
@@ -681,7 +702,12 @@ def cleanup_expired_stock_reservations() -> int:
         return 0
 
 
-@shared_task
+@shared_task(
+    autoretry_for=(Exception,),
+    max_retries=3,
+    retry_backoff=True,
+    retry_jitter=True,
+)
 def auto_cancel_stuck_pending_orders() -> dict[str, int]:
     """Auto-cancel PENDING orders that will never be paid.
 
@@ -727,14 +753,32 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
     canceled_pending = 0
     errors = 0
 
-    for order in failed_qs.iterator():
-        try:
+    def _cancel_with_lock(order, reason):
+        # Re-fetch under row lock so concurrent beat workers can't both
+        # cancel the same order. skip_locked means the losing worker
+        # bails out cleanly instead of blocking.
+        with transaction.atomic():
+            locked = (
+                Order.objects.select_for_update(skip_locked=True)
+                .filter(pk=order.pk, status=OrderStatus.PENDING)
+                .first()
+            )
+            if locked is None:
+                return False
             OrderService.cancel_order(
-                order,
-                reason="Auto-canceled: payment failed and not retried",
+                locked,
+                reason=reason,
                 refund_payment=False,
             )
-            canceled_failed += 1
+            return True
+
+    for order in failed_qs.iterator():
+        try:
+            if _cancel_with_lock(
+                order,
+                "Auto-canceled: payment failed and not retried",
+            ):
+                canceled_failed += 1
         except Exception as e:
             errors += 1
             logger.error(
@@ -746,12 +790,11 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
 
     for order in pending_qs.iterator():
         try:
-            OrderService.cancel_order(
+            if _cancel_with_lock(
                 order,
-                reason="Auto-canceled: payment never completed",
-                refund_payment=False,
-            )
-            canceled_pending += 1
+                "Auto-canceled: payment never completed",
+            ):
+                canceled_pending += 1
         except Exception as e:
             errors += 1
             logger.error(
@@ -776,7 +819,12 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
     }
 
 
-@shared_task
+@shared_task(
+    autoretry_for=(Exception,),
+    max_retries=3,
+    retry_backoff=True,
+    retry_jitter=True,
+)
 def send_checkout_abandonment_emails() -> int:
     """Email customers who reserved stock but never placed an order.
 

@@ -67,7 +67,9 @@ def _resolve_po_path(language_code: str, request) -> str | None:
     return None
 
 
-@receiver(rosetta_post_save)
+@receiver(
+    rosetta_post_save, dispatch_uid="core.sync_translation_files_to_redis"
+)
 def sync_translation_files_to_redis(sender, language_code, request, **kwargs):
     """Store the saved .po and .mo file contents in Redis for cross-pod sync."""
     po_path = _resolve_po_path(language_code, request)

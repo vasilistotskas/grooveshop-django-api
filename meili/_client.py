@@ -83,8 +83,21 @@ class Client:
     def get_index(self, index_name: str):
         return self.client.index(index_name)
 
-    def wait_for_task(self, task_uid: int) -> Task | TaskInfo:
-        task = self.client.wait_for_task(task_uid)
+    def wait_for_task(
+        self,
+        task_uid: int,
+        *,
+        timeout_in_ms: int | None = None,
+        interval_in_ms: int = 50,
+    ) -> Task | TaskInfo:
+        if timeout_in_ms is not None:
+            task = self.client.wait_for_task(
+                task_uid,
+                timeout_in_ms=timeout_in_ms,
+                interval_in_ms=interval_in_ms,
+            )
+        else:
+            task = self.client.wait_for_task(task_uid)
         return self._handle_sync(task)
 
     def get_indexes(self):

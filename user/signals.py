@@ -23,7 +23,9 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
-@receiver(password_changed)
+@receiver(
+    password_changed, dispatch_uid="user.revoke_knox_tokens_on_password_change"
+)
 def revoke_knox_tokens_on_password_change(request, user, **kwargs):
     """
     Revoke all Knox access tokens when the user changes their password.
@@ -40,7 +42,7 @@ def revoke_knox_tokens_on_password_change(request, user, **kwargs):
     )
 
 
-@receiver(user_signed_up)
+@receiver(user_signed_up, dispatch_uid="user.populate_profile")
 def populate_profile(
     sociallogin: SocialLogin | None = None, user=None, **kwargs
 ):
@@ -80,7 +82,9 @@ def populate_profile(
         )
 
 
-@receiver(post_save, sender=User)
+@receiver(
+    post_save, sender=User, dispatch_uid="user.create_default_subscriptions"
+)
 def create_default_subscriptions(sender, instance, created, **kwargs):
     if created:
         default_topics = SubscriptionTopic.objects.filter(

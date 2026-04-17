@@ -1915,7 +1915,22 @@ STRIPE_TEST_SECRET_KEY = getenv("STRIPE_TEST_SECRET_KEY", "sk_test_...")
 STRIPE_LIVE_MODE = not DEBUG
 DJSTRIPE_FOREIGN_KEY_TO_FIELD = "id"
 DJSTRIPE_WEBHOOK_VALIDATION = "verify_signature"
-DJSTRIPE_WEBHOOK_SECRET = getenv("DJSTRIPE_WEBHOOK_SECRET", "whsec_...")
+DJSTRIPE_WEBHOOK_SECRET = getenv("DJSTRIPE_WEBHOOK_SECRET", "")
+if not DJSTRIPE_WEBHOOK_SECRET or DJSTRIPE_WEBHOOK_SECRET == "whsec_...":
+    if SYSTEM_ENV == "production":
+        from django.core.exceptions import ImproperlyConfigured
+
+        raise ImproperlyConfigured(
+            "DJSTRIPE_WEBHOOK_SECRET must be set to a real Stripe webhook "
+            "secret in production (DJSTRIPE_WEBHOOK_VALIDATION=verify_signature)."
+        )
+    DJSTRIPE_WEBHOOK_SECRET = "whsec_dev_placeholder_not_used_for_verification"
+
+# Pin the Stripe API version so library upgrades can't silently shift
+# webhook payload shapes or idempotency keys. Update this in lockstep
+# with the version configured in the Stripe Dashboard. The dj-stripe
+# docs name this setting STRIPE_API_VERSION (not DJSTRIPE_-prefixed).
+STRIPE_API_VERSION = getenv("STRIPE_API_VERSION", "2024-04-10")
 STRIPE_WEBHOOK_DEBUG = getenv("STRIPE_WEBHOOK_DEBUG", "false").lower() == "true"
 
 # Viva Wallet Configuration

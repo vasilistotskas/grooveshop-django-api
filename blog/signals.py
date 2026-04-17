@@ -9,7 +9,11 @@ from blog.models import BlogComment
 logger = logging.getLogger(__name__)
 
 
-@receiver(m2m_changed, sender=BlogComment.likes.through)
+@receiver(
+    m2m_changed,
+    sender=BlogComment.likes.through,
+    dispatch_uid="blog.notify_comment_liked_receiver",
+)
 def notify_comment_liked_receiver(
     sender, instance, action, reverse, pk_set, **kwargs
 ):

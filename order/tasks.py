@@ -318,6 +318,24 @@ def send_order_status_update_email(
         if status in [OrderStatus.PENDING]:
             return True
 
+        # Skip the generic status-update email when the transition is
+        # PENDING → PROCESSING triggered by a successful payment. The
+        # confirmation email (`order_payment_confirmed` template) is
+        # sent separately by the webhook handler and is the
+        # authoritative "payment received, now processing" notification.
+        # Sending both produced a duplicate "Σε επεξεργασία" + "Payment
+        # Confirmed" pair for every online order.
+        if (
+            status in (OrderStatus.PROCESSING, OrderStatus.PROCESSING.value)
+            and order.payment_status == PaymentStatus.COMPLETED
+        ):
+            logger.info(
+                "Order %s already has payment_status=COMPLETED; skipping "
+                "PROCESSING status-update email (confirmation email covers it)",
+                order.id,
+            )
+            return True
+
         context = {
             "order": order,
             "items": order.items.select_related("product").all(),

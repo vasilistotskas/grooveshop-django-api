@@ -21,7 +21,7 @@ FROM python:${PYTHON_VERSION}-alpine${ALPINE_VERSION} AS builder
 ARG UV_IMAGE
 ARG APP_PATH
 
-RUN apk add --no-cache gcc musl-dev python3-dev linux-headers
+RUN apk add --no-cache gcc musl-dev python3-dev linux-headers gettext
 
 COPY --from=uv /uv /uvx /bin/
 WORKDIR ${APP_PATH}
@@ -35,6 +35,12 @@ COPY . .
 # Copy pre-built Tailwind CSS from tailwind-builder stage
 COPY --from=tailwind-builder ${APP_PATH}/static/css/styles.css ./static/css/styles.css
 RUN uv sync --frozen --no-editable --no-dev
+
+# Compile gettext .mo files from the committed .po sources. Kept in the
+# builder stage only — the final image reads .mo at runtime via Python's
+# stdlib gettext which has no msgfmt dependency. --ignore=.venv skips
+# vendored third-party .po files that already ship pre-compiled.
+RUN .venv/bin/python manage.py compilemessages --ignore=.venv
 ENTRYPOINT []
 
 FROM python:${PYTHON_VERSION}-alpine${ALPINE_VERSION} AS production

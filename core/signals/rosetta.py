@@ -1,111 +1,113 @@
-"""
-Rosetta post_save signal handler for syncing .po/.mo files across K8s replicas.
+"""Rosetta signal handlers.
 
-When a translation is saved via Rosetta on one pod, the .po and .mo files
-are written to disk. In a multi-replica deployment with NFS (ReadWriteMany),
-other pods may read stale files due to NFS attribute caching. This handler
-stores the file contents in Redis so that the TranslationReloadMiddleware
-on other pods can write fresh copies to their local filesystem view.
+On every Rosetta edit we do two things:
+
+1. **Mirror each changed entry into the `Translation` table** so the
+   database becomes the durable source of truth across deploys. This
+   fires on the per-entry `entry_changed` signal — it gives us the
+   exact msgids that changed without having to diff .po files.
+
+2. **Bump a Redis version tick** on the per-submit `post_save` signal
+   so other pods' TranslationReloadMiddleware notices and re-applies
+   the DB overlay to their in-memory catalog. The version key is
+   permanent (no TTL race).
+
+The historical disk-bytes-in-Redis sync (`rosetta:po_sync:…`) was
+removed in favour of this DB-backed flow — Postgres is authoritative,
+disk is transient schema-only.
 """
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import time
-from pathlib import Path
 
 from django.core.cache import cache
+from django.db import transaction
 from django.dispatch import receiver
-from rosetta.poutil import find_pos
+from rosetta.signals import entry_changed
 from rosetta.signals import post_save as rosetta_post_save
 
-from core.rosetta_storage import TRANSLATION_VERSION_CACHE_KEY
-from core.rosetta_storage import _reload_translations
+from core.rosetta_storage import (
+    TRANSLATION_VERSION_CACHE_KEY,
+    _reload_translations,
+    apply_db_overlay,
+)
 
 logger = logging.getLogger(__name__)
 
-ROSETTA_FILE_PATHS_KEY = "rosetta:file_paths"
-ROSETTA_PO_SYNC_PREFIX = "rosetta:po_sync:"
-ROSETTA_MO_SYNC_PREFIX = "rosetta:mo_sync:"
 
-# Keep synced files in Redis for 24 hours (safety expiry)
-SYNC_TIMEOUT = 86400
+@receiver(entry_changed, dispatch_uid="core.persist_rosetta_entry_to_db")
+def persist_rosetta_entry_to_db(
+    sender, user, old_msgstr, old_fuzzy, pofile, language_code, **kwargs
+):
+    """Upsert the changed entry into the Translation table.
 
+    Rosetta fires this *after* mutating the in-memory polib entry but
+    *before* saving to disk. Since the DB overlay is our source of
+    truth we persist here and don't care whether the disk write that
+    follows succeeds or not — a disk failure will self-heal on the
+    next overlay apply.
 
-def _path_hash(path: str) -> str:
-    return hashlib.md5(path.encode()).hexdigest()
+    Handles both singular and plural entries. Context-qualified msgids
+    (pgettext) come through with an embedded "\\x04" separator; that
+    format is preserved intact to match gettext's catalog key.
+    """
+    from core.models import Translation
 
+    entry = sender  # polib.POEntry
+    msgid = entry.msgid or ""
 
-def _resolve_po_path(language_code: str, request) -> str | None:
-    """Reconstruct the .po file path from Rosetta URL kwargs."""
-    if not request.resolver_match:
-        return None
-
-    kwargs = request.resolver_match.kwargs
-    po_filter = kwargs.get("po_filter", "project")
     try:
-        idx = int(kwargs.get("idx", 0))
-    except (TypeError, ValueError):
-        return None
-
-    third_party_apps = po_filter in ("all", "third-party")
-    django_apps = po_filter in ("all", "django")
-    project_apps = po_filter in ("all", "project")
-
-    po_paths = find_pos(
-        language_code,
-        project_apps=project_apps,
-        django_apps=django_apps,
-        third_party_apps=third_party_apps,
-    )
-    # Rosetta sorts by app name (dir before /locale), not full path
-    po_paths.sort(key=lambda p: p.split("/locale")[0].split("/")[-1])
-
-    if idx < len(po_paths):
-        return po_paths[idx]
-    return None
+        if entry.msgid_plural:
+            # entry.msgstr_plural is a dict {index: msgstr}
+            with transaction.atomic():
+                for plural_index, msgstr in (entry.msgstr_plural or {}).items():
+                    Translation.objects.update_or_create(
+                        language_code=language_code,
+                        msgid=msgid,
+                        plural_index=int(plural_index),
+                        defaults={
+                            "msgid_plural": entry.msgid_plural,
+                            "msgstr": msgstr or "",
+                        },
+                    )
+        else:
+            Translation.objects.update_or_create(
+                language_code=language_code,
+                msgid=msgid,
+                plural_index=0,
+                defaults={
+                    "msgid_plural": "",
+                    "msgstr": entry.msgstr or "",
+                },
+            )
+    except Exception:
+        logger.exception(
+            "Failed to persist Rosetta edit for %s / msgid=%r",
+            language_code,
+            msgid[:80],
+        )
 
 
 @receiver(
-    rosetta_post_save, dispatch_uid="core.sync_translation_files_to_redis"
+    rosetta_post_save, dispatch_uid="core.bump_translation_version_on_save"
 )
-def sync_translation_files_to_redis(sender, language_code, request, **kwargs):
-    """Store the saved .po and .mo file contents in Redis for cross-pod sync."""
-    po_path = _resolve_po_path(language_code, request)
-    if not po_path:
-        logger.warning(
-            "Could not resolve .po file path from Rosetta post_save signal"
-        )
-        return
+def bump_translation_version_on_save(
+    sender, language_code, request, **kwargs
+):
+    """Tick the shared version key so other pods refresh their overlay.
 
-    mo_path = po_path.replace(".po", ".mo")
-    ph = _path_hash(po_path)
-
-    try:
-        po_content = Path(po_path).read_bytes()
-        cache.set(f"{ROSETTA_PO_SYNC_PREFIX}{ph}", po_content, SYNC_TIMEOUT)
-        logger.info("Synced .po to Redis: %s", po_path)
-    except FileNotFoundError:
-        logger.error("Cannot read .po file for sync: %s", po_path)
-        return
-
-    try:
-        mo_content = Path(mo_path).read_bytes()
-        cache.set(f"{ROSETTA_MO_SYNC_PREFIX}{ph}", mo_content, SYNC_TIMEOUT)
-        logger.info("Synced .mo to Redis: %s", mo_path)
-    except FileNotFoundError:
-        logger.warning("No .mo file to sync: %s", mo_path)
-
-    # Maintain a mapping of path_hash -> absolute_path
-    file_paths = cache.get(ROSETTA_FILE_PATHS_KEY) or {}
-    file_paths[ph] = po_path
-    cache.set(ROSETTA_FILE_PATHS_KEY, file_paths, timeout=None)
-
-    # Bump the shared translation version so all pods pick up the change.
-    # This must happen here (not in CacheClearingRosettaStorage.set()) because
-    # Rosetta writes .po files directly to disk — storage.set() is only called
-    # for internal cache state, not during the actual translation save.
+    Also applies the overlay locally and clears the gettext cache so
+    the pod that handled the Rosetta save serves the new strings
+    without waiting for its own middleware on the next request.
+    """
     cache.set(TRANSLATION_VERSION_CACHE_KEY, time.time(), timeout=None)
-    _reload_translations()
-    logger.info("Translation version bumped after Rosetta save")
+    try:
+        apply_db_overlay(language_code=language_code)
+        _reload_translations()
+    except Exception:
+        logger.exception(
+            "Local overlay refresh failed after Rosetta save for %s",
+            language_code,
+        )

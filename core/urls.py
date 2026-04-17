@@ -16,6 +16,7 @@ from core.api.views import (
     health_check,
     list_settings,
 )
+from core.rosetta_views import DBBackedTranslationFormView
 from core.views import (
     HomeView,
     ManageTOTPSvgView,
@@ -62,6 +63,14 @@ urlpatterns += i18n_patterns(
         "_allauth/app/v1/account/authenticators/totp/svg",
         ManageTOTPSvgView.as_api_view(client="app"),
         name="manage_totp_svg",
+    ),
+    # Our DBBackedTranslationFormView overrides the same URL that rosetta.urls
+    # registers for the translation form; Django resolves the first match
+    # so this override takes priority over the default `TranslationFormView`.
+    path(
+        "rosetta/files/<str:po_filter>/<str:lang_id>/<int:idx>/",
+        DBBackedTranslationFormView.as_view(),
+        name="rosetta-form",
     ),
     path("rosetta/", include("rosetta.urls")),
     path("tinymce/", include("tinymce.urls")),

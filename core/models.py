@@ -406,3 +406,69 @@ class SoftDeleteManager(models.Manager):
 class SoftDeleteModel(SoftDeleteMixin, models.Model):
     class Meta(TypedModelMeta):
         abstract = True
+
+
+class Translation(models.Model):
+    """User-editable UI msgstr values backed by Postgres.
+
+    Rosetta edits are mirrored into this table via the
+    rosetta.signals.entry_changed receiver. On pod boot and on every
+    cross-pod invalidation tick, core.rosetta_storage.apply_db_overlay
+    reads from this table and overlays the values onto Django's
+    in-memory gettext catalog, making the DB the durable source of
+    truth for translations across deploys.
+
+    Plural handling:
+      - Singular entries use plural_index=0 and an empty msgid_plural.
+      - Plural entries (from ngettext / msgid_plural in .po) use one row
+        per plural form, with plural_index matching the msgstr[N] slot.
+
+    Context-qualified msgids (pgettext) are stored as
+    "<context>\\x04<msgid>" to match gettext's catalog key format, so
+    no extra column is needed.
+    """
+
+    language_code = models.CharField(
+        _("Language Code"),
+        max_length=10,
+    )
+    msgid = models.TextField(_("Message ID"))
+    msgid_plural = models.TextField(
+        _("Plural Message ID"),
+        blank=True,
+        default="",
+        help_text=_(
+            "Empty for singular entries. Set for ngettext / msgid_plural "
+            "entries; in that case each plural form has its own row "
+            "identified by plural_index."
+        ),
+    )
+    plural_index = models.PositiveSmallIntegerField(
+        _("Plural Index"),
+        default=0,
+        help_text=_(
+            "0 for singular entries or for the first plural form; 1, 2, ... "
+            "for subsequent plural forms defined by the language's plural rule."
+        ),
+    )
+    msgstr = models.TextField(_("Translation"), blank=True, default="")
+    updated_at = models.DateTimeField(_("Updated At"), auto_now=True)
+
+    class Meta(TypedModelMeta):
+        verbose_name = _("Translation")
+        verbose_name_plural = _("Translations")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["language_code", "msgid", "plural_index"],
+                name="translation_lang_msgid_idx_uniq",
+            ),
+        ]
+        indexes = [
+            BTreeIndex(
+                fields=["language_code"], name="translation_lang_ix"
+            ),
+        ]
+        ordering = ["language_code", "msgid", "plural_index"]
+
+    def __str__(self) -> str:
+        return f"[{self.language_code}] {self.msgid[:60]}"

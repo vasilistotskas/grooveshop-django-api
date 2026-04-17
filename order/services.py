@@ -1527,6 +1527,8 @@ class OrderService:
     @classmethod
     @transaction.atomic
     def handle_payment_succeeded(cls, payment_intent_id: str) -> Order | None:
+        from order.payment_events import publish_payment_status
+
         try:
             order = Order.objects.for_detail().get(payment_id=payment_intent_id)
         except Order.DoesNotExist:
@@ -1542,12 +1544,15 @@ class OrderService:
         if order.status == OrderStatus.PENDING:
             cls.update_order_status(order, OrderStatus.PROCESSING)
 
+        publish_payment_status(order)
         logger.info("Order %s marked as paid successfully", order.id)
         return order
 
     @classmethod
     @transaction.atomic
     def handle_payment_failed(cls, payment_intent_id: str) -> Order | None:
+        from order.payment_events import publish_payment_status
+
         try:
             order = Order.objects.for_detail().get(payment_id=payment_intent_id)
         except Order.DoesNotExist:
@@ -1559,6 +1564,7 @@ class OrderService:
         order.payment_status = PaymentStatus.FAILED
         order.save(update_fields=["payment_status"])
 
+        publish_payment_status(order)
         logger.info("Order %s payment marked as failed", order.id)
         return order
 

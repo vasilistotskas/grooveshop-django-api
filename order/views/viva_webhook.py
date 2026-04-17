@@ -488,6 +488,10 @@ def _handle_payment_created(order, event_data, transaction_id):
         },
     )
 
+    from order.payment_events import publish_payment_status
+
+    publish_payment_status(order)
+
     # Payment verified by Viva Wallet — send the confirmation email now.
     # The task is idempotent (metadata reservation + row lock), so a
     # duplicate webhook delivery or a retry will not resend.
@@ -513,6 +517,10 @@ def _handle_payment_failed(order, event_data, transaction_id):
             "provider": "viva_wallet",
         },
     )
+
+    from order.payment_events import publish_payment_status
+
+    publish_payment_status(order)
 
     # Notify the customer so they can retry instead of silently sitting
     # on a broken order.

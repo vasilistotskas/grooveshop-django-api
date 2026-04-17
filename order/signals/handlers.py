@@ -33,7 +33,7 @@ from order.tasks import (
 logger = logging.getLogger(__name__)
 
 
-@receiver(post_save, sender=Order)
+@receiver(post_save, sender=Order, dispatch_uid="order.handle_order_post_save")
 def handle_order_post_save(
     sender: type[Order], instance: Order, created: bool, **kwargs: Any
 ) -> None:
@@ -69,7 +69,7 @@ def handle_order_post_save(
         )
 
 
-@receiver(order_created)
+@receiver(order_created, dispatch_uid="order.handle_order_created")
 def handle_order_created(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
@@ -139,7 +139,9 @@ def handle_order_created(
     transaction.on_commit(clear_cart)
 
 
-@receiver(order_status_changed)
+@receiver(
+    order_status_changed, dispatch_uid="order.handle_order_status_changed"
+)
 def handle_order_status_changed(
     sender: type[Order],
     order: Order,
@@ -186,7 +188,9 @@ def handle_order_status_changed(
     )
 
 
-@receiver(pre_save, sender=OrderItem)
+@receiver(
+    pre_save, sender=OrderItem, dispatch_uid="order.handle_order_item_pre_save"
+)
 def handle_order_item_pre_save(
     sender: Any, instance: Any, **kwargs: Any
 ) -> None:
@@ -212,7 +216,11 @@ def handle_order_item_pre_save(
         instance._original_price = None
 
 
-@receiver(post_save, sender=OrderItem)
+@receiver(
+    post_save,
+    sender=OrderItem,
+    dispatch_uid="order.handle_order_item_post_save",
+)
 def handle_order_item_post_save(
     sender: type[OrderItem], instance: OrderItem, created: bool, **kwargs: Any
 ) -> None:
@@ -299,7 +307,7 @@ def handle_order_item_post_save(
             )
 
 
-@receiver(order_shipped)
+@receiver(order_shipped, dispatch_uid="order.handle_order_shipped")
 def handle_order_shipped(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
@@ -317,7 +325,7 @@ def handle_order_shipped(
     # send_order_status_update_email (uses the shipped template)
 
 
-@receiver(order_delivered)
+@receiver(order_delivered, dispatch_uid="order.handle_order_delivered")
 def handle_order_delivered(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
@@ -331,7 +339,7 @@ def handle_order_delivered(
     # send_order_status_update_email (uses the delivered template)
 
 
-@receiver(order_canceled)
+@receiver(order_canceled, dispatch_uid="order.handle_order_canceled")
 def handle_order_canceled(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
@@ -360,7 +368,7 @@ def handle_order_canceled(
         )
 
 
-@receiver(order_completed)
+@receiver(order_completed, dispatch_uid="order.handle_order_completed")
 def handle_order_completed(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
@@ -381,7 +389,7 @@ def handle_order_completed(
         )
 
 
-@receiver(order_refunded)
+@receiver(order_refunded, dispatch_uid="order.handle_order_refunded")
 def handle_order_refunded(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
@@ -408,7 +416,7 @@ def handle_order_refunded(
         )
 
 
-@receiver(order_returned)
+@receiver(order_returned, dispatch_uid="order.handle_order_returned")
 def handle_order_returned(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
@@ -671,6 +679,8 @@ def handle_stripe_checkout_completed(sender, **kwargs):
             order.metadata[f"webhook_processed_{event_id}"] = True
 
             if payment_status == "paid" and payment_intent_id:
+                from order.payment_events import publish_payment_status
+
                 order.mark_as_paid(
                     payment_id=payment_intent_id, payment_method="stripe"
                 )
@@ -683,6 +693,8 @@ def handle_stripe_checkout_completed(sender, **kwargs):
                 order.metadata["stripe_checkout_session_id"] = session_id
                 order.metadata["stripe_payment_intent_id"] = payment_intent_id
                 order.save(update_fields=["metadata"])
+
+                publish_payment_status(order)
 
                 OrderHistory.log_payment_update(
                     order=order,

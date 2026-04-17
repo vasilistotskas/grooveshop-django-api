@@ -141,10 +141,14 @@ class TestHandleStripePaymentSucceeded:
 
         initial_history_count = OrderHistory.objects.filter(order=order).count()
 
-        # Execute
-        with patch(
-            "order.signals.handlers.OrderService.handle_payment_succeeded"
-        ) as mock_service:
+        # Execute (patch the email task so its own OrderHistory note
+        # does not count toward this test's history-entry assertion).
+        with (
+            patch(
+                "order.signals.handlers.OrderService.handle_payment_succeeded"
+            ) as mock_service,
+            patch("order.signals.handlers.send_order_confirmation_email.delay"),
+        ):
             mock_service.return_value = order
             handle_stripe_payment_succeeded(
                 sender=None, event=mock_djstripe_event

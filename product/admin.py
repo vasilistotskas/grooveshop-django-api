@@ -4,9 +4,10 @@ from decimal import Decimal
 import admin_thumbnails
 from django.contrib import admin, messages
 from django.db.models import F, Q, Sum, Count, Avg, Prefetch
-from django.http import HttpResponseRedirect
+from django.db.models.functions import TruncDay
+from django.http import HttpResponseRedirect, Http404
 from django.shortcuts import render
-from django.urls import reverse_lazy
+from django.urls import path, reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.html import conditional_escape
 from django.utils.safestring import mark_safe
@@ -1840,6 +1841,13 @@ class ProductAdmin(
         else:
             pct_color = "text-green-600 dark:text-green-400"
 
+        history_url = reverse(
+            "admin:product_product_stock_history", args=[obj.pk]
+        )
+        history_link_label = conditional_escape(
+            str(_("Open full stock history chart →"))
+        )
+
         html = (
             '<div class="text-sm">'
             '<div class="mb-3">'
@@ -1862,6 +1870,11 @@ class ProductAdmin(
             f"<div><strong>📈 Increments:</strong></div><div>{safe_increment}</div>"
             "</div>"
             "</div>"
+            f'<div class="mt-3"><a href="{history_url}" '
+            'class="inline-flex items-center gap-1 rounded-md border border-gray-300 '
+            "bg-white px-3 py-1.5 text-xs font-medium text-gray-700 "
+            "hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 "
+            f'dark:text-gray-200 dark:hover:bg-gray-700">{history_link_label}</a></div>'
             "</div>"
         )
         return mark_safe(html)
@@ -2082,6 +2095,111 @@ class ProductAdmin(
             % {"count": updated},
             messages.SUCCESS,
         )
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                "<int:product_id>/stock-history/",
+                self.admin_site.admin_view(self.stock_history_view),
+                name="product_product_stock_history",
+            ),
+        ]
+        return custom_urls + urls
+
+    def stock_history_view(self, request, product_id):
+        """Per-product stock history with a 90-day time-series chart.
+
+        Renders a Chart.js stacked bar chart grouped by day and by
+        StockLog.operation_type (RESERVE/RELEASE/DECREMENT/INCREMENT),
+        plus a table of the most recent entries.
+        """
+        from order.models.stock_log import StockLog
+
+        try:
+            product = Product.objects.get(pk=product_id)
+        except Product.DoesNotExist as exc:
+            raise Http404(_("Product not found")) from exc
+
+        try:
+            window_days = int(request.GET.get("days") or 90)
+        except (TypeError, ValueError):
+            window_days = 90
+        window_days = max(7, min(window_days, 365))
+        since = timezone.now() - timedelta(days=window_days)
+
+        rows = (
+            StockLog.objects.filter(
+                product_id=product_id, created_at__gte=since
+            )
+            .annotate(day=TruncDay("created_at"))
+            .values("day", "operation_type")
+            .annotate(total=Sum("quantity_delta"), entries=Count("id"))
+            .order_by("day")
+        )
+
+        operation_types = ["RESERVE", "RELEASE", "DECREMENT", "INCREMENT"]
+        buckets: dict[str, dict[str, int]] = {}
+        for row in rows:
+            day_key = row["day"].date().isoformat() if row["day"] else ""
+            if not day_key:
+                continue
+            buckets.setdefault(day_key, {op: 0 for op in operation_types})[
+                row["operation_type"]
+            ] = int(row["total"] or 0)
+
+        labels: list[str] = []
+        cursor = since.date()
+        end = timezone.now().date()
+        while cursor <= end:
+            labels.append(cursor.isoformat())
+            cursor += timedelta(days=1)
+
+        def _series(op):
+            return [buckets.get(day, {}).get(op, 0) for day in labels]
+
+        dataset_colors = {
+            "RESERVE": "#f59e0b",
+            "RELEASE": "#6366f1",
+            "DECREMENT": "#ef4444",
+            "INCREMENT": "#10b981",
+        }
+        datasets = [
+            {
+                "label": op.title(),
+                "data": _series(op),
+                "backgroundColor": dataset_colors[op],
+                "stack": "stock-ops",
+            }
+            for op in operation_types
+        ]
+
+        recent_logs = (
+            StockLog.objects.filter(product_id=product_id)
+            .select_related("order", "performed_by")
+            .order_by("-created_at")[:50]
+        )
+
+        product_name = (
+            product.safe_translation_getter("name", any_language=True)
+            or f"Product #{product.id}"
+        )
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": _("Stock History — %(name)s") % {"name": product_name},
+            "product": product,
+            "product_name": product_name,
+            "window_days": window_days,
+            "chart_labels": labels,
+            "chart_datasets": datasets,
+            "recent_logs": recent_logs,
+            "opts": self.model._meta,
+            "change_url": reverse(
+                "admin:product_product_change", args=[product.pk]
+            ),
+        }
+        return render(request, "admin/product/stock_history.html", context)
 
 
 @admin_thumbnails.thumbnail("image")

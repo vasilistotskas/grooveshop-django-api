@@ -1,0 +1,32 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "Low Stock Alert" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<h1>{% trans "Low Stock Alert" %}</h1>
+<p>{% blocktrans count counter=products|length %}The following {{ counter }} product has reached its low-stock threshold:{% plural %}The following {{ counter }} products have reached their low-stock threshold:{% endblocktrans %}</p>
+
+<table class="email-table">
+    <thead>
+        <tr>
+            <th>{% trans "Product" %}</th>
+            <th>{% trans "SKU" %}</th>
+            <th>{% trans "Current Stock" %}</th>
+            <th>{% trans "Threshold" %}</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for p in products %}
+        <tr>
+            <td>{{ p.name }}</td>
+            <td>{{ p.sku|default:"—" }}</td>
+            <td style="font-weight: bold; color: #991b1b;">{{ p.stock }}</td>
+            <td>{{ p.low_stock_threshold }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<p class="mt-3">{% trans "Please review and restock as needed." %}</p>
+{% endblock %}

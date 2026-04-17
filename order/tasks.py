@@ -12,7 +12,7 @@ from django.utils.translation import gettext_lazy as _
 
 from extra_settings.models import Setting
 
-from order.enum.status import OrderStatus
+from order.enum.status import OrderStatus, PaymentStatus
 from order.models import Order, OrderHistory
 from order.services import OrderService
 from order.shipping import ShippingService
@@ -57,6 +57,11 @@ def _release_confirmation_email(order_id: int) -> None:
 def send_order_confirmation_email(self, order_id: int) -> bool:
     reserved_this_call = False
     try:
+        # Only reserve on the first attempt. Retries are expected to
+        # re-send because the flag is held by THIS worker — releasing
+        # on every retry would defeat idempotency, and checking the
+        # flag on retry would prevent legitimate re-sends after a
+        # transient failure.
         if self.request.retries == 0:
             if not _reserve_confirmation_email(order_id):
                 logger.info(
@@ -68,27 +73,52 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
 
         order = (
             Order.objects.select_related("user", "country", "region", "pay_way")
-            .prefetch_related("items__product__translations")
+            .prefetch_related(
+                "items__product__translations", "pay_way__translations"
+            )
             .get(id=order_id)
         )
+
+        pay_way = order.pay_way
+        is_paid = bool(
+            pay_way
+            and pay_way.is_online_payment
+            and order.payment_status == PaymentStatus.COMPLETED
+        )
+        if is_paid:
+            template_base = "emails/order/order_payment_confirmed"
+            subject = _("Payment Confirmed - Order #{order_id}").format(
+                order_id=order.id
+            )
+        else:
+            template_base = "emails/order/order_received"
+            subject = _("Order Received - #{order_id}").format(
+                order_id=order.id
+            )
+
+        payment_instructions = ""
+        if pay_way and not pay_way.is_online_payment:
+            payment_instructions = (
+                pay_way.safe_translation_getter(
+                    "instructions", any_language=True
+                )
+                or ""
+            )
+
         context = {
             "order": order,
             "items": order.items.all(),
+            "pay_way": pay_way,
+            "payment_instructions": payment_instructions,
+            "is_paid": is_paid,
             "SITE_NAME": settings.SITE_NAME,
             "INFO_EMAIL": settings.INFO_EMAIL,
             "SITE_URL": settings.NUXT_BASE_URL,
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
 
-        subject = _("Order Confirmation - #{order_id}").format(
-            order_id=order.id
-        )
-        text_content = render_to_string(
-            "emails/order/order_confirmation.txt", context
-        )
-        html_content = render_to_string(
-            "emails/order/order_confirmation.html", context
-        )
+        text_content = render_to_string(f"{template_base}.txt", context)
+        html_content = render_to_string(f"{template_base}.html", context)
 
         msg = EmailMultiAlternatives(
             subject,
@@ -139,6 +169,132 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
         if reserved_this_call:
             _release_confirmation_email(order_id)
 
+        return False
+
+
+PAYMENT_FAILED_EMAIL_SENT_FLAG = "payment_failed_email_sent"
+
+
+def _reserve_payment_failed_email(order_id: int) -> bool:
+    """Atomically claim the payment-failed-email slot for an order.
+
+    Mirrors `_reserve_confirmation_email` so concurrent webhook
+    deliveries (Stripe + Viva, or retries) cannot both send the email.
+    Returns True if this caller won the race and should proceed,
+    False if another caller already claimed it. Raises
+    Order.DoesNotExist if the order is missing.
+    """
+    with transaction.atomic():
+        order = Order.objects.select_for_update().get(id=order_id)
+        if order.metadata and order.metadata.get(
+            PAYMENT_FAILED_EMAIL_SENT_FLAG
+        ):
+            return False
+        if not order.metadata:
+            order.metadata = {}
+        order.metadata[PAYMENT_FAILED_EMAIL_SENT_FLAG] = True
+        order.save(update_fields=["metadata"])
+    return True
+
+
+def _release_payment_failed_email(order_id: int) -> None:
+    """Release the payment-failed-email reservation on permanent send failure."""
+    with transaction.atomic():
+        order = Order.objects.select_for_update().filter(id=order_id).first()
+        if order is None or not order.metadata:
+            return
+        if order.metadata.pop(PAYMENT_FAILED_EMAIL_SENT_FLAG, None) is not None:
+            order.save(update_fields=["metadata"])
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=300)
+def send_payment_failed_email(self, order_id: int) -> bool:
+    """Notify the customer that their payment failed.
+
+    Idempotent via metadata flag (reserve-before-send). Includes a
+    retry URL so the customer can attempt the payment again without
+    starting a new order.
+    """
+    reserved_this_call = False
+    try:
+        if self.request.retries == 0:
+            if not _reserve_payment_failed_email(order_id):
+                logger.info(
+                    "Payment failed email already sent for order #%s, skipping",
+                    order_id,
+                )
+                return True
+            reserved_this_call = True
+
+        order = (
+            Order.objects.select_related("user", "pay_way")
+            .prefetch_related("items__product__translations")
+            .get(id=order_id)
+        )
+
+        retry_url = (
+            f"{settings.NUXT_BASE_URL.rstrip('/')}/account/orders/{order.id}"
+            if getattr(settings, "NUXT_BASE_URL", None)
+            else ""
+        )
+
+        context = {
+            "order": order,
+            "retry_url": retry_url,
+            "SITE_NAME": settings.SITE_NAME,
+            "INFO_EMAIL": settings.INFO_EMAIL,
+            "SITE_URL": settings.NUXT_BASE_URL,
+            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+        }
+
+        subject = _("Payment Failed - Order #{order_id}").format(
+            order_id=order.id
+        )
+        text_content = render_to_string(
+            "emails/order/payment_failed.txt", context
+        )
+        html_content = render_to_string(
+            "emails/order/payment_failed.html", context
+        )
+
+        msg = EmailMultiAlternatives(
+            subject,
+            text_content,
+            settings.DEFAULT_FROM_EMAIL,
+            [order.email],
+            reply_to=[settings.INFO_EMAIL],
+        )
+        msg.attach_alternative(html_content, "text/html")
+        msg.send()
+
+        OrderHistory.log_note(
+            order=order,
+            note=f"Payment failed email sent to {order.email}",
+        )
+
+        logger.info(
+            "Payment failed email sent for order #%s",
+            order.id,
+            extra={"order_id": order.id, "email": order.email},
+        )
+        return True
+
+    except Order.DoesNotExist:
+        logger.error(
+            f"Could not send payment-failed email - Order #{order_id} not found",
+            extra={"order_id": order_id},
+        )
+        return False
+
+    except Exception as e:
+        logger.error(
+            f"Error sending payment-failed email for order #{order_id}: {e!s}",
+            extra={"order_id": order_id, "error": str(e)},
+        )
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=e) from e
+        if reserved_this_call:
+            _release_payment_failed_email(order_id)
         return False
 
 
@@ -497,7 +653,7 @@ def cleanup_expired_stock_reservations() -> int:
     other customers.
 
     Expired reservations are those where:
-    - expires_at < current_time (past the 15-minute TTL)
+    - expires_at < current_time (past STOCK_RESERVATION_TTL_MINUTES)
     - consumed = False (not yet converted to sale or released)
 
     Returns:
@@ -523,3 +679,195 @@ def cleanup_expired_stock_reservations() -> int:
             exc_info=True,
         )
         return 0
+
+
+@shared_task
+def auto_cancel_stuck_pending_orders() -> dict[str, int]:
+    """Auto-cancel PENDING orders that will never be paid.
+
+    Two buckets:
+    - Orders with FAILED payment older than
+      ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES (default 30)
+    - Orders with PENDING payment older than
+      ORDER_AUTO_CANCEL_PENDING_HOURS (default 24) — covers the case
+      where the customer abandoned online checkout without triggering
+      any webhook.
+
+    Delegates to OrderService.cancel_order which restores stock via
+    StockManager.increment_stock and releases any outstanding
+    StockReservation records.
+    """
+    failed_minutes = Setting.get(
+        "ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES", default=30
+    )
+    pending_hours = Setting.get("ORDER_AUTO_CANCEL_PENDING_HOURS", default=24)
+
+    now = timezone.now()
+    failed_cutoff = now - timedelta(minutes=failed_minutes)
+    pending_cutoff = now - timedelta(hours=pending_hours)
+
+    failed_qs = Order.objects.filter(
+        status=OrderStatus.PENDING,
+        payment_status=PaymentStatus.FAILED,
+        updated_at__lt=failed_cutoff,
+    )
+    # Only auto-cancel online-payment orders — offline methods (COD,
+    # bank transfer) are expected to sit PENDING until the customer
+    # pays, sometimes for days. Positive filter also excludes orders
+    # with no pay_way at all (NULL) which are treated as
+    # offline-equivalent for this bucket.
+    pending_qs = Order.objects.filter(
+        status=OrderStatus.PENDING,
+        payment_status=PaymentStatus.PENDING,
+        created_at__lt=pending_cutoff,
+        pay_way__is_online_payment=True,
+    )
+
+    canceled_failed = 0
+    canceled_pending = 0
+    errors = 0
+
+    for order in failed_qs.iterator():
+        try:
+            OrderService.cancel_order(
+                order,
+                reason="Auto-canceled: payment failed and not retried",
+                refund_payment=False,
+            )
+            canceled_failed += 1
+        except Exception as e:
+            errors += 1
+            logger.error(
+                "Auto-cancel (failed-payment) error for order %s: %s",
+                order.id,
+                e,
+                exc_info=True,
+            )
+
+    for order in pending_qs.iterator():
+        try:
+            OrderService.cancel_order(
+                order,
+                reason="Auto-canceled: payment never completed",
+                refund_payment=False,
+            )
+            canceled_pending += 1
+        except Exception as e:
+            errors += 1
+            logger.error(
+                "Auto-cancel (stale-pending) error for order %s: %s",
+                order.id,
+                e,
+                exc_info=True,
+            )
+
+    total = canceled_failed + canceled_pending
+    if total or errors:
+        logger.info(
+            "auto_cancel_stuck_pending_orders: canceled_failed=%s canceled_pending=%s errors=%s",
+            canceled_failed,
+            canceled_pending,
+            errors,
+        )
+    return {
+        "canceled_failed": canceled_failed,
+        "canceled_pending": canceled_pending,
+        "errors": errors,
+    }
+
+
+@shared_task
+def send_checkout_abandonment_emails() -> int:
+    """Email customers who reserved stock but never placed an order.
+
+    Finds authenticated users whose StockReservations expired without
+    being consumed (no order created) and who have not yet been
+    notified. Uses StockReservation.abandonment_notified as the
+    idempotency flag — flipped to True for the whole session after a
+    successful send, preventing repeat emails across daily runs.
+    """
+    from cart.models.cart import Cart
+    from order.models.stock_reservation import StockReservation
+
+    hours = Setting.get("CHECKOUT_ABANDONMENT_HOURS", default=2)
+    cutoff = timezone.now() - timedelta(hours=hours)
+
+    # NOTE: we intentionally do NOT filter on `consumed=False`. The
+    # `cleanup_expired_stock_reservations` task runs every 5 minutes
+    # and flips `consumed=True` on every expired reservation, so
+    # by the time this task fires (daily) the flag is always True.
+    # `abandonment_notified=False` is the correct idempotency gate,
+    # and `order__isnull=True` still restricts us to reservations
+    # that never converted into a real sale.
+    abandoned_session_ids = list(
+        StockReservation.objects.filter(
+            abandonment_notified=False,
+            expires_at__lt=timezone.now(),
+            updated_at__lt=cutoff,
+            order__isnull=True,
+        )
+        .values_list("session_id", flat=True)
+        .distinct()
+    )
+
+    if not abandoned_session_ids:
+        return 0
+
+    carts = (
+        Cart.objects.select_related("user")
+        .filter(uuid__in=abandoned_session_ids, user__isnull=False)
+        .prefetch_related("items__product__translations")
+    )
+
+    sent = 0
+    for cart in carts:
+        if not cart.user or not cart.user.email:
+            continue
+        try:
+            context = {
+                "cart": cart,
+                "items": list(cart.items.all()),
+                "cart_url": (
+                    f"{settings.NUXT_BASE_URL.rstrip('/')}/cart"
+                    if getattr(settings, "NUXT_BASE_URL", None)
+                    else ""
+                ),
+                "SITE_NAME": settings.SITE_NAME,
+                "INFO_EMAIL": settings.INFO_EMAIL,
+                "SITE_URL": settings.NUXT_BASE_URL,
+                "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+            }
+            subject = _("Did you forget something? — {site_name}").format(
+                site_name=settings.SITE_NAME
+            )
+            text_content = render_to_string(
+                "emails/cart/checkout_abandoned.txt", context
+            )
+            html_content = render_to_string(
+                "emails/cart/checkout_abandoned.html", context
+            )
+            msg = EmailMultiAlternatives(
+                subject,
+                text_content,
+                settings.DEFAULT_FROM_EMAIL,
+                [cart.user.email],
+                reply_to=[settings.INFO_EMAIL],
+            )
+            msg.attach_alternative(html_content, "text/html")
+            msg.send()
+
+            StockReservation.objects.filter(session_id=str(cart.uuid)).update(
+                abandonment_notified=True
+            )
+            sent += 1
+        except Exception as e:
+            logger.error(
+                "Error sending checkout-abandonment email for cart %s: %s",
+                cart.id,
+                e,
+                exc_info=True,
+            )
+
+    if sent:
+        logger.info("Sent %s checkout-abandonment emails", sent)
+    return sent

@@ -644,6 +644,20 @@ def get_celery_beat_schedule():
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
+        "auto-cancel-stuck-pending-orders": {
+            "task": "order.tasks.auto_cancel_stuck_pending_orders",
+            "schedule": crontab(minute="*/15"),
+        },
+        "check-low-stock-products": {
+            "task": "product.tasks.check_low_stock_products",
+            "schedule": SCHEDULE_PRESETS["every_hour"],
+        },
+        "send-checkout-abandonment-emails": {
+            "task": "order.tasks.send_checkout_abandonment_emails",
+            "schedule": SCHEDULE_PRESETS["daily_6am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
     }
 
     if path.exists("/.dockerenv") and not getenv("KUBERNETES_SERVICE_HOST"):
@@ -869,7 +883,27 @@ EXTRA_SETTINGS_DEFAULTS = [
     {
         "name": "STOCK_RESERVATION_TTL_MINUTES",
         "type": "int",
-        "value": 15,
+        "value": 30,
+    },
+    {
+        "name": "ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES",
+        "type": "int",
+        "value": 30,
+    },
+    {
+        "name": "ORDER_AUTO_CANCEL_PENDING_HOURS",
+        "type": "int",
+        "value": 24,
+    },
+    {
+        "name": "LOW_STOCK_THRESHOLD",
+        "type": "int",
+        "value": 10,
+    },
+    {
+        "name": "CHECKOUT_ABANDONMENT_HOURS",
+        "type": "int",
+        "value": 2,
     },
     # Loyalty system settings
     {

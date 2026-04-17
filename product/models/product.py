@@ -74,6 +74,20 @@ class Product(
     )
     active = models.BooleanField(_("Active"), default=True)
     stock = models.PositiveIntegerField(_("Stock"), default=0)
+    low_stock_threshold = models.PositiveIntegerField(
+        _("Low Stock Threshold"),
+        default=10,
+        help_text=_(
+            "Stock level at or below which admins get a low-stock alert. Set to 0 to disable alerts for this product."
+        ),
+    )
+    low_stock_alert_sent = models.BooleanField(
+        _("Low Stock Alert Sent"),
+        default=False,
+        help_text=_(
+            "Internal flag — prevents duplicate alerts. Automatically cleared when stock rises above the threshold."
+        ),
+    )
     discount_percent = models.DecimalField(
         _("Discount Percent"),
         max_digits=11,

@@ -12,7 +12,10 @@ from django.views.decorators.http import require_http_methods
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models.history import OrderHistory
 from order.models.order import Order
-from order.tasks import send_order_confirmation_email
+from order.tasks import (
+    send_order_confirmation_email,
+    send_payment_failed_email,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -510,6 +513,10 @@ def _handle_payment_failed(order, event_data, transaction_id):
             "provider": "viva_wallet",
         },
     )
+
+    # Notify the customer so they can retry instead of silently sitting
+    # on a broken order.
+    send_payment_failed_email.delay(order.id)
 
 
 def _handle_reversal_created(order, event_data, transaction_id):

@@ -1,0 +1,12 @@
+{% load i18n %}{% trans "LOW STOCK ALERT" %}
+
+{% blocktrans count counter=products|length %}The following {{ counter }} product has reached its low-stock threshold:{% plural %}The following {{ counter }} products have reached their low-stock threshold:{% endblocktrans %}
+
+{% for p in products %}- {{ p.name }} (SKU: {{ p.sku|default:"—" }}) — {% trans "stock" %}: {{ p.stock }} / {% trans "threshold" %}: {{ p.low_stock_threshold }}
+{% endfor %}
+
+{% trans "Please review and restock as needed." %}
+
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}

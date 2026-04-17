@@ -5,6 +5,7 @@ import uuid
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
 from drf_spectacular.utils import extend_schema_view
@@ -34,6 +35,7 @@ from order.exceptions import (
     PaymentNotFoundError,
 )
 from order.filters import OrderFilter
+from order.models.history import OrderHistory
 from order.models.order import Order
 from order.payment import get_payment_provider
 from order.serializers.order import (
@@ -153,6 +155,18 @@ serializers_config: SerializersConfig = {
         ),
         tags=["Orders"],
     ),
+    "retry_payment": ActionConfig(
+        request=CreatePaymentIntentRequestSerializer,
+        response=CreatePaymentIntentResponseSerializer,
+        operation_id="retryOrderPayment",
+        summary=_("Retry payment for a failed or pending order"),
+        description=_(
+            "Create a fresh Stripe PaymentIntent for an order whose previous "
+            "payment failed or was never completed, so the customer can try again "
+            "without starting a new order."
+        ),
+        tags=["Orders"],
+    ),
 }
 
 
@@ -226,6 +240,7 @@ class OrderViewSet(BaseModelViewSet):
             "payment_status",
             "create_payment_intent",
             "create_checkout_session",
+            "retry_payment",
         }
         admin_only_actions = {"add_tracking", "update_status", "refund_order"}
         public_actions = {"create"}
@@ -259,6 +274,7 @@ class OrderViewSet(BaseModelViewSet):
                 "payment_status",
                 "create_payment_intent",
                 "create_checkout_session",
+                "retry_payment",
             }
             if self.action not in guest_allowed_actions:
                 raise PermissionDenied(
@@ -709,6 +725,112 @@ class OrderViewSet(BaseModelViewSet):
         response_serializer = response_serializer_class(data=payment_response)
         response_serializer.is_valid(raise_exception=True)
 
+        return Response(response_serializer.validated_data)
+
+    @action(detail=True, methods=["POST"], url_path="retry-payment")
+    def retry_payment(self, request, *args, **kwargs):
+        """Create a fresh Stripe PaymentIntent for a failed/pending order.
+
+        The customer retains the same order, the same items, and the
+        same reserved stock (already decremented at order creation).
+        We just mint a new PaymentIntent, store its id on the order,
+        reset the payment status to PENDING, and return the client
+        secret so the frontend can re-mount Stripe Elements.
+        """
+        from order.enum.status import PaymentStatus
+
+        order = self.get_object()
+
+        if order.is_paid:
+            return Response(
+                {"detail": _("This order has already been paid.")},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        retryable_statuses = {
+            PaymentStatus.FAILED,
+            PaymentStatus.PENDING,
+            PaymentStatus.CANCELED,
+        }
+        if order.payment_status not in retryable_statuses:
+            return Response(
+                {
+                    "detail": _(
+                        "This order's payment status does not allow a retry."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not order.pay_way or order.pay_way.provider_code != "stripe":
+            return Response(
+                {"detail": _("Retry is only supported for Stripe payments.")},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        request_serializer_class = self.get_request_serializer()
+        request_serializer = request_serializer_class(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+        validated_data = request_serializer.validated_data
+
+        payment_data = dict(validated_data.get("payment_data") or {})
+        for key in ("payment_method_id", "customer_id", "return_url"):
+            value = validated_data.get(key)
+            if value:
+                payment_data[key] = value
+
+        previous_payment_id = order.payment_id
+        previous_payment_status = order.payment_status
+        success, payment_response = PayWayService.process_payment(
+            pay_way=order.pay_way, order=order, **payment_data
+        )
+
+        if not success:
+            return Response(
+                {
+                    "detail": _("Failed to create payment intent."),
+                    "error": payment_response,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        new_payment_id = payment_response.get("payment_id")
+        if new_payment_id:
+            order.payment_id = new_payment_id
+        order.payment_status = PaymentStatus.PENDING
+        if not order.metadata:
+            order.metadata = {}
+        retry_history = order.metadata.setdefault("payment_retries", [])
+        retry_history.append(
+            {
+                "at": timezone.now().isoformat(),
+                "previous_payment_id": previous_payment_id or "",
+                "new_payment_id": new_payment_id or "",
+            }
+        )
+        # Reset per-flow idempotency flags so the confirmation email
+        # can fire again on the (expected) new payment_intent.succeeded,
+        # and the customer can be re-notified of any new failure.
+        order.metadata.pop("confirmation_email_sent", None)
+        order.metadata.pop("payment_failed_email_sent", None)
+        order.save(update_fields=["payment_id", "payment_status", "metadata"])
+
+        OrderHistory.log_payment_update(
+            order=order,
+            previous_value={
+                "payment_status": str(previous_payment_status),
+                "payment_id": previous_payment_id or "",
+            },
+            new_value={
+                "payment_status": "pending",
+                "payment_id": new_payment_id or "",
+                "retry": True,
+            },
+        )
+
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(data=payment_response)
+        response_serializer.is_valid(raise_exception=True)
         return Response(response_serializer.validated_data)
 
     @action(detail=True, methods=["POST"])

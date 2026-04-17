@@ -27,6 +27,7 @@ from order.signals import (
 from order.tasks import (
     send_order_confirmation_email,
     send_order_status_update_email,
+    send_payment_failed_email,
 )
 
 logger = logging.getLogger(__name__)
@@ -526,6 +527,9 @@ def handle_stripe_payment_failed(sender, **kwargs):
                     "payment_id": payment_intent_id,
                 },
             )
+            # Notify the customer so they can retry instead of silently
+            # sitting on a broken order.
+            send_payment_failed_email.delay(order.id)
 
     except Exception as e:
         logger.error(

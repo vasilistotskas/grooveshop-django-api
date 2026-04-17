@@ -1,0 +1,24 @@
+{% load i18n %}{% trans "PAYMENT FAILED" %}
+
+{% trans "We were unable to complete the payment for your order. Don't worry — your items are still reserved for you." %}
+
+{% trans "Order" %} #{{ order.id }}
+{% trans "Date" %}: {{ order.created_at|date:"SHORT_DATE_FORMAT" }}
+{% trans "Payment Status" %}: {% trans "Failed" %}
+{% trans "Total" %}: {{ order.total_price }}
+
+{% if retry_url %}{% trans "TRY AGAIN" %}
+{% trans "Click the link below to retry your payment:" %}
+{{ retry_url }}
+
+{% endif %}{% trans "Common reasons for failed payments:" %}
+- {% trans "Insufficient funds" %}
+- {% trans "Incorrect card details" %}
+- {% trans "Card not authorized for online payments" %}
+- {% trans "3D Secure verification was not completed" %}
+
+{% trans "If the problem persists, please contact our customer service." %}
+
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}

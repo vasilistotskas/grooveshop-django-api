@@ -329,10 +329,15 @@ class TestHandleStripePaymentFailed:
 
         initial_history_count = OrderHistory.objects.filter(order=order).count()
 
-        # Execute
-        with patch(
-            "order.signals.handlers.OrderService.handle_payment_failed"
-        ) as mock_service:
+        # Execute (patch the email task so its own OrderHistory note
+        # does not count toward this test's history-entry assertion
+        # under CELERY_TASK_ALWAYS_EAGER).
+        with (
+            patch(
+                "order.signals.handlers.OrderService.handle_payment_failed"
+            ) as mock_service,
+            patch("order.signals.handlers.send_payment_failed_email.delay"),
+        ):
             mock_service.return_value = order
             handle_stripe_payment_failed(sender=None, event=mock_failed_event)
 

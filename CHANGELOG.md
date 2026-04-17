@@ -3,6 +3,83 @@
 
 
 
+## v1.97.1 (2026-04-17)
+
+### Bug fixes
+
+* fix: update uv lock ([`1893579`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1893579e4c83c70965daf73d21ed7814be81f863))
+
+* fix(order): suppress duplicate status-update email on paid transitions
+
+When an online payment succeeded the customer received two emails in
+quick succession:
+  1. "Order #N Status Update - Σε επεξεργασία" (from the PROCESSING
+     transition fired by OrderService.update_order_status)
+  2. "Payment Confirmed" (from send_order_confirmation_email dispatched
+     by the Stripe / Viva webhook handler)
+
+Both carry the same "your payment went through, we're now processing
+your order" message. The confirmation email is the authoritative one —
+it has the itemised order summary, payment ID, and dedicated template.
+
+send_order_status_update_email now short-circuits when new_status is
+PROCESSING and payment_status is already COMPLETED (i.e. the PENDING →
+PROCESSING transition was triggered by a paid webhook). The same logic
+guards offline-to-paid admin transitions too.
+
+For manual admin moves to PROCESSING on an unpaid order the status
+email still fires, since payment_status won't be COMPLETED yet.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`64287d7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/64287d7db596c30406d075f45534a5acc879c5ff))
+
+### Chores
+
+* chore(i18n): merge production Rosetta edits with regenerated msgids
+
+Pulled locale/el/LC_MESSAGES/django.po off a live backend pod
+(backend-5fcb5c67c7-w24ts) and ran msgmerge --no-fuzzy-matching with
+the prior makemessages output:
+
+msgmerge prod-el.po locale/el/LC_MESSAGES/django.po -o merged-el.po
+
+Result: 116 translated msgstrs — prod translations take priority,
+new msgids from the audit (Payment Confirmed, Thank you! Your payment
+has been received…, Payment Confirmed - Order #{order_id}, plus ~350
+others) remain as empty msgstrs ready for Rosetta.
+
+17 msgids that existed only in prod were dropped; 16 of them were
+whitespace-only placeholders ("" / " " / " ") and the remaining one
+used an obsolete %(site_name)s format no longer in the codebase.
+Nothing meaningful lost.
+
+This merge is a one-time rescue. The prod sync-via-Redis middleware
+has a 24h TTL that races with deploys — see follow-up discussion for
+a durable fix.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`f24ba9b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f24ba9b24ece592381802fb33a7d9e915336517f))
+
+* chore(i18n): refresh Greek translations with makemessages
+
+Ran django-admin makemessages -l el to pick up newly-added translatable
+strings. The extraction surfaces 354 new msgids that weren't in the
+.po file yet — most notably:
+  - "Payment Confirmed"
+  - "Thank you! Your payment has been received and your order is now
+    being processed."
+  - "Payment Confirmed - Order #{order_id}"
+
+Without this refresh, the strings exist in the email templates and
+code but are invisible to Rosetta, so translators can't add Greek
+versions through the /rosetta/ admin UI.
+
+Existing translations are preserved; this commit only adds empty
+msgstr entries for new strings and refreshes source-location comments.
+German and English .po files are untouched — de extraction currently
+fails due to pre-existing duplicate msgid entries that belong in a
+separate cleanup pass.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`582d33f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/582d33f6fd44573d9819ecbb29e87a567be54c48))
+
 ## v1.97.0 (2026-04-17)
 
 ### Bug fixes

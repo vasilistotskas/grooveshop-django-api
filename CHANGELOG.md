@@ -3,6 +3,115 @@
 
 
 
+## v1.97.0 (2026-04-17)
+
+### Bug fixes
+
+* fix: update uv lock ([`6d832b3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6d832b3aff9f648e91e95d3eada76e074a3752bf))
+
+* fix: correctness and performance audit fixes across signals, tasks, and Meili
+
+- add dispatch_uid to every @receiver to prevent duplicate handler firing
+  if an app module is re-imported (tests, shell reloads, WSGI workers)
+- product.post_create_historical_record_callback scoped to
+  Product.history.model so other audited models don't dispatch wasted work
+- product.signals async reindex paths fetch pks via values_list instead of
+  running .exists() followed by a full instance iteration — one query,
+  not two
+- notification.handle_notification_created caches serialized translations
+  in Django cache for 60s so a fanout to N users issues one translation
+  SELECT instead of N
+- 5 bare @shared_task decorators in order.tasks gain autoretry_for,
+  max_retries, retry_backoff, retry_jitter (check_pending_orders,
+  update_order_statuses_from_shipping, cleanup_expired_stock_reservations,
+  auto_cancel_stuck_pending_orders, send_checkout_abandonment_emails)
+- order.auto_cancel_stuck_pending_orders wraps each cancel in
+  transaction.atomic + select_for_update(skip_locked) so concurrent beat
+  workers can't both cancel the same order
+- order.tasks + core.tasks email subjects use gettext (eager) over
+  gettext_lazy so resolution timing is deterministic at the call site
+- meili.reindex_model_task adds order_by("pk") before batch slicing —
+  PostgreSQL slicing on an unordered queryset can skip or duplicate rows
+- meili._client.wait_for_task accepts optional timeout_in_ms; the per-
+  document indexing task uses 5000ms so Celery workers aren't held
+  indefinitely when Meili queues are backlogged
+- settings: DJSTRIPE_WEBHOOK_SECRET raises ImproperlyConfigured in
+  production if the placeholder leaks through — prevents silent signature
+  verification against a known literal
+- settings: pin STRIPE_API_VERSION (not DJSTRIPE_-prefixed per dj-stripe
+docs) so library upgrades can't silently shift webhook payload shapes
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`171f00e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/171f00ed42fc503f545d4adb10feee8d472ea75f))
+
+### Features
+
+* feat(order): SSE payment-status events via Redis pub/sub
+
+Payment status updates are now pushed to subscribers instead of polled.
+A new helper (order.payment_events.publish_payment_status) emits to
+Redis channel payment:status:{order_id} after transaction.on_commit, so
+downstream subscribers never read a pre-commit snapshot.
+
+Wired into every authoritative payment-status transition:
+- OrderService.handle_payment_succeeded / handle_payment_failed
+- Stripe checkout.session.completed webhook
+- Viva Wallet _handle_payment_succeeded / _handle_payment_failed
+
+The Nuxt side subscribes via h3 createEventStream and forwards messages
+to the browser as SSE, replacing the 10-attempt × 2s poll loop
+(pollPaymentStatus) in the checkout flow.
+
+Publish failures are swallowed — the payment state itself is already
+in Postgres, and the Nuxt client falls back to polling if the stream
+drops.
+
+Tests cover channel format, payload shape (orderId, orderUuid, status,
+paymentStatus, paymentId), and the Redis-down error path.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`766ad27`](https://github.com/vasilistotskas/grooveshop-django-api/commit/766ad270f68e6b74cb26687e0f2c6a35b34235ee))
+
+* feat(auth): ticket-based WebSocket authentication
+
+Knox tokens previously rode in the WebSocket URL as access_token query
+params. URL strings are logged by every proxy, CDN, and browser history —
+shipping a 7-day credential through that surface was unsafe.
+
+New flow:
+- POST /api/v1/websocket/ticket mints a single-use ticket (secrets.token_urlsafe)
+  stored in Redis with 60s TTL, keyed to request.user.pk
+- core.middleware.channels.TokenAuthMiddleware now prefers ?ticket=<value>
+  on /ws/ URLs; the consumer middleware deletes the key on first read,
+  so an intercepted ticket becomes useless after one use or 60s
+- Legacy ?access_token= path kept as fallback for the migration window;
+  remove it once all clients are shipping tickets
+
+Tickets are authorization-only — the Knox token still lives in the
+encrypted Nuxt session cookie for HTTP auth.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`2c45906`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2c45906ce9b653e840ad11ea24f355555d3179a8))
+
+### Testing
+
+* test: align signal disconnects with dispatch_uid and fix lazy-Redis patch
+
+CI picked up two regressions from the prior audit commits:
+
+- tests/integration/user/test_signals.py connected/disconnected
+  create_default_subscriptions without dispatch_uid, so after the
+  audit added dispatch_uid="user.create_default_subscriptions" to the
+  receiver, the disconnect() calls silently no-opped. The signal kept
+  firing during the test body and the IntegrityError surfaced from
+  double-creating the default subscriptions. Pass dispatch_uid on all
+  three connect/disconnect pairs so the registry keys match.
+
+- tests/unit/order/test_payment_events.py patched Redis as an
+  attribute of order.payment_events, but Redis is imported lazily
+  inside _publish (it never becomes a module attribute). Patch redis.Redis
+  at the source instead. Error-path test patches redis.Redis.from_url
+  directly.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`85c0e90`](https://github.com/vasilistotskas/grooveshop-django-api/commit/85c0e90325ec80d8a3da570bd91ffcffd4091ce9))
+
 ## v1.96.0 (2026-04-17)
 
 ### Bug fixes

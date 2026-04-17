@@ -27,8 +27,10 @@ def test_publish_payment_status_fires_redis_publish_with_expected_payload():
     order.payment_status = "COMPLETED"
     order.payment_id = "pi_123"
 
+    # Redis is lazy-imported inside _publish, so patch at its source
+    # (redis.Redis) rather than as an attribute of order.payment_events.
     with (
-        patch("order.payment_events.Redis") as redis_cls,
+        patch("redis.Redis") as redis_cls,
         patch(
             "order.payment_events.transaction.on_commit",
             side_effect=lambda cb: cb(),
@@ -62,7 +64,7 @@ def test_publish_payment_status_swallows_redis_errors():
 
     with (
         patch(
-            "order.payment_events.Redis",
+            "redis.Redis.from_url",
             side_effect=RuntimeError("redis down"),
         ),
         patch(

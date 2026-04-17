@@ -8,15 +8,15 @@ msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-04-18 01:40+0300\n"
-"PO-Revision-Date: 2023-07-12 12:32+0300\n"
-"Last-Translator:   <bill@bill.gr>\n"
+"PO-Revision-Date: 2026-04-17 12:58+0300\n"
+"Last-Translator: Webside Admin <webside@hotmail.gr>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "Language: \n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"X-Translated-Using: django-rosetta 0.9.9\n"
+"X-Translated-Using: django-rosetta 0.10.3\n"
 
 #: .\admin\admin.py:56 .\admin\admin.py:104
 #, python-format
@@ -3185,7 +3185,7 @@ msgid ""
 "Thank you for shopping with %(site_name)s! We look forward to serving you "
 "again."
 msgstr ""
-"Ευχαριστούμε που ψωνίσατε με %(site_name)s! Ανυπομονούμε να σας "
+"Ευχαριστούμε που αγοράσατε από %(site_name)s! Ανυπομονούμε να σας "
 "εξυπηρετήσουμε ξανά."
 
 #: .\core\templates\emails\order\order_completed.txt:3
@@ -3270,7 +3270,7 @@ msgstr ""
 #: .\core\templates\emails\order\order_shipped.html:36
 #: .\core\templates\emails\order\order_shipped.txt:19
 msgid "Thank you for shopping with us!"
-msgstr "Ευχαριστούμε που ψωνίσατε μαζί μας!"
+msgstr "Ευχαριστούμε που αγοράσατε από μας!"
 
 #: .\core\templates\emails\order\order_confirmation.txt:1
 msgid "ORDER CONFIRMATION"
@@ -3324,7 +3324,7 @@ msgstr ""
 #: .\core\templates\emails\order\order_delivered.html:31
 #: .\core\templates\emails\order\order_delivered.txt:16
 msgid "We'd love to hear your feedback! How was your shopping experience?"
-msgstr "Θα θέλαμε να ακούσουμε τη γνώμη σας! Πώς ήταν η εμπειρία αγορών σας;"
+msgstr "Θα θέλαμε να ακούσουμε τη γνώμη σας! Πώς ήταν η εμπειρία σας;"
 
 #: .\core\templates\emails\order\order_delivered.html:35
 msgid "Rate Your Experience"
@@ -3449,7 +3449,7 @@ msgstr ""
 #: .\core\templates\emails\order\order_status_generic.txt:44
 #, python-format
 msgid "Thank you for shopping with %(site_name)s!"
-msgstr "Ευχαριστούμε που ψωνίσατε με %(site_name)s!"
+msgstr "Ευχαριστούμε  %(site_name)s!"
 
 #: .\core\templates\emails\order\order_pending_reminder.txt:6
 msgid "Total Amount"
@@ -3629,8 +3629,7 @@ msgstr "Η παραγγελία σας έχει παραδοθεί στη διε
 #: .\core\templates\emails\order\order_status_generic.txt:20
 msgid ""
 "Your order has been completed successfully. Thank you for shopping with us!"
-msgstr ""
-"Η παραγγελία σας ολοκληρώθηκε επιτυχώς. Ευχαριστούμε που ψωνίσατε μαζί μας!"
+msgstr "Η παραγγελία σας ολοκληρώθηκε επιτυχώς. Ευχαριστούμε πολύ!"
 
 #: .\core\templates\emails\order\order_status_generic.html:70
 #: .\core\templates\emails\order\order_status_generic.txt:22

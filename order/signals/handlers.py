@@ -513,8 +513,41 @@ def handle_stripe_payment_failed(sender, **kwargs):
     try:
         event: Event = kwargs["event"]
         payment_intent_id = event.data["object"]["id"]
+        event_id = event.id
 
         logger.info("Stripe payment failed: %s", payment_intent_id)
+
+        # Event-level idempotency: Stripe may redeliver the same event.
+        # A customer who has moved on to a retry (payment_id already
+        # overwritten with the new intent) must not get a second
+        # failure email from a late redelivery of the old one.
+        already_processed = False
+        with transaction.atomic():
+            order_lookup = (
+                Order.objects.select_for_update()
+                .filter(payment_id=payment_intent_id)
+                .first()
+            )
+            if order_lookup:
+                if order_lookup.metadata and order_lookup.metadata.get(
+                    f"webhook_processed_{event_id}"
+                ):
+                    logger.info(
+                        "Webhook %s already processed for order %s, skipping",
+                        event_id,
+                        order_lookup.id,
+                    )
+                    already_processed = True
+                else:
+                    if not order_lookup.metadata:
+                        order_lookup.metadata = {}
+                    order_lookup.metadata[f"webhook_processed_{event_id}"] = (
+                        True
+                    )
+                    order_lookup.save(update_fields=["metadata"])
+
+        if already_processed:
+            return
 
         order = OrderService.handle_payment_failed(payment_intent_id)
 

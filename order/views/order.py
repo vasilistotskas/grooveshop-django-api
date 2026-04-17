@@ -795,25 +795,39 @@ class OrderViewSet(BaseModelViewSet):
             )
 
         new_payment_id = payment_response.get("payment_id")
-        if new_payment_id:
-            order.payment_id = new_payment_id
-        order.payment_status = PaymentStatus.PENDING
-        if not order.metadata:
-            order.metadata = {}
-        retry_history = order.metadata.setdefault("payment_retries", [])
-        retry_history.append(
-            {
-                "at": timezone.now().isoformat(),
-                "previous_payment_id": previous_payment_id or "",
-                "new_payment_id": new_payment_id or "",
-            }
-        )
-        # Reset per-flow idempotency flags so the confirmation email
-        # can fire again on the (expected) new payment_intent.succeeded,
-        # and the customer can be re-notified of any new failure.
-        order.metadata.pop("confirmation_email_sent", None)
-        order.metadata.pop("payment_failed_email_sent", None)
-        order.save(update_fields=["payment_id", "payment_status", "metadata"])
+
+        # Lock the order row while we swap in the new payment intent.
+        # A late `payment_intent.payment_failed` webhook for the OLD
+        # intent could otherwise land between read and save, flip
+        # payment_status to FAILED, and enqueue a duplicate failure
+        # email concurrently with this retry flow.
+        with transaction.atomic():
+            locked_order = Order.objects.select_for_update().get(pk=order.pk)
+            if new_payment_id:
+                locked_order.payment_id = new_payment_id
+            locked_order.payment_status = PaymentStatus.PENDING
+            if not locked_order.metadata:
+                locked_order.metadata = {}
+            retry_history = locked_order.metadata.setdefault(
+                "payment_retries", []
+            )
+            retry_history.append(
+                {
+                    "at": timezone.now().isoformat(),
+                    "previous_payment_id": previous_payment_id or "",
+                    "new_payment_id": new_payment_id or "",
+                }
+            )
+            # Reset per-flow idempotency flags so the confirmation
+            # email can fire again on the (expected) new
+            # payment_intent.succeeded, and the customer can be
+            # re-notified of any new failure.
+            locked_order.metadata.pop("confirmation_email_sent", None)
+            locked_order.metadata.pop("payment_failed_email_sent", None)
+            locked_order.save(
+                update_fields=["payment_id", "payment_status", "metadata"]
+            )
+        order = locked_order
 
         OrderHistory.log_payment_update(
             order=order,

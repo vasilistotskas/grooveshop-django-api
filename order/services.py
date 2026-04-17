@@ -18,6 +18,7 @@ from order.exceptions import (
     PaymentError,
     PaymentNotFoundError,
     ProductNotFoundError,
+    StockReservationError,
 )
 from order.models.item import OrderItem
 from order.models.order import Order
@@ -1237,6 +1238,24 @@ class OrderService:
                         reservation_id,
                         order.id,
                     )
+                except StockReservationError as e:
+                    # The periodic cleanup task runs every 5 min and
+                    # flips expired reservations to consumed=True. On
+                    # stale cancels (e.g. auto_cancel_stuck_pending_orders
+                    # on 24h-old PENDING orders) this is the normal
+                    # happy path, not an error — log at DEBUG.
+                    if "already consumed" in str(e):
+                        logger.debug(
+                            "Reservation %s already consumed for order %s (expected for stale cancels)",
+                            reservation_id,
+                            order.id,
+                        )
+                    else:
+                        logger.warning(
+                            "Failed to release reservation %s: %s",
+                            reservation_id,
+                            e,
+                        )
                 except Exception as e:
                     logger.warning(
                         "Failed to release reservation %s: %s",

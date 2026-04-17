@@ -464,9 +464,7 @@ class Translation(models.Model):
             ),
         ]
         indexes = [
-            BTreeIndex(
-                fields=["language_code"], name="translation_lang_ix"
-            ),
+            BTreeIndex(fields=["language_code"], name="translation_lang_ix"),
         ]
         ordering = ["language_code", "msgid", "plural_index"]
 

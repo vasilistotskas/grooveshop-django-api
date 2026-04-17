@@ -46,7 +46,9 @@ class DBBackedTranslationFormView(TranslationFormView):
                 ).values("msgid", "plural_index", "msgstr")
             }
         except Exception:
-            logger.debug("DB overlay read failed for Rosetta view", exc_info=True)
+            logger.debug(
+                "DB overlay read failed for Rosetta view", exc_info=True
+            )
             return po
 
         if not overlay:

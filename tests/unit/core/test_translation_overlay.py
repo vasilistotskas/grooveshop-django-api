@@ -162,9 +162,9 @@ def test_persist_rosetta_entry_writes_plural_rows():
         language_code="el",
     )
 
-    rows = Translation.objects.filter(language_code="el", msgid="1 cat").order_by(
-        "plural_index"
-    )
+    rows = Translation.objects.filter(
+        language_code="el", msgid="1 cat"
+    ).order_by("plural_index")
     assert [r.msgstr for r in rows] == ["1 γάτα", "%d γάτες"]
     assert all(r.msgid_plural == "%d cats" for r in rows)
 
@@ -172,11 +172,10 @@ def test_persist_rosetta_entry_writes_plural_rows():
 @pytest.mark.django_db
 def test_bump_translation_version_updates_cache_key():
     cache.delete(TRANSLATION_VERSION_CACHE_KEY)
-    with patch(
-        "core.signals.rosetta.apply_db_overlay"
-    ) as overlay, patch(
-        "core.signals.rosetta._reload_translations"
-    ) as reload_:
+    with (
+        patch("core.signals.rosetta.apply_db_overlay") as overlay,
+        patch("core.signals.rosetta._reload_translations") as reload_,
+    ):
         bump_translation_version_on_save(
             sender=None, language_code="el", request=MagicMock()
         )
@@ -194,11 +193,12 @@ def test_middleware_refreshes_once_per_version_tick():
     mw_module._local_translation_version = None
     cache.set(TRANSLATION_VERSION_CACHE_KEY, 42.0, timeout=None)
 
-    with patch(
-        "core.middleware.translation_reload.apply_db_overlay"
-    ) as overlay, patch(
-        "core.middleware.translation_reload._reload_translations"
-    ) as reload_:
+    with (
+        patch("core.middleware.translation_reload.apply_db_overlay") as overlay,
+        patch(
+            "core.middleware.translation_reload._reload_translations"
+        ) as reload_,
+    ):
         mw = TranslationReloadMiddleware(lambda req: None)
         mw.process_request(MagicMock())
         overlay.assert_called_once()

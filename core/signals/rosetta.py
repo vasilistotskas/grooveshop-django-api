@@ -93,9 +93,7 @@ def persist_rosetta_entry_to_db(
 @receiver(
     rosetta_post_save, dispatch_uid="core.bump_translation_version_on_save"
 )
-def bump_translation_version_on_save(
-    sender, language_code, request, **kwargs
-):
+def bump_translation_version_on_save(sender, language_code, request, **kwargs):
     """Tick the shared version key so other pods refresh their overlay.
 
     Also applies the overlay locally and clears the gettext cache so

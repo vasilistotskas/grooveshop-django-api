@@ -3,6 +3,48 @@
 
 
 
+## v1.95.0 (2026-04-17)
+
+### Bug fixes
+
+* fix(order): isolate email task in webhook history test
+
+test_successful_payment_logs_order_history asserts exactly one new
+OrderHistory entry after the Stripe webhook runs, but the new
+send_order_confirmation_email.delay call now fires eagerly under
+CELERY_TASK_ALWAYS_EAGER and adds its own "email sent" note, pushing
+the count to +2. Patch the email task in this test so the assertion
+only measures the webhook's own history entry.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`25815bc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/25815bc30a8d8a7d2ee41a2dc676bb09ed18c9c0))
+
+### Features
+
+* feat(order): defer confirmation email until payment succeeds for online payments
+
+Previously the order confirmation email was sent unconditionally on order
+creation, which meant customers paying with Stripe or Viva Wallet received
+the email before their payment had actually cleared. Offline methods (COD,
+bank transfer) still get the email immediately since the customer needs
+order details to pay manually.
+
+- order_created signal now only enqueues the email when pay_way is offline,
+  missing, or the order is already paid at creation time
+- Stripe payment_intent.succeeded and checkout.session.completed webhooks
+  now enqueue the email after mark_as_paid; checkout.session.completed
+  uses transaction.on_commit so a rolled-back handler cannot send
+- Viva Wallet _handle_payment_created enqueues the email after the
+  transaction is verified as completed
+- send_order_confirmation_email is now idempotent via a metadata
+  reservation (confirmation_email_sent flag + select_for_update), so
+  overlapping triggers (e.g. payment_intent.succeeded + checkout.session.completed)
+  or retried webhooks cannot cause duplicate sends; the flag is released
+  on permanent failure so admins can resend
+- Tests updated to cover offline-immediate, online-deferred, idempotency,
+  and webhook-triggered email paths
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`e8d10df`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e8d10dfe242c85538596eadc12ab10a8f95c6e10))
+
 ## v1.94.0 (2026-04-17)
 
 ### Features

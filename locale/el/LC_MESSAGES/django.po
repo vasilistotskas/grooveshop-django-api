@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-18 01:40+0300\n"
+"POT-Creation-Date: 2026-04-18 02:42+0300\n"
 "PO-Revision-Date: 2026-04-17 12:58+0300\n"
 "Last-Translator: Webside Admin <webside@hotmail.gr>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -2320,7 +2320,7 @@ msgstr ""
 msgid "Created At"
 msgstr ""
 
-#: .\core\models.py:156
+#: .\core\models.py:156 .\core\models.py:455
 msgid "Updated At"
 msgstr ""
 
@@ -2330,6 +2330,42 @@ msgstr ""
 
 #: .\core\models.py:207
 msgid "Is Published"
+msgstr ""
+
+#: .\core\models.py:432
+msgid "Language Code"
+msgstr ""
+
+#: .\core\models.py:435
+msgid "Message ID"
+msgstr ""
+
+#: .\core\models.py:437
+msgid "Plural Message ID"
+msgstr ""
+
+#: .\core\models.py:441
+msgid ""
+"Empty for singular entries. Set for ngettext / msgid_plural entries; in that "
+"case each plural form has its own row identified by plural_index."
+msgstr ""
+
+#: .\core\models.py:447
+msgid "Plural Index"
+msgstr ""
+
+#: .\core\models.py:450
+msgid ""
+"0 for singular entries or for the first plural form; 1, 2, ... for "
+"subsequent plural forms defined by the language's plural rule."
+msgstr ""
+
+#: .\core\models.py:454 .\core\models.py:458
+msgid "Translation"
+msgstr ""
+
+#: .\core\models.py:459
+msgid "Translations"
 msgstr ""
 
 #: .\core\tasks.py:455
@@ -4011,11 +4047,11 @@ msgstr ""
 msgid "Request Meta"
 msgstr ""
 
-#: .\core\urls.py:54
+#: .\core\urls.py:55
 msgid "admin/email-templates/"
 msgstr ""
 
-#: .\core\urls.py:57
+#: .\core\urls.py:58
 msgid "admin/"
 msgstr ""
 
@@ -5913,7 +5949,7 @@ msgstr ""
 msgid "Order Confirmation #{order_id}"
 msgstr ""
 
-#: .\order\notifications.py:69 .\order\tasks.py:433
+#: .\order\notifications.py:69 .\order\tasks.py:451
 #, python-brace-format
 msgid "Your Order #{order_id} Has Shipped"
 msgstr ""
@@ -6228,17 +6264,17 @@ msgstr "Η Παραγγελία Παραδόθηκε"
 msgid "Payment Failed - Order #{order_id}"
 msgstr ""
 
-#: .\order\tasks.py:338
+#: .\order\tasks.py:356
 #, python-brace-format
 msgid "Order #{order_id} Status Update - {status}"
 msgstr ""
 
-#: .\order\tasks.py:566
+#: .\order\tasks.py:584
 #, python-brace-format
 msgid "Reminder: Complete Your Order #{order_id}"
 msgstr ""
 
-#: .\order\tasks.py:888
+#: .\order\tasks.py:906
 #, fuzzy, python-brace-format
 #| msgid "Thank you for shopping with %(site_name)s!"
 msgid "Did you forget something? — {site_name}"

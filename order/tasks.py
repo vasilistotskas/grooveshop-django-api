@@ -4,6 +4,7 @@ from datetime import timedelta
 from celery import shared_task
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
+from django.db import transaction
 from django.db.models import F
 from django.template.loader import render_to_string
 from django.utils import timezone
@@ -19,9 +20,52 @@ from order.shipping import ShippingService
 logger = logging.getLogger(__name__)
 
 
+CONFIRMATION_EMAIL_SENT_FLAG = "confirmation_email_sent"
+
+
+def _reserve_confirmation_email(order_id: int) -> bool:
+    """Atomically claim the confirmation-email slot for an order.
+
+    Returns True if this caller won the race and should proceed with the
+    send, False if another caller has already sent (or is sending) the
+    email. Raises Order.DoesNotExist if the order is missing so the
+    caller can surface it consistently with the rest of the task.
+    """
+    with transaction.atomic():
+        order = Order.objects.select_for_update().get(id=order_id)
+        if order.metadata and order.metadata.get(CONFIRMATION_EMAIL_SENT_FLAG):
+            return False
+        if not order.metadata:
+            order.metadata = {}
+        order.metadata[CONFIRMATION_EMAIL_SENT_FLAG] = True
+        order.save(update_fields=["metadata"])
+    return True
+
+
+def _release_confirmation_email(order_id: int) -> None:
+    """Clear the confirmation-email reservation on permanent failure so an
+    admin (or a future retry path) can resend the email."""
+    with transaction.atomic():
+        order = Order.objects.select_for_update().filter(id=order_id).first()
+        if order is None or not order.metadata:
+            return
+        if order.metadata.pop(CONFIRMATION_EMAIL_SENT_FLAG, None) is not None:
+            order.save(update_fields=["metadata"])
+
+
 @shared_task(bind=True, max_retries=3, default_retry_delay=300)
 def send_order_confirmation_email(self, order_id: int) -> bool:
+    reserved_this_call = False
     try:
+        if self.request.retries == 0:
+            if not _reserve_confirmation_email(order_id):
+                logger.info(
+                    "Order confirmation email already sent (or reserved) for order #%s, skipping",
+                    order_id,
+                )
+                return True
+            reserved_this_call = True
+
         order = (
             Order.objects.select_related("user", "country", "region", "pay_way")
             .prefetch_related("items__product__translations")
@@ -91,6 +135,9 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
                 f"(attempt {retry_count + 1}/{max_retries + 1})"
             )
             raise self.retry(exc=e) from e
+
+        if reserved_this_call:
+            _release_confirmation_email(order_id)
 
         return False
 

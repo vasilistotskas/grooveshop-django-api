@@ -73,7 +73,19 @@ def handle_order_created(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
     """Handle order creation."""
-    send_order_confirmation_email.delay(order.id)
+    # Offline payments (COD, bank transfer) and already-paid orders get the
+    # confirmation email immediately. Online payments (Stripe, Viva Wallet)
+    # defer it to the payment-success webhook so the email only goes out
+    # once the payment actually succeeds. Missing pay_way is treated as
+    # offline to preserve the legacy fallback behavior.
+    pay_way = order.pay_way
+    is_online_pending = (
+        pay_way is not None
+        and pay_way.is_online_payment
+        and order.payment_status != PaymentStatus.COMPLETED
+    )
+    if not is_online_pending:
+        send_order_confirmation_email.delay(order.id)
     OrderHistory.log_note(order=order, note="Order created")
 
     # Clear cart after successful order creation (both user and guest)
@@ -479,6 +491,12 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
                     "payment_id": payment_intent_id,
                 },
             )
+            # Payment is confirmed — now the customer gets the
+            # confirmation email. The task itself is idempotent via a
+            # metadata reservation, so parallel webhook deliveries or a
+            # subsequent checkout.session.completed event cannot cause
+            # a duplicate send.
+            send_order_confirmation_email.delay(order.id)
 
     except Exception as e:
         logger.error(
@@ -643,6 +661,14 @@ def handle_stripe_checkout_completed(sender, **kwargs):
                     "Order %s marked as paid via checkout session %s",
                     order_id,
                     session_id,
+                )
+
+                # Payment confirmed via Stripe Checkout — send the
+                # confirmation email now (idempotent).
+                transaction.on_commit(
+                    lambda oid=order.id: send_order_confirmation_email.delay(
+                        oid
+                    )
                 )
 
             elif payment_status == "unpaid":

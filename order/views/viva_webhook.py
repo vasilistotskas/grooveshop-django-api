@@ -12,6 +12,7 @@ from django.views.decorators.http import require_http_methods
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models.history import OrderHistory
 from order.models.order import Order
+from order.tasks import send_order_confirmation_email
 
 logger = logging.getLogger(__name__)
 
@@ -483,6 +484,11 @@ def _handle_payment_created(order, event_data, transaction_id):
             "provider": "viva_wallet",
         },
     )
+
+    # Payment verified by Viva Wallet — send the confirmation email now.
+    # The task is idempotent (metadata reservation + row lock), so a
+    # duplicate webhook delivery or a retry will not resend.
+    send_order_confirmation_email.delay(order.id)
 
 
 def _handle_payment_failed(order, event_data, transaction_id):

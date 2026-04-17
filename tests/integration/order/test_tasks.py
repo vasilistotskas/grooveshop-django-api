@@ -62,6 +62,42 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         self.assertFalse(result)
         mock_logger.assert_called_once()
 
+    @patch("order.tasks.EmailMultiAlternatives")
+    @patch("order.tasks.render_to_string")
+    @override_settings(
+        SITE_NAME="GrooveShop",
+        INFO_EMAIL="support@example.com",
+        NUXT_BASE_URL="http://example.com",
+        STATIC_BASE_URL="http://example.com",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    def test_send_order_confirmation_email_idempotent(
+        self, mock_render, mock_email
+    ):
+        # Calling the task twice in a row (e.g. order_created signal
+        # followed by payment webhook) must only send one email.
+        mock_email_instance = Mock()
+        mock_email.return_value = mock_email_instance
+        mock_render.side_effect = [
+            "Email content",
+            "HTML content",
+            "Email content",
+            "HTML content",
+        ]
+
+        first = send_order_confirmation_email(self.order.id)
+        second = send_order_confirmation_email(self.order.id)
+
+        self.assertTrue(first)
+        self.assertTrue(second)
+        mock_email_instance.send.assert_called_once()
+
+        self.order.refresh_from_db()
+        self.assertTrue(
+            self.order.metadata.get("confirmation_email_sent"),
+            "metadata flag must be set after a successful send",
+        )
+
     @patch("order.tasks.OrderHistory.log_note")
     @patch("order.tasks.EmailMultiAlternatives")
     @patch("order.tasks.render_to_string")

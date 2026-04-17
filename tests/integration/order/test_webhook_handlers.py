@@ -76,6 +76,57 @@ class TestHandleStripePaymentSucceeded:
         # Verify
         mock_service.assert_called_once_with(payment_intent_id)
 
+    def test_successful_payment_enqueues_confirmation_email(
+        self, mock_djstripe_event
+    ):
+        """
+        Online payments defer the confirmation email until the
+        payment-success webhook fires. Verify the task is enqueued.
+        """
+        payment_intent_id = "pi_test_123456"
+        order = OrderFactory(
+            payment_id=payment_intent_id,
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+        )
+
+        with (
+            patch(
+                "order.signals.handlers.OrderService.handle_payment_succeeded"
+            ) as mock_service,
+            patch(
+                "order.signals.handlers.send_order_confirmation_email.delay"
+            ) as mock_email,
+        ):
+            mock_service.return_value = order
+            handle_stripe_payment_succeeded(
+                sender=None, event=mock_djstripe_event
+            )
+
+        mock_email.assert_called_once_with(order.id)
+
+    def test_successful_payment_skips_email_when_order_missing(
+        self, mock_djstripe_event
+    ):
+        """
+        If the service returns None (order not found), no email
+        task should be enqueued.
+        """
+        with (
+            patch(
+                "order.signals.handlers.OrderService.handle_payment_succeeded"
+            ) as mock_service,
+            patch(
+                "order.signals.handlers.send_order_confirmation_email.delay"
+            ) as mock_email,
+        ):
+            mock_service.return_value = None
+            handle_stripe_payment_succeeded(
+                sender=None, event=mock_djstripe_event
+            )
+
+        mock_email.assert_not_called()
+
     def test_successful_payment_logs_order_history(self, mock_djstripe_event):
         """
         Test that successful payment creates OrderHistory entry.

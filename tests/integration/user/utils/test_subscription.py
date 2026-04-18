@@ -468,7 +468,7 @@ class TestSubscriptionUtils:
             send_newsletter(
                 topic=self.topic,
                 subject="Test",
-                template_name="test.html",
+                template_base="test",
                 context={},
             )
 

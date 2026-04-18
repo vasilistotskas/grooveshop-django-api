@@ -26,15 +26,26 @@ from core.rosetta_storage import (
 logger = logging.getLogger(__name__)
 
 # Per-process counter; sentinel None forces the first request to sync
-# even if the current pod booted after the most recent version tick.
+# when the remote version key exists (e.g. after a Rosetta save or
+# after import_po_to_translations bumped it at deploy time).
 _local_translation_version: float | None = None
 
 
 class TranslationReloadMiddleware(MiddlewareMixin):
     """Refresh in-memory catalogs when Rosetta edits land on another pod.
 
-    Safe no-op when the Redis key is absent (fresh cluster, no edits
-    yet) and when the cache backend raises transiently.
+    Bootstrap flow: the `import_po_to_translations` management command
+    bumps the Redis version key as part of PreSync, so every pod boots,
+    mismatches its local counter (None) against the remote tick, and
+    applies the DB overlay on its first real request. Every subsequent
+    Rosetta save re-bumps the key via `bump_translation_version_on_save`.
+
+    Fresh clusters with no tick yet: middleware returns early, the pod
+    serves whatever msgstrs the image baked into the .mo files until
+    the first overlay fires.
+
+    Safe no-op when the cache or DB is unreachable — failures are
+    logged and the request proceeds without overlay.
     """
 
     def process_request(self, request):

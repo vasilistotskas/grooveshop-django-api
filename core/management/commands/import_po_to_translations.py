@@ -11,14 +11,17 @@ are skipped to keep the table tidy.
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 
 import polib
 from django.conf import settings
+from django.core.cache import cache
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from core.models import Translation
+from core.rosetta_storage import TRANSLATION_VERSION_CACHE_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +100,26 @@ class Command(BaseCommand):
         if dry_run:
             summary = f"[DRY RUN] {summary}"
         self.stdout.write(self.style.SUCCESS(summary))
+
+        if not dry_run and total_imported:
+            # Bump the shared version tick so every running pod's
+            # TranslationReloadMiddleware picks up the freshly-seeded
+            # DB state on its next request — no need to restart pods
+            # after the first import or a manual reconciliation run.
+            try:
+                cache.set(TRANSLATION_VERSION_CACHE_KEY, time.time(), timeout=None)
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        "Bumped translation version cache key; "
+                        "running pods will re-overlay on next request."
+                    )
+                )
+            except Exception as exc:  # pragma: no cover — defensive
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Could not bump translation version key: {exc}"
+                    )
+                )
 
     def _import_po(
         self, language_code: str, po_path: str, *, dry_run: bool

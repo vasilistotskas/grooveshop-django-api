@@ -20,13 +20,11 @@ class CoreConfig(AppConfig):
         except ImproperlyConfigured as e:
             logger.error("Task configuration error: %s", e)
 
-        # Prime the in-memory gettext catalogs with DB-backed msgstrs
-        # before the first request. Safe during `migrate`: if the
-        # Translation table doesn't exist yet, the overlay returns
-        # without doing anything (see apply_db_overlay).
-        try:
-            from core.rosetta_storage import apply_db_overlay
-
-            apply_db_overlay()
-        except Exception as exc:  # pragma: no cover — defensive
-            logger.debug("Initial translation overlay skipped: %s", exc)
+        # Intentionally no apply_db_overlay() here: ready() runs during
+        # Django setup, which can be triggered at import time by
+        # wsgi/__init__.py's application(...) warmup call. In pytest
+        # collection the DB is blocked for tests without the django_db
+        # mark (RuntimeError), and even with try/except guards the
+        # error was surfacing through the import chain. The overlay now
+        # fires on the first request via TranslationReloadMiddleware —
+        # see core/middleware/translation_reload.py.

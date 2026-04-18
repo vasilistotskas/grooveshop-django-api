@@ -13854,6 +13854,75 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaymentStatusResponse'
           description: ''
+  /api/v1/order/{id}/retry-payment:
+    post:
+      operationId: retryOrderPayment
+      description: Create a fresh Stripe PaymentIntent for an order whose previous
+        payment failed or was never completed, so the customer can try again without
+        starting a new order.
+      summary: Retry payment for a failed or pending order
+      parameters:
+      - in: path
+        name: id
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        required: true
+      tags:
+      - Orders
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentIntentRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentIntentRequestRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentIntentRequestRequest'
+      security:
+      - knoxApiToken: []
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatePaymentIntentResponse'
+          description: ''
   /api/v1/order/{id}/update_status:
     post:
       operationId: updateOrderStatus
@@ -26639,6 +26708,72 @@ paths:
           description: ''
         '200':
           description: No response body
+  /api/v1/user/subscription/confirm/{token}:
+    get:
+      operationId: confirmSubscriptionByToken
+      description: |-
+        Public endpoint for the confirmation link emailed to new subscribers.
+
+        The confirmation token itself is 64 chars of random entropy (sufficient
+        authorization); no login required. Accepts both GET (user clicks the
+        link in a mail client) and POST (for programmatic confirmation).
+      summary: Confirm a pending subscription via email token
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+      tags:
+      - User Subscriptions
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfirmResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+    post:
+      operationId: user_subscription_confirm_create
+      description: |-
+        Public endpoint for the confirmation link emailed to new subscribers.
+
+        The confirmation token itself is 64 chars of random entropy (sufficient
+        authorization); no login required. Accepts both GET (user clicks the
+        link in a mail client) and POST (for programmatic confirmation).
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+      tags:
+      - user
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ConfirmResponseRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ConfirmResponseRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmResponseRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfirmResponse'
+          description: ''
   /api/v1/user/subscription/topic:
     get:
       operationId: listSubscriptionTopic
@@ -27430,12 +27565,73 @@ paths:
                     items:
                       $ref: '#/components/schemas/SubscriptionTopic'
           description: ''
-  /api/v1/user/unsubscribe/{uidb64}/{token}/{topic_slug}:
+  /api/v1/user/unsubscribe/{uidb64}/{token}:
     get:
       operationId: unsubscribeViaLink
-      description: Unsubscribe from a subscription topic using an email unsubscribe
-        link.
-      summary: Unsubscribe via email link
+      description: |-
+        GET (user click) + POST (RFC 8058 one-click) unsubscribe.
+
+        `topic_slug` is optional: when omitted, the user is unsubscribed from
+        ALL active subscriptions (used by non-topic marketing emails such as
+        re-engagement and abandoned-cart).
+      summary: Unsubscribe via email link (GET)
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: uidb64
+        schema:
+          type: string
+        required: true
+      tags:
+      - User Subscriptions
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unsubscribe'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+    post:
+      operationId: unsubscribeOneClick
+      description: Invoked by mail clients honoring List-Unsubscribe-Post=One-Click.
+        Returns 200 OK on success or invalid token (silent per RFC 8058).
+      summary: Unsubscribe via RFC 8058 one-click POST
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: uidb64
+        schema:
+          type: string
+        required: true
+      tags:
+      - User Subscriptions
+      responses:
+        '200':
+          description: No response body
+  /api/v1/user/unsubscribe/{uidb64}/{token}/{topic_slug}:
+    get:
+      operationId: unsubscribeViaLink_2
+      description: |-
+        GET (user click) + POST (RFC 8058 one-click) unsubscribe.
+
+        `topic_slug` is optional: when omitted, the user is unsubscribed from
+        ALL active subscriptions (used by non-topic marketing emails such as
+        re-engagement and abandoned-cart).
+      summary: Unsubscribe via email link (GET)
       parameters:
       - in: path
         name: token
@@ -27454,9 +27650,6 @@ paths:
         required: true
       tags:
       - User Subscriptions
-      security:
-      - knoxApiToken: []
-      - cookieAuth: []
       responses:
         '200':
           content:
@@ -27469,6 +27662,50 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+    post:
+      operationId: unsubscribeOneClick_2
+      description: Invoked by mail clients honoring List-Unsubscribe-Post=One-Click.
+        Returns 200 OK on success or invalid token (silent per RFC 8058).
+      summary: Unsubscribe via RFC 8058 one-click POST
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: topicSlug
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: uidb64
+        schema:
+          type: string
+        required: true
+      tags:
+      - User Subscriptions
+      responses:
+        '200':
+          description: No response body
+  /api/v1/websocket/ticket:
+    post:
+      operationId: createWebSocketTicket
+      description: Returns a single-use ticket valid for 60 seconds. Pass as `?ticket=<value>`
+        on the WebSocket connection URL.
+      summary: Mint a short-lived WebSocket ticket
+      tags:
+      - WebSocket
+      security:
+      - knoxApiToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebSocketTicketResponse'
           description: ''
 components:
   schemas:
@@ -29409,6 +29646,26 @@ components:
         * `NEWSLETTER` - Newsletter
         * `PROMOTIONAL` - Promotional
         * `OTHER` - Other
+    ConfirmResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        topic:
+          type: string
+      required:
+      - status
+    ConfirmResponseRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          minLength: 1
+        topic:
+          type: string
+          minLength: 1
+      required:
+      - status
     ContactWrite:
       type: object
       properties:
@@ -33222,6 +33479,12 @@ components:
           maxLength: 200
         bio:
           type: string
+        languageCode:
+          type: string
+          minLength: 1
+          title: Language
+          description: Preferred language for emails and UI messages.
+          maxLength: 10
     PayWay:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -36201,6 +36464,8 @@ components:
           format: email
         topicSlug:
           type: string
+        count:
+          type: integer
         error:
           type: string
       required:
@@ -36543,6 +36808,11 @@ components:
           readOnly: true
         bio:
           type: string
+        languageCode:
+          type: string
+          title: Language
+          description: Preferred language for emails and UI messages.
+          maxLength: 10
         isActive:
           type: boolean
           readOnly: true
@@ -36805,6 +37075,12 @@ components:
           maxLength: 200
         bio:
           type: string
+        languageCode:
+          type: string
+          minLength: 1
+          title: Language
+          description: Preferred language for emails and UI messages.
+          maxLength: 10
       required:
       - email
     UsernameUpdateRequest:
@@ -36825,6 +37101,16 @@ components:
           description: Success message for username update
       required:
       - detail
+    WebSocketTicketResponse:
+      type: object
+      properties:
+        ticket:
+          type: string
+        expiresIn:
+          type: integer
+      required:
+      - expiresIn
+      - ticket
     ZeroResultQuery:
       type: object
       description: Serializer for zero-result query analytics.

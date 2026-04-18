@@ -380,8 +380,17 @@ class UserSubscriptionViewSet(BaseModelViewSet):
 
         return Response(results)
 
-    @action(detail=True, methods=["POST"])
+    @action(
+        detail=True,
+        methods=["POST"],
+        permission_classes=[IsAuthenticated],
+    )
     def confirm(self, request, pk=None):
+        """Authenticated confirm — the owner submits the token from their UI.
+
+        A separate public endpoint `ConfirmSubscriptionByTokenView` handles
+        the unauthenticated email-link case.
+        """
         try:
             subscription = self.get_object()
             token = request.data.get("token")
@@ -420,63 +429,166 @@ class UserSubscriptionViewSet(BaseModelViewSet):
             )
 
 
-class UnsubscribeView(APIView):
+class ConfirmSubscriptionByTokenView(APIView):
+    """Public endpoint for the confirmation link emailed to new subscribers.
+
+    The confirmation token itself is 64 chars of random entropy (sufficient
+    authorization); no login required. Accepts both GET (user clicks the
+    link in a mail client) and POST (for programmatic confirmation).
+    """
+
     permission_classes = []
+    authentication_classes = []
+
+    class ConfirmResponseSerializer(serializers.Serializer):
+        status = serializers.CharField()
+        topic = serializers.CharField(required=False)
+
+    serializer_class = ConfirmResponseSerializer
+
+    def _resolve(self, token: str):
+        if not token:
+            return None
+        return (
+            UserSubscription.objects.select_related("user", "topic")
+            .filter(
+                confirmation_token=token,
+                status=UserSubscription.SubscriptionStatus.PENDING,
+            )
+            .first()
+        )
+
+    @extend_schema(
+        operation_id="confirmSubscriptionByToken",
+        summary=_("Confirm a pending subscription via email token"),
+        tags=["User Subscriptions"],
+        responses={
+            200: ConfirmResponseSerializer,
+            400: ErrorResponseSerializer,
+        },
+    )
+    def get(self, request, token: str):
+        return self._handle(token)
+
+    def post(self, request, token: str):
+        return self._handle(token)
+
+    def _handle(self, token: str):
+        subscription = self._resolve(token)
+        if subscription is None:
+            return Response(
+                {"error": _("Invalid or expired confirmation link.")},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        subscription.activate()
+        return Response(
+            {"status": "confirmed", "topic": subscription.topic.name},
+            status=status.HTTP_200_OK,
+        )
+
+
+class UnsubscribeView(APIView):
+    """GET (user click) + POST (RFC 8058 one-click) unsubscribe.
+
+    `topic_slug` is optional: when omitted, the user is unsubscribed from
+    ALL active subscriptions (used by non-topic marketing emails such as
+    re-engagement and abandoned-cart).
+    """
+
+    permission_classes = []
+    authentication_classes = []
 
     class UnsubscribeSerializer(serializers.Serializer):
         message = serializers.CharField()
         topic = serializers.CharField(required=False)
         user_email = serializers.EmailField(required=False)
         topic_slug = serializers.CharField(required=False)
+        count = serializers.IntegerField(required=False)
         error = serializers.CharField(required=False)
 
     serializer_class = UnsubscribeSerializer
 
-    @extend_schema(
-        operation_id="unsubscribeViaLink",
-        summary=_("Unsubscribe via email link"),
-        description=_(
-            "Unsubscribe from a subscription topic using an email unsubscribe link."
-        ),
-        tags=["User Subscriptions"],
-        responses={
-            200: UnsubscribeSerializer,
-            400: ErrorResponseSerializer,
-        },
-    )
-    def get(self, request, uidb64: str, token: str, topic_slug: str):
+    def _validate_token(self, uidb64: str, token: str):
         try:
             uid = urlsafe_base64_decode(uidb64).decode()
             user = User.objects.get(pk=uid)
         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-            return Response(
-                {"error": "Invalid unsubscribe link"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
+            return None, _("Invalid unsubscribe link")
         if not default_token_generator.check_token(user, token):
-            return Response(
-                {"error": "Invalid or expired unsubscribe link"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return None, _("Invalid or expired unsubscribe link")
+        return user, None
 
-        try:
-            subscription = UserSubscription.objects.get(
-                user=user,
-                topic__slug=topic_slug,
-                status=UserSubscription.SubscriptionStatus.ACTIVE,
-            )
+    def _apply(self, user, topic_slug: str | None):
+        qs = UserSubscription.objects.filter(
+            user=user,
+            status=UserSubscription.SubscriptionStatus.ACTIVE,
+        )
+        if topic_slug:
+            qs = qs.filter(topic__slug=topic_slug)
+        count = 0
+        topic_name = None
+        for subscription in qs.select_related("topic"):
             subscription.unsubscribe()
+            topic_name = subscription.topic.name
+            count += 1
+        return count, topic_name
 
+    @extend_schema(
+        operation_id="unsubscribeViaLink",
+        summary=_("Unsubscribe via email link (GET)"),
+        tags=["User Subscriptions"],
+        responses={200: UnsubscribeSerializer, 400: ErrorResponseSerializer},
+    )
+    def get(
+        self, request, uidb64: str, token: str, topic_slug: str | None = None
+    ):
+        return self._handle(request, uidb64, token, topic_slug)
+
+    @extend_schema(
+        operation_id="unsubscribeOneClick",
+        summary=_("Unsubscribe via RFC 8058 one-click POST"),
+        description=_(
+            "Invoked by mail clients honoring List-Unsubscribe-Post=One-Click. "
+            "Returns 200 OK on success or invalid token (silent per RFC 8058)."
+        ),
+        tags=["User Subscriptions"],
+        request=None,
+        responses={200: None},
+    )
+    def post(
+        self, request, uidb64: str, token: str, topic_slug: str | None = None
+    ):
+        user, error = self._validate_token(uidb64, token)
+        if user is not None:
+            self._apply(user, topic_slug)
+        # RFC 8058: always 200 to avoid leaking validity to scanners.
+        return Response(status=status.HTTP_200_OK)
+
+    def _handle(
+        self,
+        request,
+        uidb64: str,
+        token: str,
+        topic_slug: str | None,
+    ):
+        user, error = self._validate_token(uidb64, token)
+        if error is not None:
+            return Response(
+                {"error": str(error)}, status=status.HTTP_400_BAD_REQUEST
+            )
+        count, topic_name = self._apply(user, topic_slug)
+        if count == 0:
             return Response(
                 {
-                    "message": "Successfully unsubscribed",
-                    "topic": subscription.topic.name,
-                    "user_email": user.email,
+                    "message": str(_("Already unsubscribed")),
+                    "topic_slug": topic_slug or "",
                 }
             )
-
-        except UserSubscription.DoesNotExist:
-            return Response(
-                {"message": "Already unsubscribed", "topic_slug": topic_slug}
-            )
+        return Response(
+            {
+                "message": str(_("Successfully unsubscribed")),
+                "topic": topic_name or "",
+                "user_email": user.email,
+                "count": count,
+            }
+        )

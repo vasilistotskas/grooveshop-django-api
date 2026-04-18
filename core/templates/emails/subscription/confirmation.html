@@ -1,21 +1,31 @@
 {% extends "emails/base/email_base.html" %}
 {% load i18n %}
 
-{% block email_title %}{% trans "Subscription Confirmation" %} - {{ SITE_NAME }}{% endblock %}
+{% block email_title %}{% trans "Confirm your subscription" %} - {{ SITE_NAME }}{% endblock %}
 
 {% block email_content %}
-<h1>{% trans "Subscription Confirmed!" %}</h1>
+<h1>{% trans "Confirm your subscription" %}</h1>
 
 <p>{% blocktrans with first_name=user.first_name|default:user.username %}Hi {{ first_name }},{% endblocktrans %}</p>
 
-<p>{% blocktrans with topic_name=topic.name %}Your subscription to {{ topic_name }} has been successfully confirmed! We're excited to have you on board.{% endblocktrans %}</p>
+<p>{% blocktrans with topic_name=topic.name %}Please confirm you'd like to subscribe to {{ topic_name }}. Your subscription isn't active yet — tap the button below to complete it.{% endblocktrans %}</p>
+
+<div class="text-center mt-2 mb-2">
+    <a href="{{ confirmation_url }}" class="email-button">
+        {% trans "Confirm subscription" %}
+    </a>
+</div>
+
+<p class="text-muted" style="font-size: 13px;">
+    {% trans "If the button doesn't work, copy and paste this link into your browser:" %}<br>
+    <a href="{{ confirmation_url }}">{{ confirmation_url }}</a>
+</p>
 
 <div class="email-card">
     <h2>{% trans "Subscription Details" %}</h2>
     <p><strong>{% trans "Topic" %}:</strong> {{ topic.name }}</p>
     <p><strong>{% trans "Category" %}:</strong> {{ topic.get_category_display }}</p>
-    <p><strong>{% trans "Status" %}:</strong> <span style="color: #10b981; font-weight: 600;">{% trans "Active" %}</span></p>
-    <p><strong>{% trans "Subscribed On" %}:</strong> {{ subscription.subscribed_at|date:"SHORT_DATE_FORMAT" }}</p>
+    <p><strong>{% trans "Requested On" %}:</strong> {{ subscription.subscribed_at|date:"SHORT_DATE_FORMAT" }}</p>
 
     {% if topic.description %}
     <h3>{% trans "What You'll Receive" %}</h3>
@@ -23,16 +33,7 @@
     {% endif %}
 </div>
 
-<h3>{% trans "What's Next?" %}</h3>
-<p>{% trans "You'll start receiving updates based on your subscription preferences. You can manage your subscriptions anytime from your account settings." %}</p>
+<p class="mt-3">{% trans "If you didn't request this subscription, you can safely ignore this email — nothing will happen." %}</p>
 
-<div class="text-center mt-2">
-    <a href="{{ SITE_URL }}/account/subscriptions" class="email-button">
-        {% trans "Manage Subscriptions" %}
-    </a>
-</div>
-
-<p class="mt-3">{% trans "If you didn't request this subscription or want to unsubscribe, you can do so at any time from your account settings." %}</p>
-
-<p>{% blocktrans with site_name=SITE_NAME %}Thank you for staying connected with {{ site_name }}!{% endblocktrans %}</p>
+<p>{% blocktrans with site_name=SITE_NAME %}Thanks,<br>The {{ site_name }} team{% endblocktrans %}</p>
 {% endblock %}

@@ -3,7 +3,7 @@ import shutil
 import tempfile
 from datetime import timedelta
 from pathlib import Path
-from unittest.mock import Mock, mock_open, patch
+from unittest.mock import MagicMock, Mock, mock_open, patch
 
 import pytest
 from django.conf import settings
@@ -481,7 +481,7 @@ class TestClearLogFilesTask:
 
 @pytest.mark.django_db(transaction=True)
 class TestSendInactiveUserNotificationsTask:
-    @patch("core.tasks.send_mail")
+    @patch("core.tasks.EmailMultiAlternatives")
     @patch("core.tasks.render_to_string")
     @patch("core.tasks.logger")
     @override_settings(
@@ -489,7 +489,7 @@ class TestSendInactiveUserNotificationsTask:
         DEFAULT_FROM_EMAIL="noreply@example.com",
     )
     def test_send_inactive_user_notifications_success(
-        self, mock_logger, mock_render, mock_send_mail, db
+        self, mock_logger, mock_render, mock_email_cls, db
     ):
         UserAccountFactory(
             last_login=timezone.now() - timedelta(days=30),
@@ -522,17 +522,16 @@ class TestSendInactiveUserNotificationsTask:
         assert result["emails_sent"] == 2
         assert result["failed"] == 0
 
-        assert mock_send_mail.call_count == 2
+        assert mock_email_cls.call_count == 2
+        kwargs = mock_email_cls.call_args_list[0][1]
+        assert "We miss you!" in kwargs["subject"]
+        assert kwargs["from_email"] == "noreply@example.com"
 
-        call_args = mock_send_mail.call_args_list[0][1]
-        assert "We miss you!" in call_args["subject"]
-        assert call_args["from_email"] == "noreply@example.com"
-
-    @patch("core.tasks.send_mail")
+    @patch("core.tasks.EmailMultiAlternatives")
     @patch("core.tasks.render_to_string")
     @patch("core.tasks.logger")
     def test_send_inactive_user_notifications_with_failures(
-        self, mock_logger, mock_render, mock_send_mail, db
+        self, mock_logger, mock_render, mock_email_cls, db
     ):
         UserAccountFactory(
             last_login=timezone.now() - timedelta(days=70),
@@ -547,10 +546,10 @@ class TestSendInactiveUserNotificationsTask:
         )
 
         mock_render.return_value = "<html>Test email</html>"
-        mock_send_mail.side_effect = [
-            Exception("SMTP error"),
-            None,
-        ]
+        first_msg = MagicMock()
+        first_msg.send.side_effect = Exception("SMTP error")
+        second_msg = MagicMock()
+        mock_email_cls.side_effect = [first_msg, second_msg]
 
         result = send_inactive_user_notifications()
 
@@ -560,14 +559,16 @@ class TestSendInactiveUserNotificationsTask:
         assert result["failed"] == 1
         assert len(result["failed_details"]) == 1
 
-    @patch("core.tasks.send_mail")
+    @patch("core.tasks.EmailMultiAlternatives")
     @patch("core.tasks.render_to_string")
     @patch("core.tasks.logger")
     def test_send_inactive_user_notifications_too_many_failures(
-        self, mock_logger, mock_render, mock_send_mail, db
+        self, mock_logger, mock_render, mock_email_cls, db
     ):
         mock_render.return_value = "<html>Test email</html>"
-        mock_send_mail.side_effect = Exception("SMTP error")
+        failing_msg = MagicMock()
+        failing_msg.send.side_effect = Exception("SMTP error")
+        mock_email_cls.return_value = failing_msg
 
         for i in range(55):
             UserAccountFactory(

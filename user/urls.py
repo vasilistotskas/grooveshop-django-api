@@ -4,6 +4,7 @@ from rest_framework.urlpatterns import format_suffix_patterns
 from user.views.account import UserAccountViewSet
 from user.views.address import UserAddressViewSet
 from user.views.subscription import (
+    ConfirmSubscriptionByTokenView,
     SubscriptionTopicViewSet,
     UnsubscribeView,
     UserSubscriptionViewSet,
@@ -156,7 +157,17 @@ urlpatterns = [
     path(
         "user/unsubscribe/<str:uidb64>/<str:token>/<str:topic_slug>",
         UnsubscribeView.as_view(),
+        name="user-unsubscribe-topic",
+    ),
+    path(
+        "user/unsubscribe/<str:uidb64>/<str:token>",
+        UnsubscribeView.as_view(),
         name="user-unsubscribe",
+    ),
+    path(
+        "user/subscription/confirm/<str:token>",
+        ConfirmSubscriptionByTokenView.as_view(),
+        name="user-subscription-confirm-by-token",
     ),
 ]
 

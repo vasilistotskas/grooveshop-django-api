@@ -3,21 +3,20 @@ from datetime import timedelta
 
 from celery import shared_task
 from django.conf import settings
+from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
 from django.db.models import F
 from django.template.loader import render_to_string
 from django.utils import timezone
-
-# Eager gettext so email subjects resolve at the call site. Lazy strings
-# would resolve at str() time against the Celery worker's active language,
-# which is effectively LANGUAGE_CODE anyway but with less predictable timing.
-# When a customer-preferred-language field lands on User/Order, wrap each
-# email task body in `with translation.override(customer_lang):` to honor it.
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 from django.utils.translation import gettext as _
+from django.utils import translation
 
 from extra_settings.models import Setting
 
+from core.utils.i18n import get_order_language, get_user_language
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models import Order, OrderHistory
 from order.services import OrderService
@@ -91,40 +90,42 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
             and pay_way.is_online_payment
             and order.payment_status == PaymentStatus.COMPLETED
         )
-        if is_paid:
-            template_base = "emails/order/order_payment_confirmed"
-            subject = _("Payment Confirmed - Order #{order_id}").format(
-                order_id=order.id
-            )
-        else:
-            template_base = "emails/order/order_received"
-            subject = _("Order Received - #{order_id}").format(
-                order_id=order.id
-            )
 
-        payment_instructions = ""
-        if pay_way and not pay_way.is_online_payment:
-            payment_instructions = (
-                pay_way.safe_translation_getter(
-                    "instructions", any_language=True
+        with translation.override(get_order_language(order)):
+            if is_paid:
+                template_base = "emails/order/order_payment_confirmed"
+                subject = _("Payment Confirmed - Order #{order_id}").format(
+                    order_id=order.id
                 )
-                or ""
-            )
+            else:
+                template_base = "emails/order/order_received"
+                subject = _("Order Received - #{order_id}").format(
+                    order_id=order.id
+                )
 
-        context = {
-            "order": order,
-            "items": order.items.all(),
-            "pay_way": pay_way,
-            "payment_instructions": payment_instructions,
-            "is_paid": is_paid,
-            "SITE_NAME": settings.SITE_NAME,
-            "INFO_EMAIL": settings.INFO_EMAIL,
-            "SITE_URL": settings.NUXT_BASE_URL,
-            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
-        }
+            payment_instructions = ""
+            if pay_way and not pay_way.is_online_payment:
+                payment_instructions = (
+                    pay_way.safe_translation_getter(
+                        "instructions", any_language=True
+                    )
+                    or ""
+                )
 
-        text_content = render_to_string(f"{template_base}.txt", context)
-        html_content = render_to_string(f"{template_base}.html", context)
+            context = {
+                "order": order,
+                "items": order.items.all(),
+                "pay_way": pay_way,
+                "payment_instructions": payment_instructions,
+                "is_paid": is_paid,
+                "SITE_NAME": settings.SITE_NAME,
+                "INFO_EMAIL": settings.INFO_EMAIL,
+                "SITE_URL": settings.NUXT_BASE_URL,
+                "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+            }
+
+            text_content = render_to_string(f"{template_base}.txt", context)
+            html_content = render_to_string(f"{template_base}.html", context)
 
         msg = EmailMultiAlternatives(
             subject,
@@ -253,15 +254,16 @@ def send_payment_failed_email(self, order_id: int) -> bool:
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
 
-        subject = _("Payment Failed - Order #{order_id}").format(
-            order_id=order.id
-        )
-        text_content = render_to_string(
-            "emails/order/payment_failed.txt", context
-        )
-        html_content = render_to_string(
-            "emails/order/payment_failed.html", context
-        )
+        with translation.override(get_order_language(order)):
+            subject = _("Payment Failed - Order #{order_id}").format(
+                order_id=order.id
+            )
+            text_content = render_to_string(
+                "emails/order/payment_failed.txt", context
+            )
+            html_content = render_to_string(
+                "emails/order/payment_failed.html", context
+            )
 
         msg = EmailMultiAlternatives(
             subject,
@@ -353,24 +355,27 @@ def send_order_status_update_email(
 
         template_base = f"emails/order/order_{status.lower()}"
 
-        subject = _("Order #{order_id} Status Update - {status}").format(
-            order_id=order.id, status=OrderStatus(status).label
-        )
+        with translation.override(get_order_language(order)):
+            subject = _("Order #{order_id} Status Update - {status}").format(
+                order_id=order.id, status=OrderStatus(status).label
+            )
 
-        try:
-            text_content = render_to_string(f"{template_base}.txt", context)
-            html_content = render_to_string(f"{template_base}.html", context)
-        except Exception:
-            logger.warning(
-                f"Template {template_base} not found, using generic template",
-                extra={"order_id": order_id, "status": status},
-            )
-            text_content = render_to_string(
-                "emails/order/order_status_generic.txt", context
-            )
-            html_content = render_to_string(
-                "emails/order/order_status_generic.html", context
-            )
+            try:
+                text_content = render_to_string(f"{template_base}.txt", context)
+                html_content = render_to_string(
+                    f"{template_base}.html", context
+                )
+            except Exception:
+                logger.warning(
+                    f"Template {template_base} not found, using generic template",
+                    extra={"order_id": order_id, "status": status},
+                )
+                text_content = render_to_string(
+                    "emails/order/order_status_generic.txt", context
+                )
+                html_content = render_to_string(
+                    "emails/order/order_status_generic.html", context
+                )
 
         msg = EmailMultiAlternatives(
             subject,
@@ -448,15 +453,16 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
 
-        subject = _("Your Order #{order_id} Has Shipped").format(
-            order_id=order.id
-        )
-        text_content = render_to_string(
-            "emails/order/order_shipped.txt", context
-        )
-        html_content = render_to_string(
-            "emails/order/order_shipped.html", context
-        )
+        with translation.override(get_order_language(order)):
+            subject = _("Your Order #{order_id} Has Shipped").format(
+                order_id=order.id
+            )
+            text_content = render_to_string(
+                "emails/order/order_shipped.txt", context
+            )
+            html_content = render_to_string(
+                "emails/order/order_shipped.html", context
+            )
 
         msg = EmailMultiAlternatives(
             subject,
@@ -581,15 +587,16 @@ def check_pending_orders() -> int:
                 "STATIC_BASE_URL": settings.STATIC_BASE_URL,
             }
 
-            subject = _("Reminder: Complete Your Order #{order_id}").format(
-                order_id=order.id
-            )
-            text_content = render_to_string(
-                "emails/order/order_pending_reminder.txt", context
-            )
-            html_content = render_to_string(
-                "emails/order/order_pending_reminder.html", context
-            )
+            with translation.override(get_order_language(order)):
+                subject = _("Reminder: Complete Your Order #{order_id}").format(
+                    order_id=order.id
+                )
+                text_content = render_to_string(
+                    "emails/order/order_pending_reminder.txt", context
+                )
+                html_content = render_to_string(
+                    "emails/order/order_pending_reminder.html", context
+                )
 
             msg = EmailMultiAlternatives(
                 subject,
@@ -890,6 +897,14 @@ def send_checkout_abandonment_emails() -> int:
         if not cart.user or not cart.user.email:
             continue
         try:
+            uid = urlsafe_base64_encode(force_bytes(cart.user.pk))
+            token = default_token_generator.make_token(cart.user)
+            unsubscribe_url = (
+                f"{settings.API_BASE_URL.rstrip('/')}/api/v1/user/unsubscribe/{uid}/{token}"
+                if getattr(settings, "API_BASE_URL", None)
+                else ""
+            )
+
             context = {
                 "cart": cart,
                 "items": list(cart.items.all()),
@@ -898,26 +913,41 @@ def send_checkout_abandonment_emails() -> int:
                     if getattr(settings, "NUXT_BASE_URL", None)
                     else ""
                 ),
+                "preferences_url": (
+                    f"{settings.NUXT_BASE_URL.rstrip('/')}/account/subscriptions/"
+                    if getattr(settings, "NUXT_BASE_URL", None)
+                    else ""
+                ),
+                "unsubscribe_url": unsubscribe_url,
                 "SITE_NAME": settings.SITE_NAME,
                 "INFO_EMAIL": settings.INFO_EMAIL,
                 "SITE_URL": settings.NUXT_BASE_URL,
                 "STATIC_BASE_URL": settings.STATIC_BASE_URL,
             }
-            subject = _("Did you forget something? — {site_name}").format(
-                site_name=settings.SITE_NAME
-            )
-            text_content = render_to_string(
-                "emails/cart/checkout_abandoned.txt", context
-            )
-            html_content = render_to_string(
-                "emails/cart/checkout_abandoned.html", context
-            )
+            with translation.override(get_user_language(cart.user)):
+                subject = _("Did you forget something? — {site_name}").format(
+                    site_name=settings.SITE_NAME
+                )
+                text_content = render_to_string(
+                    "emails/cart/checkout_abandoned.txt", context
+                )
+                html_content = render_to_string(
+                    "emails/cart/checkout_abandoned.html", context
+                )
+            headers = {"List-ID": f"abandoned-cart.{settings.SITE_NAME}"}
+            if unsubscribe_url:
+                headers["List-Unsubscribe"] = (
+                    f"<mailto:{settings.INFO_EMAIL}?subject=unsubscribe>, "
+                    f"<{unsubscribe_url}>"
+                )
+                headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
             msg = EmailMultiAlternatives(
                 subject,
                 text_content,
                 settings.DEFAULT_FROM_EMAIL,
                 [cart.user.email],
                 reply_to=[settings.INFO_EMAIL],
+                headers=headers,
             )
             msg.attach_alternative(html_content, "text/html")
             msg.send()

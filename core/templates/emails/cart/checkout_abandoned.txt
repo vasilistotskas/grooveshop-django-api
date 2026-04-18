@@ -13,3 +13,6 @@
 {{ SITE_NAME }}
 {{ INFO_EMAIL }}
 {{ SITE_URL }}
+
+{% trans "Don't want to receive these reminders?" %}
+{% trans "Manage your preferences" %}: {{ preferences_url|default:SITE_URL }}

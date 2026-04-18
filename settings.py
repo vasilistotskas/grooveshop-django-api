@@ -389,6 +389,7 @@ ACCOUNT_LOGIN_BY_CODE_TIMEOUT = 300
 ACCOUNT_SIGNUP_FORM_HONEYPOT_FIELD = "email_confirm"
 ACCOUNT_DEFAULT_HTTP_PROTOCOL = "http" if DEBUG else "https"
 ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE = True
+ACCOUNT_EMAIL_SUBJECT_PREFIX = f"[{SITE_NAME}] "
 
 LOGIN_REDIRECT_URL = NUXT_BASE_URL + "/account"
 USERSESSIONS_TRACK_ACTIVITY = True
@@ -878,7 +879,7 @@ EXTRA_SETTINGS_DEFAULTS = [
     {
         "name": "SUBSCRIPTION_CONFIRMATION_URL",
         "type": "string",
-        "value": "https://example.com/confirm/{token}/",
+        "value": f"{API_BASE_URL}/api/v1/user/subscription/confirm/{{token}}",
     },
     {
         "name": "STOCK_RESERVATION_TTL_MINUTES",

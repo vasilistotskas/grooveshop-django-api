@@ -37,11 +37,8 @@ class OrderSignalsTestCase(TestCase):
         self.product.refresh_from_db()
         self.initial_stock = self.product.stock
 
-    @patch("order.notifications.send_order_confirmation")
     @patch("order.signals.handlers.send_order_confirmation_email.delay")
-    def test_order_created_offline_payment_sends_email(
-        self, mock_email_task, mock_direct_notification
-    ):
+    def test_order_created_offline_payment_sends_email(self, mock_email_task):
         # Offline payment methods (COD, bank transfer) need the
         # confirmation email immediately so the customer has the order
         # details before paying manually.
@@ -51,7 +48,6 @@ class OrderSignalsTestCase(TestCase):
         order_created.send(sender=Order, order=self.order)
 
         mock_email_task.assert_called_once_with(self.order.id)
-        mock_direct_notification.assert_not_called()
 
         self.assertTrue(
             OrderHistory.objects.filter(

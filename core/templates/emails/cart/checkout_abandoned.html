@@ -37,3 +37,18 @@
 
 <p class="mt-3">{% trans "Hurry — popular items may sell out quickly!" %}</p>
 {% endblock %}
+
+{% block email_footer %}
+<p class="text-bold">{{ SITE_NAME }}</p>
+<p>
+    {% trans "Questions?" %}
+    <a href="mailto:{{ INFO_EMAIL }}">{% trans "Contact us" %}</a>
+</p>
+<p class="text-muted">
+    &copy; {% now "Y" %} {{ SITE_NAME }}. {% trans "All rights reserved." %}
+</p>
+<p class="text-muted mt-2" style="font-size: 12px;">
+    {% trans "Don't want to receive these reminders?" %}
+    <a href="{{ preferences_url|default:SITE_URL }}">{% trans "Manage your email preferences" %}</a>
+</p>
+{% endblock %}

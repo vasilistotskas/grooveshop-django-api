@@ -10,14 +10,20 @@ from django.contrib.auth import get_user_model
 from django.core import management
 from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
-from django.core.mail import send_mail
+from django.core.mail import EmailMultiAlternatives, send_mail
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 from django.db import connections, transaction
 from django.db.models import F
 from django.template.loader import render_to_string
 from django.utils import timezone
 
 # See order/tasks.py for rationale — eager gettext over lazy for email subjects.
+from django.utils import translation
 from django.utils.translation import gettext as _
+
+from core.utils.i18n import get_user_language
 
 from extra_settings.models import Setting
 
@@ -437,7 +443,7 @@ def send_inactive_user_notifications() -> dict[str, Any]:
         .exclude(
             last_reengagement_email_at__gt=cooldown_cutoff,
         )
-        .values_list("id", "email", "first_name", "username")
+        .only("id", "email", "first_name", "username")
     )
 
     success_count = 0
@@ -446,42 +452,58 @@ def send_inactive_user_notifications() -> dict[str, Any]:
 
     logger.info("Starting to send emails to inactive users")
 
-    for user_id, email, first_name, username in inactive_users_qs.iterator(
-        chunk_size=200
-    ):
+    for user in inactive_users_qs.iterator(chunk_size=200):
         total_users += 1
 
         try:
-            mail_subject = _("We miss you!")
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+            unsubscribe_url = (
+                f"{settings.API_BASE_URL}/api/v1/user/unsubscribe/{uid}/{token}"
+            )
 
             context = {
                 "user": {
-                    "id": user_id,
-                    "first_name": first_name,
-                    "username": username,
-                    "email": email,
+                    "id": user.id,
+                    "first_name": user.first_name,
+                    "username": user.username,
+                    "email": user.email,
                 },
-                "app_base_url": settings.NUXT_BASE_URL,
+                "unsubscribe_url": unsubscribe_url,
                 "SITE_NAME": settings.SITE_NAME,
                 "INFO_EMAIL": settings.INFO_EMAIL,
                 "SITE_URL": settings.NUXT_BASE_URL,
                 "STATIC_BASE_URL": settings.STATIC_BASE_URL,
             }
 
-            message = render_to_string(
-                "emails/user/inactive_user_email_template.html", context
-            )
+            with translation.override(get_user_language(user)):
+                mail_subject = _("We miss you!")
+                html_body = render_to_string(
+                    "emails/user/inactive_user_email_template.html", context
+                )
+                text_body = render_to_string(
+                    "emails/user/inactive_user_email_template.txt", context
+                )
 
-            send_mail(
+            email_msg = EmailMultiAlternatives(
                 subject=mail_subject,
-                message=message,
+                body=text_body,
                 from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[email],
-                fail_silently=False,
-                html_message=message,
+                to=[user.email],
+                reply_to=[settings.INFO_EMAIL],
+                headers={
+                    "List-Unsubscribe": (
+                        f"<mailto:{settings.INFO_EMAIL}?subject=unsubscribe>, "
+                        f"<{unsubscribe_url}>"
+                    ),
+                    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                    "List-ID": f"reengagement.{settings.SITE_NAME}",
+                },
             )
+            email_msg.attach_alternative(html_body, "text/html")
+            email_msg.send(fail_silently=False)
 
-            User.objects.filter(pk=user_id).update(
+            User.objects.filter(pk=user.pk).update(
                 reengagement_email_count=F("reengagement_email_count") + 1,
                 last_reengagement_email_at=now,
             )
@@ -493,13 +515,13 @@ def send_inactive_user_notifications() -> dict[str, Any]:
 
         except Exception as e:
             logger.error(
-                f"Failed to send email to user {user_id}",
-                extra={"user_id": user_id, "error": str(e)},
+                f"Failed to send email to user {user.pk}",
+                extra={"user_id": user.pk, "error": str(e)},
             )
             failed_emails.append(
                 {
-                    "user_id": user_id,
-                    "email": email[:3] + "***",
+                    "user_id": user.pk,
+                    "email": (user.email or "")[:3] + "***",
                     "error": str(e),
                 }
             )

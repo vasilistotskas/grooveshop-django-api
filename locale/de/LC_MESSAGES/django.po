@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-18 02:42+0300\n"
+"POT-Creation-Date: 2026-04-18 15:27+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -37,7 +37,7 @@ msgstr ""
 msgid "Comments"
 msgstr ""
 
-#: .\blog\admin.py:82 .\settings.py:1412 .\tag\admin.py:111 .\tag\admin.py:772
+#: .\blog\admin.py:82 .\settings.py:1413 .\tag\admin.py:111 .\tag\admin.py:772
 #: .\tag\models\tag.py:27
 msgid "Tags"
 msgstr ""
@@ -126,8 +126,6 @@ msgstr ""
 #: .\core\templates\emails\order\order_pending_reminder.html:19
 #: .\core\templates\emails\order\order_pending_reminder.txt:7
 #: .\core\templates\emails\order\order_shipped.html:13
-#: .\core\templates\emails\subscription\confirmation.html:17
-#: .\core\templates\emails\subscription\confirmation.txt:13
 #: .\notification\admin.py:361 .\notification\admin.py:646
 #: .\notification\admin.py:714 .\order\admin.py:644 .\order\models\order.py:135
 #: .\pay_way\admin.py:257 .\product\admin.py:440 .\product\admin.py:719
@@ -195,8 +193,8 @@ msgid "Title"
 msgstr ""
 
 #: .\blog\admin.py:664
-#: .\core\templates\emails\subscription\confirmation.html:16
-#: .\core\templates\emails\subscription\confirmation.txt:12
+#: .\core\templates\emails\subscription\confirmation.html:27
+#: .\core\templates\emails\subscription\confirmation.txt:16
 #: .\notification\admin.py:274 .\notification\models\notification.py:31
 #: .\product\admin.py:1478 .\product\admin.py:2327 .\product\admin.py:2884
 #: .\user\admin.py:856 .\user\models\subscription.py:34 .\vat\admin.py:182
@@ -716,7 +714,7 @@ msgstr ""
 msgid "Blog Author"
 msgstr ""
 
-#: .\blog\models\author.py:25 .\settings.py:1503
+#: .\blog\models\author.py:25 .\settings.py:1504
 msgid "Blog Authors"
 msgstr ""
 
@@ -739,7 +737,7 @@ msgstr ""
 msgid "Blog Category"
 msgstr ""
 
-#: .\blog\models\category.py:42 .\settings.py:1510
+#: .\blog\models\category.py:42 .\settings.py:1511
 msgid "Blog Categories"
 msgstr ""
 
@@ -751,7 +749,7 @@ msgstr ""
 msgid "Blog Comment"
 msgstr ""
 
-#: .\blog\models\comment.py:55 .\settings.py:1517
+#: .\blog\models\comment.py:55 .\settings.py:1518
 msgid "Blog Comments"
 msgstr ""
 
@@ -763,7 +761,7 @@ msgstr ""
 msgid "Blog Post"
 msgstr ""
 
-#: .\blog\models\post.py:56 .\settings.py:1498
+#: .\blog\models\post.py:56 .\settings.py:1499
 msgid "Blog Posts"
 msgstr ""
 
@@ -787,8 +785,6 @@ msgstr ""
 #: .\core\templates\admin\email_template_management.html:524
 #: .\core\templates\admin\index.html:347
 #: .\core\templates\admin\product\apply_discount.html:131
-#: .\core\templates\emails\subscription\confirmation.html:17
-#: .\core\templates\emails\subscription\confirmation.txt:13
 #: .\notification\admin.py:26 .\pay_way\models.py:18
 #: .\product\models\attribute.py:20 .\product\models\attribute_value.py:25
 #: .\product\models\category.py:28 .\product\models\category_image.py:33
@@ -802,7 +798,7 @@ msgstr ""
 msgid "Blog Tag"
 msgstr ""
 
-#: .\blog\models\tag.py:27 .\settings.py:1524
+#: .\blog\models\tag.py:27 .\settings.py:1525
 msgid "Blog Tags"
 msgstr ""
 
@@ -1500,7 +1496,7 @@ msgstr ""
 msgid "Last Activity"
 msgstr ""
 
-#: .\cart\models\cart.py:31 .\settings.py:1443
+#: .\cart\models\cart.py:31 .\settings.py:1444
 msgid "Carts"
 msgstr ""
 
@@ -2293,6 +2289,11 @@ msgstr ""
 msgid "Type cannot be changed after creation"
 msgstr ""
 
+#: .\core\management\commands\send_newsletter.py:41
+#, python-brace-format
+msgid "Weekly Digest - Week {week}"
+msgstr ""
+
 #: .\core\models.py:21
 msgid "Seo Title"
 msgstr ""
@@ -2362,7 +2363,7 @@ msgstr ""
 msgid "Translations"
 msgstr ""
 
-#: .\core\tasks.py:455
+#: .\core\tasks.py:456
 msgid "We miss you!"
 msgstr ""
 
@@ -2525,7 +2526,7 @@ msgid "Error"
 msgstr ""
 
 #: .\core\templates\admin\index.html:4 .\core\templates\admin\index.html:29
-#: .\settings.py:1379
+#: .\settings.py:1380
 msgid "Dashboard"
 msgstr ""
 
@@ -2717,7 +2718,7 @@ msgid "Active Carts"
 msgstr ""
 
 #: .\core\templates\admin\index.html:610
-#: .\core\templates\admin\partials\footer_stats.html:15 .\settings.py:1543
+#: .\core\templates\admin\partials\footer_stats.html:15 .\settings.py:1544
 #, fuzzy
 #| msgid "Contact us"
 msgid "Contact Messages"
@@ -2776,7 +2777,7 @@ msgid "Stock History — %(product_name)s"
 msgstr ""
 
 #: .\core\templates\admin\product\stock_history.html:16
-#: .\product\models\product.py:140 .\settings.py:1391
+#: .\product\models\product.py:140 .\settings.py:1392
 msgid "Products"
 msgstr ""
 
@@ -2905,6 +2906,7 @@ msgstr ""
 
 #: .\core\templates\base.html:78
 #: .\core\templates\emails\base\email_base.html:361
+#: .\core\templates\emails\cart\checkout_abandoned.html:48
 #: .\core\templates\emails\marketing\newsletter.html:84
 #: .\core\templates\emails\user\inactive_user_email_template.html:74
 msgid "All rights reserved."
@@ -2912,12 +2914,14 @@ msgstr "Alle Rechte vorbehalten."
 
 # Email Template Translations
 #: .\core\templates\emails\base\email_base.html:355
+#: .\core\templates\emails\cart\checkout_abandoned.html:44
 #: .\core\templates\emails\marketing\newsletter.html:80
 #: .\core\templates\emails\user\inactive_user_email_template.html:70
 msgid "Questions?"
 msgstr "Fragen?"
 
 #: .\core\templates\emails\base\email_base.html:357
+#: .\core\templates\emails\cart\checkout_abandoned.html:45
 #: .\core\templates\emails\marketing\newsletter.html:81
 #: .\core\templates\emails\user\inactive_user_email_template.html:71
 msgid "Contact us"
@@ -2954,6 +2958,15 @@ msgstr ""
 msgid "Hurry — popular items may sell out quickly!"
 msgstr ""
 
+#: .\core\templates\emails\cart\checkout_abandoned.html:51
+#: .\core\templates\emails\cart\checkout_abandoned.txt:17
+msgid "Don't want to receive these reminders?"
+msgstr ""
+
+#: .\core\templates\emails\cart\checkout_abandoned.html:52
+msgid "Manage your email preferences"
+msgstr ""
+
 #: .\core\templates\emails\cart\checkout_abandoned.txt:1
 msgid "YOU LEFT SOMETHING BEHIND"
 msgstr ""
@@ -2964,6 +2977,10 @@ msgstr ""
 
 #: .\core\templates\emails\cart\checkout_abandoned.txt:8
 msgid "Return to your cart:"
+msgstr ""
+
+#: .\core\templates\emails\cart\checkout_abandoned.txt:18
+msgid "Manage your preferences"
 msgstr ""
 
 #: .\core\templates\emails\marketing\newsletter.html:4
@@ -3196,7 +3213,6 @@ msgstr "Bestelldetails"
 
 #: .\core\templates\emails\order\order_completed.html:29
 #: .\core\templates\emails\order\order_completed.txt:20
-#: .\core\templates\emails\subscription\confirmation.html:26
 msgid "What's Next?"
 msgstr ""
 
@@ -3300,8 +3316,8 @@ msgstr "Wenn Sie Fragen haben, wenden Sie sich bitte an unseren Kundenservice."
 
 #: .\core\templates\emails\order\order_confirmation.html:59
 #: .\core\templates\emails\order\order_confirmation.txt:26
-#: .\core\templates\emails\order\order_delivered.html:39
-#: .\core\templates\emails\order\order_delivered.txt:20
+#: .\core\templates\emails\order\order_delivered.html:31
+#: .\core\templates\emails\order\order_delivered.txt:16
 #: .\core\templates\emails\order\order_payment_confirmed.html:64
 #: .\core\templates\emails\order\order_shipped.html:36
 #: .\core\templates\emails\order\order_shipped.txt:19
@@ -3361,15 +3377,6 @@ msgid ""
 "your order, please contact our customer service."
 msgstr "Wenn Sie Fragen haben, wenden Sie sich bitte an unseren Kundenservice."
 
-#: .\core\templates\emails\order\order_delivered.html:31
-#: .\core\templates\emails\order\order_delivered.txt:16
-msgid "We'd love to hear your feedback! How was your shopping experience?"
-msgstr ""
-
-#: .\core\templates\emails\order\order_delivered.html:35
-msgid "Rate Your Experience"
-msgstr ""
-
 #: .\core\templates\emails\order\order_delivered.txt:1
 msgid "YOUR ORDER HAS BEEN DELIVERED"
 msgstr ""
@@ -3381,10 +3388,6 @@ msgstr ""
 #: .\core\templates\emails\order\order_delivered.txt:8
 #: .\core\templates\emails\order\order_shipped.txt:9
 msgid "DELIVERY ADDRESS"
-msgstr ""
-
-#: .\core\templates\emails\order\order_delivered.txt:17
-msgid "Visit our website to rate your experience."
 msgstr ""
 
 #: .\core\templates\emails\order\order_payment_confirmed.html:4
@@ -3813,13 +3816,8 @@ msgid "threshold"
 msgstr ""
 
 #: .\core\templates\emails\subscription\confirmation.html:4
-#, fuzzy
-#| msgid "Order Confirmation"
-msgid "Subscription Confirmation"
-msgstr "Bestellbestätigung"
-
 #: .\core\templates\emails\subscription\confirmation.html:7
-msgid "Subscription Confirmed!"
+msgid "Confirm your subscription"
 msgstr ""
 
 #: .\core\templates\emails\subscription\confirmation.html:9
@@ -3829,84 +3827,83 @@ msgid "Hi %(first_name)s,"
 msgstr ""
 
 #: .\core\templates\emails\subscription\confirmation.html:11
-#: .\core\templates\emails\subscription\confirmation.txt:7
 #, python-format
 msgid ""
-"Your subscription to %(topic_name)s has been successfully confirmed! We're "
-"excited to have you on board."
+"Please confirm you'd like to subscribe to %(topic_name)s. Your subscription "
+"isn't active yet — tap the button below to complete it."
 msgstr ""
 
-#: .\core\templates\emails\subscription\confirmation.html:14
+# Email Template Translations
+#: .\core\templates\emails\subscription\confirmation.html:15
+#, fuzzy
+#| msgid "Questions?"
+msgid "Confirm subscription"
+msgstr "Fragen?"
+
+#: .\core\templates\emails\subscription\confirmation.html:20
+msgid "If the button doesn't work, copy and paste this link into your browser:"
+msgstr ""
+
+#: .\core\templates\emails\subscription\confirmation.html:25
 #: .\user\admin.py:954
 msgid "Subscription Details"
 msgstr ""
 
-#: .\core\templates\emails\subscription\confirmation.html:15
-#: .\core\templates\emails\subscription\confirmation.txt:11 .\user\admin.py:845
+#: .\core\templates\emails\subscription\confirmation.html:26
+#: .\core\templates\emails\subscription\confirmation.txt:15 .\user\admin.py:845
 #: .\user\admin.py:993 .\user\models\subscription.py:114
 msgid "Topic"
 msgstr ""
 
-#: .\core\templates\emails\subscription\confirmation.html:18
-#: .\core\templates\emails\subscription\confirmation.txt:14
-msgid "Subscribed On"
-msgstr ""
-
-#: .\core\templates\emails\subscription\confirmation.html:21
-msgid "What You'll Receive"
-msgstr ""
-
-#: .\core\templates\emails\subscription\confirmation.html:27
-#: .\core\templates\emails\subscription\confirmation.txt:24
-msgid ""
-"You'll start receiving updates based on your subscription preferences. You "
-"can manage your subscriptions anytime from your account settings."
+#: .\core\templates\emails\subscription\confirmation.html:28
+#: .\core\templates\emails\subscription\confirmation.txt:17
+msgid "Requested On"
 msgstr ""
 
 #: .\core\templates\emails\subscription\confirmation.html:31
-msgid "Manage Subscriptions"
+msgid "What You'll Receive"
 msgstr ""
 
-#: .\core\templates\emails\subscription\confirmation.html:35
-#: .\core\templates\emails\subscription\confirmation.txt:32
+#: .\core\templates\emails\subscription\confirmation.html:36
+#: .\core\templates\emails\subscription\confirmation.txt:25
 msgid ""
-"If you didn't request this subscription or want to unsubscribe, you can do "
-"so at any time from your account settings."
+"If you didn't request this subscription, you can safely ignore this email — "
+"nothing will happen."
 msgstr ""
 
-#: .\core\templates\emails\subscription\confirmation.html:37
-#: .\core\templates\emails\subscription\confirmation.txt:34
-#, fuzzy, python-format
-#| msgid "Thank you for shopping with us!"
-msgid "Thank you for staying connected with %(site_name)s!"
-msgstr "Vielen Dank, dass Sie bei uns eingekauft haben!"
+#: .\core\templates\emails\subscription\confirmation.html:38
+#, python-format
+msgid "Thanks,<br>The %(site_name)s team"
+msgstr ""
 
 #: .\core\templates\emails\subscription\confirmation.txt:1
-msgid "SUBSCRIPTION CONFIRMED"
+msgid "CONFIRM YOUR SUBSCRIPTION"
+msgstr ""
+
+#: .\core\templates\emails\subscription\confirmation.txt:7
+#, python-format
+msgid ""
+"Please confirm you'd like to subscribe to %(topic_name)s. Your subscription "
+"isn't active yet — open the link below to complete it."
 msgstr ""
 
 #: .\core\templates\emails\subscription\confirmation.txt:9
+msgid "CONFIRM HERE"
+msgstr ""
+
+#: .\core\templates\emails\subscription\confirmation.txt:13
 msgid "SUBSCRIPTION DETAILS"
 msgstr ""
 
-#: .\core\templates\emails\subscription\confirmation.txt:17
+#: .\core\templates\emails\subscription\confirmation.txt:20
 msgid "WHAT YOU'LL RECEIVE"
 msgstr ""
 
-#: .\core\templates\emails\subscription\confirmation.txt:22
-msgid "WHAT'S NEXT?"
-msgstr ""
-
-#: .\core\templates\emails\subscription\confirmation.txt:26
-msgid "MANAGE YOUR SUBSCRIPTIONS"
-msgstr ""
-
-#: .\core\templates\emails\subscription\confirmation.txt:28
-msgid "Visit"
-msgstr ""
-
-#: .\core\templates\emails\subscription\confirmation.txt:30
-msgid "UNSUBSCRIBE"
+#: .\core\templates\emails\subscription\confirmation.txt:27
+#, python-format
+msgid ""
+"Thanks,\n"
+"The %(site_name)s team"
 msgstr ""
 
 #: .\core\templates\emails\user\inactive_user_email_template.html:4
@@ -4299,7 +4296,7 @@ msgstr ""
 msgid "Image Flag"
 msgstr ""
 
-#: .\country\models.py:56 .\settings.py:1578
+#: .\country\models.py:56 .\settings.py:1579
 msgid "Countries"
 msgstr ""
 
@@ -4388,7 +4385,7 @@ msgstr ""
 msgid "Loyalty Tier"
 msgstr ""
 
-#: .\loyalty\models\tier.py:44 .\settings.py:1557
+#: .\loyalty\models\tier.py:44 .\settings.py:1558
 msgid "Loyalty Tiers"
 msgstr ""
 
@@ -4412,7 +4409,7 @@ msgstr ""
 msgid "Points Transaction"
 msgstr ""
 
-#: .\loyalty\models\transaction.py:50 .\settings.py:1564
+#: .\loyalty\models\transaction.py:50 .\settings.py:1565
 msgid "Points Transactions"
 msgstr ""
 
@@ -4920,7 +4917,7 @@ msgstr ""
 msgid "Expiry Date"
 msgstr ""
 
-#: .\notification\models\notification.py:70 .\settings.py:1536
+#: .\notification\models\notification.py:70 .\settings.py:1537
 msgid "Notifications"
 msgstr ""
 
@@ -5777,7 +5774,7 @@ msgstr ""
 msgid "Timestamp of the most recent reminder email."
 msgstr ""
 
-#: .\order\models\order.py:212 .\settings.py:1438
+#: .\order\models\order.py:212 .\settings.py:1439
 msgid "Orders"
 msgstr ""
 
@@ -5935,26 +5932,6 @@ msgstr ""
 
 #: .\order\models\stock_reservation.py:85
 msgid "Stock Reservations"
-msgstr ""
-
-#: .\order\notifications.py:36
-#, python-brace-format
-msgid "Order Confirmation #{order_id}"
-msgstr ""
-
-#: .\order\notifications.py:69 .\order\tasks.py:451
-#, python-brace-format
-msgid "Your Order #{order_id} Has Shipped"
-msgstr ""
-
-#: .\order\notifications.py:103
-#, python-brace-format
-msgid "Your Order #{order_id} Has Been Delivered"
-msgstr ""
-
-#: .\order\notifications.py:135
-#, python-brace-format
-msgid "Your Order #{order_id} Has Been Canceled"
 msgstr ""
 
 #: .\order\serializers\item.py:79 .\order\serializers\item.py:113
@@ -6239,33 +6216,38 @@ msgstr ""
 msgid "This order has no payment ID."
 msgstr ""
 
-#: .\order\tasks.py:96
+#: .\order\tasks.py:99
 #, python-brace-format
 msgid "Payment Confirmed - Order #{order_id}"
 msgstr ""
 
-#: .\order\tasks.py:101
+#: .\order\tasks.py:104
 #, fuzzy, python-brace-format
 #| msgid "Order Delivered"
 msgid "Order Received - #{order_id}"
 msgstr "Bestellung Zugestellt"
 
-#: .\order\tasks.py:256
+#: .\order\tasks.py:259
 #, python-brace-format
 msgid "Payment Failed - Order #{order_id}"
 msgstr ""
 
-#: .\order\tasks.py:356
+#: .\order\tasks.py:359
 #, python-brace-format
 msgid "Order #{order_id} Status Update - {status}"
 msgstr ""
 
-#: .\order\tasks.py:584
+#: .\order\tasks.py:454
+#, python-brace-format
+msgid "Your Order #{order_id} Has Shipped"
+msgstr ""
+
+#: .\order\tasks.py:587
 #, python-brace-format
 msgid "Reminder: Complete Your Order #{order_id}"
 msgstr ""
 
-#: .\order\tasks.py:906
+#: .\order\tasks.py:923
 #, python-brace-format
 msgid "Did you forget something? — {site_name}"
 msgstr ""
@@ -7504,7 +7486,7 @@ msgstr ""
 msgid "Check this to also apply discount to inactive products"
 msgstr ""
 
-#: .\product\models\attribute.py:31 .\settings.py:1417
+#: .\product\models\attribute.py:31 .\settings.py:1418
 msgid "Attributes"
 msgstr ""
 
@@ -7512,7 +7494,7 @@ msgstr ""
 msgid "Attribute Value"
 msgstr ""
 
-#: .\product\models\attribute_value.py:36 .\settings.py:1424
+#: .\product\models\attribute_value.py:36 .\settings.py:1425
 msgid "Attribute Values"
 msgstr ""
 
@@ -7876,7 +7858,7 @@ msgstr ""
 msgid "Region Code"
 msgstr ""
 
-#: .\region\models.py:26 .\settings.py:1585
+#: .\region\models.py:26 .\settings.py:1586
 msgid "Regions"
 msgstr ""
 
@@ -8055,90 +8037,90 @@ msgstr ""
 msgid "German"
 msgstr ""
 
-#: .\settings.py:1375
+#: .\settings.py:1376
 msgid "Navigation"
 msgstr ""
 
-#: .\settings.py:1386
+#: .\settings.py:1387
 msgid "Catalog"
 msgstr ""
 
-#: .\settings.py:1398
+#: .\settings.py:1399
 msgid "Categories"
 msgstr ""
 
-#: .\settings.py:1405
+#: .\settings.py:1406
 msgid "Reviews"
 msgstr ""
 
-#: .\settings.py:1433
+#: .\settings.py:1434
 msgid "Sales"
 msgstr ""
 
-#: .\settings.py:1448
+#: .\settings.py:1449
 msgid "Payment Methods"
 msgstr ""
 
-#: .\settings.py:1453
+#: .\settings.py:1454
 msgid "VAT Rates"
 msgstr ""
 
-#: .\settings.py:1460
+#: .\settings.py:1461
 msgid "Users & Engagement"
 msgstr ""
 
-#: .\settings.py:1465
+#: .\settings.py:1466
 msgid "Users"
 msgstr ""
 
 # Email Template Translations
-#: .\settings.py:1472
+#: .\settings.py:1473
 #, fuzzy
 #| msgid "Questions?"
 msgid "Subscriptions"
 msgstr "Fragen?"
 
-#: .\settings.py:1479 .\user\models\subscription.py:80
+#: .\settings.py:1480 .\user\models\subscription.py:80
 msgid "Subscription Topics"
 msgstr ""
 
-#: .\settings.py:1486
+#: .\settings.py:1487
 msgid "Groups"
 msgstr ""
 
-#: .\settings.py:1493
+#: .\settings.py:1494
 msgid "Blog & Content"
 msgstr ""
 
-#: .\settings.py:1531
+#: .\settings.py:1532
 msgid "Communications"
 msgstr ""
 
-#: .\settings.py:1552
+#: .\settings.py:1553
 msgid "Loyalty"
 msgstr ""
 
-#: .\settings.py:1573
+#: .\settings.py:1574
 msgid "System Settings"
 msgstr ""
 
-#: .\settings.py:1590
+#: .\settings.py:1591
 msgid "Sites"
 msgstr ""
 
-#: .\settings.py:1595
+#: .\settings.py:1596
 msgid "Extra Settings"
 msgstr ""
 
-#: .\settings.py:1608
+#: .\settings.py:1609
 msgid "Rosetta"
 msgstr ""
 
-#: .\settings.py:1613
+#: .\settings.py:1614
 msgid "Cache"
 msgstr ""
 
-#: .\settings.py:1618
+#: .\settings.py:1619
 msgid "Email Templates"
 msgstr ""
 
@@ -9026,7 +9008,7 @@ msgstr ""
 msgid "Invalid or inactive topic IDs: {}"
 msgstr ""
 
-#: .\user\utils\subscription.py:67
+#: .\user\utils\subscription.py:66
 #, python-brace-format
 msgid "Confirm your subscription to {topic}"
 msgstr ""
@@ -9326,3 +9308,13 @@ msgstr ""
 #: .\vat\models.py:40
 msgid "Vats"
 msgstr ""
+
+#, fuzzy
+#~| msgid "Order Confirmation"
+#~ msgid "Subscription Confirmation"
+#~ msgstr "Bestellbestätigung"
+
+#, fuzzy, python-format
+#~| msgid "Thank you for shopping with us!"
+#~ msgid "Thank you for staying connected with %(site_name)s!"
+#~ msgstr "Vielen Dank, dass Sie bei uns eingekauft haben!"

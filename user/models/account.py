@@ -108,6 +108,12 @@ class UserAccount(
         blank=True,
         on_delete=models.SET_NULL,
     )
+    language_code = models.CharField(
+        _("Language"),
+        max_length=10,
+        default=settings.LANGUAGE_CODE,
+        help_text=_("Preferred language for emails and UI messages."),
+    )
 
     objects: UserAccountManager = UserAccountManager()
 

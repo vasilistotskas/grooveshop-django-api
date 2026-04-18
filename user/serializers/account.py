@@ -67,12 +67,21 @@ class UserWriteSerializer(UserSerializer):
             "youtube",
             "github",
             "bio",
+            "language_code",
         )
         read_only_fields = (
             "created_at",
             "updated_at",
             "uuid",
         )
+
+    def validate_language_code(self, value: str) -> str:
+        if not value:
+            return settings.LANGUAGE_CODE
+        valid = {code for code, _name in settings.LANGUAGES}
+        if value not in valid:
+            raise serializers.ValidationError(_("Unsupported language code."))
+        return value
 
     def validate_email(self, email):
         if self.instance and self.instance.email != email:
@@ -203,6 +212,7 @@ class UserDetailsSerializer(UserSerializer):
             "youtube",
             "github",
             "bio",
+            "language_code",
             "is_active",
             "is_staff",
             "is_superuser",

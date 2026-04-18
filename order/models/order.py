@@ -204,6 +204,14 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         blank=True,
         help_text=_("Timestamp of the most recent reminder email."),
     )
+    language_code = models.CharField(
+        _("Language"),
+        max_length=10,
+        default=settings.LANGUAGE_CODE,
+        help_text=_(
+            "Language captured at order creation, used when rendering order emails."
+        ),
+    )
 
     objects: OrderManager = OrderManager()
 

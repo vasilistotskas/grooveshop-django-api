@@ -11,8 +11,9 @@ from django.contrib.auth import get_user_model
 from django.db.models.signals import post_save
 from django.utils.crypto import get_random_string
 
+from django.db import transaction
+
 from user.models.subscription import SubscriptionTopic, UserSubscription
-from user.utils.subscription import send_subscription_confirmation
 
 if TYPE_CHECKING:  # pragma: no cover
     from allauth.socialaccount.models import SocialLogin
@@ -105,4 +106,12 @@ def create_default_subscriptions(sender, instance, created, **kwargs):
             if topic.requires_confirmation:
                 subscription.confirmation_token = get_random_string(64)
                 subscription.save()
-                send_subscription_confirmation(subscription, instance)
+                # Dispatch only after the outer transaction commits so the
+                # worker can't read the row before it's persisted.
+                from user.tasks import send_subscription_confirmation_email_task
+
+                transaction.on_commit(
+                    lambda s=subscription: (
+                        send_subscription_confirmation_email_task.delay(s.id)
+                    )
+                )

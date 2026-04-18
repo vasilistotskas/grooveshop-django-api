@@ -211,7 +211,7 @@ class TestSubscriptionUtils:
         result = send_newsletter(
             topic=self.topic,
             subject="Test Subject",
-            template_name="newsletter/test.html",
+            template_base="newsletter/test",
             context=context,
             batch_size=50,
         )
@@ -246,7 +246,7 @@ class TestSubscriptionUtils:
         result = send_newsletter(
             topic=self.topic,
             subject="Test Subject",
-            template_name="newsletter/test.html",
+            template_base="newsletter/test",
             context={},
         )
 
@@ -280,7 +280,7 @@ class TestSubscriptionUtils:
         result = send_newsletter(
             topic=self.topic,
             subject="Test Subject",
-            template_name="newsletter/test.html",
+            template_base="newsletter/test",
             context={},
         )
 
@@ -298,7 +298,7 @@ class TestSubscriptionUtils:
         result = send_newsletter(
             topic=self.topic,
             subject="Test Subject",
-            template_name="newsletter/test.html",
+            template_base="newsletter/test",
             context={},
         )
 

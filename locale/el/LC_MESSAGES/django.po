@@ -2371,7 +2371,7 @@ msgstr ""
 
 #: .\core\tasks.py:456
 msgid "We miss you!"
-msgstr ""
+msgstr "Μας λείπετε!"
 
 #: .\core\templates\admin\clear_cache.html:13
 #: .\core\templates\admin\clear_cache.html:21
@@ -3508,10 +3508,8 @@ msgstr "Ομάδα"
 
 #: .\core\templates\emails\order\order_received.html:4
 #: .\core\templates\emails\order\order_received.html:7
-#, fuzzy
-#| msgid "Order Delivered"
 msgid "Order Received"
-msgstr "Η Παραγγελία Παραδόθηκε"
+msgstr "Παραλάβαμε την παραγγελία σας"
 
 #: .\core\templates\emails\order\order_received.html:8
 #: .\core\templates\emails\order\order_received.txt:3
@@ -3830,7 +3828,7 @@ msgstr ""
 #: .\core\templates\emails\subscription\confirmation.html:4
 #: .\core\templates\emails\subscription\confirmation.html:7
 msgid "Confirm your subscription"
-msgstr ""
+msgstr "Επιβεβαίωση εγγραφής"
 
 #: .\core\templates\emails\subscription\confirmation.html:9
 #: .\core\templates\emails\subscription\confirmation.txt:5
@@ -6232,39 +6230,37 @@ msgstr ""
 #: .\order\tasks.py:99
 #, python-brace-format
 msgid "Payment Confirmed - Order #{order_id}"
-msgstr ""
+msgstr "Η πληρωμή επιβεβαιώθηκε — Παραγγελία #{order_id}"
 
 #: .\order\tasks.py:104
-#, fuzzy, python-brace-format
-#| msgid "Order Delivered"
+#, python-brace-format
 msgid "Order Received - #{order_id}"
-msgstr "Η Παραγγελία Παραδόθηκε"
+msgstr "Παραλάβαμε την παραγγελία σας — #{order_id}"
 
 #: .\order\tasks.py:259
 #, python-brace-format
 msgid "Payment Failed - Order #{order_id}"
-msgstr ""
+msgstr "Η πληρωμή απέτυχε — Παραγγελία #{order_id}"
 
 #: .\order\tasks.py:359
 #, python-brace-format
 msgid "Order #{order_id} Status Update - {status}"
-msgstr ""
+msgstr "Παραγγελία #{order_id} — Ενημέρωση κατάστασης: {status}"
 
 #: .\order\tasks.py:454
 #, python-brace-format
 msgid "Your Order #{order_id} Has Shipped"
-msgstr ""
+msgstr "Η παραγγελία σας #{order_id} έχει αποσταλεί"
 
 #: .\order\tasks.py:587
 #, python-brace-format
 msgid "Reminder: Complete Your Order #{order_id}"
-msgstr ""
+msgstr "Υπενθύμιση: ολοκληρώστε την παραγγελία σας #{order_id}"
 
 #: .\order\tasks.py:923
-#, fuzzy, python-brace-format
-#| msgid "Thank you for shopping with %(site_name)s!"
+#, python-brace-format
 msgid "Did you forget something? — {site_name}"
-msgstr "Ευχαριστούμε που ψωνίσατε με %(site_name)s!"
+msgstr "Ξεχάσατε κάτι; — {site_name}"
 
 #: .\order\views\item.py:44
 msgid "Process a refund for an order item"
@@ -9026,7 +9022,7 @@ msgstr ""
 #: .\user\utils\subscription.py:66
 #, python-brace-format
 msgid "Confirm your subscription to {topic}"
-msgstr ""
+msgstr "Επιβεβαίωση εγγραφής στο {topic}"
 
 #: .\user\validators.py:10
 msgid ""

@@ -3,6 +3,84 @@
 
 
 
+## v1.99.1 (2026-04-18)
+
+### Bug fixes
+
+* fix: update uv lock ([`446ec89`](https://github.com/vasilistotskas/grooveshop-django-api/commit/446ec896a74db31a4d92830035d4ad4f6fd43760))
+
+* fix(i18n): make import_po_to_translations additive by default so Rosetta edits survive
+
+The command's old behaviour was update_or_create for every row parsed
+from .po, which silently overwrote every Rosetta edit with whatever was
+committed in the image's .po file. PreSync doesn't call this command
+today, but the ergonomics were a trap: any operator running it manually
+after a makemessages run or merge conflict would wipe every translation
+an editor had ever touched via Rosetta.
+
+The DB Translation table is the durable source of truth (per the
+overlay architecture in core/rosetta_storage.py). .po files are only
+the schema seed. Align the command with that guarantee:
+
+- Default is now additive: rows that already exist for (language_code,
+  msgid, plural_index) are preserved; only missing msgids are imported.
+- New --force flag restores the destructive behaviour for the rare case
+  where the operator really does want to overwrite from disk (e.g.
+  reseeding a freshly cloned DB from .po). Emits a prominent WARNING
+  when set.
+- Summary line now reports imported + preserved + skipped counts.
+
+Tests cover all three paths: additive preserves Rosetta rows, additive
+seeds missing msgids, and --force overwrites. 3/3 pass. ([`8ff2cb1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8ff2cb1c1fd6ac19de395ed52d00638bde171891))
+
+* fix(i18n): translate email subjects for el + apply Translation overlay to Celery workers
+
+Two bugs surfaced together when a live test order landed with
+`Order Received - #38` in English despite a Greek msgstr existing in
+Rosetta/Postgres:
+
+1. .po msgids were fuzzy or empty for every transactional-email subject
+   I added in the email overhaul. Django's gettext skips fuzzy entries
+   unconditionally, so Rosetta saves that looked landed on disk never
+   actually reached runtime lookups. Removed the fuzzy flag and wrote
+   proper, non-fuzzy Greek translations for:
+
+- Payment Confirmed - Order #{order_id}
+- Order Received - #{order_id} (was fuzzy-carried from "Order Delivered")
+- Payment Failed - Order #{order_id}
+- Order #{order_id} Status Update - {status}
+- Your Order #{order_id} Has Shipped
+- Reminder: Complete Your Order #{order_id}
+- Did you forget something? — {site_name}
+- We miss you!
+- Confirm your subscription (template heading)
+- Confirm your subscription to {topic} (subject)
+- Order Received (template heading; was fuzzy)
+
+Verified via django.utils.translation.gettext under
+translation.override('el') that each key resolves to the new msgstr.
+
+2. Celery workers never applied the DB-backed translation overlay.
+   core.middleware.translation_reload seeds and refreshes gettext
+   catalogs on every web request, but workers never see middleware —
+   so a long-lived worker serves whatever .po/.mo was baked into the
+   deployed image and stays blind to every Rosetta edit until the pod
+   is rolled. That's the architectural reason the Greek msgstr the
+   operator had already saved in Rosetta never reached the email send.
+
+Two new signal handlers in core/celery.py:
+- worker_process_init → apply_db_overlay() once at boot, so fresh
+  workers have DB-backed msgstrs in their in-memory catalog.
+- task_prerun → compare TRANSLATION_VERSION_CACHE_KEY against a
+  per-process counter; re-apply overlay + clear gettext caches when
+  another pod bumped the tick. Mirrors the web-side middleware with
+  the same single-Redis-round-trip cost per task.
+
+On next deploy PreSync runs import_po_to_translations which seeds the DB
+from these corrected .po msgstrs, bumps the version tick, and every web
+pod refreshes on its next request; worker pods refresh on their next
+task. Future Rosetta edits propagate the same way without a redeploy. ([`f2498c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f2498c716b2e583709d3dd68fc2287593c0fe164))
+
 ## v1.99.0 (2026-04-18)
 
 ### Bug fixes

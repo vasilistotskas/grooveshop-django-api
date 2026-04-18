@@ -487,108 +487,144 @@ class ConfirmSubscriptionByTokenView(APIView):
         )
 
 
-class UnsubscribeView(APIView):
-    """GET (user click) + POST (RFC 8058 one-click) unsubscribe.
+class UnsubscribeResponseSerializer(serializers.Serializer):
+    message = serializers.CharField()
+    topic = serializers.CharField(required=False)
+    user_email = serializers.EmailField(required=False)
+    topic_slug = serializers.CharField(required=False)
+    count = serializers.IntegerField(required=False)
+    error = serializers.CharField(required=False)
 
-    `topic_slug` is optional: when omitted, the user is unsubscribed from
-    ALL active subscriptions (used by non-topic marketing emails such as
-    re-engagement and abandoned-cart).
+
+def _validate_unsubscribe_token(uidb64: str, token: str):
+    try:
+        uid = urlsafe_base64_decode(uidb64).decode()
+        user = User.objects.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        return None, _("Invalid unsubscribe link")
+    if not default_token_generator.check_token(user, token):
+        return None, _("Invalid or expired unsubscribe link")
+    return user, None
+
+
+def _apply_unsubscribe(user, topic_slug: str | None):
+    qs = UserSubscription.objects.filter(
+        user=user,
+        status=UserSubscription.SubscriptionStatus.ACTIVE,
+    )
+    if topic_slug:
+        qs = qs.filter(topic__slug=topic_slug)
+    count = 0
+    topic_name = None
+    for subscription in qs.select_related("topic"):
+        subscription.unsubscribe()
+        topic_name = subscription.topic.name
+        count += 1
+    return count, topic_name
+
+
+def _unsubscribe_get_response(uidb64: str, token: str, topic_slug: str | None):
+    user, error = _validate_unsubscribe_token(uidb64, token)
+    if error is not None:
+        return Response(
+            {"error": str(error)}, status=status.HTTP_400_BAD_REQUEST
+        )
+    count, topic_name = _apply_unsubscribe(user, topic_slug)
+    if count == 0:
+        return Response(
+            {
+                "message": str(_("Already unsubscribed")),
+                "topic_slug": topic_slug or "",
+            }
+        )
+    return Response(
+        {
+            "message": str(_("Successfully unsubscribed")),
+            "topic": topic_name or "",
+            "user_email": user.email,
+            "count": count,
+        }
+    )
+
+
+def _unsubscribe_post_response(uidb64: str, token: str, topic_slug: str | None):
+    user, _err = _validate_unsubscribe_token(uidb64, token)
+    if user is not None:
+        _apply_unsubscribe(user, topic_slug)
+    # RFC 8058: always 200 to avoid leaking token validity to scanners.
+    return Response(status=status.HTTP_200_OK)
+
+
+class UnsubscribeTopicView(APIView):
+    """Topic-scoped unsubscribe: `/unsubscribe/<uid>/<token>/<topic_slug>`.
+
+    Used by marketing emails with a specific List-ID (newsletter etc.).
     """
 
     permission_classes = []
     authentication_classes = []
-
-    class UnsubscribeSerializer(serializers.Serializer):
-        message = serializers.CharField()
-        topic = serializers.CharField(required=False)
-        user_email = serializers.EmailField(required=False)
-        topic_slug = serializers.CharField(required=False)
-        count = serializers.IntegerField(required=False)
-        error = serializers.CharField(required=False)
-
-    serializer_class = UnsubscribeSerializer
-
-    def _validate_token(self, uidb64: str, token: str):
-        try:
-            uid = urlsafe_base64_decode(uidb64).decode()
-            user = User.objects.get(pk=uid)
-        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-            return None, _("Invalid unsubscribe link")
-        if not default_token_generator.check_token(user, token):
-            return None, _("Invalid or expired unsubscribe link")
-        return user, None
-
-    def _apply(self, user, topic_slug: str | None):
-        qs = UserSubscription.objects.filter(
-            user=user,
-            status=UserSubscription.SubscriptionStatus.ACTIVE,
-        )
-        if topic_slug:
-            qs = qs.filter(topic__slug=topic_slug)
-        count = 0
-        topic_name = None
-        for subscription in qs.select_related("topic"):
-            subscription.unsubscribe()
-            topic_name = subscription.topic.name
-            count += 1
-        return count, topic_name
+    serializer_class = UnsubscribeResponseSerializer
 
     @extend_schema(
-        operation_id="unsubscribeViaLink",
-        summary=_("Unsubscribe via email link (GET)"),
+        operation_id="unsubscribeFromTopicViaLink",
+        summary=_("Unsubscribe from a topic via email link (GET)"),
         tags=["User Subscriptions"],
-        responses={200: UnsubscribeSerializer, 400: ErrorResponseSerializer},
+        responses={
+            200: UnsubscribeResponseSerializer,
+            400: ErrorResponseSerializer,
+        },
     )
-    def get(
-        self, request, uidb64: str, token: str, topic_slug: str | None = None
-    ):
-        return self._handle(request, uidb64, token, topic_slug)
+    def get(self, request, uidb64: str, token: str, topic_slug: str):
+        return _unsubscribe_get_response(uidb64, token, topic_slug)
 
     @extend_schema(
-        operation_id="unsubscribeOneClick",
-        summary=_("Unsubscribe via RFC 8058 one-click POST"),
+        operation_id="unsubscribeFromTopicOneClick",
+        summary=_("RFC 8058 one-click unsubscribe from a topic"),
         description=_(
             "Invoked by mail clients honoring List-Unsubscribe-Post=One-Click. "
-            "Returns 200 OK on success or invalid token (silent per RFC 8058)."
+            "Returns 200 OK regardless of token validity (silent per RFC 8058)."
         ),
         tags=["User Subscriptions"],
         request=None,
         responses={200: None},
     )
-    def post(
-        self, request, uidb64: str, token: str, topic_slug: str | None = None
-    ):
-        user, error = self._validate_token(uidb64, token)
-        if user is not None:
-            self._apply(user, topic_slug)
-        # RFC 8058: always 200 to avoid leaking validity to scanners.
-        return Response(status=status.HTTP_200_OK)
+    def post(self, request, uidb64: str, token: str, topic_slug: str):
+        return _unsubscribe_post_response(uidb64, token, topic_slug)
 
-    def _handle(
-        self,
-        request,
-        uidb64: str,
-        token: str,
-        topic_slug: str | None,
-    ):
-        user, error = self._validate_token(uidb64, token)
-        if error is not None:
-            return Response(
-                {"error": str(error)}, status=status.HTTP_400_BAD_REQUEST
-            )
-        count, topic_name = self._apply(user, topic_slug)
-        if count == 0:
-            return Response(
-                {
-                    "message": str(_("Already unsubscribed")),
-                    "topic_slug": topic_slug or "",
-                }
-            )
-        return Response(
-            {
-                "message": str(_("Successfully unsubscribed")),
-                "topic": topic_name or "",
-                "user_email": user.email,
-                "count": count,
-            }
-        )
+
+class UnsubscribeAllView(APIView):
+    """Non-topic unsubscribe: `/unsubscribe/<uid>/<token>`.
+
+    Unsubscribes from ALL active subscriptions — used by emails without a
+    topic binding such as re-engagement and abandoned-cart.
+    """
+
+    permission_classes = []
+    authentication_classes = []
+    serializer_class = UnsubscribeResponseSerializer
+
+    @extend_schema(
+        operation_id="unsubscribeFromAllViaLink",
+        summary=_("Unsubscribe from all topics via email link (GET)"),
+        tags=["User Subscriptions"],
+        responses={
+            200: UnsubscribeResponseSerializer,
+            400: ErrorResponseSerializer,
+        },
+    )
+    def get(self, request, uidb64: str, token: str):
+        return _unsubscribe_get_response(uidb64, token, None)
+
+    @extend_schema(
+        operation_id="unsubscribeFromAllOneClick",
+        summary=_("RFC 8058 one-click unsubscribe from all topics"),
+        description=_(
+            "Invoked by mail clients honoring List-Unsubscribe-Post=One-Click. "
+            "Returns 200 OK regardless of token validity (silent per RFC 8058)."
+        ),
+        tags=["User Subscriptions"],
+        request=None,
+        responses={200: None},
+    )
+    def post(self, request, uidb64: str, token: str):
+        return _unsubscribe_post_response(uidb64, token, None)

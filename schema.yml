@@ -27567,14 +27567,13 @@ paths:
           description: ''
   /api/v1/user/unsubscribe/{uidb64}/{token}:
     get:
-      operationId: unsubscribeViaLink
+      operationId: unsubscribeFromAllViaLink
       description: |-
-        GET (user click) + POST (RFC 8058 one-click) unsubscribe.
+        Non-topic unsubscribe: `/unsubscribe/<uid>/<token>`.
 
-        `topic_slug` is optional: when omitted, the user is unsubscribed from
-        ALL active subscriptions (used by non-topic marketing emails such as
-        re-engagement and abandoned-cart).
-      summary: Unsubscribe via email link (GET)
+        Unsubscribes from ALL active subscriptions — used by emails without a
+        topic binding such as re-engagement and abandoned-cart.
+      summary: Unsubscribe from all topics via email link (GET)
       parameters:
       - in: path
         name: token
@@ -27593,7 +27592,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Unsubscribe'
+                $ref: '#/components/schemas/UnsubscribeResponse'
           description: ''
         '400':
           content:
@@ -27602,10 +27601,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
     post:
-      operationId: unsubscribeOneClick
+      operationId: unsubscribeFromAllOneClick
       description: Invoked by mail clients honoring List-Unsubscribe-Post=One-Click.
-        Returns 200 OK on success or invalid token (silent per RFC 8058).
-      summary: Unsubscribe via RFC 8058 one-click POST
+        Returns 200 OK regardless of token validity (silent per RFC 8058).
+      summary: RFC 8058 one-click unsubscribe from all topics
       parameters:
       - in: path
         name: token
@@ -27624,14 +27623,12 @@ paths:
           description: No response body
   /api/v1/user/unsubscribe/{uidb64}/{token}/{topic_slug}:
     get:
-      operationId: unsubscribeViaLink_2
+      operationId: unsubscribeFromTopicViaLink
       description: |-
-        GET (user click) + POST (RFC 8058 one-click) unsubscribe.
+        Topic-scoped unsubscribe: `/unsubscribe/<uid>/<token>/<topic_slug>`.
 
-        `topic_slug` is optional: when omitted, the user is unsubscribed from
-        ALL active subscriptions (used by non-topic marketing emails such as
-        re-engagement and abandoned-cart).
-      summary: Unsubscribe via email link (GET)
+        Used by marketing emails with a specific List-ID (newsletter etc.).
+      summary: Unsubscribe from a topic via email link (GET)
       parameters:
       - in: path
         name: token
@@ -27655,7 +27652,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Unsubscribe'
+                $ref: '#/components/schemas/UnsubscribeResponse'
           description: ''
         '400':
           content:
@@ -27664,10 +27661,10 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
     post:
-      operationId: unsubscribeOneClick_2
+      operationId: unsubscribeFromTopicOneClick
       description: Invoked by mail clients honoring List-Unsubscribe-Post=One-Click.
-        Returns 200 OK on success or invalid token (silent per RFC 8058).
-      summary: Unsubscribe via RFC 8058 one-click POST
+        Returns 200 OK regardless of token validity (silent per RFC 8058).
+      summary: RFC 8058 one-click unsubscribe from a topic
       parameters:
       - in: path
         name: token
@@ -36452,7 +36449,7 @@ components:
         * `EXPIRE` - Expire
         * `ADJUST` - Adjust
         * `BONUS` - Bonus
-    Unsubscribe:
+    UnsubscribeResponse:
       type: object
       properties:
         message:

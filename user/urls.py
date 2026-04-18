@@ -6,7 +6,8 @@ from user.views.address import UserAddressViewSet
 from user.views.subscription import (
     ConfirmSubscriptionByTokenView,
     SubscriptionTopicViewSet,
-    UnsubscribeView,
+    UnsubscribeAllView,
+    UnsubscribeTopicView,
     UserSubscriptionViewSet,
 )
 
@@ -156,12 +157,12 @@ urlpatterns = [
     ),
     path(
         "user/unsubscribe/<str:uidb64>/<str:token>/<str:topic_slug>",
-        UnsubscribeView.as_view(),
+        UnsubscribeTopicView.as_view(),
         name="user-unsubscribe-topic",
     ),
     path(
         "user/unsubscribe/<str:uidb64>/<str:token>",
-        UnsubscribeView.as_view(),
+        UnsubscribeAllView.as_view(),
         name="user-unsubscribe",
     ),
     path(

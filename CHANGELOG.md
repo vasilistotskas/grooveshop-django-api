@@ -3,6 +3,251 @@
 
 
 
+## v1.98.0 (2026-04-18)
+
+### Bug fixes
+
+* fix: lint ([`eebf501`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eebf5018e073367aca351d338b410375391dfe04))
+
+* fix(i18n): stop hitting DB at import/boot time, bootstrap overlay via seed cmd
+
+tests/unit/wsgi/test_*.py kept ERRORing with "Database access not
+allowed, use the 'django_db' mark" on CI. Root cause:
+
+wsgi/__init__.py line 20 invokes the full WSGI application at module
+import time as a startup warmup (application({"PATH_INFO": "/"}, ...))
+
+That runs the entire middleware stack, which during test collection
+happens inside pytest-django's DB-access block. The previous design
+had two places that could hit the DB during that warmup:
+
+- CoreConfig.ready() → apply_db_overlay()
+- TranslationReloadMiddleware.process_request → first-request overlay
+
+Both were wrapped in try/except Exception, but pytest-django's
+RuntimeError surfaced through the test collection anyway (likely via
+logging or a secondary teardown path). Catching after the fact wasn't
+enough — the only reliable fix is to not touch the DB during the
+warmup.
+
+Both hooks removed. Bootstrap flow is now:
+
+1. PreSync: migrate (creates Translation table)
+2. PreSync: uv run python manage.py import_po_to_translations
+   — seeds the table AND bumps the shared Redis version tick
+3. Pods boot; on first real request, middleware sees
+   `_local_translation_version (None) != remote_version` and applies
+   the overlay. Subsequent requests no-op.
+4. Every Rosetta save re-bumps the tick via
+   core.signals.rosetta.bump_translation_version_on_save.
+
+Fresh cluster with no tick yet: middleware returns early, pod serves
+the .mo msgstrs baked into the image until the first bump lands.
+Acceptable starting state — the image already ships the committed
+translations from the repo's .po files.
+
+The management command now bumps the version on successful imports
+(not on --dry-run), so both the first-deploy seed and any manual
+reconciliation run propagate to running pods without restart.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`2934d3a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2934d3a9511e31a82ddb803ab4143a91d9586cdd))
+
+* fix(i18n): preserve TranslationCatalog wrapper in DB overlay + harden tests
+
+Three CI regressions from the prior feat(i18n) commit, all tied to the
+shape of Django 6.0's in-memory translation catalog:
+
+1. Admin actions calling ngettext (tag/product admin) blew up with
+   "'dict' object has no attribute 'plural'". Django 6.0 wraps
+   DjangoTranslation._catalog in a `TranslationCatalog` helper class
+   (trans_real.py:73) rather than a plain dict — its `.plural(msgid, n)`
+   method is used by `GNUTranslations.ngettext` (trans_real.py:278) to
+   resolve plural forms across merged sub-catalogs. The previous
+   implementation replaced `_catalog` with `dict(...)`, which is still
+   subscriptable but loses `.plural`, so every ngettext call crashed.
+
+apply_db_overlay now mutates the existing TranslationCatalog via its
+`__setitem__` (which writes to `_catalogs[0]`) instead of replacing
+it. Works identically for the plain-dict fallback on older Django
+versions.
+
+2. `tests/unit/core/test_translation_overlay.py::test_apply_db_overlay_
+   tolerates_missing_translation_table` previously mocked the private
+   `_overlay_rows` helper with `side_effect=ProgrammingError`, which
+   bypassed the real helper's exception handler. Rewritten to patch
+   `Translation.objects.filter` directly so the test actually exercises
+   the swallow-and-return-[] branch inside `_overlay_rows`.
+
+`_overlay_rows` also widened its `except` clause to catch `Exception`
+rather than only `(OperationalError, ProgrammingError)` so pytest-
+django's `RuntimeError("Database access not allowed, use the
+django_db mark")` is handled gracefully in tests that don't have
+the mark (unblocks tests/unit/wsgi/* collection errors).
+
+3. `test_send_order_status_update_email_template_fallback` flaked
+   after `fix(order): suppress duplicate status-update email on paid
+   transitions` landed — OrderFactory's default payment_status is a
+   random choice across every PaymentStatus value, so ~1 in 6 runs
+   rolled COMPLETED, tripped the new "skip PROCESSING email when
+   already paid" short-circuit, and never reached the template-
+   fallback code the test was checking. Pinning `payment_status=
+   PaymentStatus.PENDING` in `setUp` makes every test in that class
+   exercise the intended email code path deterministically.
+
+Also added a positive assertion in the singular-overlay test that
+`catalog._catalog.plural` remains callable after the overlay, so any
+future regression that swaps the TranslationCatalog wrapper for a
+plain dict fails loudly.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`f497ea0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f497ea03cd8c1133d61f5ab5da11227caa8c5efb))
+
+* fix: lint ([`0c7a402`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0c7a402393fbf71d4429529ef6415442072982d4))
+
+### Build system
+
+* build(docker): compile gettext .mo at build time, untrack compiled catalogs
+
+Added `gettext` to the builder stage's apk install (ships the
+`msgfmt` binary Django's `compilemessages` needs) and a
+`compilemessages --ignore=.venv` step after `uv sync`. The final
+production image reads .mo files at runtime via Python's stdlib
+`gettext`, which has no external dependency, so no apk install is
+needed in the production stage — .mo files flow through the existing
+builder→production COPY.
+
+`*.mo` is now in `.gitignore` so the compiled catalogs don't diverge
+from their `.po` sources between local edits and CI builds. The
+three previously-tracked `.mo` files (de/el/en) were untracked in
+the companion dedupe commit.
+
+Eliminates a long-standing class of "msgids are in the .po but
+translations aren't rendering" bugs caused by developers forgetting
+to run compilemessages before committing.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`e25ac18`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e25ac18930d58074f58b723ae36fcf7e36ffba6c))
+
+### Chores
+
+* chore(i18n): dedupe de/en .po files and refresh makemessages
+
+A manually-appended email-template block at the tail of
+locale/de/LC_MESSAGES/django.po and locale/en/LC_MESSAGES/django.po
+introduced 11 duplicate msgid entries per file. msgmerge flagged them
+as "fatal errors" and refused to extract new strings from code —
+which is why de and en had been frozen for weeks while el kept
+growing. scripts/dedupe_po.py walks each .po with polib, keeps the
+entry whose msgstr is non-empty, and merges both entries' source
+references so nothing is lost.
+
+After dedup, makemessages -a picked up:
+- 344+ msgids now extracted cleanly across all three locales
+- "Payment Confirmed" / "Thank you! Your payment has been received…"
+  / "Payment Confirmed - Order #{order_id}" now present in de + en too
+- per-locale translated counts: el=116, de=73, en=73
+
+The script is idempotent — re-running against a clean file does
+nothing.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`903a1d3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/903a1d30801480ac2ad217dd79eaa23223b93f21))
+
+### Features
+
+* feat(i18n): make Rosetta view DB-only, no disk writes on save
+
+Forced po_file_is_writable=False on DBBackedTranslationFormView so
+Rosetta's save path never calls polib.POFile.save() to touch the
+image-baked locale directory. That path would have failed on the
+read-only image layer anyway, and in the prior shared-PVC setup it
+raced with NFS cache invalidation. With this override:
+
+- Rosetta uses its CacheRosettaStorage for the edit session only
+  (Redis-backed, 24h working-copy cache).
+- Our rosetta.signals.entry_changed receiver persists every edit
+  directly to the Translation table — the durable source of truth.
+- Our rosetta.signals.post_save receiver bumps the shared version
+  key so other pods' TranslationReloadMiddleware re-applies the DB
+  overlay within one request.
+
+Net effect: the .po/.mo on disk is purely the msgid schema baked
+from the image; msgstrs live and breathe in Postgres. The
+grooveshop-backend-locale-pvc becomes redundant (kept for now as a
+Stage 2 infrastructure cleanup — removing it prematurely would
+conflict with rolling-deploy pods still mounting the PVC).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`6af1fcc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6af1fccbbf678702c178d9849cda8eb6b2726fe0))
+
+* feat(i18n): database-backed Rosetta translations survive deploys
+
+Rosetta edits previously lived on pod-local disk and were synced
+across replicas via .po/.mo bytes in Redis with a 24 h TTL. Every
+deploy overwrote /app/locale with the image, and anyone who saved a
+translation ≥ 24 h ago lost their work. The cross-pod sync was also
+fragile: a pod that booted with stale bytes could overwrite a fresh
+image's .po mid-request.
+
+This commit moves the source of truth to Postgres.
+
+Architecture:
+
+- `core.models.Translation` — language_code × msgid × plural_index with
+  msgstr. Unique per (lang, msgid, plural_index). Plurals and
+  pgettext contexts are represented natively (msgid_plural separate
+  column, context embedded in msgid via \x04 like stdlib gettext).
+
+- `core.rosetta_storage.apply_db_overlay(language_code=None)` reads
+  the Translation table and mutates `trans_real.translation(lang)._catalog`
+  in place. Atomic single-attribute rebind under the GIL; no lock
+  needed. Handles both singular (string key) and plural (tuple key)
+  gettext catalog entries.
+
+- `core.signals.rosetta.persist_rosetta_entry_to_db` hooks the
+  Rosetta `entry_changed` signal and upserts each edited msgstr
+  (singular or plural form) into the Translation table.
+
+- `core.signals.rosetta.bump_translation_version_on_save` keeps the
+  existing Redis version-tick for cross-pod invalidation, but now
+  calls `apply_db_overlay` + `_reload_translations` locally instead
+  of reading .po bytes off disk/Redis.
+
+- `TranslationReloadMiddleware` re-applies the DB overlay when the
+  version key changes. The old `_sync_files_from_redis` disk-writer
+  is gone — no more disk mutation at runtime.
+
+- `CoreConfig.ready` calls `apply_db_overlay` at startup so every pod
+  serves DB values from its first request. Guarded against
+  OperationalError/ProgrammingError so `migrate` before the new
+  table exists does not raise.
+
+- `core.rosetta_views.DBBackedTranslationFormView` overrides
+  Rosetta's `po_file` property so the editor form displays current
+  DB msgstrs (and rehashes entries so POST round-trips still match).
+  Registered on the same `rosetta-form` URL path before `rosetta.urls`
+  is included — Django's first-match resolution picks it up.
+
+- New command `import_po_to_translations` seeds the Translation table
+  from whatever .po files are on disk (run once after migrate, or
+  after a manual .po merge to reconcile).
+
+Deploy flow (after this lands + `import_po_to_translations` runs
+once):
+
+1. New image boots with whatever .po is in the repo (msgid schema).
+2. AppConfig.ready applies the DB overlay → in-memory catalog has
+   correct msgstrs before first request.
+3. Rosetta save → writes to disk + Redis version tick + Translation
+   row upsert.
+4. Other pods' middleware notices the tick, re-applies DB overlay.
+5. Next deploy → image again carries only msgids; DB still wins.
+   No more kubectl rescue.
+
+Tests (9) cover: apply_db_overlay for singular + plural + empty
+msgstr paths, persist signal for create/update/plural entries,
+version bump integration, middleware's once-per-tick refresh logic,
+and the migrate-phase guard when the Translation table doesn't
+exist yet.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`a3828d2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a3828d230902d994d40293cb1c0047842d1fad16))
+
 ## v1.97.1 (2026-04-17)
 
 ### Bug fixes

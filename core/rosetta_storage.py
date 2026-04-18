@@ -19,7 +19,6 @@ that matters across deploys.
 from __future__ import annotations
 
 import logging
-from typing import Iterable
 
 from rosetta.storage import CacheRosettaStorage
 
@@ -60,14 +59,13 @@ def _configured_languages() -> list[str]:
     return [code for code, _name in getattr(settings, "LANGUAGES", [])]
 
 
-def _overlay_rows(language_code: str) -> Iterable[tuple[str, str, int, str]]:
+def _overlay_rows(language_code: str) -> list[tuple[str, str, int, str]]:
     """Fetch (msgid, msgid_plural, plural_index, msgstr) tuples from DB.
 
-    Returns an empty iterable if the Translation table is missing
-    (first migrate not yet run) or the DB is unreachable.
+    Returns an empty list if the Translation table is missing (first
+    migrate not yet run), the DB is unreachable, or a test harness
+    (e.g. pytest-django) is actively blocking database access.
     """
-    from django.db.utils import OperationalError, ProgrammingError
-
     try:
         from core.models import Translation
     except Exception as exc:  # pragma: no cover — ImportError during teardown
@@ -80,9 +78,13 @@ def _overlay_rows(language_code: str) -> Iterable[tuple[str, str, int, str]]:
             .exclude(msgstr="")
             .values_list("msgid", "msgid_plural", "plural_index", "msgstr")
         )
-    except (OperationalError, ProgrammingError) as exc:
+    except Exception as exc:
+        # Catch a broad Exception rather than the DB-specific ones: in
+        # addition to OperationalError / ProgrammingError, pytest-django
+        # raises RuntimeError for tests without the django_db mark, and
+        # other harnesses may raise their own subclasses.
         logger.debug(
-            "Translation table not available for overlay (%s): %s",
+            "Translation overlay rows unavailable for %s: %s",
             language_code,
             exc,
         )
@@ -96,6 +98,14 @@ def apply_db_overlay(language_code: str | None = None) -> None:
     a specific language to refresh a single catalog (e.g. from the
     Rosetta signal handler after one locale's .po was edited).
 
+    Django 6.0 wraps `_catalog` in a `TranslationCatalog` class rather
+    than using a plain dict; its `__setitem__` writes into the first
+    underlying catalog and preserves the per-catalog plural functions
+    (see trans_real.TranslationCatalog). We must mutate through that
+    interface rather than replacing `_catalog` with a plain dict —
+    downstream `ngettext` calls `self._catalog.plural(...)` which only
+    exists on the wrapper.
+
     Keys by-form:
       - Singular (`msgid_plural` empty): catalog key is the plain msgid str.
       - Plural: catalog key is the tuple `(msgid, plural_index)` — matching
@@ -103,7 +113,8 @@ def apply_db_overlay(language_code: str | None = None) -> None:
 
     Safe to call during AppConfig.ready: the function swallows the
     OperationalError / ProgrammingError that fires during the initial
-    `migrate` before the Translation table exists.
+    `migrate` before the Translation table exists, plus any broader
+    DB-access errors raised by test harnesses (pytest-django).
     """
     from django.utils.translation import trans_real
 
@@ -116,17 +127,25 @@ def apply_db_overlay(language_code: str | None = None) -> None:
             logger.warning("Could not load catalog for %s: %s", lang, exc)
             continue
 
-        base = dict(getattr(catalog, "_catalog", {}) or {})
+        try:
+            rows = _overlay_rows(lang)
+        except Exception as exc:
+            logger.debug("Overlay rows unavailable for %s: %s", lang, exc)
+            continue
+
+        underlying = getattr(catalog, "_catalog", None)
+        if underlying is None:
+            continue
+
         applied = 0
-        for msgid, msgid_plural, plural_index, msgstr in _overlay_rows(lang):
-            if msgid_plural:
-                base[(msgid, plural_index)] = msgstr
-            else:
-                base[msgid] = msgstr
+        for msgid, msgid_plural, plural_index, msgstr in rows:
+            key = (msgid, plural_index) if msgid_plural else msgid
+            # TranslationCatalog.__setitem__ writes to self._catalogs[0];
+            # plain-dict _catalog (older Django) also supports subscript
+            # assignment. Works for both.
+            underlying[key] = msgstr
             applied += 1
 
-        # Atomic rebind under GIL — no lock needed for single-attribute assignment.
-        catalog._catalog = base
         if applied:
             logger.debug(
                 "Applied %d DB translations to catalog for %s", applied, lang

@@ -6,7 +6,7 @@ from django.test import TestCase as DjangoTestCase
 from django.test import override_settings
 from django.utils import timezone
 
-from order.enum.status import OrderStatus
+from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.order import Order
 from order.tasks import (
@@ -22,11 +22,20 @@ from order.tasks import (
 @pytest.mark.django_db
 class OrderTasksSimpleTestCase(DjangoTestCase):
     def setUp(self):
+        # Pin both status and payment_status so tests that exercise the
+        # PROCESSING email path (status-update, template fallback) are
+        # deterministic — the factory's default payment_status is a
+        # random choice across all PaymentStatus values, which made
+        # these tests flake whenever COMPLETED was rolled (the task
+        # intentionally skips the PROCESSING status-update email when
+        # the payment is already complete, to avoid duplicating the
+        # separate "Payment Confirmed" email).
         self.order = OrderFactory.create(
             email="customer@example.com",
             first_name="John",
             last_name="Doe",
             status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
         )
 
     @patch("order.tasks.OrderHistory.log_note")

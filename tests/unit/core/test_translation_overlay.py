@@ -56,7 +56,13 @@ def test_apply_db_overlay_injects_singular_msgstr():
     apply_db_overlay("el")
 
     catalog = trans_real.translation("el")
+    # Read through the TranslationCatalog wrapper's __getitem__ so we
+    # exercise the same code path Django's gettext uses.
     assert catalog._catalog["Hello, world"] == "Γειά σου, κόσμε"
+    # ngettext paths and the rest of Django rely on _catalog.plural
+    # existing (it's a method on TranslationCatalog); a regression
+    # that swapped _catalog for a plain dict would break this.
+    assert callable(getattr(catalog._catalog, "plural", None))
 
 
 @pytest.mark.django_db
@@ -89,7 +95,7 @@ def test_apply_db_overlay_skips_empty_msgstr():
 
     catalog = trans_real.translation("el")
     # Empty DB rows do not overwrite an on-disk translation (if any) —
-    # the key is simply absent from the overlay dict.
+    # the key is simply absent from the overlay.
     assert catalog._catalog.get("Untranslated Yet") in (None, "")
 
 
@@ -217,12 +223,18 @@ def test_middleware_refreshes_once_per_version_tick():
 
 @pytest.mark.django_db
 def test_apply_db_overlay_tolerates_missing_translation_table():
-    """Simulates the migrate phase before 0006_translation runs."""
+    """Simulates the migrate phase before 0006_translation runs.
+
+    Patch the real DB query to raise ProgrammingError; the private
+    `_overlay_rows` helper is expected to swallow it and return an
+    empty list, so apply_db_overlay finishes without propagating.
+    """
     from django.db.utils import ProgrammingError
 
     with patch(
-        "core.rosetta_storage._overlay_rows",
-        side_effect=ProgrammingError("relation does not exist"),
-    ):
-        # Must not raise — just logs + returns.
+        "core.models.Translation.objects",
+    ) as objects:
+        objects.filter.side_effect = ProgrammingError("relation does not exist")
+        # Must not raise — exception handling inside _overlay_rows
+        # returns an empty iterable and apply_db_overlay continues.
         apply_db_overlay("el")

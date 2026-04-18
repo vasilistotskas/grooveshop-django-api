@@ -1,11 +1,15 @@
 """Seed the Translation table from on-disk .po files.
 
-Run once after the 0006_translation migration lands, or whenever you
-want to force-overwrite DB msgstrs from whatever is on disk (e.g.
-after a manual .po merge).
+Run once after the 0006_translation migration lands to bootstrap the DB
+from whatever was committed in the images' .po files.
 
-Idempotent — msgstrs already in the DB get overwritten. Empty msgstrs
-are skipped to keep the table tidy.
+The DB is the durable source of truth for translations — Rosetta saves
+upsert Translation rows directly, so the default behaviour here is
+**additive only**: rows that already exist in the DB are preserved and
+only missing msgids are seeded. Pass `--force` to restore the historical
+destructive behaviour (overwrite every row from .po, wiping any Rosetta
+edits that were not committed back to .po). Empty msgstrs are always
+skipped.
 """
 
 from __future__ import annotations
@@ -49,16 +53,36 @@ class Command(BaseCommand):
             action="store_true",
             help="Parse .po files and report counts without writing to the DB.",
         )
+        parser.add_argument(
+            "--force",
+            action="store_true",
+            help=(
+                "Overwrite existing Translation rows from .po. Without this "
+                "flag the command is additive-only: rows already in the DB "
+                "(i.e. every Rosetta edit) are preserved."
+            ),
+        )
 
     def handle(self, *args, **options):
         language_filter = options.get("languages")
         dry_run = options.get("dry_run", False)
+        force = options.get("force", False)
+
+        if force:
+            self.stdout.write(
+                self.style.WARNING(
+                    "--force set: existing Translation rows will be "
+                    "overwritten from .po. Any Rosetta edit that isn't in "
+                    "the committed .po file will be lost."
+                )
+            )
 
         if not settings.LOCALE_PATHS:
             raise CommandError("LOCALE_PATHS is empty.")
 
         total_imported = 0
         total_skipped = 0
+        total_preserved = 0
 
         for locale_root in settings.LOCALE_PATHS:
             root = Path(locale_root)
@@ -80,21 +104,26 @@ class Command(BaseCommand):
                 if not po_path.exists():
                     continue
 
-                imported, skipped = self._import_po(
-                    lang_dir.name, str(po_path), dry_run=dry_run
+                imported, skipped, preserved = self._import_po(
+                    lang_dir.name,
+                    str(po_path),
+                    dry_run=dry_run,
+                    force=force,
                 )
                 total_imported += imported
                 total_skipped += skipped
+                total_preserved += preserved
                 verb = "Would import" if dry_run else "Imported"
                 self.stdout.write(
                     self.style.SUCCESS(
                         f"{verb} {imported} rows from {po_path} "
-                        f"({skipped} skipped)"
+                        f"({skipped} skipped empty, {preserved} preserved)"
                     )
                 )
 
         summary = (
             f"Total: {total_imported} rows imported, "
+            f"{total_preserved} preserved (DB already had a row), "
             f"{total_skipped} skipped (empty msgstr)."
         )
         if dry_run:
@@ -124,12 +153,11 @@ class Command(BaseCommand):
                 )
 
     def _import_po(
-        self, language_code: str, po_path: str, *, dry_run: bool
-    ) -> tuple[int, int]:
+        self, language_code: str, po_path: str, *, dry_run: bool, force: bool
+    ) -> tuple[int, int, int]:
         po = polib.pofile(po_path)
-        imported = 0
+        candidates: list[Translation] = []
         skipped = 0
-        rows_to_write: list[Translation] = []
 
         for entry in po:
             if entry.obsolete:
@@ -140,7 +168,7 @@ class Command(BaseCommand):
                     if not msgstr:
                         skipped += 1
                         continue
-                    rows_to_write.append(
+                    candidates.append(
                         Translation(
                             language_code=language_code,
                             msgid=entry.msgid or "",
@@ -149,12 +177,11 @@ class Command(BaseCommand):
                             msgstr=msgstr,
                         )
                     )
-                    imported += 1
             else:
                 if not entry.msgstr:
                     skipped += 1
                     continue
-                rows_to_write.append(
+                candidates.append(
                     Translation(
                         language_code=language_code,
                         msgid=entry.msgid or "",
@@ -163,13 +190,35 @@ class Command(BaseCommand):
                         msgstr=entry.msgstr,
                     )
                 )
-                imported += 1
 
-        if dry_run or not rows_to_write:
-            return imported, skipped
+        if not candidates:
+            return 0, skipped, 0
+
+        # Additive mode: load every existing (msgid, plural_index) key for
+        # this language in one query so we can skip rows already in the DB
+        # — those came from a Rosetta edit and are the operator's intent.
+        preserved = 0
+        if not force:
+            existing_keys = set(
+                Translation.objects.filter(
+                    language_code=language_code
+                ).values_list("msgid", "plural_index")
+            )
+            filtered: list[Translation] = []
+            for row in candidates:
+                if (row.msgid, row.plural_index) in existing_keys:
+                    preserved += 1
+                    continue
+                filtered.append(row)
+            candidates = filtered
+
+        imported = len(candidates)
+
+        if dry_run or not candidates:
+            return imported, skipped, preserved
 
         with transaction.atomic():
-            for row in rows_to_write:
+            for row in candidates:
                 Translation.objects.update_or_create(
                     language_code=row.language_code,
                     msgid=row.msgid,
@@ -179,4 +228,4 @@ class Command(BaseCommand):
                         "msgstr": row.msgstr,
                     },
                 )
-        return imported, skipped
+        return imported, skipped, preserved

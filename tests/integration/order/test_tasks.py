@@ -403,9 +403,14 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 @pytest.mark.django_db
 class OrderTasksIntegrationTestCase(DjangoTestCase):
     def setUp(self):
+        # Pin payment_status: OrderFactory's default is random (see factories
+        # /order.py:180) and can land on COMPLETED, which makes
+        # send_order_status_update_email skip the PROCESSING email as a
+        # duplicate of the payment-confirmed email.
         self.order = OrderFactory.create(
             email="integration@example.com",
             status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.PENDING,
             tracking_number="INT123",
             shipping_carrier="FedEx",
         )

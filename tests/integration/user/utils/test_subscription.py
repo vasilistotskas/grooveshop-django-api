@@ -81,7 +81,15 @@ class TestSubscriptionUtils:
         mock_check.assert_called_once_with(
             user=self.user, topic_slug=self.topic.slug
         )
-        mock_render.assert_called_once()
+        # Renders both the .html body and the dedicated .txt body.
+        assert mock_render.call_count == 2
+        rendered_templates = {
+            call.args[0] for call in mock_render.call_args_list
+        }
+        assert rendered_templates == {
+            "emails/subscription/confirmation.html",
+            "emails/subscription/confirmation.txt",
+        }
         mock_email_class.assert_called_once()
         mock_email.attach_alternative.assert_called_once()
         mock_email.send.assert_called_once()
@@ -151,7 +159,7 @@ class TestSubscriptionUtils:
 
         assert result is False
 
-    @override_settings(NUXT_BASE_URL="https://test-site.com")
+    @override_settings(API_BASE_URL="https://api.test-site.com")
     @patch("user.utils.subscription.default_token_generator")
     @patch("user.utils.subscription.urlsafe_base64_encode")
     def test_generate_unsubscribe_link(self, mock_encode, mock_token_gen):
@@ -160,23 +168,26 @@ class TestSubscriptionUtils:
 
         result = generate_unsubscribe_link(self.user, self.topic)
 
-        expected_url = "https://test-site.com/unsubscribe/encoded-uid/test-token/test-newsletter/"
+        # Points directly at the Django API so List-Unsubscribe headers work
+        # without a Nuxt frontend page.
+        expected_url = "https://api.test-site.com/api/v1/user/unsubscribe/encoded-uid/test-token/test-newsletter"
         assert result == expected_url
         mock_token_gen.make_token.assert_called_once_with(self.user)
         mock_encode.assert_called_once()
 
-    @override_settings(NUXT_BASE_URL="")
+    @override_settings(API_BASE_URL="https://api.test-site.com/")
     @patch("user.utils.subscription.default_token_generator")
     @patch("user.utils.subscription.urlsafe_base64_encode")
-    def test_generate_unsubscribe_link_no_site_url(
+    def test_generate_unsubscribe_link_strips_trailing_slash(
         self, mock_encode, mock_token_gen
     ):
+        """Trailing slash on API_BASE_URL must not produce a double slash."""
         mock_token_gen.make_token.return_value = "test-token"
         mock_encode.return_value = "encoded-uid"
 
         result = generate_unsubscribe_link(self.user, self.topic)
 
-        expected_url = "/unsubscribe/encoded-uid/test-token/test-newsletter/"
+        expected_url = "https://api.test-site.com/api/v1/user/unsubscribe/encoded-uid/test-token/test-newsletter"
         assert result == expected_url
 
     @override_settings(

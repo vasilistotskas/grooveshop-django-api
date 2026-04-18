@@ -3,6 +3,101 @@
 
 
 
+## v1.99.0 (2026-04-18)
+
+### Bug fixes
+
+* fix(test): pin payment_status in email-sequence test to avoid factory randomness
+
+OrderFactory.payment_status uses random.choice across every PaymentStatus
+value (factories/order.py:180). When that randomly produced COMPLETED,
+send_order_status_update_email's intentional dedup — skip the PROCESSING
+email because the payment-confirmed email already fired — kicked in and
+mock_email.send.call_count landed at 2 instead of 3.
+
+Pin payment_status=PENDING in the test's OrderFactory.create to guarantee
+the PROCESSING branch runs. ([`5c67883`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5c67883c328367986d419665f1efca3abeaca4fd))
+
+* fix(test): update subscription tests for dedicated .txt render and API-based unsubscribe URL
+
+- test_send_subscription_confirmation_success: send_subscription_confirmation
+  now renders both .html and .txt (no more strip_tags fallback), so assert
+  render_to_string was called twice with the expected template names.
+- test_generate_unsubscribe_link: unsubscribe URL points at API_BASE_URL
+  (the Django unsubscribe endpoint) not NUXT_BASE_URL, and no longer has a
+  trailing slash. Rewrite the "no_site_url" case as "strips_trailing_slash"
+  since API_BASE_URL is always set in real deployments and the old empty
+  fallback produced an unreachable URL anyway. ([`3d19cd8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3d19cd8483434500c1fabb962e33ce160d752920))
+
+* fix(schema): split UnsubscribeView into topic-scoped and all-topics variants
+
+drf-spectacular was emitting "operationId unsubscribeViaLink has collisions"
+and the same for unsubscribeOneClick because a single UnsubscribeView served
+two URL paths (/<uid>/<token>/<slug> and /<uid>/<token>) — drf-spectacular
+generates one operation per (path, method) pair but could only see one set
+of @extend_schema decorators on the shared view.
+
+Split into two thin classes so each URL has its own operation:
+- UnsubscribeTopicView → unsubscribeFromTopicViaLink / …OneClick
+- UnsubscribeAllView → unsubscribeFromAllViaLink / …OneClick
+
+Shared logic lives in module-level helpers (_validate_unsubscribe_token,
+_apply_unsubscribe, _unsubscribe_get_response, _unsubscribe_post_response)
+so both classes stay thin and the DRF contract stays identical.
+
+urls.py points at the two new classes via their existing route names so no
+email URLs or external callers change.
+
+Verified: `uv run python manage.py spectacular --file schema.yml` now emits
+no warnings; schema.yml checked in. ([`25b07fe`](https://github.com/vasilistotskas/grooveshop-django-api/commit/25b07fe6dd26b17abbfab8e12c2866c79f64e7c2))
+
+* fix: schema ([`5d6d131`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5d6d13140a8d3ee7bed583f2ff50171bbc4df4ea))
+
+* fix(test): rename missed template_name to template_base in newsletter test
+
+The send_newsletter() signature was renamed (template_name → template_base)
+but one test still passed the old kwarg, which ty check flagged as an
+unknown-argument. Matches the rename applied in the previous commit. ([`c1653c0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c1653c02d39a6f259ea5ef43ba35074682e73474))
+
+* fix: remove order delivered email section ([`76afd27`](https://github.com/vasilistotskas/grooveshop-django-api/commit/76afd27ad36871e53feab3b10f5dcc72ef0a5125))
+
+### Features
+
+* feat(email): overhaul transactional email, add per-user language and one-click unsubscribe
+
+Broken flows fixed:
+- subscription confirmation template never rendered the {{ confirmation_url }} button, so opt-in was impossible; template now leads with the CTA.
+- UserSubscriptionViewSet.confirm required IsOwnerOrAdmin but was reached from unauthenticated email clicks; new public ConfirmSubscriptionByTokenView at /api/v1/user/subscription/confirm/<token> uses the 64-char random token as sole auth.
+- SUBSCRIPTION_CONFIRMATION_URL default pointed at example.com; now {API_BASE_URL}/api/v1/user/subscription/confirm/{token}.
+- UnsubscribeView: added POST handler for RFC 8058 one-click compliance (returns 200 per spec) and made topic_slug optional so inactive-user / abandoned-cart links work without a topic.
+- Newsletter management command referenced a non-existent template path; now points at emails/marketing/newsletter and renders both .html and .txt.
+- Inactive-user task rendered HTML as plain text via send_mail(message=html_message=html); switched to EmailMultiAlternatives with a separate .txt render and a signed uid/token unsubscribe link (no more ?email= leak).
+- Abandoned-cart email had no unsubscribe footer/header; added preferences link + tokenized unsubscribe URL.
+- Contact signal sanitizes user-supplied name before it lands in Subject (CRLF injection guard).
+
+Per-user language:
+- UserAccount.language_code + Order.language_code fields (migrations 0023/0029); default settings.LANGUAGE_CODE.
+- core.utils.i18n helpers: get_user_language, get_order_language, resolve_request_language (X-Language/X-Locale/Accept-Language).
+- UserAccountAdapter.save_user + SocialAccountAdapter.save_user capture language on signup from the forwarded header.
+- UserAccountAdapter.send_mail wraps allauth email rendering in translation.override(user.language_code) so verification/password-reset/MFA mails respect the stored preference.
+- Every customer-facing Celery email task wraps subject + body rendering in translation.override(...): order confirmation, payment failed, status updates, shipping, pending-order reminders, checkout abandonment, inactive-user re-engagement, subscription confirmation, newsletter.
+- UserWriteSerializer / UserDetailsSerializer expose language_code with validation against settings.LANGUAGES.
+
+Email deliverability:
+- List-Unsubscribe + List-Unsubscribe-Post: List-Unsubscribe=One-Click headers on newsletter, inactive-user, and abandoned-cart emails (RFC 8058).
+- List-ID header per email category for Gmail grouping.
+- reply_to=[INFO_EMAIL] set consistently.
+- ACCOUNT_EMAIL_SUBJECT_PREFIX = "[{SITE_NAME}] " so every allauth mail is branded.
+
+Background tasks and async:
+- send_subscription_confirmation_email_task (3 retries, 300s backoff) replaces the sync util call from user.signals; dispatched via transaction.on_commit so the worker never reads a row before commit.
+- Newsletter dedup via Redis SETNX key newsletter:sent:{slug}:{uid}:{date} with configurable window; manage command gained --force and --dedup-window.
+
+Cleanup:
+- Removed dead order/notifications.py EmailNotifier/OrderNotificationManager (replaced by order.tasks long ago); removed the dead test_notifications.py and the assert_not_called patch in test_signals.py.
+- Updated inactive-user task tests to mock EmailMultiAlternatives (was mocking the old send_mail); updated newsletter tests for the template_name -> template_base rename.
+- makemessages run for el/en/de. ([`45400bc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/45400bca826a8f729b82398f52b35b3af90cf8da))
+
 ## v1.98.0 (2026-04-18)
 
 ### Bug fixes

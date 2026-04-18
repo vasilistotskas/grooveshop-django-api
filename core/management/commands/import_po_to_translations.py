@@ -107,7 +107,9 @@ class Command(BaseCommand):
             # DB state on its next request — no need to restart pods
             # after the first import or a manual reconciliation run.
             try:
-                cache.set(TRANSLATION_VERSION_CACHE_KEY, time.time(), timeout=None)
+                cache.set(
+                    TRANSLATION_VERSION_CACHE_KEY, time.time(), timeout=None
+                )
                 self.stdout.write(
                     self.style.SUCCESS(
                         "Bumped translation version cache key; "

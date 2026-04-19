@@ -43,9 +43,7 @@ class UserAccountAdapter(DefaultAccountAdapter):
         Celery-triggered HTTP, integration tests) don't trip allauth's strict
         "header-or-nothing" default introduced in 65.14.2.
         """
-        ip = request.headers.get("X-Real-IP") or request.META.get(
-            "REMOTE_ADDR"
-        )
+        ip = request.headers.get("X-Real-IP") or request.META.get("REMOTE_ADDR")
         cleaned = clean_client_ip(ip) if ip else None
         if not cleaned:
             raise PermissionDenied("Unable to determine client IP address")

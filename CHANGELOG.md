@@ -3,6 +3,21 @@
 
 
 
+## v1.100.2 (2026-04-19)
+
+### Bug fixes
+
+* fix: lint ([`04c0c13`](https://github.com/vasilistotskas/grooveshop-django-api/commit/04c0c132d8420bfbe4fc0e53d952162c1a0aeda0))
+
+* fix(throttle): add per-endpoint rate limits on contact and payment actions
+
+Stacks ScopedRateThrottle-style subclasses on ContactCreateView (AllowAny)
+and the create_payment_intent / create_checkout_session @actions so a single
+IP/user cannot brute-force or abuse expensive payment provider calls past
+5-10 requests/minute, while the global anon/user daily caps still apply.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`9ba370a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ba370ad4c64f0739c476a3b41359fc9f888b252))
+
 ## v1.100.1 (2026-04-19)
 
 ### Bug fixes

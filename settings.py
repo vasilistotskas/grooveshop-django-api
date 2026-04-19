@@ -394,13 +394,12 @@ ACCOUNT_EMAIL_SUBJECT_PREFIX = f"[{SITE_NAME}] "
 LOGIN_REDIRECT_URL = NUXT_BASE_URL + "/account"
 USERSESSIONS_TRACK_ACTIVITY = True
 
-# Trust X-Real-IP (set by the Nuxt proxy via h3's getRequestIP, which resolves
-# the true client IP from the X-Forwarded-For chain in prod and falls back to
-# the socket address in local dev) so allauth's session IP column reflects the
-# real client instead of REMOTE_ADDR (the Nuxt pod's cluster IP in production).
-# As of allauth 65.14.2 this setting is required — the default get_client_ip()
-# no longer trusts X-Forwarded-For to prevent spoofing / rate-limit bypass.
-ALLAUTH_TRUSTED_CLIENT_IP_HEADER = "X-Real-IP"
+# Client IP resolution for allauth's session/rate-limit machinery is handled
+# by UserAccountAdapter.get_client_ip, which prefers X-Real-IP (set by the
+# Nuxt proxy from h3 getRequestIP) and falls back to REMOTE_ADDR. We override
+# the adapter instead of setting ALLAUTH_TRUSTED_CLIENT_IP_HEADER because the
+# latter hard-requires the header — direct-to-Django paths (health probes,
+# Celery-triggered HTTP calls, tests) would otherwise 403 on every hit.
 
 HEADLESS_TOKEN_STRATEGY = "core.api.tokens.SessionTokenStrategy"
 HEADLESS_FRONTEND_URLS = {

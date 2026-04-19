@@ -757,27 +757,47 @@ def _get_stock_badge(stock):
 
 
 def _get_rating_stars(rate):
-    """Generate star rating display."""
-    filled = "★" * rate
-    empty = "☆" * (5 - rate)
+    """Render a 5-star display from a 1-10 rate field."""
+    stars = max(0, min(5, round((rate or 0) / 2)))
+    filled = "★" * stars
+    empty = "☆" * (5 - stars)
     return format_html(
-        '<span class="text-yellow-500 font-mono">{}{}</span>', filled, empty
+        '<span class="inline-flex items-center gap-1 font-mono">'
+        '<span class="text-amber-500">{}</span>'
+        '<span class="text-base-300 dark:text-base-600">{}</span>'
+        '<span class="text-xs text-base-500 dark:text-base-400 ml-1">{}/10</span>'
+        "</span>",
+        filled,
+        empty,
+        rate or 0,
     )
 
 
 def _get_review_status_badge(status):
-    """Generate HTML badge for review status."""
-    colors = {
-        "NEW": "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-        "APPROVED": "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
-        "REJECTED": "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
+    """Generate HTML badge for review status (NEW / TRUE / FALSE)."""
+    styles = {
+        "NEW": (
+            "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+            "New",
+        ),
+        "TRUE": (
+            "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
+            "Approved",
+        ),
+        "FALSE": (
+            "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300",
+            "Rejected",
+        ),
     }
-    color_class = colors.get(
-        status, "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
+    color_class, label = styles.get(
+        status,
+        (
+            "bg-base-100 text-base-700 dark:bg-base-800 dark:text-base-300",
+            str(status).title() if status else "—",
+        ),
     )
-    label = status.replace("_", " ").title()
     return format_html(
-        '<span class="px-2 py-1 text-xs font-semibold rounded-full {}">{}</span>',
+        '<span class="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full {}">{}</span>',
         color_class,
         label,
     )

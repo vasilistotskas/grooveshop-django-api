@@ -10,39 +10,102 @@
 
 /* Unfold color theme integration */
 @theme {
-  /* Base color palette (neutral grays) - using rgb() for proper color values */
-  --color-base-50: rgb(250 250 250);
-  --color-base-100: rgb(244 244 245);
-  --color-base-200: rgb(228 228 231);
-  --color-base-300: rgb(212 212 216);
-  --color-base-400: rgb(161 161 170);
-  --color-base-500: rgb(113 113 122);
-  --color-base-600: rgb(82 82 91);
-  --color-base-700: rgb(63 63 70);
-  --color-base-800: rgb(39 39 42);
-  --color-base-900: rgb(24 24 27);
-  --color-base-950: rgb(9 9 11);
+  /* Base neutral palette (slate) — matches UNFOLD["COLORS"]["base"] */
+  --color-base-50: oklch(98.5% 0.002 247.839);
+  --color-base-100: oklch(96.7% 0.003 264.542);
+  --color-base-200: oklch(92.8% 0.006 264.531);
+  --color-base-300: oklch(87.2% 0.010 258.338);
+  --color-base-400: oklch(70.7% 0.022 261.325);
+  --color-base-500: oklch(55.1% 0.027 264.364);
+  --color-base-600: oklch(44.6% 0.030 256.802);
+  --color-base-700: oklch(37.3% 0.034 259.733);
+  --color-base-800: oklch(27.8% 0.033 256.848);
+  --color-base-900: oklch(21.0% 0.034 264.665);
+  --color-base-950: oklch(13.0% 0.028 261.692);
 
-  /* Primary brand colors */
-  --color-primary-50: rgb(239 246 255);
-  --color-primary-100: rgb(219 234 254);
-  --color-primary-200: rgb(191 219 254);
-  --color-primary-300: rgb(147 197 253);
-  --color-primary-400: rgb(96 165 250);
-  --color-primary-500: rgb(59 130 246);
-  --color-primary-600: rgb(37 99 235);
-  --color-primary-700: rgb(29 78 216);
-  --color-primary-800: rgb(30 64 175);
-  --color-primary-900: rgb(30 58 138);
-  --color-primary-950: rgb(23 37 84);
+  /* Primary brand (indigo) — matches UNFOLD["COLORS"]["primary"] */
+  --color-primary-50: oklch(96.2% 0.018 272.314);
+  --color-primary-100: oklch(93.0% 0.034 272.788);
+  --color-primary-200: oklch(87.0% 0.065 274.039);
+  --color-primary-300: oklch(78.5% 0.115 274.713);
+  --color-primary-400: oklch(67.3% 0.182 276.935);
+  --color-primary-500: oklch(58.5% 0.233 277.117);
+  --color-primary-600: oklch(51.1% 0.262 276.966);
+  --color-primary-700: oklch(45.7% 0.240 277.023);
+  --color-primary-800: oklch(39.8% 0.195 277.366);
+  --color-primary-900: oklch(35.9% 0.144 278.697);
+  --color-primary-950: oklch(25.7% 0.090 281.288);
 
   /* Font colors for light/dark modes */
-  --color-font-subtle-light: rgb(113 113 122);
-  --color-font-subtle-dark: rgb(161 161 170);
-  --color-font-default-light: rgb(39 39 42);
-  --color-font-default-dark: rgb(244 244 245);
-  --color-font-important-light: rgb(24 24 27);
-  --color-font-important-dark: rgb(250 250 250);
+  --color-font-subtle-light: var(--color-base-500);
+  --color-font-subtle-dark: var(--color-base-400);
+  --color-font-default-light: var(--color-base-700);
+  --color-font-default-dark: var(--color-base-200);
+  --color-font-important-light: var(--color-base-900);
+  --color-font-important-dark: var(--color-base-50);
+
+  /* Status accent palettes used by dashboard icon chips and badges.
+     Tailwind v4 replaces the default color namespace when @theme defines
+     --color-*, so the shades we reference must be declared explicitly. */
+  --color-sky-50: oklch(97.7% 0.013 236.62);
+  --color-sky-100: oklch(95.1% 0.026 236.824);
+  --color-sky-200: oklch(90.1% 0.058 230.902);
+  --color-sky-300: oklch(82.8% 0.111 230.318);
+  --color-sky-400: oklch(74.6% 0.16 232.661);
+  --color-sky-500: oklch(68.5% 0.169 237.323);
+  --color-sky-600: oklch(58.8% 0.158 241.966);
+  --color-sky-700: oklch(50% 0.134 242.749);
+  --color-sky-800: oklch(44.3% 0.11 240.79);
+  --color-sky-900: oklch(39.1% 0.09 240.876);
+  --color-sky-950: oklch(29.3% 0.066 243.157);
+
+  --color-emerald-50: oklch(97.9% 0.021 166.113);
+  --color-emerald-100: oklch(95% 0.052 163.051);
+  --color-emerald-200: oklch(90.5% 0.093 164.15);
+  --color-emerald-300: oklch(84.5% 0.143 164.978);
+  --color-emerald-400: oklch(76.5% 0.177 163.223);
+  --color-emerald-500: oklch(69.6% 0.17 162.48);
+  --color-emerald-600: oklch(59.6% 0.145 163.225);
+  --color-emerald-700: oklch(50.8% 0.118 165.612);
+  --color-emerald-800: oklch(43.2% 0.095 166.913);
+  --color-emerald-900: oklch(37.8% 0.077 168.94);
+  --color-emerald-950: oklch(26.2% 0.051 172.552);
+
+  --color-violet-50: oklch(96.9% 0.016 293.756);
+  --color-violet-100: oklch(94.3% 0.029 294.588);
+  --color-violet-200: oklch(89.4% 0.057 293.283);
+  --color-violet-300: oklch(81.1% 0.111 293.571);
+  --color-violet-400: oklch(70.2% 0.183 293.541);
+  --color-violet-500: oklch(60.6% 0.25 292.717);
+  --color-violet-600: oklch(54.1% 0.281 293.009);
+  --color-violet-700: oklch(49.1% 0.27 292.581);
+  --color-violet-800: oklch(43.2% 0.232 292.759);
+  --color-violet-900: oklch(38% 0.189 293.745);
+  --color-violet-950: oklch(28.3% 0.141 291.089);
+
+  --color-amber-50: oklch(98.7% 0.022 95.277);
+  --color-amber-100: oklch(96.2% 0.059 95.617);
+  --color-amber-200: oklch(92.4% 0.12 95.746);
+  --color-amber-300: oklch(87.9% 0.169 91.605);
+  --color-amber-400: oklch(82.8% 0.189 84.429);
+  --color-amber-500: oklch(76.9% 0.188 70.08);
+  --color-amber-600: oklch(66.6% 0.179 58.318);
+  --color-amber-700: oklch(55.5% 0.163 48.998);
+  --color-amber-800: oklch(47.3% 0.137 46.201);
+  --color-amber-900: oklch(41.4% 0.112 45.904);
+  --color-amber-950: oklch(27.9% 0.077 45.635);
+
+  --color-rose-50: oklch(96.9% 0.015 12.422);
+  --color-rose-100: oklch(94.1% 0.03 12.58);
+  --color-rose-200: oklch(89.2% 0.058 10.001);
+  --color-rose-300: oklch(81% 0.117 11.638);
+  --color-rose-400: oklch(71.2% 0.194 13.428);
+  --color-rose-500: oklch(64.5% 0.246 16.439);
+  --color-rose-600: oklch(58.6% 0.253 17.585);
+  --color-rose-700: oklch(51.4% 0.222 16.935);
+  --color-rose-800: oklch(45.5% 0.188 13.697);
+  --color-rose-900: oklch(41% 0.159 10.272);
+  --color-rose-950: oklch(27.1% 0.105 12.094);
 }
 
 /* Custom styles for Unfold admin */

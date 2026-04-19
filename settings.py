@@ -1326,10 +1326,11 @@ ROSETTA_CACHE_NAME = "default"
 ROSETTA_STORAGE_CLASS = "core.rosetta_storage.CacheClearingRosettaStorage"
 
 UNFOLD = {
-    "SITE_TITLE": getenv("UNFOLD_SITE_TITLE", "GrooveShop Title"),
-    "SITE_HEADER": getenv("UNFOLD_SITE_HEADER", "GrooveShop Header"),
-    "SITE_SUBHEADER": getenv("UNFOLD_SITE_SUBHEADER", "GrooveShop SubHeader"),
-    "SITE_SYMBOL": "speed",
+    "SITE_TITLE": getenv("UNFOLD_SITE_TITLE", "Webside Admin"),
+    "SITE_HEADER": getenv("UNFOLD_SITE_HEADER", "Webside"),
+    "SITE_SUBHEADER": getenv("UNFOLD_SITE_SUBHEADER", "Commerce control"),
+    "SITE_SYMBOL": "storefront",
+    "SITE_URL": "/",
     "SITE_ICON": {
         "light": lambda request: static("icon-light.svg"),
         "dark": lambda request: static("icon-dark.svg"),
@@ -1346,22 +1347,51 @@ UNFOLD = {
             "href": lambda request: static("favicon/favicon.svg"),
         },
     ],
+    "SHOW_HISTORY": True,
+    "SHOW_VIEW_ON_SITE": True,
+    "SHOW_BACK_BUTTON": True,
+    "BORDER_RADIUS": "0.625rem",
+    "ENVIRONMENT": "admin.environment.environment_callback",
     "COLORS": {
+        "base": {
+            "50": "oklch(98.5% 0.002 247.839)",
+            "100": "oklch(96.7% 0.003 264.542)",
+            "200": "oklch(92.8% 0.006 264.531)",
+            "300": "oklch(87.2% 0.010 258.338)",
+            "400": "oklch(70.7% 0.022 261.325)",
+            "500": "oklch(55.1% 0.027 264.364)",
+            "600": "oklch(44.6% 0.030 256.802)",
+            "700": "oklch(37.3% 0.034 259.733)",
+            "800": "oklch(27.8% 0.033 256.848)",
+            "900": "oklch(21.0% 0.034 264.665)",
+            "950": "oklch(13.0% 0.028 261.692)",
+        },
         "primary": {
-            "50": "238 242 255",
-            "100": "224 231 255",
-            "200": "199 210 254",
-            "300": "165 180 252",
-            "400": "129 140 248",
-            "500": "99 102 241",
-            "600": "79 70 229",
-            "700": "67 56 202",
-            "800": "55 48 163",
-            "900": "49 46 129",
-            "950": "30 27 75",
+            "50": "oklch(96.2% 0.018 272.314)",
+            "100": "oklch(93.0% 0.034 272.788)",
+            "200": "oklch(87.0% 0.065 274.039)",
+            "300": "oklch(78.5% 0.115 274.713)",
+            "400": "oklch(67.3% 0.182 276.935)",
+            "500": "oklch(58.5% 0.233 277.117)",
+            "600": "oklch(51.1% 0.262 276.966)",
+            "700": "oklch(45.7% 0.240 277.023)",
+            "800": "oklch(39.8% 0.195 277.366)",
+            "900": "oklch(35.9% 0.144 278.697)",
+            "950": "oklch(25.7% 0.090 281.288)",
+        },
+        "font": {
+            "subtle-light": "var(--color-base-500)",
+            "subtle-dark": "var(--color-base-400)",
+            "default-light": "var(--color-base-700)",
+            "default-dark": "var(--color-base-200)",
+            "important-light": "var(--color-base-900)",
+            "important-dark": "var(--color-base-50)",
         },
     },
     "SHOW_LANGUAGES": True,
+    "LOGIN": {
+        "redirect_after": lambda request: reverse_lazy("admin:index"),
+    },
     "STYLES": [
         lambda request: static("css/styles.css"),
         lambda request: static("css/admin.css"),
@@ -1408,6 +1438,7 @@ UNFOLD = {
                         "link": reverse_lazy(
                             "admin:product_productreview_changelist"
                         ),
+                        "badge": "admin.badges.pending_reviews_badge",
                     },
                     {
                         "title": _("Tags"),
@@ -1439,6 +1470,7 @@ UNFOLD = {
                         "title": _("Orders"),
                         "icon": "receipt_long",
                         "link": reverse_lazy("admin:order_order_changelist"),
+                        "badge": "admin.badges.pending_orders_badge",
                     },
                     {
                         "title": _("Carts"),
@@ -1520,6 +1552,7 @@ UNFOLD = {
                         "link": reverse_lazy(
                             "admin:blog_blogcomment_changelist"
                         ),
+                        "badge": "admin.badges.pending_comments_badge",
                     },
                     {
                         "title": _("Blog Tags"),
@@ -1546,6 +1579,7 @@ UNFOLD = {
                         "link": reverse_lazy(
                             "admin:contact_contact_changelist"
                         ),
+                        "badge": "admin.badges.unread_messages_badge",
                     },
                 ],
             },

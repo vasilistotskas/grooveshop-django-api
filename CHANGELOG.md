@@ -3,6 +3,12 @@
 
 
 
+## v1.100.1 (2026-04-19)
+
+### Bug fixes
+
+* fix: update uv lock ([`01de097`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01de09724117861e28515db86bb699a8291fe7fa))
+
 ## v1.100.0 (2026-04-19)
 
 ### Bug fixes

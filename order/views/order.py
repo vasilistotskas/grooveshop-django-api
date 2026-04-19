@@ -19,9 +19,11 @@ from rest_framework.exceptions import (
 )
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from core.api.permissions import IsOwnerOrAdmin, IsOwnerOrAdminOrGuest
 from core.api.serializers import ErrorResponseSerializer
+from core.api.throttling import PaymentAttemptAnonThrottle, PaymentAttemptThrottle
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     ActionConfig,
@@ -670,7 +672,20 @@ class OrderViewSet(BaseModelViewSet):
             "customer_notes": request.data.get("customer_notes", ""),
         }
 
-    @action(detail=True, methods=["POST"])
+    # Payment endpoints are expensive and abuse-prone (Stripe PaymentIntent
+    # creation, Viva Wallet checkout session). Stack the global anon/user caps
+    # with tight per-IP / per-user burst throttles. Guest orders can hit these
+    # via uuid query param, so both anon and user throttles are needed.
+    @action(
+        detail=True,
+        methods=["POST"],
+        throttle_classes=[
+            AnonRateThrottle,
+            UserRateThrottle,
+            PaymentAttemptThrottle,
+            PaymentAttemptAnonThrottle,
+        ],
+    )
     def create_payment_intent(self, request, *args, **kwargs):
         """Create a payment intent for an order."""
         order = self.get_object()
@@ -847,7 +862,16 @@ class OrderViewSet(BaseModelViewSet):
         response_serializer.is_valid(raise_exception=True)
         return Response(response_serializer.validated_data)
 
-    @action(detail=True, methods=["POST"])
+    @action(
+        detail=True,
+        methods=["POST"],
+        throttle_classes=[
+            AnonRateThrottle,
+            UserRateThrottle,
+            PaymentAttemptThrottle,
+            PaymentAttemptAnonThrottle,
+        ],
+    )
     def create_checkout_session(self, request, *args, **kwargs):
         """Create a hosted checkout session for an order."""
         order = self.get_object()

@@ -248,6 +248,13 @@ REST_FRAMEWORK = {
         "anon": None if DEBUG else "100000/day",
         "user": None if DEBUG else "150000/day",
         "burst": None if DEBUG else "5/minute",
+        # Per-endpoint scopes. Applied via throttle_classes on specific views
+        # (ContactCreateThrottle, PaymentAttemptThrottle, PaymentAttemptAnonThrottle
+        # in core.api.throttling) — the global anon/user throttles continue to
+        # apply on top.
+        "contact": None if DEBUG else "5/minute",
+        "payment": None if DEBUG else "10/minute",
+        "payment_anon": None if DEBUG else "5/minute",
     },
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",

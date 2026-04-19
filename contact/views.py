@@ -21,7 +21,11 @@ class ContactCreateView(generics.CreateAPIView):
     # Stack: global anon/user daily caps + a tight per-IP burst limit for this
     # unauthenticated endpoint. Without this, the default 100k/day anon limit
     # is too loose for a contact form and enables spam/abuse.
-    throttle_classes = [AnonRateThrottle, UserRateThrottle, ContactCreateThrottle]
+    throttle_classes = [
+        AnonRateThrottle,
+        UserRateThrottle,
+        ContactCreateThrottle,
+    ]
 
     @extend_schema(
         operation_id="createContact",

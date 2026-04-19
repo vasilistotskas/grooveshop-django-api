@@ -23,7 +23,10 @@ from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from core.api.permissions import IsOwnerOrAdmin, IsOwnerOrAdminOrGuest
 from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import PaymentAttemptAnonThrottle, PaymentAttemptThrottle
+from core.api.throttling import (
+    PaymentAttemptAnonThrottle,
+    PaymentAttemptThrottle,
+)
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     ActionConfig,

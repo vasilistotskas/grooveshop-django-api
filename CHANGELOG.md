@@ -3,6 +3,91 @@
 
 
 
+## v1.100.0 (2026-04-19)
+
+### Bug fixes
+
+* fix: lint ([`989623f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/989623fcc9894f81ca73f1b0009f23cdff9d2f3b))
+
+* fix(auth): override get_client_ip in adapter instead of trusting single header
+
+The previous ALLAUTH_TRUSTED_CLIENT_IP_HEADER = "X-Real-IP" setting
+made allauth's get_client_ip() read only that header and raise
+PermissionDenied when missing. Combined with USERSESSIONS_TRACK_ACTIVITY
+(which runs on every authenticated request via UserSessionsMiddleware),
+any direct-to-Django caller without the header got 403 — health probes,
+Celery-triggered HTTP, and the integration test suite all broke (17
+analytics tests were failing with "Unable to determine client IP address").
+
+Drop the setting and override UserAccountAdapter.get_client_ip to prefer
+X-Real-IP (set by the Nuxt proxy from h3 getRequestIP) with a
+REMOTE_ADDR fallback. Keeps the spoof-safe priority while staying
+functional on proxy-less paths.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`3af4300`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3af4300d214b2866de1a5f49c793b2a4ab4e53ea))
+
+* fix(auth): trust X-Real-IP for allauth session IP tracking
+
+allauth 65.14.2 removed default X-Forwarded-For trust (anti-spoofing +
+rate-limit-bypass protection), so get_client_ip() now falls back to
+REMOTE_ADDR unless a trusted header or proxy count is configured. In
+K8s that means UserSession.ip recorded the Nuxt pod cluster IP on
+every request (USERSESSIONS_TRACK_ACTIVITY=True) instead of the real
+client.
+
+Nuxt sets X-Real-IP from h3 getRequestIP(event, { xForwardedFor: true })
+and Django now reads it via ALLAUTH_TRUSTED_CLIENT_IP_HEADER.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`bd31805`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bd3180503340f8d674c5b57ab948a3ec3bcca678))
+
+### Chores
+
+* chore: sync uv.lock to pyproject version 1.99.1 ([`b10d3b8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b10d3b8d1259a4b1a5bd88f7811223fb134c92e0))
+
+### Features
+
+* feat(admin): revamp Unfold theme with oklch palette, dashboard badges, env banner
+
+- Move SITE_TITLE/HEADER/SUBHEADER/SYMBOL to env-overridable strings,
+  add SITE_URL, BORDER_RADIUS, SHOW_HISTORY/VIEW_ON_SITE/BACK_BUTTON,
+  ENVIRONMENT callback, and LOGIN.redirect_after.
+- Replace indigo RGB palette with zinc-based oklch base + primary scales
+  and matching font semantic tokens.
+- Add pending-review / pending-order / pending-comment / unread-message
+  badges in the sidebar via admin/badges.py.
+- Add admin/environment.py for the Unfold environment banner.
+- Polish dashboard rating stars (5-of-10 display) and review status
+  badges (NEW / TRUE / FALSE mapped to amber / emerald / rose).
+- Sync static CSS + tailwind input to match new palette.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`0b82aa4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0b82aa40fc42f2e5c30ec75a848fdfd2f9a1b1c5))
+
+### Unknown
+
+* i18n(el): seed 41 missing msgstrs for order / cart / subscription / inactive-user email chrome
+
+"Payment Status" arrived in English on a live test order even though
+the operator had saved "Κατάσταση πληρωμής" via Rosetta. Two causes,
+one fixed per-edit and one fixed at the baseline:
+
+1. The Celery worker rendering the email may have been running an
+   image that pre-dates the worker_process_init / task_prerun overlay
+   wiring (f2498c71). Fresh worker pods on the latest image now pull
+   DB-backed Rosetta edits on boot and refresh on the Redis version
+   tick — if "Κατάσταση πληρωμής" is in core_translation, it WILL
+   reach the next email.
+
+2. The .po baseline had msgstr "" for ~40 strings across order_received,
+   order_payment_confirmed, payment_failed, order_shipped,
+   order_pending_reminder, checkout_abandoned, subscription/confirmation,
+   and inactive_user templates. Seeded the obvious translations with
+   a polib pass that only fills entries whose current msgstr is empty
+   — any Rosetta edit already on disk is preserved (strict additive).
+
+After deploy, even a worker that can't reach the Translation table at
+boot (or with an empty overlay) serves Greek correctly from the .mo
+fallback. The overlay still wins when it's present. ([`eb56a13`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eb56a13ec6d4192bf669004de2cd77d6a1dd2f0a))
+
 ## v1.99.1 (2026-04-18)
 
 ### Bug fixes

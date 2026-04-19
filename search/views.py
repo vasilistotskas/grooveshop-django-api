@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import unquote
 
 from django.conf import settings as django_settings
+from django.core.cache import caches
 from django.db.models import Avg, Count
 from extra_settings.models import Setting
 from django.utils import timezone
@@ -12,7 +13,7 @@ from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
@@ -826,3 +827,106 @@ def search_analytics(request):
     }
 
     return Response(response_data, status=status.HTTP_200_OK)
+
+
+_TRENDING_CACHE_TTL_SECONDS = 300  # 5 minutes
+_TRENDING_MIN_QUERY_LENGTH = 2
+_TRENDING_DEFAULT_LIMIT = 8
+_TRENDING_MAX_LIMIT = 20
+_TRENDING_WINDOW_HOURS = 24
+
+
+@extend_schema(
+    operation_id="listTrendingSearches",
+    tags=["Search"],
+    summary=_("List trending search queries"),
+    description=_(
+        "Return the most popular search queries from the last 24 hours, "
+        "suitable for surfacing in the search modal empty state. Cached "
+        "for 5 minutes per (language_code, content_type, limit)."
+    ),
+    parameters=[
+        OpenApiParameter(
+            name="language_code",
+            description=_("Filter queries by language (e.g. 'el')."),
+            required=False,
+        ),
+        OpenApiParameter(
+            name="content_type",
+            description=_(
+                "Filter by content type: product, blog_post, federated. "
+                "Defaults to product."
+            ),
+            required=False,
+        ),
+        OpenApiParameter(
+            name="limit",
+            description=_("Max results. Default 8, cap 20."),
+            required=False,
+        ),
+    ],
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def search_trending(request):
+    """Return top search queries over the last 24h (Redis-cached)."""
+    language_code = request.query_params.get("language_code") or ""
+    content_type = request.query_params.get("content_type") or "product"
+
+    try:
+        limit = int(request.query_params.get("limit", _TRENDING_DEFAULT_LIMIT))
+    except (TypeError, ValueError):
+        limit = _TRENDING_DEFAULT_LIMIT
+    limit = max(1, min(limit, _TRENDING_MAX_LIMIT))
+
+    if (
+        language_code
+        and _VALID_LANGUAGE_CODES
+        and language_code not in _VALID_LANGUAGE_CODES
+    ):
+        raise ValidationError({"language_code": _("Unsupported language.")})
+
+    cache_key = f"search:trending:{content_type}:{language_code}:{limit}"
+    cached = caches["default"].get(cache_key)
+    if cached is not None:
+        return Response(cached, status=status.HTTP_200_OK)
+
+    cutoff = timezone.now() - timedelta(hours=_TRENDING_WINDOW_HOURS)
+    qs = (
+        SearchQuery.objects.filter(
+            timestamp__gte=cutoff,
+            results_count__gt=0,
+            content_type=content_type,
+        )
+        .exclude(query__isnull=True)
+        .exclude(query__exact="")
+    )
+    if language_code:
+        qs = qs.filter(language_code=language_code)
+
+    top = (
+        qs.values("query")
+        .annotate(count=Count("id"))
+        .order_by("-count")[: limit * 2]
+    )
+
+    results: list[dict] = []
+    for row in top:
+        query_text = (row.get("query") or "").strip()
+        if len(query_text) < _TRENDING_MIN_QUERY_LENGTH:
+            continue
+        results.append({"query": query_text, "count": row["count"]})
+        if len(results) >= limit:
+            break
+
+    payload = {
+        "window_hours": _TRENDING_WINDOW_HOURS,
+        "content_type": content_type,
+        "language_code": language_code or None,
+        "results": results,
+    }
+
+    caches["default"].set(
+        cache_key, payload, timeout=_TRENDING_CACHE_TTL_SECONDS
+    )
+    return Response(payload, status=status.HTTP_200_OK)

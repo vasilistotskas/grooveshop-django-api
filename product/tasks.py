@@ -1,10 +1,12 @@
 import logging
+from decimal import Decimal
 
 from celery import shared_task
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.db import models
 from django.template.loader import render_to_string
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from core import celery_app
@@ -221,3 +223,180 @@ def check_low_stock_products() -> dict:
         product_ids,
     )
     return {"alerted": len(product_ids), "ids": product_ids}
+
+
+def _send_product_alert_email(
+    *, recipient: str, subject: str, context: dict, template_basename: str
+) -> bool:
+    try:
+        text_content = render_to_string(
+            f"emails/product/{template_basename}.txt", context
+        )
+        html_content = render_to_string(
+            f"emails/product/{template_basename}.html", context
+        )
+    except Exception:  # noqa: BLE001 — template may not exist yet
+        # Minimal plain-text fallback keeps the feature working even if
+        # the dedicated template has not been authored yet.
+        text_content = (
+            f"{subject}\n\nCheck it out: {context.get('product_url', '')}\n"
+        )
+        html_content = (
+            f"<p>{subject}</p>"
+            f"<p><a href='{context.get('product_url', '')}'>View product</a></p>"
+        )
+
+    try:
+        msg = EmailMultiAlternatives(
+            subject,
+            text_content,
+            settings.DEFAULT_FROM_EMAIL,
+            [recipient],
+        )
+        msg.attach_alternative(html_content, "text/html")
+        msg.send()
+        return True
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "Failed to send product alert email to %s: %s",
+            recipient,
+            exc,
+            exc_info=True,
+        )
+        return False
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=3,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def send_product_alert_restock(product_id: int) -> dict:
+    """Notify every active RESTOCK ProductAlert subscriber for a product."""
+    from product.models.alert import ProductAlert, ProductAlertKind
+    from product.models.product import Product
+
+    try:
+        product = Product.objects.get(id=product_id)
+    except Product.DoesNotExist:
+        return {"status": "skipped", "reason": "product_not_found"}
+
+    product_url = (
+        f"{settings.NUXT_BASE_URL}/products/{product.id}/{product.slug}"
+    )
+    product_name = (
+        product.safe_translation_getter("name", any_language=True)
+        or f"Product {product.slug or product.id}"
+    )
+
+    alerts = ProductAlert.objects.filter(
+        product_id=product_id,
+        kind=ProductAlertKind.RESTOCK,
+        is_active=True,
+        notified_at__isnull=True,
+    ).select_related("user")
+
+    sent = 0
+    now = timezone.now()
+    for alert in alerts:
+        recipient = alert.email or (alert.user.email if alert.user_id else "")
+        if not recipient:
+            continue
+
+        context = {
+            "product_name": product_name,
+            "product_url": product_url,
+            "SITE_NAME": settings.SITE_NAME,
+        }
+        subject = _("[{site}] {name} is back in stock").format(
+            site=settings.SITE_NAME, name=product_name
+        )
+        if _send_product_alert_email(
+            recipient=recipient,
+            subject=str(subject),
+            context=context,
+            template_basename="restock_alert",
+        ):
+            sent += 1
+
+    # Single-shot: deactivate every alert we processed, even failures —
+    # a retry loop would otherwise hammer broken addresses.
+    ProductAlert.objects.filter(
+        product_id=product_id,
+        kind=ProductAlertKind.RESTOCK,
+        is_active=True,
+        notified_at__isnull=True,
+    ).update(is_active=False, notified_at=now)
+
+    return {"status": "success", "product_id": product_id, "sent": sent}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=3,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
+    """Notify PRICE_DROP subscribers whose target_price is >= new_price."""
+    from product.models.alert import ProductAlert, ProductAlertKind
+    from product.models.product import Product
+
+    try:
+        product = Product.objects.get(id=product_id)
+    except Product.DoesNotExist:
+        return {"status": "skipped", "reason": "product_not_found"}
+
+    new_price_dec = Decimal(str(new_price))
+    product_url = (
+        f"{settings.NUXT_BASE_URL}/products/{product.id}/{product.slug}"
+    )
+    product_name = (
+        product.safe_translation_getter("name", any_language=True)
+        or f"Product {product.slug or product.id}"
+    )
+
+    alerts = ProductAlert.objects.filter(
+        product_id=product_id,
+        kind=ProductAlertKind.PRICE_DROP,
+        is_active=True,
+        notified_at__isnull=True,
+        target_price__gte=new_price_dec,
+    ).select_related("user")
+
+    sent = 0
+    now = timezone.now()
+    triggered_ids: list[int] = []
+    for alert in alerts:
+        recipient = alert.email or (alert.user.email if alert.user_id else "")
+        if not recipient:
+            continue
+
+        context = {
+            "product_name": product_name,
+            "product_url": product_url,
+            "new_price": new_price,
+            "target_price": str(alert.target_price.amount),
+            "SITE_NAME": settings.SITE_NAME,
+        }
+        subject = _("[{site}] Price drop: {name} is now at your target").format(
+            site=settings.SITE_NAME, name=product_name
+        )
+        if _send_product_alert_email(
+            recipient=recipient,
+            subject=str(subject),
+            context=context,
+            template_basename="price_drop_alert",
+        ):
+            sent += 1
+        triggered_ids.append(alert.id)
+
+    if triggered_ids:
+        ProductAlert.objects.filter(id__in=triggered_ids).update(
+            is_active=False, notified_at=now
+        )
+
+    return {"status": "success", "product_id": product_id, "sent": sent}

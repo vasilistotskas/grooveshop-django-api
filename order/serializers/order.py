@@ -785,3 +785,16 @@ class CancelOrderRequestSerializer(serializers.Serializer):
         default=True,
         help_text="Whether to automatically refund the payment if the order is paid",
     )
+
+
+class ReorderItemSerializer(serializers.Serializer):
+    product_id = serializers.IntegerField()
+    requested_quantity = serializers.IntegerField()
+    added_quantity = serializers.IntegerField(required=False, default=0)
+    reason = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class ReorderResponseSerializer(serializers.Serializer):
+    cart_id = serializers.IntegerField(allow_null=True)
+    added_items = ReorderItemSerializer(many=True)
+    skipped_items = ReorderItemSerializer(many=True)

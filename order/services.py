@@ -1200,6 +1200,78 @@ class OrderService:
 
     @classmethod
     @transaction.atomic
+    def reorder_to_cart(cls, order: Order, user) -> dict[str, Any]:
+        """Add each item from a past order back into the user's active cart.
+
+        Items with insufficient stock or inactive products are recorded in
+        `skipped_items` rather than rejecting the whole reorder. Quantities
+        are capped at current stock.
+        """
+        from cart.models import Cart, CartItem
+
+        cart, _created = Cart.objects.get_or_create(user=user)
+
+        added: list[dict[str, Any]] = []
+        skipped: list[dict[str, Any]] = []
+
+        for item in order.items.select_related("product").all():
+            product = item.product
+            requested = item.quantity
+
+            if not getattr(product, "active", True):
+                skipped.append(
+                    {
+                        "product_id": product.id,
+                        "requested_quantity": requested,
+                        "added_quantity": 0,
+                        "reason": "inactive",
+                    }
+                )
+                continue
+
+            available = getattr(product, "stock", 0) or 0
+            if available <= 0:
+                skipped.append(
+                    {
+                        "product_id": product.id,
+                        "requested_quantity": requested,
+                        "added_quantity": 0,
+                        "reason": "out_of_stock",
+                    }
+                )
+                continue
+
+            to_add = min(requested, available)
+
+            existing = CartItem.objects.filter(
+                cart=cart, product=product
+            ).first()
+            if existing:
+                existing.quantity += to_add
+                existing.save(update_fields=["quantity"])
+            else:
+                CartItem.objects.create(
+                    cart=cart, product=product, quantity=to_add
+                )
+
+            entry = {
+                "product_id": product.id,
+                "requested_quantity": requested,
+                "added_quantity": to_add,
+                "reason": "partial" if to_add < requested else "",
+            }
+            if to_add < requested:
+                skipped.append(entry)
+            added.append(entry)
+
+        return {
+            "cart_id": cart.id,
+            "added_items": added,
+            "skipped_items": skipped,
+        }
+
+    @classmethod
+    @transaction.atomic
     def cancel_order(
         cls,
         order: Order,

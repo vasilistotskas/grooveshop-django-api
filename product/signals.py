@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 product_price_lowered = django.dispatch.Signal()
 product_price_increased = django.dispatch.Signal()
+product_back_in_stock = django.dispatch.Signal()
 
 
 @receiver(
@@ -51,6 +52,16 @@ def post_create_historical_record_callback(
     # Track stock changes
     old_stock = prev_record.stock
     new_stock = instance.stock
+
+    # Back-in-stock transition (0 → positive). Emitted before StockLog
+    # writes below so subscribers observe the freshly-restocked product.
+    if old_stock <= 0 and new_stock > 0:
+        product_back_in_stock.send(
+            sender=Product,
+            instance=instance,
+            old_stock=old_stock,
+            new_stock=new_stock,
+        )
 
     if old_stock != new_stock:
         # Detect if this is a programmatic stock operation from order/stock.py
@@ -193,13 +204,30 @@ def reindex_product_translations(sender, instance, **kwargs):
 def notify_product_price_lowered(
     sender, instance, old_price, new_price, **kwargs
 ):
-    from product.tasks import send_price_drop_notifications
+    from product.tasks import (
+        send_price_drop_notifications,
+        send_product_alert_price_drop,
+    )
 
     send_price_drop_notifications.delay(
         product_id=instance.id,
         old_price=float(old_price),
         new_price=float(new_price),
     )
+    send_product_alert_price_drop.delay(
+        product_id=instance.id,
+        new_price=float(new_price),
+    )
+
+
+@receiver(
+    product_back_in_stock,
+    dispatch_uid="product.notify_product_back_in_stock",
+)
+def notify_product_back_in_stock(sender, instance, **kwargs):
+    from product.tasks import send_product_alert_restock
+
+    send_product_alert_restock.delay(product_id=instance.id)
 
 
 @receiver(

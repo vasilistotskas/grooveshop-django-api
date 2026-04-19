@@ -57,6 +57,7 @@ from order.serializers.order import (
     PaymentStatusResponseSerializer,
     RefundOrderRequestSerializer,
     RefundOrderResponseSerializer,
+    ReorderResponseSerializer,
     UpdateStatusSerializer,
 )
 from order.services import OrderService
@@ -169,6 +170,18 @@ serializers_config: SerializersConfig = {
             "Create a fresh Stripe PaymentIntent for an order whose previous "
             "payment failed or was never completed, so the customer can try again "
             "without starting a new order."
+        ),
+        tags=["Orders"],
+    ),
+    "reorder": ActionConfig(
+        response=ReorderResponseSerializer,
+        operation_id="reorderOrder",
+        summary=_("Reorder the items from a past order"),
+        description=_(
+            "Copy each item from a past order back into the authenticated "
+            "user's active cart. Items whose products are inactive or out "
+            "of stock are returned in skipped_items; quantities are capped "
+            "at current stock."
         ),
         tags=["Orders"],
     ),
@@ -1069,6 +1082,27 @@ class OrderViewSet(BaseModelViewSet):
             request,
             serializer_class=response_serializer_class,
         )
+
+    @action(detail=True, methods=["POST"])
+    def reorder(self, request, *args, **kwargs):
+        """Clone a past order's items back into the user's active cart."""
+        order = self.get_object()
+
+        user = request.user
+        if not user or not user.is_authenticated:
+            raise NotAuthenticated(
+                _("Authentication is required to reorder a past order.")
+            )
+        if order.user_id != user.id and not user.is_staff:
+            raise PermissionDenied(
+                _("You can only reorder your own past orders.")
+            )
+
+        result = OrderService.reorder_to_cart(order=order, user=user)
+        response_serializer_class = self.get_response_serializer()
+        serializer = response_serializer_class(data=result)
+        serializer.is_valid(raise_exception=True)
+        return Response(serializer.validated_data)
 
     @action(detail=True, methods=["POST"])
     def add_tracking(self, request, *args, **kwargs):

@@ -1,3 +1,4 @@
+from .alert import ProductAlert, ProductAlertKind
 from .attribute import Attribute
 from .attribute_value import AttributeValue
 from .category import ProductCategory
@@ -12,6 +13,8 @@ __all__ = [
     "Attribute",
     "AttributeValue",
     "Product",
+    "ProductAlert",
+    "ProductAlertKind",
     "ProductAttribute",
     "ProductCategory",
     "ProductCategoryImage",

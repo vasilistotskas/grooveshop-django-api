@@ -159,6 +159,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "core.middleware.allauth_ratelimit.AllAuthRateLimitMiddleware",
+    "core.middleware.idempotency.IdempotencyMiddleware",  # Idempotency-Key header replay protection
     "search.middleware.SearchAnalyticsMiddleware",  # Search analytics tracking
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",

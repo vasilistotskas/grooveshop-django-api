@@ -3,6 +3,39 @@
 
 
 
+## v1.101.0 (2026-04-19)
+
+### Bug fixes
+
+* fix: update uv lock ([`3878e38`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3878e3829d602fb47826a48b90959061986b5bb8))
+
+### Features
+
+* feat: quick-win feature batch — reorder, alerts, trending, idempotency
+
+* order reorder: OrderService.reorder_to_cart + POST /orders/{id}/reorder
+  clones past-order items into the user's cart, capping qty at current
+  stock and returning added/skipped breakdowns so the frontend can
+  surface partial-success toasts.
+* product alerts: new ProductAlert model (RESTOCK + PRICE_DROP), guest
+  or user subscriptions, single-shot fire-and-deactivate semantics.
+  product_back_in_stock signal + notify_product_back_in_stock receiver
+  dispatch Celery send_product_alert_restock on 0→positive transitions,
+  and the existing price_lowered signal now also fans out to
+  send_product_alert_price_drop for subscribers whose target_price
+  threshold is met.
+* trending searches: new /search/trending aggregates SearchQuery top
+  queries over a 24h window, Redis-cached 5 minutes per
+  (content_type, language_code, limit) tuple.
+* idempotency: IdempotencyMiddleware replays cached 2xx/4xx JSON
+  responses for retried POST/PUT/PATCH/DELETE when the client sends
+  Idempotency-Key (RFC draft behavior, scoped by user/session, 24h).
+* low-stock threshold: expose Product.low_stock_threshold on the
+  product serializer so the frontend can show accurate "only N left"
+  scarcity badges instead of a hardcoded threshold.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`a33f183`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a33f1833d78fe81c9c9b778e9d16e5384fa80fa9))
+
 ## v1.100.2 (2026-04-19)
 
 ### Bug fixes

@@ -3,6 +3,32 @@
 
 
 
+## v1.104.0 (2026-04-20)
+
+### Features
+
+* feat(api): light up orphaned endpoints — address prefill, reorder, alert filters
+
+- user/address: register the previously-orphaned ``get_main`` action so
+  the checkout UI can prefill its form from the user's saved default
+- order: register the ``reorder`` action so past orders can feed their
+  items back into the active cart in one POST
+- product/alert: expose ``product`` / ``kind`` / ``is_active`` via
+  filterset_fields so the PDP can pre-answer "am I already subscribed?"
+  and render the active state instead of a duplicate-submit path
+- product/ProductAlertSerializer: map the ``EmailField(blank=True)`` to
+  ``allow_null=True`` + normalise ``""`` to ``None`` in
+  ``to_representation`` so round-trips aren't broken by Zod's
+  email-format check over a default-empty string; drop the auto
+  UniqueTogetherValidators that (as a side-effect) were forcing email
+  to be required on input — DB-level UniqueConstraint + the view's
+  IntegrityError → 409 already covers uniqueness
+- search/listTrendingSearches: add concrete response serializers and
+  typed query parameters so drf-spectacular emits a real schema instead
+  of the graceful-fallback warning (0 errors now)
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`bee8568`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bee8568556fb7019fc1788530256411908ad4306))
+
 ## v1.103.0 (2026-04-20)
 
 ### Features

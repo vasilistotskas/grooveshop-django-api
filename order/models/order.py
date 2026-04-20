@@ -235,8 +235,16 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
             BTreeIndex(fields=["region"], name="order_region_ix"),
             BTreeIndex(fields=["user", "status"], name="order_user_status_ix"),
             BTreeIndex(
+                fields=["user", "-created_at"],
+                name="order_user_created_ix",
+            ),
+            BTreeIndex(
                 fields=["status", "payment_status"],
                 name="order_status_payment_ix",
+            ),
+            BTreeIndex(
+                fields=["payment_status", "-created_at"],
+                name="order_paystatus_created_ix",
             ),
             BTreeIndex(
                 fields=["tracking_number"], name="order_tracking_num_ix"

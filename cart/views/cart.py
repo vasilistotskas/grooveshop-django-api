@@ -25,8 +25,14 @@ from cart.serializers.cart import (
     ReleaseReservationsResponseSerializer,
     ReserveStockResponseSerializer,
 )
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
+
 from cart.services import CartService
 from core.api.serializers import ErrorResponseSerializer
+from core.api.throttling import (
+    CartMutationAnonThrottle,
+    CartMutationThrottle,
+)
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
@@ -176,6 +182,17 @@ class CartViewSet(BaseModelViewSet):
     ordering = ["-last_activity", "-created_at"]
     search_fields = ["user__email", "user__first_name", "user__last_name"]
 
+    _MUTATION_ACTIONS = frozenset(
+        {
+            "update",
+            "partial_update",
+            "destroy",
+            "reserve_stock",
+            "release_reservations",
+            "create_payment_intent",
+        }
+    )
+
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
         self.cart_service = CartService(request=request)
@@ -189,6 +206,19 @@ class CartViewSet(BaseModelViewSet):
             # via X-Cart-Id header — anonymous requests must be permitted.
             self.permission_classes = [AllowAny]
         return super().get_permissions()
+
+    def get_throttles(self):
+        if self.action in self._MUTATION_ACTIONS:
+            # Per-minute burst limits layered ON TOP of the global daily caps
+            # (DEFAULT_THROTTLE_CLASSES) — include the defaults explicitly so
+            # the override supplements rather than replaces them.
+            return [
+                CartMutationThrottle(),
+                CartMutationAnonThrottle(),
+                AnonRateThrottle(),
+                UserRateThrottle(),
+            ]
+        return super().get_throttles()
 
     def get_queryset(self):
         """

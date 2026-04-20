@@ -12,13 +12,19 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import (
+    api_view,
+    permission_classes,
+    throttle_classes,
+)
 from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from blog.models.post import BlogPostTranslation
 from core.api.serializers import ErrorResponseSerializer
+from core.api.throttling import SearchThrottle
 from meili._client import client as meili_client
 from product.models.product import ProductTranslation
 from search.greeklish import expand_greeklish_query
@@ -868,6 +874,7 @@ _TRENDING_WINDOW_HOURS = 24
 )
 @api_view(["GET"])
 @permission_classes([AllowAny])
+@throttle_classes([SearchThrottle, AnonRateThrottle, UserRateThrottle])
 def search_trending(request):
     """Return top search queries over the last 24h (Redis-cached)."""
     language_code = request.query_params.get("language_code") or ""

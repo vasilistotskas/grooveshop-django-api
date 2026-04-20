@@ -1,4 +1,5 @@
 from django.apps import apps
+from django.core.cache import cache
 from django.db.models import Count, Sum, Avg
 from django.db.models.functions import TruncDay
 from django.utils import timezone
@@ -6,12 +7,28 @@ from django.utils.html import format_html, escape
 from django.urls import reverse
 from datetime import timedelta
 
+DASHBOARD_CACHE_KEY = "admin:dashboard:data:v1"
+DASHBOARD_CACHE_TTL = 300  # 5 minutes
+
 
 def dashboard_callback(request, context):
     """
     Enhanced dashboard callback for Unfold admin.
     Provides KPIs, chart data, and table data for the admin dashboard.
+
+    The underlying data is request-independent (admin-only URLs from
+    ``reverse()`` + DB aggregates) so we cache the full payload in Redis
+    for 5 minutes and invalidate on domain model writes via signals.
     """
+    data = cache.get_or_set(
+        DASHBOARD_CACHE_KEY, _build_dashboard_data, DASHBOARD_CACHE_TTL
+    )
+    context.update(data)
+    return context
+
+
+def _build_dashboard_data():
+    """Compute every KPI/chart/table block in a single pass."""
     User = apps.get_model("user", "UserAccount")
     Product = apps.get_model("product", "Product")
     Order = apps.get_model("order", "Order")
@@ -20,7 +37,6 @@ def dashboard_callback(request, context):
     ProductReview = apps.get_model("product", "ProductReview")
     UserSubscription = apps.get_model("user", "UserSubscription")
     Contact = apps.get_model("contact", "Contact")
-    Cart = apps.get_model("cart", "Cart")
     Cart = apps.get_model("cart", "Cart")
     ProductCategory = apps.get_model("product", "ProductCategory")
     BlogCategory = apps.get_model("blog", "BlogCategory")
@@ -466,7 +482,9 @@ def dashboard_callback(request, context):
     }
 
     # Top Products Table
-    top_products = Product.objects.order_by("-view_count")[:5]
+    top_products = Product.objects.prefetch_related("translations").order_by(
+        "-view_count"
+    )[:5]
     products_table_rows = []
     for product in top_products:
         name = (
@@ -494,9 +512,11 @@ def dashboard_callback(request, context):
     }
 
     # Recent Reviews Table
-    recent_reviews = ProductReview.objects.select_related(
-        "product", "user"
-    ).order_by("-created_at")[:5]
+    recent_reviews = (
+        ProductReview.objects.select_related("product", "user")
+        .prefetch_related("product__translations")
+        .order_by("-created_at")[:5]
+    )
     reviews_table_rows = []
     for review in recent_reviews:
         product_name = (
@@ -545,9 +565,11 @@ def dashboard_callback(request, context):
     }
 
     # Low Stock Products Table
-    low_stock_products = Product.objects.filter(
-        active=True, stock__lt=10
-    ).order_by("stock")[:5]
+    low_stock_products = (
+        Product.objects.filter(active=True, stock__lt=10)
+        .prefetch_related("translations")
+        .order_by("stock")[:5]
+    )
     low_stock_rows = []
     for product in low_stock_products:
         name = (
@@ -572,9 +594,11 @@ def dashboard_callback(request, context):
     }
 
     # Recent Stock Logs Table
-    recent_stock_logs = StockLog.objects.select_related(
-        "product", "performed_by"
-    ).order_by("-created_at")[:5]
+    recent_stock_logs = (
+        StockLog.objects.select_related("product", "performed_by")
+        .prefetch_related("product__translations")
+        .order_by("-created_at")[:5]
+    )
     stock_log_rows = []
     for log in recent_stock_logs:
         product_name = (
@@ -612,18 +636,16 @@ def dashboard_callback(request, context):
 
     # ========== PROGRESS BARS ==========
 
-    # Inventory health (percentage of products in stock)
-    total_active_products = Product.objects.filter(active=True).count()
+    # Inventory health (percentage of products in stock).
+    # ``total_products`` counted active products above — reuse it.
     in_stock_products = Product.objects.filter(active=True, stock__gt=0).count()
     inventory_health = (
-        (in_stock_products / total_active_products * 100)
-        if total_active_products > 0
-        else 0
+        (in_stock_products / total_products * 100) if total_products > 0 else 0
     )
 
     inventory_progress = {
         "title": "Inventory Health",
-        "description": f"{in_stock_products}/{total_active_products} products in stock",
+        "description": f"{in_stock_products}/{total_products} products in stock",
         "value": round(inventory_health, 1),
     }
 
@@ -651,69 +673,65 @@ def dashboard_callback(request, context):
         },
     ]
 
-    # ========== UPDATE CONTEXT ==========
-    context.update(
-        {
-            # Core KPIs
-            "kpi": {
-                "users": total_users,
-                "new_users_today": new_users_today,
-                "products": total_products,
-                "orders": total_orders,
-                "revenue": total_revenue,
-                "pending_orders": pending_orders_count,
-                "blog_views": total_blog_views,
-                "pending_reviews": pending_reviews_count,
-                "avg_rating": round(avg_rating, 1) if avg_rating else 0,
-                "subscribers": total_subscribers,
-                "low_stock": low_stock_count,
-                "active_carts": active_carts_count,
-                "messages": total_messages,
-                "orders_this_month": orders_this_month,
-                "avg_order_value": round(avg_order_value, 2),
-                "total_blog_likes": total_blog_likes,
-                # Blog KPIs
-                "blog_posts": total_blog_posts,
-                "published_posts": published_posts,
-                "featured_posts": featured_posts,
-                "pending_comments": pending_blog_comments,
-                "total_comments": total_blog_comments,
-                # Categories
-                "categories": total_categories,
-            },
-            # Charts (JSON strings for Chart.js)
-            "performance_chart": performance_chart,
-            "users_chart": users_chart,
-            "status_chart": status_chart,
-            "payment_chart": payment_chart,
-            "country_chart": country_chart,
-            "blog_category_chart": blog_category_chart,
-            "product_category_chart": product_category_chart,
-            "subscription_chart": subscription_chart,
-            "cart_chart": cart_chart,
-            # Tables (Unfold format)
-            "orders_table": orders_table,
-            "products_table": products_table,
-            "reviews_table": reviews_table,
-            "messages_table": messages_table,
-            "low_stock_table": low_stock_table,
-            "stock_log_table": stock_log_table,
-            # Progress bars
-            "inventory_progress": inventory_progress,
-            # Quick links
-            "quick_links": quick_links,
-            "active_users": active_users_count,
-            "inactive_users": inactive_users_count,
-            "abandoned_carts": abandoned_carts_count,
-            "discounted_products": discounted_products_count,
-            "recent_orders": recent_orders,
-            "top_products": top_products,
-            "recent_reviews": recent_reviews,
-            "recent_messages": recent_messages,
-        }
-    )
-
-    return context
+    # ========== ASSEMBLE PAYLOAD ==========
+    return {
+        # Core KPIs
+        "kpi": {
+            "users": total_users,
+            "new_users_today": new_users_today,
+            "products": total_products,
+            "orders": total_orders,
+            "revenue": total_revenue,
+            "pending_orders": pending_orders_count,
+            "blog_views": total_blog_views,
+            "pending_reviews": pending_reviews_count,
+            "avg_rating": round(avg_rating, 1) if avg_rating else 0,
+            "subscribers": total_subscribers,
+            "low_stock": low_stock_count,
+            "active_carts": active_carts_count,
+            "messages": total_messages,
+            "orders_this_month": orders_this_month,
+            "avg_order_value": round(avg_order_value, 2),
+            "total_blog_likes": total_blog_likes,
+            # Blog KPIs
+            "blog_posts": total_blog_posts,
+            "published_posts": published_posts,
+            "featured_posts": featured_posts,
+            "pending_comments": pending_blog_comments,
+            "total_comments": total_blog_comments,
+            # Categories
+            "categories": total_categories,
+        },
+        # Charts (JSON strings for Chart.js)
+        "performance_chart": performance_chart,
+        "users_chart": users_chart,
+        "status_chart": status_chart,
+        "payment_chart": payment_chart,
+        "country_chart": country_chart,
+        "blog_category_chart": blog_category_chart,
+        "product_category_chart": product_category_chart,
+        "subscription_chart": subscription_chart,
+        "cart_chart": cart_chart,
+        # Tables (Unfold format)
+        "orders_table": orders_table,
+        "products_table": products_table,
+        "reviews_table": reviews_table,
+        "messages_table": messages_table,
+        "low_stock_table": low_stock_table,
+        "stock_log_table": stock_log_table,
+        # Progress bars
+        "inventory_progress": inventory_progress,
+        # Quick links
+        "quick_links": quick_links,
+        "active_users": active_users_count,
+        "inactive_users": inactive_users_count,
+        "abandoned_carts": abandoned_carts_count,
+        "discounted_products": discounted_products_count,
+        # The ``*_table`` entries above carry fully rendered rows — raw
+        # queryset results are intentionally omitted from the cache payload
+        # so the Unfold template can't trigger surprise ORM fetches
+        # (e.g. lazy `.user` / `.translations` lookups) on a cache hit.
+    }
 
 
 def _get_status_badge(status):

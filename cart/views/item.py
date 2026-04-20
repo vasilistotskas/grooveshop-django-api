@@ -20,8 +20,14 @@ from cart.serializers.item import (
     CartItemCreateSerializer,
     CartItemUpdateSerializer,
 )
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
+
 from cart.services import CartService
 from core.api.serializers import ErrorResponseSerializer
+from core.api.throttling import (
+    CartMutationAnonThrottle,
+    CartMutationThrottle,
+)
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
@@ -139,12 +145,27 @@ class CartItemViewSet(BaseModelViewSet):
     ]
     cart_service: CartService
 
+    _MUTATION_ACTIONS = frozenset(
+        {"create", "update", "partial_update", "destroy"}
+    )
+
     def get_permissions(self):
         # All cart item operations support guest users via X-Cart-Id header.
         # get_queryset() enforces ownership so non-admin users only see their
         # own cart's items.
         self.permission_classes = [AllowAny]
         return super().get_permissions()
+
+    def get_throttles(self):
+        if self.action in self._MUTATION_ACTIONS:
+            # Layer per-minute burst limits ON TOP of the global daily caps.
+            return [
+                CartMutationThrottle(),
+                CartMutationAnonThrottle(),
+                AnonRateThrottle(),
+                UserRateThrottle(),
+            ]
+        return super().get_throttles()
 
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)

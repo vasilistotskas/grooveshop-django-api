@@ -150,6 +150,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "core.middleware.correlation_id.CorrelationIdMiddleware",
     "django.middleware.gzip.GZipMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -256,6 +257,9 @@ REST_FRAMEWORK = {
         "contact": None if DEBUG else "5/minute",
         "payment": None if DEBUG else "10/minute",
         "payment_anon": None if DEBUG else "5/minute",
+        "cart_mutation": None if DEBUG else "60/minute",
+        "cart_mutation_anon": None if DEBUG else "30/minute",
+        "search": None if DEBUG else "120/minute",
     },
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
@@ -1844,17 +1848,20 @@ if IS_KUBERNETES:
         "disable_existing_loggers": False,
         "formatters": {
             "json": {
-                "format": '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "module": "%(module)s", "function": "%(funcName)s", "line": %(lineno)d, "process": "%(process)d", "thread": "%(thread)d", "pod": "%(hostname)s", "message": "%(message)s"}',
+                "format": '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "module": "%(module)s", "function": "%(funcName)s", "line": %(lineno)d, "process": "%(process)d", "thread": "%(thread)d", "pod": "%(hostname)s", "correlation_id": "%(correlation_id)s", "message": "%(message)s"}',
                 "datefmt": "%Y-%m-%dT%H:%M:%S",
             },
             "console": {
-                "format": "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(funcName)s: %(message)s",
+                "format": "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] [cid=%(correlation_id)s] %(funcName)s: %(message)s",
                 "datefmt": "%Y-%m-%d %H:%M:%S",
             },
         },
         "filters": {
             "add_hostname": {
                 "()": "core.logging.HostnameFilter",
+            },
+            "add_correlation_id": {
+                "()": "core.logging.CorrelationIdFilter",
             },
         },
         "handlers": {
@@ -1864,7 +1871,7 @@ if IS_KUBERNETES:
                 if SYSTEM_ENV == "production"
                 else "console",
                 "level": logging_level,
-                "filters": ["add_hostname"],
+                "filters": ["add_hostname", "add_correlation_id"],
             },
         },
         "root": {
@@ -1897,12 +1904,17 @@ elif IS_DOCKER or IS_DEVELOPMENT:
         "disable_existing_loggers": False,
         "formatters": {
             "verbose": {
-                "format": "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(funcName)s: %(message)s",
+                "format": "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] [cid=%(correlation_id)s] %(funcName)s: %(message)s",
                 "datefmt": "%Y-%m-%d %H:%M:%S",
             },
             "simple": {
                 "format": "[%(asctime)s] %(levelname)s %(name)s: %(message)s",
                 "datefmt": "%H:%M:%S",
+            },
+        },
+        "filters": {
+            "add_correlation_id": {
+                "()": "core.logging.CorrelationIdFilter",
             },
         },
         "handlers": {
@@ -1918,6 +1930,7 @@ elif IS_DOCKER or IS_DEVELOPMENT:
                 "backupCount": backup_count,
                 "level": logging_level,
                 "formatter": "verbose",
+                "filters": ["add_correlation_id"],
             },
         },
         "root": {

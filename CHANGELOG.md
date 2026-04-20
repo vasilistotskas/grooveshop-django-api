@@ -3,6 +3,12 @@
 
 
 
+## v1.102.0 (2026-04-20)
+
+### Features
+
+* feat: Bump Meilisearch ([`c976cdf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c976cdfedcd3bcaf8119f277517e52970732fd26))
+
 ## v1.101.0 (2026-04-19)
 
 ### Bug fixes

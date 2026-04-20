@@ -173,7 +173,7 @@ Tests in `tests/` with `unit/`, `integration/`, and `utils/` subdirectories. Key
 
 ### Infrastructure (Docker)
 
-- `infra.compose.yml` — PostgreSQL 17, Redis, RabbitMQ, Meilisearch v1.22.3, pgAdmin, RedisInsight
+- `infra.compose.yml` — PostgreSQL 17, Redis, RabbitMQ, Meilisearch v1.42.1, pgAdmin, RedisInsight
 - `app.compose.yml` — backend-init (migrations), backend, celery_worker, celery_beat, celery_flower
 - `docker-compose.yml` — Combines both on `grooveshop-backbone` bridge network
 - `Dockerfile` — Multi-stage Alpine build (uv → tailwind CSS → Python deps → production)

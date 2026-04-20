@@ -47,6 +47,11 @@ class ProductAlertViewSet(BaseModelViewSet):
     queryset = ProductAlert.objects.all()
     serializers_config = serializers_config
     http_method_names = ["get", "post", "delete", "head", "options"]
+    # ``product`` + ``kind`` + ``is_active`` power the PDP "am I already
+    # subscribed?" lookup — the frontend queries this before opening the
+    # Notify-Me modal so we render an "alert active" state instead of
+    # letting the user submit and hit the 409 that uniqueness enforces.
+    filterset_fields = ("product", "kind", "is_active")
     ordering_fields = ["id", "created_at", "notified_at"]
     ordering = ["-created_at"]
 

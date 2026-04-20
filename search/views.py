@@ -36,6 +36,7 @@ from search.serializers import (
     ProductMeiliSearchResponseSerializer,
     ProductTranslationSerializer,
     SearchAnalyticsResponseSerializer,
+    TrendingSearchResponseSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -851,14 +852,19 @@ _TRENDING_WINDOW_HOURS = 24
         "suitable for surfacing in the search modal empty state. Cached "
         "for 5 minutes per (language_code, content_type, limit)."
     ),
+    responses={200: TrendingSearchResponseSerializer},
     parameters=[
         OpenApiParameter(
             name="language_code",
+            type=str,
+            location=OpenApiParameter.QUERY,
             description=_("Filter queries by language (e.g. 'el')."),
             required=False,
         ),
         OpenApiParameter(
             name="content_type",
+            type=str,
+            location=OpenApiParameter.QUERY,
             description=_(
                 "Filter by content type: product, blog_post, federated. "
                 "Defaults to product."
@@ -867,6 +873,8 @@ _TRENDING_WINDOW_HOURS = 24
         ),
         OpenApiParameter(
             name="limit",
+            type=int,
+            location=OpenApiParameter.QUERY,
             description=_("Max results. Default 8, cap 20."),
             required=False,
         ),

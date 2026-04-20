@@ -11840,6 +11840,7 @@ paths:
         name: paymentStatus
         schema:
           type: string
+          title: Κατάσταση πληρωμής
           enum:
           - CANCELED
           - COMPLETED
@@ -12433,6 +12434,7 @@ paths:
         name: order_PaymentStatus
         schema:
           type: string
+          title: Κατάσταση πληρωμής
           enum:
           - CANCELED
           - COMPLETED
@@ -13854,6 +13856,64 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaymentStatusResponse'
           description: ''
+  /api/v1/order/{id}/reorder:
+    post:
+      operationId: reorderOrder
+      description: Copy each item from a past order back into the authenticated user's
+        active cart. Items whose products are inactive or out of stock are returned
+        in skipped_items; quantities are capped at current stock.
+      summary: Reorder the items from a past order
+      parameters:
+      - in: path
+        name: id
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        required: true
+      tags:
+      - Orders
+      security:
+      - knoxApiToken: []
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReorderResponse'
+          description: ''
   /api/v1/order/{id}/retry-payment:
     post:
       operationId: retryOrderPayment
@@ -14392,6 +14452,7 @@ paths:
         name: paymentStatus
         schema:
           type: string
+          title: Κατάσταση πληρωμής
           enum:
           - CANCELED
           - COMPLETED
@@ -16644,6 +16705,322 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProductDetail'
+          description: ''
+  /api/v1/product/alert:
+    get:
+      operationId: listProductAlert
+      description: 'Retrieve a list of Product alerts with filtering and search capabilities.
+        Supports multiple pagination strategies: pageNumber (default), cursor, and
+        limitOffset.'
+      summary: List Product alerts
+      parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Cursor for pagination
+      - in: query
+        name: isActive
+        schema:
+          oneOf:
+          - type: string
+            enum:
+            - 'true'
+            - 'false'
+            - '1'
+            - '0'
+          - type: boolean
+      - in: query
+        name: kind
+        schema:
+          type: string
+          enum:
+          - price_drop
+          - restock
+        description: |-
+          * `restock` - Restock
+          * `price_drop` - Price drop
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Language code for translations (el, en, de)
+      - name: ordering
+        in: query
+        required: false
+        description: 'Which field to use when ordering the results. Available fields:
+          id, -id, createdAt, -createdAt, notifiedAt, -notifiedAt'
+        schema:
+          type: string
+          enum:
+          - id
+          - -id
+          - createdAt
+          - -createdAt
+          - notifiedAt
+          - -notifiedAt
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+      - in: query
+        name: pageSize
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Number of results to return per page
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Enable or disable pagination
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Pagination strategy type
+      - in: query
+        name: product
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - Product Alerts
+      security:
+      - knoxApiToken: []
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProductAlertList'
+          description: ''
+    post:
+      operationId: createProductAlert
+      description: Create a new Product alert. Requires authentication.
+      summary: Create a Product alert
+      parameters:
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Language code for translations (el, en, de)
+      tags:
+      - Product Alerts
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProductAlertRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProductAlertRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductAlertRequest'
+        required: true
+      security:
+      - knoxApiToken: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductAlert'
+          description: ''
+  /api/v1/product/alert/{id}:
+    get:
+      operationId: retrieveProductAlert
+      description: Get detailed information about a specific Product alert.
+      summary: Retrieve a Product alert
+      parameters:
+      - in: path
+        name: id
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        required: true
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Language code for translations (el, en, de)
+      tags:
+      - Product Alerts
+      security:
+      - knoxApiToken: []
+      - cookieAuth: []
+      responses:
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductAlert'
+          description: ''
+    delete:
+      operationId: destroyProductAlert
+      description: Delete a Product alert. Requires authentication.
+      summary: Delete a Product alert
+      parameters:
+      - in: path
+        name: id
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        required: true
+      tags:
+      - Product Alerts
+      security:
+      - knoxApiToken: []
+      - cookieAuth: []
+      responses:
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
           description: ''
   /api/v1/product/attribute:
     get:
@@ -22653,6 +23030,46 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+  /api/v1/search/trending:
+    get:
+      operationId: listTrendingSearches
+      description: Return the most popular search queries from the last 24 hours,
+        suitable for surfacing in the search modal empty state. Cached for 5 minutes
+        per (language_code, content_type, limit).
+      summary: List trending search queries
+      parameters:
+      - in: query
+        name: contentType
+        schema:
+          type: string
+        description: 'Filter by content type: product, blog_post, federated. Defaults
+          to product.'
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+        description: Filter queries by language (e.g. 'el').
+      - in: query
+        name: limit
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Max results. Default 8, cap 20.
+      tags:
+      - Search
+      security:
+      - knoxApiToken: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrendingSearchResponse'
+          description: ''
   /api/v1/settings:
     get:
       operationId: settings_list
@@ -25925,6 +26342,53 @@ paths:
               schema:
                 $ref: '#/components/schemas/UserAddressDetail'
           description: ''
+  /api/v1/user/address/get_main:
+    get:
+      operationId: getMainUserAddress
+      description: Retrieve the user's main address.
+      summary: Get main address
+      tags:
+      - User Addresses
+      security:
+      - knoxApiToken: []
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAddressDetail'
+          description: ''
   /api/v1/user/subscription:
     get:
       operationId: listUserSubscription
@@ -26094,7 +26558,7 @@ paths:
         description: |-
           Filter by subscription status
 
-          * `ACTIVE` - Active
+          * `ACTIVE` - Ενεργή
           * `PENDING` - Pending Confirmation
           * `UNSUBSCRIBED` - Unsubscribed
           * `BOUNCED` - Bounced
@@ -26137,6 +26601,7 @@ paths:
         name: topicCategory
         schema:
           type: string
+          title: Κατηγορία
           enum:
           - ACCOUNT
           - MARKETING
@@ -26786,6 +27251,7 @@ paths:
         name: category
         schema:
           type: string
+          title: Κατηγορία
           enum:
           - ACCOUNT
           - MARKETING
@@ -27759,6 +28225,7 @@ components:
                   type: string
         active:
           type: boolean
+          title: Ενεργή
         sortOrder:
           type: integer
           readOnly: true
@@ -27823,6 +28290,7 @@ components:
                   type: string
         active:
           type: boolean
+          title: Ενεργή
         sortOrder:
           type: integer
           readOnly: true
@@ -29029,6 +29497,7 @@ components:
                   type: string
         active:
           type: boolean
+          title: Ενεργή
         sortOrder:
           type: integer
           readOnly: true
@@ -29084,6 +29553,7 @@ components:
                   type: string
         active:
           type: boolean
+          title: Ενεργή
         sortOrder:
           type: integer
           readOnly: true
@@ -29136,6 +29606,7 @@ components:
                   type: string
         active:
           type: boolean
+          title: Ενεργή
       required:
       - translations
     BulkSubscriptionRequest:
@@ -30259,20 +30730,6 @@ components:
         * `FEATURE` - Feature Image
         * `PROMOTIONAL` - Promotional Image
         * `SEASONAL` - Seasonal Image
-    KindEnum:
-      enum:
-      - ERROR
-      - SUCCESS
-      - INFO
-      - WARNING
-      - DANGER
-      type: string
-      description: |-
-        * `ERROR` - Σφάλμα
-        * `SUCCESS` - Success
-        * `INFO` - Info
-        * `WARNING` - Warning
-        * `DANGER` - Danger
     LocationTypeEnum:
       enum:
       - HOME
@@ -30418,7 +30875,7 @@ components:
           description: URL link or empty string
           readOnly: true
         kind:
-          $ref: '#/components/schemas/KindEnum'
+          $ref: '#/components/schemas/NotificationKindEnum'
         expiryDate:
           type: string
           format: date-time
@@ -30459,6 +30916,20 @@ components:
             type: integer
       required:
       - ids
+    NotificationKindEnum:
+      enum:
+      - ERROR
+      - SUCCESS
+      - INFO
+      - WARNING
+      - DANGER
+      type: string
+      description: |-
+        * `ERROR` - Σφάλμα
+        * `SUCCESS` - Success
+        * `INFO` - Info
+        * `WARNING` - Warning
+        * `DANGER` - Danger
     NotificationSuccessResponse:
       type: object
       properties:
@@ -30694,6 +31165,7 @@ components:
           nullable: true
           maxLength: 255
         paymentStatus:
+          title: Κατάσταση πληρωμής
           oneOf:
           - $ref: '#/components/schemas/PaymentStatusEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -30952,6 +31424,7 @@ components:
           nullable: true
           maxLength: 255
         paymentStatus:
+          title: Κατάσταση πληρωμής
           oneOf:
           - $ref: '#/components/schemas/PaymentStatusEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -32025,6 +32498,44 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PointsTransaction'
+    PaginatedProductAlertList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        links:
+          type: object
+          properties:
+            next:
+              type: string
+              nullable: true
+              format: uri
+              example: http://api.example.org/accounts/?page=4
+            previous:
+              type: string
+              nullable: true
+              format: uri
+              example: http://api.example.org/accounts/?page=2
+        count:
+          type: integer
+          example: 123
+        totalPages:
+          type: integer
+          example: 123
+        pageSize:
+          type: integer
+          example: 123
+        pageTotalResults:
+          type: integer
+          example: 123
+        page:
+          type: integer
+          example: 123
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductAlert'
     PaginatedProductCategoryImageList:
       type: object
       required:
@@ -32699,6 +33210,7 @@ components:
                   type: string
         active:
           type: boolean
+          title: Ενεργή
     PatchedCartItemUpdateRequest:
       type: object
       properties:
@@ -32908,6 +33420,7 @@ components:
                   type: string
         active:
           type: boolean
+          title: Ενεργή
         cost:
           type: number
           format: double
@@ -32969,6 +33482,7 @@ components:
           default: MAIN
         active:
           type: boolean
+          title: Ενεργή
         translations:
           type: object
           properties:
@@ -33028,6 +33542,7 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         active:
           type: boolean
+          title: Ενεργή
         parent:
           type: integer
           nullable: true
@@ -33181,6 +33696,7 @@ components:
           maxLength: 255
         active:
           type: boolean
+          title: Ενεργή
     PatchedRegionWriteRequest:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -33249,6 +33765,7 @@ components:
         category:
           allOf:
           - $ref: '#/components/schemas/CategoryEnum'
+          title: Κατηγορία
           description: |-
             Category of the subscription topic
 
@@ -33261,7 +33778,7 @@ components:
             * `OTHER` - Other
         isActive:
           type: boolean
-          title: Active
+          title: Ενεργή
           description: Whether this topic is currently available for subscription
         isDefault:
           type: boolean
@@ -33294,6 +33811,7 @@ components:
                   type: string
         active:
           type: boolean
+          title: Ενεργή
     PatchedTaggedItemWriteRequest:
       type: object
       properties:
@@ -33521,6 +34039,7 @@ components:
           readOnly: true
         active:
           type: boolean
+          title: Ενεργή
         cost:
           type: number
           format: double
@@ -33623,6 +34142,7 @@ components:
           readOnly: true
         active:
           type: boolean
+          title: Ενεργή
         cost:
           type: number
           format: double
@@ -33725,6 +34245,7 @@ components:
                   type: string
         active:
           type: boolean
+          title: Ενεργή
         cost:
           type: number
           format: double
@@ -33913,8 +34434,14 @@ components:
           type: integer
           maximum: 2147483647
           minimum: 0
+        lowStockThreshold:
+          type: integer
+          readOnly: true
+          description: Stock level at or below which admins get a low-stock alert.
+            Set to 0 to disable alerts for this product.
         active:
           type: boolean
+          title: Ενεργή
         weight:
           type: object
           properties:
@@ -34015,6 +34542,7 @@ components:
       - finalPrice
       - id
       - likesCount
+      - lowStockThreshold
       - mainImagePath
       - price
       - priceSavePercent
@@ -34028,6 +34556,95 @@ components:
       - vatPercent
       - vatValue
       - viewCount
+    ProductAlert:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        kind:
+          $ref: '#/components/schemas/ProductAlertKindEnum'
+        product:
+          type: integer
+        user:
+          type: integer
+          readOnly: true
+          nullable: true
+        email:
+          type: string
+          format: email
+          nullable: true
+          maxLength: 254
+        targetPrice:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          nullable: true
+        isActive:
+          type: boolean
+          readOnly: true
+        notifiedAt:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - createdAt
+      - id
+      - isActive
+      - kind
+      - notifiedAt
+      - product
+      - updatedAt
+      - user
+      - uuid
+    ProductAlertKindEnum:
+      enum:
+      - restock
+      - price_drop
+      type: string
+      description: |-
+        * `restock` - Restock
+        * `price_drop` - Price drop
+    ProductAlertRequest:
+      type: object
+      properties:
+        kind:
+          $ref: '#/components/schemas/ProductAlertKindEnum'
+        product:
+          type: integer
+        email:
+          type: string
+          format: email
+          nullable: true
+          minLength: 1
+          maxLength: 254
+        targetPrice:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          nullable: true
+      required:
+      - kind
+      - product
     ProductAttribute:
       type: object
       description: Serializer for ProductAttribute with nested attribute and value
@@ -34120,6 +34737,7 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         active:
           type: boolean
+          title: Ενεργή
         parent:
           type: integer
           nullable: true
@@ -34187,6 +34805,7 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         active:
           type: boolean
+          title: Ενεργή
         parent:
           type: integer
           nullable: true
@@ -34258,6 +34877,7 @@ components:
           default: MAIN
         active:
           type: boolean
+          title: Ενεργή
         sortOrder:
           type: integer
           readOnly: true
@@ -34351,6 +34971,7 @@ components:
           default: MAIN
         active:
           type: boolean
+          title: Ενεργή
         sortOrder:
           type: integer
           readOnly: true
@@ -34425,6 +35046,7 @@ components:
           default: MAIN
         active:
           type: boolean
+          title: Ενεργή
         translations:
           type: object
           properties:
@@ -34488,6 +35110,7 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         active:
           type: boolean
+          title: Ενεργή
         parent:
           type: integer
           nullable: true
@@ -34556,8 +35179,14 @@ components:
           type: integer
           maximum: 2147483647
           minimum: 0
+        lowStockThreshold:
+          type: integer
+          readOnly: true
+          description: Stock level at or below which admins get a low-stock alert.
+            Set to 0 to disable alerts for this product.
         active:
           type: boolean
+          title: Ενεργή
         weight:
           type: object
           properties:
@@ -34658,6 +35287,7 @@ components:
       - finalPrice
       - id
       - likesCount
+      - lowStockThreshold
       - mainImagePath
       - price
       - priceSavePercent
@@ -34724,8 +35354,14 @@ components:
           type: integer
           maximum: 2147483647
           minimum: 0
+        lowStockThreshold:
+          type: integer
+          readOnly: true
+          description: Stock level at or below which admins get a low-stock alert.
+            Set to 0 to disable alerts for this product.
         active:
           type: boolean
+          title: Ενεργή
         weight:
           type: object
           properties:
@@ -34826,6 +35462,7 @@ components:
       - finalPrice
       - id
       - likesCount
+      - lowStockThreshold
       - mainImagePath
       - price
       - priceSavePercent
@@ -35536,6 +36173,7 @@ components:
           maxLength: 255
         active:
           type: boolean
+          title: Ενεργή
       required:
       - category
       - price
@@ -35792,6 +36430,40 @@ components:
       required:
       - message
       - releasedCount
+    ReorderItem:
+      type: object
+      properties:
+        productId:
+          type: integer
+        requestedQuantity:
+          type: integer
+        addedQuantity:
+          type: integer
+          default: 0
+        reason:
+          type: string
+          default: ''
+      required:
+      - productId
+      - requestedQuantity
+    ReorderResponse:
+      type: object
+      properties:
+        cartId:
+          type: integer
+          nullable: true
+        addedItems:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReorderItem'
+        skippedItems:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReorderItem'
+      required:
+      - addedItems
+      - cartId
+      - skippedItems
     ReserveStockResponse:
       type: object
       description: Serializer for reserve stock response.
@@ -35907,7 +36579,7 @@ components:
       - BOUNCED
       type: string
       description: |-
-        * `ACTIVE` - Active
+        * `ACTIVE` - Ενεργή
         * `PENDING` - Pending Confirmation
         * `UNSUBSCRIBED` - Unsubscribed
         * `BOUNCED` - Bounced
@@ -35954,6 +36626,7 @@ components:
         category:
           allOf:
           - $ref: '#/components/schemas/CategoryEnum'
+          title: Κατηγορία
           description: |-
             Category of the subscription topic
 
@@ -35966,7 +36639,7 @@ components:
             * `OTHER` - Other
         isActive:
           type: boolean
-          title: Active
+          title: Ενεργή
           description: Whether this topic is currently available for subscription
         isDefault:
           type: boolean
@@ -36027,6 +36700,7 @@ components:
         category:
           allOf:
           - $ref: '#/components/schemas/CategoryEnum'
+          title: Κατηγορία
           description: |-
             Category of the subscription topic
 
@@ -36039,7 +36713,7 @@ components:
             * `OTHER` - Other
         isActive:
           type: boolean
-          title: Active
+          title: Ενεργή
           description: Whether this topic is currently available for subscription
         isDefault:
           type: boolean
@@ -36104,6 +36778,7 @@ components:
         category:
           allOf:
           - $ref: '#/components/schemas/CategoryEnum'
+          title: Κατηγορία
           description: |-
             Category of the subscription topic
 
@@ -36116,7 +36791,7 @@ components:
             * `OTHER` - Other
         isActive:
           type: boolean
-          title: Active
+          title: Ενεργή
           description: Whether this topic is currently available for subscription
         isDefault:
           type: boolean
@@ -36155,6 +36830,7 @@ components:
                   type: string
         active:
           type: boolean
+          title: Ενεργή
         sortOrder:
           type: integer
           readOnly: true
@@ -36210,6 +36886,7 @@ components:
                   type: string
         active:
           type: boolean
+          title: Ενεργή
         sortOrder:
           type: integer
           readOnly: true
@@ -36267,6 +36944,7 @@ components:
                   type: string
         active:
           type: boolean
+          title: Ενεργή
       required:
       - translations
     TaggedItem:
@@ -36449,6 +37127,46 @@ components:
         * `EXPIRE` - Expire
         * `ADJUST` - Adjust
         * `BONUS` - Bonus
+    TrendingSearchItem:
+      type: object
+      description: 'One trending search result: a query string + its occurrence count.'
+      properties:
+        query:
+          type: string
+          description: The user-entered search term.
+        count:
+          type: integer
+          description: Number of times this query ran in the trending window.
+      required:
+      - count
+      - query
+    TrendingSearchResponse:
+      type: object
+      description: |-
+        Response payload for ``listTrendingSearches``.
+
+        The shape mirrors what the view caches in Redis so drf-spectacular
+        can resolve a concrete schema (otherwise it falls back to
+        ``unable to guess serializer`` and emits a W002 warning).
+      properties:
+        windowHours:
+          type: integer
+          description: Trailing window size the results were aggregated over.
+        contentType:
+          type: string
+          description: Content namespace the queries were scoped to.
+        languageCode:
+          type: string
+          nullable: true
+          description: BCP-47 filter applied; null when the caller didn't pass one.
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrendingSearchItem'
+      required:
+      - contentType
+      - results
+      - windowHours
     UnsubscribeResponse:
       type: object
       properties:
@@ -36813,7 +37531,7 @@ components:
         isActive:
           type: boolean
           readOnly: true
-          title: Active
+          title: Ενεργή
         isStaff:
           type: boolean
           readOnly: true

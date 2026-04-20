@@ -3,6 +3,26 @@
 
 
 
+## v1.103.0 (2026-04-20)
+
+### Features
+
+* feat(hardening): cache admin dashboard, throttle cart/search, add correlation IDs
+
+- admin: cache full dashboard_callback payload in Redis (5 min TTL),
+  extract into _build_dashboard_data(), prefetch translations on
+  top-products/low-stock/stock-log loops, and invalidate via
+  post_save/post_delete signals on ten domain models
+- throttling: new CartMutationThrottle, CartMutationAnonThrottle and
+  SearchThrottle (layered on top of global daily caps) applied to
+  CartViewSet/CartItemViewSet write actions and search_trending
+- observability: CorrelationIdMiddleware + CorrelationIdFilter inject
+  an X-Correlation-ID per request into log records (JSON + dev verbose)
+- order: composite indexes on (user, -created_at) and
+  (payment_status, -created_at) via migration 0030
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`4c99e04`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4c99e04b14651582babc50c05d7467ddd008b128))
+
 ## v1.102.0 (2026-04-20)
 
 ### Features

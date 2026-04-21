@@ -29,8 +29,12 @@ CARRIER_TRACKING_URLS: dict[str, str] = {
 
 class OrderSerializer(serializers.ModelSerializer[Order]):
     items = OrderItemDetailSerializer(many=True)
-    country = PrimaryKeyRelatedField(queryset=Country.objects.all())
-    region = PrimaryKeyRelatedField(queryset=Region.objects.all())
+    country = PrimaryKeyRelatedField(
+        queryset=Country.objects.all(), allow_null=True
+    )
+    region = PrimaryKeyRelatedField(
+        queryset=Region.objects.all(), allow_null=True
+    )
     pay_way = PrimaryKeyRelatedField(
         queryset=PayWay.objects.all(), allow_null=True
     )

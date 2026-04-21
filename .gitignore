@@ -141,3 +141,4 @@ NOTES.MD
 .kiro
 /docs/
 .claude/settings.local.json
+/mediafiles_private/

@@ -145,13 +145,21 @@ def dispatch_tier_changed(
     try:
         from loyalty.models.tier import LoyaltyTier
 
+        # ``LoyaltyTier.required_level`` is the canonical ordering
+        # field — higher means more prestigious. Missing tier
+        # (SET_NULL scenario) is treated as the lowest level so a
+        # no-tier → any-tier transition counts as "up".
         old_level = (
-            LoyaltyTier.objects.only("level").get(pk=old_id).level
+            LoyaltyTier.objects.only("required_level")
+            .get(pk=old_id)
+            .required_level
             if old_id
             else -1
         )
         new_level = (
-            LoyaltyTier.objects.only("level").get(pk=new_id).level
+            LoyaltyTier.objects.only("required_level")
+            .get(pk=new_id)
+            .required_level
             if new_id
             else -1
         )

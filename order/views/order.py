@@ -264,6 +264,8 @@ class OrderViewSet(BaseModelViewSet):
             "partial_update",
             "destroy",
             "my_orders",
+            "reorder",
+            "invoice",
         }
         guest_allowed_actions = {
             "retrieve_by_uuid",

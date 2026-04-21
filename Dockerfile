@@ -60,7 +60,13 @@ RUN apk add --no-cache \
     # WeasyPrint runtime shared libraries — cairo/pango/gdk-pixbuf are
     # dlopen'd at PDF-generation time, so the runtime image needs them
     # even though the Python wheels live in the builder's .venv.
+    # Pango needs actual font files at runtime (without them you get
+    # ``pango_font_describe: font != NULL`` criticals and blank PDFs);
+    # ttf-dejavu covers Latin + Greek, font-noto-cjk covers CJK in case
+    # a product name ever sneaks a Chinese character into an invoice.
     cairo pango gdk-pixbuf libffi \
+    ttf-dejavu font-noto font-noto-cjk \
+    fontconfig \
     && addgroup -g ${GID} -S app \
     && adduser -u ${UID} -S app -G app \
     && mkdir -p ${APP_PATH} \

@@ -108,6 +108,26 @@ services:
     networks:
       - grooveshop-backbone
 
+  mailpit:
+    container_name: mailpit
+    image: axllent/mailpit:latest
+    restart: no
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    environment:
+      MP_MAX_MESSAGES: 5000
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8025/readyz"]
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - grooveshop-backbone
+
 volumes:
   postgres_data:
   service-media_stream:

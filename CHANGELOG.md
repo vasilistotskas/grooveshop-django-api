@@ -3,6 +3,30 @@
 
 
 
+## v1.104.1 (2026-04-21)
+
+### Bug fixes
+
+* fix(filters): emit CSV-aware schema for camel-case ordering
+
+DRF's ``OrderingFilter`` accepts a comma-separated list of keys (the
+backend ``get_ordering_param`` already splits on ``,``), but the
+spectacular extension for ``CamelCaseOrderingFilter`` emitted a
+single-value ``enum`` — so every generated Zod consumer (openapi-ts)
+rejected any multi-sort value. Concrete symptom: the checkout sent
+``ordering=-isMain,-createdAt`` and Nuxt's Zod query validator
+returned 400 before the request reached Django.
+
+Replace the ``enum`` with a ``type: string, pattern: ...`` regex
+that matches any comma-separated combination of the allowed camelCase
+keys. ``re.escape`` guards against metacharacters so a future field
+name like ``-createdAt`` doesn't corrupt the alternation. openapi-ts
+regenerates as ``z.string().regex(...)`` — single-key sorts still
+match trivially, multi-key sorts now validate, and the pattern keeps
+the same allow-list protection the enum provided.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`6b9a2ab`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6b9a2ab72933f90b14ebd33ac1361452e6914914))
+
 ## v1.104.0 (2026-04-20)
 
 ### Features

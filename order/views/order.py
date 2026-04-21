@@ -44,6 +44,7 @@ from order.filters import OrderFilter
 from order.models.history import OrderHistory
 from order.models.order import Order
 from order.payment import get_payment_provider
+from order.serializers.invoice import InvoiceDownloadResponseSerializer
 from order.serializers.order import (
     AddTrackingSerializer,
     CancelOrderRequestSerializer,
@@ -183,6 +184,17 @@ serializers_config: SerializersConfig = {
             "user's active cart. Items whose products are inactive or out "
             "of stock are returned in skipped_items; quantities are capped "
             "at current stock."
+        ),
+        tags=["Orders"],
+    ),
+    "invoice": ActionConfig(
+        response=InvoiceDownloadResponseSerializer,
+        operation_id="retrieveOrderInvoice",
+        summary=_("Get invoice download metadata for an order"),
+        description=_(
+            "Return the order's invoice metadata and a short-lived signed "
+            "URL to download the PDF. 404 if the invoice has not been "
+            "generated yet (e.g. order not completed)."
         ),
         tags=["Orders"],
     ),
@@ -1091,6 +1103,26 @@ class OrderViewSet(BaseModelViewSet):
             request,
             serializer_class=response_serializer_class,
         )
+
+    @action(detail=True, methods=["GET"])
+    def invoice(self, request, *args, **kwargs):
+        """Return invoice metadata + download URL for an order.
+
+        404 when the invoice has not been generated yet (e.g. order
+        still PENDING). Permission check is done via the viewset's
+        standard ``get_object`` flow which already covers owner/admin
+        and guest-via-uuid access.
+        """
+        order = self.get_object()
+        invoice = getattr(order, "invoice", None)
+        if invoice is None or not invoice.has_document():
+            raise NotFound(
+                _("Invoice has not been generated for this order yet.")
+            )
+        serializer = InvoiceDownloadResponseSerializer(
+            invoice, context={"request": request}
+        )
+        return Response(serializer.data)
 
     @action(detail=True, methods=["POST"])
     def reorder(self, request, *args, **kwargs):

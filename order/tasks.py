@@ -513,33 +513,45 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=300)
 def generate_order_invoice(self, order_id: int) -> bool:
+    """Generate a PDF invoice for an order and persist it.
+
+    Idempotent via ``order.invoicing.generate_invoice`` — calling this
+    task twice for the same order is a no-op on the second call
+    (returns the existing Invoice row). Safe to invoke from
+    ``handle_order_completed`` without an explicit dedupe flag.
+    """
+    from order.invoicing import generate_invoice
+
     try:
-        Order.objects.get(id=order_id)
-
-        # TODO: Generate a PDF invoice using weasyprint or reportlab,
-        # store it in a file field on the Order model or a separate Invoice model.
-        raise NotImplementedError("Invoice generation not yet implemented")
-
+        order = Order.objects.select_related(
+            "country", "region", "pay_way"
+        ).get(id=order_id)
     except Order.DoesNotExist:
         logger.error(
-            f"Could not generate invoice - Order #{order_id} not found",
+            "Could not generate invoice - Order #%s not found",
+            order_id,
             extra={"order_id": order_id},
         )
         return False
 
-    except NotImplementedError:
-        raise
-
+    try:
+        invoice = generate_invoice(order)
     except Exception as e:
         logger.error(
-            f"Error generating invoice for order #{order_id}: {e!s}",
+            "Error generating invoice for order #%s: %s",
+            order_id,
+            e,
             extra={"order_id": order_id, "error": str(e)},
+            exc_info=True,
         )
-
         if self.request.retries < self.max_retries:
             raise self.retry(exc=e) from e
-
         return False
+
+    logger.info(
+        "Invoice %s ready for order #%s", invoice.invoice_number, order_id
+    )
+    return True
 
 
 @shared_task(

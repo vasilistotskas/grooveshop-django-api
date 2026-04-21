@@ -34,6 +34,7 @@ from order.notifications import (
     notify_payment_failed_live,
 )
 from order.tasks import (
+    generate_order_invoice,
     send_order_confirmation_email,
     send_order_status_update_email,
     send_payment_failed_email,
@@ -467,9 +468,13 @@ def handle_order_completed(
     """Handle order completed signal."""
     try:
         if order.document_type == OrderDocumentTypeEnum.INVOICE.value:
-            # TODO: Re-enable when generate_order_invoice is implemented
-            # (currently raises NotImplementedError)
-            pass
+            # Generate the PDF invoice asynchronously. ``generate_order_invoice``
+            # is idempotent via ``order.invoicing.generate_invoice`` — calling
+            # twice returns the existing Invoice row, so the fact that
+            # ``order_completed`` might fire again on a re-save is safe.
+            transaction.on_commit(
+                lambda oid=order.id: generate_order_invoice.delay(oid)
+            )
 
         OrderHistory.log_note(order=order, note="Order completed")
 

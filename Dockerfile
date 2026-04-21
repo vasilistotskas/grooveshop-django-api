@@ -21,7 +21,12 @@ FROM python:${PYTHON_VERSION}-alpine${ALPINE_VERSION} AS builder
 ARG UV_IMAGE
 ARG APP_PATH
 
-RUN apk add --no-cache gcc musl-dev python3-dev linux-headers gettext
+RUN apk add --no-cache \
+    gcc musl-dev python3-dev linux-headers gettext \
+    # WeasyPrint native dependencies (PDF invoice rendering). Ship in
+    # the builder stage because pip resolves a source build for the
+    # Python bindings if these aren't present.
+    cairo-dev pango-dev gdk-pixbuf-dev libffi-dev
 
 COPY --from=uv /uv /uvx /bin/
 WORKDIR ${APP_PATH}
@@ -52,6 +57,10 @@ RUN apk add --no-cache \
     postgresql17 \
     postgresql17-client \
     gzip \
+    # WeasyPrint runtime shared libraries — cairo/pango/gdk-pixbuf are
+    # dlopen'd at PDF-generation time, so the runtime image needs them
+    # even though the Python wheels live in the builder's .venv.
+    cairo pango gdk-pixbuf libffi \
     && addgroup -g ${GID} -S app \
     && adduser -u ${UID} -S app -G app \
     && mkdir -p ${APP_PATH} \

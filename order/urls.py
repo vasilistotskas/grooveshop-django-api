@@ -54,6 +54,11 @@ urlpatterns = [
         name="order-cancel",
     ),
     path(
+        "order/<int:pk>/invoice",
+        OrderViewSet.as_view({"get": "invoice"}),
+        name="order-invoice",
+    ),
+    path(
         "order/<int:pk>/reorder",
         OrderViewSet.as_view({"post": "reorder"}),
         name="order-reorder",

@@ -62,6 +62,7 @@ dependencies = [
   "defusedxml>=0.7.1",
   "nh3>=0.3.4",
   "pyjwt==2.12.1",
+  "weasyprint>=68.1",
 ]
 
 [project.urls]

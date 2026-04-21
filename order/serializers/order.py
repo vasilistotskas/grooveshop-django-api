@@ -120,7 +120,19 @@ class OrderDetailSerializer(OrderSerializer):
     tracking_details = serializers.SerializerMethodField(
         help_text="Tracking and shipping details"
     )
+    has_invoice = serializers.SerializerMethodField(
+        help_text=(
+            "True when a PDF invoice has been generated — the frontend "
+            "can show the download CTA without issuing a separate "
+            "request to the invoice endpoint to find out."
+        )
+    )
     phone = PhoneNumberField(read_only=True)
+
+    @extend_schema_field({"type": "boolean"})
+    def get_has_invoice(self, obj: Order) -> bool:
+        invoice = getattr(obj, "invoice", None)
+        return bool(invoice and invoice.has_document())
 
     @extend_schema_field(
         {
@@ -265,6 +277,7 @@ class OrderDetailSerializer(OrderSerializer):
             "order_timeline",
             "pricing_breakdown",
             "tracking_details",
+            "has_invoice",
             "phone",
             "document_type",
             "payment_id",
@@ -282,6 +295,7 @@ class OrderDetailSerializer(OrderSerializer):
             "order_timeline",
             "pricing_breakdown",
             "tracking_details",
+            "has_invoice",
         )
 
 

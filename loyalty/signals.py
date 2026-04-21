@@ -2,12 +2,23 @@ import logging
 from typing import Any
 
 from django.db import transaction
-from django.dispatch import receiver
+from django.db.models.signals import post_save, pre_save
+from django.dispatch import Signal, receiver
 
 from order.models.order import Order
 from order.signals import order_canceled, order_completed, order_refunded
+from user.models.account import UserAccount
 
 logger = logging.getLogger(__name__)
+
+
+# Fires when ``UserAccount.loyalty_tier`` actually changes value.
+# Kwargs: ``user``, ``old_tier_id`` (may be None on first promotion),
+# ``new_tier_id`` (may be None on SET_NULL), ``direction`` (``"up"`` |
+# ``"down"`` | ``"same"``). Downstream notification tasks use the
+# direction to decide whether to celebrate the user or stay silent —
+# nobody wants a toast telling them they lost a tier.
+loyalty_tier_changed = Signal()
 
 
 @receiver(
@@ -76,3 +87,125 @@ def handle_order_refunded_loyalty(
         logger.exception(
             "Failed to queue loyalty reversal for order %s", order.id
         )
+
+
+@receiver(
+    pre_save,
+    sender=UserAccount,
+    dispatch_uid="loyalty.cache_original_loyalty_tier",
+)
+def cache_original_loyalty_tier(
+    sender: type[UserAccount], instance: UserAccount, **kwargs: Any
+) -> None:
+    """Snapshot the pre-save tier id so the post_save handler can
+    detect transitions without issuing a second query.
+
+    On inserts (``pk`` not yet set) the snapshot is ``None`` — the
+    post_save branch treats this as "no previous tier" and skips
+    dispatch, so newly-created users who happen to spawn with a tier
+    don't get an unexpected "tier up" notification.
+    """
+    if not instance.pk:
+        instance._original_loyalty_tier_id = None
+        return
+    try:
+        old = sender.objects.only("loyalty_tier_id").get(pk=instance.pk)
+        instance._original_loyalty_tier_id = old.loyalty_tier_id
+    except sender.DoesNotExist:
+        instance._original_loyalty_tier_id = None
+
+
+@receiver(
+    post_save,
+    sender=UserAccount,
+    dispatch_uid="loyalty.dispatch_tier_changed",
+)
+def dispatch_tier_changed(
+    sender: type[UserAccount],
+    instance: UserAccount,
+    created: bool,
+    **kwargs: Any,
+) -> None:
+    """Fire ``loyalty_tier_changed`` on real tier transitions.
+
+    Skips creates (no previous tier to compare against) and no-op saves
+    (tier id unchanged). Direction is derived from tier ``level`` so
+    downstream listeners don't need to fetch tiers themselves.
+    """
+    if created:
+        return
+    if not hasattr(instance, "_original_loyalty_tier_id"):
+        return
+    old_id = instance._original_loyalty_tier_id
+    new_id = instance.loyalty_tier_id
+    if old_id == new_id:
+        return
+
+    direction = "same"
+    try:
+        from loyalty.models.tier import LoyaltyTier
+
+        old_level = (
+            LoyaltyTier.objects.only("level").get(pk=old_id).level
+            if old_id
+            else -1
+        )
+        new_level = (
+            LoyaltyTier.objects.only("level").get(pk=new_id).level
+            if new_id
+            else -1
+        )
+        if new_level > old_level:
+            direction = "up"
+        elif new_level < old_level:
+            direction = "down"
+    except Exception:
+        logger.exception(
+            "Failed to resolve tier direction for user %s (%s -> %s)",
+            instance.pk,
+            old_id,
+            new_id,
+        )
+
+    def send_tier_changed() -> None:
+        loyalty_tier_changed.send(
+            sender=sender,
+            user=instance,
+            old_tier_id=old_id,
+            new_tier_id=new_id,
+            direction=direction,
+        )
+        logger.debug(
+            "Sent loyalty_tier_changed for user %s (%s -> %s, %s)",
+            instance.pk,
+            old_id,
+            new_id,
+            direction,
+        )
+
+    transaction.on_commit(send_tier_changed)
+
+
+@receiver(
+    loyalty_tier_changed,
+    dispatch_uid="loyalty.notify_tier_up_live",
+)
+def notify_tier_up_live(
+    sender: type[UserAccount],
+    user: UserAccount,
+    direction: str,
+    **kwargs: Any,
+) -> None:
+    """Celebrate tier promotions with a live notification.
+
+    Tier downgrades are intentionally silent — notifying someone that
+    they've *lost* status is gratuitously negative. Lateral moves
+    (``"same"``) shouldn't happen in practice, but we guard against
+    them defensively.
+    """
+    if direction != "up":
+        return
+    from loyalty.tasks import notify_loyalty_tier_up_live
+
+    user_id = user.pk
+    transaction.on_commit(lambda: notify_loyalty_tier_up_live.delay(user_id))

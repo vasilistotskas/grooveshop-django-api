@@ -1723,6 +1723,15 @@ SPECTACULAR_SETTINGS = {
         "OrderStatus": "order.enum.status.OrderStatus",
         "ReviewStatus": "product.enum.review.ReviewStatus",
         "SubscriptionStatus": "user.models.subscription.UserSubscription.SubscriptionStatus",
+        # Both ``SubscriptionTopic.category`` and ``Notification.category``
+        # expose a ``category`` field, and they use different enum sets
+        # (SubscriptionTopic.TopicCategory vs NotificationCategoryEnum).
+        # Without these overrides, drf-spectacular auto-renames the
+        # colliding enum to ``CategoryXYZEnum`` which bleeds into
+        # generated frontend types and breaks consumer imports on every
+        # regeneration.
+        "TopicCategory": "user.models.subscription.SubscriptionTopic.TopicCategory",
+        "NotificationCategory": "notification.enum.NotificationCategoryEnum",
     },
 }
 

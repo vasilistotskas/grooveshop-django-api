@@ -47,9 +47,13 @@ def handle_notification_created(
 
     data = {
         "user_id": instance.user_id,
+        "id": instance.id,
         "seen": instance.seen,
         "link": instance.notification.link,
         "kind": instance.notification.kind,
+        "category": instance.notification.category,
+        "priority": instance.notification.priority,
+        "notification_type": instance.notification.notification_type,
         "translations": _get_translations(instance.notification),
     }
 

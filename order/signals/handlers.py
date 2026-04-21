@@ -21,8 +21,17 @@ from order.signals import (
     order_paid,
     order_refunded,
     order_returned,
+    order_shipment_dispatched,
     order_shipped,
     order_status_changed,
+)
+from order.notifications import (
+    notify_order_created_live,
+    notify_order_refunded_live,
+    notify_order_shipment_dispatched_live,
+    notify_order_status_changed_live,
+    notify_payment_confirmed_live,
+    notify_payment_failed_live,
 )
 from order.tasks import (
     send_order_confirmation_email,
@@ -39,8 +48,6 @@ def handle_order_post_save(
 ) -> None:
     """Handle order post-save signal."""
     if created:
-        # Send signal after transaction commits to avoid race conditions
-        from django.db import transaction
 
         def send_created_signal():
             order_created.send(sender=sender, order=instance)
@@ -48,6 +55,7 @@ def handle_order_post_save(
                 "Sent order_created signal for new order %s", instance.id
             )
 
+        # Defer to on_commit so the Celery task sees the committed row.
         transaction.on_commit(send_created_signal)
         return
 
@@ -67,6 +75,54 @@ def handle_order_post_save(
             instance._original_status,
             instance.status,
         )
+
+    # Detect the null → set transition on tracking info. We treat an
+    # empty string the same as None because the field is declared with
+    # ``blank=True`` and Django serializers happily round-trip "" as
+    # "no value". Fire on commit to avoid a race where the Celery task
+    # reads a not-yet-visible row.
+    #
+    # Additionally require the *value* to have actually changed between
+    # original and current — protects against the clear-then-reset case
+    # where an admin blanks the tracking, saves (post_save refreshes
+    # the ``_original_*`` snapshot to ""), then re-enters the same
+    # tracking number. Without the equality check the signal would
+    # fire a second time and the shopper would get a duplicate
+    # "Tracking available" notification.
+    tracking_unchanged = (
+        (
+            instance.tracking_number == instance._original_tracking_number
+            and instance.shipping_carrier == instance._original_shipping_carrier
+        )
+        if hasattr(instance, "_original_tracking_number")
+        else False
+    )
+
+    if (
+        hasattr(instance, "_original_tracking_number")
+        and hasattr(instance, "_original_shipping_carrier")
+        and not (
+            instance._original_tracking_number
+            and instance._original_shipping_carrier
+        )
+        and instance.tracking_number
+        and instance.shipping_carrier
+        and not tracking_unchanged
+    ):
+
+        def send_shipment_dispatched() -> None:
+            order_shipment_dispatched.send(
+                sender=sender,
+                order=instance,
+                tracking_number=instance.tracking_number,
+                shipping_carrier=instance.shipping_carrier,
+            )
+            logger.debug(
+                "Sent order_shipment_dispatched signal for order %s",
+                instance.id,
+            )
+
+        transaction.on_commit(send_shipment_dispatched)
 
 
 @receiver(order_created, dispatch_uid="order.handle_order_created")
@@ -89,9 +145,15 @@ def handle_order_created(
         send_order_confirmation_email.delay(order.id)
     OrderHistory.log_note(order=order, note="Order created")
 
+    # Live in-app notification for authenticated shoppers. The task
+    # itself drops guests silently, so there's no is_guest check here.
+    if order.user_id:
+        transaction.on_commit(
+            lambda oid=order.id: notify_order_created_live.delay(oid)
+        )
+
     # Clear cart after successful order creation (both user and guest)
     from cart.models import Cart
-    from django.db import transaction
 
     def clear_cart():
         """Clear cart after transaction commits."""
@@ -159,6 +221,18 @@ def handle_order_status_changed(
 
     send_order_status_update_email.delay(order.id, new_status)
 
+    # Live in-app notification. ``notify_order_status_changed_live``
+    # filters internally for statuses we actually want to surface in the
+    # bell (PROCESSING, SHIPPED, DELIVERED, COMPLETED, CANCELED), so
+    # dispatching unconditionally is safe and centralises the policy in
+    # one place (``order/notifications.py::_ORDER_STATUS_COPY``).
+    if order.user_id:
+        transaction.on_commit(
+            lambda oid=order.id, s=new_status: (
+                notify_order_status_changed_live.delay(oid, s)
+            )
+        )
+
     if new_status == OrderStatus.SHIPPED.value:
         order_shipped.send(sender=sender, order=order)
 
@@ -186,6 +260,24 @@ def handle_order_status_changed(
         old_status,
         new_status,
     )
+
+
+@receiver(
+    order_shipment_dispatched,
+    dispatch_uid="order.notify_shipment_dispatched",
+)
+def notify_shipment_dispatched(
+    sender: type[Order], order: Order, **kwargs: Any
+) -> None:
+    """Forward the shipment-dispatched signal to the live notification task.
+
+    The signal is already fired via ``transaction.on_commit`` in
+    ``handle_order_post_save``, so we can call ``.delay`` directly — the
+    row is guaranteed committed by the time we run.
+    """
+    if not order.user_id:
+        return
+    notify_order_shipment_dispatched_live.delay(order.id)
 
 
 @receiver(
@@ -408,6 +500,14 @@ def handle_order_refunded(
             },
         )
 
+        # Live notification so the shopper learns about the refund without
+        # having to check email. ``notify_order_refunded_live`` silently
+        # drops guest orders.
+        if order.user_id:
+            transaction.on_commit(
+                lambda oid=order.id: notify_order_refunded_live.delay(oid)
+            )
+
         logger.info("Order %s refunded", order.id)
 
     except Exception as e:
@@ -507,6 +607,18 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
             # a duplicate send.
             send_order_confirmation_email.delay(order.id)
 
+            # Live notification for the same event. The event-level
+            # idempotency guard above (webhook_processed_{event_id})
+            # already prevents duplicate dispatches from Stripe
+            # redeliveries; the task itself is a single INSERT, so this
+            # is safe at-most-once per event.
+            if order.user_id:
+                transaction.on_commit(
+                    lambda oid=order.id: notify_payment_confirmed_live.delay(
+                        oid
+                    )
+                )
+
     except Exception as e:
         logger.error(
             "Error handling payment_intent.succeeded: %s", e, exc_info=True
@@ -571,6 +683,14 @@ def handle_stripe_payment_failed(sender, **kwargs):
             # Notify the customer so they can retry instead of silently
             # sitting on a broken order.
             send_payment_failed_email.delay(order.id)
+
+            # Parallel live notification — same idempotency story as
+            # the succeeded branch above (guarded by the event-level
+            # metadata flag).
+            if order.user_id:
+                transaction.on_commit(
+                    lambda oid=order.id: notify_payment_failed_live.delay(oid)
+                )
 
     except Exception as e:
         logger.error(

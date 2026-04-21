@@ -225,9 +225,15 @@ def notify_product_price_lowered(
     dispatch_uid="product.notify_product_back_in_stock",
 )
 def notify_product_back_in_stock(sender, instance, **kwargs):
-    from product.tasks import send_product_alert_restock
+    from product.tasks import (
+        notify_back_in_stock_favourites_live,
+        send_product_alert_restock,
+    )
 
+    # Explicit opt-in subscribers get an email (ProductAlert RESTOCK).
     send_product_alert_restock.delay(product_id=instance.id)
+    # Implicit interest (favouriters) gets a live in-app notification.
+    notify_back_in_stock_favourites_live.delay(product_id=instance.id)
 
 
 @receiver(

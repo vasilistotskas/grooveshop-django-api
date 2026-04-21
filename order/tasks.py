@@ -908,8 +908,14 @@ def send_checkout_abandonment_emails() -> int:
             context = {
                 "cart": cart,
                 "items": list(cart.items.all()),
+                # Point the CTA at the recovery route — the Nuxt page
+                # there re-attaches the cart to the session (including
+                # the logged-out → login → back round-trip via the
+                # global auth middleware) and forwards to /cart with a
+                # ``recovered=1`` flag so the shopper sees a welcome
+                # banner instead of landing silently on their items.
                 "cart_url": (
-                    f"{settings.NUXT_BASE_URL.rstrip('/')}/cart"
+                    f"{settings.NUXT_BASE_URL.rstrip('/')}/cart/recover/{cart.uuid}"
                     if getattr(settings, "NUXT_BASE_URL", None)
                     else ""
                 ),

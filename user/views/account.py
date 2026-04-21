@@ -3,7 +3,8 @@ from __future__ import annotations
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.utils import extend_schema_view
+from drf_spectacular.openapi import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
 
@@ -29,7 +30,7 @@ from core.utils.serializers import (
     crud_config,
 )
 from notification.filters import NotificationUserFilter
-from notification.serializers.user import NotificationUserSerializer
+from notification.serializers.user import NotificationUserDetailSerializer
 from order.filters import OrderFilter
 from order.serializers.order import OrderSerializer
 from product.filters.favourite import ProductFavouriteFilter
@@ -105,12 +106,26 @@ serializers_config: SerializersConfig = {
         tags=["User Accounts"],
     ),
     "notifications": ActionConfig(
-        response=NotificationUserSerializer,
+        response=NotificationUserDetailSerializer,
         many=True,
         operation_id="getUserAccountNotifications",
         summary=_("Get user's notifications"),
         description=_("Get all notifications for a specific user."),
         tags=["User Accounts"],
+        # Advertise the seen filter (comes from NotificationUserFilter on
+        # the ViewSet) so the generated OpenAPI schema matches reality.
+        # Without this, ``drf-spectacular`` only picks up the ordering /
+        # pagination / search params and the Nuxt client has no way to
+        # pass ``?seen=true|false`` via the generated types.
+        parameters=[
+            OpenApiParameter(
+                name="seen",
+                type=OpenApiTypes.BOOL,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description=_("Filter notifications by seen/unseen state."),
+            ),
+        ],
     ),
     "subscriptions": ActionConfig(
         response=UserSubscriptionSerializer,

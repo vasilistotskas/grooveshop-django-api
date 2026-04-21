@@ -5,6 +5,7 @@ from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory, TestCase
 from django.utils import timezone
+from django.utils.translation import override as translation_override
 
 from notification.admin import (
     NotificationAdmin,
@@ -69,19 +70,25 @@ class NotificationStatusFilterTestCase(TestCase):
         )
 
     def test_lookups(self):
-        lookups = self.filter.lookups(self.request, self.model_admin)
+        # ``lookups`` returns ``(key, lazy_translated_label)`` pairs —
+        # label contents depend on the active locale (Greek by default
+        # in this test suite). Force English so the literal assertions
+        # stay deterministic without making the test locale-dependent.
+        with translation_override("en"):
+            lookups = self.filter.lookups(self.request, self.model_admin)
+            lookup_pairs = [(key, str(label)) for key, label in lookups]
 
-        self.assertEqual(len(lookups), 10)
-        self.assertIn(("active", "Active"), lookups)
-        self.assertIn(("expired", "Expired"), lookups)
-        self.assertIn(("urgent", "Urgent Priority"), lookups)
-        self.assertIn(("recent", "Recent (Last 7 days)"), lookups)
-        self.assertIn(("with_link", "Has Link"), lookups)
-        self.assertIn(("system", "System Notifications"), lookups)
-        self.assertIn(("order", "Order Related"), lookups)
-        self.assertIn(("payment", "Payment Related"), lookups)
-        self.assertIn(("security", "Security Related"), lookups)
-        self.assertIn(("promotion", "Promotions"), lookups)
+        self.assertEqual(len(lookup_pairs), 10)
+        self.assertIn(("active", "Active"), lookup_pairs)
+        self.assertIn(("expired", "Expired"), lookup_pairs)
+        self.assertIn(("urgent", "Urgent Priority"), lookup_pairs)
+        self.assertIn(("recent", "Recent (Last 7 days)"), lookup_pairs)
+        self.assertIn(("with_link", "Has Link"), lookup_pairs)
+        self.assertIn(("system", "System Notifications"), lookup_pairs)
+        self.assertIn(("order", "Order Related"), lookup_pairs)
+        self.assertIn(("payment", "Payment Related"), lookup_pairs)
+        self.assertIn(("security", "Security Related"), lookup_pairs)
+        self.assertIn(("promotion", "Promotions"), lookup_pairs)
 
     def test_queryset_active(self):
         self.filter.used_parameters = {"notification_status": "active"}

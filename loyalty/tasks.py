@@ -116,3 +116,79 @@ def recalculate_user_tier(self, user_id: int) -> dict:
         "user_id": user_id,
         "new_tier": str(user.loyalty_tier) if user.loyalty_tier else None,
     }
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    bind=True,
+    max_retries=3,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def notify_loyalty_tier_up_live(self, user_id: int) -> dict:
+    """Fire a celebratory live notification on a real tier promotion.
+
+    The caller (loyalty signal handler) is already responsible for
+    confirming the direction is ``"up"`` — we only re-read the user
+    here to get a fresh tier name for the message body without trusting
+    a stale name that was captured at dispatch time.
+    """
+    from django.conf import settings
+
+    from loyalty.models.tier import LoyaltyTier
+    from notification.enum import (
+        NotificationCategoryEnum,
+        NotificationKindEnum,
+        NotificationTypeEnum,
+    )
+    from notification.services import create_user_notification
+    from user.models.account import UserAccount
+
+    try:
+        user = UserAccount.objects.select_related("loyalty_tier").get(
+            id=user_id
+        )
+    except UserAccount.DoesNotExist:
+        logger.warning(
+            "notify_loyalty_tier_up_live: user %s not found", user_id
+        )
+        return {"status": "skipped", "reason": "user_not_found"}
+
+    tier: LoyaltyTier | None = user.loyalty_tier
+    tier_name = (
+        tier.safe_translation_getter("name", any_language=True) if tier else ""
+    ) or ""
+
+    loyalty_url = f"{settings.NUXT_BASE_URL or ''}/account/loyalty"
+
+    create_user_notification(
+        user,
+        kind=NotificationKindEnum.SUCCESS,
+        category=NotificationCategoryEnum.PROMOTION,
+        notification_type=NotificationTypeEnum.LOYALTY_TIER_UP,
+        link=loyalty_url,
+        translations={
+            "en": {
+                "title": f"You're now {tier_name}!"
+                if tier_name
+                else "Tier upgraded!",
+                "message": (
+                    "Your loyalty tier just went up — tap to see the new "
+                    "benefits you've unlocked."
+                ),
+            },
+            "el": {
+                "title": (
+                    f"Ανέβηκες στο {tier_name}!"  # noqa: RUF001
+                    if tier_name
+                    else "Νέο επίπεδο πιστότητας!"  # noqa: RUF001
+                ),
+                "message": (
+                    "Το επίπεδο πιστότητάς σου ανέβηκε — δες τα νέα "  # noqa: RUF001
+                    "προνόμια που ξεκλείδωσες."  # noqa: RUF001
+                ),
+            },
+        },
+    )
+    return {"status": "sent", "user_id": user_id}

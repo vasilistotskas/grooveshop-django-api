@@ -275,6 +275,12 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._original_status = self.status
+        # Cache tracking state so the post_save handler can detect the
+        # null → set transition that fires ``order_shipment_dispatched``.
+        # Using the field values (not pk) covers both fresh instances
+        # and refreshed-from-DB ones without a second query.
+        self._original_tracking_number = self.tracking_number
+        self._original_shipping_carrier = self.shipping_carrier
 
     def __str__(self) -> str:
         return f"Order {self.id} - {self.first_name} {self.last_name}"
@@ -297,6 +303,8 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
 
         super().save(*args, **kwargs)
         self._original_status = self.status
+        self._original_tracking_number = self.tracking_number
+        self._original_shipping_carrier = self.shipping_carrier
 
     def clean(self) -> None:
         errors: dict[str, list] = {}

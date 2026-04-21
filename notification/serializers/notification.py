@@ -40,6 +40,9 @@ class NotificationSerializer(
             "id",
             "link",
             "kind",
+            "category",
+            "priority",
+            "notification_type",
             "expiry_date",
             "created_at",
             "updated_at",
@@ -87,5 +90,8 @@ class NotificationWriteSerializer(
             "translations",
             "link",
             "kind",
+            "category",
+            "priority",
+            "notification_type",
             "expiry_date",
         )

@@ -37,6 +37,7 @@ from order.exceptions import (
     InsufficientStockError,
     InvalidOrderDataError,
     InvalidStatusTransitionError,
+    OrderCancellationError,
     PaymentNotFoundError,
 )
 from order.filters import OrderFilter
@@ -1052,6 +1053,14 @@ class OrderViewSet(BaseModelViewSet):
 
             return Response(response_data)
 
+        except OrderCancellationError as e:
+            # The service raises this for expected state-transition
+            # failures (order already shipped, already canceled, stale
+            # status, etc.). Surface it as a 400 so the frontend can
+            # treat it as a conflict (refresh + toast) rather than the
+            # generic "unexpected error" branch.
+            logger.warning("Order %s cancel rejected: %s", order.id, e.reason)
+            raise ValidationError({"detail": str(e.reason)}) from e
         except ValueError as e:
             logger.warning("Error canceling order: %s", e)
             raise ValidationError(

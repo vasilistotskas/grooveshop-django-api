@@ -71,19 +71,24 @@ def notify_back_in_stock_favourites_live(product_id: int) -> dict:
             category=NotificationCategoryEnum.PRODUCT,
             notification_type=NotificationTypeEnum.RESTOCK_FAVOURITE,
             link=product_url,
+            # Plain text — the ``link`` field above carries the target
+            # URL and the frontend wraps the whole card in a navigate
+            # handler, so embedding ``<a>`` tags in the body would just
+            # render as literal HTML in the bell and notifications
+            # page (both use text interpolation, not v-html).
             translations={
                 "en": {
                     "title": "Back in stock",
                     "message": (
-                        f"<a href='{product_url}'>{product_name}</a> is "
-                        f"available again. Grab it before it sells out."
+                        f"{product_name} is available again. "
+                        f"Grab it before it sells out."
                     ),
                 },
                 "el": {
                     "title": "Ξανά διαθέσιμο",  # noqa: RUF001
                     "message": (
-                        f"Το <a href='{product_url}'>{product_name}</a> "  # noqa: RUF001
-                        f"είναι ξανά διαθέσιμο. Πρόλαβέ το πριν εξαντληθεί."  # noqa: RUF001
+                        f"Το {product_name} είναι ξανά διαθέσιμο. "  # noqa: RUF001
+                        f"Πρόλαβέ το πριν εξαντληθεί."  # noqa: RUF001
                     ),
                 },
             },
@@ -160,23 +165,22 @@ def send_price_drop_notifications(
             category=NotificationCategoryEnum.PRODUCT,
             notification_type=NotificationTypeEnum.PRICE_DROP_FAVOURITE,
             link=product_url,
+            # Plain text — see restock task above for rationale.
             translations={
                 "en": {
                     "title": "Price Drop!",
                     "message": (
-                        f"The price of <a href='{product_url}'>"
-                        f"{instance_name}</a> has dropped"
-                        f" from {old_price} to {new_price}."
-                        f" Check it out now!"
+                        f"The price of {instance_name} has dropped "
+                        f"from {old_price} to {new_price}. "
+                        f"Check it out now!"
                     ),
                 },
                 "el": {
                     "title": "Μείωση Τιμής!",  # noqa: RUF001
                     "message": (
-                        f"Η τιμή του <a href='{product_url}'>"  # noqa: RUF001
-                        f"{instance_name}</a> μειώθηκε"  # noqa: RUF001
-                        f" από {old_price} σε {new_price}."
-                        f" Δείτε το τώρα!"  # noqa: RUF001
+                        f"Η τιμή του {instance_name} μειώθηκε από "  # noqa: RUF001
+                        f"{old_price} σε {new_price}. "
+                        f"Δείτε το τώρα!"  # noqa: RUF001
                     ),
                 },
             },

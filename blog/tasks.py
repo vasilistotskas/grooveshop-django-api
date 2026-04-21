@@ -62,18 +62,23 @@ def notify_comment_liked_task(
             category=NotificationCategoryEnum.REVIEW,
             notification_type=NotificationTypeEnum.COMMENT_LIKED,
             link=blog_post_url,
+            # Plain text — the ``link`` carries the blog-post URL and
+            # the UI treats the notification card as a single tap
+            # target, so ``<a>`` tags in the copy would render as
+            # literal HTML.
             translations={
                 "en": {
-                    "title": (f"<a href='{blog_post_url}'>Comment</a> Liked!"),
-                    "message": (f"Your comment was liked by {liker_label}."),
+                    "title": "Your comment was liked",
+                    "message": (
+                        f"{liker_label} liked your comment. "
+                        f"Tap to see the thread."
+                    ),
                 },
                 "el": {
-                    "title": (
-                        f"Το <a href='{blog_post_url}'>σχόλιο</a>"
-                        f" σου πήρε like!"
-                    ),
+                    "title": "Το σχόλιό σου πήρε like!",  # noqa: RUF001
                     "message": (
-                        f"Το σχόλιο σου άρεσε στον χρήστη {liker_label}."
+                        f"Στον χρήστη {liker_label} άρεσε το σχόλιό σου. "  # noqa: RUF001
+                        f"Πάτα εδώ για να δεις τη συζήτηση."  # noqa: RUF001
                     ),
                 },
             },

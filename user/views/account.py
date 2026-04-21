@@ -171,21 +171,37 @@ class UserAccountViewSet(BaseModelViewSet):
     ordering = ["-created_at"]
     search_fields = ["id", "email", "username", "first_name", "last_name"]
 
-    def get_filterset_class(self):
-        action_filter_map = {
-            "favourite_products": ProductFavouriteFilter,
-            "orders": OrderFilter,
-            "product_reviews": ProductReviewFilter,
-            "addresses": UserAddressFilter,
-            "blog_post_comments": BlogCommentFilter,
-            "liked_blog_posts": BlogPostFilter,
-            "notifications": NotificationUserFilter,
-            "subscriptions": UserSubscriptionFilter,
-        }
+    # Per-action filtersets — each nested action operates over a
+    # different model (orders, favourites, notifications, …) so we
+    # switch filter classes based on ``self.action``.
+    #
+    # NOTE: ``django-filter``'s ``DjangoFilterBackend`` reads the
+    # ``filterset_class`` *attribute* via ``getattr(view,
+    # 'filterset_class', None)`` — it does NOT call this method. Just
+    # defining ``get_filterset_class`` as a method silently bound no
+    # filter at all on every nested action (unseen/seen tab on the
+    # notifications page returned identical counts because ``seen``
+    # was never forwarded to the QuerySet). We override
+    # ``filter_queryset`` below to materialise the per-action class
+    # onto the instance attribute right before DRF's filter chain
+    # runs, so the backend actually sees it.
+    _action_filter_map: dict[str, type] = {
+        "favourite_products": ProductFavouriteFilter,
+        "orders": OrderFilter,
+        "product_reviews": ProductReviewFilter,
+        "addresses": UserAddressFilter,
+        "blog_post_comments": BlogCommentFilter,
+        "liked_blog_posts": BlogPostFilter,
+        "notifications": NotificationUserFilter,
+        "subscriptions": UserSubscriptionFilter,
+    }
 
-        if self.action in action_filter_map:
-            return action_filter_map[self.action]
-        return UserAccountFilter
+    def get_filterset_class(self):
+        return self._action_filter_map.get(self.action or "", UserAccountFilter)
+
+    def filter_queryset(self, queryset):
+        self.filterset_class = self.get_filterset_class()
+        return super().filter_queryset(queryset)
 
     def _get_checked_user(self):
         """Get the target user with ownership/admin permission check."""

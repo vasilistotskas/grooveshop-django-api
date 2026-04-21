@@ -41,8 +41,11 @@ from user.filters import UserAddressFilter, UserSubscriptionFilter
 from user.filters.account import UserAccountFilter
 from user.models.subscription import SubscriptionTopic, UserSubscription
 from user.serializers.account import (
+    DeleteAccountRequestSerializer,
+    DeleteAccountResponseSerializer,
     UsernameUpdateResponseSerializer,
     UsernameUpdateSerializer,
+    UserDataExportSerializer,
     UserSubscriptionSummaryResponseSerializer,
 )
 from user.serializers.address import UserAddressSerializer
@@ -148,6 +151,40 @@ serializers_config: SerializersConfig = {
         operation_id="getUserAccountSubscriptionSummary",
         summary=_("Get user's subscription summary"),
         description=_("Get a summary of subscriptions for a specific user."),
+        tags=["User Accounts"],
+    ),
+    "request_data_export": ActionConfig(
+        response=UserDataExportSerializer,
+        operation_id="requestUserAccountDataExport",
+        summary=_("Request GDPR data export"),
+        description=_(
+            "Queue a job that compiles the user's personal data and emails "
+            "a one-off download link. Returns the new UserDataExport record."
+        ),
+        tags=["User Accounts"],
+    ),
+    "data_exports": ActionConfig(
+        response=UserDataExportSerializer,
+        many=True,
+        operation_id="listUserAccountDataExports",
+        summary=_("List GDPR data exports"),
+        description=_(
+            "List recent data-export requests for this user so the UI can "
+            "show progress and the last download link."
+        ),
+        tags=["User Accounts"],
+    ),
+    "delete_account": ActionConfig(
+        request=DeleteAccountRequestSerializer,
+        response=DeleteAccountResponseSerializer,
+        operation_id="deleteUserAccountGdpr",
+        summary=_("Delete account (GDPR right-to-erasure)"),
+        description=_(
+            "Anonymises the user's orders (kept for tax/accounting) and "
+            "hard-deletes every other linked record. Irreversible. "
+            "Caller must have re-authenticated via allauth within the "
+            "window configured by ``ACCOUNT_REAUTHENTICATION_TIMEOUT``."
+        ),
         tags=["User Accounts"],
     ),
 }
@@ -451,3 +488,96 @@ class UserAccountViewSet(BaseModelViewSet):
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(summary)
         return Response(response_serializer.data)
+
+    @action(detail=True, methods=["GET"])
+    def data_exports(self, request, pk=None):
+        """List this user's recent GDPR export jobs (paginated)."""
+        from user.models.data_export import UserDataExport
+
+        self.ordering_fields = []
+        self.ordering = []
+        self.search_fields = []
+
+        user = self.get_object()
+        queryset = UserDataExport.objects.filter(user=user).order_by(
+            "-created_at"
+        )
+
+        return self.paginate_and_serialize(
+            queryset, request, serializer_class=UserDataExportSerializer
+        )
+
+    @action(detail=True, methods=["POST"])
+    def request_data_export(self, request, pk=None):
+        """Queue a data-export job for this user.
+
+        Rate-limited to one PENDING/PROCESSING export at a time per
+        user so a double-click doesn't spawn duplicate jobs. The
+        Celery task is idempotent per ``UserDataExport`` row anyway,
+        but the UX point is to show the in-flight one not a stack.
+        """
+        from user.models.data_export import UserDataExport
+        from user.services.gdpr import create_export_request
+        from user.tasks import export_user_data_task
+
+        user = self.get_object()
+
+        existing = (
+            UserDataExport.objects.filter(
+                user=user,
+                status__in=[
+                    UserDataExport.Status.PENDING,
+                    UserDataExport.Status.PROCESSING,
+                ],
+            )
+            .order_by("-created_at")
+            .first()
+        )
+        if existing is not None:
+            serializer = UserDataExportSerializer(
+                existing, context={"request": request}
+            )
+            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+
+        export = create_export_request(user)
+        export_user_data_task.delay(export.id)
+
+        serializer = UserDataExportSerializer(
+            export, context={"request": request}
+        )
+        return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+
+    @action(detail=True, methods=["POST"])
+    def delete_account(self, request, pk=None):
+        """Right-to-erasure endpoint.
+
+        The caller must POST ``{"confirmation": "DELETE"}``. The
+        actual scrub runs in ``delete_user_account_task``; we respond
+        immediately and the session is invalidated on the next
+        request when the User row is gone.
+        """
+        from user.tasks import delete_user_account_task
+
+        user = self.get_object()
+
+        if request.user != user and not request.user.is_staff:
+            return Response(
+                {"detail": _("You can only delete your own account.")},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        req_serializer = DeleteAccountRequestSerializer(data=request.data)
+        req_serializer.is_valid(raise_exception=True)
+
+        delete_user_account_task.delay(user.id)
+
+        return Response(
+            {
+                "detail": _(
+                    "Your account is being deleted. You will be logged out "
+                    "shortly. Orders are retained in anonymised form for "
+                    "tax/accounting purposes."
+                )
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )

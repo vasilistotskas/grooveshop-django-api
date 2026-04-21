@@ -250,3 +250,50 @@ class UserSubscriptionSummaryResponseSerializer(serializers.Serializer):
     total_subscriptions = serializers.IntegerField()
     active_subscriptions = serializers.IntegerField()
     categories = serializers.ListField(child=serializers.CharField())
+
+
+class UserDataExportSerializer(serializers.Serializer):
+    """Read-only view of a UserDataExport row for the privacy UI."""
+
+    id = serializers.IntegerField(read_only=True)
+    status = serializers.CharField(read_only=True)
+    token = serializers.CharField(read_only=True)
+    file_size = serializers.IntegerField(read_only=True, allow_null=True)
+    expires_at = serializers.DateTimeField(read_only=True, allow_null=True)
+    created_at = serializers.DateTimeField(read_only=True)
+    download_url = serializers.SerializerMethodField()
+
+    def get_download_url(self, obj) -> str | None:
+        from user.models.data_export import UserDataExport
+
+        if obj.status != UserDataExport.Status.READY:
+            return None
+        request = self.context.get("request")
+        path = f"/api/v1/user/data_export/{obj.token}/download"
+        if request is not None:
+            return request.build_absolute_uri(path)
+        return path
+
+
+class DeleteAccountRequestSerializer(serializers.Serializer):
+    """Body for ``POST user/account/{id}/delete_account``.
+
+    Requires the user to re-type ``DELETE`` as a guardrail. The allauth
+    re-authentication happens outside this serializer via the session
+    middleware's ``X-Session-Token`` header before the task is queued.
+    """
+
+    confirmation = serializers.CharField(
+        help_text=_('Must equal the literal string "DELETE".')
+    )
+
+    def validate_confirmation(self, value: str) -> str:
+        if value != "DELETE":
+            raise serializers.ValidationError(
+                _("Type DELETE exactly to confirm account deletion.")
+            )
+        return value
+
+
+class DeleteAccountResponseSerializer(serializers.Serializer):
+    detail = serializers.CharField()

@@ -1,0 +1,19 @@
+{% load i18n %}{% blocktrans with site_name=SITE_NAME %}Your data export is ready — {{ site_name }}{% endblocktrans %}
+
+{% blocktrans with name=user.first_name|default:user.username %}Hi {{ name }},{% endblocktrans %}
+
+{% trans "Your personal data export is ready to download. The archive contains every record we hold that relates to you: profile, addresses, orders, favourites, reviews, blog comments, loyalty activity, notifications, and subscriptions." %}
+
+{% trans "Download your export" %}: {{ download_url }}
+
+{% blocktrans with size=file_size_kb %}File size: {{ size }} KB{% endblocktrans %}
+{% blocktrans with expires=expires_at|date:"SHORT_DATETIME_FORMAT" %}The link expires on {{ expires }}. After that you can request a new export from the privacy settings page.{% endblocktrans %}
+
+{% trans "This is a one-off download link. Save the file somewhere safe — we don't keep a copy after the link expires." %}
+
+{% trans "If you did not request this export, please contact support right away." %}
+
+---
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}

@@ -79,19 +79,43 @@ class ResponseDoc:
     rows: list[ResponseRow]
 
     def first(self) -> ResponseRow:
-        """Convenience for single-entity submissions. Raises
-        ``IndexError`` when the response is empty — treat as a bug."""
+        """Convenience for single-entity submissions. Synthesises a
+        ``TechnicalError`` row with no mark when the response doc is
+        empty — happens for some AADE gateway faults (auth issues
+        that land as 200 with an empty body). Callers branch on
+        ``status_code`` anyway, so this keeps the downstream
+        classification logic consistent instead of crashing with
+        ``IndexError``."""
+        if not self.rows:
+            return ResponseRow(
+                index=0,
+                status_code="TechnicalError",
+                errors=[
+                    MyDataError(
+                        code="",
+                        message="AADE returned an empty ResponseDoc",
+                    )
+                ],
+            )
         return self.rows[0]
 
 
 def parse_response_doc(xml_bytes: bytes) -> ResponseDoc:
     """Parse the ``ResponseDoc`` XML returned by any AADE submission.
 
-    Namespace-tolerant — AADE returns the doc sometimes bare,
-    sometimes under ``xmlns="http://www.aade.gr/..."``. We strip the
-    namespace prefix before matching so both forms work.
+    Shape tolerance: AADE's dev endpoint sometimes wraps the real
+    ``ResponseDoc`` inside a Microsoft DataContract ``<string>``
+    envelope (``xmlns="http://schemas.microsoft.com/2003/10/Serialization/"``)
+    with the inner XML HTML-entity-escaped as text. We unwrap that
+    form before parsing. The bare and namespaced ``ResponseDoc``
+    forms both work via the namespace-stripping in ``_local``.
     """
     root = fromstring(xml_bytes)
+    if _local(root.tag) == "string" and root.text:
+        # Re-parse the inner (previously escaped) XML. ``root.text``
+        # already contains the unescaped string because ElementTree
+        # resolves entities on parse.
+        root = fromstring(root.text.encode("utf-8"))
     rows = [_parse_row(el) for el in _iter_children(root, "response")]
     return ResponseDoc(rows=rows)
 
@@ -99,13 +123,29 @@ def parse_response_doc(xml_bytes: bytes) -> ResponseDoc:
 def _parse_row(el: Element) -> ResponseRow:
     status_code = _coerce_status(_text(el, "statusCode"))
     index = int(_text(el, "index") or "0")
-    errors = [
-        MyDataError(
-            code=_text(err_el, "code") or "",
-            message=_text(err_el, "message") or "",
-        )
-        for err_el in _iter_children(el, "errors")
-    ]
+    # AADE wraps multiple ``<error>`` rows inside a single
+    # ``<errors>`` container (per v1.0.10 §6.1 ErrorType list). Flat
+    # test fixtures sometimes inline the ``<code>`` / ``<message>``
+    # directly in ``<errors>`` — tolerate both shapes.
+    errors: list[MyDataError] = []
+    for errors_el in _iter_children(el, "errors"):
+        inner_errors = list(_iter_children(errors_el, "error"))
+        if inner_errors:
+            for err_el in inner_errors:
+                errors.append(
+                    MyDataError(
+                        code=_text(err_el, "code") or "",
+                        message=_text(err_el, "message") or "",
+                    )
+                )
+        else:
+            # Legacy / flat shape: <errors><code/><message/></errors>
+            errors.append(
+                MyDataError(
+                    code=_text(errors_el, "code") or "",
+                    message=_text(errors_el, "message") or "",
+                )
+            )
     return ResponseRow(
         index=index,
         status_code=status_code,

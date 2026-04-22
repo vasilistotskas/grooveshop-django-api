@@ -258,6 +258,45 @@ class SendInvoiceToMydataTestCase(TestCase):
         invoice.refresh_from_db()
         self.assertEqual(invoice.mydata_status, MyDataStatus.SUBMITTED)
 
+    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
+    @patch("order.mydata.client.MyDataClient.send_invoices")
+    @patch("order.tasks.send_invoice_email.delay")
+    def test_duplicate_uid_is_terminal_not_retried(
+        self, mock_email, mock_send, _mock_render
+    ):
+        """Regression: AADE error 228 (duplicate uid) used to be
+        caught in the retry branch alongside transport errors — that
+        produced 5 wasted round-trips with the same uid (AADE
+        answers 228 every time because the content is identical).
+        Now the task treats it as terminal, delivers the email, and
+        logs the uid for manual reconciliation."""
+        _enable_mydata()
+        order, invoice = _make_invoice()
+        duplicate_xml = b"""<?xml version="1.0" encoding="UTF-8"?>
+<ResponseDoc>
+    <response>
+        <index>1</index>
+        <statusCode>ValidationError</statusCode>
+        <errors>
+            <code>228</code>
+            <message>It has already been sent for another invoice (MARK: 123)</message>
+        </errors>
+    </response>
+</ResponseDoc>"""
+        mock_send.return_value = duplicate_xml
+
+        result = send_invoice_to_mydata(order.id)
+
+        # Must NOT retry — a single call is enough.
+        self.assertFalse(result)
+        self.assertEqual(mock_send.call_count, 1)
+        # Customer still gets the pre-transmission PDF.
+        mock_email.assert_called_once_with(order.id)
+        # Invoice ends up in REJECTED state so ops can reconcile.
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.mydata_status, MyDataStatus.REJECTED)
+        self.assertEqual(invoice.mydata_error_code, "228")
+
     def test_missing_invoice_returns_false(self):
         """An order without an Invoice row (e.g. document_type ≠
         INVOICE) must short-circuit to the email chain, not crash."""

@@ -77,14 +77,37 @@ def submit_invoice(invoice: Any) -> ResponseRow | None:
             code="MISSING_SELLER_VAT",
         )
 
-    built = build_invoice_xml(
-        invoice,
-        issuer_vat=issuer_vat,
-        issuer_country="GR",
-        branch=config.issuer_branch,
-        series_prefix=config.invoice_series_prefix,
-    )
-    validate_invoice_doc(built.xml_bytes)
+    try:
+        built = build_invoice_xml(
+            invoice,
+            issuer_vat=issuer_vat,
+            issuer_country="GR",
+            branch=config.issuer_branch,
+            series_prefix=config.invoice_series_prefix,
+        )
+    except ValueError as exc:
+        # Unsupported VAT rate or malformed invoice_number — bad
+        # master data, not transient. Record as a terminal validation
+        # failure so the admin UI surfaces the reason rather than
+        # retrying 5 times and then burying the error.
+        _persist_failure(
+            invoice,
+            code="BUILD",
+            message=f"Failed to build myDATA payload: {exc}",
+        )
+        raise MyDataValidationError(str(exc), code="BUILD") from exc
+
+    try:
+        validate_invoice_doc(built.xml_bytes)
+    except Exception as exc:  # noqa: BLE001 — xmlschema raises many subtypes
+        # XSD validation error is terminal: the payload does not
+        # match the pinned schema. Fall into the same rejection
+        # bucket as a server-side ValidationError so ops can see
+        # the reason in the admin instead of a zombie SUBMITTED row.
+        _persist_failure(
+            invoice, code="XSD", message=f"Local XSD validation failed: {exc}"
+        )
+        raise MyDataValidationError(str(exc), code="XSD") from exc
 
     # Persist UID + request-scope identity BEFORE the HTTP call so a
     # transport failure leaves enough state to recover on retry.

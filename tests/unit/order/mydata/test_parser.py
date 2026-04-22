@@ -124,3 +124,20 @@ class ParseResponseDocTestCase(SimpleTestCase):
         self.assertTrue(row.is_success)
         self.assertEqual(row.cancellation_mark, 900000000000001)
         self.assertIsNone(row.invoice_mark)
+
+    def test_empty_response_doc_returns_synthetic_error_row(self):
+        """Regression: AADE gateway sometimes returns HTTP 200 with
+        an empty ``<ResponseDoc/>`` (auth / routing issues). The
+        parser used to raise ``IndexError`` from ``first()``, which
+        crashed the Celery task and left the invoice zombied in
+        SUBMITTED state. Now it returns a TechnicalError row so the
+        service-layer classifier treats it as a (retryable)
+        transport fault rather than crashing."""
+        empty = b'<?xml version="1.0" encoding="UTF-8"?><ResponseDoc/>'
+        doc = parse_response_doc(empty)
+        self.assertEqual(doc.rows, [])
+        # ``first()`` must NOT raise — returns a synthetic error row.
+        row = doc.first()
+        self.assertEqual(row.status_code, "TechnicalError")
+        self.assertFalse(row.is_success)
+        self.assertEqual(len(row.errors), 1)

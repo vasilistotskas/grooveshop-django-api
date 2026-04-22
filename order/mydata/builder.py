@@ -1,69 +1,175 @@
 """Build the ``InvoicesDoc`` XML payload from an :class:`Invoice` row.
 
 Scope for Tier A: ``invoiceType=11.1`` (Α.Λ.Π. — retail receipt, B2C).
-Structure is driven off the AADE ``myDATA v1.0.12`` XSDs — the XSDs
-use two namespaces (``icls:`` for the top-level ``InvoicesDoc`` +
-``invoice`` elements and the ``ih:`` prefix in the schema
-documentation for common types). In practice AADE accepts the
-unprefixed form below.
+Structure is driven off the AADE ``myDATA v1.0.10`` XSDs and validated
+against the official error catalogue (PDF bundled under ``docs/``).
+
+Element ordering inside ``<invoice>`` is fixed by AADE's schema
+(PDF line 667): ``issuer, counterpart, paymentMethods,
+invoiceHeader, invoiceDetails, taxesTotals, invoiceSummary``. Wrong
+order triggers error 101 (XML syntax / schema).
 
 Extensibility (Tier B — B2B / credit notes / refunds):
 - Switch ``invoiceType`` based on ``order.document_type`` +
   buyer-VAT presence.
 - Populate ``counterpart`` with buyer VAT / tax office when issuing
   1.1 (B2B sales invoice).
-- Pass ``correlatedInvoices`` element for 5.1 linked credit notes.
-- Set ``vatCategory`` differently per market (0% export, reverse
-  charge, etc.).
+- Pass ``correlatedInvoices`` (inside InvoiceHeader) for 5.1 linked
+  credit notes.
+- Populate ``vatExemptionCategory`` per export / reverse-charge kind.
 
 Decimal handling follows AADE rules: **2 decimal places, ROUND_HALF_UP,
-sum-then-round not round-then-sum** (errors 203 / 207–210 otherwise).
+and summary totals MUST equal the sum of the rounded line values**
+(errors 203 / 207–210 otherwise). We therefore accumulate the
+rounded per-line totals as we emit them, and derive the summary
+from those sums — never from the pre-computed bucket aggregates,
+which can drift by a cent on multi-item mixed-VAT orders.
+
 Greek text is emitted as native UTF-8 — do NOT HTML-escape (double
 encoding triggers schema rejection).
 """
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 from xml.etree.ElementTree import Element, SubElement, tostring
 
-from order.mydata.uid import build_uid
 from order.mydata.types import (
+    CLASSIFICATION_CATEGORY_GOODS_SALES,
+    CLASSIFICATION_TYPE_RETAIL_GOODS,
     PAYMENT_METHOD_CASH,
+    PAYMENT_METHOD_POS_CARD,
     PAYMENT_METHOD_WEB_BANKING,
     VAT_CATEGORY_0,
-    VAT_CATEGORY_13,
-    VAT_CATEGORY_24,
+    VAT_CATEGORY_3,
+    VAT_CATEGORY_4,
     VAT_CATEGORY_6,
+    VAT_CATEGORY_9,
+    VAT_CATEGORY_13,
+    VAT_CATEGORY_17,
+    VAT_CATEGORY_24,
+    VAT_EXEMPTION_NO_VAT_ARTICLES,
 )
+from order.mydata.uid import build_uid
 
 
-# VAT rate → AADE ``vatCategory`` code. The AADE enum is a strict
-# whitelist of known rates; we pick the closest category by rate.
-# (Reverse charge / exempt flavours require ``vatExemptionCategory``
-# handling — out of scope for the 11.1 MVP, see Tier B notes above.)
+# VAT rate → AADE ``vatCategory``. Strict whitelist per v1.0.10 annex
+# 8.x; unknown rates are treated as a bug upstream (in master data)
+# rather than silently remapped to 0% — that would trip error 217
+# (missing vatExemptionCategory) downstream, which is a confusing
+# way to learn you have bad VAT rows.
 _VAT_CATEGORY_BY_RATE: dict[Decimal, int] = {
     Decimal("24"): VAT_CATEGORY_24,
+    Decimal("17"): VAT_CATEGORY_17,
     Decimal("13"): VAT_CATEGORY_13,
+    Decimal("9"): VAT_CATEGORY_9,
     Decimal("6"): VAT_CATEGORY_6,
+    Decimal("4"): VAT_CATEGORY_4,  # Island discount 4% (classic)
+    Decimal("3"): VAT_CATEGORY_3,  # Law 5057/2023
     Decimal("0"): VAT_CATEGORY_0,
 }
+# Rates that are NOT taxed — these land in vatCategory=7 and need
+# ``vatExemptionCategory`` per AADE error 217.
+_ZERO_RATED = Decimal("0")
 
 
 def _vat_category(rate: Decimal) -> int:
     """Map a numeric VAT rate to the AADE ``vatCategory`` integer.
 
-    Unknown rates fall back to category 7 (0% — we flag these with a
-    dev-log warning via the caller; AADE rejects them downstream so
-    don't try to silently patch up bad master data)."""
-    return _VAT_CATEGORY_BY_RATE.get(rate, VAT_CATEGORY_0)
+    Raises ``ValueError`` on unknown rates so bad master data
+    surfaces loudly in :func:`order.mydata.service.submit_invoice`
+    rather than getting silently rewritten and rejected by AADE
+    with a misleading error code."""
+    try:
+        return _VAT_CATEGORY_BY_RATE[rate]
+    except KeyError as exc:
+        raise ValueError(
+            f"Unsupported VAT rate {rate}% for myDATA — add it to "
+            "_VAT_CATEGORY_BY_RATE or fix the Vat row."
+        ) from exc
 
 
 def _money(value: Decimal) -> str:
     """Serialise a ``Decimal`` using AADE's 2dp ``ROUND_HALF_UP``."""
     return str(value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+def _split_gross(line_gross: Decimal, rate: Decimal) -> tuple[Decimal, Decimal]:
+    """Back out net + VAT from a gross amount, each quantised to 2dp.
+
+    Returning the ROUNDED values is essential — the per-line and
+    summary columns must agree after AADE's server-side re-rounding
+    (errors 203 / 207–210 otherwise)."""
+    divisor = Decimal("1") + rate / Decimal("100")
+    line_net = line_gross / divisor if divisor else line_gross
+    line_vat = line_gross - line_net
+    return (
+        Decimal(_money(line_net)),
+        Decimal(_money(line_vat)),
+    )
+
+
+def _emit_detail(
+    parent: Element,
+    *,
+    line_number: int,
+    line_net: Decimal,
+    line_vat: Decimal,
+    rate: Decimal,
+) -> None:
+    """Append one fully-populated ``<invoiceDetails>`` row.
+
+    Includes the mandatory ``<incomeClassification>`` per AADE error
+    314 (every 11.1 line needs a classification) and the
+    ``<vatExemptionCategory>`` disambiguator required when
+    ``vatCategory=7`` (error 217)."""
+    row = SubElement(parent, "invoiceDetails")
+    SubElement(row, "lineNumber").text = str(line_number)
+    SubElement(row, "netValue").text = _money(line_net)
+    SubElement(row, "vatCategory").text = str(_vat_category(rate))
+    SubElement(row, "vatAmount").text = _money(line_vat)
+    if rate == _ZERO_RATED:
+        SubElement(row, "vatExemptionCategory").text = str(
+            VAT_EXEMPTION_NO_VAT_ARTICLES
+        )
+    _emit_income_classification(row, amount=line_net)
+
+
+# AADE hosts the classification type + category + amount in a
+# SEPARATE namespace from the invoice body — the "Classificaton"
+# spelling (missing `i`) is the official URI per AADE's XSDs, verified
+# via live dev response. Do NOT correct the typo.
+_INCLS_NS = "https://www.aade.gr/myDATA/incomeClassificaton/v1.0"
+
+
+def _emit_income_classification(parent: Element, *, amount: Decimal) -> None:
+    """Append a ``<incomeClassification>`` block. Its inner elements
+    live under ``_INCLS_NS`` per AADE's schema — the outer element
+    itself stays in the invoice namespace.
+    """
+    cls = SubElement(parent, "incomeClassification")
+    SubElement(
+        cls, f"{{{_INCLS_NS}}}classificationType"
+    ).text = CLASSIFICATION_TYPE_RETAIL_GOODS
+    SubElement(
+        cls, f"{{{_INCLS_NS}}}classificationCategory"
+    ).text = CLASSIFICATION_CATEGORY_GOODS_SALES
+    SubElement(cls, f"{{{_INCLS_NS}}}amount").text = _money(amount)
+
+
+def _ancillary_charges(order: Any):
+    """Yield the customer-paid amounts that sit outside ``OrderItem``
+    rows (shipping, payment-method fee). Empty / zero values are
+    skipped — AADE rejects zero-amount lines."""
+    shipping = getattr(order, "shipping_price", None)
+    if shipping is not None and shipping.amount > 0:
+        yield Decimal(shipping.amount)
+    fee = getattr(order, "payment_method_fee", None)
+    if fee is not None and fee.amount > 0:
+        yield Decimal(fee.amount)
 
 
 @dataclass(frozen=True)
@@ -77,6 +183,27 @@ class BuiltInvoice:
     invoice_type: str
     series: str
     aa: int
+
+
+def _pick_payment_type(invoice: Any) -> int:
+    """Map the order's payment state to AADE ``paymentMethodDetails.type``.
+
+    ``payment_id`` populated = an online provider (Stripe / Viva /
+    etc.) acknowledged the charge → POS / e-POS (code 7). Web Banking
+    (6) would only be correct for manual bank-transfer flows; COD
+    orders without a provider id → Cash (3).
+    """
+    payment_id = getattr(invoice.order, "payment_id", "") or ""
+    pay_way = getattr(invoice.order, "pay_way", None)
+    if payment_id:
+        return PAYMENT_METHOD_POS_CARD
+    # No transaction ID on file; lean on the PayWay flag when it
+    # exists — an "online" pay way without a payment_id is an
+    # anomaly (probably mid-flow) so we still pick POS; otherwise
+    # we treat as cash/COD.
+    if pay_way is not None and getattr(pay_way, "is_online_payment", False):
+        return PAYMENT_METHOD_WEB_BANKING
+    return PAYMENT_METHOD_CASH
 
 
 def build_invoice_xml(
@@ -120,16 +247,33 @@ def build_invoice_xml(
         aa=aa,
     )
 
-    root = Element("InvoicesDoc")
+    # The official AADE namespace is MANDATORY — without it the
+    # server can't match any element against the XSD and returns
+    # error 101 for every tag ("Could not find schema information
+    # for the element 'X'"). Kept as a literal string rather than
+    # a module-level constant so the schema version bump (v1.0.10 →
+    # v1.0.12) is a single textual change.
+    root = Element(
+        "InvoicesDoc",
+        {"xmlns": "http://www.aade.gr/myDATA/invoice/v1.0"},
+    )
     invoice_el = SubElement(root, "invoice")
 
-    # Issuer block
+    # ── issuer ──────────────────────────────────────────────────
     issuer = SubElement(invoice_el, "issuer")
     SubElement(issuer, "vatNumber").text = issuer_vat
     SubElement(issuer, "country").text = issuer_country
     SubElement(issuer, "branch").text = str(branch)
 
-    # Header
+    # (counterpart is omitted for 11.1 retail — AADE errors 223/224
+    # forbid populating buyer identity on an ΑΛΠ.)
+
+    # ── invoiceHeader ───────────────────────────────────────────
+    # Actual XSD sequence (verified via live AADE dev response): the
+    # PDF field-list table orders things differently to the XSD, so
+    # don't be fooled by docs — ``invoiceHeader`` must come BEFORE
+    # ``paymentMethods`` (error 101 otherwise, with a helpful
+    # "expected invoiceHeader" message).
     header = SubElement(invoice_el, "invoiceHeader")
     SubElement(header, "series").text = series
     SubElement(header, "aa").text = str(aa)
@@ -137,61 +281,97 @@ def build_invoice_xml(
     SubElement(header, "invoiceType").text = invoice_type
     SubElement(header, "currency").text = invoice.currency or "EUR"
 
-    # Payment methods — single row for an online-paid retail sale.
+    # ── paymentMethods ──────────────────────────────────────────
     pm_container = SubElement(invoice_el, "paymentMethods")
     pm_row = SubElement(pm_container, "paymentMethodDetails")
-    # Type 3 = Web banking / card online; type 7 = cash (offline
-    # payment). Mapping is kept narrow — extend in Tier B.
-    pay_type = (
-        PAYMENT_METHOD_WEB_BANKING
-        if getattr(invoice.order, "payment_id", "")
-        else PAYMENT_METHOD_CASH
-    )
-    SubElement(pm_row, "type").text = str(pay_type)
+    SubElement(pm_row, "type").text = str(_pick_payment_type(invoice))
     SubElement(pm_row, "amount").text = _money(Decimal(invoice.total.amount))
 
-    # Line items — one ``invoiceDetails`` per item, with its own VAT
-    # category so the server-side sum matches ours.
-    for idx, item in enumerate(
-        invoice.order.items.select_related("product__vat").all(), start=1
-    ):
-        row = SubElement(invoice_el, "invoiceDetails")
-        SubElement(row, "lineNumber").text = str(idx)
-        # Gross unit × qty = line gross; AADE wants NET (excl. VAT) +
-        # VAT amount separately, so back out the net here using the
-        # same formula as ``_compute_vat_breakdown``.
+    # ── invoiceDetails ──────────────────────────────────────────
+    # Accumulate rounded per-line totals + per-classification sums so
+    # the summary numbers we emit exactly match the sum of the lines
+    # the server sees (avoids errors 203 / 207–210). Shipping and
+    # payment-method fees are emitted as extra lines so
+    # ``paymentMethods.amount`` still equals the invoice gross.
+    summed_net = Decimal("0")
+    summed_vat = Decimal("0")
+    summed_gross = Decimal("0")
+    classification_totals: dict[tuple[str, str], Decimal] = defaultdict(
+        lambda: Decimal("0")
+    )
+
+    line_number = 0
+    for item in invoice.order.items.select_related("product__vat").all():
         rate = (
             Decimal(item.product.vat.value)
             if item.product and item.product.vat_id
             else Decimal("0")
         )
-        unit_gross = Decimal(item.price.amount)
-        qty = Decimal(item.quantity)
-        line_gross = unit_gross * qty
-        divisor = Decimal("1") + rate / Decimal("100")
-        line_net = line_gross / divisor if divisor else line_gross
-        line_vat = line_gross - line_net
-        SubElement(row, "netValue").text = _money(line_net)
-        SubElement(row, "vatCategory").text = str(_vat_category(rate))
-        SubElement(row, "vatAmount").text = _money(line_vat)
+        line_gross = Decimal(item.price.amount) * Decimal(item.quantity)
+        line_net, line_vat = _split_gross(line_gross, rate)
+        line_number += 1
+        _emit_detail(
+            invoice_el,
+            line_number=line_number,
+            line_net=line_net,
+            line_vat=line_vat,
+            rate=rate,
+        )
+        summed_net += line_net
+        summed_vat += line_vat
+        summed_gross += line_net + line_vat
+        classification_totals[
+            (
+                CLASSIFICATION_TYPE_RETAIL_GOODS,
+                CLASSIFICATION_CATEGORY_GOODS_SALES,
+            )
+        ] += line_net
 
-    # Summary — MUST equal the sum of the lines above (errors 203 /
-    # 207–210 otherwise). ``_order_totals`` already quantised these.
+    # Shipping + payment-method fee — customer-paid amounts that sit
+    # outside ``OrderItem`` rows. Treated as VAT 24% (standard GR
+    # domestic rate). Tier B will thread through per-order overrides
+    # for exports / island rates.
+    for gross_decimal in _ancillary_charges(invoice.order):
+        line_net, line_vat = _split_gross(gross_decimal, Decimal("24"))
+        line_number += 1
+        _emit_detail(
+            invoice_el,
+            line_number=line_number,
+            line_net=line_net,
+            line_vat=line_vat,
+            rate=Decimal("24"),
+        )
+        summed_net += line_net
+        summed_vat += line_vat
+        summed_gross += line_net + line_vat
+        classification_totals[
+            (
+                CLASSIFICATION_TYPE_RETAIL_GOODS,
+                CLASSIFICATION_CATEGORY_GOODS_SALES,
+            )
+        ] += line_net
+
+    # (taxesTotals is omitted for 11.1 — only non-VAT document-level
+    # taxes populate it. Leaving it out means AADE derives document-
+    # level tax totals from the per-line columns.)
+
+    # ── invoiceSummary ──────────────────────────────────────────
     summary = SubElement(invoice_el, "invoiceSummary")
-    SubElement(summary, "totalNetValue").text = _money(
-        Decimal(invoice.subtotal.amount)
-    )
-    SubElement(summary, "totalVatAmount").text = _money(
-        Decimal(invoice.total_vat.amount)
-    )
+    SubElement(summary, "totalNetValue").text = _money(summed_net)
+    SubElement(summary, "totalVatAmount").text = _money(summed_vat)
     SubElement(summary, "totalWithheldAmount").text = "0.00"
     SubElement(summary, "totalFeesAmount").text = "0.00"
     SubElement(summary, "totalStampDutyAmount").text = "0.00"
     SubElement(summary, "totalOtherTaxesAmount").text = "0.00"
     SubElement(summary, "totalDeductionsAmount").text = "0.00"
-    SubElement(summary, "totalGrossValue").text = _money(
-        Decimal(invoice.total.amount)
-    )
+    SubElement(summary, "totalGrossValue").text = _money(summed_gross)
+    # Aggregate classification block MUST mirror the sums of the
+    # per-line entries by (classificationType, classificationCategory).
+    # Tier A only emits the retail-goods / category1_1 combo, so the
+    # summary has a single row — Tier B extends this when we have
+    # multiple classification buckets.
+    for _key, amount in classification_totals.items():
+        _emit_income_classification(summary, amount=amount)
 
     xml_bytes = tostring(root, encoding="utf-8", xml_declaration=True)
     return BuiltInvoice(

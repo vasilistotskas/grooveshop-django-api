@@ -761,20 +761,45 @@ def send_invoice_to_mydata(self, order_id: int) -> bool:
 
     try:
         response = submit_invoice(invoice)
-    except (MyDataTransportError, MyDataDuplicateError) as exc:
-        # Retryable / reconcilable. Celery's retry raises
-        # ``Retry`` internally so the return below is unreachable on
-        # non-terminal attempts — but keeps the type stable.
+    except MyDataTransportError as exc:
+        # Transient: network, 5xx, 429. Retry with the SAME uid —
+        # AADE dedupes via error 228 so repeats are safe.
         logger.warning(
-            "myDATA submission retryable failure for order #%s: %s",
+            "myDATA submission transport failure for order #%s: %s",
             order_id,
             exc,
         )
         if self.request.retries < self.max_retries:
             raise self.retry(exc=exc) from exc
         # Out of retries — fall through to email so the buyer still
-        # gets the pre-transmission PDF; REJECTED state already
-        # persisted by ``submit_invoice``.
+        # gets the pre-transmission PDF; status stays SUBMITTED so
+        # ops can retry manually once AADE is back.
+        send_invoice_email.delay(order_id)
+        return False
+    except MyDataDuplicateError as exc:
+        # AADE error 228: the same uid is already registered under
+        # another MARK. Retrying will only loop — the response is
+        # identical every time. Tier A.5 will call
+        # ``RequestTransmittedDocs`` to recover the existing MARK and
+        # flip the row to CONFIRMED; for now we log loud, leave
+        # REJECTED state in place, and deliver the pre-transmission
+        # PDF so the customer isn't blocked.
+        logger.error(
+            "myDATA submission rejected as duplicate for order #%s "
+            "(uid=%s). Ops reconciliation needed via "
+            "RequestTransmittedDocs: %s",
+            order_id,
+            invoice.mydata_uid,
+            exc,
+        )
+        OrderHistory.log_note(
+            order=order,
+            note=(
+                f"myDATA reported duplicate uid for invoice "
+                f"{invoice.invoice_number} — manual reconciliation required "
+                f"(query RequestTransmittedDocs with uid={invoice.mydata_uid})"
+            ),
+        )
         send_invoice_email.delay(order_id)
         return False
     except (MyDataValidationError, MyDataAuthError) as exc:

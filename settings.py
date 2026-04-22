@@ -1116,6 +1116,59 @@ EXTRA_SETTINGS_DEFAULTS = [
         "value": "",
         "description": "Seller contact email (falls back to INFO_EMAIL).",
     },
+    # myDATA (AADE / IAPR) integration. Credentials come from the
+    # AADE developer portal after subscription approval — separate
+    # accounts for dev and prod. Keep ``MYDATA_ENABLED`` off and
+    # ``MYDATA_ENVIRONMENT=dev`` until a real submission round-trips
+    # successfully against the sandbox.
+    {
+        "name": "MYDATA_ENABLED",
+        "type": "bool",
+        "value": False,
+        "description": "Master toggle. When off the integration is a pure no-op.",
+    },
+    {
+        "name": "MYDATA_AUTO_SUBMIT",
+        "type": "bool",
+        "value": False,
+        "description": "If true, submit the invoice automatically once the PDF is rendered. Otherwise submission happens only via the admin action.",
+    },
+    {
+        "name": "MYDATA_ENVIRONMENT",
+        "type": "string",
+        "value": "dev",
+        "description": "Target environment: 'dev' (mydataapidev.aade.gr) or 'prod' (mydatapi.aade.gr/myDATA). Dev and prod are separate portals with separate credentials.",
+    },
+    {
+        "name": "MYDATA_USER_ID",
+        "type": "string",
+        "value": "",
+        "description": "aade-user-id header — TAXISnet developer account username issued via the myDATA portal.",
+    },
+    {
+        "name": "MYDATA_SUBSCRIPTION_KEY",
+        "type": "string",
+        "value": "",
+        "description": "Ocp-Apim-Subscription-Key header — Azure APIM key from the myDATA developer portal.",
+    },
+    {
+        "name": "MYDATA_INVOICE_SERIES_PREFIX",
+        "type": "string",
+        "value": "GRVP",
+        "description": "Prefix for the AADE series code. Combined with the issuer VAT + year to form e.g. 'GRVP-2026'.",
+    },
+    {
+        "name": "MYDATA_ISSUER_BRANCH",
+        "type": "int",
+        "value": 0,
+        "description": "AADE branch code — 0 for main branch. Change only if invoicing from a registered secondary establishment.",
+    },
+    {
+        "name": "MYDATA_REQUEST_TIMEOUT_SECONDS",
+        "type": "int",
+        "value": 30,
+        "description": "HTTP request timeout in seconds. AADE endpoints are sometimes slow under load — 30s is the usual sweet spot.",
+    },
 ]
 
 EMAIL_BACKEND = getenv(

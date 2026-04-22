@@ -63,6 +63,8 @@ dependencies = [
   "nh3>=0.3.4",
   "pyjwt==2.12.1",
   "weasyprint>=68.1",
+  "requests==2.32.5",
+  "xmlschema==4.2.0",
 ]
 
 [project.urls]

@@ -8,10 +8,15 @@ __pycache__
 db.sqlite3
 staticfiles/*
 mediafiles/*
+mediafiles_private/*
 cache/*
 logs/*
 backups/*
 .auth-token
+
+# Invoice PDFs pulled out of the container for manual inspection
+INV-*.pdf
+INV-preview.pdf
 
 # Not all .gitkeep files
 !.gitkeep

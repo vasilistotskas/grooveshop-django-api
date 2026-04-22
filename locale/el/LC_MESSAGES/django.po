@@ -738,7 +738,7 @@ msgstr ""
 #: .\pay_way\models.py:74 .\product\models\category.py:38
 #: .\product\models\product.py:358 .\user\models\subscription.py:68
 msgid "Description"
-msgstr ""
+msgstr "Περιγραφή"
 
 #: .\blog\models\category.py:41
 msgid "Blog Category"
@@ -1270,7 +1270,7 @@ msgstr ""
 
 #: .\cart\admin.py:517
 msgid "Qty"
-msgstr ""
+msgstr "Ποσ."
 
 #: .\cart\admin.py:528 .\order\admin.py:1247 .\pay_way\admin.py:204
 #: .\product\admin.py:1270 .\product\admin.py:1509
@@ -4768,7 +4768,7 @@ msgstr ""
 
 #: .\notification\enum.py:23 .\order\admin.py:540
 msgid "Payment"
-msgstr ""
+msgstr "Πληρωμή"
 
 #: .\notification\enum.py:27
 msgid "Account"
@@ -7638,7 +7638,7 @@ msgstr ""
 
 #: .\product\models\review.py:27
 msgid "Rate"
-msgstr ""
+msgstr "Συντ."
 
 #: .\product\models\review.py:35
 msgid "Comment"
@@ -9338,6 +9338,97 @@ msgstr ""
 #: .\vat\models.py:40
 msgid "Vats"
 msgstr ""
+
+# ── Invoice PDF (core/templates/invoices/invoice.html) ────────────
+# Greek tax-compliance labels. "ΑΦΜ" / "ΔΟΥ" / "Γ.Ε.ΜΗ." are the
+# standard abbreviations businesses expect on a printed invoice.
+#: .\core\templates\invoices\invoice.html
+msgid "INVOICE"
+msgstr "ΤΙΜΟΛΟΓΙΟ"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Issue date"
+msgstr "Ημερομηνία έκδοσης"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Order date"
+msgstr "Ημερομηνία παραγγελίας"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Bill to"
+msgstr "Προς"
+
+#: .\core\templates\invoices\invoice.html
+msgid "VAT ID"
+msgstr "ΑΦΜ"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Tax office"
+msgstr "ΔΟΥ"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Reg. No."
+msgstr "Αρ. Γ.Ε.ΜΗ."
+
+#: .\core\templates\invoices\invoice.html
+msgid "Business activity"
+msgstr "Επάγγελμα"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Phone"
+msgstr "Τηλέφωνο"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Method"
+msgstr "Τρόπος"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Ref"
+msgstr "Αρ. αναφοράς"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Unit (gross)"
+msgstr "Μονάδα (μικτή)"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Line total"
+msgstr "Σύνολο γραμμής"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Subtotal (excl. VAT)"
+msgstr "Υποσύνολο (χωρίς ΦΠΑ)"
+
+#: .\core\templates\invoices\invoice.html
+msgid "VAT"
+msgstr "ΦΠΑ"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Payment fee"
+msgstr "Χρέωση πληρωμής"
+
+#: .\core\templates\invoices\invoice.html
+msgid "VAT breakdown"
+msgstr "Ανάλυση ΦΠΑ"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Net"
+msgstr "Καθαρό"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Gross"
+msgstr "Μικτό"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Page"
+msgstr "Σελίδα"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Scan to verify"
+msgstr "Σάρωση για επαλήθευση"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Unnamed product"
+msgstr "Προϊόν χωρίς όνομα"
 
 #~ msgid "We'd love to hear your feedback! How was your shopping experience?"
 #~ msgstr "Θα θέλαμε να ακούσουμε τη γνώμη σας! Πώς ήταν η εμπειρία σας;"

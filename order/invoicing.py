@@ -56,7 +56,9 @@ logger = logging.getLogger(__name__)
 INVOICE_SELLER_SETTING_KEYS = {
     "name": "INVOICE_SELLER_NAME",
     "vat_id": "INVOICE_SELLER_VAT_ID",
+    "tax_office": "INVOICE_SELLER_TAX_OFFICE",
     "registration_number": "INVOICE_SELLER_REGISTRATION_NUMBER",
+    "business_activity": "INVOICE_SELLER_BUSINESS_ACTIVITY",
     "address_line_1": "INVOICE_SELLER_ADDRESS_LINE_1",
     "address_line_2": "INVOICE_SELLER_ADDRESS_LINE_2",
     "city": "INVOICE_SELLER_CITY",
@@ -191,6 +193,112 @@ def _order_totals(
     }
 
 
+def _pay_way_display(order: Order) -> str:
+    """Human-readable payment method label for the invoice.
+
+    Prefers the translated ``PayWay.name`` (structured choice), then
+    ``Order.payment_method`` (legacy free-text, often a provider code
+    like ``offline_...``), then an empty string.
+    """
+    pay_way = getattr(order, "pay_way", None)
+    if pay_way is not None:
+        name = pay_way.safe_translation_getter("name", any_language=True)
+        if name:
+            return name
+    return order.payment_method or ""
+
+
+def _verification_url(order: Order) -> str:
+    """Public-facing order URL the QR code points at.
+
+    Lands on the customer's order detail page on the storefront —
+    scanning redirects a logged-in customer straight to their copy of
+    the invoice download button. Guests hit the login wall; once the
+    order is claimed via its UUID the Nuxt page re-renders.
+    """
+    base = getattr(settings, "NUXT_BASE_URL", "").rstrip("/")
+    return f"{base}/account/orders/{order.id}"
+
+
+def _build_qr_svg(url: str) -> str:
+    """Inline SVG QR code for ``url``.
+
+    Uses ``SvgPathImage`` so the QR is a single ``<path>`` element —
+    WeasyPrint renders it as true vector geometry, no rasterisation
+    and no PIL dependency on the render path. Returns an ``<svg>``
+    string safe to drop into the template via ``|safe``.
+    """
+    import qrcode
+    import qrcode.image.svg
+
+    qr = qrcode.QRCode(
+        image_factory=qrcode.image.svg.SvgPathImage,
+        box_size=10,
+        border=2,
+    )
+    qr.add_data(url)
+    qr.make(fit=True)
+    img = qr.make_image()
+    return img.to_string(encoding="unicode")
+
+
+def _vat_breakdown_for_render(
+    rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Convert the stored string-Decimal breakdown to Decimal for render.
+
+    The invoice's persisted ``vat_breakdown`` uses strings so it
+    round-trips through JSON storage losslessly. The template needs
+    real numbers so ``floatformat`` / locale-aware output works.
+    """
+    converted: list[dict[str, Any]] = []
+    for row in rows:
+        converted.append(
+            {
+                "rate": Decimal(row["rate"]),
+                "subtotal": Decimal(row["subtotal"]),
+                "vat": Decimal(row["vat"]),
+                "gross": Decimal(row["gross"]),
+            }
+        )
+    return converted
+
+
+def _render_items(order: Order) -> list[dict[str, Any]]:
+    """Flatten order items into a render-friendly structure.
+
+    Django templates can't pass keyword arguments to methods, so the
+    product name (via parler's ``safe_translation_getter``) has to be
+    resolved here. Each row carries the exact numbers and labels the
+    template needs — no more fragile ``|default`` chains against bound
+    methods.
+    """
+    rows: list[dict[str, Any]] = []
+    for item in order.items.select_related("product__vat").all():
+        product = item.product
+        name = ""
+        sku = ""
+        vat_rate: Decimal | None = None
+        if product is not None:
+            name = (
+                product.safe_translation_getter("name", any_language=True) or ""
+            )
+            sku = getattr(product, "sku", "") or ""
+            if product.vat_id and product.vat:
+                vat_rate = Decimal(product.vat.value)
+        rows.append(
+            {
+                "name": name,
+                "sku": sku,
+                "quantity": item.quantity,
+                "unit_gross": Decimal(item.price.amount),
+                "vat_rate": vat_rate,
+                "line_total": Decimal(item.total_price.amount),
+            }
+        )
+    return rows
+
+
 def _build_context(
     order: Order,
     invoice: Invoice,
@@ -202,15 +310,21 @@ def _build_context(
     Kept separate from the render call so tests can assert exact
     content without going through WeasyPrint.
     """
+    verification_url = _verification_url(order)
     return {
         "invoice": invoice,
         "order": order,
-        "items": list(order.items.select_related("product__vat").all()),
+        "items": _render_items(order),
         "seller": invoice.seller_snapshot,
         "buyer": invoice.buyer_snapshot,
-        "vat_breakdown": vat_breakdown,
+        # Rendering context uses Decimals so ``floatformat`` stays
+        # locale-aware; persisted JSON keeps the string form.
+        "vat_breakdown": _vat_breakdown_for_render(vat_breakdown),
         "totals": totals,
         "currency": invoice.currency,
+        "pay_way_name": _pay_way_display(order),
+        "verification_url": verification_url,
+        "qr_svg": _build_qr_svg(verification_url),
     }
 
 

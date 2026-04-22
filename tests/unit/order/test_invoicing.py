@@ -20,8 +20,11 @@ from djmoney.money import Money
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
 from order.invoicing import (
+    _build_context,
+    _build_qr_svg,
     _compute_vat_breakdown,
     _order_totals,
+    _render_items,
     generate_invoice,
 )
 from order.models.invoice import Invoice, InvoiceCounter
@@ -237,3 +240,113 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
         self.assertIn("name", invoice.seller_snapshot)
         self.assertIn("email", invoice.buyer_snapshot)
         self.assertEqual(invoice.currency, "EUR")
+
+
+class RenderItemsTestCase(TestCase):
+    """``_render_items`` resolves the product name via
+    ``safe_translation_getter('name', ...)`` in Python — Django templates
+    can't pass keyword arguments to methods, which is why the old
+    template rendered the product ID instead of its name."""
+
+    def test_resolves_product_name_and_sku(self) -> None:
+        vat = VatFactory(value=24)
+        product = ProductFactory(vat=vat)
+        # ProductFactory seeds translations via parler; the 'el' row is
+        # what gets picked up under ``translation_override('el')``.
+        expected_name = (
+            product.safe_translation_getter("name", any_language=True) or ""
+        )
+        self.assertNotEqual(expected_name, "", "Factory must seed a name")
+
+        order = OrderFactory(num_order_items=0)
+        OrderItemFactory(
+            order=order,
+            product=product,
+            price=Money(Decimal("12.40"), "EUR"),
+            quantity=2,
+        )
+
+        rows = _render_items(order)
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["name"], expected_name)
+        self.assertEqual(row["sku"], product.sku)
+        self.assertEqual(row["quantity"], 2)
+        self.assertEqual(row["unit_gross"], Decimal("12.40"))
+        self.assertEqual(row["vat_rate"], Decimal("24"))
+        # 12.40 × 2 = 24.80
+        self.assertEqual(row["line_total"], Decimal("24.80"))
+
+    def test_product_without_vat_reports_none_rate(self) -> None:
+        """None vs 0 matters — the template uses ``is not None`` to
+        decide whether to render "X%" at all."""
+        product = ProductFactory(vat=None)
+        order = OrderFactory(num_order_items=0)
+        OrderItemFactory(
+            order=order,
+            product=product,
+            price=Money(Decimal("5.00"), "EUR"),
+            quantity=1,
+        )
+
+        rows = _render_items(order)
+        self.assertIsNone(rows[0]["vat_rate"])
+
+
+class QrSvgTestCase(TestCase):
+    """The QR is rendered with ``SvgPathImage`` so it's a single ``<path>``
+    element — WeasyPrint handles it as true vector geometry. Keeping
+    the output tight matters because it's inlined into the PDF."""
+
+    def test_returns_svg_string_containing_data(self) -> None:
+        svg = _build_qr_svg("https://example.com/orders/1")
+        self.assertIsInstance(svg, str)
+        self.assertIn("<svg", svg)
+        self.assertIn("</svg>", svg)
+        # SvgPathImage emits a single path element
+        self.assertIn("<path", svg)
+
+
+class BuildContextTestCase(TestCase):
+    """``_build_context`` enriches the render context with fields the
+    template needs (items, QR, pay-way display) while keeping the
+    persisted ``vat_breakdown`` JSON unchanged."""
+
+    @override_settings(NUXT_BASE_URL="https://shop.example.com")
+    def test_context_exposes_qr_and_verification_url(self) -> None:
+        vat = VatFactory(value=24)
+        product = ProductFactory(vat=vat)
+        order = OrderFactory(num_order_items=0)
+        OrderItemFactory(
+            order=order,
+            product=product,
+            price=Money(Decimal("12.40"), "EUR"),
+            quantity=1,
+        )
+        breakdown = _compute_vat_breakdown(order)
+        totals = _order_totals(order, breakdown)
+        # Use a freshly-built Invoice instance — we don't need it saved
+        # for this test, just the snapshot attributes.
+        invoice = Invoice(
+            order=order,
+            invoice_number="INV-2026-000001",
+            seller_snapshot={"name": "Test Seller"},
+            buyer_snapshot={"name": "Test Buyer"},
+            currency="EUR",
+        )
+        invoice.issue_date = order.created_at.date()
+
+        ctx = _build_context(order, invoice, breakdown, totals)
+        self.assertEqual(
+            ctx["verification_url"],
+            f"https://shop.example.com/account/orders/{order.id}",
+        )
+        self.assertIn("<svg", ctx["qr_svg"])
+        # Rendering breakdown rows carry Decimals (not strings) so
+        # ``floatformat`` in the template stays locale-aware.
+        self.assertIsInstance(ctx["vat_breakdown"][0]["subtotal"], Decimal)
+        # Persisted row is still string-shaped (JSON-friendly).
+        self.assertIsInstance(breakdown[0]["subtotal"], str)
+        # Items exposed as flat dicts, not model instances.
+        self.assertIsInstance(ctx["items"][0], dict)
+        self.assertIn("name", ctx["items"][0])

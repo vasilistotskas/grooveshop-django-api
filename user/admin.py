@@ -1,8 +1,10 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.models import Group
 from django.db import models
 from django.db.models import Count, Q
+from django.shortcuts import redirect
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import conditional_escape
 from django.utils.safestring import mark_safe
@@ -610,30 +612,42 @@ class UserAdmin(ModelAdmin):
         return mark_safe(html)
 
     @action(
-        description=str(_("Adjust loyalty points for selected users")),
+        description=str(_("Adjust loyalty points for this user")),
         variant=ActionVariant.INFO,
         icon="loyalty",
     )
-    def adjust_loyalty_points(self, request, queryset):
+    def adjust_loyalty_points(self, request, object_id):
+        """Award a flat points adjustment to the user on this change page.
+
+        Unfold detail-action signature is ``(self, request, object_id)``
+        — the URL pattern is ``<path:object_id>/<action>/``. Older code
+        took ``queryset`` and iterated it, which silently iterated the
+        id string character-by-character and awarded points to the
+        wrong users.
+        """
         points_amount = 100
         description = "Manual admin adjustment"
-        count = 0
-        for user in queryset:
-            PointsTransaction.objects.create(
-                user=user,
-                points=points_amount,
-                transaction_type=TransactionType.ADJUST,
-                description=description,
-                created_by=request.user,
-            )
-            count += 1
+        change_url = reverse("admin:user_useraccount_change", args=[object_id])
+
+        try:
+            user = UserAccount.objects.get(pk=object_id)
+        except (UserAccount.DoesNotExist, ValueError, TypeError):
+            messages.error(request, _("User not found."))
+            return redirect(change_url)
+
+        PointsTransaction.objects.create(
+            user=user,
+            points=points_amount,
+            transaction_type=TransactionType.ADJUST,
+            description=description,
+            created_by=request.user,
+        )
         self.message_user(
             request,
-            _(
-                "%(count)d user(s) received %(points)d loyalty points adjustment."
-            )
-            % {"count": count, "points": points_amount},
+            _("%(user)s received a %(points)d loyalty points adjustment.")
+            % {"user": user, "points": points_amount},
         )
+        return redirect(change_url)
 
     actions_detail = ["adjust_loyalty_points"]
 

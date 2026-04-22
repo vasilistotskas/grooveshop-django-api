@@ -1,7 +1,11 @@
+import logging
 from datetime import timedelta
 
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.db.models import Count, Sum
+from django.http import FileResponse, Http404
+from django.shortcuts import redirect
+from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import conditional_escape
 from django.utils.safestring import mark_safe
@@ -19,11 +23,15 @@ from unfold.enums import ActionVariant
 
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
+from order.invoicing import generate_invoice
 from order.models.history import OrderHistory, OrderItemHistory
+from order.models.invoice import Invoice, InvoiceCounter
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.models.stock_log import StockLog
 from order.services import OrderService
+
+logger = logging.getLogger(__name__)
 
 
 class OrderStatusGroupFilter(DropdownFilter):
@@ -319,6 +327,72 @@ class OrderHistoryInline(TabularInline):
         )
 
 
+def _invoice_download_url(invoice: Invoice) -> str | None:
+    """Admin-only URL to stream the stored PDF back through admin auth."""
+    if not invoice.pk:
+        return None
+    return reverse("admin:order_invoice_download", args=[invoice.pk])
+
+
+class InvoiceInline(TabularInline):
+    """Single-row inline surfacing the order's invoice (if any).
+
+    Archival-only — the invoice itself is immutable once rendered
+    (Greek tax law: no gaps, no edits). Admins regenerate or issue
+    new invoices via the order-level detail actions on OrderAdmin.
+    """
+
+    model = Invoice
+    extra = 0
+    max_num = 0
+    can_delete = False
+    show_change_link = True
+    tab = True
+
+    fields = (
+        "invoice_number",
+        "issue_date",
+        "total",
+        "currency",
+        "document_status",
+    )
+    readonly_fields = (
+        "invoice_number",
+        "issue_date",
+        "total",
+        "currency",
+        "document_status",
+    )
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description=_("Document"))
+    def document_status(self, obj):
+        if not obj or not obj.pk:
+            return mark_safe(
+                '<span class="text-base-600 dark:text-base-300 italic">—</span>'
+            )
+        if not obj.has_document():
+            return mark_safe(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full">'
+                "⏳ Pending render"
+                "</span>"
+            )
+        url = _invoice_download_url(obj)
+        safe_url = conditional_escape(url or "")
+        html = (
+            '<a href="' + safe_url + '" target="_blank" rel="noopener" '
+            'class="inline-flex items-center px-2 py-1 text-xs font-medium '
+            "bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 "
+            'rounded-full hover:underline">'
+            "📄 Download PDF"
+            "</a>"
+        )
+        return mark_safe(html)
+
+
 @admin.register(Order)
 class OrderAdmin(ModelAdmin):
     compressed_fields = True
@@ -472,7 +546,8 @@ class OrderAdmin(ModelAdmin):
         "mark_as_completed",
         "mark_as_canceled",
     ]
-    inlines = [OrderItemInline, OrderHistoryInline]
+    actions_detail = ["generate_invoice_now", "regenerate_invoice"]
+    inlines = [OrderItemInline, InvoiceInline, OrderHistoryInline]
     save_on_top = True
     date_hierarchy = "created_at"
     list_select_related = ["user", "country", "region", "pay_way"]
@@ -1081,6 +1156,148 @@ class OrderAdmin(ModelAdmin):
             except ValueError as e:
                 self.message_user(request, f"Error: {e!s}", level="error")
 
+    # --- Invoice detail actions ---------------------------------------
+    # Unfold detail-action signature is ``(self, request, object_id)`` —
+    # the URL pattern is ``<path:object_id>/<url_path>/``.
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path(
+                "invoice/<int:invoice_id>/download/",
+                self.admin_site.admin_view(self.invoice_download_view),
+                name="order_invoice_download",
+            ),
+        ]
+        return custom + urls
+
+    def invoice_download_view(self, request, invoice_id: int):
+        """Stream the invoice PDF back through admin auth.
+
+        Works for any storage backend (S3 / FileSystem) because we
+        open the file via the storage API rather than redirecting to
+        ``document_file.url``. Keeps the download gated by the admin
+        login (not a one-shot signed URL).
+        """
+        try:
+            invoice = Invoice.objects.select_related("order").get(pk=invoice_id)
+        except Invoice.DoesNotExist as exc:
+            raise Http404(_("Invoice not found.")) from exc
+        if not invoice.has_document():
+            raise Http404(_("Invoice PDF has not been generated yet."))
+        return FileResponse(
+            invoice.document_file.open("rb"),
+            content_type="application/pdf",
+            as_attachment=True,
+            filename=f"{invoice.invoice_number}.pdf",
+        )
+
+    def _redirect_to_order_change(self, object_id):
+        return redirect(reverse("admin:order_order_change", args=[object_id]))
+
+    @action(
+        description=str(_("Generate invoice")),
+        variant=ActionVariant.PRIMARY,
+        icon="receipt_long",
+    )
+    def generate_invoice_now(self, request, object_id):
+        """Synchronously render an invoice for this order.
+
+        Idempotent — if an invoice already exists it's returned as-is
+        (no counter slot consumed, no file re-render). Runs inline
+        rather than via Celery so the admin gets immediate success /
+        failure feedback.
+        """
+        try:
+            order = Order.objects.get(pk=object_id)
+        except Order.DoesNotExist:
+            messages.error(request, _("Order not found."))
+            return self._redirect_to_order_change(object_id)
+
+        if order.document_type != OrderDocumentTypeEnum.INVOICE.value:
+            messages.warning(
+                request,
+                _(
+                    "Order #%(order_id)s has document_type=%(doc)s, not "
+                    "INVOICE. Generating anyway as an explicit admin "
+                    "override — update the order's document type if this "
+                    "is ongoing."
+                )
+                % {"order_id": order.id, "doc": order.document_type},
+            )
+
+        try:
+            invoice = generate_invoice(order)
+        except Exception as exc:  # noqa: BLE001 — surface all errors in admin
+            logger.exception(
+                "Admin invoice generation failed for order %s", order.id
+            )
+            messages.error(
+                request,
+                _("Invoice generation failed: %(err)s") % {"err": str(exc)},
+            )
+            return self._redirect_to_order_change(object_id)
+
+        if invoice.has_document():
+            messages.success(
+                request,
+                _("Invoice %(num)s ready for order #%(order_id)s.")
+                % {"num": invoice.invoice_number, "order_id": order.id},
+            )
+        else:
+            messages.warning(
+                request,
+                _(
+                    "Invoice row %(num)s exists but the PDF was not "
+                    "rendered — check server logs."
+                )
+                % {"num": invoice.invoice_number},
+            )
+        return self._redirect_to_order_change(object_id)
+
+    @action(
+        description=str(_("Regenerate invoice (allocates new number!)")),
+        variant=ActionVariant.DANGER,
+        icon="refresh",
+    )
+    def regenerate_invoice(self, request, object_id):
+        """Force-rebuild the invoice.
+
+        ⚠️ Allocates a NEW sequential number from ``InvoiceCounter`` and
+        overwrites the existing Invoice row — the old invoice_number is
+        permanently unrecoverable. Use only to fix a corrupted PDF /
+        wrong buyer snapshot; Greek tax law forbids number gaps in
+        normal operation.
+        """
+        try:
+            order = Order.objects.get(pk=object_id)
+        except Order.DoesNotExist:
+            messages.error(request, _("Order not found."))
+            return self._redirect_to_order_change(object_id)
+
+        try:
+            invoice = generate_invoice(order, force=True)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception(
+                "Admin invoice regeneration failed for order %s", order.id
+            )
+            messages.error(
+                request,
+                _("Invoice regeneration failed: %(err)s") % {"err": str(exc)},
+            )
+            return self._redirect_to_order_change(object_id)
+
+        messages.success(
+            request,
+            _(
+                "Invoice regenerated as %(num)s for order #%(order_id)s. "
+                "A new counter slot was consumed — the previous number is "
+                "now a permanent gap in the sequence."
+            )
+            % {"num": invoice.invoice_number, "order_id": order.id},
+        )
+        return self._redirect_to_order_change(object_id)
+
 
 @admin.register(OrderItem)
 class OrderItemAdmin(ModelAdmin):
@@ -1614,3 +1831,157 @@ class StockLogAdmin(ModelAdmin):
     )
     date_hierarchy = "created_at"
     list_select_related = ("product", "order", "performed_by")
+
+
+class HasDocumentFilter(DropdownFilter):
+    title = _("Has PDF")
+    parameter_name = "has_document"
+
+    def lookups(self, request, model_admin):
+        return [
+            ("yes", _("Rendered")),
+            ("no", _("Pending render")),
+        ]
+
+    def queryset(self, request, queryset):
+        match self.value():
+            case "yes":
+                return queryset.exclude(document_file="").exclude(
+                    document_file__isnull=True
+                )
+            case "no":
+                return queryset.filter(document_file="") | queryset.filter(
+                    document_file__isnull=True
+                )
+            case _:
+                return queryset
+
+
+@admin.register(Invoice)
+class InvoiceAdmin(ModelAdmin):
+    """Read-mostly archive of rendered invoices.
+
+    Invoices are immutable by convention — Greek tax law forbids edits
+    once the number is allocated. This admin exposes browsing, search,
+    and per-row download. Use ``OrderAdmin``'s ``Generate invoice``
+    detail action to create invoices; ``Regenerate`` there is the only
+    way to replace one (consumes a new counter slot).
+    """
+
+    compressed_fields = True
+    list_fullwidth = True
+    list_filter_submit = True
+    list_filter_sheet = True
+
+    list_display = (
+        "invoice_number",
+        "order_link",
+        "issue_date",
+        "total_display",
+        "currency",
+        "document_badge",
+    )
+    list_filter = (
+        ("issue_date", RangeDateTimeFilter),
+        HasDocumentFilter,
+    )
+    search_fields = (
+        "invoice_number",
+        "order__id",
+        "order__email",
+        "order__first_name",
+        "order__last_name",
+    )
+    ordering = ("-issue_date", "-invoice_number")
+    date_hierarchy = "issue_date"
+    list_select_related = ("order",)
+
+    readonly_fields = (
+        "invoice_number",
+        "issue_date",
+        "order_link",
+        "document_badge",
+        "subtotal",
+        "total_vat",
+        "total",
+        "currency",
+        "vat_breakdown",
+        "seller_snapshot",
+        "buyer_snapshot",
+        "created_at",
+        "updated_at",
+    )
+    fields = readonly_fields
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return bool(request.user and request.user.is_superuser)
+
+    @admin.display(description=_("Order"))
+    def order_link(self, obj):
+        if not obj.order_id:
+            return "—"
+        url = reverse("admin:order_order_change", args=[obj.order_id])
+        safe_url = conditional_escape(url)
+        safe_id = conditional_escape(str(obj.order_id))
+        html = f'<a href="{safe_url}" class="underline">#{safe_id}</a>'
+        return mark_safe(html)
+
+    @admin.display(description=_("Total"))
+    def total_display(self, obj):
+        safe_total = conditional_escape(str(obj.total))
+        html = f'<div class="text-sm font-bold">{safe_total}</div>'
+        return mark_safe(html)
+
+    @admin.display(description=_("Document"))
+    def document_badge(self, obj):
+        if not obj.has_document():
+            return mark_safe(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full">'
+                "⏳ Pending"
+                "</span>"
+            )
+        url = _invoice_download_url(obj)
+        safe_url = conditional_escape(url or "")
+        html = (
+            '<a href="' + safe_url + '" target="_blank" rel="noopener" '
+            'class="inline-flex items-center px-2 py-1 text-xs font-medium '
+            "bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 "
+            'rounded-full hover:underline">'
+            "📄 Download"
+            "</a>"
+        )
+        return mark_safe(html)
+
+
+@admin.register(InvoiceCounter)
+class InvoiceCounterAdmin(ModelAdmin):
+    """Per-year sequential invoice counter.
+
+    Editable by superusers only — bumping ``next_number`` is an ops
+    action (e.g. reserving ``INV-2026-000001..100`` for legacy imports).
+    Regular staff should never touch it; a wrong value corrupts the
+    sequence across all future invoices that year.
+    """
+
+    compressed_fields = True
+    list_fullwidth = True
+
+    list_display = ("year", "next_number")
+    ordering = ("-year",)
+    readonly_fields = ()
+
+    def has_add_permission(self, request):
+        return bool(request.user and request.user.is_superuser)
+
+    def has_change_permission(self, request, obj=None):
+        return bool(request.user and request.user.is_superuser)
+
+    def has_delete_permission(self, request, obj=None):
+        return bool(request.user and request.user.is_superuser)

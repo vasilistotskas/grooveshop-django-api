@@ -105,24 +105,27 @@ class MyDataClient:
         response body — the service layer decides those. Here we only
         classify transport-level failures.
         """
-        if 200 <= response.status_code < 300:
+        # ``requests.Response.status_code`` is typed ``int | None`` but
+        # at runtime is always populated once the request completes —
+        # coerce early so narrowing works the rest of the function.
+        status = response.status_code or 0
+        if 200 <= status < 300:
             return
         body_preview = (response.text or "")[:500]
-        if response.status_code in (401, 403):
+        if status in (401, 403):
             raise MyDataAuthError(
-                f"AADE rejected credentials ({response.status_code}): "
-                f"{body_preview}",
-                code=str(response.status_code),
+                f"AADE rejected credentials ({status}): {body_preview}",
+                code=str(status),
             )
-        if response.status_code == 429 or response.status_code >= 500:
+        if status == 429 or status >= 500:
             raise MyDataTransportError(
-                f"AADE HTTP {response.status_code}: {body_preview}",
-                code=str(response.status_code),
+                f"AADE HTTP {status}: {body_preview}",
+                code=str(status),
             )
         # 4xx other than auth / throttle → payload problem. Fall back
         # to a transport error so the caller retries once; the service
         # layer converts terminal row-level errors to ValidationError.
         raise MyDataTransportError(
-            f"AADE HTTP {response.status_code}: {body_preview}",
-            code=str(response.status_code),
+            f"AADE HTTP {status}: {body_preview}",
+            code=str(status),
         )

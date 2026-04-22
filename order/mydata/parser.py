@@ -15,12 +15,28 @@ Status codes per the spec: ``Success``, ``ValidationError``,
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Literal, cast, get_args
 from xml.etree.ElementTree import Element, fromstring
 
 StatusCode = Literal[
     "Success", "ValidationError", "TechnicalError", "XMLSyntaxError"
 ]
+
+# Runtime whitelist for narrowing arbitrary strings back to the
+# Literal. ``get_args(StatusCode)`` keeps this in sync automatically.
+_STATUS_CODES: frozenset[str] = frozenset(get_args(StatusCode))
+
+
+def _coerce_status(raw: str | None) -> StatusCode:
+    """Narrow AADE's ``statusCode`` string to our ``StatusCode`` Literal.
+
+    AADE always returns one of the four values, but a malformed /
+    partial response could theoretically carry something else — treat
+    unknowns as ``TechnicalError`` so the caller reacts conservatively.
+    """
+    if raw and raw in _STATUS_CODES:
+        return cast(StatusCode, raw)
+    return "TechnicalError"
 
 
 @dataclass(frozen=True)
@@ -81,7 +97,7 @@ def parse_response_doc(xml_bytes: bytes) -> ResponseDoc:
 
 
 def _parse_row(el: Element) -> ResponseRow:
-    status_code = _text(el, "statusCode") or "TechnicalError"
+    status_code = _coerce_status(_text(el, "statusCode"))
     index = int(_text(el, "index") or "0")
     errors = [
         MyDataError(
@@ -92,7 +108,7 @@ def _parse_row(el: Element) -> ResponseRow:
     ]
     return ResponseRow(
         index=index,
-        status_code=status_code,  # type: ignore[arg-type]
+        status_code=status_code,
         invoice_uid=_text(el, "invoiceUid") or "",
         invoice_mark=_int_or_none(_text(el, "invoiceMark")),
         cancellation_mark=_int_or_none(_text(el, "cancellationMark")),

@@ -3,6 +3,54 @@
 
 
 
+## v1.106.0 (2026-04-22)
+
+### Features
+
+* feat(invoicing): admin actions + QR/Greek-localised PDF
+
+Admin:
+- OrderAdmin gains "Generate invoice" (synchronous, idempotent) and
+  "Regenerate invoice" (force=True, with counter-gap warning) detail
+  actions, plus an InvoiceInline surfacing the current invoice on the
+  order page. New InvoiceAdmin / InvoiceCounterAdmin give a read-mostly
+  browser with per-row PDF download streamed via admin auth — works on
+  every storage backend, not just S3.
+- user/admin.py: adjust_loyalty_points used (self, request, queryset)
+  while being declared in actions_detail. Unfold routes detail actions
+  as <path:object_id>/..., so queryset was the user-id string; iterating
+  it awarded points to each digit as a separate user. Fixed to the
+  correct (self, request, object_id) signature.
+
+PDF:
+- Product name was rendering as the product ID — safe_translation_getter
+  was called without the "name" arg, returned None, and |default:id fired.
+  Fixed by resolving names in Python (_render_items) since Django
+  templates can't pass kwargs to methods.
+- Unified decimal formatting (locale-aware floatformat everywhere; VAT
+  breakdown rows now render as Decimals, stored JSON still strings so
+  the idempotency contract + tests stay intact).
+- Unified VAT % format (floatformat:"-1" drops trailing ".0" only when
+  the rate is integer).
+- Added QR code (inline SVG via qrcode.image.svg.SvgPathImage — zero
+  PIL on render path) pointing at the frontend order page.
+- Greek compliance: tax_office (ΔΟΥ) + business_activity seller settings,
+  buyer VAT ID field in the template (snapshot plumbing to follow).
+- Shows order date when it differs from issue date.
+- Pay-way display uses translated PayWay.name; payment_id falls under a
+  "Ref:" label instead of being the primary payment line.
+- Running footer with seller legal line on every page.
+- Full Greek translation pass (.po updated, compilemessages run).
+
+Notable gotcha caught during QA: Django's {% trans %} silently skips
+msgids containing '%' — the trans tag post-processes as a format string
+and a bare '%' swallows output. Keep '%' outside the tag.
+
+dev.Dockerfile:
+- Added gettext (msgfmt/xgettext) for makemessages/compilemessages.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`72593da`](https://github.com/vasilistotskas/grooveshop-django-api/commit/72593daa592fc36803020d4e9d99a0477d1009b1))
+
 ## v1.105.0 (2026-04-22)
 
 ### Bug fixes

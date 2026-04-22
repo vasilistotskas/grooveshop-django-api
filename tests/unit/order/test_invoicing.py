@@ -214,14 +214,30 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
     def test_force_refreshes_snapshots_without_new_row(
         self, _mock_render
     ) -> None:
+        """``force=True`` must preserve the original ``invoice_number``
+        and ``issue_date`` — allocating a new counter slot would leave
+        a gap in the sequential register, which Greek tax law forbids.
+        Only the PDF + snapshots + totals get refreshed."""
         order = self._make_order()
         first = generate_invoice(order)
         # Simulate buyer edit
         order.first_name = "NewFirst"
         order.save()
+        counter_before = InvoiceCounter.objects.get(
+            year=first.issue_date.year
+        ).next_number
+
         refreshed = generate_invoice(order, force=True)
+
         self.assertEqual(first.pk, refreshed.pk)
+        self.assertEqual(first.invoice_number, refreshed.invoice_number)
+        self.assertEqual(first.issue_date, refreshed.issue_date)
         self.assertIn("NewFirst", refreshed.buyer_snapshot.get("name", ""))
+        # Counter must NOT advance on force regeneration.
+        counter_after = InvoiceCounter.objects.get(
+            year=first.issue_date.year
+        ).next_number
+        self.assertEqual(counter_before, counter_after)
 
     @override_settings(DEFAULT_CURRENCY="EUR")
     @patch(

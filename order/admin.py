@@ -1256,18 +1256,18 @@ class OrderAdmin(ModelAdmin):
         return self._redirect_to_order_change(object_id)
 
     @action(
-        description=str(_("Regenerate invoice (allocates new number!)")),
-        variant=ActionVariant.DANGER,
+        description=str(_("Regenerate invoice (same number)")),
+        variant=ActionVariant.WARNING,
         icon="refresh",
     )
     def regenerate_invoice(self, request, object_id):
-        """Force-rebuild the invoice.
+        """Re-render the invoice PDF + snapshots in place.
 
-        ⚠️ Allocates a NEW sequential number from ``InvoiceCounter`` and
-        overwrites the existing Invoice row — the old invoice_number is
-        permanently unrecoverable. Use only to fix a corrupted PDF /
-        wrong buyer snapshot; Greek tax law forbids number gaps in
-        normal operation.
+        Preserves the original ``invoice_number`` and ``issue_date`` so
+        the sequential register stays gap-free (Greek tax law). Only
+        the PDF, seller / buyer snapshots, and derived totals are
+        refreshed — use this to fix a corrupted PDF or to apply an
+        updated seller address/VAT ID without breaking audit traceability.
         """
         try:
             order = Order.objects.get(pk=object_id)
@@ -1290,9 +1290,8 @@ class OrderAdmin(ModelAdmin):
         messages.success(
             request,
             _(
-                "Invoice regenerated as %(num)s for order #%(order_id)s. "
-                "A new counter slot was consumed — the previous number is "
-                "now a permanent gap in the sequence."
+                "Invoice %(num)s refreshed for order #%(order_id)s "
+                "(number preserved; PDF + snapshots regenerated)."
             )
             % {"num": invoice.invoice_number, "order_id": order.id},
         )

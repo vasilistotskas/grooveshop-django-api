@@ -518,7 +518,9 @@ def generate_order_invoice(self, order_id: int) -> bool:
     Idempotent via ``order.invoicing.generate_invoice`` — calling this
     task twice for the same order is a no-op on the second call
     (returns the existing Invoice row). Safe to invoke from
-    ``handle_order_completed`` without an explicit dedupe flag.
+    ``handle_order_completed`` without an explicit dedupe flag. Once
+    the PDF is ready this task also schedules ``send_invoice_email``
+    so the buyer gets a copy via email.
     """
     from order.invoicing import generate_invoice
 
@@ -551,7 +553,152 @@ def generate_order_invoice(self, order_id: int) -> bool:
     logger.info(
         "Invoice %s ready for order #%s", invoice.invoice_number, order_id
     )
+    # Only attempt the email if the PDF was actually rendered — an
+    # Invoice row without a file would just produce an empty
+    # attachment. The email task is itself idempotent via a metadata
+    # flag so chaining here is safe across retries.
+    if invoice.has_document():
+        send_invoice_email.delay(order_id)
     return True
+
+
+INVOICE_EMAIL_SENT_FLAG = "invoice_email_sent"
+
+
+def _reserve_invoice_email(order_id: int) -> bool:
+    """Mirror of ``_reserve_confirmation_email`` for the invoice email.
+
+    Returns ``True`` when this caller won the race. The flag lives
+    under ``Order.metadata`` so it survives task retries and
+    concurrent webhook bursts.
+    """
+    with transaction.atomic():
+        order = Order.objects.select_for_update().get(id=order_id)
+        if order.metadata and order.metadata.get(INVOICE_EMAIL_SENT_FLAG):
+            return False
+        if not order.metadata:
+            order.metadata = {}
+        order.metadata[INVOICE_EMAIL_SENT_FLAG] = True
+        order.save(update_fields=["metadata"])
+    return True
+
+
+def _release_invoice_email(order_id: int) -> None:
+    """Clear the invoice-email reservation on permanent failure."""
+    with transaction.atomic():
+        order = Order.objects.select_for_update().filter(id=order_id).first()
+        if order is None or not order.metadata:
+            return
+        if order.metadata.pop(INVOICE_EMAIL_SENT_FLAG, None) is not None:
+            order.save(update_fields=["metadata"])
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=300)
+def send_invoice_email(self, order_id: int) -> bool:
+    """Email the rendered invoice PDF to the buyer.
+
+    Chained from ``generate_order_invoice`` once the PDF is ready.
+    Idempotent via ``INVOICE_EMAIL_SENT_FLAG`` in ``Order.metadata`` so
+    a retry or a re-fired ``order_completed`` signal doesn't re-send.
+    Released on permanent failure so an admin can resend manually.
+    """
+    reserved_this_call = False
+    try:
+        if self.request.retries == 0:
+            if not _reserve_invoice_email(order_id):
+                logger.info(
+                    "Invoice email already sent for order #%s, skipping",
+                    order_id,
+                )
+                return True
+            reserved_this_call = True
+
+        order = Order.objects.select_related(
+            "user", "country", "region", "pay_way"
+        ).get(id=order_id)
+        invoice = getattr(order, "invoice", None)
+        if invoice is None or not invoice.has_document():
+            # No PDF to attach — release the flag so a later generation
+            # can trigger the email.
+            _release_invoice_email(order_id)
+            logger.warning(
+                "Invoice email skipped for order #%s — PDF not ready",
+                order_id,
+            )
+            return False
+
+        with translation.override(get_order_language(order)):
+            subject = _(
+                "Invoice {invoice_number} for your order #{order_id}"
+            ).format(invoice_number=invoice.invoice_number, order_id=order.id)
+            context = {
+                "order": order,
+                "invoice": invoice,
+                "SITE_NAME": settings.SITE_NAME,
+                "INFO_EMAIL": settings.INFO_EMAIL,
+                "SITE_URL": settings.NUXT_BASE_URL,
+                "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+            }
+            text_content = render_to_string(
+                "emails/order/invoice_issued.txt", context
+            )
+            html_content = render_to_string(
+                "emails/order/invoice_issued.html", context
+            )
+
+        msg = EmailMultiAlternatives(
+            subject,
+            text_content,
+            settings.DEFAULT_FROM_EMAIL,
+            [order.email],
+            reply_to=[settings.INFO_EMAIL],
+        )
+        msg.attach_alternative(html_content, "text/html")
+
+        # ``storage.open`` works for both S3 and FileSystem — streams
+        # from S3 in prod, opens the file in dev. ``.read()`` is fine
+        # at invoice sizes (≤ ~50kB typical).
+        with invoice.document_file.open("rb") as fh:
+            pdf_bytes = fh.read()
+        msg.attach(
+            f"{invoice.invoice_number}.pdf",
+            pdf_bytes,
+            "application/pdf",
+        )
+
+        msg.send()
+
+        logger.info(
+            "Invoice email sent for order #%s (%s)",
+            order.id,
+            invoice.invoice_number,
+        )
+        OrderHistory.log_note(
+            order=order,
+            note=f"Invoice {invoice.invoice_number} emailed to {order.email}",
+        )
+        return True
+
+    except Order.DoesNotExist:
+        logger.error(
+            "Could not send invoice email - Order #%s not found",
+            order_id,
+        )
+        return False
+
+    except Exception as e:
+        logger.error(
+            "Error sending invoice email for order #%s: %s",
+            order_id,
+            e,
+            extra={"order_id": order_id, "error": str(e)},
+            exc_info=True,
+        )
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=e) from e
+        if reserved_this_call:
+            _release_invoice_email(order_id)
+        return False
 
 
 @shared_task(

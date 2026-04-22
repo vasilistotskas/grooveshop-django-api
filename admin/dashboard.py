@@ -19,12 +19,45 @@ def dashboard_callback(request, context):
     The underlying data is request-independent (admin-only URLs from
     ``reverse()`` + DB aggregates) so we cache the full payload in Redis
     for 5 minutes and invalidate on domain model writes via signals.
+    Seller-config warnings are computed fresh (not cached) so fixing
+    the setting is reflected on the admin's next page load.
     """
     data = cache.get_or_set(
         DASHBOARD_CACHE_KEY, _build_dashboard_data, DASHBOARD_CACHE_TTL
     )
     context.update(data)
+    context["seller_config_warnings"] = _check_seller_config()
     return context
+
+
+# Tax-mandatory seller fields. Missing values produce a red dashboard
+# alert — a fresh install MUST fill these in before issuing real
+# invoices, otherwise the PDF renders with no legal identity and
+# would not pass a tax audit.
+_REQUIRED_SELLER_SETTINGS = (
+    ("INVOICE_SELLER_NAME", "Company name"),
+    ("INVOICE_SELLER_VAT_ID", "VAT ID (ΑΦΜ)"),
+    ("INVOICE_SELLER_TAX_OFFICE", "Tax office (ΔΟΥ)"),
+)
+
+
+def _check_seller_config() -> list[dict]:
+    """Return a list of warning rows for empty required seller settings.
+
+    Empty string means "present in DB but never filled" — the
+    ``EXTRA_SETTINGS_DEFAULTS`` seed creates the row with a blank
+    value so ops can find it in the Settings admin. Non-critical
+    fields (address, phone) aren't surfaced here to avoid nagging
+    for strictly-optional info.
+    """
+    from extra_settings.models import Setting
+
+    warnings = []
+    for key, label in _REQUIRED_SELLER_SETTINGS:
+        value = Setting.get(key, default="")
+        if not value:
+            warnings.append({"key": key, "label": label})
+    return warnings
 
 
 def _build_dashboard_data():

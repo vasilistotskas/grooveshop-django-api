@@ -12,6 +12,7 @@ from order.models.order import Order
 from order.tasks import (
     check_pending_orders,
     generate_order_invoice,
+    send_invoice_email,
     send_order_confirmation_email,
     send_order_status_update_email,
     send_shipping_notification_email,
@@ -233,14 +234,19 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         self.assertFalse(result)
         mock_logger.assert_called_once()
 
+    @patch("order.tasks.send_invoice_email.delay")
     @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
-    def test_generate_order_invoice_success(self, mock_render_pdf):
+    def test_generate_order_invoice_success(
+        self, mock_render_pdf, mock_send_email
+    ):
         result = generate_order_invoice(self.order.id)
 
         self.assertTrue(result)
         mock_render_pdf.assert_called_once()
         self.order.refresh_from_db()
         self.assertTrue(hasattr(self.order, "invoice"))
+        # The email task is chained once the PDF is ready.
+        mock_send_email.assert_called_once_with(self.order.id)
 
     @patch("order.tasks.logger.error")
     def test_generate_order_invoice_order_not_found(self, mock_logger):
@@ -248,6 +254,60 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
         self.assertFalse(result)
         mock_logger.assert_called_once()
+
+    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
+    @override_settings(
+        SITE_NAME="GrooveShop",
+        INFO_EMAIL="support@example.com",
+        NUXT_BASE_URL="http://example.com",
+        STATIC_BASE_URL="http://example.com",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    def test_send_invoice_email_attaches_pdf(self, _mock_render):
+        """PDF bytes from the generated invoice must be attached to the
+        outbound email, and the flag in ``Order.metadata`` must prevent
+        a second send."""
+        from django.core import mail
+
+        from order.invoicing import generate_invoice
+
+        generate_invoice(self.order)
+
+        result = send_invoice_email(self.order.id)
+        self.assertTrue(result)
+        self.assertEqual(len(mail.outbox), 1)
+        msg = mail.outbox[0]
+        self.assertIn(self.order.email, msg.to)
+        # One attachment, PDF mimetype, non-empty bytes
+        self.assertEqual(len(msg.attachments), 1)
+        name, content, mimetype = msg.attachments[0]
+        self.assertTrue(name.endswith(".pdf"))
+        self.assertEqual(mimetype, "application/pdf")
+        self.assertTrue(content.startswith(b"%PDF-"))
+
+        # Second call is a no-op — flag reservation wins.
+        result2 = send_invoice_email(self.order.id)
+        self.assertTrue(result2)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_send_invoice_email_without_rendered_pdf_skips(self):
+        """If the PDF is missing (e.g. generation hasn't run yet), the
+        task returns False and releases the flag so a later generation
+        can re-trigger the email."""
+        from order.models.invoice import Invoice, InvoiceCounter
+
+        InvoiceCounter.objects.create(year=2026, next_number=1)
+        Invoice.objects.create(
+            order=self.order, invoice_number="INV-2026-000001"
+        )
+
+        result = send_invoice_email(self.order.id)
+        self.assertFalse(result)
+        self.order.refresh_from_db()
+        # Flag cleared so a later re-trigger can proceed.
+        self.assertFalse(
+            (self.order.metadata or {}).get("invoice_email_sent"),
+        )
 
     @patch("order.tasks.OrderHistory.log_note")
     @patch("order.tasks.EmailMultiAlternatives")

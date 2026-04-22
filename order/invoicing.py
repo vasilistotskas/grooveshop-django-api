@@ -2,8 +2,10 @@
 
 Given an :class:`Order`, this module renders a Greek-tax-law compliant
 PDF invoice, allocates an atomic sequential number via
-:class:`InvoiceCounter`, and stores the result in private media so it
-can only be downloaded via a signed URL from the order's owner.
+:class:`InvoiceCounter`, and stores the result in private media. The
+customer-facing download goes through ``OrderViewSet.invoice_download``
+which streams the bytes via Django auth — no raw storage URLs are
+ever exposed to clients.
 
 The heavy lifting is split into small helpers so the unit tests can
 pin ``_compute_vat_breakdown`` and ``_build_context`` without spinning
@@ -342,9 +344,11 @@ def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
 
     Returns the existing Invoice if one exists unless ``force=True``.
     Never fabricates sequential numbers — always routes through
-    :meth:`InvoiceCounter.allocate`. With ``force=True`` a new counter
-    slot is consumed and the old ``invoice_number`` is permanently lost
-    — use only for corrective regeneration.
+    :meth:`InvoiceCounter.allocate`. With ``force=True`` the original
+    ``invoice_number`` and ``issue_date`` are preserved so the
+    sequential register stays gap-free (Greek tax law forbids
+    gaps) — only the PDF, snapshots, and derived totals are
+    refreshed.
     """
     existing = Invoice.objects.filter(order_id=order.id).first()
     if existing and not force:
@@ -355,8 +359,18 @@ def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
         )
         return existing
 
-    issue_date = timezone.localdate()
-    invoice_number = InvoiceCounter.allocate(issue_date.year)
+    if existing and force:
+        # Preserve the original number + issue date so regeneration
+        # doesn't consume a fresh counter slot and leave the previous
+        # one orphaned. The "corrective regen" use case is "the PDF
+        # is wrong" not "this never happened".
+        invoice = existing
+        invoice_number = existing.invoice_number
+        issue_date = existing.issue_date
+    else:
+        issue_date = timezone.localdate()
+        invoice_number = InvoiceCounter.allocate(issue_date.year)
+        invoice = Invoice(order=order)
 
     vat_breakdown = _compute_vat_breakdown(order)
     totals = _order_totals(order, vat_breakdown)
@@ -366,7 +380,6 @@ def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
         else settings.DEFAULT_CURRENCY
     )
 
-    invoice = existing if existing and force else Invoice(order=order)
     invoice.invoice_number = invoice_number
     invoice.issue_date = issue_date
     invoice.seller_snapshot = _seller_snapshot()

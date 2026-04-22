@@ -154,8 +154,10 @@ class Invoice(TimeStampMixinModel, UUIDModel):
         blank=True,
         null=True,
         help_text=_(
-            "The rendered PDF. Stored in private storage — access "
-            "only via signed URL from the download endpoint."
+            "The rendered PDF. Stored in private storage — customer "
+            "access goes through ``OrderViewSet.invoice_download`` "
+            "(streamed through Django auth); direct storage URLs are "
+            "signed via ``PrivateMediaStorage`` as a defence in depth."
         ),
     )
     subtotal = MoneyField(

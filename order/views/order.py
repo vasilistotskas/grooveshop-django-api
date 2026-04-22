@@ -193,9 +193,12 @@ serializers_config: SerializersConfig = {
         operation_id="retrieveOrderInvoice",
         summary=_("Get invoice download metadata for an order"),
         description=_(
-            "Return the order's invoice metadata and a short-lived signed "
-            "URL to download the PDF. 404 if the invoice has not been "
-            "generated yet (e.g. order not completed)."
+            "Return the order's invoice metadata and an absolute URL to "
+            "the streaming download endpoint (``/order/{id}/invoice/"
+            "download``). The URL is gated by the same owner/admin "
+            "permission check as this metadata endpoint — no raw "
+            "storage URLs are exposed to the client. 404 if the invoice "
+            "has not been generated yet (e.g. order not completed)."
         ),
         tags=["Orders"],
     ),

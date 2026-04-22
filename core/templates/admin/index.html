@@ -23,6 +23,36 @@
 
 {% block content %}
 <div class="flex flex-col gap-6">
+    {# Seller-config alert: empty required INVOICE_SELLER_* settings #}
+    {% if seller_config_warnings %}
+    <div class="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-4">
+        <div class="flex items-start gap-3">
+            <span class="material-symbols-outlined text-red-600 dark:text-red-300 flex-shrink-0">warning</span>
+            <div class="flex-1">
+                <h3 class="text-sm font-semibold text-red-900 dark:text-red-100 mb-1">
+                    {% trans "Invoice seller details are incomplete" %}
+                </h3>
+                <p class="text-sm text-red-800 dark:text-red-200 mb-2">
+                    {% trans "The following required fields are empty. Invoices issued now will render without a legal identity and will not pass a tax audit." %}
+                </p>
+                <ul class="text-sm text-red-800 dark:text-red-200 list-disc ml-5 mb-3">
+                    {% for w in seller_config_warnings %}
+                    <li>
+                        <span class="font-medium">{{ w.label }}</span>
+                        <code class="text-xs ml-1 px-1 py-0.5 rounded bg-red-100 dark:bg-red-900/60">{{ w.key }}</code>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <a href="{% url 'admin:extra_settings_setting_changelist' %}?q=INVOICE_SELLER_"
+                   class="inline-flex items-center gap-1.5 text-sm font-medium text-red-700 dark:text-red-300 hover:underline">
+                    {% trans "Fix in Settings" %}
+                    <span class="material-symbols-outlined text-sm">arrow_forward</span>
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     {# Header #}
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>

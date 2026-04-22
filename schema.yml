@@ -13493,6 +13493,33 @@ paths:
               schema:
                 $ref: '#/components/schemas/InvoiceDownloadResponse'
           description: ''
+  /api/v1/order/{id}/invoice/download:
+    get:
+      operationId: downloadOrderInvoice
+      description: Streams the rendered PDF through Django auth. 404 when the invoice
+        has not been generated yet. Same ownership check as the metadata endpoint
+        — returns a signed S3 stream on prod and a filesystem stream in dev without
+        exposing the storage URL to the client.
+      summary: Download the invoice PDF
+      parameters:
+      - in: path
+        name: id
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        required: true
+      tags:
+      - Orders
+      security:
+      - knoxApiToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          description: No response body
+        '404':
+          description: No response body
   /api/v1/order/{id}/payment_status:
     get:
       operationId: getOrderPaymentStatus
@@ -30363,7 +30390,7 @@ components:
         * `SEASONAL` - Seasonal Image
     InvoiceDownloadResponse:
       type: object
-      description: Invoice metadata plus a short-lived signed download URL.
+      description: Invoice metadata plus an absolute URL to the streaming endpoint.
       properties:
         invoiceNumber:
           type: string
@@ -30380,13 +30407,14 @@ components:
           type: string
           nullable: true
           description: |-
-            Return a signed, short-lived URL for the PDF.
+            Absolute URL to ``OrderViewSet.invoice_download``.
 
-            On S3 backends django-storages already signs the URL when
-            ``default_acl='private'`` and ``AWS_QUERYSTRING_AUTH=True`` —
-            otherwise the storage backend's ``.url()`` returns the relative
-            path which the Nuxt layer can still fetch through its own
-            authenticated proxy.
+            Routes every client click through Django so the same
+            ``IsOwnerOrAdmin`` check applies to the bytes as to the
+            metadata — avoids the pre-existing leak where
+            ``document_file.url`` returned either an unsigned S3 URL
+            (403s without IAM) or a broken ``/media/...`` path (not
+            served in dev).
           readOnly: true
         subtotal:
           type: string

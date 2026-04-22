@@ -376,6 +376,13 @@ def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
         invoice = existing
         invoice_number = existing.invoice_number
         issue_date = existing.issue_date
+        # Delete the stale PDF so the regenerated one lands at the
+        # same storage key. Django's default ``get_available_name``
+        # appends a suffix to avoid overwrites, which would leave
+        # the pre-MARK PDF as an orphan (plus cost an extra S3
+        # object per regeneration in prod).
+        if invoice.document_file:
+            invoice.document_file.delete(save=False)
     else:
         issue_date = timezone.localdate()
         invoice_number = InvoiceCounter.allocate(issue_date.year)

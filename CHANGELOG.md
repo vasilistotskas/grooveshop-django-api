@@ -3,6 +3,130 @@
 
 
 
+## v1.108.1 (2026-04-22)
+
+### Bug fixes
+
+* fix(invoicing): share mediafiles_private across containers + drop orphan PDFs
+
+Two dev-parity fixes surfaced while verifying the myDATA chain end-to-
+end with real AADE dev:
+
+1. **``mediafiles_private`` now a shared named volume** across backend
+   + celery_worker + celery_beat. Without it the worker regenerated
+   the post-MARK PDF into its own container-local FS while the
+   backend kept serving the pre-myDATA version — fine in prod
+   (S3 is shared) but a broken experience in dev. Named volume
+   mirrors the S3 behaviour.
+
+2. **Force-regen deletes the stale PDF before writing the new one.**
+   Django's ``FileSystemStorage.get_available_name`` (and ``S3Boto3Storage``
+   with ``file_overwrite=False``) appends a random suffix when a file
+   with the same name exists. That left every regeneration with an
+   orphan ``invoice_number.pdf`` + the real ``invoice_number_<hash>.pdf``
+   the DB pointed at — accumulating junk and costing an extra S3
+   object per force=True call. Now ``generate_invoice`` deletes the
+   old ``document_file`` before saving; the regenerated PDF lands
+   at the same storage key every time.
+
+Verified end-to-end: after this change, chain run #11 produced a
+single ``INV-2026-000011.pdf`` (34kB) with MARK 400001961694800 +
+AADE QR embedded; no orphan on disk.
+
+Full suite 267/267.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`3e7a11d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3e7a11d715d1847464d07097530618ba73330300))
+
+* fix(mydata): AADE dev roundtrip now succeeds end-to-end
+
+Integration tests passed locally but the real AADE dev sandbox
+rejected every submission. Live roundtrip revealed six bugs the
+authoritative PDF didn't flag clearly. All fixed and pinned with
+regression tests; a real invoice now posts successfully (MARK
+400001961694181 returned on the final smoke run).
+
+What broke and how it's fixed:
+
+1. **Wrong payment codes in types.py** — every submission sent the
+   wrong ``paymentMethodDetails.type``. AADE v1.0.10 annex 8.12
+   numbers: 1=domestic bank, 2=foreign bank, 3=cash, 4=cheque,
+   5=on credit, 6=web banking, 7=POS / e-POS, 8=IRIS. My constants
+   had 3=web_banking, 4=POS, 7=cash (shifted by one). Fixed.
+
+2. **Wrong XSD element order** — thought ``paymentMethods`` had to
+   come BEFORE ``invoiceHeader`` (misreading the PDF's field-list
+   table). AADE's live error response is the only authoritative
+   source: ``issuer, counterpart, invoiceHeader, paymentMethods,
+   invoiceDetails, taxesTotals, invoiceSummary``. Fixed.
+
+3. **Missing AADE default namespace** — without
+   ``xmlns="http://www.aade.gr/myDATA/invoice/v1.0"`` on the root,
+   AADE returns error 101 for every element ("Could not find
+   schema information"). Added.
+
+4. **Classification children in wrong namespace** — the
+   ``<incomeClassification>`` outer element stays in the invoice
+   namespace but its children (``classificationType``,
+   ``classificationCategory``, ``amount``) must sit under
+   ``https://www.aade.gr/myDATA/incomeClassificaton/v1.0`` (yes,
+   AADE's URI has a typo: "Classificaton" missing an ``i`` — keep it).
+   Added _emit_income_classification helper that does both.
+
+5. **Wrong classification pair for 11.1** — ``E3_561_001`` +
+   ``category1_1`` is for B2B wholesale, not retail. AADE error
+   313 ("forbidden for invoiceType Item11_1"). Correct pair for
+   retail is ``E3_561_003`` + ``category1_3`` (Λιανικές — Ιδιωτική
+   Πελατεία). Fixed.
+
+6. **Strict VAT validation** — unknown rates used to silently
+   fall through to vatCategory=7 and trigger AADE error 217
+   downstream. Now raises ValueError in the builder; the service
+   layer catches it and persists a readable error code so ops
+   sees "Unsupported VAT rate 10.0%" in admin instead of a
+   misleading AADE error.
+
+Also closed out from the agent review:
+
+- **MyDataDuplicateError retry loop**: AADE error 228 was in the
+  same retry branch as transport errors → 5 wasted round-trips
+  returning 228 every time. Now treated as terminal (logs loud,
+  chains email, flags for manual reconciliation via
+  RequestTransmittedDocs when Tier A.5 lands).
+- **Empty ResponseDoc crash**: parser.first() raised IndexError
+  on empty docs (rare AADE gateway fault) bypassing all error
+  handling. Now returns a synthetic TechnicalError row.
+- **XSD validation error uncaught**: XMLSchemaValidationError from
+  the optional validator bypassed MyDataError taxonomy. Now wrapped
+  and converted to MyDataValidationError so the invoice ends up
+  REJECTED in admin, not zombied in SUBMITTED.
+- **Summary/line rounding drift**: summary used the bucket-rounded
+  invoice.subtotal/total_vat while lines were rounded independently
+  — multi-item mixed-VAT orders hit AADE error 203/207-210. Now
+  summary derives from the rounded line values accumulated during
+  emit.
+- **Shipping + payment_method_fee missing from XML**: caused
+  paymentMethods.amount != totalGrossValue. Now emitted as extra
+  invoiceDetails rows (VAT 24% — Greek standard for domestic
+  shipping/fees; Tier B extends per export / island overrides).
+
+New / updated tests (~10 regression tests total):
+- payment codes: type=7 for card, type=3 for COD (was the inverse)
+- element order: invoiceHeader precedes paymentMethods
+- AADE namespace present on root
+- incomeClassification present on every detail + aggregated summary
+- classification children in the separate AADE namespace
+- summary == rounded line sum
+- unknown VAT rate raises ValueError
+- 0% VAT emits vatExemptionCategory
+- shipping + fee become detail lines so paymentMethods.amount
+  matches totalGrossValue
+- duplicate-uid error terminates immediately (not retried 5x)
+- empty ResponseDoc returns synthetic error row (no IndexError)
+
+Full suite 267/267 green.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`03c9f70`](https://github.com/vasilistotskas/grooveshop-django-api/commit/03c9f705d4f8ed5955d961de053edcd8be2d8089))
+
 ## v1.108.0 (2026-04-22)
 
 ### Bug fixes

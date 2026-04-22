@@ -3,6 +3,202 @@
 
 
 
+## v1.108.0 (2026-04-22)
+
+### Bug fixes
+
+* fix(mydata): ty diagnostics on client status narrowing + parser cast
+
+ty's inference is stricter than mypy for two spots the first commit
+slipped past:
+
+client.py — ``requests.Response.status_code`` is typed ``int | None``;
+chained comparisons (200 <= x < 300, x >= 500) don't narrow through
+the Optional, so ty flags them as unsupported operators on None.
+Coerce once to ``status = response.status_code or 0`` and use that
+throughout the method.
+
+parser.py — ``# type: ignore[arg-type]`` on the Literal narrowing
+isn't honoured by ty. Replace with a dedicated ``_coerce_status``
+helper that whitelists via ``get_args(StatusCode)`` and uses
+``typing.cast`` for the final narrowing. More honest + testable
+than the ignore anyway: unknown strings now deterministically fall
+back to ``TechnicalError`` instead of being silently typed-as-correct.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`96daed1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/96daed177617520720bb56425f47c4af1fdcd03f))
+
+* fix: update uv lock ([`045a1ed`](https://github.com/vasilistotskas/grooveshop-django-api/commit/045a1ed30feb401f05d881e61d168ed08d0f5ab0))
+
+### Features
+
+* feat(mydata): task wiring + admin actions + PDF MARK/QR + dashboard alerts
+
+Completes Tier A — Celery chain submits invoices to AADE on order
+completion, customer receives a PDF carrying the legal MARK + AADE-
+returned QR code, admin can submit/cancel manually, dashboard flags
+misconfiguration and rejections. Still feature-flagged via
+MYDATA_ENABLED — flip it on after sandbox smoke test.
+
+Task chain (order/tasks.py):
+- send_invoice_to_mydata: new task. Runs the service-layer submit,
+  classifies exceptions (Transport/Duplicate → retry, Validation/
+  Auth → terminal), on success regenerates the PDF with force=True
+  (so the customer's PDF embeds the MARK + AADE qr_url), then chains
+  send_invoice_email. On terminal failure still chains the email so
+  the customer isn't left empty-handed while ops reconciles.
+- cancel_mydata_invoice: new task. Routes through service.cancel_invoice;
+  retries on transport, gives up terminal, logs OrderHistory on success.
+- generate_order_invoice now routes to send_invoice_to_mydata when
+  MyDataConfig.is_ready() and auto_submit is on; otherwise retains
+  the original direct-to-email path.
+
+PDF (order/invoicing.py + template):
+- _build_context now prefers invoice.mydata_qr_url over the
+  order-tracking URL — the QR points at AADE's verification portal
+  once the MARK is assigned (the legally-compliant scan target).
+- Template renders a MARK line in the header meta when present. "MARK"
+  translated to Μ.ΑΡ.Κ (el), kept as "MARK" (de).
+
+Admin:
+- InvoiceAdmin: mydata_status_badge column (colour-coded per state
+  with the MARK number inlined when present), mydata_status in
+  list_filter, mydata_mark/mydata_uid in search_fields, new "myDATA
+  (AADE)" fieldset grouping the 13 integration fields as read-only.
+- OrderAdmin: two new detail actions — "Send invoice to myDATA"
+  (primary, cloud_upload icon) and "Cancel invoice in myDATA" (danger,
+  cancel icon). Both dispatch the Celery tasks fire-and-forget with
+  clear success / warning messages surfaced via the admin messages
+  framework.
+
+Dashboard banners (admin/dashboard.py + index.html):
+- _check_mydata_state: fresh (un-cached) query of MYDATA_ENABLED +
+  credentials + rejections in the last 7 days.
+- Template renders three conditional banners: red when enabled but
+  credentials missing, amber when recent rejections exist (deep-links
+  to the filtered Invoice changelist), blue info when pointing at the
+  dev sandbox. Fresh per page load — fixing the setting is visible
+  on the next refresh.
+
+Tests (9 new): test_mydata_submission.py covers the chain decision
+(enabled vs disabled), success path (MARK + qr_url persisted, email
+chained, PDF re-rendered with MARK), validation error path (REJECTED
+state + email still sent with pre-transmission PDF), transport retry
+fallback (max retries exhausted → fall back to email), cancellation
+persists cancellation_mark, no-MARK cancellation skip. Full invoice
+test suite remains green (256/256).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`d41b067`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d41b0678008f80bea4526e85594806491e309bc9))
+
+* feat(mydata): foundation — models + builder + client + service (Tier A scaffold)
+
+Scope: Greek IAPR / AADE myDATA integration for B2C retail sales
+(invoiceType 11.1). Feature-flagged off — toggle MYDATA_ENABLED in
+Settings admin after sandbox validation. Full submission + cancellation
+flow lands end-to-end; Celery task wiring + admin UI + PDF template
+changes follow in a separate commit.
+
+New package order/mydata/:
+- config.py: MyDataConfig snapshot resolved from extra_settings. Hard-
+  coded dev/prod base URLs (AADE publishes them) so a typo in the env
+  setting can't misroute prod traffic.
+- uid.py: deterministic SHA-1(issuer_vat, issueDate, branch, invoiceType,
+  series, aa, deviationType) over ISO-8859-7 per AADE v1.0.10 §5. This
+  is the idempotency anchor — retries MUST hash identically so AADE
+  dedupes via error 228.
+- builder.py: Invoice → InvoicesDoc XML. 2dp ROUND_HALF_UP money,
+  sum-then-round line totals (avoids errors 203/207–210), Greek text
+  emitted as native UTF-8 (double-escape → schema rejection).
+- client.py: requests.Session wrapper; classifies 401/403 as
+  MyDataAuthError (not retryable), 429/5xx as MyDataTransportError
+  (retryable). No retry policy here — that's the service/Celery layer.
+- parser.py: ResponseDoc → typed ResponseRow. Namespace-tolerant (AADE
+  ships both prefixed and bare); handles partial-success batches.
+- validator.py: OPTIONAL XSD pre-validation. No-op until ops drops the
+  official AADE XSDs into xsd/ (they're behind portal auth — we can't
+  ship them). AADE validates server-side too, so this is fail-fast
+  not correctness.
+- service.py: public submit_invoice / cancel_invoice. select_for_update
+  persists UID + identity fields BEFORE the HTTP call so transport
+  failures leave recoverable state. Error 228 → MyDataDuplicateError
+  (Tier A.5 will recover via RequestTransmittedDocs); all other
+  ValidationError/XMLSyntaxError → REJECTED state + typed exception.
+- exceptions.py: 4-class taxonomy driving retry policy (Transport vs
+  Auth vs Validation vs Duplicate).
+- types.py: AADE enum constants (invoiceType, paymentMethodDetails.type,
+  vatCategory, known errorCodes) — no IntEnum wrapping since AADE
+  ships plain ints/strings in the XSD.
+
+Invoice model additions (migration 0032):
+  mydata_status, mydata_invoice_type, mydata_series, mydata_aa,
+  mydata_uid, mydata_mark (unique, bigint), mydata_authentication_code,
+  mydata_qr_url, mydata_cancellation_mark, mydata_error_code,
+  mydata_error_message, mydata_submitted_at, mydata_confirmed_at.
+  All nullable/blank-default so pre-myDATA invoices migrate cleanly
+  (the "leave existing invoices alone" policy). BTreeIndex on
+  mydata_status for admin filters.
+
+Settings (EXTRA_SETTINGS_DEFAULTS): MYDATA_ENABLED, MYDATA_AUTO_SUBMIT,
+MYDATA_ENVIRONMENT (dev/prod), MYDATA_USER_ID, MYDATA_SUBSCRIPTION_KEY,
+MYDATA_INVOICE_SERIES_PREFIX (default 'GRVP'), MYDATA_ISSUER_BRANCH
+(default 0), MYDATA_REQUEST_TIMEOUT_SECONDS.
+
+Dependencies: requests (already transitive, now explicit),
+xmlschema==4.2.0 (only for the optional XSD validator).
+
+Tests (19 new):
+- test_uid.py (6): determinism, distinct-inputs-distinct-outputs, ISO-
+  8859-7 encoding pin, B1/B2 receiver-VAT inclusion.
+- test_parser.py (5): success, ValidationError, namespaced response,
+  partial-success batch, cancellation mark.
+- test_builder.py (8): InvoicesDoc root, issuer fields, header
+  (invoiceType=11.1, series={prefix}-{year}, aa as plain int),
+  line-sum == summary (errors 203/207–210), payment amount ==
+  totalGrossValue, uid deterministic.
+
+Authoritative source: myDATA API Documentation v1.0.10 (AADE
+pre-official ERP, Nov 2024) — dropped in docs/ by the user.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`76a885d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/76a885d0ac8b442996693dc53d233375680fa75e))
+
+* feat(invoicing): email PDF on completion + seller-unconfigured banner + misc polish
+
+Email:
+- New send_invoice_email task chained from generate_order_invoice once
+  the PDF is ready. Attaches the rendered PDF (streamed from storage
+  via storage.open('rb') — works on S3 and FS), renders under the
+  buyer's language, and is idempotent via INVOICE_EMAIL_SENT_FLAG in
+  Order.metadata (same pattern as the existing confirmation-email
+  reservation). Templates at emails/order/invoice_issued.{txt,html}.
+
+Admin banner:
+- dashboard_callback now computes seller_config_warnings fresh on
+  every load (not cached — fixing the setting should be reflected
+  immediately) and flags empty INVOICE_SELLER_NAME / VAT_ID /
+  TAX_OFFICE. The index.html template renders a red alert at the
+  top with a "Fix in Settings" link that pre-filters the settings
+  admin to the INVOICE_SELLER_ prefix. Non-critical fields (address,
+  phone) don't trigger the warning to avoid nagging.
+
+generate_invoice force=True preserves the original invoice_number
+and issue_date — allocating a fresh counter slot on regeneration
+was leaving gaps in the sequential register (Greek tax law forbids
+gaps). Admin "Regenerate invoice" action message and variant updated
+to reflect the new no-gap behaviour.
+
+Doc drift:
+- serializers_config['invoice'] description no longer says "short-lived
+  signed URL" (it's now an absolute URL to a Django-gated endpoint).
+- Invoice.document_file.help_text and order.invoicing module docstring
+  describe the actual flow (Django-gated streaming, storage URLs as
+  defence-in-depth).
+
+Tests: +3 new (send_invoice_email attaches PDF, idempotency flag
+prevents double-send, missing PDF skips & releases flag), existing
+force-regeneration test tightened to assert invoice_number + issue_date
+preservation and unchanged counter. Full invoice suite 52/52.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`92a61db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/92a61db27ee8f73e744f9951b3336ba2b971b7ea))
+
 ## v1.107.0 (2026-04-22)
 
 ### Features

@@ -233,9 +233,14 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         self.assertFalse(result)
         mock_logger.assert_called_once()
 
-    def test_generate_order_invoice_not_implemented(self):
-        with self.assertRaises(NotImplementedError):
-            generate_order_invoice(self.order.id)
+    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
+    def test_generate_order_invoice_success(self, mock_render_pdf):
+        result = generate_order_invoice(self.order.id)
+
+        self.assertTrue(result)
+        mock_render_pdf.assert_called_once()
+        self.order.refresh_from_db()
+        self.assertTrue(hasattr(self.order, "invoice"))
 
     @patch("order.tasks.logger.error")
     def test_generate_order_invoice_order_not_found(self, mock_logger):
@@ -441,15 +446,15 @@ class OrderTasksIntegrationTestCase(DjangoTestCase):
 
         self.assertEqual(mock_email_instance.send.call_count, 3)
 
-    def test_database_operations_integrity(self):
+    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
+    def test_database_operations_integrity(self, mock_render_pdf):
         self.assertTrue(Order.objects.filter(id=self.order.id).exists())
 
         original_status = self.order.status
 
-        # generate_order_invoice raises NotImplementedError (stub)
-        with self.assertRaises(NotImplementedError):
-            generate_order_invoice(self.order.id)
+        result = generate_order_invoice(self.order.id)
+        self.assertTrue(result)
 
-        # Order status should not be modified by the failed invoice task
+        # Invoice generation must not mutate the order's status.
         self.order.refresh_from_db()
         self.assertEqual(self.order.status, original_status)

@@ -69,11 +69,6 @@ INVOICE_SELLER_SETTING_KEYS = {
 }
 
 
-class InvoiceAlreadyExists(Exception):
-    """Raised when :func:`generate_invoice` is called with ``force=False``
-    against an order that already has an :class:`Invoice` row."""
-
-
 def _seller_snapshot() -> dict[str, str]:
     """Resolve seller info from ``extra_settings`` with dev-friendly defaults.
 
@@ -347,12 +342,9 @@ def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
 
     Returns the existing Invoice if one exists unless ``force=True``.
     Never fabricates sequential numbers — always routes through
-    :meth:`InvoiceCounter.allocate`.
-
-    Raises :class:`InvoiceAlreadyExists` only when ``force=False`` and
-    an invoice is already attached and the caller opted into strict
-    mode (see ``tasks.generate_order_invoice`` for how the retryable
-    Celery task uses this).
+    :meth:`InvoiceCounter.allocate`. With ``force=True`` a new counter
+    slot is consumed and the old ``invoice_number`` is permanently lost
+    — use only for corrective regeneration.
     """
     existing = Invoice.objects.filter(order_id=order.id).first()
     if existing and not force:

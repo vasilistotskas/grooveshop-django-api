@@ -112,3 +112,85 @@ class OrderInvoiceEndpointTestCase(APITestCase):
             response.status_code,
             (status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND),
         )
+
+    @patch(
+        "order.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4\n%...\n%EOF",
+    )
+    def test_download_url_points_at_streaming_endpoint(
+        self, _mock_render
+    ) -> None:
+        """The metadata endpoint must return an absolute URL to the
+        Django-gated streaming action — NOT a raw S3 / filesystem URL.
+        That's the whole point of routing through Django: identical
+        behaviour on both backends + mandatory ownership check."""
+        from order.invoicing import generate_invoice
+
+        order = OrderFactory(user=self.user)
+        generate_invoice(order)
+
+        response = self.client.get(self._url(order.pk))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        download_url = response.data["download_url"]
+        self.assertIsNotNone(download_url)
+        expected_path = reverse(
+            "order-invoice-download", kwargs={"pk": order.pk}
+        )
+        self.assertIn(expected_path, download_url)
+
+
+class OrderInvoiceDownloadEndpointTestCase(APITestCase):
+    """Covers ``OrderViewSet.invoice_download`` — the streaming endpoint
+    backing ``InvoiceDownloadResponseSerializer.download_url``."""
+
+    def setUp(self) -> None:
+        self.user = UserAccountFactory()
+        self.client.force_authenticate(user=self.user)
+
+    def _url(self, order_id: int) -> str:
+        return reverse("order-invoice-download", kwargs={"pk": order_id})
+
+    def test_returns_404_when_no_invoice(self) -> None:
+        order = OrderFactory(user=self.user)
+        response = self.client.get(self._url(order.pk))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_returns_404_when_invoice_row_has_no_pdf(self) -> None:
+        order = OrderFactory(user=self.user)
+        InvoiceCounter.objects.create(year=2026, next_number=1)
+        Invoice.objects.create(
+            order=order,
+            invoice_number="INV-2026-000001",
+        )
+        response = self.client.get(self._url(order.pk))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    @patch(
+        "order.invoicing._render_pdf_bytes",
+        return_value=b"%PDF-1.4\n%FAKE\n%EOF",
+    )
+    def test_streams_pdf_as_attachment(self, _mock_render) -> None:
+        from order.invoicing import generate_invoice
+
+        order = OrderFactory(user=self.user)
+        invoice = generate_invoice(order)
+
+        response = self.client.get(self._url(order.pk))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertIn(
+            f"{invoice.invoice_number}.pdf",
+            response["Content-Disposition"],
+        )
+        # FileResponse streams chunks; assert the body is non-empty and
+        # starts with the PDF magic.
+        body = b"".join(response.streaming_content)
+        self.assertTrue(body.startswith(b"%PDF-"))
+
+    def test_other_user_cannot_download(self) -> None:
+        order = OrderFactory(user=UserAccountFactory())
+        response = self.client.get(self._url(order.pk))
+        self.assertIn(
+            response.status_code,
+            (status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND),
+        )

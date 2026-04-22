@@ -1038,6 +1038,84 @@ EXTRA_SETTINGS_DEFAULTS = [
         "type": "int",
         "value": 100,
     },
+    # Invoice seller info — surfaced on the generated PDF via
+    # ``order.invoicing._seller_snapshot``. Defaults land blank so
+    # a fresh install doesn't silently ship a plausible-but-wrong
+    # legal identity; ops must fill them in via the admin Settings
+    # page before issuing the first invoice in production. Keys are
+    # documented in ``INVOICE_SELLER_SETTING_KEYS``.
+    {
+        "name": "INVOICE_SELLER_NAME",
+        "type": "string",
+        "value": "",
+        "description": "Legal company name shown at the top of the invoice.",
+    },
+    {
+        "name": "INVOICE_SELLER_VAT_ID",
+        "type": "string",
+        "value": "",
+        "description": "Seller tax/VAT identifier (ΑΦΜ in Greece). Required by Greek tax law.",
+    },
+    {
+        "name": "INVOICE_SELLER_TAX_OFFICE",
+        "type": "string",
+        "value": "",
+        "description": "Seller tax office (ΔΟΥ in Greece). Required by Greek tax law.",
+    },
+    {
+        "name": "INVOICE_SELLER_REGISTRATION_NUMBER",
+        "type": "string",
+        "value": "",
+        "description": "Business registry number (Αρ. Γ.Ε.ΜΗ. in Greece).",
+    },
+    {
+        "name": "INVOICE_SELLER_BUSINESS_ACTIVITY",
+        "type": "string",
+        "value": "",
+        "description": "Primary business activity / trade (Επάγγελμα in Greece).",
+    },
+    {
+        "name": "INVOICE_SELLER_ADDRESS_LINE_1",
+        "type": "string",
+        "value": "",
+        "description": "First line of the seller's registered address.",
+    },
+    {
+        "name": "INVOICE_SELLER_ADDRESS_LINE_2",
+        "type": "string",
+        "value": "",
+        "description": "Second line of the seller's registered address (optional).",
+    },
+    {
+        "name": "INVOICE_SELLER_CITY",
+        "type": "string",
+        "value": "",
+        "description": "City of the seller's registered address.",
+    },
+    {
+        "name": "INVOICE_SELLER_POSTAL_CODE",
+        "type": "string",
+        "value": "",
+        "description": "Postal code of the seller's registered address.",
+    },
+    {
+        "name": "INVOICE_SELLER_COUNTRY",
+        "type": "string",
+        "value": "",
+        "description": "Country of the seller's registered address.",
+    },
+    {
+        "name": "INVOICE_SELLER_PHONE",
+        "type": "string",
+        "value": "",
+        "description": "Seller contact phone number (optional).",
+    },
+    {
+        "name": "INVOICE_SELLER_EMAIL",
+        "type": "string",
+        "value": "",
+        "description": "Seller contact email (falls back to INFO_EMAIL).",
+    },
 ]
 
 EMAIL_BACKEND = getenv(

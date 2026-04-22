@@ -5,10 +5,11 @@ import uuid
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from django.http import FileResponse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
-from drf_spectacular.utils import extend_schema_view
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import (
@@ -266,6 +267,7 @@ class OrderViewSet(BaseModelViewSet):
             "my_orders",
             "reorder",
             "invoice",
+            "invoice_download",
         }
         guest_allowed_actions = {
             "retrieve_by_uuid",
@@ -1125,6 +1127,52 @@ class OrderViewSet(BaseModelViewSet):
             invoice, context={"request": request}
         )
         return Response(serializer.data)
+
+    @extend_schema(
+        operation_id="downloadOrderInvoice",
+        tags=["Orders"],
+        summary=_("Download the invoice PDF"),
+        description=_(
+            "Streams the rendered PDF through Django auth. 404 when "
+            "the invoice has not been generated yet. Same ownership "
+            "check as the metadata endpoint — returns a signed S3 "
+            "stream on prod and a filesystem stream in dev without "
+            "exposing the storage URL to the client."
+        ),
+        responses={200: None, 404: None},
+    )
+    @action(detail=True, methods=["GET"], url_path="invoice/download")
+    def invoice_download(self, request, *args, **kwargs):
+        """Stream the invoice PDF through Django auth.
+
+        Why this exists instead of redirecting to ``document_file.url``:
+        - FileSystem backend: ``url()`` returns ``/media/...`` which
+          isn't actually served (private files live under a separate
+          ``mediafiles_private/`` root).
+        - S3 backend: ``AWS_QUERYSTRING_AUTH`` is ``False`` globally
+          for static / public media; ``PrivateMediaStorage`` overrides
+          it locally but even then direct S3 URLs leak the bucket layout.
+        - Streaming through Django keeps the download gated by the
+          same ``IsOwnerOrAdmin`` check as the metadata endpoint, works
+          identically on every backend, and the customer's browser
+          sees a clean ``api.webside.gr`` URL in history.
+
+        Uses ``storage.open('rb')`` rather than ``open(abs_path, 'rb')``
+        so it works on S3 without downloading the file to disk first
+        (django-storages' S3 file object streams chunks).
+        """
+        order = self.get_object()
+        invoice = getattr(order, "invoice", None)
+        if invoice is None or not invoice.has_document():
+            raise NotFound(
+                _("Invoice has not been generated for this order yet.")
+            )
+        return FileResponse(
+            invoice.document_file.open("rb"),
+            content_type="application/pdf",
+            as_attachment=True,
+            filename=f"{invoice.invoice_number}.pdf",
+        )
 
     @action(detail=True, methods=["POST"])
     def reorder(self, request, *args, **kwargs):

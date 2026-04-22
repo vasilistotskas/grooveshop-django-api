@@ -1,20 +1,25 @@
 """Read-only serializer for invoice download metadata.
 
 The invoice PDF itself is stored in private storage; consumers receive
-a short-lived signed URL rather than the file bytes. The serializer
-exposes enough data for the frontend to render a "Download Invoice"
-button (invoice number, issue date, total) without an extra round-trip.
+an absolute URL to a Django-auth-gated streaming endpoint rather than
+a direct storage URL. This keeps the download contract identical on
+S3 and FileSystem and makes the ownership check mandatory at the
+HTTP boundary (no leaky presigned links, no dependence on Nuxt doing
+the auth forwarding). The serializer also exposes the data the
+frontend needs (invoice number, issue date, totals) to render a
+"Download Invoice" button without a second round-trip.
 """
 
 from __future__ import annotations
 
+from django.urls import reverse
 from rest_framework import serializers
 
 from order.models.invoice import Invoice
 
 
 class InvoiceDownloadResponseSerializer(serializers.ModelSerializer):
-    """Invoice metadata plus a short-lived signed download URL."""
+    """Invoice metadata plus an absolute URL to the streaming endpoint."""
 
     download_url = serializers.SerializerMethodField()
     total = serializers.SerializerMethodField()
@@ -36,20 +41,22 @@ class InvoiceDownloadResponseSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_download_url(self, obj: Invoice) -> str | None:
-        """Return a signed, short-lived URL for the PDF.
+        """Absolute URL to ``OrderViewSet.invoice_download``.
 
-        On S3 backends django-storages already signs the URL when
-        ``default_acl='private'`` and ``AWS_QUERYSTRING_AUTH=True`` —
-        otherwise the storage backend's ``.url()`` returns the relative
-        path which the Nuxt layer can still fetch through its own
-        authenticated proxy.
+        Routes every client click through Django so the same
+        ``IsOwnerOrAdmin`` check applies to the bytes as to the
+        metadata — avoids the pre-existing leak where
+        ``document_file.url`` returned either an unsigned S3 URL
+        (403s without IAM) or a broken ``/media/...`` path (not
+        served in dev).
         """
         if not obj.has_document():
             return None
-        try:
-            return obj.document_file.url
-        except Exception:  # noqa: BLE001 — storage backends may vary
-            return None
+        request = self.context.get("request")
+        path = reverse("order-invoice-download", kwargs={"pk": obj.order_id})
+        if request is not None:
+            return request.build_absolute_uri(path)
+        return path
 
     def _money_amount(self, money_field) -> str | None:
         if money_field is None:

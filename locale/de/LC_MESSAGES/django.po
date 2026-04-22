@@ -731,7 +731,7 @@ msgstr ""
 #: .\product\models\category.py:38 .\product\models\product.py:358
 #: .\user\models\subscription.py:68
 msgid "Description"
-msgstr ""
+msgstr "Beschreibung"
 
 #: .\blog\models\category.py:41
 msgid "Blog Category"
@@ -1263,7 +1263,7 @@ msgstr ""
 
 #: .\cart\admin.py:517
 msgid "Qty"
-msgstr ""
+msgstr "Menge"
 
 #: .\cart\admin.py:528 .\order\admin.py:1247 .\pay_way\admin.py:204
 #: .\product\admin.py:1270 .\product\admin.py:1509
@@ -4743,7 +4743,7 @@ msgstr ""
 
 #: .\notification\enum.py:23 .\order\admin.py:540
 msgid "Payment"
-msgstr ""
+msgstr "Zahlung"
 
 #: .\notification\enum.py:27
 msgid "Account"
@@ -7608,7 +7608,7 @@ msgstr ""
 
 #: .\product\models\review.py:27
 msgid "Rate"
-msgstr ""
+msgstr "Satz"
 
 #: .\product\models\review.py:35
 msgid "Comment"
@@ -9308,6 +9308,97 @@ msgstr ""
 #: .\vat\models.py:40
 msgid "Vats"
 msgstr ""
+
+# ── Invoice PDF (core/templates/invoices/invoice.html) ────────────
+# German business-invoice terminology — "USt-IdNr." is the standard
+# VAT number abbreviation; "Finanzamt" maps 1:1 to Greek ΔΟΥ.
+#: .\core\templates\invoices\invoice.html
+msgid "INVOICE"
+msgstr "RECHNUNG"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Issue date"
+msgstr "Ausstellungsdatum"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Order date"
+msgstr "Bestelldatum"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Bill to"
+msgstr "Rechnungsempfänger"
+
+#: .\core\templates\invoices\invoice.html
+msgid "VAT ID"
+msgstr "USt-IdNr."
+
+#: .\core\templates\invoices\invoice.html
+msgid "Tax office"
+msgstr "Finanzamt"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Reg. No."
+msgstr "HR-Nr."
+
+#: .\core\templates\invoices\invoice.html
+msgid "Business activity"
+msgstr "Tätigkeit"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Phone"
+msgstr "Telefon"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Method"
+msgstr "Zahlungsart"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Ref"
+msgstr "Ref."
+
+#: .\core\templates\invoices\invoice.html
+msgid "Unit (gross)"
+msgstr "Einheit (brutto)"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Line total"
+msgstr "Gesamt"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Subtotal (excl. VAT)"
+msgstr "Zwischensumme (ohne MwSt.)"
+
+#: .\core\templates\invoices\invoice.html
+msgid "VAT"
+msgstr "MwSt."
+
+#: .\core\templates\invoices\invoice.html
+msgid "Payment fee"
+msgstr "Zahlungsgebühr"
+
+#: .\core\templates\invoices\invoice.html
+msgid "VAT breakdown"
+msgstr "MwSt.-Aufschlüsselung"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Net"
+msgstr "Netto"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Gross"
+msgstr "Brutto"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Page"
+msgstr "Seite"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Scan to verify"
+msgstr "Zum Überprüfen scannen"
+
+#: .\core\templates\invoices\invoice.html
+msgid "Unnamed product"
+msgstr "Unbenanntes Produkt"
 
 #, fuzzy
 #~| msgid "Order Confirmation"

@@ -59,6 +59,11 @@ urlpatterns = [
         name="order-invoice",
     ),
     path(
+        "order/<int:pk>/invoice/download",
+        OrderViewSet.as_view({"get": "invoice_download"}),
+        name="order-invoice-download",
+    ),
+    path(
         "order/<int:pk>/reorder",
         OrderViewSet.as_view({"post": "reorder"}),
         name="order-reorder",

@@ -3,6 +3,51 @@
 
 
 
+## v1.107.0 (2026-04-22)
+
+### Features
+
+* feat(invoicing): streaming download endpoint + de locale + seller defaults
+
+Customer-facing invoice download was silently broken in both modes:
+- S3 prod: AWS_QUERYSTRING_AUTH=False global meant document_file.url
+  returned unsigned S3 URLs that 403 without IAM.
+- FS dev: url() returned /media/... which isn't served (private files
+  live under mediafiles_private/).
+
+New flow:
+- Added OrderViewSet.invoice_download action (GET
+  /api/v1/order/<id>/invoice/download) that streams the PDF via
+  FileResponse + storage.open('rb'). Works identically on S3 and FS,
+  gated by the same IsOwnerOrAdmin check as the metadata endpoint.
+- InvoiceDownloadResponseSerializer.download_url now builds an
+  absolute URL to that endpoint via request.build_absolute_uri —
+  no raw storage URLs ever reach the client.
+- PrivateMediaStorage sets querystring_auth=True so any future direct-
+  storage consumer gets a presigned URL (defensive, not relied on).
+
+extra_settings:
+- EXTRA_SETTINGS_DEFAULTS gains 12 INVOICE_SELLER_* entries so the
+  rows exist in the Settings admin for ops to fill in. Defaults are
+  empty strings — a fresh install renders an obviously-incomplete
+  invoice rather than one with a plausible-but-wrong legal identity.
+
+German locale:
+- Added 21 invoice-specific msgid/msgstr entries to de/django.po
+  (RECHNUNG, USt-IdNr., Finanzamt, MwSt., etc.) and filled 4
+  pre-existing empty entries (Payment, Description, Qty, Rate).
+  English falls through to msgids, no en changes needed.
+
+Cleanup:
+- Dropped the dead InvoiceAlreadyExists class and its now-false
+  docstring reference in generate_invoice.
+
+Tests: 7 new — download URL points at the streaming endpoint, the
+endpoint serves application/pdf, 404 when no invoice / no PDF, 403
+for other users. Full suite still 13/13 in the invoice modules.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`47f9b0e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/47f9b0e88583c7669b0ff5c2b68347cbd755103b))
+
 ## v1.106.0 (2026-04-22)
 
 ### Features
